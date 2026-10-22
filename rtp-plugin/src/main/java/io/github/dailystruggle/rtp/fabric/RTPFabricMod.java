@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.fabric;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBitStartup;
 import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
@@ -320,6 +321,8 @@ public final class RTPFabricMod implements ModInitializer {
                                     "[RTP] Fabric effects wiring failed: "
                                             + t.getClass().getSimpleName() + ": " + t.getMessage());
                         }
+
+                        RtpBitStartup.schedule();
                     });
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
                     .SERVER_STOPPED.register(server ->

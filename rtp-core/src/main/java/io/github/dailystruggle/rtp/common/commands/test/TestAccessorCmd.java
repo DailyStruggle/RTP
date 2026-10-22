@@ -1,14 +1,23 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -44,6 +53,47 @@ import org.jetbrains.annotations.Nullable;
  */
 public class TestAccessorCmd extends BaseRTPCmdImpl {
 
+  public static final BitCode TEST_ACCESSOR_UNAVAILABLE = RtpBitCodes.TEST.register(
+      3001, "TEST_ACCESSOR_UNAVAILABLE", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Initialize the server accessor before running the test.");
+  public static final BitCode TEST_ACCESSOR_MATERIALS = RtpBitCodes.TEST.register(
+      3002, "TEST_ACCESSOR_MATERIALS", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Provide a non-empty material set containing common materials.");
+  public static final BitCode TEST_ACCESSOR_TAGS = RtpBitCodes.TEST.register(
+      3003, "TEST_ACCESSOR_TAGS", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Return a non-null block tag snapshot.");
+  public static final BitCode TEST_ACCESSOR_SENDER = RtpBitCodes.TEST.register(
+      3004, "TEST_ACCESSOR_SENDER", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Provide a valid console sender and return null for unknown players.");
+  public static final BitCode TEST_ACCESSOR_FORMAT = RtpBitCodes.TEST.register(
+      3005, "TEST_ACCESSOR_FORMAT", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Return non-null formatted and color-stripped messages.");
+  public static final BitCode TEST_ACCESSOR_THREAD = RtpBitCodes.TEST.register(
+      3006, "TEST_ACCESSOR_THREAD", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Return a non-negative scheduler overtime measurement.");
+  public static final BitCode TEST_ACCESSOR_BIOME = RtpBitCodes.TEST.register(
+      3007, "TEST_ACCESSOR_BIOME", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Return a biome sample for an available world.");
+  public static final BitCode TEST_ACCESSOR_MENU = RtpBitCodes.TEST.register(
+      3008, "TEST_ACCESSOR_MENU", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Provide the expected menu permission and locale queries.");
+  public static final BitCode TEST_ACCESSOR_VERSION = RtpBitCodes.TEST.register(
+      3009, "TEST_ACCESSOR_VERSION", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Return complete platform and server version metadata.");
+  public static final BitCode TEST_ACCESSOR_WORLD = RtpBitCodes.TEST.register(
+      3010, "TEST_ACCESSOR_WORLD", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Return consistent world lookups and world metadata.");
+  public static final BitCode TEST_ACCESSOR_MESSAGING = RtpBitCodes.TEST.register(
+      3011, "TEST_ACCESSOR_MESSAGING", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Support the server accessor message and announcement overloads.");
+  public static final BitCode TEST_ACCESSOR_SUBSYSTEM = RtpBitCodes.TEST.register(
+      3012, "TEST_ACCESSOR_SUBSYSTEM", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Provide TPS, plugin directory, scheduler and location generator access.");
+  public static final BitCode TEST_ACCESSOR_WORLD_BORDER = RtpBitCodes.TEST.register(
+      3013, "TEST_ACCESSOR_WORLD_BORDER", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.accessor", "", "Support world-border updates and resets for online players.");
+  public static final BitComponent COMPONENT = registerComponent();
+
   public static class Result {
     public boolean pass = true;
     public boolean materialsValid = false;
@@ -65,6 +115,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
   public TestAccessorCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
   }
 
   @Override
@@ -87,10 +138,48 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    Result r = runProbe(callerId);
-    emit(callerId, r);
+    BitResult result = RtpBit.RUNNER.run(COMPONENT.withCheck(() -> {
+      Result probe = runProbe(callerId);
+      emit(callerId, probe);
+      return toBitReport(probe);
+    }), Runnable::run);
+    if (ProbeBitReport.isJson(parameterValues)) {
+      ProbeBitReport.emitJson(callerId, result);
+    } else {
+      BitTableOutput.emit(callerId, io.github.dailystruggle.bit.BitTable.rows(COMPONENT, result));
+    }
     triggerJacocoDump();
-    return r.pass;
+    return result.report().health() != io.github.dailystruggle.bit.BitHealth.FAILED;
+  }
+
+  private static BitComponent registerComponent() {
+    BitComponent component = new BitComponent("accessor", "test.accessor", BitTier.IBIT,
+        BitSideEffect.MUTATING, 60_000, () -> toBitReport(runProbe(RTPAPI.serverId)));
+    RtpBit.RUNNER.register(component);
+    return component;
+  }
+
+  static BitReport toBitReport(Result result) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("accessor");
+    if ("RTPServerAccessor is null".equals(result.message)) {
+      return report.check(TEST_ACCESSOR_UNAVAILABLE, false, "accessor", result.message).build();
+    }
+
+    String detail = result.details.isEmpty() ? result.message : String.join("; ", result.details);
+    return report
+        .check(TEST_ACCESSOR_MATERIALS, result.materialsValid, "accessor.materials", detail)
+        .check(TEST_ACCESSOR_TAGS, result.tagsValid, "accessor.tags", detail)
+        .check(TEST_ACCESSOR_SENDER, result.senderValid, "accessor.sender", detail)
+        .check(TEST_ACCESSOR_FORMAT, result.formatValid, "accessor.format", detail)
+        .check(TEST_ACCESSOR_THREAD, result.threadValid, "accessor.thread", detail)
+        .check(TEST_ACCESSOR_BIOME, result.biomeValid, "accessor.biome", detail)
+        .check(TEST_ACCESSOR_MENU, result.menuValid, "accessor.menu", detail)
+        .check(TEST_ACCESSOR_VERSION, result.versionValid, "accessor.version", detail)
+        .check(TEST_ACCESSOR_WORLD, result.worldValid, "accessor.world", detail)
+        .check(TEST_ACCESSOR_MESSAGING, result.messagingValid, "accessor.messaging", detail)
+        .check(TEST_ACCESSOR_SUBSYSTEM, result.subsystemValid, "accessor.subsystem", detail)
+        .check(TEST_ACCESSOR_WORLD_BORDER, result.worldBorderValid, "accessor.worldBorder", detail)
+        .build();
   }
 
   /**

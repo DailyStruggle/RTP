@@ -185,4 +185,22 @@ class NeoForgeSchedulerBudgetTest {
         scheduler.drainDue(Long.MAX_VALUE);
         assertEquals(20, ran.get());
     }
+
+    @Test
+    @DisplayName("ADR-087: background fill is held back while the server-wide generation budget is full")
+    void generationBudgetSaturatesBackgroundWork() {
+        NeoForgeScheduler scheduler = new NeoForgeScheduler();
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget budget =
+                io.github.dailystruggle.rtp.common.tools.GenerationBudget.server();
+        java.util.List<Runnable> releases = new ArrayList<>();
+        try {
+            while (!budget.saturated()) releases.add(budget.begin());
+            assertTrue(scheduler.isGenerationSaturated(null));
+            assertTrue(scheduler.isRegionSaturated(null, 0, 0), "promotions see the same signal");
+            releases.remove(0).run();
+            org.junit.jupiter.api.Assertions.assertFalse(scheduler.isGenerationSaturated(null));
+        } finally {
+            releases.forEach(Runnable::run);
+        }
+    }
 }

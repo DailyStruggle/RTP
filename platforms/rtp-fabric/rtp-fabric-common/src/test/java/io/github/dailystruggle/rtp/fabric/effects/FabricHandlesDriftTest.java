@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.fabric.effects;
 
 import com.mojang.authlib.GameProfile;
+import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
 import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
@@ -162,7 +163,7 @@ class FabricHandlesDriftTest {
     }
 
     @Test
-    @DisplayName("startGlide: routes through FabricVersionAdapter#teleport and uses ServerLevel#getServer for watchdog")
+    @DisplayName("startGlide: routes through FabricVersionAdapter#teleport and hands the glide to the keep-alive")
     void startGlideRoutesThroughAdapterAndServerLevel() {
         ServerPlayer player = mock(ServerPlayer.class);
         ServerLevel level = mock(ServerLevel.class);
@@ -175,8 +176,8 @@ class FabricHandlesDriftTest {
         when(player.getZ()).thenReturn(-200.0);
         when(player.getYRot()).thenReturn(90.0f);
         when(player.getXRot()).thenReturn(0.0f);
-        when(player.getUUID()).thenReturn(UUID.randomUUID());
-        when(server.getTickCount()).thenReturn(1000);
+        UUID id = UUID.randomUUID();
+        when(player.getUUID()).thenReturn(id);
 
         AtomicBoolean adapterCalled = new AtomicBoolean(false);
         FabricVersionAdapter adapter = mock(FabricVersionAdapter.class);
@@ -192,9 +193,16 @@ class FabricHandlesDriftTest {
 
         assertTrue(adapterCalled.get(), "FabricVersionAdapter#teleport must be consulted");
         verify(player).startFallFlying();
-        // ServerLevel#getServer() must be queried for the watchdog, NOT player.getServer()
-        verify(level, atLeastOnce()).getServer();
-        verify(server).execute(any(Runnable.class));
+        // RTP-70: without an elytra vanilla clears the flag next tick; the keep-alive re-applies it.
+        assertTrue(GlideKeepAlive.isTracked(id), "glide must be handed to GlideKeepAlive");
+        when(player.isAlive()).thenReturn(true);
+        when(player.isFallFlying()).thenReturn(false);
+        GlideKeepAlive.tick();
+        verify(player, times(2)).startFallFlying();
+        verify(player).resetFallDistance();
+        // No busy re-enqueue watchdog on the server executor any more.
+        verify(server, never()).execute(any(Runnable.class));
+        GlideKeepAlive.clear();
     }
 
     @Test

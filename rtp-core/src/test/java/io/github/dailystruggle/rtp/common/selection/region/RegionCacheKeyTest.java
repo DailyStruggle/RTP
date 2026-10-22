@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -265,5 +266,41 @@ public class RegionCacheKeyTest {
         assertNotEquals(base, withSlope);
         vert.set(GenericVerticalAdjustorKeys.slopeRadius, 4);
         assertNotEquals(withSlope, currentKey());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: unset maxHillAngle keeps the cache key; setting it changes it (ADR-120)")
+    void maxHillAngle_changesCacheKeyOnlyWhenSet() {
+        String base = currentKey();
+        assertEquals(-1.0, vert.maxHillAngle());
+        assertEquals(base, currentKey(), "reading an absent maxHillAngle must not populate vert data");
+        vert.set(GenericVerticalAdjustorKeys.maxHillAngle, 30);
+        assertEquals(30.0, vert.maxHillAngle());
+        assertNotEquals(base, currentKey());
+        vert.set(GenericVerticalAdjustorKeys.maxHillAngle, 120);
+        assertEquals(AbstractVerticalAdjustor.MAX_HILL_ANGLE, vert.maxHillAngle(), "clamped below 90");
+        vert.set(GenericVerticalAdjustorKeys.maxHillAngle, -5);
+        assertEquals(-1.0, vert.maxHillAngle());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: shipped maxHillAngle \"off\" reads as off and hashes like an absent key (ADR-120)")
+    void maxHillAngle_offMatchesAbsent() {
+        String base = currentKey();
+        for (Object off : new Object[] {"off", "OFF", Boolean.FALSE, "", -1}) {
+            vert.set(GenericVerticalAdjustorKeys.maxHillAngle, off);
+            assertEquals(-1.0, vert.maxHillAngle(), "off value " + off);
+            assertEquals(base, currentKey(), "off value " + off + " must keep the cache key");
+        }
+        vert.set(GenericVerticalAdjustorKeys.maxHillAngle, "45");
+        assertEquals(45.0, vert.maxHillAngle());
+        String fromString = currentKey();
+        assertEquals(fromString, currentKey(), "reading a string angle must not rewrite vert data");
+        vert.set(GenericVerticalAdjustorKeys.maxHillAngle, 45);
+        assertEquals(fromString, currentKey(), "\"45\" and 45 hash alike");
+        vert.set(GenericVerticalAdjustorKeys.maxHillAngle, 60);
+        assertNotEquals(fromString, currentKey());
+        vert.set(GenericVerticalAdjustorKeys.maxHillAngle, "steep");
+        assertEquals(-1.0, vert.maxHillAngle(), "unparsable value turns the check off");
     }
 }

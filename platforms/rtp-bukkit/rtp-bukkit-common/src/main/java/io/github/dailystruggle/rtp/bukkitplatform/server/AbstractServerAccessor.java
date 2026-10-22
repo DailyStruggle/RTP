@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
 import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
@@ -162,10 +163,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public @NotNull io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
+  public @NotNull io.github.dailystruggle.server.api.PlatformFamily getPlatformFamily() {
     // Bukkit/Spigot and every Bukkit-derived fork (Paper, Folia, Purpur, ...) share the
     // org.bukkit API surface, so they all classify as the BUKKIT family.
-    return io.github.dailystruggle.rtp.api.server.PlatformFamily.BUKKIT;
+    return io.github.dailystruggle.server.api.PlatformFamily.BUKKIT;
   }
 
   private boolean isPaper() {
@@ -276,6 +277,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable RTPPlayer getPlayer(UUID uuid) {
+    // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return null;
     return wrapPlayer(player);
@@ -283,6 +287,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable RTPPlayer getPlayer(String name) {
+    RTPPlayer mock = MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(name);
     if (player == null) return null;
     return wrapPlayer(player);
@@ -296,6 +302,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public @NotNull RTPCommandSender getSender(UUID uuid) {
     if (uuid.equals(RTPAPI.serverId)) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) {
       OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
@@ -466,6 +474,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public @NotNull Set<String> getOnlinePlayerNames() {
     Set<String> names = new HashSet<>();
     for (Player player : Bukkit.getOnlinePlayers()) {
+      if (MockPlayerRegistry.isMock(player.getUniqueId())) continue;
       names.add(player.getName());
     }
     return names;
@@ -902,7 +911,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (players.isEmpty()) return Collections.emptyList();
       java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> list = new java.util.ArrayList<>(players.size());
       for (Player p : players) {
-        if (p == null) continue;
+        if (p == null || MockPlayerRegistry.isMock(p.getUniqueId())) continue;
         io.github.dailystruggle.rtp.api.entity.RTPPlayer rp = getPlayer(p.getUniqueId());
         if (rp != null) list.add(rp);
       }

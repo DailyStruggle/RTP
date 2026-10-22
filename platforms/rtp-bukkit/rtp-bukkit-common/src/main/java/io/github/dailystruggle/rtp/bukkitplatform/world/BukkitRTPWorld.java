@@ -27,6 +27,21 @@ import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
 
 public class BukkitRTPWorld extends RTPWorld<World> {
+  /** Server-wide count of live loads the chunk system is still working on (see GenerationBudget). */
+  private static final io.github.dailystruggle.rtp.common.tools.GenerationBudget GENERATION_BUDGET =
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.server();
+
+  static {
+    io.github.dailystruggle.rtp.common.tools.GenerationBudget.configureServerCap(() -> {
+      try {
+        return io.github.dailystruggle.rtp.common.tools.GenerationBudget.capFor(
+            org.bukkit.Bukkit.getBukkitVersion());
+      } catch (Throwable t) {
+        return io.github.dailystruggle.rtp.common.tools.GenerationBudget.VANILLA_CAP;
+      }
+    });
+  }
+
   private static final AtomicBoolean biomeException = new AtomicBoolean(false);
   private static Function<Location, String> getBiome =
       location -> {
@@ -194,7 +209,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-    return resolveChunkKey(cx, cz, true);
+    return resolveChunkKey(cx, cz, true,
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.currentReservation());
   }
 
   /**
@@ -203,10 +219,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    */
   @Override
   public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
-    return resolveChunkKey(cx, cz, false);
+    return resolveChunkKey(cx, cz, false, null);
   }
 
-  private CompletableFuture<Long> resolveChunkKey(int cx, int cz, boolean allowLive) {
+  private CompletableFuture<Long> resolveChunkKey(
+      int cx, int cz, boolean allowLive,
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
     // ADR-016 - Anvil read-only data source (no longer a gate).
@@ -258,12 +276,14 @@ public class BukkitRTPWorld extends RTPWorld<World> {
               return CompletableFuture.completedFuture(key);
             }
             // No view available (UNKNOWN) → live load is authoritative.
-            return allowLive ? loadChunkFuture(cx, cz, key) : CompletableFuture.completedFuture(null);
+            return allowLive
+                ? loadChunkFuture(cx, cz, key, generationSlot)
+                : CompletableFuture.completedFuture(null);
           });
     }
 
     if (!allowLive && !isResident(cx, cz)) return CompletableFuture.completedFuture(null);
-    return loadChunkFuture(cx, cz, key);
+    return loadChunkFuture(cx, cz, key, generationSlot);
   }
 
   private boolean isResident(int cx, int cz) {
@@ -283,7 +303,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    */
   public CompletableFuture<Long> loadLiveChunk(int cx, int cz) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
-    return loadChunkFuture(cx, cz, key);
+    return loadChunkFuture(cx, cz, key,
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.currentReservation());
   }
 
   /**
@@ -592,7 +613,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * {@link World#getChunkAt(int, int)} fallback exists (S-005). Each edge is logged at
    * {@code WARNING}; the API-absent edge once per world (REQ-RTP-S-004).
    */
-  private CompletableFuture<Long> loadChunkFuture(int cx, int cz, long key) {
+  private CompletableFuture<Long> loadChunkFuture(
+      int cx, int cz, long key,
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
     // Count only actual live chunk-load attempts dispatched to the chunk system.
     // Probe-only paths (ADR-016 anvil pre-filter) and probe-cache hits MUST NOT bump
     // this counter - see the Javadoc on RTPWorld.totalChunkLoads. This avoids the
@@ -617,7 +640,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // fork implements true async generation (Paper/Folia). On vanilla Spigot the
     // scheduling still resolves on the main thread internally, but the caller is
     // not blocked - a strict improvement over the previous runTask+getChunkAt path.
-    return profileChunkLoad(requestChunkAsync(cx, cz, key), chunkLoadStartNanos, chunkGenerated);
+    CompletableFuture<Long> load = requestChunkAsync(cx, cz, key, generationSlot);
+    if (load == null && generationSlot != null) generationSlot.close();
+    return profileChunkLoad(load, chunkLoadStartNanos, chunkGenerated);
   }
 
   /**
@@ -625,12 +650,19 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * with {@code key} on success; every failure edge logs and completes with {@code null}.
    * Never completes exceptionally; never calls {@link World#getChunkAt(int, int)} (S-005).
    */
-  private CompletableFuture<Long> requestChunkAsync(int cx, int cz, long key) {
+  private CompletableFuture<Long> requestChunkAsync(
+      int cx, int cz, long key,
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
     if (CHUNK_AT_ASYNC_FUTURE != null) {
+      // Counted until the server's future settles; Spigot's scheduler holds background fill
+      // back at the cap (GenerationBudget). Paper/Folia count too but never report saturation.
+      final Runnable releaseGeneration = GENERATION_BUDGET.begin(generationSlot);
       try {
         @SuppressWarnings("unchecked")
         CompletableFuture<org.bukkit.Chunk> asyncFuture =
             (CompletableFuture<org.bukkit.Chunk>) CHUNK_AT_ASYNC_FUTURE.invoke(world, cx, cz);
+        if (asyncFuture == null) releaseGeneration.run();
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.releaseOn(asyncFuture, releaseGeneration);
         if (asyncFuture != null) {
           CompletableFuture<Long> out = new CompletableFuture<>();
           asyncFuture.whenComplete((chunk, ex) -> {
@@ -658,6 +690,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
             "[RTP] Reflective async chunk API returned null for world=" + name + " chunk=("
                 + cx + "," + cz + ") - candidate rejected (no synchronous fallback, S-005)");
       } catch (Throwable t) {
+        releaseGeneration.run();
         // Test doubles (e.g. MockBukkit) or old forks may not honor the async API.
         RTP.log(java.util.logging.Level.WARNING,
             "[RTP] Reflective async chunk API failed for world=" + name + " chunk=(" + cx
@@ -665,10 +698,13 @@ public class BukkitRTPWorld extends RTPWorld<World> {
                 + " - candidate rejected (no synchronous fallback, S-005)");
       }
     } else if (asyncApiAbsentWarned.compareAndSet(false, true)) {
+      if (generationSlot != null) generationSlot.close();
       RTP.log(java.util.logging.Level.WARNING,
           "[RTP] World#getChunkAtAsync(int,int) CompletableFuture API is unavailable on this"
               + " server; unloaded chunks in world=" + name + " are rejected instead of loaded"
               + " synchronously (S-005). Pre-generate the world or use Paper/Folia.");
+    } else if (generationSlot != null) {
+      generationSlot.close();
     }
     return CompletableFuture.completedFuture(null);
   }
@@ -908,7 +944,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // Ticket only once resident; failures keep nothing and are logged (S-004). API-absent edge
     // is already logged once per world by requestChunkAsync.
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
-    requestChunkAsync(cx, cz, key).whenComplete((k, ex) -> {
+    requestChunkAsync(cx, cz, key, null).whenComplete((k, ex) -> {
       if (ex != null || k == null) {
         if (CHUNK_AT_ASYNC_FUTURE != null) {
           RTP.log(java.util.logging.Level.WARNING,

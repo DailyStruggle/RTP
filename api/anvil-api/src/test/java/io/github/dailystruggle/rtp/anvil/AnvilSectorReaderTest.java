@@ -355,6 +355,78 @@ class AnvilSectorReaderTest {
         "a rejected group is not left open for later callers");
   }
 
+  @Test
+  @DisplayName("REQ-RTP-F-015 / ADR-120: square jobs decode only the same-file chunks they ask for, once per drain")
+  void squareJobs_decodeOnDemand(@TempDir Path world) throws Exception {
+    Path regionDir = world.resolve("region");
+    Files.createDirectories(regionDir);
+    int[] slots = new int[16];
+    int[] offsets = new int[16];
+    byte[][] payloads = new byte[16][];
+    for (int i = 0; i < 16; i++) {
+      int x = i % 4, z = i / 4;
+      slots[i] = slot(x, z);
+      offsets[i] = 2 + i;
+      payloads[i] = payload(root(x, z, (x == 3) ? "minecraft:sand" : "minecraft:stone"));
+    }
+    Files.write(regionDir.resolve("r.0.0.mca"), layout(18, slots, offsets, payloads));
+    java.util.ArrayDeque<Runnable> pool = new java.util.ArrayDeque<>();
+    ColumnProbeCoalescer c = new ColumnProbeCoalescer(pool::add);
+
+    ChunkSquare[] escaped = new ChunkSquare[1];
+    java.util.concurrent.CompletableFuture<ColumnProbe> probe = c.submit(world, "", 1, 1, MIN_Y, MAX_Y);
+    java.util.concurrent.CompletableFuture<String> a = c.submitSquare(world, "", 2, 2, MIN_Y, MAX_Y, sq -> {
+      escaped[0] = sq;
+      return sq.chunk(1, 0).blockAt(0) + "," + sq.chunk(1, 1).blockAt(0) + "," + sq.chunk(2, 0);
+    });
+    java.util.concurrent.CompletableFuture<String> b = c.submitSquare(world, "", 1, 1, MIN_Y, MAX_Y,
+        sq -> sq.chunk(2, 2).blockAt(0) + "," + sq.chunk(-2, 0) + "," + sq.chunk(0, 3) + "," + sq.chunk(2, 0).blockAt(0)
+            + "," + sq.chunk(2, 2).blockAt(0));
+    assertEquals(1, pool.size(), "probes and square jobs share one drain per file");
+    assertEquals(0L, c.squareDecodes(), "nothing decoded before the drain");
+    pool.poll().run();
+
+    assertEquals("SAND,SAND,null", a.get(), "(3,2), (3,3); (4,2) not generated");
+    assertEquals("SAND,null,null,SAND,SAND", b.get(), "(3,3); another file and |d| > 2 never read; (3,1)");
+    assertEquals(4L, c.squareDecodes(), "(3,2), (3,3), (4,2), (3,1): (3,3) shared, nothing else decoded");
+    assertEquals(2L, c.squareJobs());
+    assertEquals("minecraft:stone", probe.get().blockAt(0), "probe in the same drain unaffected");
+    assertNull(escaped[0].chunk(1, 0), "a square is unreadable once its job returned");
+
+    java.util.concurrent.CompletableFuture<Object> failing = c.submitSquare(world, "", 0, 0, MIN_Y, MAX_Y, sq -> {
+      throw new IllegalStateException("job bug");
+    });
+    java.util.concurrent.CompletableFuture<Object> missing = c.submitSquare(world, "", 40, 0, MIN_Y, MAX_Y, sq -> "ran");
+    while (!pool.isEmpty()) pool.poll().run();
+    assertTrue(failing.isCompletedExceptionally(), "S-004: a failing job fails its own future");
+    assertNull(missing.get(), "missing region file: job not run");
+  }
+
+  @Test
+  @DisplayName("ADR-120: the terrain probe answers blocks like the column probe inside its window, nothing else")
+  void terrainProbe_matchesColumnProbeInWindow(@TempDir Path world) throws Exception {
+    byte[] region = layout(4, new int[] {slot(0, 0)}, new int[] {2},
+        new byte[][] {payload(root(0, 0, "minecraft:stone"))});
+    ColumnProbe full = AnvilReader.readColumnProbe(region, region.length, 0, 0, MIN_Y, MAX_Y);
+    ColumnProbe lean = AnvilReader.readTerrainProbe(region, region.length, 0, 0, MIN_Y, MAX_Y);
+    assertNotNull(lean);
+    for (int y = MIN_Y; y <= MAX_Y; y++) {
+      assertEquals(full.blockAt(3, 5, y), lean.blockAt(3, 5, y), "y=" + y);
+    }
+    assertNull(lean.biomeAt(0), "biomes are not decoded");
+    assertEquals(Integer.MIN_VALUE, lean.heightmapTopY(), "heightmaps are not decoded");
+    assertNull(AnvilReader.readTerrainProbe(region, region.length, 0, 0, 32, 47),
+        "no section overlaps the window: unreadable, never air");
+    assertNull(AnvilReader.readTerrainProbe(region, region.length, 1, 0, MIN_Y, MAX_Y), "absent chunk");
+
+    Path regionDir = world.resolve("region");
+    Files.createDirectories(regionDir);
+    Files.write(regionDir.resolve("r.0.0.mca"), region);
+    try (AnvilSectorReader.Session s = AnvilSectorReader.openSession(regionDir.resolve("r.0.0.mca"))) {
+      assertEquals("minecraft:stone", s.readTerrainProbe(0, 0, MIN_Y, MAX_Y).blockAt(0));
+    }
+  }
+
   // ---------------------------------------------------------------------------- fixtures
 
   private static int slot(int lx, int lz) {

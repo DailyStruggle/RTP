@@ -301,21 +301,31 @@ Displays the current runtime state of the plugin: loaded worlds, permanent regio
 
 Operator-facing self-test commands that exercise the teleport pipeline, queue, safety checks, verifiers, and scheduler against the live server.
 
-**Required permission:** `rtp.test`
+**Required permission:** `rtp.test`; named `HEAVY` probes also require `rtp.test.mutating`.
 
 | Sub-command | Status | Description |
 |---|---|---|
-| `/rtp test stress player=<name> [iterations=N] [intervalTicks=T] [region=<name>]` | Available | Repeatedly teleports the listed player(s) through the real `/rtp` pipeline. `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`). |
-| `/rtp test queue`, `safety`, `verifiers`, `memory`, `platform`, `full` | Planned | Not yet available. |
+| `/rtp test stress [count=1-16] [iterations=N] [intervalTicks=T] [region=<name>]` | Available | Without `player=`, exercises the pipeline with registered mock players in the default region or the selected region. `count` defaults to `4`; `iterations` is clamped to `[1, 1000]` (default `10`). |
+| `/rtp test stress player=<name> [iterations=N] [intervalTicks=T] [region=<name>]` | Available | Retains real-player platform teleport checks; `intervalTicks` is clamped to `[10, 6000]` (default `40`). Its BIT component is `stress-player`. |
+| `/rtp test queue-starvation [region=<name>] [samples=N]` | Available | Bounded queue sampling; console uses the default region when `region=` is omitted. Requires `rtp.test.mutating`. |
+| `/rtp test disconnect-midflight` | Available | Verifies disconnect cleanup using a registered mock player when the default region world is loaded. |
+| `/rtp test folia-ownership` | Available | Checks the Folia region handoff using a mock player and the default region world. |
+| `/rtp test async-reply [region=<name>]` | Available | Exercises the pipeline reply with a mock player. |
+| `/rtp test async-reply player=<name>` | Available | Retains real-player reply-thread classification; its BIT component is `async-reply-player`. |
+| `/rtp test hologram player=<name> [seconds=N]` | Available | Spawns and closes a temporary player-visible hologram; console invocation reports provider status only. |
+| `/rtp test queue`, `safety`, `verifiers`, `memory`, `platform` | Planned | Not yet available. |
 
 **Examples**
 ```
+/rtp test stress count=4 iterations=3
 /rtp test stress player=leaf26
 /rtp test stress player=leaf26 iterations=50 intervalTicks=60
 /rtp test stress player=Alice player=Bob region=mining
+/rtp test async-reply player=Alice
+/rtp test hologram player=Alice seconds=10
 ```
 
-> **Threading note:** The stress loop runs asynchronously and delegates each iteration to the standard `/rtp` pipeline, so every safety guard (cooldown, economy, claim verifiers, async chunk I/O) remains active. Per-iteration failures are logged at `WARNING` in the server log.
+> **Threading note:** Mock stress and queue sampling run asynchronously; mock teleports still use the standard `/rtp` pipeline. Real-player stress delegates each iteration to the standard pipeline, so normal safety guards remain active. Probe timeouts appear as `BIT_COMPONENT_TIMEOUT` in the BIT report.
 
 ---
 

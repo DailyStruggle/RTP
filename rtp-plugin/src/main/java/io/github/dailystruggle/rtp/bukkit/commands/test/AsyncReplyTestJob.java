@@ -1,15 +1,30 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitCodes;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.bukkitplatform.commands.parameters.OnlinePlayerParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerSession;
+import io.github.dailystruggle.rtp.common.mock.RuntimeMockRTPPlayer;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,6 +50,24 @@ import org.jetbrains.annotations.Nullable;
  */
 public class AsyncReplyTestJob extends BaseRTPCmdImpl {
 
+  private static final String OWNER = "test.async-reply";
+  private static final long COMPONENT_TIMEOUT_MS = 15_000L;
+
+  public static final BitCode PIPELINE_THROWN = registerCode(4501, "PROBE_ASYNC_REPLY_PIPELINE_THROWN");
+  public static final BitCode PIPELINE_NOT_REACHED = registerCode(4502, "PROBE_ASYNC_REPLY_PIPELINE_NOT_REACHED");
+  public static final BitCode PROCESSING_LEAK = registerCode(4503, "PROBE_ASYNC_REPLY_PROCESSING_LEAK");
+  public static final BitCode WORLD_UNAVAILABLE = registerCode(4504, "PROBE_ASYNC_REPLY_WORLD_UNAVAILABLE");
+  public static final BitCode PLAYER_UNKNOWN = registerCode(4505, "PROBE_ASYNC_REPLY_PLAYER_UNKNOWN");
+  public static final BitCode THREAD_UNSAFE = registerCode(4506, "PROBE_ASYNC_REPLY_THREAD_UNSAFE");
+  public static final BitCode MOCKED_PIPELINE = RtpBitCodes.PROBE.register(
+      4507,
+      "PROBE_ASYNC_REPLY_MOCKED_PIPELINE",
+      java.lang.System.Logger.Level.INFO,
+      BitTier.IBIT,
+      OWNER,
+      "",
+      "This result exercises the pipeline with a registered mock, not a real player.");
+
   /** Lowercase substrings identifying the pipeline's first player-facing reply
    *  across English defaults and localized {@code messages.yml} variants. */
   static final String[] REPLY_NEEDLES = {
@@ -43,9 +76,13 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
 
   /** Max wall time to wait for the first tracked reply before timing out. */
   static final long REPLY_TIMEOUT_MS = 5_000L;
+  public static final BitComponent COMPONENT = registerComponent("async-reply", BitSideEffect.HEAVY, OWNER);
+  public static final BitComponent PLAYER_COMPONENT =
+      registerComponent("async-reply-player", BitSideEffect.NEEDS_PLAYER, OWNER + "-player");
 
   public AsyncReplyTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
     addParameter(
         "player",
         new OnlinePlayerParameter(
@@ -61,7 +98,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
 
   @Override
   public String permission() {
-    return "rtp.test";
+    return "rtp.test.mutating";
   }
 
   @Override
@@ -69,45 +106,87 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
     return "assert the async /rtp pipeline marshals its reply to a safe messaging thread";
   }
 
+  private static BitCode registerCode(int id, String key) {
+    return RtpBitCodes.PROBE.register(
+        id,
+        key,
+        java.lang.System.Logger.Level.ERROR,
+        BitTier.IBIT,
+        OWNER,
+        "",
+        "Verify the asynchronous reply pipeline and mock teleport cleanup.");
+  }
+
+  private static BitComponent registerComponent(
+      String id, BitSideEffect sideEffect, String subsystem) {
+    BitComponent component =
+        new BitComponent(
+            id,
+            subsystem,
+            BitTier.IBIT,
+            sideEffect,
+            COMPONENT_TIMEOUT_MS,
+            () -> ProbeBitReport.forProbe(id).build());
+    RtpBit.RUNNER.register(component);
+    return component;
+  }
+
+  static BitReport timeoutReport(String detail) {
+    return ProbeVerdict.failureReport(COMPONENT, BitCodes.COMPONENT_TIMEOUT, detail);
+  }
+
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
+    final RTPCmd rootCmd = findRtpCmd();
+    if (rootCmd == null) {
+      String msg = "&c[RTP test/async-reply] root rtp command not found; aborting";
+      reportFailure(callerId, parameterValues, COMPONENT, PIPELINE_THROWN, "async-reply.root", msg);
+      return true;
+    }
+
+    List<String> playerNames = parameterValues.get("player");
+    if (playerNames == null || playerNames.isEmpty()) {
+      Runnable unregister =
+          ActiveTestJobs.register(callerId, new ActiveTestJobs.Job("async-reply", () -> {}));
+      ProbeVerdict.runAsync(COMPONENT, () -> runMockPipeline(callerId, rootCmd, parameterValues))
+          .whenComplete(
+              (result, failure) -> {
+                try {
+                  if (failure != null) {
+                    reportFailure(callerId, parameterValues, COMPONENT, PIPELINE_THROWN,
+                        "async-reply.mock", failure.toString());
+                  } else {
+                    ProbeBitReport.emit(callerId, parameterValues, COMPONENT, result);
+                  }
+                } finally {
+                  unregister.run();
+                }
+              });
+      return true;
+    }
+
     // --- S-006: guard against being invoked before rtp-core finishes loading. ---
     final RTPServerAccessor realAccessor = RTPRuntime.serverAccessor();
     if (realAccessor == null || RTPRuntime.scheduler() == null) {
-      RTP.log(
-          Level.WARNING,
-          "[RTP test/async-reply] rejected: rtp-core not loaded (serverAccessor/scheduler null)");
+      String msg = "[RTP test/async-reply] rejected: rtp-core not loaded (serverAccessor/scheduler null)";
+      reportFailure(callerId, parameterValues, PLAYER_COMPONENT, PIPELINE_THROWN, "async-reply.runtime", msg);
       return true;
     }
 
     // --- Argument validation (S-004: fail loud, not silent). ---
-    List<String> playerNames = parameterValues.get("player");
-    if (playerNames == null || playerNames.isEmpty()) {
-      String msg = "&c[RTP test/async-reply] missing required player:<name> argument";
-      realAccessor.sendMessage(callerId, msg);
-      RTP.log(Level.WARNING, msg);
-      return true;
-    }
-
     RTPPlayer target = realAccessor.getPlayer(playerNames.get(0));
     if (target == null) {
       String msg = "&c[RTP test/async-reply] unknown player: " + playerNames.get(0);
       realAccessor.sendMessage(callerId, msg);
       RTP.log(Level.WARNING, msg);
+      reportFailure(callerId, parameterValues, PLAYER_COMPONENT, PLAYER_UNKNOWN, "async-reply.player", msg);
       return true;
     }
     final UUID targetId = target.uuid();
 
-    final RTPCmd rootCmd = findRtpCmd();
-    if (rootCmd == null) {
-      String msg = "&c[RTP test/async-reply] root rtp command not found; aborting";
-      realAccessor.sendMessage(callerId, msg);
-      RTP.log(Level.WARNING, msg);
-      return true;
-    }
 
     // The probe body runs on the async tier: we don't want to hold the
     // calling thread (which may be the main server thread on Paper/Spigot)
@@ -126,14 +205,122 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
     };
     hookHolder[0] = ActiveTestJobs.register(
         callerId, new ActiveTestJobs.Job("async-reply", cancelHook));
-    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
-      try {
-        runProbe(callerId, realAccessor, targetId, targetName, rootCmd, parameterValues);
-      } finally {
-        if (hookHolder[0] != null) hookHolder[0].run();
-      }
-    });
+    ProbeVerdict.runAsync(
+            PLAYER_COMPONENT,
+            () -> runProbe(callerId, realAccessor, targetId, targetName, rootCmd, parameterValues))
+        .whenComplete(
+            (result, failure) -> {
+              try {
+                if (failure != null) {
+                  reportFailure(callerId, parameterValues, PLAYER_COMPONENT, PIPELINE_THROWN, "async-reply.probe", failure.toString());
+                } else {
+                  ProbeBitReport.emit(callerId, parameterValues, PLAYER_COMPONENT, result);
+                }
+              } finally {
+                if (hookHolder[0] != null) hookHolder[0].run();
+              }
+            });
     return true;
+  }
+
+  private BitReport runMockPipeline(
+      UUID callerId, RTPCmd rootCmd, Map<String, List<String>> parameterValues) {
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    if (accessor == null || TeleportSessions.current() == null) {
+      return ProbeBitReport.forProbe("async-reply")
+          .check(PIPELINE_THROWN, false, "async-reply.runtime", "RTP core or teleport sessions are unavailable.")
+          .build();
+    }
+    List<String> regions = parameterValues.get("region");
+    String regionName = regions == null || regions.isEmpty()
+        ? MockProbeWorld.DEFAULT_REGION
+        : regions.get(0);
+    RTPWorld<?> world = MockProbeWorld.resolve(regionName);
+    if (world == null) {
+      return ProbeBitReport.forProbe("async-reply")
+          .check(WORLD_UNAVAILABLE, false, "async-reply.world", "Region '" + regionName + "' has no loaded world.")
+          .build();
+    }
+
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("async-reply");
+    String line = null;
+    boolean timedOut = false;
+    try (MockPlayerSession session = MockPlayerSession.open(MockProbeWorld.spawn(world))) {
+      RuntimeMockRTPPlayer mock = session.player();
+      report(callerId, accessor, "[RTP test/async-reply] begin for player=" + mock.name());
+      CompletableFuture<?> teleport = mock.teleportFuture();
+      try {
+        Map<String, List<String>> args = new HashMap<>();
+        args.put("player", Collections.singletonList(mock.name()));
+        if (regions != null && !regions.isEmpty()) args.put("region", new ArrayList<>(regions));
+        rootCmd.compute(callerId, args, null);
+      } catch (Throwable failure) {
+        line = "[RTP test/async-reply] pipeline invocation threw "
+            + failure.getClass().getSimpleName() + ": " + failure.getMessage();
+        RTP.log(Level.WARNING, line, failure);
+        report.check(PIPELINE_THROWN, false, "async-reply.pipeline", line);
+      }
+      if (line == null) {
+        try {
+          teleport.get(REPLY_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+          if (mock.setLocationCount() == 0) {
+            report.check(PIPELINE_NOT_REACHED, false, "async-reply.setLocation", "Pipeline future completed without setLocation.");
+            line = "[RTP test/async-reply] FAIL mocked pipeline did not reach setLocation for player=" + mock.name();
+          } else {
+            TeleportSessions sessions = TeleportSessions.current();
+            boolean processingCleared = sessions != null && !sessions.processingPlayers.contains(mock.uuid());
+            report.check(PROCESSING_LEAK, processingCleared, "async-reply.processingPlayers", "Mock UUID remained in processingPlayers after the pipeline completed.");
+            report.note(MOCKED_PIPELINE, "async-reply.mock", "Pipeline executed with a registered mock player; thread classification requires a real player.");
+            line = "[RTP test/async-reply] PASS mocked pipeline player=" + mock.name();
+          }
+        } catch (TimeoutException timeout) {
+          line = "[RTP test/async-reply] TIMEOUT: no mock teleport within "
+              + REPLY_TIMEOUT_MS + "ms (needles=" + String.join("/", REPLY_NEEDLES) + ")";
+          timedOut = true;
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          line = "[RTP test/async-reply] wait interrupted: " + interrupted.getMessage();
+          report.check(PIPELINE_THROWN, false, "async-reply.wait", line);
+        } catch (Throwable failure) {
+          line = "[RTP test/async-reply] wait failed: "
+              + failure.getClass().getSimpleName() + ": " + failure.getMessage();
+          report.check(PIPELINE_THROWN, false, "async-reply.wait", line);
+        }
+      }
+      if (line != null) {
+        if (line.contains("FAIL") || line.contains("TIMEOUT") || line.contains("threw")) {
+          if (!line.contains("TIMEOUT")) report.check(PIPELINE_THROWN, false, "async-reply.pipeline", line);
+          RTP.log(Level.WARNING, line);
+        } else {
+          RTP.log(Level.INFO, line);
+        }
+        if (!callerId.equals(RTPAPI.serverId)) accessor.sendMessage(callerId, line);
+      }
+    } catch (RuntimeException failure) {
+      String detail = "Mock player session failed: " + failure;
+      RTP.log(Level.WARNING, "[RTP test/async-reply] " + detail, failure);
+      report.check(PIPELINE_THROWN, false, "async-reply.mock", detail);
+    } finally {
+      report(callerId, accessor, "[RTP test/async-reply] end");
+    }
+    if (timedOut) return timeoutReport(line);
+    return report.build();
+  }
+
+  private void reportFailure(
+      UUID callerId,
+      Map<String, List<String>> parameterValues,
+      BitComponent component,
+      BitCode code,
+      String path,
+      String detail) {
+    if (RTPRuntime.serverAccessor() != null && !callerId.equals(RTPAPI.serverId)) {
+      RTPRuntime.serverAccessor().sendMessage(callerId, detail);
+    }
+    RTP.log(Level.WARNING, detail);
+    BitReport report = ProbeBitReport.forProbe(component.id()).check(code, false, path, detail).build();
+    ProbeVerdict.record(component, CompletableFuture.completedFuture(report), component.timeoutMillis())
+        .thenAccept(result -> ProbeBitReport.emit(callerId, parameterValues, component, result));
   }
 
   /**
@@ -155,7 +342,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
    * untouched and is symmetric with how the rest of the test harness
    * captures messages.
    */
-  private void runProbe(
+  private BitReport runProbe(
       UUID callerId,
       RTPServerAccessor realAccessor,
       UUID targetId,
@@ -163,6 +350,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
       RTPCmd rootCmd,
       Map<String, List<String>> parameterValues) {
 
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("async-reply-player");
     final CompletableFuture<Thread> delivery = new CompletableFuture<>();
     // The interceptor sees the resolved (post-MessagesKeys, post-format)
     // string. Most pipeline replies (chunkLoading, PLAYER_LOADING,
@@ -185,6 +373,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
         };
 
     SendMessage.addInterceptor(probe);
+    boolean invocationFailed = false;
     try {
       report(callerId, realAccessor, "[RTP test/async-reply] begin for player=" + targetName);
 
@@ -207,49 +396,59 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
                 + t.getMessage();
         realAccessor.sendMessage(callerId, msg);
         RTP.log(Level.WARNING, msg, t);
-        return;
+        report.check(PIPELINE_THROWN, false, "async-reply-player.pipeline", msg);
+        invocationFailed = true;
       }
 
-      try {
-        Thread deliveryThread = delivery.get(REPLY_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        evaluate(callerId, realAccessor, deliveryThread);
-      } catch (TimeoutException te) {
-        String msg =
-            "[RTP test/async-reply] TIMEOUT: no tracked reply within "
-                + REPLY_TIMEOUT_MS
-                + "ms (needles="
-                + String.join("/", REPLY_NEEDLES)
-                + ")";
-        realAccessor.sendMessage(callerId, msg);
-        RTP.log(Level.WARNING, msg);
-      } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        String msg =
-            "[RTP test/async-reply] wait interrupted: "
-                + ie.getMessage();
-        realAccessor.sendMessage(callerId, msg);
-        RTP.log(Level.WARNING, msg, ie);
-      } catch (Throwable t) {
-        String msg =
-            "[RTP test/async-reply] wait failed: "
-                + t.getClass().getSimpleName()
-                + ": "
-                + t.getMessage();
-        realAccessor.sendMessage(callerId, msg);
-        RTP.log(Level.WARNING, msg, t);
+      if (!invocationFailed) {
+        try {
+          Thread deliveryThread = delivery.get(REPLY_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+          boolean permitted = evaluate(callerId, realAccessor, deliveryThread);
+          report.check(
+              THREAD_UNSAFE,
+              permitted,
+              "async-reply-player.thread",
+              permitted ? "" : "The first pipeline reply used an unrecognised thread.");
+        } catch (TimeoutException te) {
+          String msg =
+              "[RTP test/async-reply] TIMEOUT: no tracked reply within "
+                  + REPLY_TIMEOUT_MS
+                  + "ms (needles="
+                  + String.join("/", REPLY_NEEDLES)
+                  + ")";
+          realAccessor.sendMessage(callerId, msg);
+          RTP.log(Level.WARNING, msg);
+          return ProbeVerdict.failureReport(PLAYER_COMPONENT, BitCodes.COMPONENT_TIMEOUT, msg);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          String msg = "[RTP test/async-reply] wait interrupted: " + ie.getMessage();
+          realAccessor.sendMessage(callerId, msg);
+          RTP.log(Level.WARNING, msg, ie);
+          report.check(PIPELINE_THROWN, false, "async-reply-player.wait", msg);
+        } catch (Throwable t) {
+          String msg =
+              "[RTP test/async-reply] wait failed: "
+                  + t.getClass().getSimpleName()
+                  + ": "
+                  + t.getMessage();
+          realAccessor.sendMessage(callerId, msg);
+          RTP.log(Level.WARNING, msg, t);
+          report.check(PIPELINE_THROWN, false, "async-reply-player.wait", msg);
+        }
       }
     } finally {
       // Symmetric removal; idempotent if the interceptor was never added.
       SendMessage.removeInterceptor(probe);
       report(callerId, realAccessor, "[RTP test/async-reply] end");
     }
+    return report.build();
   }
 
   /**
    * Classifies the recorded delivery thread against the platform's
    * messaging contract and reports a pass/fail line.
    */
-  private void evaluate(UUID callerId, RTPServerAccessor realAccessor, Thread deliveryThread) {
+  private boolean evaluate(UUID callerId, RTPServerAccessor realAccessor, Thread deliveryThread) {
     final String platform = safePlatform(realAccessor);
     final boolean isPrimary = safeIsPrimary(realAccessor, deliveryThread);
     final String threadName = deliveryThread.getName();
@@ -317,6 +516,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
         realAccessor.sendMessage(callerId, line);
     }
     RTP.log(permitted ? Level.INFO : Level.WARNING, line);
+    return permitted;
   }
 
   private static String safePlatform(RTPServerAccessor accessor) {

@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -88,6 +89,8 @@ final class PregenState {
     LoadPurpose purpose = LoadPurpose.IMMEDIATE;
     /** ADR-028: backlog whose UNKNOWN entries replace shape draws; {@code null} draws from the shape. */
     @Nullable BacklogLocationBuffer backlog = null;
+    /** Admission slot for a cache fill, consumed by its first native chunk load. */
+    @Nullable GenerationBudget.Reservation generationSlot = null;
 
     private PregenState(
             Region region,

@@ -50,6 +50,9 @@ public final class FabricEventBridge {
         io.github.dailystruggle.rtp.fabric.FabricRTPCommonEntry.init();
 
         // ── Per-tick driver for FabricScheduler ─────────────────────────
+        // A tick running past ServerHealthGate.STALL_MS pauses background fill (main thread stuck on chunks).
+        ServerTickEvents.START_SERVER_TICK.register(server ->
+                io.github.dailystruggle.rtp.common.tools.ServerHealthGate.tickStarted());
         ServerTickEvents.END_SERVER_TICK.register(this::onEndServerTick);
 
         // ── World cache ─────────────────────────────────────────────────
@@ -628,6 +631,7 @@ public final class FabricEventBridge {
     }
 
     private void onEndServerTick(MinecraftServer server) {
+        io.github.dailystruggle.rtp.common.tools.ServerHealthGate.tickFinished();
         // Drives FabricScheduler's delayed/repeating queue. Throwables inside
         // tasks are caught by the scheduler itself; a throw here would crash
         // the tick loop.

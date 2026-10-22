@@ -26,6 +26,11 @@ import java.util.logging.Level;
  * <p>{@link #regionUnhealthy(UUID, int, int)} is the per-region gate (ADR-087 regional circuit
  * breaker): a slow region stops receiving background work while healthy regions continue.
  *
+ * <p>Stalled tick: hosts that call {@link #tickStarted()} / {@link #tickFinished()} also pause
+ * while one tick has run for more than {@value #STALL_MS} ms. TPS / MSPT readings freeze during a
+ * stall, so they cannot detect a main thread blocked waiting on the chunk system. A server that
+ * is paused between ticks (vanilla {@code pause-when-empty-seconds}) is not stalled.
+ *
  * <p>Serving players already waiting is never gated. Unsampled metrics fail open.
  */
 public final class ServerHealthGate {
@@ -37,6 +42,12 @@ public final class ServerHealthGate {
   static final double TPS_HYSTERESIS = 0.5;
   /** Resume only once MSPT drops this far below {@code maxMSPT}. */
   static final double MSPT_HYSTERESIS = 5.0;
+  /** A tick that has run longer than this counts as stalled. */
+  static final long STALL_MS = 1_000L;
+
+  /** {@link System#nanoTime()} at the start of the running tick; 0 when no tick is running. */
+  private static final AtomicLong tickStartNanos = new AtomicLong(0L);
+  private static final AtomicLong lastStallWarnMs = new AtomicLong(0L);
 
   private static final AtomicLong lastSampleMs = new AtomicLong(0L);
   private static final AtomicLong lastWarnMs = new AtomicLong(0L);
@@ -59,6 +70,10 @@ public final class ServerHealthGate {
    * Cached for {@value #SAMPLE_INTERVAL_MS} ms; safe to call from any thread, many times per pulse.
    */
   public static boolean shouldPause() {
+    if (tickStalled(System.nanoTime())) {
+      warnStalled();
+      return true;
+    }
     long now = System.currentTimeMillis();
     long last = lastSampleMs.get();
     if (now - last >= SAMPLE_INTERVAL_MS && lastSampleMs.compareAndSet(last, now)) {
@@ -143,6 +158,37 @@ public final class ServerHealthGate {
     return tpsBad || msptBad;
   }
 
+  /**
+   * Records that a server tick started. Called from the server thread by single-loop hosts
+   * (Spigot, Fabric, NeoForge); never on regional hosts.
+   */
+  public static void tickStarted() {
+    long now = System.nanoTime();
+    tickStartNanos.set(now == 0L ? 1L : now);
+  }
+
+  /** Records that the running server tick finished (or that the server is idle between ticks). */
+  public static void tickFinished() {
+    tickStartNanos.set(0L);
+  }
+
+  /** Whether a tick is running and has lasted more than {@value #STALL_MS} ms. */
+  public static boolean tickStalled(long nowNanos) {
+    long start = tickStartNanos.get();
+    return start != 0L && nowNanos - start > STALL_MS * 1_000_000L;
+  }
+
+  private static void warnStalled() {
+    long now = System.currentTimeMillis();
+    long lastWarn = lastStallWarnMs.get();
+    if (now - lastWarn < WARN_INTERVAL_MS || !lastStallWarnMs.compareAndSet(lastWarn, now)) return;
+    long start = tickStartNanos.get();
+    long stalledMs = start == 0L ? 0L : (System.nanoTime() - start) / 1_000_000L;
+    RTPRuntime.log(Level.WARNING, String.format(Locale.ROOT,
+        "[RTP] The current server tick has run for %d ms; pausing background cache generation."
+            + " Waiting players are still served.", stalledMs));
+  }
+
   public static double lastTps() { return lastTps; }
 
   public static double lastMspt() { return lastMspt; }
@@ -165,6 +211,13 @@ public final class ServerHealthGate {
     lastMspt = Double.NaN;
     tpsOverride = null;
     msptOverride = null;
+    tickStartNanos.set(0L);
+    lastStallWarnMs.set(0L);
+  }
+
+  /** Test seam: sets the running tick's start ({@link System#nanoTime()} units; 0 = no tick). */
+  public static void setTickStartNanosForTesting(long nanos) {
+    tickStartNanos.set(nanos);
   }
 
   static String formatRegionalDetail(List<FoliaRegionSample> samples) {

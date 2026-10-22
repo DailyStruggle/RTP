@@ -150,6 +150,16 @@ public class NeoForgeScheduler implements RTPScheduler {
     drainDueWithinTickBudget();
   }
 
+  /**
+   * Vanilla's chunk workers serve requests first-come, first-served, so background fill waits
+   * while RTP's earlier loads are still generating (ADR-087; see {@code GenerationBudget}).
+   */
+  @Override
+  public boolean isGenerationSaturated(RTPWorld<?> world) {
+    io.github.dailystruggle.rtp.common.tools.GenerationBudget.configureServerAdmission(true);
+    return io.github.dailystruggle.rtp.common.tools.GenerationBudget.server().saturated();
+  }
+
   /** MC-free entry point; the test classpath has no {@code MinecraftServer}. */
   void drainDueWithinTickBudget() {
     if (scheduled.isEmpty()) return;

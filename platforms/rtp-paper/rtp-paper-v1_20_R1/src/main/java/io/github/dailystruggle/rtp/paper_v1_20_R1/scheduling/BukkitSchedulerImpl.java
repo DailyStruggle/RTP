@@ -7,4 +7,10 @@ public class BukkitSchedulerImpl
   public BukkitSchedulerImpl(JavaPlugin plugin) {
     super(plugin);
   }
+
+  /** Paper's chunk system prioritises player chunks over plugin loads. */
+  @Override
+  protected boolean holdsBackGeneration() {
+    return false;
+  }
 }

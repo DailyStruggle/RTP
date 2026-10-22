@@ -74,6 +74,8 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("TestSchedulerCmd")
                     .and().haveSimpleNameNotContaining("TestChunkTicketCmd")
                     .and().haveSimpleNameNotContaining("TestEventsCmd")
+                    // Bounded per-mock await on the async worker that runs the BIT check (ADR-121).
+                    .and().haveSimpleNameNotContaining("TestTeleportCmd")
                     .and().haveSimpleNameNotContaining("NetworkModeBootstrap")
                     .and().haveSimpleNameNotContaining("NetworkStateBinding")
                     .should().callMethodWhere(

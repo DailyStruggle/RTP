@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.SenderTimings;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.unobf.tools.FabricLegacyText;
 import io.github.dailystruggle.rtp.fabric.unobf.world.FabricRTPWorldUnobf;
@@ -345,13 +346,12 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public long cooldown() {
-        // Perms-driven cooldown groups not yet implemented. 0 means "use default" upstream.
-        return 0L;
+        return SenderTimings.cooldownMillis(this);
     }
 
     @Override
     public long delay() {
-        return 0L;
+        return SenderTimings.delayMillis(this);
     }
 
     @Override

@@ -1,0 +1,17 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}
+
+test {
+    useJUnitPlatform()
+}

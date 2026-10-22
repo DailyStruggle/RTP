@@ -110,7 +110,7 @@ subprojects {
     // providers, which every platform instantiates before the family filter.
     // Tests are not shipped and stay on the toolchain level.
     def java17Modules = [
-            ':rtp-api', ':rtp-core', ':anvil-api', ':yaml-api', ':commands-api',
+            ':rtp-api', ':server-api', ':rtp-core', ':anvil-api', ':bit-api', ':yaml-api', ':commands-api',
             ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
             ':rtp-proxy:rtp-proxy-common',
             ':rtp-bukkit:rtp-bukkit-common', ':rtp-bukkit:rtp-bukkit-v1_20_R1',
@@ -368,6 +368,7 @@ subprojects {
             // commands-api measured: 93.6% instruction / 80.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':commands-api': [instruction: 0.90, branch: 0.80],
+            ':bit-api': [instruction: 0.90, branch: 0.80],
     ]
     def moduleFloors = coverageFloors[project.path]
     if (moduleFloors != null) {
@@ -515,8 +516,9 @@ subprojects {
 // For a "real" registry (Maven Central) see docs/dev/PUBLISHING.md.
 //
 // Closure rationale (transitive `api`/`implementation` project edges):
-//   rtp-api  -> commands-api, yaml-api, metrics-api
-//   rtp-core -> rtp-api, anvil-api, commands-api, yaml-api, effects-api,
+//   rtp-api  -> server-api, commands-api, yaml-api, metrics-api
+//   anvil-api -> bit-api
+//   rtp-core -> rtp-api, anvil-api, bit-api, commands-api, yaml-api, effects-api,
 //               metrics-api, bstats-api, maps-api, rtp-proxy:rtp-proxy-common
 //   rtp-proxy-common   -> rtp-api
 // Every coordinate that can appear in a generated POM must itself be published,
@@ -525,8 +527,10 @@ subprojects {
 // so they are published from this build alongside the rest of the closure.
 def publishedModulePaths = [
         ':rtp-api',
+        ':server-api',
         ':rtp-core',
         ':anvil-api',
+        ':bit-api',
         ':commands-api',
         ':effects-api',
         ':yaml-api',
@@ -542,6 +546,7 @@ def publishedModulePaths = [
 // Verifies public API modules (rtp-api, commands-api, effects-api, maps-api,
 // metrics-api, anvil-api, tags-api) against the previous release baseline.
 // Configured to fail the build on unannounced binary-incompatible changes.
+// server-api is excluded until it has a released baseline.
 def apiModulesForBinaryCheck = [
         ':rtp-api',
         ':commands-api',

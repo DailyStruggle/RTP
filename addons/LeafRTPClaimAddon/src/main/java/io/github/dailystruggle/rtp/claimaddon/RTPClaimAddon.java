@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.logging.Level;

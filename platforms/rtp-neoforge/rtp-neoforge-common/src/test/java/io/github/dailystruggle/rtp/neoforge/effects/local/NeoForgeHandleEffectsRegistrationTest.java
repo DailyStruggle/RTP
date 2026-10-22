@@ -20,4 +20,15 @@ class NeoForgeHandleEffectsRegistrationTest {
         assertTrue(names.contains("DEATH"), "DEATH must be registered");
         assertTrue(names.contains("KILL"), "KILL must be registered");
     }
+
+    @Test
+    @DisplayName("RTP-70: NeoForge registers GLIDE, DROP_INVENTORY and DROP_EXP / DROP_EXPERIENCE")
+    void registersGlideAndDrops() {
+        NeoForgeEffectsInitializer.registerHandleEffects();
+
+        Collection<String> names = EffectFactory.registeredNames();
+        for (String name : new String[] {"GLIDE", "DROP_INVENTORY", "DROP_EXP", "DROP_EXPERIENCE"}) {
+            assertTrue(names.contains(name), name + " must be registered");
+        }
+    }
 }

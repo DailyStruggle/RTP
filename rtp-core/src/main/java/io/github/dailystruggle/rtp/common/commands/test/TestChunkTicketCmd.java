@@ -1,8 +1,17 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
@@ -32,6 +41,26 @@ import org.jetbrains.annotations.Nullable;
  */
 public class TestChunkTicketCmd extends BaseRTPCmdImpl {
 
+  public static final BitCode TEST_CHUNK_TICKET_OPEN = RtpBitCodes.TEST.register(
+      3101, "TEST_CHUNK_TICKET_OPEN", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.chunk-ticket", "", "Ensure opening a chunk ticket increments the live count.");
+  public static final BitCode TEST_CHUNK_TICKET_RELEASE = RtpBitCodes.TEST.register(
+      3102, "TEST_CHUNK_TICKET_RELEASE", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.chunk-ticket", "", "Release the chunk ticket and restore the baseline count.");
+  public static final BitCode TEST_CHUNK_TICKET_TRACKER_LEAK = RtpBitCodes.TEST.register(
+      3103, "TEST_CHUNK_TICKET_TRACKER_LEAK", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.chunk-ticket", "", "Untrack every ticket created by the probe.");
+  public static final BitCode TEST_CHUNK_TICKET_SENTINEL_UNTRACK = RtpBitCodes.TEST.register(
+      3104, "TEST_CHUNK_TICKET_SENTINEL_UNTRACK", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.chunk-ticket", "", "Make both sentinel untrack operations return to the baseline.");
+  public static final BitCode TEST_CHUNK_TICKET_SENTINEL_DIAGNOSTICS = RtpBitCodes.TEST.register(
+      3105, "TEST_CHUNK_TICKET_SENTINEL_DIAGNOSTICS", java.lang.System.Logger.Level.ERROR, BitTier.IBIT,
+      "test.chunk-ticket", "", "Keep a live sentinel during diagnostics and release it afterward.");
+  public static final BitCode TEST_CHUNK_TICKET_STALE_SENTINEL = RtpBitCodes.TEST.register(
+      3106, "TEST_CHUNK_TICKET_STALE_SENTINEL", java.lang.System.Logger.Level.WARNING, BitTier.IBIT,
+      "test.chunk-ticket", "", "Investigate the previous interrupted probe and clear its stale sentinels.");
+  public static final BitComponent COMPONENT = registerComponent();
+
   /** Sentinel label, distinct from any production tracker label. */
   public static final String SENTINEL_LABEL = "rtp-test-chunk-ticket-sentinel";
 
@@ -40,6 +69,7 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
 
   public TestChunkTicketCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
   }
 
   @Override
@@ -80,9 +110,63 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
       }
     }
 
-    Result r = runProbe(world);
-    emit(callerId, r);
+    RTPWorld<?> probeWorld = world;
+    BitResult result = RtpBit.RUNNER.run(COMPONENT.withCheck(() -> {
+      Result probe = runProbe(probeWorld);
+      emit(callerId, probe);
+      return toBitReport(probe);
+    }), Runnable::run);
+    if (ProbeBitReport.isJson(parameterValues)) {
+      ProbeBitReport.emitJson(callerId, result);
+    } else {
+      BitTableOutput.emit(callerId, io.github.dailystruggle.bit.BitTable.rows(COMPONENT, result));
+    }
     return true;
+  }
+
+  private static BitComponent registerComponent() {
+    BitComponent component = new BitComponent("chunk-ticket", "test.chunk-ticket", BitTier.IBIT,
+        BitSideEffect.NEEDS_WORLD, 60_000, () -> toBitReport(runProbe()));
+    RtpBit.RUNNER.register(component);
+    return component;
+  }
+
+  static BitReport toBitReport(Result result) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("chunk-ticket");
+    if (result.liveProbed) {
+      report.check(
+          TEST_CHUNK_TICKET_OPEN,
+          result.openCount == result.baselineCount + 1,
+          "chunk-ticket.open",
+          result.notes.isEmpty() ? "Live chunk ticket did not open as expected." : result.notes);
+      report.check(
+          TEST_CHUNK_TICKET_RELEASE,
+          result.closeCount < 0 || result.closeCount == result.baselineCount,
+          "chunk-ticket.release",
+          result.notes.isEmpty() ? "Live chunk ticket did not return to its baseline." : result.notes);
+      report.check(
+          TEST_CHUNK_TICKET_TRACKER_LEAK,
+          result.memoryTrackerTicketCount < 0 || result.memoryTrackerTicketCount == 0,
+          "chunk-ticket.tracker",
+          result.notes.isEmpty() ? "Probe ticket remained in MemoryTracker." : result.notes);
+    } else {
+      report.check(
+          TEST_CHUNK_TICKET_SENTINEL_UNTRACK,
+          result.afterUntrackById == 0 && result.afterUntrackByRef == 0 && result.finalResidual == 0,
+          "chunk-ticket.sentinel.untrack",
+          "Sentinel untrack or final residual check failed.");
+      report.check(
+          TEST_CHUNK_TICKET_SENTINEL_DIAGNOSTICS,
+          result.afterDiagnosticsOnLive == 1,
+          "chunk-ticket.sentinel.diagnostics",
+          "Diagnostics did not preserve exactly one live sentinel.");
+    }
+    report.check(
+        TEST_CHUNK_TICKET_STALE_SENTINEL,
+        result.staleBaseline == 0,
+        "chunk-ticket.staleBaseline",
+        "Stale sentinel entries from a prior probe were found: " + result.staleBaseline);
+    return report.build();
   }
 
   /** Core probe without target world; resolves default world if available or falls back. */

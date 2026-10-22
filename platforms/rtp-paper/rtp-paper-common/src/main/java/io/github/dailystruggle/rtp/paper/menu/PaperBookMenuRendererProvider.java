@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.paper.menu;
 
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuRendererProvider;
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 
 /**
  * {@link MenuRendererProvider} for the Paper Adventure-{@code Book} renderer

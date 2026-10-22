@@ -520,6 +520,36 @@ public final class AnvilPrefilter {
     return COLUMN_PROBES.submit(worldFolder, dim, cx, cz, minY, maxY);
   }
 
+  /**
+   * Runs {@code job} on {@link AnvilIoPool} in a coalesced drain of chunk (cx, cz)'s region file,
+   * with a {@link ChunkSquare} whose chunks are decoded over world-Y {@code [minY, maxY]} only when
+   * the job first asks for them (ADR-120 terrain square). Never opens another region file, loads
+   * or generates a chunk; no I/O on the calling thread (S-005).
+   *
+   * <p>Pre: {@code job} is pure, bounded and non-blocking (it runs while the drain holds the file).
+   *
+   * @return the job's result; {@code null} without running it when the world folder is null, the
+   *     window is empty, or the file is missing or not Anvil; exceptionally with the job's failure
+   *     (S-004)
+   */
+  public static <T> CompletableFuture<T> squareJobAsync(Path worldFolder, String dimensionSubpath, int cx,
+                                                        int cz, int minY, int maxY,
+                                                        java.util.function.Function<ChunkSquare, T> job) {
+    if (worldFolder == null || minY > maxY) return CompletableFuture.completedFuture(null);
+    String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
+    return COLUMN_PROBES.submitSquare(worldFolder, dim, cx, cz, minY, maxY, job);
+  }
+
+  /** Chunks decoded for {@link #squareJobAsync} so far (ADR-120 cost counter). */
+  public static long squareJobDecodes() {
+    return COLUMN_PROBES.squareDecodes();
+  }
+
+  /** Jobs run by {@link #squareJobAsync} so far. */
+  public static long squareJobs() {
+    return COLUMN_PROBES.squareJobs();
+  }
+
   /** Region-file groups drained by {@link #probeColumnAsync} (opens are at most this). */
   public static long columnProbeGroups() {
     return COLUMN_PROBES.groupsDrained();

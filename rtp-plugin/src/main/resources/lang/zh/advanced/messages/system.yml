@@ -15,6 +15,7 @@
 # 占位符: [filename] - 文件名
 重载中: "&b[P0] 正在加载 [filename]……"
 已重载: "&b[P0] [filename] 已成功加载。"
+reloadFailed: "&c[P0] 配置重新加载失败。请检查服务器日志。"
 更新中: "&a[P0] 正在更新 [filename]……"
 已更新: "&a[P0] [filename] 已成功更新。"
 

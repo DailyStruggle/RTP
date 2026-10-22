@@ -4,12 +4,14 @@ import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,16 +33,22 @@ public abstract class AbstractVerticalAdjustor<T extends Enum<T>> extends Vertic
   public static final int DEFAULT_SLOPE_RADIUS = 2;
   public static final int MIN_SLOPE_RADIUS = 1;
   public static final int MAX_SLOPE_RADIUS = 8;
+  /** Upper clamp of {@code maxHillAngle}; tan(90) is unbounded. */
+  public static final double MAX_HILL_ANGLE = 89.0;
 
   /** Enum constants named {@code maxSlope} / {@code slopeRadius}, or null if the key enum lacks them. */
   private final @Nullable T maxSlopeKey;
   private final @Nullable T slopeRadiusKey;
+  private final @Nullable T maxHillAngleKey;
+  /** One warning per vert for an unreadable {@code maxHillAngle}. */
+  private volatile boolean warnedHillAngle;
 
   protected AbstractVerticalAdjustor(
       Class<T> clazz, String name, List<Predicate<RTPCoords>> verifiers, EnumMap<T, Object> data) {
     super(clazz, name, verifiers, data);
     this.maxSlopeKey = constantNamed(clazz, "maxSlope");
     this.slopeRadiusKey = constantNamed(clazz, "slopeRadius");
+    this.maxHillAngleKey = constantNamed(clazz, "maxHillAngle");
   }
 
   private static <T extends Enum<T>> @Nullable T constantNamed(Class<T> clazz, String name) {
@@ -65,6 +73,48 @@ public abstract class AbstractVerticalAdjustor<T extends Enum<T>> extends Vertic
     if (slopeRadiusKey == null) return DEFAULT_SLOPE_RADIUS;
     int v = getNumber(slopeRadiusKey, DEFAULT_SLOPE_RADIUS).intValue();
     return Math.max(MIN_SLOPE_RADIUS, Math.min(MAX_SLOPE_RADIUS, v));
+  }
+
+  /**
+   * Configured {@code maxHillAngle} in degrees ({@link #hillAngleOf}), or -1 when the terrain shape
+   * check is off. Reads without writing back, so the vert data and cache key stay as configured
+   * (ADR-120).
+   */
+  public double maxHillAngle() {
+    if (maxHillAngleKey == null) return -1;
+    Object raw = getData(maxHillAngleKey);
+    double v = hillAngleOf(raw);
+    if (v < 0 && raw instanceof String s && !isOff(s) && !warnedHillAngle) {
+      warnedHillAngle = true;
+      RTPRuntime.log(Level.WARNING, "[RTP] maxHillAngle '" + s + "' is not a number or \"off\"; the hill check is off.");
+    }
+    return v;
+  }
+
+  /**
+   * {@code maxHillAngle} value in degrees, clamped to {@value #MAX_HILL_ANGLE}; -1 (off) for
+   * {@code "off"}, YAML {@code off}/{@code false}, absent, negative or unparsable values. Shared
+   * with {@code RegionCacheKey} so "off" and an absent key hash alike.
+   */
+  public static double hillAngleOf(@Nullable Object raw) {
+    double v;
+    if (raw instanceof Number n) {
+      v = n.doubleValue();
+    } else if (raw instanceof String s && !isOff(s)) {
+      try {
+        v = Double.parseDouble(s.trim().replace(',', '.'));
+      } catch (NumberFormatException e) {
+        return -1;
+      }
+    } else {
+      return -1;
+    }
+    return v >= 0 ? Math.min(MAX_HILL_ANGLE, v) : -1;
+  }
+
+  private static boolean isOff(String s) {
+    String t = s.trim();
+    return t.isEmpty() || t.equalsIgnoreCase("off") || t.equalsIgnoreCase("false");
   }
 
   /** Floor test for {@link #slopeOk}: true when feet-Y {@code y} stands on a floor in column (lx, lz). */

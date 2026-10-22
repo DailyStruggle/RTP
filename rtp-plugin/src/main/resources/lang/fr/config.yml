@@ -127,6 +127,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # Refuse les atterrissages sur les pentes ou bords de falaise aussi raides ou plus, en degrés.
+    # "off" est le plus rapide. 30 refuse environ 1 point au sol sur 5, 45 environ 1 sur 12, 60 environ 1 sur 60.
+    # Tout nombre de 0 à 89 fonctionne aussi. Activé, la recherche lit les chunks autour de chaque point.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

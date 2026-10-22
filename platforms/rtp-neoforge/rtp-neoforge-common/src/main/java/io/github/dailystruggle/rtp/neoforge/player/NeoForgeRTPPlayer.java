@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.SenderTimings;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.menu.NeoForgeBookSpec;
 import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeLegacyText;
@@ -260,12 +261,12 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public long cooldown() {
-        return 0L;
+        return SenderTimings.cooldownMillis(this);
     }
 
     @Override
     public long delay() {
-        return 0L;
+        return SenderTimings.delayMillis(this);
     }
 
     @Override
@@ -451,9 +452,11 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
     /**
      * Teleport implementation that survives mapping drift across the 1.21.x
      * carrier line. Attempts the reflective 6-arg {@code teleportTo} first, then
-     * a same-dimension packet teleport, then a position-set fallback.
+     * a same-dimension packet teleport, then a position-set fallback. Server thread only.
+     *
+     * @return {@code true} when the player was moved to {@code target}
      */
-    private static boolean performTeleport(ServerPlayer cur, ServerLevel target,
+    public static boolean performTeleport(ServerPlayer cur, ServerLevel target,
                                            double x, double y, double z,
                                            float yaw, float pitch) {
         try {

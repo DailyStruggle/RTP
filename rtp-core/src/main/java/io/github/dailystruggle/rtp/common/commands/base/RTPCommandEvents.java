@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.base;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.common.mock.SyntheticSideEffects;
 
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
@@ -43,8 +44,12 @@ public final class RTPCommandEvents {
     return () -> FAIL.remove(handler);
   }
 
-  /** Fan out a success event to every registered subscriber. */
+  /**
+   * Fan out a success event to every registered subscriber. Not published when the player or
+   * sender is a registered BIT mock (ADR-121 section 11).
+   */
   public static void fireSuccess(RTPCommandSender sender, RTPPlayer player) {
+    if (!SyntheticSideEffects.publishesEvents(player) || isSyntheticSender(sender)) return;
     for (BiConsumer<RTPCommandSender, RTPPlayer> h : SUCCESS) {
       try {
         h.accept(sender, player);
@@ -54,8 +59,12 @@ public final class RTPCommandEvents {
     }
   }
 
-  /** Fan out a fail event to every registered subscriber. */
+  /**
+   * Fan out a fail event to every registered subscriber. Not published when the sender is a
+   * registered BIT mock (ADR-121 section 11).
+   */
   public static void fireFail(RTPCommandSender sender, String msg) {
+    if (isSyntheticSender(sender)) return;
     for (BiConsumer<RTPCommandSender, String> h : FAIL) {
       try {
         h.accept(sender, msg);
@@ -63,6 +72,10 @@ public final class RTPCommandEvents {
         // intentional: a faulty subscriber must not break fan-out
       }
     }
+  }
+
+  private static boolean isSyntheticSender(RTPCommandSender sender) {
+    return sender != null && SyntheticSideEffects.isSynthetic(sender.uuid());
   }
 
   /** Remove every registered subscriber (used by tests and on full reload). */

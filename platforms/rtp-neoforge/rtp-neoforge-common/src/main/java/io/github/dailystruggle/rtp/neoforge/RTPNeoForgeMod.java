@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.neoforge;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBitStartup;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
@@ -460,6 +461,7 @@ public final class RTPNeoForgeMod {
         "[RTP][NeoForge] Core bound \u2014 accessor + scheduler + event bridge + database + "
             + "permissions + menu/book/map/metrics/backend sinks installed; "
             + "/rtp command tree registers on RegisterCommandsEvent.");
+    RtpBitStartup.schedule();
     // TODO(@leaf_26): the S-00x regression guards + traceability rows,
     // the live network-mode boot (reservation-token redemption, ADR-049),
     // and the native PvP combat tag (ADR-055). The version adapter
@@ -562,6 +564,7 @@ public final class RTPNeoForgeMod {
       // become no-ops instead of dispatching onto a torn-down server.
       try {
         io.github.dailystruggle.rtp.neoforge.effects.local.NeoForgeHandles.setServer(null);
+        io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive.clear();
       } catch (Throwable ignored) {
         // effects-api absent or already unbound; nothing to do.
       }
@@ -573,7 +576,14 @@ public final class RTPNeoForgeMod {
   }
 
   @SubscribeEvent
+  public void onServerTickStart(ServerTickEvent.Pre event) {
+    // A tick running past ServerHealthGate.STALL_MS pauses background fill (main thread stuck on chunks).
+    io.github.dailystruggle.rtp.common.tools.ServerHealthGate.tickStarted();
+  }
+
+  @SubscribeEvent
   public void onServerTick(ServerTickEvent.Post event) {
+    io.github.dailystruggle.rtp.common.tools.ServerHealthGate.tickFinished();
     // Drain the scheduler bound into RTP.scheduler (the accessor's scheduler).
     if (accessor != null) {
       accessor.getNeoForgeScheduler().tick(event.getServer());
@@ -584,6 +594,8 @@ public final class RTPNeoForgeMod {
     if (adapter != null) {
       adapter.tickRefresh();
     }
+    // Hold GLIDE effects in the air until landing (vanilla clears the flag without an elytra).
+    io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive.tick();
     // ADR-075 - sample watched players' block positions and fire
     // PlayerMoveEvents for block changes. Best-effort; never break the tick.
     try {

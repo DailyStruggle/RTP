@@ -3,14 +3,17 @@ package io.github.dailystruggle.rtp.neoforge.effects.local;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.effectsapi.common.effects.CommandEffect;
 import io.github.dailystruggle.effectsapi.common.effects.DeathEffect;
+import io.github.dailystruggle.effectsapi.common.effects.DropExpEffect;
+import io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect;
+import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * NeoForge counterpart of {@code rtp.fabric.effects.FabricEffectsInitializer}
  * (effects-api-ADR-003/004/007). Binds the NeoForge {@link NeoForgeValueCoercer}
- * and registers the Phase-1 NeoForge concrete effects (SOUND / PARTICLE /
- * TITLE / POTION / COMMAND / DEATH / KILL) with {@link EffectFactory}.
+ * and registers the NeoForge concrete effects with {@link EffectFactory}. FIREWORK
+ * and NOTE are not registered: their handle methods have no implementation yet.
  *
  * <p>Unlike the Fabric initializer, these prototypes are compiled Mojmap (no
  * Loom remap) in {@code rtp-neoforge-common}, so their static initializers do
@@ -43,12 +46,16 @@ public final class NeoForgeEffectsInitializer {
 
     /**
      * Prototypes that act only through {@link NeoForgeHandles} (no registry lookups), so they
-     * register without a bootstrapped server. Without DEATH / KILL here, a {@code DEATH} token
-     * is skipped as an unknown effect type.
+     * register without a bootstrapped server. A token missing here is skipped as an unknown
+     * effect type.
      */
     static void registerHandleEffects() {
         EffectFactory.addEffect("COMMAND",  new CommandEffect());
         EffectFactory.addEffect("DEATH",    new DeathEffect());
         EffectFactory.addEffect("KILL",     new DeathEffect());
+        EffectFactory.addEffect("GLIDE",    new GlideEffect());
+        EffectFactory.addEffect("DROP_INVENTORY",  new DropInventoryEffect());
+        EffectFactory.addEffect("DROP_EXP",        new DropExpEffect());
+        EffectFactory.addEffect("DROP_EXPERIENCE", new DropExpEffect());
     }
 }

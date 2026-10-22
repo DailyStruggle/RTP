@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.common.action;
 
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
+import io.github.dailystruggle.bit.BitFinding;
+import io.github.dailystruggle.bit.Vocabulary;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
@@ -20,6 +22,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 
 /**
@@ -28,7 +31,64 @@ import java.util.logging.Level;
  */
 public final class ActionConfigLoader {
 
+  public static final Vocabulary STEP_ACTION_KEYS = new Vocabulary("action step key", List.of(
+      "CONSOLE", "PLAYER", "ACTION", "MESSAGE", "TELL", "MSG",
+      "MESSAGE_TARGET", "TELL_TARGET", "MSG_TARGET", "FOR_EACH"));
+  public static final Vocabulary STEP_STRUCTURAL_KEYS = new Vocabulary("action step field",
+      List.of("gate", "run", "delay", "delaySeconds"));
+  public static final Vocabulary LIFECYCLE_STAGES = new Vocabulary("lifecycle stage",
+      List.of("onStart", "onBoundaryViolation", "onExpire", "onDeath", "onEnqueue", "onCancel", "onWait"));
+
+  private static volatile List<LoadedDefinition> loadedDefinitions = List.of();
+
+  /** Immutable raw definition captured when its file is validated during loading. */
+  public record LoadedDefinition(String id, String source, Map<?, ?> values) {
+    public LoadedDefinition {
+      id = id == null ? "" : id;
+      source = source == null ? "" : source;
+      values = immutableDefinition(values);
+    }
+  }
+
   private ActionConfigLoader() {}
+
+  /** Returns the immutable snapshot of definitions validated by the last successful load pass. */
+  public static List<LoadedDefinition> loadedDefinitions() {
+    return loadedDefinitions;
+  }
+
+  private static Map<?, ?> immutableDefinition(Map<?, ?> values) {
+    if (values == null || values.isEmpty()) return Map.of();
+    Map<Object, Object> copy = new LinkedHashMap<>();
+    values.forEach((key, value) -> copy.put(key, immutableValue(value)));
+    return Collections.unmodifiableMap(copy);
+  }
+
+  private static Object immutableValue(Object value) {
+    if (value instanceof Map<?, ?> map) return immutableDefinition(map);
+    if (value instanceof List<?> list) {
+      List<Object> copy = new ArrayList<>(list.size());
+      for (Object item : list) copy.add(immutableValue(item));
+      return Collections.unmodifiableList(copy);
+    }
+    if (value instanceof Set<?> set) {
+      java.util.LinkedHashSet<Object> copy = new java.util.LinkedHashSet<>();
+      for (Object item : set) copy.add(immutableValue(item));
+      return Collections.unmodifiableSet(copy);
+    }
+    return value;
+  }
+
+  private static void logValidationFindings(String id, Map<?, ?> definition, String source) {
+    for (BitFinding finding : ActionDefinitionValidator.validate(id, definition, source).findings()) {
+      String message = "[RTP Action] " + finding.code() + " (" + finding.codeId() + ") at "
+          + finding.source() + ":" + finding.path()
+          + " - " + finding.message();
+      if (!finding.expected().isBlank()) message += " (expected: " + finding.expected() + ")";
+      if (!finding.suggestion().isBlank()) message += " (did you mean: " + finding.suggestion() + "?)";
+      RTPRuntime.log(Level.WARNING, message);
+    }
+  }
 
   /**
    * Loads all action definitions from {@link MultiConfigParser} into {@link ActionManager}.
@@ -38,6 +98,7 @@ public final class ActionConfigLoader {
    */
   public static void loadActions(MultiConfigParser<ActionKeys> actionsParser, ActionManager manager) {
     if (actionsParser == null || manager == null) return;
+    List<LoadedDefinition> definitions = new ArrayList<>();
     for (ConfigParser<ActionKeys> parser : actionsParser.configParserFactory.map.values()) {
       String id = parser.name.replace(".yml", "");
       try {
@@ -58,6 +119,11 @@ public final class ActionConfigLoader {
         if (root == null) {
           root = parser.getYamlRoot();
         }
+        if (root != null) {
+          Map<?, ?> values = root.getValues(false);
+          logValidationFindings(id, values, parser.name);
+          definitions.add(new LoadedDefinition(id, parser.name, values));
+        }
         ActionDefinition def = (root != null) ? parseDefinition(id, root) : parseDefinition(id, parser);
         manager.registerAction(def);
         RTPRuntime.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
@@ -65,6 +131,7 @@ public final class ActionConfigLoader {
         RTPRuntime.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + parser.name, e);
       }
     }
+    loadedDefinitions = List.copyOf(definitions);
   }
 
   /**
@@ -77,15 +144,23 @@ public final class ActionConfigLoader {
     if (pluginDirectory == null || manager == null) return;
     File actionsDir = new File(pluginDirectory, "definitions/actions");
     if (!actionsDir.exists() || !actionsDir.isDirectory()) {
+      loadedDefinitions = List.of();
       return;
     }
     File[] files = actionsDir.listFiles((dir, name) -> name.endsWith(".yml") && !name.startsWith("."));
-    if (files == null) return;
+    if (files == null) {
+      loadedDefinitions = List.of();
+      return;
+    }
 
+    List<LoadedDefinition> definitions = new ArrayList<>();
     for (File file : files) {
       String id = file.getName().substring(0, file.getName().length() - 4);
       try (Reader reader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)) {
         RtpYamlConfig yaml = RtpYamlConfig.parse(reader);
+        Map<?, ?> values = yaml.getValues(false);
+        logValidationFindings(id, values, file.toString());
+        definitions.add(new LoadedDefinition(id, file.toString(), values));
         ActionDefinition def = parseDefinition(id, yaml);
         manager.registerAction(def);
         RTPRuntime.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
@@ -93,6 +168,7 @@ public final class ActionConfigLoader {
         RTPRuntime.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + file.getName(), e);
       }
     }
+    loadedDefinitions = List.copyOf(definitions);
   }
 
   /**

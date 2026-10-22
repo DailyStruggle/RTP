@@ -1,5 +1,10 @@
 package io.github.dailystruggle.rtp.fabric.server;
 
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
+import io.github.dailystruggle.rtp.common.mock.RuntimeMockRTPPlayer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.DataInputStream;
@@ -20,6 +25,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -171,6 +177,45 @@ class FabricServerAccessorPlayerLookupTest {
 
     // --- Fake server with no player list method ---
     public static final class FakeEmptyServer {}
+
+    @BeforeEach
+    void clearMocksBefore() {
+        MockPlayerRegistry.clear();
+    }
+
+    @AfterEach
+    void clearMocksAfter() {
+        MockPlayerRegistry.clear();
+    }
+
+    @Test
+    @DisplayName("ADR-121: registered BIT mock resolves before native lookup and is absent from online names")
+    void registeredMockResolvesBeforeNativeLookup() {
+        FabricServerAccessor accessor = new FabricServerAccessor();
+        UUID mockId = UUID.randomUUID();
+        RuntimeMockRTPPlayer mock = new RuntimeMockRTPPlayer(mockId, "rtp-bit-0a1b2c3d", null);
+        MockPlayerRegistry.register(mock);
+
+        assertSame(mock, accessor.getPlayer(mockId));
+        assertSame(mock, accessor.getPlayer("RTP-BIT-0A1B2C3D"));
+        assertSame(mock, accessor.getSender(mockId));
+        assertFalse(accessor.getOnlinePlayerNames().contains("rtp-bit-0a1b2c3d"));
+        assertTrue(accessor.getOnlinePlayers().stream().noneMatch(p -> mockId.equals(p.uuid())));
+    }
+
+    @Test
+    @DisplayName("ADR-121: after unregister, lookups fall back to native behaviour")
+    void unregisteredMockFallsBackToNative() {
+        FabricServerAccessor accessor = new FabricServerAccessor();
+        UUID mockId = UUID.randomUUID();
+        MockPlayerRegistry.register(new RuntimeMockRTPPlayer(mockId, "rtp-bit-0a1b2c3d", null));
+        MockPlayerRegistry.unregister(mockId);
+
+        // No server bound: native lookup yields null.
+        assertNull(accessor.getPlayer(mockId));
+        assertNull(accessor.getPlayer("rtp-bit-0a1b2c3d"));
+        assertNull(accessor.getSender(mockId));
+    }
 
     @Test
     void lookupWithMojangNamesResolvesPlayerAndMemoizes() {

@@ -7,6 +7,7 @@ import io.github.dailystruggle.effectsapi.common.effects.NoteEffect;
 import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
 import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
 import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
+import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import org.bukkit.Bukkit;
@@ -36,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * platforms (Spigot/Paper/Folia) call {@link #registerAll()} during plugin
  * load to populate the factory with the legacy
  * {@code FIREWORK}/{@code NOTE}/{@code PARTICLE}/{@code POTION}/{@code SOUND}/
- * {@code GLIDE} effects. Fabric uses a parallel
+ * {@code GLIDE}/{@code TITLE} effects. Fabric uses a parallel
  * {@code FabricEffectsInitializer}.
  *
  * <p>Also retains Bukkit-typed convenience methods -
@@ -55,16 +56,17 @@ public final class BukkitEffectsInitializer {
      * Schedule an {@link Effect} on the Bukkit main thread. Replaces the
      * prior {@code effect.runTask(plugin)} pattern that relied on
      * {@code Effect extends BukkitRunnable} (decoupled 2026-05-07 - see
-     * {@code Effect} class javadoc). Falls back to a direct
-     * {@link Effect#run()} call if the scheduler rejects the task (e.g. on a
-     * Folia region thread under unusual ownership conditions), preserving
-     * the resilience of the prior {@code try{runTask} catch{run}} idiom.
+     * {@code Effect} class javadoc). If the scheduler rejects the task, the
+     * failure is reported and the effect is dropped rather than run on the
+     * calling thread.
      */
     public static void runEffect(@NotNull Plugin plugin, @NotNull Effect<?> effect) {
         try {
             Bukkit.getScheduler().runTask(plugin, (Runnable) effect);
-        } catch (Throwable t) {
-            effect.run();
+        } catch (RuntimeException failure) {
+            Effect.warn("Could not schedule effect " + effect.getClass().getSimpleName()
+                    + " on the Bukkit scheduler; dropping it ("
+                    + failure.getClass().getSimpleName() + ": " + failure.getMessage() + ")");
         }
     }
 
@@ -88,6 +90,7 @@ public final class BukkitEffectsInitializer {
         EffectFactory.addEffect("SOUND", new SoundEffect(Sound.valueOf("ENTITY_PLAYER_LEVELUP")));
         // Glide requires elytra (1.9+); register conditionally to keep older servers happy.
         if (EffectsAPI.getServerIntVersion() >= 9) EffectFactory.addEffect("GLIDE", new GlideEffect());
+        EffectFactory.addEffect("TITLE", new TitleEffect());
         EffectFactory.addEffect("COMMAND", new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
         EffectFactory.addEffect("DROP_INVENTORY", new io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect());
         EffectFactory.addEffect("DROP_EXP", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());

@@ -91,8 +91,11 @@ public class Region extends FactoryValue<RegionKeys> {
    * landing activeChunkCap loads on one tick.
    */
   static final int MAX_PROMOTIONS_PER_PULSE = 8;
+  static final long SHED_REFILL_COOLDOWN_NANOS = TimeUnit.SECONDS.toNanos(30L);
   protected RTPWorld<?> savedWorld = null;
   private long lastValidationTime = 0;
+  private volatile long lastHeapShedNanos = Long.MIN_VALUE;
+  private volatile long heapPressureClearedNanos = Long.MIN_VALUE;
 
   private RegionSettings settings;
   public Shape<?> shape;
@@ -592,10 +595,30 @@ public class Region extends FactoryValue<RegionKeys> {
       shed++;
     }
     if (shed > 0) {
+      lastHeapShedNanos = System.nanoTime();
+      heapPressureClearedNanos = Long.MIN_VALUE;
       RTPRuntime.log(Level.FINE,
           "[Region:" + name + "] shed " + shed + " hot chunk ticket(s) under heap pressure; kept="
               + queueManager.keptLocations.size());
     }
+  }
+
+  static boolean shedRefillCooldownActive(long pressureClearedAtNanos, long nowNanos) {
+    return pressureClearedAtNanos == Long.MIN_VALUE
+        || nowNanos - pressureClearedAtNanos < SHED_REFILL_COOLDOWN_NANOS;
+  }
+
+  private boolean pauseAfterHeapShed(boolean heapUnderPressure, long nowNanos) {
+    if (lastHeapShedNanos == Long.MIN_VALUE) return false;
+    if (heapUnderPressure) {
+      heapPressureClearedNanos = Long.MIN_VALUE;
+      return true;
+    }
+    if (heapPressureClearedNanos == Long.MIN_VALUE) heapPressureClearedNanos = nowNanos;
+    if (shedRefillCooldownActive(heapPressureClearedNanos, nowNanos)) return true;
+    lastHeapShedNanos = Long.MIN_VALUE;
+    heapPressureClearedNanos = Long.MIN_VALUE;
+    return false;
   }
 
   /** Upper bound on waiting for a promoted chunk's ticket and native load before giving up. */
@@ -773,7 +796,11 @@ public class Region extends FactoryValue<RegionKeys> {
    * promotion checks; the candidate ends in kept, back in cold, or dropped. Holds one
    * {@code inFlightCalculations} slot until the outcome is known.
    */
-  private void promoteCold(RTPLocation coldLoc, int cx, int cz) {
+  private void promoteCold(
+      RTPLocation coldLoc,
+      int cx,
+      int cz,
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
     inFlightCalculations.incrementAndGet();
     RTPRuntime.log(Level.FINER,
         "[Region:" + name + "] SpawnWorker for cold (" + coldLoc.coords().x()
@@ -784,13 +811,34 @@ public class Region extends FactoryValue<RegionKeys> {
     RTPRuntime.log(Level.FINER,
         "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
             + ") getChunkAtAsync DISPATCHED inFlight=" + inFlightCalculations.get());
-    getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+    CompletableFuture<ChunkSet> loadFuture;
+    try {
+      loadFuture = io.github.dailystruggle.rtp.common.tools.GenerationBudget.withReservation(
+          generationSlot, () -> getWorld().getChunkAtAsync(cx, cz));
+    } catch (Throwable t) {
+      generationSlot.close();
+      inFlightCalculations.decrementAndGet();
+      queueManager.unkeptLocations.offerSilently(coldLoc);
+      RTPRuntime.log(Level.WARNING,
+          "[Region:" + name + "] cold promotion dispatch failed for chunk=(" + cx + "," + cz + ")", t);
+      return;
+    }
+    if (loadFuture == null) {
+      generationSlot.close();
+      inFlightCalculations.decrementAndGet();
+      queueManager.unkeptLocations.offerSilently(coldLoc);
+      RTPRuntime.log(Level.WARNING,
+          "[Region:" + name + "] cold promotion returned no load future for chunk=(" + cx + "," + cz + ")");
+      return;
+    }
+    loadFuture.thenAccept(chunkSet -> {
       RTPRuntime.log(Level.FINER,
           "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
               + ") thenAccept FIRED chunkSet=" + (chunkSet == null ? "null" : "present")
               + " complete()=" + (chunkSet == null || chunkSet.complete() == null
                   ? "null" : "done=" + chunkSet.complete().isDone()));
       chunkSet.complete().whenComplete((success, throwable) -> {
+        generationSlot.close();
         RTPRuntime.log(Level.FINER,
             "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                 + ") complete.whenComplete success=" + success
@@ -907,6 +955,7 @@ public class Region extends FactoryValue<RegionKeys> {
         }
       });
     }).exceptionally(throwable -> {
+      generationSlot.close();
       RTPRuntime.log(Level.FINER,
           "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
               + ") getChunkAtAsync EXCEPTIONALLY "
@@ -974,16 +1023,18 @@ public class Region extends FactoryValue<RegionKeys> {
     // waiting players (the playerQueue drain below) continues regardless.
     boolean heapUnderPressure =
         io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
-    long fillDeficit = (heapUnderPressure || tickUnhealthy) ? 0 : Math.min(deficit, MAX_PROMOTIONS_PER_PULSE);
-    if ((heapUnderPressure || tickUnhealthy) && deficit > 0) {
-      RTPRuntime.log(Level.FINE,
-          "[Region:" + name + "] hot-cache fill paused ("
-              + (heapUnderPressure ? "heap pressure" : "tick health") + "); deficit=" + deficit);
-    }
-
     // Active shed: under heap pressure, release kept chunk tickets back to unkeptLocations.
     if (heapUnderPressure) {
       shedHotCacheUnderPressure();
+    }
+    boolean shedCooldown = pauseAfterHeapShed(heapUnderPressure, System.nanoTime());
+    long fillDeficit = (heapUnderPressure || tickUnhealthy || shedCooldown)
+        ? 0 : Math.min(deficit, MAX_PROMOTIONS_PER_PULSE);
+    if ((heapUnderPressure || tickUnhealthy || shedCooldown) && deficit > 0) {
+      String reason = heapUnderPressure ? "heap pressure"
+          : tickUnhealthy ? "tick health" : "post-shed refill cooldown";
+      RTPRuntime.log(Level.FINE,
+          "[Region:" + name + "] hot-cache fill paused (" + reason + "); deficit=" + deficit);
     }
 
     for (int i = 0; i < fillDeficit; i++) {
@@ -1002,10 +1053,25 @@ public class Region extends FactoryValue<RegionKeys> {
       int cz = coldLoc.coords().z() >> 4;
       // ADR-087 regional circuit breaker: a backlogged or slow region keeps its candidate cold;
       // the next candidate (usually another region) takes this slot, so load is divided, not stacked.
+      if (RTPRuntime.scheduler() != null
+          && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
+        queueManager.unkeptLocations.offerSilently(coldLoc);
+        RTPRuntime.log(Level.FINE,
+            "[Region:" + name + "] cold promotion deferred: generation budget full");
+        break;
+      }
       if (RTPRuntime.scheduler() != null && RTPRuntime.scheduler().isRegionSaturated(getWorld(), cx, cz)) {
         queueManager.unkeptLocations.offerSilently(coldLoc); // silent: the poll kept its DB row
       } else {
-        promoteCold(coldLoc, cx, cz);
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot =
+            io.github.dailystruggle.rtp.common.tools.GenerationBudget.server().reserve();
+        if (generationSlot == null) {
+          queueManager.unkeptLocations.offerSilently(coldLoc);
+          RTPRuntime.log(Level.FINE,
+              "[Region:" + name + "] cold promotion deferred: generation budget full");
+          break;
+        }
+        promoteCold(coldLoc, cx, cz, generationSlot);
       }
     }
 
@@ -1175,7 +1241,13 @@ public class Region extends FactoryValue<RegionKeys> {
     // Floor of 1 ns keeps the one-task-per-pulse progress guarantee on this async worker.
     miscPipeline.execute(Math.max(1L, availableTime - (System.nanoTime() - start)));
 
-    if (tickUnhealthy) return;
+    if (tickUnhealthy || heapUnderPressure || shedCooldown) return;
+    // Unprioritised chunk systems: cold fill waits while earlier loads are still being generated,
+    // so the chunks players need are not queued behind RTP's (ADR-087).
+    if (RTPRuntime.scheduler() != null && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
+      RTPRuntime.log(Level.FINE, "[Region:" + name + "] cold fill waiting: chunk generation budget full");
+      return;
+    }
 
     long cacheCap = settings.cacheCap();
     long totalCap = Math.max(cacheCap + activeCap, queueManager.playerQueue.size());
@@ -1189,7 +1261,27 @@ public class Region extends FactoryValue<RegionKeys> {
       deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + queueManager.unkeptLocations.size() + inFlightCalculations.get() + pendingKeptPromotions.get());
 
       for (long i = 0; i < deficit; i++) {
-        cachePipeline.add(new RegionCacheTask(this, availableTime - (System.nanoTime() - start)));
+        if (RTPRuntime.scheduler() != null
+            && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
+          RTPRuntime.log(Level.FINE, "[Region:" + name + "] cold fill deferred: generation budget full");
+          break;
+        }
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot =
+            io.github.dailystruggle.rtp.common.tools.GenerationBudget.server().reserve();
+        if (generationSlot == null) {
+          RTPRuntime.log(Level.FINE, "[Region:" + name + "] cold fill deferred: generation budget full");
+          break;
+        }
+        RegionCacheTask task = null;
+        try {
+          task = new RegionCacheTask(this, availableTime - (System.nanoTime() - start));
+          task.holdGenerationSlot(generationSlot);
+          cachePipeline.add(task);
+        } catch (RuntimeException | Error failure) {
+          if (task != null) task.setCancelled(true);
+          else generationSlot.close();
+          throw failure;
+        }
       }
 
       // Schedule at most one observational RegionCacheTask when visitor mode is enabled.

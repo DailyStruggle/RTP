@@ -125,6 +125,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # Lehnt Landungen an Hängen oder Klippenkanten ab, die mindestens so steil sind, in Grad.
+    # "off" ist am schnellsten. 30 lehnt etwa 1 von 5 Landpunkten ab, 45 etwa 1 von 12, 60 etwa 1 von 60.
+    # Jede Zahl von 0 bis 89 geht ebenfalls. Wenn aktiv, liest die Suche die Chunks um jeden Punkt.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

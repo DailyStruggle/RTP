@@ -26,6 +26,7 @@ One jar runs on Paper, Spigot, Folia, Fabric and NeoForge. It's free and MIT-lic
 ## Contents
 
 - [What servers use it for](#what-servers-use-it-for)
+- [Why LeafRTP](#why-leafrtp)
 - [Quick start](#quick-start)
 - [Features](#features)
 - [Supported platforms](#supported-platforms)
@@ -48,6 +49,31 @@ One jar runs on Paper, Spigot, Folia, Fabric and NeoForge. It's free and MIT-lic
 - **Arenas and 1v1 duels**, with matched spawn points for each side ([recipe](docs/admin/RECIPES.md#symmetrical-1v1-duels--arena-battles-subspace-placement)).
 - **Networks behind Velocity**: `/rtp` on one server sends the player to a region on another ([proxy mode](docs/admin/proxies/INDEX.md)).
 - **Paid teleports, NPCs, signs and menus**: charge through Vault, or start a teleport from any plugin that runs a command ([recipes](docs/admin/RECIPES.md)).
+
+---
+
+## Why LeafRTP
+
+Speed is the obvious part. These are the other things it's built to get right.
+
+**For players and the world**
+
+- **Spacing.** In two test runs of 4,096 teleports each, no spot was used twice and no two players landed within 48 blocks of each other; the closest pair was 70 blocks apart. Plain random picks put about 80 pairs that close in each run. No player tracking is involved ([spacing](docs/site/how-it-works.md#spacing-between-players)).
+- **Fresh land.** Optionally, each landing area is handed out only once, so players on a long-running world keep finding untouched ground.
+- **Bad ground.** Oceans, lava, void and claimed land are remembered once and skipped from then on, across restarts. Entries expire on a timer you set, so changes to the world get picked up ([TTL](docs/admin/configuration/TTL.md)).
+- **Biome requests.** `/rtp biome=<biome>` is answered from what RTP already knows about the region, with no extra chunk loading.
+- **Biome weights.** Give a biome a weight to make it more or less likely. Biomes nobody has landed in yet stay reachable. Turn it on with `biomeWeighted: true` in `advanced/biomes.yml` ([biome settings](docs/admin/configuration/SAFETY.md)).
+- **Custom worlds.** Custom generators (Iris, Terra, datapacks) and upgraded worlds are read the same way as vanilla.
+- **Cleanup.** Every loaded chunk and background task is tracked and released, including when a teleport fails, so memory stays flat over long uptimes. Every failed teleport is reported.
+
+**For the people running it**
+
+- **GUI.** Bare `/rtp` opens a chest-style destination picker out of the box. Destinations a player can't use show as barriers, and icons can be custom items (ItemsAdder, Oraxen, Nexo, HeadDatabase). Where no menu can be shown, `/rtp` teleports directly ([GUI addon](docs/admin/ADDONS.md#the-bundled-gui-demo)).
+- **Web editor.** `/rtp editor` opens your config in a browser. Drag the region border on a map of your world, review the exact YAML change before applying it, and get a backup of every file it touches. Like the LuckPerms and spark editors, it needs no open ports ([web editor](docs/admin/WEB_EDITOR_GUIDE.md)).
+- **Admin menu.** `/rtp admin` is one book menu for setup presets, a config browser, diagnostics, scans and reload. From the console, `/rtp config <section> key=value` does the same ([in-game config](docs/admin/configuration/IN_GAME_CONFIG.md)).
+- **Safeguards.** The setup wizard (`/rtp admin setup`) shows a preview and backs up your config before it writes. Presets can be rolled back, and the editor rejects shapes that cross themselves or leave the world border.
+- **In-game help.** `/rtp info` shows what each region is doing. The full admin guide is unpacked to `plugins/RTP/docs/` on first run and can be read inside the web editor.
+- **Migration.** `/rtp config import` reads a BetterRTP, JustRTP or EzRTP config folder, even with the old plugin removed, and moves worlds, radius, cooldowns, prices and effects across, backing up anything it replaces. `/rtp config import permissions` prints the LuckPerms commands for the old permission nodes.
 
 ---
 
@@ -97,16 +123,13 @@ All commands and permissions: [COMMANDS.md](docs/admin/COMMANDS.md).
 ## Features
 
 - **Instant teleports.** RTP finds and checks safe spots before anyone asks, so a teleport is usually served in 0-2 ticks.
-- **Doesn't lag the server.** No chunk loading on the main thread, and it's built for Folia's regional threads, not patched to work on them.
+- **Doesn't lag the server.** No chunk loading on the main thread, and it's built for Folia's regional threads.
 - **Safe landings.** No lava, water, mid-air drops or suffocation. You choose which blocks and biomes count as unsafe.
 - **Respects claims.** Skips land protected by GriefPrevention, GriefDefender, WorldGuard, Towny, Lands and others, detected automatically.
-- **Learns your map.** Remembers oceans, claims and other bad areas so it stops retrying them, and keeps that across restarts.
-- **Fresh spots.** Optionally never reuses a landing area, so players keep finding new land.
 - **Any shape.** Circles, squares, rectangles or custom polygons, with uniform, centre-weighted or ring-shaped spread. Any number of regions per world.
 - **Biome filters.** Leave out oceans, or send players only to the biomes you list.
 - **Economy and cooldowns.** Optional Vault cost per teleport, plus cooldowns, use limits and per-region permissions.
 - **Configurable everything.** Every message is editable, and ships in 11 languages besides English. Teleport effects, sounds and countdowns are optional.
-- **Web editor and in-game menu.** Edit config from a browser or a clickable book menu instead of by hand.
 - **PlaceholderAPI** support for cooldowns, queues and region info on scoreboards, tab lists and holograms.
 
 <div align="center">

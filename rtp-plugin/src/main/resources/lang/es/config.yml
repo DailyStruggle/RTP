@@ -132,6 +132,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # Rechaza aterrizajes en laderas o bordes de acantilado con esta pendiente o más, en grados.
+    # "off" es lo más rápido. 30 rechaza 1 de cada 5 puntos en tierra, 45 1 de cada 12, 60 1 de cada 60.
+    # También vale cualquier número de 0 a 89. Activado, la búsqueda lee los chunks alrededor de cada punto.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

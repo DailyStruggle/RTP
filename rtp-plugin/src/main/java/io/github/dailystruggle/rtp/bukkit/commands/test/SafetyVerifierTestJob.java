@@ -1,10 +1,20 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -18,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
@@ -32,6 +42,14 @@ import org.jetbrains.annotations.Nullable;
  */
 public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
 
+  public static final BitCode PRECONDITION = registerCode(3901, "TEST_SAFETY_VERIFIER_PRECONDITION");
+  public static final BitCode UNSAFE_CACHE = registerCode(3902, "TEST_SAFETY_VERIFIER_UNSAFE_CACHE");
+  public static final BitCode FUTURE_RETURNED = registerCode(3903, "TEST_SAFETY_VERIFIER_FUTURE_RETURNED");
+  public static final BitCode FUTURE_ASYNC = registerCode(3904, "TEST_SAFETY_VERIFIER_FUTURE_ASYNC");
+  public static final BitCode DISPATCH = registerCode(3905, "TEST_SAFETY_VERIFIER_DISPATCH");
+  public static final BitCode TIMEOUT = registerCode(3906, "TEST_SAFETY_VERIFIER_TIMEOUT");
+  public static final BitComponent COMPONENT = registerComponent();
+
   /** Async-verifier wait bound. */
   static final long VERIFIER_TIMEOUT_MS = 750L;
 
@@ -40,6 +58,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
 
   public SafetyVerifierTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
   }
 
   @Override
@@ -66,12 +85,77 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     if (RTPRuntime.serverAccessor() == null) {
       String msg = "&c[RTP test/safety-verifier] serverAccessor is null; core not yet loaded";
       RTP.log(Level.WARNING, msg);
+      Result unavailable = new Result();
+      unavailable.notes = "serverAccessor is null";
+      BitResult bitResult = RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(unavailable)), Runnable::run);
+      ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
       return false;
     }
 
     Result r = runProbe();
     emit(callerId, r);
+    BitResult bitResult = RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(r)), Runnable::run);
+    ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
     return true;
+  }
+
+  private static BitCode registerCode(int id, String key) {
+    return RtpBitCodes.TEST.register(
+        id,
+        key,
+        java.lang.System.Logger.Level.ERROR,
+        BitTier.IBIT,
+        "test.safety-verifier",
+        "",
+        "Verify the teleport safety probe's preconditions, async verifier and strict timeout.");
+  }
+
+  private static BitComponent registerComponent() {
+    BitComponent component =
+        new BitComponent(
+            "safety-verifier",
+            "test.safety-verifier",
+            BitTier.IBIT,
+            BitSideEffect.SAFE,
+            5_000,
+            () -> toBitReport(runProbe()));
+    RtpBit.RUNNER.register(component);
+    return component;
+  }
+
+  static BitReport toBitReport(Result result) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("safety-verifier");
+    report.check(
+        PRECONDITION,
+        !result.sampledWorld.isBlank(),
+        "safety.world",
+        result.notes == null ? "No RTP world was available." : result.notes);
+    report.check(
+        UNSAFE_CACHE,
+        result.unsafeBlocksCached,
+        "safety.unsafeBlocks",
+        "Unsafe-block lookups did not reuse the same cached snapshot.");
+    report.check(
+        FUTURE_RETURNED,
+        result.futureReturned,
+        "safety.verifierFuture",
+        "The async verifier did not return a live CompletableFuture.");
+    report.check(
+        FUTURE_ASYNC,
+        result.futureAsync,
+        "safety.verifierFuture",
+        "The verifier future was already completed when returned.");
+    report.check(
+        DISPATCH,
+        result.verifierDispatched,
+        "safety.verifierDispatch",
+        "The registered async verifier was not dispatched.");
+    report.check(
+        TIMEOUT,
+        result.timeoutCaught,
+        "safety.verifierTimeout",
+        "The verifier wait did not take the strict timeout path.");
+    return report.build();
   }
 
   /**
@@ -122,20 +206,18 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     // verifier, and assert the returned value is a live CompletableFuture
     // that is NOT pre-completed.
     CountDownLatch verifierEntered = new CountDownLatch(1);
-    AtomicBoolean verifierShouldHang = new AtomicBoolean(true);
+    AtomicReference<CompletableFuture<Boolean>> hangingFuture = new AtomicReference<>();
     Function<RTPCoords, CompletableFuture<Boolean>> hangMock =
         loc -> {
+          if (loc != sampled) return CompletableFuture.completedFuture(true);
           verifierEntered.countDown();
           CompletableFuture<Boolean> never = new CompletableFuture<>();
-          // If the harness deadline expires, resolve the future so the
-          // try/finally unregister path cannot be blocked on a lingering
-          // upstream chain. This is belt-and-braces; the timeout on the
-          // caller's .get() is the primary S-004 signal.
-          if (!verifierShouldHang.get()) never.complete(true);
+          hangingFuture.set(never);
           return never;
         };
 
-    GlobalRegionVerifiers.addGlobalRegionVerifierAsync(hangMock);
+    AutoCloseable hangMockRegistration =
+        GlobalRegionVerifiers.addGlobalRegionVerifierAsync(SafetyVerifierTestJob.class, hangMock);
     try {
       CompletableFuture<Boolean> future =
           GlobalRegionVerifiers.checkGlobalRegionVerifiers(sampled);
@@ -183,23 +265,17 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
         r.notes = "unexpected exception waiting for verifier: " + t.getClass().getSimpleName();
       }
     } finally {
-      // Allow the hang-mock's CompletableFuture to settle on subsequent
-      // invocations (defensive; the instance we registered is removed below).
-      verifierShouldHang.set(false);
+      CompletableFuture<Boolean> pending = hangingFuture.get();
+      if (pending != null) pending.complete(true);
       // S-003 hygiene: never leave a hanging verifier registered. If this
-      // cleanup is ever changed to a best-effort log-and-continue, every
-      // subsequent real teleport will stall for VERIFIER_TIMEOUT_MS per
-      // candidate.
+      // cleanup is ever changed to a best-effort log-and-continue, a
+      // subsequent check could encounter the probe's verifier.
       try {
-        // There is no per-instance remove API on GlobalRegionVerifiers today;
-        // clearing is the only supported hygiene path. Document it so a
-        // future refactor that introduces a removeAsync(...) method updates
-        // this site (and the "Already satisfied by" note in AGENTS.md).
-        GlobalRegionVerifiers.clearGlobalRegionVerifiers();
+        hangMockRegistration.close();
       } catch (Throwable t) {
         RTP.log(
             Level.WARNING,
-            "[RTP test/safety-verifier] failed to clear verifiers after probe: "
+            "[RTP test/safety-verifier] failed to unregister probe verifier: "
                 + t.getClass().getSimpleName(),
             t);
       }
@@ -214,7 +290,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     return r;
   }
 
-  /** Emits the result per the RUNTIME_TEST_SUITE_PLAN output contract. */
+  /** Emits the unchanged legacy summary and detail rows. */
   private void emit(UUID callerId, Result r) {
     String summary =
         "[RTP test/safety-verifier] "

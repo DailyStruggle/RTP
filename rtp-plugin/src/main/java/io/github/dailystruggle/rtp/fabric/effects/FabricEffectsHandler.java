@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.effects.EffectDispatch;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -71,6 +72,7 @@ public final class FabricEffectsHandler {
      * lifecycle-hook lambdas are added once via the {@link AlreadyHooked} flag).
      */
     public static void setupEffects(MinecraftServer server) {
+        EffectDispatch.installWarnSink();
         FabricEffectRuntime.bindServer(server);
         FabricEffectsInitializer.registerAll();
 
@@ -230,7 +232,7 @@ public final class FabricEffectsHandler {
             }
 
             List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
-            for (Effect<?> effect : effects) {
+            EffectDispatch.forEachIsolated(prefix, effects, effect -> {
                 effect.setTarget(target);
                 if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
                     DeathTeleports.effectInFlight().add(handle.getUUID());
@@ -239,7 +241,7 @@ public final class FabricEffectsHandler {
                     }
                 }
                 runtime.schedule(effect, 0);
-            }
+            });
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP] Fabric effect dispatch failed for " + prefix + ": "

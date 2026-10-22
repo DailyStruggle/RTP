@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
@@ -453,8 +454,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
-    return io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC;
+  public io.github.dailystruggle.server.api.PlatformFamily getPlatformFamily() {
+    return io.github.dailystruggle.server.api.PlatformFamily.FABRIC;
   }
 
   @Override
@@ -514,6 +515,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public RTPPlayer getPlayer(UUID uuid) {
     if (uuid == null) return null;
+    // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     RTPPlayer cached = playersById.get(uuid);
     if (cached != null) return cached;
     // Lazy fallback: JOIN event registration may have failed silently
@@ -524,6 +528,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public RTPPlayer getPlayer(String name) {
     if (name == null) return null;
+    RTPPlayer mock = MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
     RTPPlayer cached = playersByName.get(name);
     if (cached != null) return cached;
     return lazyResolveAndRegisterByName(name);
@@ -719,6 +725,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (uuid.equals(RTPAPI.serverId)) {
       return new FabricConsoleSender(server);
     }
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     RTPPlayer cached = playersById.get(uuid);
     if (cached != null) return cached;
     // Same lazy fallback as getPlayer(uuid): allow command-time recovery when

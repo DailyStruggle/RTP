@@ -1,10 +1,20 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding;
@@ -29,27 +39,18 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test network} - Shape A automated integration test for the
- * network-mode SPI ({@code MULTI_SERVER_PLAN.md} H3,
- * {@code rtp-proxy-ADR-011} et al.). Reaches the live
- * {@link NetworkTransport} on this JVM via the D3 slot on
- * {@link AbstractSQLDatabaseAccessor#getNetworkStateBinding()} +
- * {@link NetworkStateBinding#transport()}, publishes N synthetic
- * {@link BackendHeartbeat} rows, asserts they appear in the local snapshot
- * and trigger subscriber fan-out, then cleans up by republishing each
- * synthetic row with {@code pluginState=SHUTTING_DOWN} so a real subscriber
- * observes the departure and the binding's reaper drops the row on its
- * next pass.
+ * {@code rtp test network} checks the local {@link NetworkTransport} binding
+ * without requiring a live proxy. Heartbeat checks publish synthetic
+ * {@link BackendHeartbeat} rows and mark them shutting down during cleanup;
+ * token checks use synthetic server and player identities.
  *
  * <p>REQ-RTP-NET-002 parity: when network mode is disabled (no binding /
  * no transport on the D3 slot), the test emits {@code network: NOT-CONFIGURED}
  * and returns without touching any transport surface, opening no threads
  * and allocating no schedulers.</p>
  *
- * <p>What this test does NOT do: it does not test HMAC reject paths
- * (Phase 4 / ADR-010), does not test multi-JVM agreement (requires a real
- * devstack), does not test churn or partition (Shape B territory), and
- * does not test reservation-token claim races. Audit row is suffixed
+ * <p>This test does not cover HMAC rejection, multi-JVM agreement, network
+ * churn, partitions or reservation-token claim races. Audit row is suffixed
  * with {@code (single-JVM only)} on an in-memory binding so operators
  * do not mistake it for a multi-server-readiness check.</p>
  *
@@ -58,6 +59,17 @@ import org.jetbrains.annotations.Nullable;
  * the umbrella.</p>
  */
 public class NetworkSimulationTestJob extends NetworkProbeTarget {
+
+  public static final BitCode NOT_CONFIGURED =
+      registerCode(3801, "TEST_NETWORK_NOT_CONFIGURED", java.lang.System.Logger.Level.INFO);
+  public static final BitCode HEARTBEAT =
+      registerCode(3802, "TEST_NETWORK_HEARTBEAT", java.lang.System.Logger.Level.ERROR);
+  public static final BitCode TOKENS =
+      registerCode(3803, "TEST_NETWORK_TOKENS", java.lang.System.Logger.Level.ERROR);
+  public static final BitCode UNAVAILABLE =
+      registerCode(3804, "TEST_NETWORK_UNAVAILABLE", java.lang.System.Logger.Level.ERROR);
+  public static final BitComponent COMPONENT = registerComponent();
+  private static final ThreadLocal<ProbeContext> ACTIVE_PROBE = new ThreadLocal<>();
 
   /** Per-step wall-clock timeout (publish/await/cleanup). */
   static final long PROBE_TIMEOUT_MS = 2_000L;
@@ -74,6 +86,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
 
   public NetworkSimulationTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the network BIT report as JSON", (uuid, value) -> true));
     // Per commands-api/README.md section 2.2 + section 4: bare tokens are always
     // subcommands, never parameter values. Expose probe modes as real
     // subcommands so `/rtp test network heartbeat`, `tokens`, and `all`
@@ -95,7 +108,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
 
   @Override
   public String description() {
-    return "exercise the live network transport via heartbeat and/or reservation-token probes (Shape A)";
+    return "exercise the local network transport via heartbeat and reservation-token probes";
   }
 
   /**
@@ -112,7 +125,8 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
     dispatchProbe(callerId, ProbeKind.HEARTBEAT,
-            DEFAULT_PEER_COUNT, DEFAULT_OBSERVE_MS, DEFAULT_TOKEN_TTL_MS);
+            DEFAULT_PEER_COUNT, DEFAULT_OBSERVE_MS, DEFAULT_TOKEN_TTL_MS,
+            ProbeBitReport.isJson(parameterValues));
     return true;
   }
 
@@ -126,16 +140,26 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
   @Override
   void dispatchProbe(UUID callerId, ProbeKind kind,
           int peerCount, long observeWindowMs, long tokenTtlMs) {
+    dispatchProbe(callerId, kind, peerCount, observeWindowMs, tokenTtlMs, false);
+  }
+
+  private void dispatchProbe(
+      UUID callerId, ProbeKind kind, int peerCount, long observeWindowMs, long tokenTtlMs, boolean json) {
+    Result result = new Result(kind);
     RTPScheduler scheduler = RTPRuntime.scheduler();
     if (scheduler == null) {
+      result.available = false;
       audit(callerId, "FAIL", "RTP.scheduler is null; core not yet loaded");
+      emitBitResult(callerId, json, result);
       return;
     }
     NetworkTransport transport = resolveTransportOrNull(
             RTP.getInstance() == null ? null : ActiveDatabase.accessor());
     if (transport == null) {
+      result.notConfigured = true;
       audit(callerId, "NOT-CONFIGURED",
               "network mode disabled or no transport bound on this JVM");
+      emitBitResult(callerId, json, result);
       return;
     }
 
@@ -143,29 +167,121 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
     hookHolder[0] = ActiveTestJobs.register(
             callerId, new ActiveTestJobs.Job("network", () -> { /* cooperative cancel only */ }));
 
-    scheduler.runTaskAsynchronously(() -> {
-      try {
-        switch (kind) {
-          case TOKENS -> runTokenProbe(callerId, transport, peerCount, tokenTtlMs);
-          case ALL -> {
-            runProbe(callerId, transport, peerCount, observeWindowMs);
-            runTokenProbe(callerId, transport,
-                    Math.min(peerCount, MAX_TOKEN_COUNT), DEFAULT_TOKEN_TTL_MS);
-          }
-          default -> runProbe(callerId, transport, peerCount, observeWindowMs);
-        }
-      } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        audit(callerId, "FAIL", "probe interrupted: " + ie.getMessage());
-        RTP.log(Level.WARNING, "[RTP test/network] probe interrupted", ie);
-      } catch (Throwable t) {
-        audit(callerId, "FAIL",
-                "uncaught: " + t.getClass().getSimpleName() + ": " + t.getMessage());
-        RTP.log(Level.WARNING, "[RTP test/network] uncaught", t);
-      } finally {
-        if (hookHolder[0] != null) hookHolder[0].run();
-      }
-    });
+    try {
+      scheduler.runTaskAsynchronously(
+          () -> {
+            ProbeContext context = new ProbeContext(result, true);
+            ACTIVE_PROBE.set(context);
+            try {
+              switch (kind) {
+                case TOKENS -> runTokenProbe(callerId, transport, peerCount, tokenTtlMs);
+                case ALL -> {
+                  runProbe(callerId, transport, peerCount, observeWindowMs);
+                  runTokenProbe(callerId, transport, Math.min(peerCount, MAX_TOKEN_COUNT), DEFAULT_TOKEN_TTL_MS);
+                }
+                default -> runProbe(callerId, transport, peerCount, observeWindowMs);
+              }
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              audit(callerId, "FAIL", "probe interrupted: " + interrupted.getMessage());
+              logProbe(Level.WARNING, "[RTP test/network] probe interrupted", interrupted);
+            } catch (Throwable failure) {
+              audit(callerId, "FAIL", "uncaught: " + failure.getClass().getSimpleName() + ": " + failure.getMessage());
+              logProbe(Level.WARNING, "[RTP test/network] uncaught", failure);
+            } finally {
+              ACTIVE_PROBE.remove();
+              emitBitResult(callerId, json, result);
+              if (hookHolder[0] != null) hookHolder[0].run();
+            }
+          });
+    } catch (Throwable failure) {
+      if (hookHolder[0] != null) hookHolder[0].run();
+      result.failure = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+      result.available = false;
+      audit(callerId, "FAIL", "async dispatch threw: " + result.failure);
+      emitBitResult(callerId, json, result);
+    }
+  }
+  private static BitCode registerCode(int id, String key, java.lang.System.Logger.Level severity) {
+    return RtpBitCodes.TEST.register(
+        id,
+        key,
+        severity,
+        BitTier.IBIT,
+        "test.network",
+        "",
+        "Check network transport availability and the selected synthetic probe.");
+  }
+  private static BitComponent registerComponent() {
+    BitComponent component =
+        new BitComponent(
+            "network",
+            "test.network",
+            BitTier.IBIT,
+            BitSideEffect.SAFE,
+            60_000,
+            NetworkSimulationTestJob::runTokenCheck);
+    RtpBit.RUNNER.register(component);
+    return component;
+  }
+  private static BitReport runTokenCheck() {
+    Result result = new Result(ProbeKind.TOKENS);
+    NetworkTransport transport =
+        resolveTransportOrNull(RTP.getInstance() == null ? null : ActiveDatabase.accessor());
+    if (transport == null) {
+      result.notConfigured = true;
+      return toBitReport(result);
+    }
+    ProbeContext context = new ProbeContext(result, false);
+    ACTIVE_PROBE.set(context);
+    try {
+      runTokenProbe(RTPAPI.serverId, transport, DEFAULT_TOKEN_COUNT, DEFAULT_TOKEN_TTL_MS);
+    } catch (Throwable failure) {
+      result.failure = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+    } finally {
+      ACTIVE_PROBE.remove();
+    }
+    return toBitReport(result);
+  }
+  static BitReport toBitReport(Result result) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("network");
+    if (result.notConfigured) {
+      report.note(NOT_CONFIGURED, "network.transport", "No network transport is bound on this JVM.");
+      return report.build();
+    }
+    report.check(UNAVAILABLE, result.available, "network.scheduler", "The scheduler or network probe could not be dispatched.");
+    if (!result.available) return report.build();
+    if (result.kind == ProbeKind.HEARTBEAT || result.kind == ProbeKind.ALL) {
+      report.check(HEARTBEAT, result.heartbeatPassed, "network.heartbeat", "Synthetic heartbeat round-trip failed.");
+    }
+    if (result.kind == ProbeKind.TOKENS || result.kind == ProbeKind.ALL) {
+      report.check(TOKENS, result.tokensPassed, "network.tokens", result.failure == null ? "Synthetic token round-trip failed." : result.failure);
+    }
+    return report.build();
+  }
+  private static void emitBitResult(UUID callerId, boolean json, Result result) {
+    BitResult bitResult =
+        RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(result)), Runnable::run);
+    ProbeBitReport.emit(callerId, json, COMPONENT, bitResult);
+  }
+  private static final class ProbeContext {
+    final Result result;
+    final boolean emitAudit;
+    ProbeContext(Result result, boolean emitAudit) {
+      this.result = result;
+      this.emitAudit = emitAudit;
+    }
+  }
+  public static final class Result {
+    public final ProbeKind kind;
+    public boolean available = true;
+    public boolean notConfigured;
+    public boolean heartbeatPassed;
+    public boolean tokensPassed;
+    public String failure;
+    Result(ProbeKind kind) {
+      this.kind = kind;
+    }
   }
 
   /**
@@ -188,7 +304,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
     }
   }
 
-  private void runProbe(
+  private static void runProbe(
           UUID callerId, NetworkTransport transport, int peerCount, long observeWindowMs)
           throws InterruptedException {
     // 1. Subscribe BEFORE publishing so synchronous bindings (in-memory) fan
@@ -203,7 +319,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
       });
     } catch (Throwable t) {
       audit(callerId, "FAIL", "subscribe threw: " + t.getMessage());
-      RTP.log(Level.WARNING, "[RTP test/network] subscribe", t);
+      logProbe(Level.WARNING, "[RTP test/network] subscribe", t);
       return;
     }
 
@@ -247,12 +363,12 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
       Thread.currentThread().interrupt();
       safeUnsubscribe(sub);
       audit(callerId, "FAIL", "publish interrupted: " + ie.getMessage());
-      RTP.log(Level.WARNING, "[RTP test/network] publish", ie);
+      logProbe(Level.WARNING, "[RTP test/network] publish", ie);
       return;
     } catch (Throwable t) {
       safeUnsubscribe(sub);
       audit(callerId, "FAIL", "publish: " + t.getClass().getSimpleName() + ": " + t.getMessage());
-      RTP.log(Level.WARNING, "[RTP test/network] publish", t);
+      logProbe(Level.WARNING, "[RTP test/network] publish", t);
       return;
     }
 
@@ -268,13 +384,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
       safeUnsubscribe(sub);
       cleanupSynthetic(transport, rows);
       audit(callerId, "FAIL", "readSnapshot interrupted: " + ie.getMessage());
-      RTP.log(Level.WARNING, "[RTP test/network] readSnapshot", ie);
+      logProbe(Level.WARNING, "[RTP test/network] readSnapshot", ie);
       return;
     } catch (Throwable t) {
       safeUnsubscribe(sub);
       cleanupSynthetic(transport, rows);
       audit(callerId, "FAIL", "readSnapshot: " + t.getClass().getSimpleName() + ": " + t.getMessage());
-      RTP.log(Level.WARNING, "[RTP test/network] readSnapshot", t);
+      logProbe(Level.WARNING, "[RTP test/network] readSnapshot", t);
       return;
     }
     Map<String, BackendHeartbeat> backends = snap.backends();
@@ -326,7 +442,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
    * reservation-token TTL reaper newly enable on Redis.</p>
    */
   @SuppressWarnings("java:S2245") // Non-cryptographic pseudo-random number generator is safe for generating synthetic benchmark test UUIDs
-  private void runTokenProbe(
+  private static void runTokenProbe(
           UUID callerId, NetworkTransport transport, int peerCount, long ttlMs) {
     final String suffix = " (" + transport.getClass().getSimpleName() + ")";
     final String serverId = SYNTHETIC_PREFIX + "tokens-"
@@ -355,13 +471,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
           audit(callerId, "FAIL", "claim interrupted: " + ie.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] claim", ie);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] claim", ie);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "claim threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] claim", t);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] claim", t);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         }
@@ -382,13 +498,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
           Thread.currentThread().interrupt();
           audit(callerId, "FAIL", "findReservation interrupted: "
                   + ie.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] findReservation", ie);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] findReservation", ie);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "findReservation(present) threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] findReservation", t);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] findReservation", t);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         }
@@ -409,13 +525,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
           Thread.currentThread().interrupt();
           audit(callerId, "FAIL", "release interrupted: "
                   + ie.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] release", ie);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] release", ie);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "release threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] release", t);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] release", t);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         }
@@ -430,13 +546,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
           Thread.currentThread().interrupt();
           audit(callerId, "FAIL", "findReservation(post-release) interrupted: "
                   + ie.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] findReservation post-release", ie);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] findReservation post-release", ie);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         } catch (Throwable t) {
           audit(callerId, "FAIL", "findReservation(post-release) threw: "
                   + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
-          RTP.log(Level.WARNING, "[RTP test/network/tokens] findReservation post-release", t);
+          logProbe(Level.WARNING, "[RTP test/network/tokens] findReservation post-release", t);
           cleanupSyntheticTokens(transport, mintedTokenIds);
           return;
         }
@@ -462,13 +578,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
         Thread.currentThread().interrupt();
         audit(callerId, "FAIL", "reap-claim interrupted: "
                 + ie.getMessage() + suffix);
-        RTP.log(Level.WARNING, "[RTP test/network/tokens] reap-claim", ie);
+        logProbe(Level.WARNING, "[RTP test/network/tokens] reap-claim", ie);
         cleanupSyntheticTokens(transport, mintedTokenIds);
         return;
       } catch (Throwable t) {
         audit(callerId, "FAIL", "reap-claim threw: "
                 + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
-        RTP.log(Level.WARNING, "[RTP test/network/tokens] reap-claim", t);
+        logProbe(Level.WARNING, "[RTP test/network/tokens] reap-claim", t);
         cleanupSyntheticTokens(transport, mintedTokenIds);
         return;
       }
@@ -492,13 +608,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
         Thread.currentThread().interrupt();
         audit(callerId, "FAIL", "reapExpired interrupted: "
                 + ie.getMessage() + suffix);
-        RTP.log(Level.WARNING, "[RTP test/network/tokens] reapExpired", ie);
+        logProbe(Level.WARNING, "[RTP test/network/tokens] reapExpired", ie);
         cleanupSyntheticTokens(transport, mintedTokenIds);
         return;
       } catch (Throwable t) {
         audit(callerId, "FAIL", "reapExpired threw: "
                 + t.getClass().getSimpleName() + ": " + t.getMessage() + suffix);
-        RTP.log(Level.WARNING, "[RTP test/network/tokens] reapExpired", t);
+        logProbe(Level.WARNING, "[RTP test/network/tokens] reapExpired", t);
         cleanupSyntheticTokens(transport, mintedTokenIds);
         return;
       }
@@ -552,7 +668,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
   }
 
   /** Republish each row with {@code SHUTTING_DOWN} and a far-past timestamp so reapers drop them. */
-  private void cleanupSynthetic(NetworkTransport transport, List<BackendHeartbeat> rows) {
+  private static void cleanupSynthetic(NetworkTransport transport, List<BackendHeartbeat> rows) {
     for (BackendHeartbeat row : rows) {
       try {
         BackendHeartbeat leave = new BackendHeartbeat(
@@ -593,9 +709,21 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
     return n != null && n.contains("InMemory");
   }
 
-  private void audit(UUID callerId, String verdict, String detail) {
+  private static void audit(UUID callerId, String verdict, String detail) {
+    ProbeContext context = ACTIVE_PROBE.get();
+    if (context != null) {
+      if ("NOT-CONFIGURED".equals(verdict)) {
+        context.result.notConfigured = true;
+      } else if ("PASS".equals(verdict)) {
+        if (context.result.kind != ProbeKind.TOKENS) context.result.heartbeatPassed = true;
+        if (context.result.kind != ProbeKind.HEARTBEAT) context.result.tokensPassed = true;
+      } else if ("FAIL".equals(verdict)) {
+        context.result.failure = detail;
+      }
+      if (!context.emitAudit) return;
+    }
     String msg = "[RTP test/network] " + verdict + ": " + detail;
-    if (!callerId.equals(RTPAPI.serverId)) {
+    if (!callerId.equals(RTPAPI.serverId) && RTPRuntime.serverAccessor() != null) {
       RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
     if ("PASS".equals(verdict) || "NOT-CONFIGURED".equals(verdict)) {
@@ -603,5 +731,10 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
     } else {
       RTP.log(Level.WARNING, msg);
     }
+  }
+
+  private static void logProbe(Level level, String message, Throwable failure) {
+    ProbeContext context = ACTIVE_PROBE.get();
+    if (context == null || context.emitAudit) RTP.log(level, message, failure);
   }
 }

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
@@ -9,6 +10,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,6 +41,9 @@ class RegionTickBudgetTest {
         world = new TrackedMockWorld("tick_budget_world");
         accessor.addWorld(world);
         ServerHealthGate.resetForTesting();
+        GenerationBudget.server().resetForTesting();
+        GenerationBudget.configureServerAdmission(true);
+        GenerationBudget.configureServerCap(null);
         MiscTasks.sync().clear();
         MiscTasks.sync().start();
     }
@@ -44,6 +51,9 @@ class RegionTickBudgetTest {
     @AfterEach
     void tearDown() {
         ServerHealthGate.resetForTesting();
+        GenerationBudget.server().resetForTesting();
+        GenerationBudget.configureServerAdmission(true);
+        GenerationBudget.configureServerCap(null);
         MiscTasks.sync().clear();
     }
 
@@ -134,19 +144,166 @@ class RegionTickBudgetTest {
         }
     }
 
+    @Test
+    @DisplayName("generation budget full (unprioritised chunk system): no promotion starts and candidates stay cold")
+    void fullGenerationBudgetHoldsPromotionBack() {
+        Region region = regionWithColdCandidates("budget_reg", 8);
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTPRuntime.scheduler();
+        java.util.concurrent.atomic.AtomicBoolean full = new java.util.concurrent.atomic.AtomicBoolean(true);
+        RTPRuntime.setScheduler(new SaturationScheduler(original, cx -> false, full::get));
+        try {
+            long before = CfDiag.regionDeficitDispatch.sum();
+            region.execute(TimeUnit.SECONDS.toNanos(1));
+            assertEquals(0, CfDiag.regionDeficitDispatch.sum() - before, "no chunk loads while the budget is full");
+            assertEquals(8, region.queueManager.unkeptLocations.size(), "cold candidates are kept, not dropped");
+
+            full.set(false);
+            region.execute(TimeUnit.SECONDS.toNanos(1));
+            assertTrue(CfDiag.regionDeficitDispatch.sum() - before > 0, "promotion resumes once loads drain");
+        } finally {
+            RTPRuntime.setScheduler(original);
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-CORE-F-002: cold fill reserves no more queued tasks than the shared generation cap")
+    void coldFillQueueIsBoundedByGenerationBudget() {
+        GenerationBudget.configureServerCap(() -> 2);
+        Region region = regionWithColdCandidates("cold_fill_budget_reg", 8);
+        region.queueManager.unkeptLocations.clear();
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTPRuntime.scheduler();
+        RTPRuntime.setScheduler(new SaturationScheduler(
+                original, cx -> false, () -> GenerationBudget.server().saturated()));
+        try {
+            region.execute(TimeUnit.SECONDS.toNanos(1));
+
+            assertEquals(2, region.cachePipeline.size(), "only two reserved cache tasks may be queued");
+            assertEquals(2, GenerationBudget.server().inFlight());
+        } finally {
+            region.cachePipeline.stop();
+            RTPRuntime.setScheduler(original);
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-CORE-F-002: a heap shed pauses refill until 30 seconds after pressure clears")
+    void heapShedRefillCooldownIsBounded() {
+        long clearedAt = 1_000L;
+
+        assertTrue(Region.shedRefillCooldownActive(Long.MIN_VALUE, clearedAt),
+                "refill remains paused while pressure has not cleared");
+        assertTrue(Region.shedRefillCooldownActive(clearedAt,
+                clearedAt + Region.SHED_REFILL_COOLDOWN_NANOS - 1L));
+        assertFalse(Region.shedRefillCooldownActive(clearedAt,
+                clearedAt + Region.SHED_REFILL_COOLDOWN_NANOS));
+    }
+
+    @Test
+    @DisplayName("REQ-CORE-F-002: cancelling a queued cache task releases its admission reservation")
+    void cancellingCacheTaskReleasesGenerationSlot() {
+        Region region = regionWithColdCandidates("cancel_slot_reg", 1);
+        GenerationBudget.Reservation slot = GenerationBudget.server().reserve();
+        assertNotNull(slot);
+        RegionCacheTask task = new RegionCacheTask(region, TimeUnit.SECONDS.toNanos(1));
+        task.holdGenerationSlot(slot);
+
+        task.setCancelled(true);
+
+        assertEquals(0, GenerationBudget.server().inFlight());
+    }
+
+    @Test
+    @DisplayName("REQ-CORE-F-002: reservations cap promotions before async load accounting begins")
+    void pendingLoadsCannotPassTheGenerationCap() {
+        GenerationBudget.configureServerCap(() -> 2);
+        PendingTrackedMockWorld pendingWorld = new PendingTrackedMockWorld("pending_budget_world");
+        world = pendingWorld;
+        ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).addWorld(world);
+        Region region = regionWithColdCandidates("pending_budget_reg", 8);
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTPRuntime.scheduler();
+        RTPRuntime.setScheduler(new SaturationScheduler(
+                original, cx -> false, () -> GenerationBudget.server().saturated()));
+        try {
+            long before = CfDiag.regionDeficitDispatch.sum();
+
+            region.execute(TimeUnit.SECONDS.toNanos(1));
+
+            assertEquals(2, CfDiag.regionDeficitDispatch.sum() - before,
+                    "only two promotions may be admitted while adapter futures are pending");
+            assertEquals(2, pendingWorld.pendingLoads.size());
+            assertEquals(2, GenerationBudget.server().inFlight(),
+                    "admission reservations count before the adapter load counter advances");
+        } finally {
+            pendingWorld.failPendingLoads();
+            RTPRuntime.setScheduler(original);
+            GenerationBudget.configureServerCap(null);
+        }
+    }
+
+    @Test
+    @DisplayName("generation budget full: the cold fill queues no new cache tasks until loads drain")
+    void fullGenerationBudgetHoldsColdFillBack() {
+        // Cold cap 8, nothing cached, no hot cap: the pulse's only chunk work is the cold fill.
+        RegionSettings settings = new RegionSettings(
+                "budget_fill_reg", world, new Circle(), new LinearAdjustor(new ArrayList<>()),
+                false, false, 8L, 0L, 0L, 0, 0.0, 1L, "", false);
+        Region region = new Region("budget_fill_reg", settings);
+        region.cachePipeline.stop();
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTPRuntime.scheduler();
+        java.util.concurrent.atomic.AtomicBoolean full = new java.util.concurrent.atomic.AtomicBoolean(true);
+        RTPRuntime.setScheduler(new SaturationScheduler(original, cx -> false, full::get));
+        try {
+            region.execute(TimeUnit.MILLISECONDS.toNanos(25));
+            assertEquals(0, region.cachePipeline.size(), "no cold-fill work while the budget is full");
+
+            full.set(false);
+            region.execute(TimeUnit.MILLISECONDS.toNanos(25));
+            assertTrue(region.cachePipeline.size() > 0, "cold fill resumes once loads drain");
+        } finally {
+            RTPRuntime.setScheduler(original);
+        }
+    }
+
+    @Test
+    @DisplayName("stalled tick: a server tick running past STALL_MS pauses promotion even with healthy TPS readings")
+    void stalledTickPausesPromotion() {
+        Region region = regionWithColdCandidates("stall_reg", 8);
+        ServerHealthGate.setReadingsForTesting(() -> 20.0, () -> 20.0);
+        ServerHealthGate.setTickStartNanosForTesting(System.nanoTime() - TimeUnit.SECONDS.toNanos(2));
+        long before = CfDiag.regionDeficitDispatch.sum();
+
+        region.execute(TimeUnit.MILLISECONDS.toNanos(25));
+        assertEquals(0, CfDiag.regionDeficitDispatch.sum() - before, "no chunk loads while the tick is stuck");
+
+        ServerHealthGate.tickFinished();
+        region.execute(TimeUnit.MILLISECONDS.toNanos(25));
+        assertTrue(CfDiag.regionDeficitDispatch.sum() - before > 0, "promotion resumes once the tick finishes");
+    }
+
     /** Delegating scheduler that reports chosen chunks as saturated. */
     private static final class SaturationScheduler implements io.github.dailystruggle.rtp.api.scheduling.RTPScheduler {
         private final io.github.dailystruggle.rtp.api.scheduling.RTPScheduler d;
         private final java.util.function.IntPredicate saturatedX;
+        private final java.util.function.BooleanSupplier generationFull;
 
         SaturationScheduler(io.github.dailystruggle.rtp.api.scheduling.RTPScheduler d,
                             java.util.function.IntPredicate saturatedX) {
+            this(d, saturatedX, () -> false);
+        }
+
+        SaturationScheduler(io.github.dailystruggle.rtp.api.scheduling.RTPScheduler d,
+                            java.util.function.IntPredicate saturatedX,
+                            java.util.function.BooleanSupplier generationFull) {
             this.d = d;
             this.saturatedX = saturatedX;
+            this.generationFull = generationFull;
         }
 
         @Override public boolean isRegionSaturated(io.github.dailystruggle.rtp.api.world.RTPWorld<?> w, int cx, int cz) {
-            return saturatedX.test(cx);
+            return saturatedX.test(cx) || isGenerationSaturated(w);
+        }
+        @Override public boolean isGenerationSaturated(io.github.dailystruggle.rtp.api.world.RTPWorld<?> w) {
+            return generationFull.getAsBoolean();
         }
         @Override public io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask runTaskAsynchronously(Runnable t) {
             return d.runTaskAsynchronously(t);
@@ -173,6 +330,29 @@ class RegionTickBudgetTest {
         @Override public void runTaskLater(io.github.dailystruggle.rtp.api.world.RTPWorld<?> w, int cx, int cz,
                                            Runnable t, long delay) {
             d.runTaskLater(w, cx, cz, t, delay);
+        }
+    }
+
+    private static final class PendingTrackedMockWorld extends TrackedMockWorld {
+        private final List<CompletableFuture<Long>> pendingLoads = new ArrayList<>();
+
+        private PendingTrackedMockWorld(String name) {
+            super(name);
+        }
+
+        @Override
+        public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
+            chunkAsyncLoadCount.incrementAndGet();
+            CompletableFuture<Long> load = new CompletableFuture<>();
+            pendingLoads.add(load);
+            return CompletableFuture.completedFuture(new ChunkSet(
+                    this, cx, cz, List.of(load), new CompletableFuture<>()));
+        }
+
+        private void failPendingLoads() {
+            for (CompletableFuture<Long> load : pendingLoads) {
+                load.completeExceptionally(new IllegalStateException("test load released"));
+            }
         }
     }
 }

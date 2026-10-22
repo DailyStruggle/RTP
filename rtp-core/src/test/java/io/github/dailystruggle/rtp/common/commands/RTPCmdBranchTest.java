@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
@@ -290,6 +291,38 @@ class RTPCmdBranchTest {
             ActiveSelection.get().permRegionLookup.remove("rtp32ReqShort");
             ActiveSelection.get().permRegionLookup.remove("rtp32ReqLong");
             ActiveSelection.get().permRegionLookup.remove("rtp32ReqPlain");
+        }
+    }
+
+    @Test
+    @DisplayName("Cooldown guard ignores fresh in-flight teleport data when no prior teleport exists")
+    void testCooldownRemainingIgnoresFreshPendingTeleport() {
+        MockRTPPlayer sender = cooldownSubject("pendingTeleportUser", 5_000L);
+        long now = System.currentTimeMillis();
+        TeleportData pending = new TeleportData();
+        pending.time = now;
+        pending.completed = false;
+        TeleportSessions.current().latestTeleportData.put(sender.uuid(), pending);
+
+        assertEquals(0L, RTPCmd.cooldownRemaining(sender, sender.uuid(), null, false, null, now));
+    }
+
+    @Test
+    @DisplayName("Cooldown guard still enforces shared last-teleport time without a local prior")
+    void testCooldownRemainingUsesSharedTimestamp() {
+        MockRTPPlayer sender = cooldownSubject("sharedCooldownUser", 5_000L);
+        long now = System.currentTimeMillis();
+        RTP rtp = RTP.getInstance();
+        io.github.dailystruggle.rtp.common.network.RTPNetworkManager previous = rtp.networkManager;
+        io.github.dailystruggle.rtp.common.network.RTPNetworkManager networkManager =
+                org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.network.RTPNetworkManager.class);
+        org.mockito.Mockito.when(networkManager.getLastTeleportTime(sender.uuid())).thenReturn(now - 1_000L);
+        rtp.networkManager = networkManager;
+        try {
+            assertEquals(4_000L,
+                    RTPCmd.cooldownRemaining(sender, sender.uuid(), null, false, null, now));
+        } finally {
+            rtp.networkManager = previous;
         }
     }
 

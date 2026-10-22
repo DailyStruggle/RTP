@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.HashMap;
@@ -18,12 +21,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests verifying {@link TestAccessorCmd} ({@code rtp test accessor}).
  */
+@DisplayName("REQ-API-F-009 accessor probe BIT report")
 class TestAccessorCmdTest {
 
   @TempDir File tempDir;
@@ -64,6 +69,12 @@ class TestAccessorCmdTest {
     assertTrue(r.subsystemValid);
     assertTrue(r.worldBorderValid);
     assertEquals("ok", r.message);
+  }
+
+  @Test
+  void registeredComponentRunsItsCheckThroughTheRunner() {
+    assertEquals(BitHealth.HEALTHY,
+        RtpBit.RUNNER.run(TestAccessorCmd.COMPONENT, Runnable::run).report().health());
   }
 
   @Test
@@ -129,6 +140,20 @@ class TestAccessorCmdTest {
   }
 
   @Test
+  void toBitReport_identifiesFailedMaterialsSurface() {
+    TestAccessorCmd.Result result = new TestAccessorCmd.Result();
+    result.pass = false;
+    result.details.add("materials empty or missing common materials");
+
+    BitReport report = TestAccessorCmd.toBitReport(result);
+
+    assertEquals(BitHealth.FAILED, report.health());
+    assertTrue(report.findings().stream().anyMatch(finding ->
+        finding.code().equals("TEST_ACCESSOR_MATERIALS")
+            && finding.path().equals("accessor.materials")));
+  }
+
+  @Test
   void onCommand_emitsSummaryToPlayer() {
     MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "player1", null);
     accessor.addPlayer(player);
@@ -147,6 +172,34 @@ class TestAccessorCmdTest {
     assertTrue(
         accessor.logMessages.stream().anyMatch(m -> m.contains("accessor")),
         accessor.logMessages.toString());
+  }
+
+  @Test
+  void onCommand_jsonEmitsBitReportAndKeepsLegacySummary() {
+    MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "json-player", null);
+    accessor.addPlayer(player);
+
+    boolean ret = new TestAccessorCmd(null).onCommand(
+        player.uuid(), Map.of("json", List.of("true")), null);
+
+    assertTrue(ret);
+    assertTrue(player.sentMessages.stream().anyMatch(m -> m.contains("[RTP test/accessor] pass=")));
+    assertTrue(player.sentMessages.stream().anyMatch(m -> m.contains("[RTP bit/test.accessor]")));
+    assertTrue(accessor.logMessages.stream().anyMatch(m -> m.contains("[RTP bit/test.accessor]")));
+    assertEquals(BitHealth.HEALTHY, ProbeBitReport.last("accessor").health());
+  }
+
+  @Test
+  void onCommand_defaultEmitsTableWithoutTouchingLegacyGrepLine() {
+    new TestAccessorCmd(null).onCommand(RTPAPI.serverId, noArgs(), null);
+
+    assertTrue(accessor.logMessages.stream().anyMatch(m ->
+        m.contains(BitTableOutput.PREFIX) && m.contains("accessor") && m.contains("HEALTHY")));
+    assertTrue(accessor.logMessages.stream()
+        .filter(m -> m.contains(BitTableOutput.PREFIX))
+        .noneMatch(m -> m.contains("[RTP test/accessor]")));
+    assertEquals(1, accessor.logMessages.stream()
+        .filter(m -> m.contains("[RTP test/accessor] pass=")).count());
   }
 
   @Test

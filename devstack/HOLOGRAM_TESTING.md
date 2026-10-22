@@ -11,9 +11,9 @@ Both `lobby-a`, `lobby-b`, `backend-a`, and `backend-b` run Paper 1.21+. On thes
 ### In-Game Verification:
 Connect to the proxy (e.g. `localhost:25565` or direct to backend `localhost:25566`) and run:
 ```text
-/rtp test hologram [seconds]
+/rtp test hologram player=<name> [seconds=N]
 ```
-*(Example: `/rtp test hologram seconds:10`)*
+*(Example: `/rtp test hologram player=Alice seconds=10`)*
 
 **Expected Result:**
 1. A billboard text display spawns 2 blocks in front of the player at eye height.

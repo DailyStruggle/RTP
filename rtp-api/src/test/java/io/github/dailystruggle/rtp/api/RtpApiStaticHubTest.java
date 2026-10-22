@@ -16,6 +16,8 @@ import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.server.api.ServerAccessor;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -30,11 +32,13 @@ import org.junit.jupiter.api.Test;
 class RtpApiStaticHubTest {
 
   private RTPServerAccessor originalServerAccessor;
+  private ServerAccessor originalCommonServerAccessor;
   private UUID originalServerId;
 
   @BeforeEach
   void setUp() {
     originalServerAccessor = RTPAPI.serverAccessor;
+    originalCommonServerAccessor = ServerAccessors.get();
     originalServerId = RTPAPI.serverId;
     resetDelegates();
   }
@@ -42,6 +46,7 @@ class RtpApiStaticHubTest {
   @AfterEach
   void tearDown() {
     RTPAPI.serverAccessor = originalServerAccessor;
+    ServerAccessors.set(originalCommonServerAccessor);
     RTPAPI.serverId = originalServerId;
     resetDelegates();
   }
@@ -83,6 +88,7 @@ class RtpApiStaticHubTest {
 
     RTPAPI.setServerAccessor(mock1);
     assertSame(mock1, RTPAPI.serverAccessor);
+    assertSame(mock1, ServerAccessors.get());
 
     // Setting the same accessor is idempotent
     RTPAPI.setServerAccessor(mock1);

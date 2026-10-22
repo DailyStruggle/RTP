@@ -9,6 +9,7 @@ package io.github.dailystruggle.rtp.anvil.bit;
  * @param diagnosticMessage human-readable summary of status or failure reason
  * @param error             exception thrown during test execution, or {@code null} if passed
  */
+@Deprecated(forRemoval = true)
 public record PbitResult(
         boolean passed,
         String componentName,
@@ -16,6 +17,11 @@ public record PbitResult(
         String diagnosticMessage,
         Throwable error
 ) {
+    /** Converts this legacy result to the standalone BIT API. */
+    public io.github.dailystruggle.bit.PbitResult asBit() {
+        return new io.github.dailystruggle.bit.PbitResult(
+                passed, componentName, durationNanos, diagnosticMessage, error);
+    }
     public static PbitResult ok(String componentName, long durationNanos) {
         return new PbitResult(true, componentName, durationNanos, "Operational", null);
     }

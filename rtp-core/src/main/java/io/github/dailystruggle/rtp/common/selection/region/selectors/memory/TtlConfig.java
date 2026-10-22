@@ -46,6 +46,8 @@ public final class TtlConfig {
     causeTtls.put(FailTypes.prefilterBlock, INFINITE);
     causeTtls.put(FailTypes.prefilterRange, INFINITE);
     causeTtls.put(FailTypes.misc, INFINITE);
+    causeTtls.put(FailTypes.terrain, INFINITE);
+    causeTtls.put(FailTypes.prefilterTerrain, INFINITE);
 
     // Dynamic tier: finite default
     causeTtls.put(FailTypes.uniquePlacement, 30L * 86400L); // 30 days

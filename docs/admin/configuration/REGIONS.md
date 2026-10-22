@@ -302,6 +302,34 @@ The `vert` block controls the Y-coordinate (height) selection.
 - Steep terrain with a low `maxSlope` rejects more chunks, so selection can take longer. Raise `maxSlope` if `/rtp` starts failing in hilly regions.
 - `FIXED` ignores both keys: it places players in mid-air, where there is no floor to measure.
 
+#### Hillside and cliff check (`maxHillAngle`)
+`maxHillAngle` (`LINEAR` and `JUMP` only) is the steepest hill, in degrees, a player may land on. It ships as `"off"` in `defaults.vert` of `config.yml`, because the check costs search time.
+
+| Value | Refuses (26.3 test world, land spots) | Use it for |
+|---|---|---|
+| `"off"` (default) | nothing | Fastest search; any terrain allowed. |
+| `30` | about 1 in 5 | Gentle landings; refuses most hillsides and many cliff edges. |
+| `45` | about 1 in 12 | Refuses steep slopes and cliff edges only. |
+| `60` | about 1 in 60 | Refuses only near-vertical ground. |
+
+Any number from `0` to `89` also works; `-1` means off, like `"off"`.
+
+```yaml
+vert:
+  name: "LINEAR"
+  # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.
+  # "off" (fastest, default), 30, 45 or 60.
+  maxHillAngle: 30
+```
+
+- **What it looks at:** the ground 16 blocks away in 8 directions, and the ground within 8 blocks of the landing spot, all inside the 3x3 chunks around the spot. A spot is refused when at least half of those directions rise or fall at `maxHillAngle` or more (a mountainside), or when the ground around the spot leans that steeply (a cliff edge or ledge).
+- **Blocks only:** it reads blocks, not the world generator, so it works the same with custom generators such as Iris or Terra. It follows the floor near the landing height, so it also works in caves and the Nether.
+- **Where it runs:** first on region files during the background search, then again on the chunks the server already has loaded around the spot. It never loads extra chunks. Ground it cannot see counts as unknown, not as steep.
+- **Effect on search:** with `selection_failure` logging on, refusals are listed as `terrain` and `prefilterTerrain` when a search gives up. Each region-file check reads about 2-3 chunks around the spot, so the background search does about 3-4 times the work per spot with the check on, and refused spots are picked again.
+- **Platforms:** every platform keeps at least the 3x3 chunks around a spot loaded, so the check behaves the same on Paper, Spigot, Folia, Fabric and NeoForge.
+- Turning `maxHillAngle` on, off or to another angle rebuilds that region's saved location data once. `"off"`, `-1` and a missing key count as the same setting, so they don't.
+- `FIXED` ignores it, as it does `maxSlope`.
+
 ### Vert Engines and Parameters
 
 #### `JUMP`

@@ -17,6 +17,7 @@ mundoNovo: "&b[P0] novo mundo '[world]' detectado"
 # espaço reservado: [filename] - nome do arquivo
 recarregando: "&b[P0] carregando [filename]..."
 recarregado: "&b[P0] [filename] carregado com sucesso."
+reloadFailed: "&c[P0] Não foi possível recarregar a configuração. Consulte o log do servidor."
 atualizando: "&a[P0] atualizando [filename]..."
 atualizado: "&a[P0] [filename] atualizado com sucesso."
 

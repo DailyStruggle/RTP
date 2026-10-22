@@ -9,6 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,6 +45,63 @@ import org.junit.jupiter.api.Test;
  * static state or Bukkit runtime has to be initialised.
  */
 class TestFullCmdTest {
+
+  @Test
+  @DisplayName("recent component health overrides the warning delta")
+  void recentComponentVerdictOverridesWarningDelta() {
+    long startedAt = System.currentTimeMillis() - 10L;
+    RtpBit.RUNNER.run(
+        TestApiCompatCmd.COMPONENT.withCheck(() -> ProbeBitReport.forProbe("api-compat").build()),
+        Runnable::run);
+    assertTrue(TestFullCmd.stepPassed("api-compat", startedAt, 4));
+
+    RtpBit.RUNNER.run(
+        TestApiCompatCmd.COMPONENT.withCheck(
+            () ->
+                ProbeBitReport.forProbe("api-compat")
+                    .check(TestApiCompatCmd.MISSING_METHOD, false, "probe", "missing method")
+                    .build()),
+        Runnable::run);
+    assertFalse(TestFullCmd.stepPassed("api-compat", startedAt, 0));
+  }
+
+  @Test
+  @DisplayName("warning deltas remain the fallback when no recent component result exists")
+  void warningDeltaFallbackWithoutRecentComponent() {
+    long startedAt = System.currentTimeMillis() + 10_000L;
+    assertTrue(TestFullCmd.stepPassed("no-component-result", startedAt, 0));
+    assertFalse(TestFullCmd.stepPassed("no-component-result", startedAt, 1));
+  }
+
+  @Test
+  @DisplayName("stress step checks both mock and player companion verdicts")
+  void playerCompanionFailureFailsTheStep() {
+    long startedAt = System.currentTimeMillis() - 10L;
+    RtpBit.RUNNER.run(
+        TestStressCmd.COMPONENT.withCheck(() -> ProbeBitReport.forProbe("stress").build()),
+        Runnable::run);
+    RtpBit.RUNNER.run(
+        TestStressCmd.PLAYER_COMPONENT.withCheck(
+            () ->
+                ProbeBitReport.forProbe("stress-player")
+                    .check(TestStressCmd.STRESS_PLAYER_FAILURES, false, "test", "failure")
+                    .build()),
+        Runnable::run);
+
+    assertFalse(TestFullCmd.stepPassed("stress", startedAt, 0));
+
+    RtpBit.RUNNER.run(
+        TestStressCmd.PLAYER_COMPONENT.withCheck(
+            () -> ProbeBitReport.forProbe("stress-player").build()),
+        Runnable::run);
+    assertTrue(TestFullCmd.stepPassed("stress", startedAt, 0));
+    assertEquals(
+        List.of("stress", "stress-player"),
+        TestFullCmd.componentIdsForStep("stress"));
+    assertEquals(
+        List.of("async-reply", "async-reply-player"),
+        TestFullCmd.componentIdsForStep("async-reply"));
+  }
 
   @Test
   @DisplayName("SHIPPED_SUBCOMMAND_NAMES has no duplicates and no overlap with excluded set")

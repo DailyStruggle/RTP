@@ -4,6 +4,8 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.server.api.ServerAccessor;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,11 +29,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class BootstrapLogBufferTest {
 
     private RTPServerAccessor previousAccessor;
+    private ServerAccessor previousCommonAccessor;
     private MockRTPServerAccessor accessor;
 
     @BeforeEach
     void setUp() throws Exception {
         previousAccessor = RTPRuntime.serverAccessor();
+        previousCommonAccessor = ServerAccessors.get();
         File tempDir = Files.createTempDirectory("rtp-boot-log-buffer-test").toFile();
         tempDir.deleteOnExit();
         accessor = new MockRTPServerAccessor(tempDir);
@@ -45,7 +49,14 @@ class BootstrapLogBufferTest {
         // Drain anything we left buffered so other tests aren't affected.
         RTP.flushPendingLogs();
         RTPRuntime.setServerAccessor(previousAccessor);
+        ServerAccessors.set(previousCommonAccessor);
         resetBufferState();
+    }
+
+    @Test
+    @DisplayName("REQ-API-NF-002: runtime registration installs the common server bridge")
+    void runtimeRegistrationInstallsCommonServerBridge() {
+        assertSame(accessor, ServerAccessors.get());
     }
 
     @Test

@@ -42,16 +42,38 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
-### 2026-10-18 - Rift fall trips `cancelDistance`; teleport cancels and the player is left in the rift
+### 2026-10-21 - Unknown-effect warning deduplication persists across reloads
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** RTP reload/effects bugfix task
+- **Location:** `api/effects-api/.../common/EffectFactory.java` unknown-type warning deduplication state
+- **Symptom / hypothesis:** The per-type warning is emitted only once and its deduplication state is not cleared on reload, so a corrected-and-reintroduced unknown effect may not produce a fresh warning.
+- **Impact:** Operators can miss a repeated configuration error after reloading effects.
+- **Suggested next step:** Confirm the intended deduplication lifetime and, if warnings should recur per reload, clear the per-type state from the reload lifecycle.
+
+### 2026-10-21 - NeoForge 1.21.1 watchdog crash: main thread stuck on a vanilla chunk load while RTP fill thrashes the heap
 
 - **Severity:** High
 - **Status:** Open
-- **Discovered during:** verifying the countdown boss-bar clear on teleport cancel (demo server, `rift` preset)
-- **Location:** `addons/LeafRTPRiftAddon/.../RiftEffect.java` `run()` (carve and restore); `rtp-plugin/.../bukkitListeners/OnPlayerMove.java` (cancel check)
-- **Symptom / hypothesis:** With `RIFT.6.3` at `preload`, `teleportDelay` 4 and `cancelDistance` 2, a bot that stood still fell about 4 blocks into the rift and got "Teleport cancelled!" 0.5 s after `/rtp`. It stayed at the bottom of the rift, and after the restore its health flickered 20/19 (likely suffocation). The fall counts as movement now that `/rtp` records its origin, and the rift does not react to the cancel.
-- **Impact:** With the Rift addon, every delayed `/rtp` cancels itself, and the player can end up inside the restored terrain.
-- **Suggested next step:** Exempt the rift's own fall from the cancel check (origin recorded after the carve, or ignore movement inside an open rift), and on `RTPTeleportCancel.postActions` restore the rift with the player moved clear. Interim: `cancelDistance` above rift radius plus fall height.
-- **Linear:** RTP-71
+- **Discovered during:** live bot check of RTP-78 effects on a standalone NeoForge 1.21.1 container (podman, `MEMORY=6G`, seed 8675309, `teleportDelay` 4)
+- **Location:** NeoForge background cache fill (`RTP-NeoForge-Async-*` workers); crash report `ServerHangWatchdog` stack: `ServerPlayer.doTick` -> `Entity.updateFluidOnEyes` -> `Level.getChunkAt` -> `ServerChunkCache.getChunk` -> `managedBlock`
+- **Symptom / hypothesis:** After `/rtp reload` and a restart, the log alternated `Heap usage 85-95% ... pausing` / `Heap pressure subsided` every few seconds, the container sat at ~640% CPU, a bot login hung, and the watchdog killed the server after `MAX_TICK_TIME` 180 s. The main thread was waiting on a vanilla load of the player's own chunk, so the chunk workers were starved; RTP's fill (or the GC load it causes) is the likely starver. Not reproduced on the first boot with 4G; not yet compared against the `HEAD` jar.
+- **Impact:** A NeoForge server can hang and crash with no player action beyond joining.
+- **Vanilla reproduction without RTP (2026-10-21, same world, all mods removed):** `forceload add` on random chunks within +-10,000 blocks, sent one at a time over RCON, does the same thing. 105 of 130 forceloads went in before one `forceload add` held the main thread in `ServerChunkCache.getChunk` -> `managedBlock` for 180 s, and the watchdog crashed the server (`crash-2026-10-21_20.54.42`, 22 of 23 `Worker-Main` threads parked, no mod frames). In a second copy, 40 forceloads then a bot join gave a 60.8 s ("1215 ticks behind") join tick; the bot stayed connected. So the hang is vanilla 1.21.1 behaviour once roughly 40-100 ticketed chunks in fresh terrain are queued; RTP's part is how many tickets its fill holds, which is the budget to fix.
+- **Attribution (2026-10-21, same world copied twice, bot joins 60 s after start):** with RTP removed the join costs one 2 s "Can't keep up" and the bot stays connected; with RTP (including the generation budget and stuck-tick pause added that day) the join tick runs 129 s and the bot times out. RTP-driven chunk writes in the first two minutes: about 14,000 with RTP, about 600 without. The budget counts only the centre chunk future of each RTP load, and the check lags the load (8 promotions pass one pulse's check before the async probe reaches the counter). Likely uncounted sources: the restart re-pin of saved kept locations and the generation cascade each RTP ticket causes around its chunk (`RTP_TICKET_DISTANCE` 1, so about radius 11 of partial generation per ticket).
+- **Suggested next step:** On hold-back hosts, take a budget slot when a promotion or re-pin is decided (not when the load reaches the adapter), count ticket applications, and pace the restart re-pin through the same budget. Re-run the A/B above to confirm.
+- **Linear:** RTP-80
+
+### 2026-10-21 - ConfigParser recompiles a regex in a hot string operation
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** mock BIT teleport probe conversion (CI-parity PMD gate)
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/ConfigParser.java:1350`
+- **Symptom / hypothesis:** PMD reports `AvoidStringRegexHelpers` for a `String.replaceAll` call, which compiles a pattern each time the operation runs. The intended replacement may be literal, or the pattern may be reusable.
+- **Impact:** Repeated parsing can incur avoidable CPU and allocation overhead, especially for larger configuration inputs.
+- **Suggested next step:** Confirm whether regex semantics are required; use a literal replacement or a precompiled `Pattern` and rerun the parser tests.
 
 ### 2026-10-19 - Claim checkers stay reflective where the plugin publishes an API (ADR-118 rule 1)
 
@@ -72,6 +94,17 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** Run alone (or with only adjustor tests), both tests throw `NullPointerException: vertAdjustorFactory is null` in the `VerticalAdjustor` constructor; they pass in the full suite. The test likely relied on `RTP.<clinit>` filling the factory registry, which the package-hub refactor made explicit (`RTP.ensureInitialized()`).
 - **Impact:** Test-only; filtered runs report false failures.
 - **Suggested next step:** Call `RTP.ensureInitialized()` (or `RTPTestSetup.install`) in the test's setup, as was done for the other tests listed in `docs/dev/RTP-HUB-RESUME.md` Wave 2.
+- **Linear:** RTP-85
+
+### 2026-10-21 - Countdown boss bar appears after an instant console `/rtp player=<name>`
+
+- **Severity:** Cosmetic
+- **Status:** Open
+- **Discovered during:** live bot check of RTP-71 on Paper 1.21.11 (`teleportDelay` 4)
+- **Location:** countdown addon boss bar vs. console-issued teleport (no warmup)
+- **Symptom / hypothesis:** The console teleport landed at once, then the player got a "Teleporting in 4..." boss bar. The bar is probably started from the configured delay rather than the delay that applied.
+- **Impact:** Players see a countdown for a teleport that already happened.
+- **Suggested next step:** Start the bar from the effective delay; skip it when that delay is 0.
 
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
@@ -129,7 +162,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** The shared effect classes are platform-neutral, but each platform registers them from its own `EffectFactory.addEffect(...)` list and no test compares the lists. Bukkit lacks `TITLE`; Fabric 26.x lacks `GLIDE`; NeoForge lacks `GLIDE`, `DROP_INVENTORY` and `DROP_EXP`. The cause is a second, effects-only platform seam (`HandleRegistry`) beside `RTPServerAccessor`.
 - **Impact:** Unregistered effect tokens in `definitions/effects/*.yml` and `rtp.effect.*` nodes are skipped without a message; operators lose effects when moving between platforms. Disclosed in `docs/admin/configuration/EVENTS_AND_EFFECTS.md` (*Platform availability*).
 - **Suggested next step:** 3.3.x patch: add the missing `addEffect` lines plus a registration parity test. Root fix: [ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md) (Proposed) - neutral accessor module, platform primitives on the accessor, one registration in effects-api.
-- **Linear:** RTP-70
+- **Linear:** RTP-70 (3.3.x stopgap: RTP-78; glide without an elytra: RTP-79)
 
 ### 2026-10-18 - Web editor paints whole walk-path squares red when hazard runs exceed the cap
 
@@ -151,6 +184,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** The itzg `start` script reads `UID`/`GID` and drops to uid 1000 otherwise (`docker run -e RUN_AS_UID=0` logs `Running as uid=1000`); `user: "0:0"` does not help because the entrypoint still demotes via `gosu`. Works on Docker Desktop for Windows (permissive binds), fails on Linux where Docker creates missing bind dirs root-owned (`AccessDeniedException: ./world/session.lock`).
 - **Impact:** The nightly `Devstack Acceptance Smoke` job (now past `npm ci`) and Linux contributors are likely to hit the same boot failure.
 - **Suggested next step:** Replace `RUN_AS_UID`/`RUN_AS_GID` with `UID: "0"`/`GID: "0"` plus `SKIP_CHOWN_DATA: "TRUE"`, then re-run the nightly workflow.
+- **Linear:** RTP-76
 
 ### 2026-10-14 - Folia safety scan reads live neighbour chunks off-thread when the centre is an Anvil view
 
@@ -203,6 +237,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** When the file database cannot load a YAML file, the log says only "could not be parsed; quarantining". The `RtpYamlParseException` key and line (here `rtpYaml.unsupported.flowMap`) never reach the operator, and for an action file with no shipped default the file just disappears into `*.corrupt-<ts>`.
 - **Impact:** Operators who copy the inline-map trigger example from older docs lose the action with no hint why.
 - **Suggested next step:** Carry the parse exception from the file database to this warning and log its message key and line.
+- **Linear:** RTP-73
 
 
 ### 2026-10-18 - `gif-preset.sh` exits silently when no LeafRTP-Pro jar is present
@@ -244,6 +279,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** Returns `world.getMaxY()` (the top block, inclusive). The `RTPWorld` contract and the Bukkit, NeoForge, intermediary Fabric and v26 adapters return an exclusive bound, and core callers (`AbstractVerticalAdjustor`, `LinearAdjustor`, `FixedAdjustor`) subtract from it.
 - **Impact:** On worlds served by the unobf carrier, vertical scans skip the top block row and headroom checks are one block too strict.
 - **Suggested next step:** Return `world.getMaxY() + 1` and fix the comment, as done in `V26_x_R1FabricRTPWorld`.
+- **Linear:** RTP-74
 
 ### 2026-10-06 — Pregen biome extraction reads surface biomes with the Anvil probe for every format
 
@@ -345,6 +381,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** `setBiomeGetter` assigns the field, but biome lookups never call it, so an addon-installed biome resolver is silently ignored. Bukkit and Folia forward the getter into `BukkitRTPWorld` / `FoliaRTPWorld`, where it is used.
 - **Impact:** On Fabric and NeoForge, biome filters ignore addon overrides (e.g. custom world generators) and always use the vanilla registry lookup.
 - **Suggested next step:** Route the world adapters' biome reads through `biomeGetter` (or forward it to the world class the way Bukkit/Folia do), and add a test that installs a stub getter and checks it is consulted. Then close Sonar's S1068 on these fields; it is a true positive.
+- **Linear:** RTP-77
 
 ### 2026-10-17 - `Factory.getOrDefault` throws on an empty map despite `@NotNull` contract
 
@@ -375,6 +412,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** For location `500` with `rotation=90`, `xzToLocation(locationToXZ(500))` returns `-9549`. The two transforms are probably rotating in opposite or inconsistent directions.
 - **Impact:** Any path that maps a placement back to its index (verification, coverage bookkeeping, backlog) mis-identifies placements on rotated rectangles.
 - **Suggested next step:** Write a round-trip property test across rotations 0/45/90/180, then fix the inverse rotation.
+- **Linear:** RTP-75
 
 ### 2026-10-18 - `ActionLifecycleTerminalAndConfinementTest` fails when run after other `rtp-core` tests
 
@@ -385,6 +423,21 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** "Delayed terminal lifecycle step aborts if player went offline" throws `ClassCastException: ProfilingRTPScheduler cannot be cast to MockRTPScheduler` in a shared JVM and passes alone. An earlier test leaves the profiling wrapper installed on the static scheduler.
 - **Impact:** Test-order flake only; no runtime effect.
 - **Suggested next step:** Install a fresh `MockRTPScheduler` in the test's own setup (or unwrap `ProfilingRTPScheduler`) instead of casting the shared static.
+
+### 2026-10-20 - `MemoryShape` rebuild scratch has no shrink condition
+
+- **Severity:** Low
+- **Status:** Triaged
+- **Discovered during:** checking the README's spatial-memory footprint figure
+- **Location:** `MemoryShape.RebuildScratch` / `scratch` field (`MemoryShape.java` ~line 2976), grown by `ensureCapacity` in `flushAndRebuild`
+- **Symptom / hypothesis:** Reusing the merge buffers across rebuilds is deliberate (single rebuilder via the `isRebuilding` CAS; avoids per-rebuild churn and G1 humongous allocations past 131072 `long` entries). The defect is the missing exit condition: buffers grow by doubling to `existing runs + pending marks` of the largest rebuild seen and never shrink. Worst case, one flush of 4,000 single-chunk marks: live data 122 runs (~18 KB), scratch ~100 KB (reflection probe, `SquareOptimizedDualLayer`, 32x32-chunk blobs). Steady-state rebuilds carry few pending marks, so typical scratch is much smaller.
+- **Impact:** After a one-off burst (scan, pregen), a region keeps peak-sized buffers until restart even when later rebuilds are small.
+- **Suggested next step:** Approved approach: decaying high-water mark per shape.
+  1. Each rebuild records `need` = largest capacity requested from `ensureCapacity`.
+  2. `recentPeak = max(need, recentPeak - recentPeak / 8)`, so a spike fades over about 8-16 rebuilds and steady load holds it up.
+  3. After publish, if a buffer's length is over `4 * recentPeak` and above a floor (~1,024 entries), reallocate it to `2 * recentPeak` (or `new long[0]` and let it regrow). The 4x shrink vs 2x grow gap prevents thrashing; large steady tables keep their buffers, so the humongous-allocation rationale holds.
+  4. Time-based exit for shapes that stop rebuilding after a burst: idle for N minutes replaces `scratch` with a fresh `RebuildScratch`.
+  - Constants from data: count `need` per rebuild over one stress run and one scan; pick the shrink factor so steady state never trims, and the decay from burst length. Verify with the fixed `RetainedFootprintBenchmarkTest` (dual-layer shape, chunk coordinates): one burst then several small rebuilds should return retained size to ~18 KB, with no extra steady-state allocation.
 
 ### 2026-10-13 - Block-list rejection log still names `safety.yml`
 
@@ -415,5 +468,15 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** The row predates the Pro support tier (ADR-100, ADR-108), which sells priority support. README and the storefront pages say it is offered.
 - **Impact:** Buyers and readers get contradictory answers about paid support.
 - **Suggested next step:** Point the row at the BuiltByBit Pro listing and describe what it covers, matching the README wording.
+
+### 2026-10-21 - `TicketFootprint.ticketDistance` serializes cache refresh
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** ADR-121 delivery step 8 CI-parity gate
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/TicketFootprint.java` line 30, `ticketDistance()`
+- **Symptom / hypothesis:** PMD `PreferNonLockingExecution` rejects the synchronized cache refresh. When the one-second snapshot expires, region maps are scanned while holding the class monitor, so concurrent callers wait for that traversal.
+- **Impact:** The full CI gate fails `:rtp-core:pmdMain`; concurrent ticket-distance checks may also experience a short delay during refresh.
+- **Suggested next step:** Replace the monitor-protected refresh with an atomic snapshot compare-and-set, preserving the cached radius while avoiding a lock around the region scan.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

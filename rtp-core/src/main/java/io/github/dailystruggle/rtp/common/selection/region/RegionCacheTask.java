@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.CompletionPaced;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import io.github.dailystruggle.rtp.common.tools.PerformanceTracker;
 
@@ -41,6 +42,8 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
      * Idempotency latch for {@link #releaseInFlight()} across multiple terminal branches.
      */
     private final AtomicBoolean released = new AtomicBoolean(false);
+    private final AtomicBoolean generationSlotReleased = new AtomicBoolean(false);
+    private volatile GenerationBudget.Reservation generationSlot;
 
     /**
      * Fill deadline in ticks (30 s); matches the per-player chunk-set failsafe. Releases the slot
@@ -107,6 +110,21 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
         return new RegionCacheTask(region, true);
     }
 
+    public void holdGenerationSlot(GenerationBudget.Reservation generationSlot) {
+        this.generationSlot = generationSlot;
+    }
+
+    private void releaseGenerationSlot() {
+        GenerationBudget.Reservation slot = generationSlot;
+        if (slot != null && generationSlotReleased.compareAndSet(false, true)) slot.close();
+    }
+
+    @Override
+    public void setCancelled(boolean cancel) {
+        super.setCancelled(cancel);
+        if (cancel) releaseGenerationSlot();
+    }
+
     /** Spark-profiler frame tag (diagram 02). See {@link RTPRunnable#sparkFrameName()}. */
     @Override
     protected String sparkFrameName() { return "rtp_cache_generator"; }
@@ -121,7 +139,10 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
      */
     @Override
     public void run() {
-        if (isCancelled()) return;
+        if (isCancelled()) {
+            releaseGenerationSlot();
+            return;
+        }
 
         if (playerId == null) {
             long cacheCap = region.getSettings().cacheCap();
@@ -134,10 +155,12 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                 // candidate. Skip when the cold stage has headroom; the default-mode
                 // deficit loop will fill that headroom on this pulse.
                 if (!cacheFull) {
+                    releaseGenerationSlot();
                     MemoryTracker.untrack(this);
                     return;
                 }
             } else if (cacheFull) {
+                releaseGenerationSlot();
                 MemoryTracker.untrack(this);
                 return;
             }
@@ -168,7 +191,8 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
             // cold queue. Third-party generators keep their own contract.
             ILocationGenerator generator = RTPRuntime.serverAccessor().getLocationGenerator();
             CompletableFuture<GenerationResult> locationFuture = (generator instanceof LocationGenerator)
-                    ? LocationGenerator.getLocationFuture(region, null, LoadPurpose.SPECULATIVE, backlog)
+                    ? LocationGenerator.getLocationFuture(
+                            region, null, LoadPurpose.SPECULATIVE, backlog, generationSlot)
                     : generator.getLocation(region, (java.util.Set<String>) null);
 
             locationFuture = locationFuture.exceptionally(e -> {
@@ -370,6 +394,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
 
     private void releaseInFlight(long minChargeNanos) {
         if (released.compareAndSet(false, true)) {
+            releaseGenerationSlot();
             region.inFlightCalculations.decrementAndGet();
             BudgetPacer p = pacer;
             if (p != null) p.recordDuration(Math.max(minChargeNanos, System.nanoTime() - dispatchNanos));

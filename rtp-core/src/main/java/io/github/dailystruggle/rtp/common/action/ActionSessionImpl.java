@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.action;
 
+import io.github.dailystruggle.bit.Vocabulary;
+
 import io.github.dailystruggle.rtp.api.action.ActionContext;
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ActionGateContext;
@@ -28,6 +30,8 @@ import java.util.regex.Pattern;
  * Implementation of an active scripted action session (ADR-093).
  */
 public final class ActionSessionImpl implements ActionSession {
+
+  public static final Vocabulary ACTION_NAMES = new Vocabulary("action name", List.of("PULL_BACK", "DISARM", "ELIMINATE"));
 
   private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 

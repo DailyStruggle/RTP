@@ -166,7 +166,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
             return PaletteIndex.RED;
         }
         return switch (values[causeOrdinal]) {
-            case vert, prefilterRange -> MAROON;
+            case vert, prefilterRange, terrain, prefilterTerrain -> MAROON;
             case safety, prefilterBlock -> SCARLET;
             case safetyExternal -> ORANGE;
             case biome, prefilterBiome -> YELLOW;

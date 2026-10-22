@@ -132,6 +132,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # 이 각도(도) 이상인 비탈이나 절벽 가장자리 착지를 거부합니다.
+    # "off" 가 가장 빠릅니다. 30 은 육지 지점 약 5곳 중 1곳, 45 는 약 12곳 중 1곳, 60 은 약 60곳 중 1곳을 거부합니다.
+    # 0~89 사이의 아무 숫자도 쓸 수 있습니다. 켜면 검색이 각 지점 주변 청크를 읽습니다.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 
