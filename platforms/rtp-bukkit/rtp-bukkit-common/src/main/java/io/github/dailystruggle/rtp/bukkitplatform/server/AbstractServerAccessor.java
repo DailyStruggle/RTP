@@ -348,8 +348,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     if (objective == null || objective.isBlank()) return null;
     org.bukkit.scoreboard.ScoreboardManager manager = Bukkit.getScoreboardManager();
     if (manager == null) return null;
-    org.bukkit.scoreboard.Scoreboard scoreboard = manager.getMainScoreboard();
-    return scoreboard == null ? null : scoreboard.getObjective(objective) != null;
+    return manager.getMainScoreboard().getObjective(objective) != null;
   }
 
   @Override

@@ -945,7 +945,7 @@ public final class ActionSessionImpl implements ActionSession {
       currentZ = (double) slot[2];
     }
 
-    if (currentX != null && currentZ != null) {
+    if (currentX != null) {
       double dx = currentX - anchorX;
       double dz = currentZ - anchorZ;
       distanceSq = dx * dx + dz * dz;

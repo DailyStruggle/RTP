@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.anvil;
 
-import io.github.dailystruggle.rtp.anvil.bit.BitHealth;
-import io.github.dailystruggle.rtp.anvil.bit.PbitResult;
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.PbitResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

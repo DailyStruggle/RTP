@@ -641,8 +641,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // fork implements true async generation (Paper/Folia). On vanilla Spigot the
     // scheduling still resolves on the main thread internally, but the caller is
     // not blocked - a strict improvement over the previous runTask+getChunkAt path.
+    // requestChunkAsync never returns null and releases generationSlot on every edge.
     CompletableFuture<Long> load = requestChunkAsync(cx, cz, key, generationSlot);
-    if (load == null && generationSlot != null) generationSlot.close();
     return profileChunkLoad(load, chunkLoadStartNanos, chunkGenerated);
   }
 

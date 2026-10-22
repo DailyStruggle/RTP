@@ -13,6 +13,7 @@ import java.util.logging.Level;
  * @governedBy ADR-115 (Package DAG Disentanglement and Finite Decision-Preservation Hypergraph)
  * @trace REQ-CORE-ARCH-003
  */
+@SuppressWarnings("JavadocDeclaration") // ADR traceability tags
 public final class EffectDispatch {
     private EffectDispatch() {}
 
@@ -31,7 +32,7 @@ public final class EffectDispatch {
         Objects.requireNonNull(action, "action");
         for (Effect<?> effect : effects) {
             String effectType = effect == null ? "<null>" : effect.getClass().getSimpleName();
-            if (effectType.isEmpty() && effect != null) effectType = effect.getClass().getName();
+            if (effectType.isEmpty()) effectType = effect.getClass().getName();
             try {
                 action.accept(effect);
             } catch (RuntimeException failure) {

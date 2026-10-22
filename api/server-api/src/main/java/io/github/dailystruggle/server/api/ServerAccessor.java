@@ -101,13 +101,11 @@ public interface ServerAccessor {
       return false;
     }
     boolean versionBounded = minServerVersion > 0 || maxServerVersion < Integer.MAX_VALUE;
-    if (versionBounded) {
-      Integer version = getServerIntVersion();
-      if (version == null || version < minServerVersion || version > maxServerVersion) {
-        return false;
-      }
+    if (!versionBounded) {
+      return true;
     }
-    return true;
+    Integer version = getServerIntVersion();
+    return version != null && version >= minServerVersion && version <= maxServerVersion;
   }
 
   /**

@@ -15,6 +15,7 @@ import java.util.List;
  * @invariant S-005: the selected footprint only pins chunks; it never synchronously loads them.
  * @prohibition Do not widen tickets when the hill check is disabled.
  */
+@SuppressWarnings("JavadocDeclaration") // ADR traceability tags
 public final class TicketFootprint {
   private static final long CACHE_NANOS = 1_000_000_000L;
   private static volatile Snapshot snapshot = new Snapshot(0L, -1);

@@ -4,6 +4,7 @@ import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import java.io.Serial;
 import java.lang.System.Logger.Level;
 import java.nio.file.Path;
 import java.util.List;
@@ -40,6 +41,7 @@ public final class ConfigCandidateGate {
 
     /** Thrown by apply paths whose candidate was rejected; the message is the rendered operator text. */
     public static final class RejectedException extends IllegalArgumentException {
+        @Serial
         private static final long serialVersionUID = 1L;
         private final transient Result result;
 

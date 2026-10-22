@@ -341,6 +341,8 @@ public final class NeoForgeHandles implements HandleProvider {
                     RTP.log(Level.WARNING, "[RTP][NeoForge] " + effect + " effect failed for " + player.getUUID(), t);
                 }
             };
+            // The running server is borrowed, never owned here.
+            //noinspection resource
             MinecraftServer server = serverOf(player);
             if (server != null) {
                 server.execute(task);

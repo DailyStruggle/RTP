@@ -902,6 +902,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             }
         }
         if (missing.isEmpty()) return null;
+        // Ownership passes to the caller, which closes it from the poll loop.
+        //noinspection resource
         TicketGenerationWatch watch = new TicketGenerationWatch(GenerationBudget.server(), () -> {
             for (long footprintKey : missing) {
                 int footprintX = (int) footprintKey;

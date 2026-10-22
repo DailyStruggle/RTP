@@ -273,7 +273,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
     }
   }
   public static final class Result {
-    public final ProbeKind kind;
+    final ProbeKind kind;
     public boolean available = true;
     public boolean notConfigured;
     public boolean heartbeatPassed;

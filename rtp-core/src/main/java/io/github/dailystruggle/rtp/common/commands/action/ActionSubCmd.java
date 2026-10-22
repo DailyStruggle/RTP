@@ -105,10 +105,9 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
 
   public void syncActions() {
     synchronized (this) {
-      ActionService effectiveService = RTPAPI.actions();
-      if (effectiveService == null && ActionServices.actionManager() != null) {
-        effectiveService = ActionServices.actionManager();
-      }
+      // actions() throws before core loads; fall back to the core manager.
+      ActionService effectiveService =
+          RTPAPI.hasActions() ? RTPAPI.actions() : ActionServices.actionManager();
       if (effectiveService instanceof ActionManager manager) {
         final ActionService finalService = effectiveService;
         // Remove any previously registered ActionCommands whose actions no longer exist

@@ -464,7 +464,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
       RTP.log(Level.WARNING, msg);
       return null;
     }
-    return region != null && region.getWorld() != null ? region : null;
+    return region.getWorld() != null ? region : null;
   }
 
   private static String safePlatform() {

@@ -188,7 +188,7 @@ public class Region extends FactoryValue<RegionKeys> {
     boolean vertRecovered = false;
     if (this.shape == null) {
       Factory<Shape<?>> sf = (ActiveSelection.get() != null) ? ActiveSelection.get().getShapeFactory() : null;
-      if (sf == null && FactoryRegistry.map() != null) {
+      if (sf == null) {
         @SuppressWarnings("unchecked")
         Factory<Shape<?>> casted = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         sf = casted;
@@ -203,12 +203,8 @@ public class Region extends FactoryValue<RegionKeys> {
       shapeRecovered = true;
     }
     if (vert == null) {
-      Factory<VerticalAdjustor<?>> vf = null;
-      if (FactoryRegistry.map() != null) {
-        @SuppressWarnings("unchecked")
-        Factory<VerticalAdjustor<?>> casted = (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
-        vf = casted;
-      }
+      @SuppressWarnings("unchecked")
+      Factory<VerticalAdjustor<?>> vf = (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
       if (vf != null) {
         vert = (VerticalAdjustor<?>) vf.get("LINEAR");
       }

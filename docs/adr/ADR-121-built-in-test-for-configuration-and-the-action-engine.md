@@ -59,7 +59,7 @@ The module splits into what is generic and what stays with each plugin:
 
 The module is threading-neutral: it never schedules work itself, it takes an executor or runs on the caller's thread, so each plugin applies its own scheduler rules. Logging goes through a supplied sink, never `System.out` or a global logger. User-facing text is not produced by `bit-api`; it emits stable `code`s and structured fields, and each plugin renders them through its own message files.
 
-`anvil-api` depends on `bit-api` (which keeps `anvil-api` RTP-free, ADR-016, ADR-077). The existing `io.github.dailystruggle.rtp.anvil.bit` types stay for one release as `@Deprecated` subtypes or aliases of the moved types, so `DynamicZstdBinding`, `LinearRegionReader` and `RegionFormatDetector` and any external implementer keep compiling. The `< 5 ms`, never-throw PBIT rule stays for in-line component checks.
+`anvil-api` depends on `bit-api` (which keeps `anvil-api` RTP-free, ADR-016, ADR-077). The `io.github.dailystruggle.rtp.anvil.bit` types are removed rather than deprecated, and `DynamicZstdBinding`, `LinearRegionReader` and `RegionFormatDetector` implement `io.github.dailystruggle.bit.BuiltInTestable` directly. The `< 5 ms`, never-throw PBIT rule stays for in-line component checks.
 
 ### 3. Allowed values live with the code that uses them
 
@@ -189,7 +189,7 @@ Per-server severity overrides (`advanced/bit.yml`, `overrides: { <KEY>: ERROR|WA
 |--------|--------|
 | new `api/bit-api` (`:bit-api`, `io.github.dailystruggle.bit`) | Generic contract and helpers listed in section 2; own README, tests and architecture test (no `io.github.dailystruggle.rtp`, `org.bukkit`, `net.minecraft` imports). |
 | `settings.gradle` | `include 'bit-api'` with `projectDir = file('api/bit-api')`. |
-| `anvil-api` | Depends on `bit-api`; old `anvil.bit` types kept as deprecated aliases for one release; implementers unchanged. |
+| `anvil-api` | Depends on `bit-api`; implementers use the `bit-api` types; the `anvil.bit` package is removed. |
 | `rtp-core` `common/action` | `ActionConfigLoader` records findings instead of dropping; allowed-value sets in `ActionConfigLoader`, `ActionSessionImpl`, `GateEvaluator`, `ActionPlaceholderSanitizer`; new `ActionDefinitionValidator`, `ActionEngineSelfTest`, `ActionCbitCounters`, `ActionSimulator`. |
 | `rtp-core` (config) | Uses `bit-api` `BitRegistry`; ADR-064 directive checker; reload path runs PBIT on the candidate. |
 | `rtp-core` (commands) | `/rtp test` becomes the BIT runner and output command (selectors, `status`, `action`); probes become registered components. |
@@ -219,7 +219,7 @@ Per-server severity overrides (`advanced/bit.yml`, `overrides: { <KEY>: ERROR|WA
 **Risks and trade-offs**
 
 - Existing operator configs with typos that "worked" by being ignored will now disable that action. Mitigation: the first release that ships this logs findings as `WARNING` for structural codes behind `advanced/bit.yml` `strictActions: false`, with `true` the default one release later; the CHANGELOG states the change.
-- Moving the `bit` package touches `anvil-api` consumers; deprecated aliases for one release avoid a source break.
+- Moving the `bit` package touches `anvil-api` consumers; the old package is removed without deprecated aliases, so an external implementer must switch imports to `io.github.dailystruggle.bit`.
 - Registration-time catalogs are only complete once owners initialise; a lazily loaded owner can be missing from `/rtp test status` or the export. The owner list and its test (section 10) close this.
 - Shaded copies of `bit-api` in separate plugins get separate registries; namespace blocks in the section 10 table keep ids unique across the monorepo even without a shared registry instance.
 - A generic module tempts RTP-specific growth. The `bit-api` architecture test and the section 2 split keep domain vocabularies, codes and message rendering in each plugin.
@@ -255,7 +255,7 @@ Per-server severity overrides (`advanced/bit.yml`, `overrides: { <KEY>: ERROR|WA
 ## References
 
 - `rtp-core/.../common/action/ActionConfigLoader.java`, `GateEvaluator.java`, `ActionSessionImpl.java`, `ActionPlaceholderSanitizer.java`, `GateExpressionParser.java`.
-- `api/anvil-api/.../anvil/bit/BuiltInTestable.java`, `PbitResult.java`, `BitHealth.java`.
+- `api/bit-api/.../bit/BuiltInTestable.java`, `PbitResult.java`, `BitHealth.java` (replacing the removed `anvil.bit` package).
 - `addons/LeafRTPActionAddon/src/main/resources/definitions/actions/` (shipped examples, e.g. `koth.yml`).
 - `docs/dev/CONFIG_COMMENT_STYLE.md` (ADR-064 directives); `LocaleParityTest`.
 - `api/commands-api`, `api/metrics-api` (precedent for standalone, plugin-agnostic modules).

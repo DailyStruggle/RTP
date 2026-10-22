@@ -98,6 +98,7 @@ public final class EffectsGroupValidator implements ConfigOwnerCheck {
     }
 
     /** Checks one group; returns its resolved explicit inherit targets (lower-case). */
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType") // empty = effects vocabulary unavailable
     private static List<String> checkGroup(ConfigSnapshot.Document document, Set<String> groupNames,
                                            Optional<Vocabulary> effects, List<BitFinding> findings) {
         String source = document.path();

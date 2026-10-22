@@ -124,7 +124,7 @@ public final class DataSizeParser {
       }
       double bytes = parsed.toBytes();
       if (bytes < 0) return -1L;
-      return (long) Math.round(bytes);
+      return Math.round(bytes);
     } catch (Exception e) {
       return defBytes;
     }
