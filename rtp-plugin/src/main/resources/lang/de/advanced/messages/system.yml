@@ -17,6 +17,7 @@ neueWelt: "&b[P0] neue Welt '[world]' erkannt"
 # Platzhalter: [filename] - Dateiname
 ladeNeu: "&b[P0] lade [filename]..."
 neuGeladen: "&b[P0] [filename] erfolgreich geladen."
+reloadFailed: "&c[P0] Die Konfiguration konnte nicht neu geladen werden. Prüfe das Serverprotokoll."
 aktualisiere: "&a[P0] aktualisiere [filename]..."
 aktualisiert: "&a[P0] [filename] erfolgreich aktualisiert."
 

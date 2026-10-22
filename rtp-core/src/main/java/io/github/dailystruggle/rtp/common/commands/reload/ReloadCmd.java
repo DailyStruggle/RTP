@@ -12,13 +12,14 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
 
 public class ReloadCmd extends BaseRTPCmdImpl {
@@ -90,36 +91,52 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, msg);
     }
 
-    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
-      boolean b = ActiveConfigs.get().reload();
-      if (!b) throw new IllegalStateException("reload failed");
+    try {
+      RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+        try {
+          boolean b = ActiveConfigs.get().reload();
+          if (!b) throw new IllegalStateException("reload failed");
 
-      // Drop the decoded-schematic cache so a swapped/edited <region>.schem file on disk is
-      // re-read on the next teleport instead of serving the stale in-memory copy (ADR-058).
-      io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster.clearCache();
+          // Drop the decoded-schematic cache so a swapped/edited <region>.schem file on disk is
+          // re-read on the next teleport instead of serving the stale in-memory copy (ADR-058).
+          io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster.clearCache();
 
-      // Re-index <dataFolder>/docs so edited shipped docs reach /rtp docs and the editor.
-      io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(
-          RTPRuntime.serverAccessor().getPluginDirectory());
+          // Re-index <dataFolder>/docs so edited shipped docs reach /rtp docs and the editor.
+          io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(
+              RTPRuntime.serverAccessor().getPluginDirectory());
 
-      String msgReloaded = msg(SystemMessages.reloaded, "");
-      if (!msgReloaded.isEmpty()) {
-        msgReloaded =
-            filenamePattern
-                .matcher(msgReloaded)
-                .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
-        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, msgReloaded);
-      }
-
-      MiscTasks.sync()
-              .add(
-                      new RTPRunnable(
-                              () -> {
-                                RTP.reloading.set(false);
-                              },
-                              1));
-    });
+          String msgReloaded = msg(SystemMessages.reloaded, "");
+          if (!msgReloaded.isEmpty()) {
+            msgReloaded =
+                filenamePattern
+                    .matcher(msgReloaded)
+                    .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, msgReloaded);
+          }
+        } catch (RuntimeException failure) {
+          sendReloadFailure(senderId, failure);
+        } finally {
+          RTP.reloading.set(false);
+        }
+      });
+    } catch (RuntimeException failure) {
+      RTP.reloading.set(false);
+      sendReloadFailure(senderId, failure);
+    }
 
     return true;
+  }
+
+  private void sendReloadFailure(UUID senderId, RuntimeException failure) {
+    RTPRuntime.log(Level.SEVERE, "Failed to reload configs: " + failure.getMessage(), failure);
+    String fallback = "&c[P0] Failed to reload configs. Check the server log.";
+    String failureMessage = fallback;
+    try {
+      String configured = msg(SystemMessages.reloadFailed, fallback);
+      if (configured != null && !configured.isBlank()) failureMessage = configured;
+    } catch (RuntimeException messageFailure) {
+      RTPRuntime.log(Level.WARNING, "Could not read the reload failure message", messageFailure);
+    }
+    RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, failureMessage);
   }
 }

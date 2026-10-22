@@ -154,7 +154,7 @@ public interface RTPCmd extends BaseRTPCmd {
       boolean requested, TeleportData prior, long now) {
     if (subject == null) return 0L;
     long globalLast = (prior != null && prior.time > 0L)
-        ? prior.time : RTP.getEffectiveLastTeleportTime(playerId);
+        ? prior.time : RTP.getSharedLastTeleportTime(playerId);
     long globalRemaining = remainingAfter(RTP.getCooldown(subject, null), globalLast, now);
     RegionSettings settings = (region == null) ? null : region.getSettings();
     if (settings == null || settings.cooldownMillis() == null || settings.cooldownMillis() < 0) {

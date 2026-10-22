@@ -132,6 +132,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # Recusa pousos em encostas ou bordas de penhasco com esta inclinação ou mais, em graus.
+    # "off" é o mais rápido. 30 recusa cerca de 1 em 5 pontos em terra, 45 cerca de 1 em 12, 60 cerca de 1 em 60.
+    # Qualquer número de 0 a 89 também funciona. Ativado, a busca lê os chunks ao redor de cada ponto.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

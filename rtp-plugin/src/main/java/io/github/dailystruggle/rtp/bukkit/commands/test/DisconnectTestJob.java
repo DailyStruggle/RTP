@@ -1,8 +1,19 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
@@ -15,7 +26,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,11 +41,19 @@ import org.jetbrains.annotations.Nullable;
  * zero, closes the reservation exactly once, and clears the UUID from
  * {@code processingPlayers}. Models {@code ChunkReservation} via
  * {@link SyntheticReservation} (no real ticket, no {@code keep(true)}) to stay
- * S-002/S-005-clean and Folia-safe. Runs on {@link ForkJoinPool#commonPool()};
+ * S-002/S-005-clean and Folia-safe. Synthetic stages use {@link RTPRuntime#scheduler()};
  * the command returns immediately and emits via {@link #emit(UUID, Result)}.
- * Traces REQ-RTP-S-002 / S-004; see {@code RUNTIME_TEST_SUITE_PLAN.md &sect;3.9}.
+ * Traces REQ-RTP-S-002 / S-004.
  */
 public class DisconnectTestJob extends BaseRTPCmdImpl {
+
+  public static final BitCode TRY_FINALLY = registerCode(3701, "TEST_DISCONNECT_JOB_TRY_FINALLY");
+  public static final BitCode RESERVATION = registerCode(3702, "TEST_DISCONNECT_JOB_RESERVATION");
+  public static final BitCode RESIDUAL_TICKETS = registerCode(3703, "TEST_DISCONNECT_JOB_RESIDUAL_TICKETS");
+  public static final BitCode PROCESSING = registerCode(3704, "TEST_DISCONNECT_JOB_PROCESSING");
+  public static final BitCode TELEPORT_DATA = registerCode(3705, "TEST_DISCONNECT_JOB_TELEPORT_DATA");
+  public static final BitCode NEXT_TASK = registerCode(3706, "TEST_DISCONNECT_JOB_NEXT_TASK");
+  public static final BitCode THREW = registerCode(3707, "TEST_DISCONNECT_JOB_THREW");
 
   /** Prefix for the synthetic probe UUID label, for log-scraping friendliness. */
   static final String PROBE_TAG = "rtp-test-disconnect-job";
@@ -43,9 +61,11 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
   /** Bound on the simulated chunk-gen chain; guarantees the probe never wedges
    *  the ActiveTestJobs registry. */
   static final long DEFAULT_TIMEOUT_MS = 2_000L;
+  public static final BitComponent COMPONENT = registerComponent();
 
   public DisconnectTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
   }
 
   @Override
@@ -69,36 +89,128 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    State live =
-        new State(
-            TeleportSessions.current().processingPlayers,
-            TeleportSessions.current().latestTeleportData,
-            TeleportSessions.current().priorTeleportData);
+    RTPScheduler scheduler = RTPRuntime.scheduler();
+    if (scheduler == null) {
+      Result failed = new Result();
+      failed.threw = "RTP.scheduler is unavailable";
+      BitResult bitResult = RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(failed)), Runnable::run);
+      emit(callerId, failed);
+      ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
+      return true;
+    }
+
+    State live = currentState();
 
     AtomicBoolean cancelFlag = new AtomicBoolean(false);
     Runnable unregister =
         ActiveTestJobs.register(
             callerId, new ActiveTestJobs.Job("disconnect-job", () -> cancelFlag.set(true)));
 
-    runProbeAsync(live, ForkJoinPool.commonPool(), DEFAULT_TIMEOUT_MS, cancelFlag::get)
-        .whenComplete(
-            (r, err) -> {
-              try {
-                if (err != null) {
-                  Result failed = new Result();
-                  failed.threw = err.getClass().getSimpleName() + ": " + err.getMessage();
-                  emit(callerId, failed);
-                } else {
-                  emit(callerId, r);
-                }
-              } finally {
-                // Release the ActiveTestJobs slot so TestFullCmd's
-                // waitForCallerJobsToDrain can see the stage as done and
-                // advance to the next sweep step (true sequential semantics).
-                unregister.run();
-              }
-            });
+    try {
+      scheduler.runTaskAsynchronously(
+          () -> {
+            try {
+              Result result =
+                  runProbeAsync(live, Runnable::run, DEFAULT_TIMEOUT_MS, cancelFlag::get)
+                      .get(DEFAULT_TIMEOUT_MS + 1_000L, TimeUnit.MILLISECONDS);
+              emit(callerId, result);
+              BitResult bitResult =
+                  RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(result)), Runnable::run);
+              ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              Result result = new Result();
+              result.threw = interrupted.getClass().getSimpleName() + ": " + interrupted.getMessage();
+              emit(callerId, result);
+              BitResult bitResult =
+                  RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(result)), Runnable::run);
+              ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
+            } catch (Throwable failure) {
+              Result result = new Result();
+              result.threw = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+              emit(callerId, result);
+              BitResult bitResult =
+                  RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(result)), Runnable::run);
+              ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
+            } finally {
+              unregister.run();
+            }
+          });
+    } catch (Throwable failure) {
+      unregister.run();
+      Result result = new Result();
+      result.threw = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+      emit(callerId, result);
+      BitResult bitResult =
+          RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(result)), Runnable::run);
+      ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
+    }
     return true;
+  }
+
+  private static BitCode registerCode(int id, String key) {
+    return RtpBitCodes.TEST.register(
+        id,
+        key,
+        java.lang.System.Logger.Level.ERROR,
+        BitTier.IBIT,
+        "test.disconnect-job",
+        "",
+        "Verify the disconnect cleanup releases this state exactly once.");
+  }
+
+  private static BitComponent registerComponent() {
+    BitComponent component =
+        new BitComponent(
+            "disconnect-job",
+            "test.disconnect-job",
+            BitTier.IBIT,
+            BitSideEffect.SAFE,
+            5_000,
+            DisconnectTestJob::quietReport);
+    RtpBit.RUNNER.register(component);
+    return component;
+  }
+
+  private static State currentState() {
+    TeleportSessions sessions = TeleportSessions.current();
+    return new State(sessions.processingPlayers, sessions.latestTeleportData, sessions.priorTeleportData);
+  }
+
+  private static BitReport quietReport() {
+    RTPScheduler scheduler = RTPRuntime.scheduler();
+    if (scheduler == null) {
+      Result result = new Result();
+      result.threw = "RTP.scheduler is unavailable";
+      return toBitReport(result);
+    }
+    try {
+      Result result =
+          runProbeAsync(currentState(), scheduler::runTaskAsynchronously, DEFAULT_TIMEOUT_MS, () -> false)
+              .get(DEFAULT_TIMEOUT_MS + 1_000L, TimeUnit.MILLISECONDS);
+      return toBitReport(result);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      Result result = new Result();
+      result.threw = interrupted.getClass().getSimpleName() + ": " + interrupted.getMessage();
+      return toBitReport(result);
+    } catch (Throwable failure) {
+      Result result = new Result();
+      result.threw = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+      return toBitReport(result);
+    }
+  }
+
+  static BitReport toBitReport(Result result) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("disconnect-job");
+    report.check(TRY_FINALLY, result.tryFinallyRan, "disconnect.tryFinally", "The cleanup finally block did not run.");
+    report.check(RESERVATION, result.reservationClosed, "disconnect.reservation", "The synthetic reservation was not closed.");
+    report.check(RESIDUAL_TICKETS, result.residualTicketCount == 0, "disconnect.residualTickets", "Synthetic chunk tickets remain.");
+    report.check(PROCESSING, result.processingCleared, "disconnect.processingPlayers", "The probe UUID remains in processing state.");
+    report.check(TELEPORT_DATA, result.teleportDataCleared, "disconnect.teleportData", "The probe UUID remains in teleport data.");
+    report.check(NEXT_TASK, result.nextTaskCancelled, "disconnect.nextTask", "The pending next task was not cancelled.");
+    report.check(THREW, result.threw == null, "disconnect.exception", result.threw);
+    return report.build();
   }
 
   /**

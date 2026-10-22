@@ -273,7 +273,9 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
      */
     private boolean tryAddTempLoadTicket(ServerLevel level, ChunkPos cp) {
         try {
-            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+            int distance = io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance();
+            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, distance);
+            recordTicketDistance(level, cp, true, distance);
             return true;
         } catch (Throwable t) {
             RTP.log(Level.FINE,
@@ -293,7 +295,9 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         MinecraftServer server = level.getServer();
         Runnable remove = () -> {
             try {
-                level.getChunkSource().removeTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+                int distance = ticketDistance(level, cp, true);
+                level.getChunkSource().removeTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, distance);
+                releaseTicketDistance(level, cp, true);
             } catch (Throwable t) {
                 RTP.log(Level.FINE,
                         "[RTP][NeoForge 26.1] temp load-ticket release failed for chunk="
@@ -409,25 +413,26 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     // -------------------------------------------------------------------------
     // Non-persistent chunk tickets - see NeoForgeVersionAdapter Javadoc and
     // rtp-fabric-ADR-006 / -016 (ported). A non-persistent, non-expiring
-    // TicketType (timeout NO_TIMEOUT, FLAG_PERSIST omitted); distance 1 ->
-    // effective level 33-1=32 (FULL/BORDER, below ENTITY_TICKING): the chunk
-    // stays pinned and block-readable for RTPChunk#isSafe but does not
-    // entity-tick, so a player-less kept chunk costs ~0 MSPT; the player's own
-    // arrival ticket promotes it to ENTITY_TICKING on teleport without a regen.
+    // TicketType (timeout NO_TIMEOUT, FLAG_PERSIST omitted). Distance 0 holds
+    // one FULL, non-ticking chunk; distance 1 is used only when active hill
+    // checks need the resident 3x3 (level 32 at the center is BLOCK_TICKING).
     // Supersedes ADR-006's ENTITY_TICKING end-state for the kept cache
     // (rtp-fabric-ADR-016).
     // -------------------------------------------------------------------------
 
-    private static final int RTP_TICKET_DISTANCE = 1;
+    private record TicketKey(ServerLevel level, ChunkPos chunkPosition, boolean temporary) {}
+
+    private static final java.util.concurrent.ConcurrentHashMap<TicketKey,
+            java.util.concurrent.ConcurrentLinkedQueue<Integer>> APPLIED_TICKET_DISTANCES =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     // 26.1 Mojmap: TicketType(long timeout, int flags), flags a bitfield over
     // FLAG_PERSIST | FLAG_LOADING | FLAG_SIMULATION | ... . Omit FLAG_PERSIST for
     // S-002 (non-persistent: never written to level.dat). Tickets are applied
     // through the public ServerChunkCache#addTicketWithRadius /
-    // #removeTicketWithRadius pair (radius 1 -> effective level 32, FULL/BORDER
-    // below ENTITY_TICKING: chunk pinned and block-readable for RTPChunk#isSafe
-    // but not entity-ticking, ~0 MSPT until the player's arrival ticket promotes
-    // it). Matches the Fabric 26.x / 1.21.11 carriers - no DistanceManager
+    // #removeTicketWithRadius pair. Distance 0 keeps the single target chunk
+    // FULL without ticking; distance 1 supplies neighboring FULL chunks for
+    // active hill checks. Matches the Fabric 26.x / 1.21.11 carriers - no DistanceManager
     // reflection on this runtime.
     private static final int RTP_TICKET_FLAGS =
             TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION;
@@ -443,6 +448,30 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     private static final TicketType RTP_TEMP_LOAD_TICKET_TYPE =
             new TicketType(600L, RTP_TICKET_FLAGS);
 
+    private static void recordTicketDistance(ServerLevel level, ChunkPos cp, boolean temporary, int distance) {
+        APPLIED_TICKET_DISTANCES.computeIfAbsent(
+                new TicketKey(level, cp, temporary),
+                key -> new java.util.concurrent.ConcurrentLinkedQueue<>())
+                .offer(distance);
+    }
+
+    private static int ticketDistance(ServerLevel level, ChunkPos cp, boolean temporary) {
+        var distances = APPLIED_TICKET_DISTANCES.get(
+                new TicketKey(level, cp, temporary));
+        Integer applied = distances == null ? null : distances.peek();
+        return applied == null
+                ? io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance()
+                : applied;
+    }
+
+    private static void releaseTicketDistance(ServerLevel level, ChunkPos cp, boolean temporary) {
+        TicketKey key = new TicketKey(level, cp, temporary);
+        var distances = APPLIED_TICKET_DISTANCES.get(key);
+        if (distances == null) return;
+        distances.poll();
+        if (distances.isEmpty()) APPLIED_TICKET_DISTANCES.remove(key, distances);
+    }
+
     @Override
     public CompletableFuture<Void> applyTicket(ServerLevel level, int cx, int cz) {
         if (level == null) {
@@ -450,7 +479,10 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
         try {
             ServerChunkCache cache = level.getChunkSource();
-            cache.addTicketWithRadius(RTP_TICKET_TYPE, new ChunkPos(cx, cz), RTP_TICKET_DISTANCE);
+            ChunkPos cp = new ChunkPos(cx, cz);
+            int distance = io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance();
+            cache.addTicketWithRadius(RTP_TICKET_TYPE, cp, distance);
+            recordTicketDistance(level, cp, false, distance);
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
@@ -467,7 +499,9 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
         try {
             ServerChunkCache cache = level.getChunkSource();
-            cache.removeTicketWithRadius(RTP_TICKET_TYPE, new ChunkPos(cx, cz), RTP_TICKET_DISTANCE);
+            ChunkPos cp = new ChunkPos(cx, cz);
+            cache.removeTicketWithRadius(RTP_TICKET_TYPE, cp, ticketDistance(level, cp, false));
+            releaseTicketDistance(level, cp, false);
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,

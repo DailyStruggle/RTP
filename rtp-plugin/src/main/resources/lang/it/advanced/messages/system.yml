@@ -17,6 +17,7 @@ nuovoMondo: "&b[P0] rilevato un nuovo mondo '[world]'"
 # segnaposto: [filename] - nome del file
 ricaricamento: "&b[P0] caricamento di [filename]..."
 ricaricato: "&b[P0] [filename] caricato con successo."
+reloadFailed: "&c[P0] Impossibile ricaricare la configurazione. Controlla il log del server."
 aggiornamento: "&a[P0] aggiornamento di [filename]..."
 aggiornato: "&a[P0] [filename] aggiornato con successo."
 

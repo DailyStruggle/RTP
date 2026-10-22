@@ -17,6 +17,7 @@ new_box: "&b[P0] sniffed a new box '[world]'"
 # placeholder: [filename] - name of file
 grooming: "&b[P0] grooming [filename]..."
 groomed_complete: "&b[P0] finished grooming [filename]."
+reloadFailed: "&c[P0] No s'ha pogut recarregar la configuració. Consulta el registre del servidor."
 rearranging_whiskers: "&a[P0] rearranging [filename]..."
 groomed: "&a[P0] [filename] all tidy."
 

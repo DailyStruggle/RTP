@@ -15,6 +15,7 @@ nieuweWereld: "&b[P0] nieuwe wereld '[world]' gedetecteerd"
 # placeholder: [filename] - bestandsnaam
 herladen: "&b[P0] [filename] laden..."
 herladen_klaar: "&b[P0] [filename] succesvol geladen."
+reloadFailed: "&c[P0] Configuratie opnieuw laden is mislukt. Controleer het serverlog."
 bijwerken: "&a[P0] [filename] bijwerken..."
 bijgewerkt: "&a[P0] [filename] succesvol bijgewerkt."
 

@@ -212,6 +212,14 @@ public class LocationGenerator implements ILocationGenerator {
     static CompletableFuture<GenerationResult> getLocationFuture(
             Region region, @Nullable Set<String> biomeNames, LoadPurpose purpose,
             @Nullable BacklogLocationBuffer backlog) {
+        return getLocationFuture(region, biomeNames, purpose, backlog, null);
+    }
+
+    /** As above, carrying an admission reservation through the speculative load path. */
+    static CompletableFuture<GenerationResult> getLocationFuture(
+            Region region, @Nullable Set<String> biomeNames, LoadPurpose purpose,
+            @Nullable BacklogLocationBuffer backlog,
+            @Nullable io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
         CfDiag.locationGenPregenEntry.increment();
         CfDiag.ensureStarted();
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
@@ -224,6 +232,7 @@ public class LocationGenerator implements ILocationGenerator {
             }
             state.purpose = (purpose == null) ? LoadPurpose.IMMEDIATE : purpose;
             state.backlog = backlog;
+            state.generationSlot = generationSlot;
             PregenTask task = new PregenTask(state, result, 1L);
             RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(task);
         } catch (Throwable t) {

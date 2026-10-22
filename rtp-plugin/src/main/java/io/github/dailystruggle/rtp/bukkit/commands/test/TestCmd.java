@@ -1,7 +1,14 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitSelector;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.commands.test.TestAllCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestEventsCmd;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
@@ -13,22 +20,28 @@ import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.TestStatusCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestTeleportCmd;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
+import java.util.Locale;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Parent node for the {@code rtp test …} runtime test suite.
  *
- * <p>See {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the full design,
- * roadmap, and requirements traceability.
+ * <p>This platform-neutral parent owns SAFE probe selectors and shares the
+ * command tree between Bukkit and Fabric; Bukkit-only children are added by
+ * {@link BukkitTestCmd}.
  *
  * <p>Lives in {@code rtp-plugin} (not {@code rtp-core}) because several
  * subcommands depend on {@code org.bukkit.*} or {@code rtp-spigot} symbols.
@@ -51,19 +64,60 @@ public class TestCmd extends BaseRTPCmdImpl {
 
   public TestCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit selected BIT tests as JSON", (uuid, value) -> true));
+    addParameter(
+        "tier",
+        new EnumParameter<>(
+            "rtp.test",
+            "run SAFE tests in the selected BIT tiers",
+            (uuid, value) -> {
+              try {
+                BitTier.valueOf(value.toUpperCase(Locale.ROOT));
+                return true;
+              } catch (IllegalArgumentException exception) {
+                return false;
+              }
+            },
+            BitTier.class));
+    addParameter(
+        "subsystem",
+        new CommandParameter(
+            "rtp.test",
+            "run SAFE tests in the selected subsystem",
+            (uuid, value) ->
+                RtpBit.RUNNER.components().stream()
+                    .anyMatch(component -> component.subsystem().equalsIgnoreCase(value))) {
+          @Override
+          public Set<String> values() {
+            return RtpBit.RUNNER.components().stream()
+                .map(component -> component.subsystem())
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.toSet());
+          }
+        });
+
     // --- Platform-neutral subcommands (safe to class-load on Bukkit + Fabric). ---
     addSubCommand(new TestCancelCmd(this));
+    addSubCommand(new TestAllCmd(this));
     addSubCommand(new TestSchedulerCmd(this));
+    addSubCommand(new TestEventsCmd(this));
     addSubCommand(new TestReloadSafetyCmd(this));
     addSubCommand(new TestConfigSetCmd(this));
     addSubCommand(new TestCommandsCmd(this));
     addSubCommand(new TestApiCompatCmd(this));
+    addSubCommand(new TestCommandsCmd(this));
+    addSubCommand(new EconomyIsolationTestJob(this));
+    addSubCommand(new DisconnectTestJob(this));
+    addSubCommand(new NetworkSimulationTestJob(this));
+    addSubCommand(new SafetyVerifierTestJob(this));
     addSubCommand(new TestChunkTicketCmd(this));
     addSubCommand(new TestDisconnectMidflightCmd(this));
     addSubCommand(new TestAnvilPrefilterCmd(this));
     addSubCommand(new TestBiomeSourceCmd(this));
     addSubCommand(new TestAsyncChunkLoadCmd(this));
     addSubCommand(new TestAccessorCmd(this));
+    addSubCommand(new TestStatusCmd(this));
+    addSubCommand(new TestTeleportCmd(this));
     addSubCommand(new QueueStarvationTestJob(this));
     addSubCommand(new EconomyIsolationTestJob(this));
     addSubCommand(new FoliaOwnershipTestJob(this));
@@ -71,11 +125,8 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new SafetyVerifierTestJob(this));
     addSubCommand(new NetworkSimulationTestJob(this));
 
-    // Bukkit-bound subcommands and the `full`/`all` umbrella are registered
-    // by BukkitTestCmd (see its Javadoc) so this class stays class-load-safe
-    // on Fabric. `full` references SendMessage (rtp-spigot), so even the
-    // umbrella has to stay Bukkit-only for now - Fabric users still get every
-    // platform-neutral subcommand individually.
+    // Bukkit-bound subcommands and `full` are registered by BukkitTestCmd,
+    // so this class stays class-load-safe on Fabric.
     registerPlatformSpecificChildren();
   }
 
@@ -108,8 +159,34 @@ public class TestCmd extends BaseRTPCmdImpl {
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
+    List<String> tiers = parameterValues.get("tier");
+    List<String> subsystems = parameterValues.get("subsystem");
+    if (tiers != null && !tiers.isEmpty() && subsystems != null && !subsystems.isEmpty()) {
+      msgInvalidCommand(callerId, "tier and subsystem selectors cannot be combined");
+      return false;
+    }
+    List<BitSelector> selectors = selectorsFrom(parameterValues);
+    if (!selectors.isEmpty()) {
+      runSelectors(callerId, selectors, io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport.isJson(parameterValues));
+    }
     // Bare `rtp test` - no-op; CommandsAPI will surface help via the `help` subtree.
     return true;
+  }
+
+  static List<BitSelector> selectorsFrom(Map<String, List<String>> parameterValues) {
+    List<String> tiers = parameterValues.get("tier");
+    if (tiers != null && !tiers.isEmpty()) {
+      return tiers.stream().map(value -> BitSelector.parse("tier:" + value)).toList();
+    }
+    List<String> subsystems = parameterValues.get("subsystem");
+    if (subsystems != null && !subsystems.isEmpty()) {
+      return subsystems.stream().map(value -> BitSelector.parse("subsystem:" + value)).toList();
+    }
+    return List.of();
+  }
+
+  protected void runSelectors(UUID callerId, List<BitSelector> selectors, boolean json) {
+    TestAllCmd.run(callerId, selectors, json);
   }
 
   // --- Per-caller test-isolation semaphore wiring ---------------------------

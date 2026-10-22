@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
+import io.github.dailystruggle.rtp.common.mock.SyntheticSideEffects;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -52,7 +53,9 @@ public final class RTPTeleportCancel extends RTPRunnable {
     if (repData != null) TeleportSessions.current().latestTeleportData.put(playerId, repData);
     else TeleportSessions.current().latestTeleportData.remove(playerId);
 
-    if (RTPRuntime.economy() != null && data.cost != 0.0 && refund && data.sender instanceof RTPPlayer) {
+    // ADR-121 section 11: a BIT mock was never charged, so it is never credited.
+    if (RTPRuntime.economy() != null && data.cost != 0.0 && refund && data.sender instanceof RTPPlayer
+        && !SyntheticSideEffects.isSynthetic(data.sender.uuid())) {
       final double refundAmount = data.cost;
       final UUID refundTarget = data.sender.uuid();
       io.github.dailystruggle.rtp.common.economy.EconomyHop.run(

@@ -1523,7 +1523,9 @@ public final class EditorSessionManager {
 
             // Trigger hot-reload on configs
             try {
-                ActiveConfigs.get().reload();
+                if (!ActiveConfigs.get().reload()) {
+                    throw new IllegalStateException("configuration reload returned false");
+                }
             } catch (Exception e) {
                 RTPRuntime.log(Level.WARNING, "Hot-reload encountered an error after applying payload: " + e.getMessage(), e);
                 throw new RuntimeException("Hot-reload error: " + e.getMessage(), e);

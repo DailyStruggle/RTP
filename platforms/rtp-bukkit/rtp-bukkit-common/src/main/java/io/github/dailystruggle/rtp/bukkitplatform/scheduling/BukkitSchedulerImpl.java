@@ -4,12 +4,16 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
+import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class BukkitSchedulerImpl implements RTPScheduler {
   private final JavaPlugin plugin;
+  private final AtomicBoolean tickWatchStarted = new AtomicBoolean(false);
 
   public BukkitSchedulerImpl(JavaPlugin plugin) {
     this.plugin = plugin;
@@ -85,6 +89,43 @@ public class BukkitSchedulerImpl implements RTPScheduler {
       ((org.bukkit.scheduler.BukkitTask) task).cancel();
     } else if (task instanceof Integer) {
       Bukkit.getScheduler().cancelTask((Integer) task);
+    }
+  }
+
+  /**
+   * Whether the server's chunk system serves requests first-come, first-served, so background
+   * fill must wait for RTP's earlier loads (vanilla Spigot). Paper's chunk system prioritises
+   * player chunks; its subclasses return {@code false}.
+   */
+  protected boolean holdsBackGeneration() {
+    return true;
+  }
+
+  @Override
+  public boolean isGenerationSaturated(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world) {
+    boolean holdsBack = holdsBackGeneration();
+    GenerationBudget.configureServerAdmission(holdsBack);
+    if (!holdsBack) return false;
+    startTickWatch();
+    return GenerationBudget.server().saturated();
+  }
+
+  /**
+   * Marks tick progress for {@link ServerHealthGate#tickStalled}: a 1-tick task that stops
+   * running means the main thread is stuck. With nobody online the server may pause between
+   * ticks (vanilla {@code pause-when-empty-seconds}), so the watch records idle instead.
+   */
+  private void startTickWatch() {
+    if (!tickWatchStarted.compareAndSet(false, true)) return;
+    try {
+      Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+        ServerHealthGate.tickFinished();
+        if (!Bukkit.getOnlinePlayers().isEmpty()) ServerHealthGate.tickStarted();
+      }, 1L, 1L);
+    } catch (Throwable t) {
+      tickWatchStarted.set(false);
+      RTPRuntime.log(java.util.logging.Level.FINE,
+          "[RTP] tick watch not started yet: " + t.getClass().getSimpleName() + ": " + t.getMessage());
     }
   }
 

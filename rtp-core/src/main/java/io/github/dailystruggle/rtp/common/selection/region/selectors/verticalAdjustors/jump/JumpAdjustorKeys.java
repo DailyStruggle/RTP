@@ -34,5 +34,12 @@ public enum JumpAdjustorKeys {
   /**
    * Horizontal distance of the slope samples, clamped to [1, 8]; 2 when absent (ADR-119).
    */
-  slopeRadius
+  slopeRadius,
+
+  /**
+   * Steepest hill, in degrees, a landing may sit on: refuses mountainsides and cliff edges over
+   * the 5x5-chunk square (ADR-120). Absent or negative disables the check. No default entry, so
+   * unset verts keep their cache key.
+   */
+  maxHillAngle
 }

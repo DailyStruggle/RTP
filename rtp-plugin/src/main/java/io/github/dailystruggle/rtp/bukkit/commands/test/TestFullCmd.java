@@ -2,6 +2,9 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
@@ -24,10 +27,10 @@ import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaSender;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +39,7 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test full} (alias: {@code rtp test all}) &mdash; runs every
+ * {@code rtp test full} &mdash; runs every
  * currently-shipped {@code rtp test *} subcommand in sequence with
  * conservative defaults, emitting a consolidated start/end log line.
  *
@@ -111,7 +114,12 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               // it. Runs on-demand only so the default sweep stays read-only.
               "config-set",
               "full",
+              // The SAFE BIT runner is a separate group command; the legacy full sweep also covers
+              // subcommands that do not yet publish BIT components.
               "all",
+              "status",
+              // A player-targeted teleport changes the caller's location and is not a group check.
+              "teleport",
               // Visual diagnostic: spawns holograms in player world context.
               "hologram",
               // Player-context diagnostic: needs the caller's live world + origin
@@ -135,7 +143,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
   @Override
   public String description() {
-    return "runs every currently-shipped rtp test subcommand in sequence (alias: all)";
+    return "runs every currently-shipped rtp test subcommand in sequence";
   }
 
   private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -254,6 +262,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       }
 
       final int warnBefore = audit.warnCount.get();
+      final long stepStartedAtMillis = System.currentTimeMillis();
       final java.util.concurrent.atomic.AtomicBoolean successFired =
           new java.util.concurrent.atomic.AtomicBoolean(false);
       final java.util.concurrent.atomic.AtomicBoolean failFired =
@@ -316,6 +325,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
         // ActiveTestJobs listeners, not just the synchronous dispatch.
         int delta = Math.max(0, audit.warnCount.get() - warnBefore);
         audit.stepWarnDeltas.put(subName, delta);
+        audit.stepVerdicts.put(subName, stepPassed(subName, stepStartedAtMillis, delta));
         scheduleNext(callerId, index + 1, audit);
       });
     } catch (Throwable t) {
@@ -498,22 +508,22 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       boolean leak = (activeTickets != 0 || activeTasks != 0);
       if (leak) {
         audit.stepWarnDeltas.put("memory-leak", (int) Math.max(1, activeTickets + activeTasks));
+        audit.stepVerdicts.put("memory-leak", false);
         RTP.log(
             Level.WARNING,
             "[RTP test/full] post-sweep assertion FAILED: MemoryTracker leak detected (activeTickets="
                 + activeTickets + ", activeTasks=" + activeTasks + ")");
       }
 
-      // Build the per-step success-rate summary from the deltas captured
-      // in runStep. Each entry was the delta in audit.warnCount across
-      // one subcommand's dispatch + drain window; 0 delta == pass.
+      // Preserve the warning count in each row while using a recent component result
+      // as the verdict when the subcommand publishes one.
       int total = audit.stepWarnDeltas.size();
       int passed = 0;
       StringBuilder rows = new StringBuilder(total * 64);
       List<String> failed = new ArrayList<>();
       for (Map.Entry<String, Integer> e : audit.stepWarnDeltas.entrySet()) {
         int d = e.getValue();
-        boolean ok = d == 0;
+        boolean ok = audit.stepVerdicts.getOrDefault(e.getKey(), d == 0);
         if (ok) passed++;
         else failed.add(e.getKey());
         rows.append("[RTP test/full]   ")
@@ -566,6 +576,25 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       SendMessage.removeInterceptor((java.util.function.BiConsumer<Level, String>) audit);
       isProcessing.set(false);
     }
+  }
+
+  static boolean stepPassed(String subName, long startedAtMillis, int warnDelta) {
+    boolean observed = false;
+    for (String componentId : componentIdsForStep(subName)) {
+      BitResult result = RtpBit.RUNNER.last(componentId);
+      if (result != null && result.completedAtMillis() >= startedAtMillis) {
+        observed = true;
+        if (result.report().health() == BitHealth.FAILED) return false;
+      }
+    }
+    return observed || warnDelta == 0;
+  }
+
+  static List<String> componentIdsForStep(String subName) {
+    if ("stress".equals(subName) || "async-reply".equals(subName)) {
+      return Arrays.asList(subName, subName + "-player");
+    }
+    return Collections.singletonList(subName);
   }
 
   /**
@@ -623,12 +652,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
   /**
    * Returns a non-null skip reason if {@code subName} should not be dispatched
    * for {@code callerId} on the current platform, or {@code null} to proceed.
-   * Encapsulates the small handful of context-dependent gates the sweep used
-   * to inline (Folia-only subcommands, console callers that lack a region or
-   * player, etc.).
+   * Encapsulates the platform-dependent gates the sweep applies to probes.
    */
   private String shouldSkip(String subName, UUID callerId) {
-    boolean isConsole = callerId.equals(RTPAPI.serverId);
     switch (subName) {
       case "folia-ownership":
         return (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia"))
@@ -636,15 +662,11 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             : "only meaningful on Folia";
       case "economy-isolation":
         if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
-            || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC
+            || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.server.api.PlatformFamily.FABRIC
             || RTPRuntime.economy() == null)) {
           return "Vault is Bukkit-only";
         }
         return null;
-      case "queue-starvation":
-        return isConsole ? "console caller has no resolvable region" : null;
-      case "async-reply":
-        return isConsole ? "console caller has no resolvable player" : null;
       default:
         return null;
     }
@@ -675,8 +697,10 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             new ArrayList<>(Collections.singletonList(String.valueOf(FULL_ITERATIONS))));
         break;
       case "async-reply":
-        args.put(
-            "player", new ArrayList<>(Collections.singletonList(resolveName(callerId))));
+        if (!callerId.equals(RTPAPI.serverId)) {
+          args.put(
+              "player", new ArrayList<>(Collections.singletonList(resolveName(callerId))));
+        }
         break;
       case "stress":
         if (!callerId.equals(RTPAPI.serverId)) {
@@ -803,6 +827,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
      * fail; the summary's denominator reflects what actually ran).
      */
     final Map<String, Integer> stepWarnDeltas = new LinkedHashMap<>();
+    final Map<String, Boolean> stepVerdicts = new LinkedHashMap<>();
 
     long elapsedMillis() {
       return Math.max(0L, (System.nanoTime() - startTimeNanos) / 1_000_000L);

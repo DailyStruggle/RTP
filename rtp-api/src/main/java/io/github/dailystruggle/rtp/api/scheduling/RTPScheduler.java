@@ -118,7 +118,8 @@ public interface RTPScheduler {
    * Whether new background work aimed at this chunk should wait because the tick loop that owns
    * it is backlogged or unhealthy (ADR-087 regional circuit breaker). Callers pick another
    * candidate or leave the work in its cache tier; player-facing work is never gated on this.
-   * Single-loop platforms return {@code false}: their server-wide gates already cover it.
+   * Single-loop platforms return {@link #isGenerationSaturated(RTPWorld)}: their server-wide
+   * gates cover tick health.
    *
    * @param world world of chunk
    * @param cx chunk X
@@ -126,6 +127,21 @@ public interface RTPScheduler {
    * @return {@code true} when background work for this chunk should be deferred
    */
   default boolean isRegionSaturated(RTPWorld<?> world, int cx, int cz) {
+    return isGenerationSaturated(world);
+  }
+
+  /**
+   * Whether new background chunk loads in this world should wait because the server's chunk
+   * system is still busy with earlier loads. Hosts whose chunk system serves requests
+   * first-come, first-served (vanilla 1.20 / 1.21 on Spigot, Fabric, NeoForge) return
+   * {@code true} while RTP's loads in flight reach a small cap, so the chunks players need are
+   * not queued behind RTP's. Hosts with a prioritised chunk system (Paper, Folia) return
+   * {@code false}. Player-facing work is never gated on this.
+   *
+   * @param world world the background work would load chunks in; may be {@code null}
+   * @return {@code true} when background chunk loads should be deferred
+   */
+  default boolean isGenerationSaturated(RTPWorld<?> world) {
     return false;
   }
 }

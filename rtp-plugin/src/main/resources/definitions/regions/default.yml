@@ -44,6 +44,9 @@ shape: "@config"
 #     maxY: 128
 #     direction: 2
 #     requireSkyLight: false
+#     # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.
+#     # "off" (fastest, default), 30, 45 or 60.
+#     maxHillAngle: 30
 vert: "@config"
 
 # If true, rtp.regions.<name> is required. "@config" inherits defaults.requirePermission

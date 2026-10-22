@@ -1,6 +1,15 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.reflect.Method;
@@ -15,12 +24,32 @@ import org.jetbrains.annotations.Nullable;
 /**
  * {@code rtp test api-compat} - read-only reflective probe of every
  * Bukkit/Paper/Folia API method RTP relies on; surfaces {@link NoSuchMethodError}
- * risk at test time (RUNTIME_TEST_SUITE_PLAN section 3.7). Curated list (not bytecode-scanned)
+ * risk at test time (ADR-121 section 11). Curated list (not bytecode-scanned)
  * to stay in lock-step with adapter notes. Missing classes report as {@code skipped}
  * (expected for platform-conditional APIs); missing methods report as failures.
  * S-004 (warn + send on miss), S-005 (pure reflection), no method is invoked.
  */
 public class TestApiCompatCmd extends BaseRTPCmdImpl {
+
+  public static final BitCode MISSING_METHOD =
+      RtpBitCodes.TEST.register(
+          4001,
+          "TEST_API_COMPAT_MISSING_METHOD",
+          java.lang.System.Logger.Level.ERROR,
+          BitTier.IBIT,
+          "test.api-compat",
+          "",
+          "Check the platform method signature required by the runtime adapter.");
+  public static final BitCode RESOLUTION_ERROR =
+      RtpBitCodes.TEST.register(
+          4002,
+          "TEST_API_COMPAT_RESOLUTION_ERROR",
+          java.lang.System.Logger.Level.ERROR,
+          BitTier.IBIT,
+          "test.api-compat",
+          "",
+          "Resolve the reported class-loading or reflection error for this platform.");
+  public static final BitComponent COMPONENT = registerComponent();
 
   /**
    * A single (declaring class FQN, method name, parameter-type FQNs) tuple
@@ -68,6 +97,7 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
 
   public TestApiCompatCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
   }
 
   @Override
@@ -93,6 +123,8 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
 
     List<ApiProbe> probes = defaultProbes();
     ProbeReport report = runProbes(probes);
+    BitResult bitResult =
+        RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(report)), Runnable::run);
 
     String summary =
         "[RTP test/api-compat] ok="
@@ -115,7 +147,32 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     emitDetail(callerId, "skipped (class not on classpath)", report.skipped, Level.INFO);
     emitDetail(callerId, "MISSING method", report.missingMethod, Level.WARNING);
     emitDetail(callerId, "resolution ERROR", report.errors, Level.WARNING);
+    ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
     return true;
+  }
+
+  private static BitComponent registerComponent() {
+    BitComponent component =
+        new BitComponent(
+            "api-compat",
+            "test.api-compat",
+            BitTier.IBIT,
+            BitSideEffect.SAFE,
+            60_000,
+            () -> toBitReport(runProbes(defaultProbes())));
+    RtpBit.RUNNER.register(component);
+    return component;
+  }
+
+  static BitReport toBitReport(ProbeReport probe) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("api-compat");
+    for (String item : probe.missingMethod) {
+      report.check(MISSING_METHOD, false, item, "Required platform API method could not be resolved.");
+    }
+    for (String item : probe.errors) {
+      report.check(RESOLUTION_ERROR, false, item, "Reflective platform API resolution failed.");
+    }
+    return report.build();
   }
 
   private void emitDetail(UUID callerId, String tag, List<String> items, Level level) {

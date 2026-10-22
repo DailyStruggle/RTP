@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.api.event.PrefabEventDispatcher;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -106,6 +107,7 @@ public class RTPAPI {
                 + "If you are an addon developer, do not overwrite RTPAPI.serverAccessor.");
       }
       serverAccessor = accessor;
+      ServerAccessors.set(accessor);
     }
   }
 

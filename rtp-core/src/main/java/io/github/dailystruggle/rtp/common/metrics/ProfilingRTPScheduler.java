@@ -109,4 +109,9 @@ public final class ProfilingRTPScheduler implements RTPScheduler {
     public boolean isRegionSaturated(RTPWorld<?> world, int cx, int cz) {
         return delegate.isRegionSaturated(world, cx, cz);
     }
+
+    @Override
+    public boolean isGenerationSaturated(RTPWorld<?> world) {
+        return delegate.isGenerationSaturated(world);
+    }
 }

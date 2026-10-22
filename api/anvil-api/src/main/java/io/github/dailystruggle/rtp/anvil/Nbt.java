@@ -171,8 +171,11 @@ public final class Nbt {
                     throw new IOException("Malformed TAG_Int_Array length: " + n);
                 }
                 requireRemaining(in, n, 4, "TAG_Int_Array");
+                // Bulk read: one copy instead of 4 stream reads per element (bounded by requireRemaining).
+                byte[] raw = new byte[n * 4];
+                in.readFully(raw);
                 int[] a = new int[n];
-                for (int i = 0; i < n; i++) a[i] = in.readInt();
+                java.nio.ByteBuffer.wrap(raw).asIntBuffer().get(a);
                 return a;
             }
             case TAG_LONG_ARRAY: {
@@ -181,8 +184,11 @@ public final class Nbt {
                     throw new IOException("Malformed TAG_Long_Array length: " + n);
                 }
                 requireRemaining(in, n, 8, "TAG_Long_Array");
+                // Bulk read: one copy instead of 8 stream reads per element (bounded by requireRemaining).
+                byte[] raw = new byte[n * 8];
+                in.readFully(raw);
                 long[] a = new long[n];
-                for (int i = 0; i < n; i++) a[i] = in.readLong();
+                java.nio.ByteBuffer.wrap(raw).asLongBuffer().get(a);
                 return a;
             }
             default:

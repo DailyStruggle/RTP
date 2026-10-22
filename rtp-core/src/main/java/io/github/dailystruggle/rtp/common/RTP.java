@@ -1282,6 +1282,19 @@ public class RTP {
         localTime = localData.time;
       }
     }
+    return Math.max(localTime, getSharedLastTeleportTime(uuid));
+  }
+
+  /**
+   * Resolves the last teleport timestamp from shared network storage, without consulting local
+   * in-flight teleport state.
+   *
+   * @param uuid player UUID
+   * @return shared epoch milliseconds, or 0 if no shared teleport is recorded
+   */
+  public static long getSharedLastTeleportTime(UUID uuid) {
+    if (uuid == null) return 0L;
+    RTP inst = instance;
     long sharedTime = 0L;
     try {
       if (inst != null && ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
@@ -1294,9 +1307,9 @@ public class RTP {
         sharedTime = inst.networkManager.getLastTeleportTime(uuid);
       }
     } catch (Throwable ignored) {
-      // Defensive: network read failure degrades safely to local time
+      // Defensive: network read failure degrades safely to no shared timestamp.
     }
-    return Math.max(localTime, sharedTime);
+    return sharedTime;
   }
 
   /**

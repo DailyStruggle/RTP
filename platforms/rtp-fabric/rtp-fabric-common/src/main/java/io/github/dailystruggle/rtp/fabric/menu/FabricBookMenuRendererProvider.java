@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.fabric.menu;
 
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuRendererProvider;
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.common.commands.menu.ChatMenuRenderer;
 
 /**

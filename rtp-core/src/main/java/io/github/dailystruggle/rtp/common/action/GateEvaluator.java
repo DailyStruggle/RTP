@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.action;
 
+import io.github.dailystruggle.bit.Vocabulary;
+
 import io.github.dailystruggle.rtp.api.action.ActionGateContext;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -31,6 +33,9 @@ import java.util.regex.Pattern;
  * <p>All gates within a step are conjunctive. Unrecognized gate keys fail closed.
  */
 public final class GateEvaluator {
+
+  public static final Vocabulary GATE_TYPES = new Vocabulary("gate type", List.of(
+      "scoreboard", "spatial", "time", "predicate", "players", "participants", "queue", "participantcount", "command"));
 
   private static final Pattern COORD_SEPARATORS = Pattern.compile("[,\\s]+");
 

@@ -175,6 +175,10 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
         (sender, s) -> true, -1, 0, 1, 2, 3));
     subParameters.put("sloperadius", new IntegerParameter(
         "rtp.params", "horizontal distance of the slope samples", (sender, s) -> true, 1, 2, 3, 4, 8));
+    // ADR-120: same cache-key rule as the slope keys.
+    subParameters.put("maxhillangle", new IntegerParameter(
+        "rtp.params", "steepest hill in degrees a landing may sit on, -1 off",
+        (sender, s) -> true, -1, 20, 25, 30, 35));
   }
 
   public JumpAdjustor(List<Predicate<RTPCoords>> verifiers) {

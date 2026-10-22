@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.common.commands.test.TestAllCmd;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import java.nio.file.Path;
 import java.util.Map;
@@ -42,7 +43,9 @@ class TestCmdPlatformSplitTest {
   private static final Set<String> PLATFORM_NEUTRAL_CHILDREN =
       Set.of(
           "cancel",
+          "all",
           "scheduler",
+          "events",
           "reload-safety",
           "config-set",
           "commands",
@@ -56,7 +59,9 @@ class TestCmdPlatformSplitTest {
           "economy-isolation",
           "folia-ownership",
           "disconnect-job",
-          "safety-verifier");
+          "network",
+          "safety-verifier",
+          "teleport");
 
   @BeforeEach
   void setUp() {
@@ -87,12 +92,12 @@ class TestCmdPlatformSplitTest {
               + child
               + "' — would NoClassDefFoundError on Fabric");
     }
-    // `all` is the umbrella alias for `full`; it must also be absent.
-    assertNull(lookup.get("ALL"), "TestCmd must not register the 'all' alias (alias of 'full')");
+    assertTrue(lookup.get("ALL") instanceof TestAllCmd, "SAFE `all` is available cross-platform");
+    assertNull(lookup.get("FULL"), "the Bukkit-only `full` sweep must remain absent on Fabric");
   }
 
   @Test
-  @DisplayName("BukkitTestCmd registers every Bukkit-bound child plus the umbrella alias")
+  @DisplayName("BukkitTestCmd registers Bukkit children and keeps all separate from full")
   void bukkitPathRegistersBukkitOnlyChildren() {
     BukkitTestCmd cmd = new BukkitTestCmd(null);
     Map<String, CommandsAPICommand> lookup = cmd.getCommandLookup();
@@ -101,10 +106,9 @@ class TestCmdPlatformSplitTest {
           lookup.get(child.toUpperCase()),
           "BukkitTestCmd missing Bukkit-only child '" + child + "'");
     }
-    // `all` is the umbrella alias of `full` (TreeCommand uses upper-case keys).
-    assertTrue(
-        lookup.containsKey("ALL"),
-        "BukkitTestCmd must register the 'all' alias of 'full'");
+    assertTrue(lookup.get("ALL") instanceof TestAllCmd, "all must use the SAFE BIT runner");
+    assertTrue(lookup.get("FULL") instanceof TestFullCmd, "full must remain the legacy sweep");
+    assertFalse(lookup.get("ALL") == lookup.get("FULL"), "all and full are distinct commands");
   }
 
   @Test

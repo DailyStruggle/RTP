@@ -155,6 +155,7 @@ The `vert` block controls how the Y coordinate (height) is chosen once a horizon
 | `minY` | Integer | `32` | Minimum Y level a player can land at. |
 | `maxY` | Integer | `255` | Maximum Y level a player can land at. |
 | `requireSkyLight` | Boolean | `false` | If `true`, only accept locations with direct sky access (above-ground only). |
+| `maxHillAngle` | `"off"` or degrees | `"off"` | `LINEAR` and `JUMP` only. Refuse landings on hillsides or cliff edges this steep or steeper. Suggested values: `"off"` (fastest), `30`, `45`, `60`. See [REGIONS.md](REGIONS.md#hillside-and-cliff-check-maxhillangle). |
 
 #### `JUMP` — additional keys
 

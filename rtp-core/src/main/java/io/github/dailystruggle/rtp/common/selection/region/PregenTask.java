@@ -5,8 +5,11 @@ import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.TerrainShapeCheck;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
@@ -785,11 +788,17 @@ final class PregenTask implements Runnable {
             } catch (Throwable ignored) {
                 return false;
             }
-            boolean rejected = probe != null && evaluateProbe(probe, cx, cz, finalL);
+            RTPCoords accepted = (probe != null) ? evaluateProbe(probe, cx, cz, finalL) : null;
+            boolean rejected = accepted == PROBE_REJECTED;
             long probeNanos = System.nanoTime() - probeStart;
             long drain = (probe != null) ? probe.drainNanos() : 0L;
             long effectiveNanos = (drain > 0L) ? Math.min(drain, probeNanos) : probeNanos;
-            if (gov != null) gov.recordProbe(effectiveNanos, probe != null ? probe.groupSize() : 0, rejected);
+            int group = (probe != null) ? probe.groupSize() : 0;
+            if (!rejected && accepted != null
+                    && startProbeTerrain(probe, accepted, cx, cz, finalL, gov, effectiveNanos, group)) {
+                return true;
+            }
+            if (gov != null) gov.recordProbe(effectiveNanos, group, rejected);
             return rejected;
         }
 
@@ -815,7 +824,12 @@ final class PregenTask implements Runnable {
                 continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0, gov, true));
                 return;
             }
-            boolean rejected = evaluateProbe(probe, cx, cz, finalL);
+            RTPCoords accepted = evaluateProbe(probe, cx, cz, finalL);
+            boolean rejected = accepted == PROBE_REJECTED;
+            if (!rejected && accepted != null
+                    && startProbeTerrain(probe, accepted, cx, cz, finalL, gov, effectiveNanos, group)) {
+                return;
+            }
             if (gov != null) gov.recordProbe(effectiveNanos, group, rejected);
             if (rejected) {
                 // reject already queued rescheduleNextAttempt via evaluateProbe.
@@ -826,21 +840,24 @@ final class PregenTask implements Runnable {
         return true;
     }
 
+    /** {@link #evaluateProbe} verdict: rejected, reschedule already queued. */
+    private static final RTPCoords PROBE_REJECTED = new RTPCoords("", 0, Integer.MIN_VALUE, 0);
+
     /**
      * Evaluate a {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}:
      * run the adjustor's probe-backed Y scan, then biome + unsafe-block check on
-     * the accepted Y. Returns {@code true} iff the probe produced a reject
+     * the accepted Y. Returns {@link #PROBE_REJECTED} iff the probe produced a reject
      * verdict (caller must not fall through to the full path) and queues
-     * {@link #rescheduleNextAttempt()}. Returns {@code false} on
-     * adjustor-UNKNOWN (probe cannot answer - fall back) or probe-accept.
+     * {@link #rescheduleNextAttempt()}; {@code null} on adjustor-UNKNOWN (probe cannot
+     * answer - fall back); otherwise the accepted landing.
      */
-    private boolean evaluateProbe(
+    private @org.jetbrains.annotations.Nullable RTPCoords evaluateProbe(
             io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe,
             int cx, int cz, long finalL) {
         RTPCoords picked = state.vert.adjustFromProbe(probe, state.world.name());
         if (picked == null) {
             // UNKNOWN - adjustor could not commit from probe data. Fall through.
-            return false;
+            return null;
         }
         int py = picked.y();
 
@@ -857,7 +874,7 @@ final class PregenTask implements Runnable {
                 }
                 recordOutcome("prefilterBiome/" + ub);
                 continueInline(this::rescheduleNextAttempt);
-                return true;
+                return PROBE_REJECTED;
             }
         }
 
@@ -874,12 +891,74 @@ final class PregenTask implements Runnable {
                 }
                 recordOutcome("prefilterBlock/" + ub);
                 continueInline(this::rescheduleNextAttempt);
-                return true;
+                return PROBE_REJECTED;
             }
         }
 
         // Probe accepted. Full authoritative pipeline still runs via requestChunk.
-        return false;
+        return picked;
+    }
+
+    /**
+     * ADR-120 provisional terrain verdict for a probe that passed the cheap prefilters: one job in
+     * the region file's drain reads the square on demand, so only the chunks the staged check
+     * touches are decoded, and none for candidates the prefilters already rejected. Region edge
+     * and corner chunks measure fewer directions; the live recheck decides those.
+     *
+     * @return {@code false} when the check is off (caller continues as before); else {@code true},
+     *     with the governor sample, the reject (reschedule) or the full path queued on completion
+     */
+    private boolean startProbeTerrain(io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe,
+                                      RTPCoords picked, int cx, int cz, long finalL,
+                                      @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov,
+                                      long probeNanos, int group) {
+        double hillAngle = maxHillAngle();
+        if (hillAngle < 0) return false;
+        double tan = TerrainShapeCheck.tanOf(hillAngle);
+        int radius = TerrainShapeCheck.SQUARE_RADIUS;
+        int y = picked.y(), lx = picked.x() & 15, lz = picked.z() & 15;
+        int minY = probe.minY() + 1, maxY = probe.maxY();
+        // Neighbours hold only the floor search window (feet-Y +-LAYER_WINDOW, plus y-1).
+        int wMin = Math.max(probe.minY(), y - TerrainShapeCheck.LAYER_WINDOW - 1);
+        int wMax = Math.min(maxY, y + TerrainShapeCheck.LAYER_WINDOW);
+        CompletableFuture<TerrainShapeCheck.Verdict> job;
+        final long jobStart = System.nanoTime();
+        try {
+            job = state.world.probeChunkSquare(cx, cz, wMin, wMax, square -> TerrainShapeCheck.evaluate(
+                    TerrainShapeCheck.probeSquare(probe, square, radius), lx, lz, y, tan, minY, maxY));
+        } catch (RuntimeException e) {
+            RTPRuntime.log(Level.FINE, "[RTP] probeChunkSquare threw: " + e);
+            return false;
+        }
+        if (job == null) return false;
+        job.whenComplete((v, ex) -> {
+            if (ex != null) {
+                // Provisional only: a failed job falls through to the authoritative live recheck.
+                RTPRuntime.log(Level.FINE, "[RTP] probe terrain check failed: " + ex);
+            }
+            boolean rejected = ex == null && v != null && v.reject(tan);
+            if (gov != null) gov.recordProbe(probeNanos + (System.nanoTime() - jobStart), group, rejected);
+            if (rejected) {
+                recordProbeTerrainReject(v, finalL);
+                continueInline(this::rescheduleNextAttempt);
+            } else {
+                continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0, gov, true));
+            }
+        });
+        return true;
+    }
+
+    /** Fail map, outcome and, for verdicts that measured all 8 directions, spatial memory. */
+    private void recordProbeTerrainReject(TerrainShapeCheck.Verdict v, long finalL) {
+        if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
+        if (state.verbose) {
+            String why = "steep=" + v.steep() + "/" + v.measured() + (v.planeKnown() && !v.ruleRejects() ? " plane" : "");
+            state.failMap.get(FailTypes.prefilterTerrain).compute(why, (s, a) -> (a == null) ? 1L : ++a);
+        }
+        recordOutcome("prefilterTerrain/steep dirs=" + v.steep() + "/" + v.measured());
+        if (v.full() && state.shape instanceof MemoryShape) {
+            ((MemoryShape<?>) state.shape).addBadChunk(finalL, FailTypes.terrain);
+        }
     }
 
     /**
@@ -1015,7 +1094,9 @@ final class PregenTask implements Runnable {
         // rtpChunkCache for the next attempt; rejection on null/exception still
         // routes through the existing FailTypes.nullChunk attribution path.
         final long loadStart = System.nanoTime();
-        state.world.getOrLoadChunk(cx, cz, "PregenTask.requestChunk")
+        GenerationBudget.withReservation(
+                state.generationSlot,
+                () -> state.world.getOrLoadChunk(cx, cz, "PregenTask.requestChunk"))
                 .whenComplete((chunk, ex) -> {
                     // Failed loads are charged too: dropping the slowest outcomes biases cost low.
                     long duration = System.nanoTime() - loadStart;
@@ -1386,7 +1467,6 @@ final class PregenTask implements Runnable {
         final int finalX = candidate.x();
         final int finalY = candidate.y();
         final int finalZ = candidate.z();
-        final String resBiome = candidate.biome();
         int safe = state.safetyRadius;
         // ADR-015 Folia-follow-up: no redundant stale-guard here. For the
         // live-backed branch the guard already fired on the region-owning
@@ -1445,6 +1525,102 @@ final class PregenTask implements Runnable {
             return;
         }
 
+        double hillAngle = maxHillAngle();
+        if (hillAngle >= 0) {
+            recheckTerrain(candidate, localChunks, L, centerChunkX, centerChunkZ, reservation, hillAngle);
+            return;
+        }
+        runGlobalVerifiers(candidate, reservation);
+    }
+
+    /** Vert's {@code maxHillAngle} in degrees, or -1 when the terrain shape check is off (ADR-120). */
+    private double maxHillAngle() {
+        return (state.vert instanceof AbstractVerticalAdjustor<?> av) ? av.maxHillAngle() : -1;
+    }
+
+    /**
+     * ADR-120 authoritative terrain recheck over the 3x3 square the server already holds around
+     * the candidate (one RTP ticket keeps it resident; never loads, S-005). Runs where the safety
+     * scan ran: inline when the safety grid covers the square, else after the resident lookups,
+     * on the centre's region on Folia. Missing chunks count as unmeasured.
+     */
+    private void recheckTerrain(SafetyCandidate candidate, RTPChunk<?>[] localChunks, int L,
+                                int centerChunkX, int centerChunkZ,
+                                @org.jetbrains.annotations.Nullable ChunkReservation reservation,
+                                double hillAngle) {
+        CompletableFuture<RTPChunk<?>[]> square;
+        try {
+            square = TerrainShapeCheck.residentSquare(state.world, centerChunkX, centerChunkZ, localChunks, L,
+                    TerrainShapeCheck.SQUARE_RADIUS);
+        } catch (RuntimeException e) {
+            RTPRuntime.log(Level.WARNING, "[RTP] Terrain recheck setup failed: " + e, e);
+            recordOutcome("terrain/setupFailed");
+            closeIfPresent(reservation);
+            rescheduleNextAttempt();
+            return;
+        }
+        if (square.isDone()) {
+            evaluateTerrain(candidate, square.getNow(null), reservation, hillAngle);
+            return;
+        }
+        square.whenComplete((grid, ex) -> {
+            Runnable eval = () -> evaluateTerrain(candidate, grid, reservation, hillAngle);
+            if (reservation != null && isFoliaPlatform()) {
+                dispatchToRegion(candidate.cx(), candidate.cz(), reservation, eval);
+            } else {
+                continueInline(eval);
+            }
+        });
+    }
+
+    /**
+     * Rejects through the safety-reject path (S-004) with {@link FailTypes#terrain}; marks spatial
+     * memory only for verdicts that measured all 8 directions, so a partial square never retires
+     * a chunk.
+     */
+    private void evaluateTerrain(SafetyCandidate candidate, RTPChunk<?>[] grid,
+                                 @org.jetbrains.annotations.Nullable ChunkReservation reservation,
+                                 double hillAngle) {
+        final int fx = candidate.x(), fy = candidate.y(), fz = candidate.z();
+        double tan = TerrainShapeCheck.tanOf(hillAngle);
+        TerrainShapeCheck.Verdict v;
+        try {
+            TerrainShapeCheck.SquareReader reader = TerrainShapeCheck.within(TerrainShapeCheck.chunkSquare(grid),
+                    TerrainShapeCheck.SQUARE_RADIUS);
+            v = TerrainShapeCheck.evaluate(reader, fx & 15, fz & 15, fy, tan,
+                    state.world.getMinHeight() + 1, state.world.getMaxHeight() - 1);
+        } catch (RuntimeException e) {
+            // A neighbour unloaded or refused a read mid-check: reject this attempt, never accept (S-004).
+            RTPRuntime.log(Level.WARNING, "[RTP] Terrain recheck threw at (" + fx + "," + fy + "," + fz + "): " + e, e);
+            recordOutcome("terrain/readFailed");
+            closeIfPresent(reservation);
+            rescheduleNextAttempt();
+            return;
+        }
+        if (!v.reject(tan)) {
+            runGlobalVerifiers(candidate, reservation);
+            return;
+        }
+        if (state.verbose) {
+            String why = "steep=" + v.steep() + "/" + v.measured() + (v.planeKnown() && !v.ruleRejects() ? " plane" : "");
+            state.failMap.get(FailTypes.terrain).compute(why, (s, a) -> (a == null) ? 1L : ++a);
+        }
+        recordOutcome("terrain/steep (" + fx + "," + fy + "," + fz + ") dirs=" + v.steep() + "/" + v.measured());
+        if (v.full() && state.shape instanceof MemoryShape) {
+            // Same chunk-uniform reasoning as the safety mark: the twin index picks the same column.
+            ((MemoryShape<?>) state.shape).addBadChunk(candidate.l(), FailTypes.terrain);
+        }
+        closeIfPresent(reservation);
+        rescheduleNextAttempt();
+    }
+
+    private void runGlobalVerifiers(SafetyCandidate candidate,
+                                    @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
+        final long finalL = candidate.l();
+        final int finalX = candidate.x();
+        final int finalY = candidate.y();
+        final int finalZ = candidate.z();
+        final String resBiome = candidate.biome();
         // --- GlobalRegionVerifiers (non-blocking) ---
         RTPCoords resCoords = new RTPCoords(state.world.name(), finalX, finalY, finalZ);
         GlobalRegionVerifiers.checkGlobalRegionVerifiersDetailed(resCoords)

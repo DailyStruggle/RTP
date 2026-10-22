@@ -277,17 +277,18 @@ Shows queue depth, latency and per-region state:
 
 ### Stress test
 
-Optional; worth doing if you expect many teleports at once. It runs real teleports on a player with every normal check on (cooldown, economy, claims):
+Optional; useful when checking either the pipeline without moving a real account or real-player platform behavior. Mock mode exercises the RTP pipeline; `player=<name>` selects real teleports with normal checks (cooldown, economy, claims):
 
 ```
+/rtp test stress count=4 iterations=3
 /rtp test stress player=Alice
 /rtp test stress player=Alice iterations=50 intervalTicks=60
 /rtp test stress player=Alice player=Bob region=mining
 ```
 
-- `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`).
+- Mock `count` is clamped to `[1, 16]` (default `4`); `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`). Use `player=<name>` for the real-player variant.
 - Per-iteration failures log at `WARNING` — watch the console.
-- `stress` is the only sub-command available today; `queue`, `safety`, `verifiers`, `memory`, `platform`, `full` are planned.
+- Additional diagnostics are listed in [COMMANDS.md](COMMANDS.md) section `/rtp test`.
 
 Full reference: [COMMANDS.md](COMMANDS.md) section `/rtp test`.
 

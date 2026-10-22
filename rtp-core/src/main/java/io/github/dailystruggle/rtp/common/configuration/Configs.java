@@ -603,14 +603,19 @@ public class Configs {
    * @return true if successful
    */
   public boolean reload() {
-    RTPRuntime.log(Level.FINE, "[RTP] reload(): flushing fileDatabase queries before parser swap");
-    this.fileDatabase.processQueries(Long.MAX_VALUE);
-    RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase.processQueries complete; reconnecting");
-    this.fileDatabase.connect();
-    RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase reconnected; entering reloadAction");
-    reloadAction();
-    RTPRuntime.log(Level.FINE, "[RTP] reload(): complete");
-    return true;
+    try {
+      RTPRuntime.log(Level.FINE, "[RTP] reload(): flushing fileDatabase queries before parser swap");
+      this.fileDatabase.processQueries(Long.MAX_VALUE);
+      RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase.processQueries complete; reconnecting");
+      this.fileDatabase.connect();
+      RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase reconnected; entering reloadAction");
+      reloadAction();
+      RTPRuntime.log(Level.FINE, "[RTP] reload(): complete");
+      return true;
+    } catch (RuntimeException failure) {
+      RTPRuntime.log(Level.SEVERE, "[RTP] reload() failed: " + failure.getMessage(), failure);
+      return false;
+    }
   }
 
   /**

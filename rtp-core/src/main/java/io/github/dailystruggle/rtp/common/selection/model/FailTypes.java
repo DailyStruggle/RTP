@@ -41,5 +41,13 @@ public enum FailTypes {
      * out again. Tracked separately from {@link #misc} so operators can see
      * how much of the region the unique-placements knob has retired. */
     uniquePlacement,
-    misc
+    misc,
+    /** Live recheck over the server-resident 5x5-chunk square found a mountainside or cliff edge
+     * steeper than the vert's {@code maxHillAngle} (ADR-120). Also the spatial-memory cause for
+     * terrain verdicts that measured all 8 directions. */
+    terrain,
+    /** Probe fast path rejected the candidate on a provisional terrain verdict, read from the
+     * chunks of one region file (ADR-120). Counted apart from {@link #terrain} so operators can
+     * see how much the pre-compute saves. */
+    prefilterTerrain
 }

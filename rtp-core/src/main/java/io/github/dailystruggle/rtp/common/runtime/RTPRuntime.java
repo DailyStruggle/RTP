@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.runtime;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.server.api.ServerAccessors;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BooleanSupplier;
@@ -79,6 +80,7 @@ public final class RTPRuntime {
 
   public static void setServerAccessor(RTPServerAccessor accessor) {
     serverAccessor = accessor;
+    ServerAccessors.set(accessor);
   }
 
   public static RTPScheduler scheduler() {

@@ -21,6 +21,7 @@ newWorld: "&b[P0] detected a new world '[world]'"
 # placeholder: [filename] - name of file
 reloading: "&b[P0] loading [filename]..."
 reloaded: "&b[P0] successfully loaded [filename]."
+reloadFailed: "&c[P0] Failed to reload configs. Check the server log."
 updating: "&a[P0] updating [filename]..."
 updated: "&a[P0] successfully updated [filename]."
 

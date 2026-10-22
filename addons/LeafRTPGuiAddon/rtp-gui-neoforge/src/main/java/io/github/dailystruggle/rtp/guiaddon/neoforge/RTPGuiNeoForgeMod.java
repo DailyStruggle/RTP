@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.guiaddon.neoforge;
 
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.guiaddon.common.GuiRenderers;
 import io.github.dailystruggle.rtp.guiaddon.common.RTPGuiCommonAddon;

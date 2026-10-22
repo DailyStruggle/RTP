@@ -110,4 +110,52 @@ class BukkitSchedulerImplTest {
 
         assertFalse(ran.get(), "Cancelled task must not run when ticks are advanced past its delay");
     }
+
+    /**
+     * ADR-087: on vanilla Spigot background fill waits while the server-wide generation budget is
+     * full; a Paper scheduler (prioritised chunk system) never reports saturation.
+     */
+    @Test
+    @Timeout(2)
+    void generationBudget_spigotHoldsBack_paperDoesNot() {
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget budget =
+            io.github.dailystruggle.rtp.common.tools.GenerationBudget.server();
+        BukkitSchedulerImpl paper = new BukkitSchedulerImpl(plugin) {
+            @Override
+            protected boolean holdsBackGeneration() {
+                return false;
+            }
+        };
+        java.util.List<Runnable> releases = new java.util.ArrayList<>();
+        try {
+            assertFalse(scheduler.isGenerationSaturated(null));
+            while (!budget.saturated()) releases.add(budget.begin());
+            assertTrue(scheduler.isGenerationSaturated(null), "Spigot: budget full holds fill back");
+            assertTrue(scheduler.isRegionSaturated(null, 0, 0), "promotions see the same signal");
+            assertFalse(paper.isGenerationSaturated(null), "Paper: never held back by the budget");
+        } finally {
+            releases.forEach(Runnable::run);
+        }
+    }
+
+    /** The Spigot tick watch marks a stuck main thread only while players are online. */
+    @Test
+    @Timeout(2)
+    void tickWatch_marksTicks_onlyWithPlayersOnline() {
+        io.github.dailystruggle.rtp.common.tools.ServerHealthGate.resetForTesting();
+        try {
+            scheduler.isGenerationSaturated(null); // starts the watch
+            bukkitScheduler.performTicks(2);
+            assertFalse(io.github.dailystruggle.rtp.common.tools.ServerHealthGate.tickStalled(
+                System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)),
+                "no players online: idle, never stalled");
+            MockBukkit.getMock().addPlayer();
+            bukkitScheduler.performTicks(2);
+            assertTrue(io.github.dailystruggle.rtp.common.tools.ServerHealthGate.tickStalled(
+                System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)),
+                "players online: a tick that never ends again would count as stalled");
+        } finally {
+            io.github.dailystruggle.rtp.common.tools.ServerHealthGate.resetForTesting();
+        }
+    }
 }

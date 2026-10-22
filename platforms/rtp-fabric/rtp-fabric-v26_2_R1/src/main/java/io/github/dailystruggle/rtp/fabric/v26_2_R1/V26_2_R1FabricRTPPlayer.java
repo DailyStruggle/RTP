@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.SenderTimings;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
@@ -282,8 +283,8 @@ public final class V26_2_R1FabricRTPPlayer implements RTPPlayer,
         }
     }
 
-    @Override public long cooldown() { return 0L; }
-    @Override public long delay() { return 0L; }
+    @Override public long cooldown() { return SenderTimings.cooldownMillis(this); }
+    @Override public long delay() { return SenderTimings.delayMillis(this); }
 
     @Override
     public void performCommand(@Nullable RTPPlayer player, String command) {

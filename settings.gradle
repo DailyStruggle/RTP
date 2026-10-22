@@ -116,9 +116,11 @@ def excludeJdk25 = startParameter.projectProperties.containsKey('excludeJdk25') 
         System.getenv('JITPACK') != null
 
 include 'rtp-api'
+// server-api -- reusable, platform-neutral server identity and logging SPI.
+include 'server-api'
 // Non-rtp-exclusive, platform-neutral API modules are grouped under the
 // api/ folder to declutter the repo root. The Gradle project paths and
-// Maven coordinates are intentionally KEPT FLAT (':yaml-api',
+// Maven coordinates are intentionally KEPT FLAT (':server-api', ':yaml-api',
 // ':effects-api', ':maps-api', ':metrics-api', and the nested
 // ':effects-api:effects-api-fabric-unobf'); only the on-disk location moves,
 // applied via projectDir overrides at the bottom of this section. This keeps
@@ -128,6 +130,8 @@ include 'rtp-api'
 // In-tree module: consumed by rtp-api/rtp-core and every platform adapter via
 // project(':commands-api'). Pure Java (Brigadier as compileOnly), no Loom.
 include 'commands-api'
+// bit-api -- generic built-in test contract for plugin-agnostic BIT consumers.
+include 'bit-api'
 // yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted from
 // rtp-core so rtp-api can host the configurable selection model without a core
 // dependency. Pure Java, no platform/Loom dependency.
@@ -175,6 +179,8 @@ include 'tags-api'
 // unobf carrier inherits no projectDir from its parent in Gradle, so it is
 // overridden explicitly.
 project(':commands-api').projectDir = file('api/commands-api')
+project(':server-api').projectDir   = file('api/server-api')
+project(':bit-api').projectDir     = file('api/bit-api')
 project(':effects-api').projectDir  = file('api/effects-api')
 if (!excludeJdk25) {
     project(':effects-api:effects-api-fabric-unobf').projectDir = file('api/effects-api/effects-api-fabric-unobf')

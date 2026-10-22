@@ -132,6 +132,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # この角度(度)以上の斜面や崖の縁への着地を拒否します。
+    # "off" が最速です。30 は陸地の約5か所に1か所、45 は約12か所に1か所、60 は約60か所に1か所を拒否します。
+    # 0〜89 の任意の数値も使えます。有効にすると、検索は各地点の周囲のチャンクを読み込みます。
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

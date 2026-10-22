@@ -133,6 +133,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # Odrzuca lądowania na zboczach lub krawędziach klifów o takim lub większym nachyleniu, w stopniach.
+    # "off" jest najszybsze. 30 odrzuca ok. 1 na 5 miejsc na lądzie, 45 ok. 1 na 12, 60 ok. 1 na 60.
+    # Działa też dowolna liczba od 0 do 89. Po włączeniu wyszukiwanie odczytuje chunki wokół każdego miejsca.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

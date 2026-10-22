@@ -18,6 +18,8 @@ public enum SystemMessages {
   reloading,
   /** Sent to the command sender when a configuration reload completes successfully. */
   reloaded,
+  /** Sent to the command sender when a configuration reload fails. */
+  reloadFailed,
   /** Sent when the plugin begins applying a configuration or data update. */
   updating,
   /** Sent when the configuration or data update completes successfully. */

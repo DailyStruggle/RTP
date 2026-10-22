@@ -87,7 +87,7 @@ rtp.effect.<stage>.<TYPE>[.<arg1>[.<arg2>[...]]]
 
 ### Built-in effect types
 
-Registered in `effects-api/.../EffectFactory.java` by each platform's effects initializer. Not every type is registered on every platform yet; see *Platform availability* below the table. A type that is not registered on your platform is skipped without an error.
+Registered in `effects-api/.../EffectFactory.java` by each platform's effects initializer. `FIREWORK` and `NOTE` are not registered on Fabric or NeoForge yet; see *Platform availability* below the table. A type that is not registered on your platform is skipped without an error.
 
 | `<TYPE>` | Class | Safety / extras |
 |----------|-------|-----------------|
@@ -96,7 +96,7 @@ Registered in `effects-api/.../EffectFactory.java` by each platform's effects in
 | `PARTICLE` | `ParticleEffect` | Spawns particles at the player. |
 | `POTION` | `PotionEffect` | Applied to the teleporting player. |
 | `SOUND` | `SoundEffect` | Played at the player's location. |
-| `GLIDE` | `GlideEffect` | Lifts the player and starts an elytra glide down (no elytra item needed). `GlideSafetyListener` keeps the glide going until the player is just above ground and handles players still gliding at shutdown. |
+| `GLIDE` | `GlideEffect` | Lifts the player and starts an elytra glide down (no elytra item needed). The glide is kept going until the player lands, with no fall damage. On Bukkit-family servers `GlideSafetyListener` also handles players still gliding at shutdown; Fabric and NeoForge do not place them on shutdown. |
 | `TITLE` | `TitleEffect` | Shows a title and subtitle to the player. |
 | `COMMAND` | `CommandEffect` | Executes a console or player command at the configured trigger stage (effects-api-ADR-007). |
 | `DROP_INVENTORY` | `DropInventoryEffect` | Drops inventory at origin location before teleporting without going through death screen. |
@@ -107,13 +107,11 @@ Registered in `effects-api/.../EffectFactory.java` by each platform's effects in
 
 | `<TYPE>` | Bukkit / Paper / Spigot / Folia | Fabric (MC 1.20.1 - 1.21.x) | Fabric (MC 26.x) | NeoForge |
 |----------|------|------|------|------|
-| `SOUND`, `PARTICLE`, `POTION`, `COMMAND`, `DEATH` / `KILL` | yes | yes | yes | yes |
+| `SOUND`, `PARTICLE`, `POTION`, `TITLE`, `GLIDE`, `COMMAND`, `DEATH` / `KILL` | yes | yes | yes | yes |
+| `DROP_INVENTORY`, `DROP_EXP` / `DROP_EXPERIENCE` | yes | yes | yes | yes |
 | `FIREWORK`, `NOTE` | yes | no | no | no |
-| `GLIDE` | yes | yes | no | no |
-| `TITLE` | no | yes | yes | yes |
-| `DROP_INVENTORY`, `DROP_EXP` / `DROP_EXPERIENCE` | yes | yes | yes | no |
 
-Where `TITLE` is missing, use `COMMAND CONSOLE title [player] title ...` instead. Making every type available on every platform is tracked in [ADR-116](../../adr/ADR-116-effects-through-neutral-server-accessor.md).
+On Fabric and NeoForge, `DROP_INVENTORY` drops the items where the player is standing. Making every type available on every platform is tracked in [ADR-116](../../adr/ADR-116-effects-through-neutral-server-accessor.md).
 
 #### Positional arguments per type
 

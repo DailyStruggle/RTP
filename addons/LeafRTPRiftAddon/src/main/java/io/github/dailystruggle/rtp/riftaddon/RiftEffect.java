@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.playerData.MoveCancelGrace;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -231,6 +232,10 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
     // the player genuinely falls into it instead of the client predicting a fall the server
     // rejects (which previously left them floating). run() is already dispatched on a thread that
     // owns the player / footprint, so the write is legal here.
+    //
+    // The fall is our own doing, so it must not trip cancelDistance (RTP-71): while the rift is
+    // open only horizontal movement counts. The slack covers a lagging restore; restore clears it.
+    MoveCancelGrace.grant(ph.uuid(), seconds * 1000L + GRACE_SLACK_MILLIS);
     int placed = world.setBlocks(carve);
     RTP.log(Level.FINE, "[LeafRTPRiftAddon] RIFT carved " + placed + " block(s) into air");
 
@@ -292,17 +297,37 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
     final List<BlockDelta> toRestore = originals;
     final Map<RTPLocation, String> clientRestore = fakeRestore;
     final UUID viewerId = ph.uuid();
+    final RTPLocation standing = center;
+    final int riftRadius = radius;
     Runnable restore = () -> {
       // Put the real carved blocks back. This also broadcasts a real block update at each rim
       // position, which clears the dark-rim client fake there, so the rim needs no separate undo.
       int back = riftWorld.setBlocks(toRestore);
       RTP.log(Level.FINE, "[LeafRTPRiftAddon] RIFT restored " + back + " block(s)");
+      RTPPlayer viewer =
+          (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPlayer(viewerId) : null;
+      boolean online = viewer != null && viewer.isOnline();
       // Clear the client-only fake air over the gravity blocks (their real block never changed,
       // so setBlocks did not touch them). Only meaningful while the player is online.
-      if (!clientRestore.isEmpty() && RTPRuntime.serverAccessor() != null) {
-        RTPPlayer viewer = RTPRuntime.serverAccessor().getPlayer(viewerId);
-        if (viewer != null && viewer.isOnline()) viewer.sendClientBlockChanges(clientRestore);
+      if (online && !clientRestore.isEmpty()) viewer.sendClientBlockChanges(clientRestore);
+      // A player still inside the sphere (teleport cancelled, or SECONDS shorter than the delay)
+      // is now inside restored terrain: put them back on the block they stood on, which is air
+      // again. Grace stays open until that teleport lands so it does not cancel the pending /rtp.
+      java.util.concurrent.CompletableFuture<Boolean> moving =
+          (online && isInsideRift(viewer.getLocation(), standing, riftRadius))
+              ? viewer.setLocation(standing)
+              : null;
+      if (moving == null) {
+        MoveCancelGrace.clear(viewerId);
+        return;
       }
+      moving.whenComplete((moved, error) -> {
+        MoveCancelGrace.clear(viewerId);
+        if (error != null || !Boolean.TRUE.equals(moved)) {
+          RTP.log(Level.WARNING, "[LeafRTPRiftAddon] RIFT could not move " + viewerId
+              + " clear of the restored terrain", error);
+        }
+      });
     };
 
     if (RTPRuntime.scheduler() != null) {
@@ -334,6 +359,23 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
 
   /** Registry name (matched case-insensitively, stored upper-cased by the factory). */
   static final String NAME = "RIFT";
+
+  /** Extra move-cancel grace beyond {@code SECONDS}, for a restore delayed by server lag. */
+  static final long GRACE_SLACK_MILLIS = 5_000L;
+
+  /**
+   * Whether {@code now} is within the carved sphere (plus one block for the shell) around
+   * {@code center}, in the same world. Such a player would be buried by the restore.
+   */
+  static boolean isInsideRift(RTPLocation now, RTPLocation center, int radius) {
+    if (now == null || center == null || now.world() == null || center.world() == null) return false;
+    if (!now.world().name().equals(center.world().name())) return false;
+    long dx = (long) now.x() - center.x();
+    long dy = (long) now.y() - center.y();
+    long dz = (long) now.z() - center.z();
+    long reach = radius + 1L;
+    return dx * dx + dy * dy + dz * dz <= reach * reach;
+  }
 
   /** Pick a dark rim block for a position, deterministically (stable across the restore). */
   private static String rimBlock(RTPLocation loc) {

@@ -8,18 +8,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class AnvilRegionByteCacheTest {
 
+  private long originalRevalidateIntervalMillis;
+
   @BeforeEach
   void reset() {
+    originalRevalidateIntervalMillis = AnvilRegionByteCache.revalidateIntervalMillis();
     AnvilRegionByteCache.invalidateAll();
     AnvilRegionByteCache.resetStats();
     // Deterministic staleness for tests that rewrite files within one window.
     AnvilRegionByteCache.setRevalidateIntervalMillis(0L);
+  }
+
+  @AfterEach
+  void restoreRevalidateInterval() {
+    AnvilRegionByteCache.setRevalidateIntervalMillis(originalRevalidateIntervalMillis);
   }
 
   @Test

@@ -169,11 +169,15 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public RTPPlayer getPlayer(UUID uuid) {
+        RTPPlayer mock = MockPlayerRegistry.get(uuid);
+        if (mock != null) return mock;
         return playersById.get(uuid);
     }
 
     @Override
     public RTPPlayer getPlayer(String name) {
+        RTPPlayer mock = MockPlayerRegistry.getByName(name);
+        if (mock != null) return mock;
         return playersByName.get(name);
     }
 
@@ -187,6 +191,8 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     public RTPCommandSender getSender(UUID uuid) {
         if (uuid == null) return consolePlayer;
         if (uuid.equals(consolePlayer.uuid()) || uuid.equals(new UUID(0, 0))) return consolePlayer;
+        RTPPlayer mock = MockPlayerRegistry.get(uuid);
+        if (mock != null) return mock;
         RTPCommandSender sender = sendersById.get(uuid);
         if (sender != null) return sender;
         RTPPlayer player = playersById.get(uuid);

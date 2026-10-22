@@ -125,6 +125,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # 拒绝落在坡度大于或等于此角度(度)的山坡或悬崖边缘。
+    # "off" 最快。30 约拒绝五分之一的陆地点,45 约十二分之一,60 约六十分之一。
+    # 也可填 0 到 89 之间的任意数字。开启后,搜索会读取每个点周围的区块。
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

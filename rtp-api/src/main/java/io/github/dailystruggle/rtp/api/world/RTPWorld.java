@@ -437,6 +437,25 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * Runs {@code job} over the chunks around (cx, cz) that share its {@code .mca} region file, each
+   * decoded over world-Y {@code [minY, maxY]} only when the job first asks for it (ADR-120 terrain
+   * square). Runs on the Anvil I/O pool; never opens another region file, loads or generates a
+   * chunk, and does no I/O on the caller (S-005). Default: {@link
+   * io.github.dailystruggle.rtp.anvil.AnvilPrefilter#squareJobAsync} over {@link
+   * #anvilWorldFolder()}.
+   *
+   * <p>Pre: {@code job} is pure, bounded and non-blocking.
+   *
+   * @return the job's result, {@code null} when this world has no Anvil store (job not run), or
+   *     exceptionally with the job's failure
+   */
+  public <T> CompletableFuture<T> probeChunkSquare(int cx, int cz, int minY, int maxY,
+      java.util.function.Function<io.github.dailystruggle.rtp.anvil.ChunkSquare, T> job) {
+    return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.squareJobAsync(
+        anvilWorldFolder(), anvilDimensionSubpath(), cx, cz, minY, maxY, job);
+  }
+
+  /**
    * Bulk biome read over a single anvil region file ({@code r.<rcx>.<rcz>.mca}) for biome charts.
    *
    * <p>Blocking, off-tick-thread only (S-005). Never performs live chunk I/O; on-disk anvil only.

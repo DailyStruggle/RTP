@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 
 import java.nio.charset.StandardCharsets;
@@ -143,6 +144,12 @@ public final class RegionCacheKey {
           value = e.getValue();
           break;
         }
+      }
+      if ("vert".equals(prefix) && "maxHillAngle".equals(k)) {
+        // ADR-120: "off" hashes like an absent key; "30" and 30.0 alike.
+        double deg = AbstractVerticalAdjustor.hillAngleOf(value);
+        if (deg < 0) continue;
+        value = deg;
       }
       sb.append(prefix).append('.')
           .append(k.toLowerCase())

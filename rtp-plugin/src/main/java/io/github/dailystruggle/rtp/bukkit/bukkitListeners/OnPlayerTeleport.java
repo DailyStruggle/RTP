@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import io.github.dailystruggle.rtp.common.playerData.MoveCancelGrace;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -37,6 +38,8 @@ public final class OnPlayerTeleport implements Listener {
 
     TeleportData data = TeleportSessions.current().latestTeleportData.get(player.getUniqueId());
     if (data == null || data.completed) return;
+    // An effect moving the player itself (Rift move-clear after restore) is not an external teleport.
+    if (MoveCancelGrace.isActive(player.getUniqueId())) return;
 
     // if currently teleporting, stop that and clean up
     if (TeleportSessions.current().latestTeleportData.containsKey(player.getUniqueId())) {

@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.anvil;
 
 import io.github.dailystruggle.rtp.anvil.bit.BitHealth;
 import io.github.dailystruggle.rtp.anvil.bit.PbitResult;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +19,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DisplayName("RegionFormatDetector - World Directory Survey & Format Profiles")
 class RegionFormatDetectorTest {
+
+    private long originalRevalidateIntervalMillis;
+
+    @BeforeEach
+    void setUp() {
+        originalRevalidateIntervalMillis = AnvilRegionByteCache.revalidateIntervalMillis();
+        AnvilRegionByteCache.setRevalidateIntervalMillis(60_000L);
+        RegionFormatDetector.INSTANCE.invalidateCache();
+    }
+
+    @AfterEach
+    void restoreTestState() {
+        RegionFormatDetector.INSTANCE.invalidateCache();
+        AnvilRegionByteCache.setRevalidateIntervalMillis(originalRevalidateIntervalMillis);
+    }
 
     @Test
     @DisplayName("Empty or non-existent directory resolves to EMPTY profile")
@@ -78,6 +95,8 @@ class RegionFormatDetectorTest {
     @Test
     @DisplayName("Detected format is kept until invalidateCache, even as files are added")
     void detectedFormatIsSticky(@TempDir Path tempDir) throws IOException {
+        assertTrue(AnvilRegionByteCache.revalidateIntervalNanos() > 0L,
+                "format detection stickiness requires a positive cache window");
         Files.createFile(tempDir.resolve("r.0.0.mca"));
         RegionFormatDetector detector = RegionFormatDetector.INSTANCE;
         detector.invalidateCache();

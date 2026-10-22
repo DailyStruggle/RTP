@@ -1,8 +1,12 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
+
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
@@ -30,7 +34,9 @@ public final class LoginCacheTask implements Runnable {
 
         for (int i = 0; i < count; i++) {
             if (login.size() + region.inFlightCalculations.get() >= effectiveCap()) break;
-            promoteOne();
+            GenerationBudget.Reservation generationSlot = GenerationBudget.server().reserve();
+            if (generationSlot == null) break;
+            promoteOne(generationSlot);
         }
     }
 
@@ -56,22 +62,67 @@ public final class LoginCacheTask implements Runnable {
         }
     }
 
-    private void promoteOne() {
+    private void promoteOne(GenerationBudget.Reservation generationSlot) {
         RegionQueueManager qm = region.queueManager;
         LockFreeLocationBuffer login = qm.loginLocations;
-        if (login == null) return;
+        if (login == null) {
+            generationSlot.close();
+            return;
+        }
 
         // pollSilently: identical DB-key re-offer race protection as Region.execute().
         RTPLocation coldLoc = qm.unkeptLocations.pollSilently();
-        if (coldLoc == null) return;
+        if (coldLoc == null) {
+            generationSlot.close();
+            return;
+        }
 
         region.inFlightCalculations.incrementAndGet();
         int cx = coldLoc.coords().x() >> 4;
         int cz = coldLoc.coords().z() >> 4;
 
-        region.getWorld().recordChunkLoadOrigin("LoginCacheTask.promote");
-        region.getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
-            chunkSet.complete().whenComplete((success, throwable) -> {
+        CompletableFuture<ChunkSet> loadFuture;
+        try {
+            region.getWorld().recordChunkLoadOrigin("LoginCacheTask.promote");
+            loadFuture = GenerationBudget.withReservation(
+                    generationSlot, () -> region.getWorld().getChunkAtAsync(cx, cz));
+        } catch (Throwable throwable) {
+            generationSlot.close();
+            region.inFlightCalculations.decrementAndGet();
+            qm.unkeptLocations.offer(coldLoc);
+            RTPRuntime.log(Level.WARNING, "[LoginCacheTask] chunk-load dispatch failed", throwable);
+            return;
+        }
+        if (loadFuture == null) {
+            generationSlot.close();
+            region.inFlightCalculations.decrementAndGet();
+            qm.unkeptLocations.offer(coldLoc);
+            RTPRuntime.log(Level.WARNING, "[LoginCacheTask] chunk-load dispatch returned no future");
+            return;
+        }
+
+        loadFuture.thenAccept(chunkSet -> {
+            if (chunkSet == null) {
+                generationSlot.close();
+                try {
+                    qm.unkeptLocations.offer(coldLoc);
+                } finally {
+                    region.inFlightCalculations.decrementAndGet();
+                }
+                return;
+            }
+            java.util.concurrent.CompletableFuture<Boolean> completion = chunkSet.complete();
+            if (completion == null) {
+                generationSlot.close();
+                try {
+                    qm.unkeptLocations.offer(coldLoc);
+                } finally {
+                    region.inFlightCalculations.decrementAndGet();
+                }
+                return;
+            }
+            completion.whenComplete((success, throwable) -> {
+                generationSlot.close();
                 if (success == null || !success) {
                     try {
                         qm.unkeptLocations.offer(coldLoc);
@@ -138,6 +189,7 @@ public final class LoginCacheTask implements Runnable {
                 }
             });
         }).exceptionally(throwable -> {
+            generationSlot.close();
             region.inFlightCalculations.decrementAndGet();
             qm.unkeptLocations.offer(coldLoc);
             return null;

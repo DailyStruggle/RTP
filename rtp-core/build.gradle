@@ -20,6 +20,8 @@ dependencies {
     // instead of carrying a per-carrier copy. The reverse edge stays forbidden:
     // anvil-api must not depend on any RTP module.
     api project(':anvil-api')
+    // bit-api -- generic built-in test contract (ADR-121); action config findings use it.
+    api project(':bit-api')
     // yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted
     // from this module so rtp-api can host the configurable selection model.
     // 'api' so downstream consumers keep seeing the YAML types transitively.

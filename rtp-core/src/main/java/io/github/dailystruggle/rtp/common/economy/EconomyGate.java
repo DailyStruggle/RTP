@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.mock.SyntheticSideEffects;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.UUID;
@@ -68,6 +69,8 @@ public final class EconomyGate {
     if (payerId == null || payerId.equals(CommandsAPI.serverId)) {
       return new Charge(Result.ALLOWED, 0.0);
     }
+    // ADR-121 section 11: a BIT mock has no real account; never query or debit it.
+    if (SyntheticSideEffects.isSynthetic(payerId)) return new Charge(Result.ALLOWED, 0.0);
     if (freeSubject != null && freeSubject.hasPermission("rtp.free")) {
       return new Charge(Result.ALLOWED, 0.0);
     }

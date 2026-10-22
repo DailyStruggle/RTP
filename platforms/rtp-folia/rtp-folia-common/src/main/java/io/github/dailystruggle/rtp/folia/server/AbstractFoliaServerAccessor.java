@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
 import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
@@ -176,6 +177,9 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   @GlobalRegionThread
   public @Nullable RTPPlayer getPlayer(UUID uuid) {
+    // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return null;
     return new FoliaRTPPlayer(player);
@@ -184,6 +188,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   @GlobalRegionThread
   public @Nullable RTPPlayer getPlayer(String name) {
+    RTPPlayer mock = MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(name);
     if (player == null) return null;
     return new FoliaRTPPlayer(player);
@@ -197,6 +203,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public @NotNull RTPCommandSender getSender(UUID uuid) {
     if (uuid.equals(RTPAPI.serverId)) return new FoliaRTPCommandSender(Bukkit.getConsoleSender());
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return new FoliaRTPCommandSender(Bukkit.getConsoleSender());
     return new FoliaRTPPlayer(player);

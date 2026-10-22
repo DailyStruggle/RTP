@@ -1,9 +1,18 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
@@ -34,6 +43,22 @@ import org.jetbrains.annotations.Nullable;
  */
 public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
+  public static final BitCode SAMPLE_FAILURES = registerCode(4201, "PROBE_QUEUE_STARVATION_FAILURES");
+  public static final BitCode SAMPLE_STALLS = registerCode(4202, "PROBE_QUEUE_STARVATION_STALLS");
+  public static final BitCode COMPUTE_THROWN = registerCode(4203, "PROBE_QUEUE_STARVATION_COMPUTE_THROWN");
+  public static final BitCode REGION_UNAVAILABLE = registerCode(4204, "PROBE_QUEUE_STARVATION_REGION_UNAVAILABLE");
+  public static final BitCode CANCELLED = RtpBitCodes.PROBE.register(
+      4205,
+      "PROBE_QUEUE_STARVATION_CANCELLED",
+      java.lang.System.Logger.Level.WARNING,
+      BitTier.IBIT,
+      "test.queue-starvation",
+      "",
+      "Allow the bounded sampling run to complete.");
+  public static final BitComponent COMPONENT = registerComponent();
+
+  private static final long COMPONENT_TIMEOUT_MS = 120_000L;
+
   /** Default dummy-location burst size. */
   static final int DEFAULT_SAMPLES = 15;
 
@@ -45,6 +70,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
   public QueueStarvationTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
     addParameter(
         "region",
         new RegionParameter(
@@ -64,12 +90,36 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
   @Override
   public String permission() {
-    return "rtp.test";
+    return "rtp.test.mutating";
   }
 
   @Override
   public String description() {
     return "drain N dummy locations and measure ADR-006 pre-generator refill latency";
+  }
+
+  private static BitCode registerCode(int id, String key) {
+    return RtpBitCodes.PROBE.register(
+        id,
+        key,
+        java.lang.System.Logger.Level.ERROR,
+        BitTier.IBIT,
+        "test.queue-starvation",
+        "",
+        "Resolve the queue sampling failure and rerun the bounded probe.");
+  }
+
+  private static BitComponent registerComponent() {
+    BitComponent component =
+        new BitComponent(
+            "queue-starvation",
+            "test.queue-starvation",
+            BitTier.IBIT,
+            BitSideEffect.HEAVY,
+            COMPONENT_TIMEOUT_MS,
+            () -> ProbeBitReport.forProbe("queue-starvation").build());
+    RtpBit.RUNNER.register(component);
+    return component;
   }
 
   @Override
@@ -79,7 +129,19 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
     // ---- Resolve target region (S-004: loud failure on typo) ----
     final Region region = resolveRegion(callerId, parameterValues);
-    if (region == null) return true;
+    if (region == null) {
+      String detail = "[RTP test/queue-starvation] no resolvable region or loaded world";
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)
+          && RTPRuntime.serverAccessor() != null) {
+        RTPRuntime.serverAccessor().sendMessage(callerId, "&c" + detail);
+      }
+      RTP.log(Level.WARNING, detail);
+      completeReport(callerId, parameterValues,
+          ProbeBitReport.forProbe("queue-starvation")
+              .check(REGION_UNAVAILABLE, false, "queue-starvation.region", detail)
+              .build());
+      return true;
+    }
 
     final int samples =
         clamp(
@@ -100,6 +162,9 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
             + " (ADR-006)");
 
     final AtomicBoolean cancelled = new AtomicBoolean(false);
+    final CompletableFuture<BitReport> reportFuture = new CompletableFuture<>();
+    ProbeVerdict.record(COMPONENT, reportFuture, COMPONENT_TIMEOUT_MS)
+        .thenAccept(result -> ProbeBitReport.emit(callerId, parameterValues, COMPONENT, result));
     final Object[] handleHolder = new Object[1];
     final Runnable[] unregisterHolder = new Runnable[1];
 
@@ -116,16 +181,39 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     RTPRuntime.serverAccessor().sendMessage(callerId, startMsg);
     RTP.log(Level.INFO, startMsg);
 
+    Runnable canceller =
+        () -> {
+          cancelled.set(true);
+          reportFuture.complete(cancellationReport("cancelled by operator"));
+          Object handle = handleHolder[0];
+          if (handle != null && RTPRuntime.scheduler() != null) {
+            try {
+              RTPRuntime.scheduler().cancelTask(handle);
+            } catch (Throwable failure) {
+              RTP.log(Level.WARNING, "[RTP test/queue-starvation] task cancellation failed", failure);
+            }
+          }
+          String msg = "[RTP test/queue-starvation] cancelled by operator";
+          if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)
+              && RTPRuntime.serverAccessor() != null) {
+            RTPRuntime.serverAccessor().sendMessage(callerId, msg);
+          }
+          RTP.log(Level.INFO, msg);
+        };
     Runnable body =
         () -> {
-          if (cancelled.get()) return;
+          if (cancelled.get()) {
+            reportFuture.complete(cancellationReport("cancelled before sampling started"));
+            return;
+          }
           try {
-            runSamplingPhase(callerId, region, samples, expectedPipe, cancelled);
+            reportFuture.complete(runSamplingPhase(callerId, region, samples, expectedPipe, cancelled));
           } catch (Throwable t) {
             RTP.log(
                 Level.WARNING,
                 "[RTP test/queue-starvation] aborted due to unexpected error: " + t.getMessage(),
                 t);
+            reportFuture.completeExceptionally(t);
           } finally {
             Runnable unreg = unregisterHolder[0];
             if (unreg != null) unreg.run();
@@ -134,32 +222,32 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
     // REQ-RTP-S-005: kick off on the async scheduler; never touch the
     // main thread for chunk-adjacent work.
-    handleHolder[0] = RTPRuntime.scheduler().runTaskAsynchronously(body);
-
-    Runnable canceller =
-        () -> {
-          cancelled.set(true);
-          Object h = handleHolder[0];
-          if (h != null) {
-            try {
-              RTPRuntime.scheduler().cancelTask(h);
-            } catch (Throwable ignored) {
-              // best-effort; see ActiveTestJobs.cancelOwned
-            }
-          }
-          String msg = "[RTP test/queue-starvation] cancelled by operator";
-          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
-          RTP.log(Level.INFO, msg);
-        };
+    if (RTPRuntime.scheduler() == null) {
+      String msg = "[RTP test/queue-starvation] RTP.scheduler is unavailable";
+      RTP.log(Level.WARNING, msg);
+      reportFuture.complete(
+          ProbeBitReport.forProbe("queue-starvation")
+              .check(REGION_UNAVAILABLE, false, "queue-starvation.scheduler", msg)
+              .build());
+      return true;
+    }
     unregisterHolder[0] =
         ActiveTestJobs.register(callerId, new ActiveTestJobs.Job("queue-starvation", canceller));
+    try {
+      handleHolder[0] = RTPRuntime.scheduler().runTaskAsynchronously(body);
+    } catch (Throwable failure) {
+      reportFuture.completeExceptionally(failure);
+      RTP.log(Level.WARNING, "[RTP test/queue-starvation] async dispatch failed", failure);
+      unregisterHolder[0].run();
+      return true;
+    }
 
     return true;
   }
 
   // ---- Phase 1: drain the cache and record per-sample timings. ------------
   // ---- Phase 2: pulse SelectionAPI.compute() and record refill timing. ---
-  private void runSamplingPhase(
+  private BitReport runSamplingPhase(
       UUID callerId,
       Region region,
       int samples,
@@ -169,10 +257,11 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     final AtomicInteger successes = new AtomicInteger(0);
     final AtomicInteger failures = new AtomicInteger(0);
     final AtomicInteger stalls = new AtomicInteger(0);
+    final AtomicBoolean computeFailed = new AtomicBoolean(false);
 
     long drainStart = System.nanoTime();
     for (int i = 0; i < samples; i++) {
-      if (cancelled.get()) return;
+      if (cancelled.get()) return cancellationReport("cancelled during sampling");
 
       long t0 = System.nanoTime();
       long elapsedMs;
@@ -194,6 +283,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
             try {
               result.reservation().close();
             } catch (Throwable closeErr) {
+              failures.incrementAndGet();
               RTP.log(
                   Level.WARNING,
                   "[RTP test/queue-starvation] failed to close reservation for sample "
@@ -244,6 +334,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     try {
       ActiveSelection.get().compute();
     } catch (Throwable t) {
+      computeFailed.set(true);
       RTP.log(
           Level.WARNING,
           "[RTP test/queue-starvation] SelectionAPI.compute() threw: " + t.getMessage(),
@@ -313,6 +404,34 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
           Level.WARNING,
           "[RTP test/queue-starvation] ASSERTION FAILED: " + failures.get() + " sample(s) failed");
     }
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("queue-starvation");
+    report.check(
+        SAMPLE_FAILURES,
+        failures.get() == 0,
+        "queue-starvation.samples",
+        failures.get() + " sample(s) failed.");
+    report.check(
+        SAMPLE_STALLS,
+        stalls.get() == 0,
+        "queue-starvation.stalls",
+        stalls.get() + " sample(s) exceeded " + LOG_N_STALL_THRESHOLD_MS + " ms.");
+    report.check(
+        COMPUTE_THROWN,
+        !computeFailed.get(),
+        "queue-starvation.compute",
+        computeFailed.get() ? "SelectionAPI.compute() threw." : "");
+    return report.build();
+  }
+
+  private void completeReport(UUID callerId, Map<String, List<String>> args, BitReport report) {
+    ProbeVerdict.record(COMPONENT, CompletableFuture.completedFuture(report), COMPONENT_TIMEOUT_MS)
+        .thenAccept(result -> ProbeBitReport.emit(callerId, args, COMPONENT, result));
+  }
+
+  private static BitReport cancellationReport(String detail) {
+    return ProbeBitReport.forProbe("queue-starvation")
+        .note(CANCELLED, "queue-starvation.cancelled", detail)
+        .build();
   }
 
   // ---- Helpers ----------------------------------------------------------
@@ -321,14 +440,18 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     List<String> regionNames = parameterValues.get("region");
     String regionName = (regionNames == null || regionNames.isEmpty()) ? null : regionNames.get(0);
     Region region;
+    if (ActiveSelection.get() == null) return null;
     if (regionName != null) {
-      region = ActiveSelection.get().getRegionOrDefault(regionName);
-        return region;
+      region = ActiveSelection.get().getRegion(regionName);
+      return region != null && region.getWorld() != null ? region : null;
+    }
+    if (callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      region = ActiveSelection.get().getRegion(MockProbeWorld.DEFAULT_REGION);
+      return region != null && region.getWorld() != null ? region : null;
     }
     // Fall back to caller's current region.
     try {
-      region =
-          ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(callerId));
+      region = ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(callerId));
     } catch (Throwable t) {
       region = null;
     }
@@ -341,7 +464,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
       RTP.log(Level.WARNING, msg);
       return null;
     }
-    return region;
+    return region != null && region.getWorld() != null ? region : null;
   }
 
   private static String safePlatform() {

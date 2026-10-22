@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit;
 
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
+import io.github.dailystruggle.rtp.common.bit.RtpBitStartup;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
@@ -355,6 +356,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // dispatch the startup burst. Decoupled from Region.execute() per ADR-023.
     initLoginReserveCache();
 
+    RtpBitStartup.schedule();
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable EXIT -- plugin enabled");
   }
 

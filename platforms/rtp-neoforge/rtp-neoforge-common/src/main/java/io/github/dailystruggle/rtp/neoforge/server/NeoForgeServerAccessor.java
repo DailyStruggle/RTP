@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -177,8 +178,8 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
-        return io.github.dailystruggle.rtp.api.server.PlatformFamily.NEOFORGE;
+    public io.github.dailystruggle.server.api.PlatformFamily getPlatformFamily() {
+        return io.github.dailystruggle.server.api.PlatformFamily.NEOFORGE;
     }
 
     @Override
@@ -242,6 +243,9 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     @Override
     public RTPPlayer getPlayer(UUID uuid) {
         if (uuid == null) return null;
+        // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+        RTPPlayer mock = MockPlayerRegistry.get(uuid);
+        if (mock != null) return mock;
         RTPPlayer cached = playersById.get(uuid);
         if (cached != null) return cached;
         return lazyResolveByUuid(uuid);
@@ -250,6 +254,8 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     @Override
     public RTPPlayer getPlayer(String name) {
         if (name == null) return null;
+        RTPPlayer mock = MockPlayerRegistry.getByName(name);
+        if (mock != null) return mock;
         RTPPlayer cached = playersByName.get(name);
         if (cached != null) return cached;
         MinecraftServer s = server;
@@ -282,6 +288,8 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (uuid.equals(RTPAPI.serverId)) {
             return new NeoForgeConsoleSender(server);
         }
+        RTPPlayer mock = MockPlayerRegistry.get(uuid);
+        if (mock != null) return mock;
         RTPPlayer cached = playersById.get(uuid);
         if (cached != null) return cached;
         return lazyResolveByUuid(uuid);

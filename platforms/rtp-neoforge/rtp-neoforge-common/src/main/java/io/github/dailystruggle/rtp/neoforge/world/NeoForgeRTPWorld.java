@@ -11,6 +11,9 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
+import io.github.dailystruggle.rtp.common.tools.TicketGenerationWatch;
+import io.github.dailystruggle.rtp.common.selection.region.TicketFootprint;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
@@ -25,7 +28,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -70,6 +75,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     // in forgetChunkAt / forgetChunks, so the map does not grow unbounded.
     private final ConcurrentHashMap<Long, ChunkAccess> chunkCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, NeoForgeRTPChunk> rtpChunkCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, TicketGenerationWatch> ticketGenerationWatches =
+            new ConcurrentHashMap<>();
     private final io.github.dailystruggle.rtp.anvil.AnvilProbeSupport anvilProbeSupport =
             new io.github.dailystruggle.rtp.anvil.AnvilProbeSupport();
 
@@ -172,7 +179,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
-        return resolveChunkKey(chunkX, chunkZ, true);
+        return resolveChunkKey(chunkX, chunkZ, true, GenerationBudget.currentReservation());
     }
 
     /**
@@ -181,10 +188,11 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Long> getChunkIfReadable(int chunkX, int chunkZ) {
-        return resolveChunkKey(chunkX, chunkZ, false);
+        return resolveChunkKey(chunkX, chunkZ, false, null);
     }
 
-    private CompletableFuture<Long> resolveChunkKey(int chunkX, int chunkZ, boolean allowLive) {
+    private CompletableFuture<Long> resolveChunkKey(
+            int chunkX, int chunkZ, boolean allowLive, GenerationBudget.Reservation generationSlot) {
         final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
 
         if (shouldPrefilter(chunkX, chunkZ)) {
@@ -217,7 +225,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                                     return CompletableFuture.completedFuture(key);
                                 }
                                 return allowLive
-                                        ? loadLiveChunk(chunkX, chunkZ, key)
+                                        ? loadLiveChunk(chunkX, chunkZ, key, generationSlot)
                                         : CompletableFuture.completedFuture(null);
                             });
                 }
@@ -225,7 +233,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         }
 
         if (!allowLive && !isChunkLoaded(chunkX, chunkZ)) return CompletableFuture.completedFuture(null);
-        return loadLiveChunk(chunkX, chunkZ, key);
+        return loadLiveChunk(chunkX, chunkZ, key, generationSlot);
     }
 
     @SuppressWarnings("unchecked")
@@ -250,13 +258,29 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     private static final long LIVE_LOAD_DEADLINE_MS = 30_000L;
 
     /**
+     * Server-wide count of live loads vanilla is still generating; the chunk worker pool is
+     * shared by every level and serves requests first-come, first-served, so background fill
+     * waits at the cap (see {@link GenerationBudget}).
+     */
+    private static final GenerationBudget GENERATION_BUDGET = GenerationBudget.server();
+
+    static {
+        GenerationBudget.configureServerCap(() -> {
+            NeoForgeVersionAdapter a = NeoForgeVersionAdapterRegistry.peek();
+            return GenerationBudget.capFor(a == null ? null : a.mcVersion());
+        });
+    }
+
+    /**
      * Live-chunk load path. Dispatches the non-blocking
      * {@link NeoForgeVersionAdapter#requestFullChunkAsync} onto the server tick
      * thread via {@link MinecraftServer#execute(Runnable)}; vanilla's chunk
      * system completes the inner future off-thread.
      */
-    private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
+    private CompletableFuture<Long> loadLiveChunk(
+            int chunkX, int chunkZ, long key, GenerationBudget.Reservation generationSlot) {
         if (world == null) {
+            if (generationSlot != null) generationSlot.close();
             CompletableFuture<Long> failed = new CompletableFuture<>();
             failed.completeExceptionally(new IllegalStateException(
                     "NeoForgeRTPWorld.getChunkAt: ServerLevel is null (world=" + name + ")"));
@@ -265,14 +289,21 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         final MinecraftServer server = world.getServer();
 
         CompletableFuture<Long> existing = inFlightLiveLoads.get(key);
-        if (existing != null) return existing;
+        if (existing != null) {
+            if (generationSlot != null) generationSlot.close();
+            return existing;
+        }
 
         CompletableFuture<Long> result = new CompletableFuture<>();
         CompletableFuture<Long> raced = inFlightLiveLoads.putIfAbsent(key, result);
-        if (raced != null) return raced;
+        if (raced != null) {
+            if (generationSlot != null) generationSlot.close();
+            return raced;
+        }
 
         final NeoForgeVersionAdapter adapter = NeoForgeVersionAdapterRegistry.peek();
         if (adapter == null) {
+            if (generationSlot != null) generationSlot.close();
             inFlightLiveLoads.remove(key, result);
             result.completeExceptionally(new IllegalStateException(
                     "NeoForgeRTPWorld.loadLiveChunk: NeoForgeVersionAdapter not yet installed"));
@@ -280,7 +311,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         }
 
         final long dispatchStartNanos = System.nanoTime();
-        dispatchFullChunk(server, adapter, chunkX, chunkZ).whenComplete((chunk, error) -> {
+        dispatchFullChunk(server, adapter, chunkX, chunkZ, generationSlot).whenComplete((chunk, error) -> {
             inFlightLiveLoads.remove(key, result);
             if (error != null) {
                 Throwable cause = (error instanceof CompletionException && error.getCause() != null)
@@ -345,9 +376,13 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
      * Stores nothing; callers decide whether the chunk is cached.
      */
     private CompletableFuture<ChunkAccess> dispatchFullChunk(
-            MinecraftServer server, NeoForgeVersionAdapter adapter, int chunkX, int chunkZ) {
+            MinecraftServer server, NeoForgeVersionAdapter adapter, int chunkX, int chunkZ,
+            GenerationBudget.Reservation generationSlot) {
         final int inFlightNow = liveLoadInFlight.incrementAndGet();
         totalChunkLoads.incrementAndGet();
+        // Released when vanilla's future settles, not at LIVE_LOAD_DEADLINE_MS: a load RTP gave up
+        // on is still occupying the chunk workers.
+        final Runnable releaseGeneration = GENERATION_BUDGET.begin(generationSlot);
 
         // Trace the live-load dispatch end to end at FINER: whether the
         // server.execute runnable runs on the tick thread, what the adapter
@@ -371,6 +406,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                                 + (adapterFuture == null ? "null" : "id@" + System.identityHashCode(adapterFuture)
                                         + " done=" + adapterFuture.isDone())
                                 + " world=" + name + " chunk=(" + chunkX + "," + chunkZ + ")");
+                GenerationBudget.releaseOn(adapterFuture, releaseGeneration);
                 if (adapterFuture != null) {
                     adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.FINER,
                             "[RTP][NeoForge] adapter future COMPLETE world=" + name
@@ -385,6 +421,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                         "[RTP][NeoForge] adapter.requestFullChunkAsync THREW world=" + name
                                 + " chunk=(" + chunkX + "," + chunkZ + "): "
                                 + t.getClass().getSimpleName() + ": " + t.getMessage());
+                releaseGeneration.run();
                 bridge.completeExceptionally(t);
             }
         };
@@ -393,6 +430,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         try {
             server.execute(dispatchOnTick);
         } catch (Throwable rejected) {
+            releaseGeneration.run();
             bridge.completeExceptionally(rejected);
         }
         // NO short pre-dispatch timeout here. The bridge only completes once the
@@ -808,14 +846,40 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                             + " (world=" + name + " chunk=(" + cx + "," + cz + "))"));
             return failed;
         }
+        final long key = chunkKey(cx, cz);
         return CompletableFuture.supplyAsync(() -> {
+            TicketGenerationWatch watch = null;
             try {
-                CompletableFuture<Void> f = forceLoad
+                ServerChunkCache cache = world.getChunkSource();
+                if (forceLoad) watch = createTicketGenerationWatch(cache, cx, cz);
+                CompletableFuture<Void> ticketFuture = forceLoad
                         ? adapter.applyTicket(world, cx, cz)
                         : adapter.releaseTicket(world, cx, cz);
-                f.getNow(null);
+                if (ticketFuture == null) {
+                    throw new IllegalStateException("NeoForge ticket operation returned no future");
+                }
+                TicketGenerationWatch pendingWatch = watch;
+                if (forceLoad) {
+                    ticketFuture.whenComplete((ignored, error) -> {
+                        if (error != null) {
+                            if (pendingWatch != null) pendingWatch.close();
+                        } else if (pendingWatch == null) {
+                            cancelTicketGenerationWatch(key);
+                        } else if (pendingWatch.isActive()) {
+                            TicketGenerationWatch previous = ticketGenerationWatches.put(key, pendingWatch);
+                            if (previous != null) previous.close();
+                            scheduleTicketGenerationPoll(key, pendingWatch);
+                        }
+                    });
+                } else {
+                    ticketFuture.whenComplete((ignored, error) -> {
+                        if (error == null) cancelTicketGenerationWatch(key);
+                    });
+                }
+                ticketFuture.getNow(null);
                 return null;
             } catch (Throwable t) {
+                if (watch != null) watch.close();
                 RTP.log(java.util.logging.Level.WARNING,
                         "[RTP] NeoForgeRTPWorld.setForceLoadedImpl failed for world=" + name
                                 + " chunk=(" + cx + "," + cz + ") forceLoad=" + forceLoad
@@ -823,6 +887,83 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 return null;
             }
         }, server);
+    }
+
+    private TicketGenerationWatch createTicketGenerationWatch(ServerChunkCache cache, int cx, int cz) {
+        int distance = TicketFootprint.ticketDistance();
+        List<Long> missing = new ArrayList<>();
+        for (int dx = -distance; dx <= distance; dx++) {
+            for (int dz = -distance; dz <= distance; dz++) {
+                int footprintX = cx + dx;
+                int footprintZ = cz + dz;
+                if (!cache.hasChunk(footprintX, footprintZ)) {
+                    missing.add(chunkKey(footprintX, footprintZ));
+                }
+            }
+        }
+        if (missing.isEmpty()) return null;
+        TicketGenerationWatch watch = new TicketGenerationWatch(GenerationBudget.server(), () -> {
+            for (long footprintKey : missing) {
+                int footprintX = (int) footprintKey;
+                int footprintZ = (int) (footprintKey >> 32);
+                if (!cache.hasChunk(footprintX, footprintZ)) return false;
+            }
+            return true;
+        });
+        return watch.isActive() ? watch : null;
+    }
+
+    private void scheduleTicketGenerationPoll(long key, TicketGenerationWatch watch) {
+        if (ticketGenerationWatches.get(key) != watch) {
+            watch.close();
+            return;
+        }
+        try {
+            io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler = RTPRuntime.scheduler();
+            if (scheduler == null) {
+                ticketGenerationWatches.remove(key, watch);
+                watch.close();
+                return;
+            }
+            scheduler.runTaskLater(() -> pollTicketGeneration(key, watch), 1L);
+        } catch (Throwable t) {
+            ticketGenerationWatches.remove(key, watch);
+            watch.close();
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] NeoForge ticket-generation watch stopped for world=" + name
+                            + " chunkKey=" + key,
+                    t);
+        }
+    }
+
+    private void pollTicketGeneration(long key, TicketGenerationWatch watch) {
+        if (ticketGenerationWatches.get(key) != watch) {
+            watch.close();
+            return;
+        }
+        try {
+            if (!watch.poll()) {
+                ticketGenerationWatches.remove(key, watch);
+                return;
+            }
+            scheduleTicketGenerationPoll(key, watch);
+        } catch (Throwable t) {
+            ticketGenerationWatches.remove(key, watch);
+            watch.close();
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] NeoForge ticket-generation watch stopped for world=" + name
+                            + " chunkKey=" + key,
+                    t);
+        }
+    }
+
+    private void cancelTicketGenerationWatch(long key) {
+        TicketGenerationWatch watch = ticketGenerationWatches.remove(key);
+        if (watch != null) watch.close();
+    }
+
+    private static long chunkKey(int cx, int cz) {
+        return ((long) cx & 0xffffffffL) | ((long) cz << 32);
     }
 
     @Override

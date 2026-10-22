@@ -6,6 +6,8 @@ import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
 import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
 import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
 import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
+import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.particles.ParticleTypes;
@@ -49,6 +51,7 @@ public final class FabricEffectsInitializer {
         if (!REGISTERED.compareAndSet(false, true)) return;
 
         FabricHandles.register();
+        ServerTickEvents.END_SERVER_TICK.register(server -> GlideKeepAlive.tick());
         // ADR-004: per-platform leaf operations live in FabricValueCoercer.
         EffectFactory.setCoercer(new FabricValueCoercer());
 

@@ -18,8 +18,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.SyntheticSideEffects;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -1153,8 +1153,8 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         DeathTeleports.pending().put(playerId, this);
         if (teleportData != null) {
           teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
-          if (teleportData.sender != null && ActiveDatabase.accessor() != null) {
-            ActiveDatabase.accessor().cacheValue(teleportData);
+          if (teleportData.sender != null) {
+            SyntheticSideEffects.persistTeleportData(playerId, teleportData);
           }
         }
         TeleportSessions.current().processingPlayers.remove(playerId);
@@ -1165,7 +1165,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
 
       teleportData.completed = true;
       teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
-      RTP.updateSharedLastTeleportTime(playerId, teleportData.time);
+      SyntheticSideEffects.recordSharedLastTeleport(playerId, teleportData.time);
       if (region != null && region.name != null) {
         RTP.setLastRegionTeleportTime(playerId, region.name, teleportData.time);
       }
@@ -1182,10 +1182,9 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runTeleport setLocation dispatched playerId=" + playerId
               + " attempts=" + teleportData.attempts
               + " processingTime=" + teleportData.processingTime + "ms");
-      // Guarded: a throw here would skip the completion callback below (arrival hold, S-004 audit).
-      if (ActiveDatabase.accessor() != null) {
-        ActiveDatabase.accessor().cacheValue(teleportData);
-      }
+      // Gate null-checks the accessor: a throw here would skip the completion callback below
+      // (arrival hold, S-004 audit).
+      SyntheticSideEffects.persistTeleportData(playerId, teleportData);
 
       setLocation.whenComplete(
           (aBoolean, throwable) -> {
@@ -1207,9 +1206,9 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
               }
               if (aBoolean != null && aBoolean) {
                 computeDistance();
-                // ADR-104 heatmap layer: bounded in-memory per-chunk landing count
-                io.github.dailystruggle.rtp.common.metrics.LandingHeatmap.record(
-                    region != null ? region.name : null, location.x(), location.z());
+                // ADR-104 heatmap layer; ADR-121 s11: mock landings go to BitTeleportLog instead
+                SyntheticSideEffects.recordLanding(
+                    playerId, region != null ? region.name : null, location, teleportData);
                 String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
                 RTPRuntime.serverAccessor().sendMessage(playerId, message);
 
@@ -1229,7 +1228,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                 // BetterRTP LockAfter parity: count this successful use toward the
                 // per-player cap. No-op while lockAfterUses <= 0.
                 if (ConfigCache.lockAfterUses > 0) {
-                  ActiveDatabase.teleportLimitStore().recordSuccess(playerId,
+                  SyntheticSideEffects.recordLimitUse(playerId,
                       ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                       System.currentTimeMillis());
                 }
@@ -1323,14 +1322,14 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         if (playerId != null) {
           computeDistance();
           if (destination != null) {
-            io.github.dailystruggle.rtp.common.metrics.LandingHeatmap.record(
-                region != null ? region.name : null, destination.x(), destination.z());
+            SyntheticSideEffects.recordLanding(
+                playerId, region != null ? region.name : null, destination, teleportData);
           }
           String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
           RTPRuntime.serverAccessor().sendMessage(playerId, message);
 
           if (ConfigCache.lockAfterUses > 0) {
-            ActiveDatabase.teleportLimitStore().recordSuccess(playerId,
+            SyntheticSideEffects.recordLimitUse(playerId,
                 ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                 System.currentTimeMillis());
           }

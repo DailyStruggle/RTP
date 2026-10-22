@@ -70,7 +70,7 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 ---
 
 ### 3.1 `RTPServerAccessor`
-`io.github.dailystruggle.rtp.api.server.RTPServerAccessor` is the central service locator and lifecycle gateway instantiated and bound by the platform adapter on startup.
+`io.github.dailystruggle.rtp.api.server.RTPServerAccessor` is the central service locator and lifecycle gateway instantiated and bound by the platform adapter on startup. It extends the platform-neutral `io.github.dailystruggle.server.api.ServerAccessor` from `api/server-api`.
 
 #### Lifecycle & Subsystems
 - `void start()` / `void start(Object pluginHandle)`
@@ -89,16 +89,23 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 - `PlayerLifecycleHook getPlayerLifecycleHook()`
   - **Purpose:** Returns the platform-agnostic lifecycle hook that dispatches player join, quit, and teleportation events.
 
-#### Platform Identity & Compatibility
+#### Common Server Identity, Compatibility & Logging
+These methods are declared by `ServerAccessor` and are available through `RTPServerAccessor`:
 - `String getServerVersion()`
-  - **Purpose:** Returns human-readable platform string (e.g. `"Paper 1.21.4"`, `"Fabric 1.21.1"`).
-- `int getServerIntVersion()`
+  - **Purpose:** Returns the server-reported version string (e.g. `"git-Paper-400 (MC: 1.21.1)"`).
+- `String getPlatform()`
+  - **Purpose:** Returns a platform identifier such as `"paper"`, `"folia"`, `"fabric"`, or `"neoforge"`.
+- `Integer getServerIntVersion()`
   - **Purpose:** Normalized integer version (e.g. `20` for 1.20.x, `21` for 1.21.x) for quick version gating.
 - `PlatformFamily getPlatformFamily()`
-  - **Purpose:** Returns enum: `BUKKIT`, `PAPER`, `FOLIA`, `FABRIC`, `NEOFORGE`, `VELOCITY`, or `BUNGEECORD`.
+  - **Purpose:** Returns `BUKKIT`, `FABRIC`, `NEOFORGE`, or `UNKNOWN`; Bukkit-derived platforms including Paper and Folia use `BUKKIT`.
   - **Usage:** Used by addons and core for platform-aware capability gating.
 - `boolean isCompatible(PlatformFamily family, int minVersion, int maxVersion)`
   - **Purpose:** Compatibility check for addons to verify if the server platform satisfies their requirements.
+- `void log(Level level, String message)` / `void log(Level level, String message, Throwable throwable)`
+  - **Purpose:** Writes through the platform's server logger; `ServerAccessors.log(...)` uses a generic logger before the accessor is installed.
+
+#### RTP-Specific Services
 - `File getPluginDirectory()`
   - **Purpose:** Returns the base directory where `config.yml`, `regions.yml`, and `messages.yml` reside.
 - `Object getPlugin()`
@@ -405,6 +412,7 @@ Adapters can enhance functionality by implementing optional SPI interfaces:
 
 | SPI Framework | Module | Purpose | Adapter Implementation |
 |---|---|---|---|
+| **`server-api`** | `api/server-api` | Server identity, platform family and logging | Implement the neutral `ServerAccessor` contract through the RTP server accessor. |
 | **`metrics-api`** | `api/metrics-api` | Runtime telemetry (TPS, MSPT, queue depth, memory) | Implement `MetricsBinding` to sample platform-specific tick timing and heap. |
 | **`effects-api`** | `api/effects-api` | Particles, sounds, and visual effects | Implement `EffectsHandler` to spawn platform-native particle packets and play sounds. |
 | **`maps-api`** | `api/maps-api` | In-game minimap / filled map rendering | Implement `MapBinding` to render RTP region bounds and biomes onto platform map canvases. |
@@ -420,7 +428,7 @@ Use this step-by-step checklist when building a new platform adapter from scratc
 - [ ] **1. Module & Repo Setup:**
   - Create `platforms/rtp-<platform>` directory.
   - Add `include 'rtp-<platform>'` (or version submodules) to `settings.gradle` and assign `project(':rtp-<platform>').projectDir = file('platforms/rtp-<platform>')`.
-  - Add new platform identifier to `io.github.dailystruggle.rtp.api.server.PlatformFamily` enum in `rtp-api`.
+  - Add new platform identifier to `io.github.dailystruggle.server.api.PlatformFamily` enum in `server-api`.
   - Configure `build.gradle` targeting Java 21+ with `api project(':rtp-api')`, `implementation project(':rtp-core')`, and `compileOnly project(':commands-api')`. Ensure zero platform imports leak into `rtp-core`.
 - [ ] **2. Scheduler Implementation:**
   - Implement `RTPScheduler` (synchronous tick dispatch, asynchronous thread pool, delayed/repeating tasks).
@@ -525,8 +533,8 @@ if (!exclude<Platform>) {
 }
 ```
 
-### 9.3 `rtp-api` PlatformFamily Registration
-Every platform adapter must have a recognized entry in `io.github.dailystruggle.rtp.api.server.PlatformFamily`:
+### 9.3 `server-api` PlatformFamily Registration
+Every platform adapter must have a recognized entry in `io.github.dailystruggle.server.api.PlatformFamily`:
 
 ```java
 public enum PlatformFamily {
