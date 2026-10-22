@@ -32,7 +32,7 @@ Language selection is configured in [`language.yml`](LANGUAGE.md). See [LANGUAGE
 
 ### Duration Unit Suffixes & Parsing
 
-Any duration setting (such as `teleportCooldown`, `teleportDelay`, `lockAfterResetSeconds`, cache TTLs in `advanced/ttl.yml`, and queue intervals in `advanced/performance.yml`) accepts human-readable **temporal unit suffixes** as well as composite strings:
+Any duration setting (such as `teleportCooldown`, `teleportDelay`, `lockAfterResetSeconds`, cache TTLs in `advanced/ttl.yml`, the timing keys in [`advanced/performance.yml`](PERFORMANCE.md#duration-values) and [`safety.yml`](SAFETY.md#duration-values), and the `*Ms` / `maxAgeDays` keys in [`advanced/network.yml`](../proxies/CONFIGURATION.md#duration-values)) accepts human-readable **temporal unit suffixes** as well as composite strings:
 
 - **Game Ticks:**
   - `t`, `tick`, `ticks`: Minecraft game ticks (1 tick = 50ms = 0.05s, 20 ticks = 1s). E.g. `teleportDelay: 40t` (2 seconds).

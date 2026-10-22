@@ -15,11 +15,17 @@ You can update safety settings through:
 
 ---
 
+## Duration Values
+
+Keys marked **Integer / Duration** below accept a plain number of seconds or a duration with unit suffixes (e.g. `100t`, `30s`, `10m`, `24h`, `1d`, or composites such as `1m30s`). A suffixed value is converted from its own units, so `invulnerabilityTime: 100t` is 5 seconds and `pvpCombatTagSeconds: 1m` is 60 seconds. Sentinels keep their meaning: `platformRestoreSeconds: -1` still disables restoration, and `0` keeps its documented meaning for each key. Full suffix list: [CORE_CONFIG.md -> Duration Unit Suffixes & Parsing](CORE_CONFIG.md#duration-unit-suffixes--parsing).
+
+---
+
 ## Landing Protection
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `invulnerabilityTime` | Integer | `5` | Seconds of invulnerability granted after teleporting. Prevents fall, fire, or drowning damage on arrival. |
+| `invulnerabilityTime` | Integer / Duration | `5` | Seconds of invulnerability granted after teleporting. Prevents fall, fire, or drowning damage on arrival. `0` disables. |
 | `safetyRadius` | Integer | `0` | Block radius around the landing point to check for hazards. `0` = check only the landing block. |
 | `staleChunkRetryLimit` | Integer | `2` | Bounded retry budget for the stale-chunk guard. Prevents race conditions where a chunk unloads before evaluation. |
 | `anvilPrefilterEnabled` | Boolean | `true` | Off-thread region prefilter: screens candidate destinations by reading region files (`.mca` Anvil format, plus any format an addon registers) from disk, dropping known-unsafe ones before they cost a chunk load. A chunk it cannot read (e.g. not yet generated, or stored in an unregistered format such as `.linear`) is not rejected - it passes through to the normal live-load safety check. |
@@ -34,7 +40,7 @@ Used as a legacy fallback if no solid ground is found.
 | `platformDepth` | Integer | `1` | Depth (downward) of the platform. |
 | `platformAirHeight` | Integer | `2` | Height of air to ensure above the platform. |
 | `platformMaterial` | String | `GLASS` | Block type used if no solid block exists. |
-| `platformRestoreSeconds` | Integer | `-1` | Optional timeout after which a built platform's footprint is restored to its original blocks. `-1` disables restoration (permanent platform). `0` restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart. |
+| `platformRestoreSeconds` | Integer / Duration | `-1` | Optional timeout after which a built platform's footprint is restored to its original blocks. `-1` disables restoration (permanent platform). `0` restores as soon as the footprint chunk is loaded again; a positive value restores after that many seconds. The countdown only advances while the footprint chunk is loaded (it pauses while the area is unloaded), and pending restores survive a server restart. |
 
 > **Note on `platformRestoreSeconds`.** Restoration writes the captured original blocks back; every restore (and any failure) is logged, never silently dropped. Available on the Bukkit/Spigot/Paper and Folia platforms; the Fabric platform does not build emergency platforms, so the timeout has no effect there. Because the platform is only ever built on land the safety pipeline already cleared of claims, the footprint starts in unclaimed terrain; if you expect players to build on top of the temporary platform before it expires, leave restoration disabled (`-1`).
 
@@ -47,7 +53,7 @@ Configure whether players can teleport while in combat.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `pvpCheckEnabled` | Boolean | `false` | When `true`, checks if a player is in combat before teleporting. |
-| `pvpCombatTagSeconds` | Integer | `15` | Duration (seconds) a player remains in combat after a PvP hit (built-in tracker). |
+| `pvpCombatTagSeconds` | Integer / Duration | `15` | Duration (seconds) a player remains in combat after a PvP hit (built-in tracker). |
 | `pvpOnCombat` | Enum | `"DENY"` | Action taken when a player in combat attempts `/rtp`. Options: `ALLOW`, `DENY`, `DELAY`, `CANCEL`. |
 | `pvpSource` | Enum | `"AUTO"` | Source for combat state. Options: `AUTO` (external plugin if present, else native), `NATIVE` (built-in tracker only), `EXTERNAL` (plugin hook only). |
 | `pvpTagVictim` | Boolean | `true` | Built-in tracker: tag the player taking damage. |
