@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.tasks.tick.TickBudget;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
@@ -168,6 +169,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     this.defaultInteractiveTimeoutMs = Math.max(100L, defaultInteractiveTimeoutMs);
     this.budget = budget;
     this.health = health;
+    GenerationBudget.configureServerAdmission(false);
   }
 
   /** Fails open: a missing or throwing metrics source never stalls regional work. */
@@ -686,6 +688,12 @@ public class FoliaSchedulerImpl implements RTPScheduler {
             periodMs,
             TimeUnit.MILLISECONDS
     );
+  }
+
+  @Override
+  public boolean isGenerationSaturated(RTPWorld<?> world) {
+    GenerationBudget.configureServerAdmission(false);
+    return false;
   }
 
   /** Backlogged (deep queue or late slice) or unhealthy region: background work should go elsewhere. */
