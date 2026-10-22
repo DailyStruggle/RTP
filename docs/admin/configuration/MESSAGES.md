@@ -58,6 +58,20 @@ Feedback sent to the operator running `/rtp editor apply token=<token>`.
 | `editorApplyFailed` | Fetching, validating or applying the payload failed. | `[reason]` |
 | `editorApplyDigestMissing` | A byte-store payload has no `sha256` checksum, so it was refused. | - |
 | `editorApplyFileUnreadable` | The offline drop file (`editor/<token>.json`) could not be read; the byte store is tried next. | `[reason]` |
+| `editorApplyRejected` | The configuration checks ([BIT.md](BIT.md)) found an `ERROR` in the edited files, so nothing was written and the running config is kept. | `[count]` error count; `[code]`, `[source]`, `[path]` of the first error |
+
+---
+
+## Reload Messages (`system.yml`)
+
+Feedback sent to the sender of `/rtp reload` (and `/rtp reload <file>`). `reloadRejected` is also sent when Hot-Apply, `/rtp config`, a prefab, setup or a config import would produce a config that fails the checks.
+
+| Key | Sent when | Placeholders |
+|---|---|---|
+| `reloading` | The reload started. | `[filename]` |
+| `reloaded` | The reload finished and the new config is active. | `[filename]` |
+| `reloadFailed` | The reload threw an error. The cause is logged at `SEVERE` in the server log. | - |
+| `reloadRejected` | The configuration checks ([BIT.md](BIT.md)) found an `ERROR`; nothing was swapped and the running config is kept. Run `/rtp test subsystem=config` for the full list. | `[count]` error count; `[code]`, `[source]`, `[path]` of the first error |
 
 ---
 
