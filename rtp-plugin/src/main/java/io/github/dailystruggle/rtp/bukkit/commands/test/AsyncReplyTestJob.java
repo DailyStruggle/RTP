@@ -287,15 +287,13 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
           report.check(PIPELINE_THROWN, false, "async-reply.wait", line);
         }
       }
-      if (line != null) {
-        if (line.contains("FAIL") || line.contains("TIMEOUT") || line.contains("threw")) {
-          if (!line.contains("TIMEOUT")) report.check(PIPELINE_THROWN, false, "async-reply.pipeline", line);
-          RTP.log(Level.WARNING, line);
-        } else {
-          RTP.log(Level.INFO, line);
-        }
-        if (!callerId.equals(RTPAPI.serverId)) accessor.sendMessage(callerId, line);
+      if (line.contains("FAIL") || line.contains("TIMEOUT") || line.contains("threw")) {
+        if (!line.contains("TIMEOUT")) report.check(PIPELINE_THROWN, false, "async-reply.pipeline", line);
+        RTP.log(Level.WARNING, line);
+      } else {
+        RTP.log(Level.INFO, line);
       }
+      if (!callerId.equals(RTPAPI.serverId)) accessor.sendMessage(callerId, line);
     } catch (RuntimeException failure) {
       String detail = "Mock player session failed: " + failure;
       RTP.log(Level.WARNING, "[RTP test/async-reply] " + detail, failure);

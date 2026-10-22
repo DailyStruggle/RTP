@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Simulates an action definition and reports its gate outcomes and recorded commands. */
@@ -68,10 +69,10 @@ public class TestActionCmd extends BaseRTPCmdImpl {
 
   @Override
   public CompletableFuture<Boolean> onCommand(
-      UUID callerId,
-      java.util.function.Predicate<String> permissionCheckMethod,
-      java.util.function.Consumer<String> messageMethod,
-      String[] args,
+      @NotNull UUID callerId,
+      @NotNull java.util.function.Predicate<String> permissionCheckMethod,
+      @NotNull java.util.function.Consumer<String> messageMethod,
+      @NotNull String[] args,
       int i,
       @Nullable Map<String, CommandParameter> tempParameters) {
     for (int index = i; index < args.length; index++) {
@@ -123,11 +124,10 @@ public class TestActionCmd extends BaseRTPCmdImpl {
     Runnable unregister = ActiveTestJobs.register(callerId,
         new ActiveTestJobs.Job(name(), () -> cancelled.set(true)));
     try {
-      int requestedPlayers = players;
       List<String> requestedScript = List.copyOf(script);
       RTPRuntime.scheduler().runTaskAsynchronously(() -> {
         try {
-          if (!cancelled.get()) executeSimulation(callerId, actionId, requestedPlayers, requestedScript);
+          if (!cancelled.get()) executeSimulation(callerId, actionId, players, requestedScript);
         } catch (RuntimeException failure) {
           report(callerId, "Action simulation failed: " + failure.getMessage(), Level.WARNING, failure);
         } finally {

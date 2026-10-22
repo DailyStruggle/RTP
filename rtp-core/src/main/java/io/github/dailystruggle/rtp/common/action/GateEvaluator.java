@@ -161,7 +161,7 @@ public final class GateEvaluator {
   }
 
   @SuppressWarnings("unchecked")
-  public static boolean evaluate(
+  static boolean evaluate(
       Map<String, Object> gateConfig,
       ActionGateContext context,
       Map<String, Predicate<ActionGateContext>> externalPredicates,
@@ -212,7 +212,9 @@ public final class GateEvaluator {
           } else if ("rtp_alive".equalsIgnoreCase(objStr)) {
             // Count alive session participants via server accessor if available
             RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
-            if (trace != null) {
+            if (context == null) {
+              scoreValue = 0.0;
+            } else if (trace != null) {
               scoreValue = context.participantCount();
             } else if (accessor != null && io.github.dailystruggle.rtp.api.RTPAPI.actionService != null) {
               scoreValue = io.github.dailystruggle.rtp.api.RTPAPI.actionService.getSession(context.sessionId())
@@ -399,7 +401,7 @@ public final class GateEvaluator {
           if (rawCommands.isEmpty()) return completeGateEvaluation(gateConfig, context, false, trace);
 
           RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
-          if (trace == null && accessor == null) return completeGateEvaluation(gateConfig, context, false, trace);
+          if (trace == null && accessor == null) return completeGateEvaluation(gateConfig, context, false, null);
 
           Map<String, Object> tokens = new HashMap<>();
           if (additionalTokens != null && !additionalTokens.isEmpty()) {
@@ -441,12 +443,12 @@ public final class GateEvaluator {
 
             Optional<Boolean> nativeResult = evaluateEntityPredicate(substituted, accessor);
             if (nativeResult.isPresent()) {
-              if (!nativeResult.get()) return completeGateEvaluation(gateConfig, context, false, trace);
+              if (!nativeResult.get()) return completeGateEvaluation(gateConfig, context, false, null);
               continue; // predicate satisfied; do not dispatch the vanilla command
             }
 
             boolean success = accessor.executeCommand(new UUID(0, 0), substituted);
-            if (!success) return completeGateEvaluation(gateConfig, context, false, trace);
+            if (!success) return completeGateEvaluation(gateConfig, context, false, null);
           }
         }
         default -> {

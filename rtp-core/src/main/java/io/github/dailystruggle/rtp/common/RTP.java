@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
-import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
@@ -255,6 +254,8 @@ public class RTP {
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
     io.github.dailystruggle.rtp.api.RTPAPI.isAirDelegate = RTP::isAir;
 
+    // Process-wide singleton, closed by RTP shutdown.
+    //noinspection resource
     PhysicalTriggerManager.instance().start();
 
     // First-class teleport entry point for addons: trigger an RTP for an online
@@ -1250,16 +1251,6 @@ public class RTP {
   private final TeleportSessions sessions = new TeleportSessions();
   public io.github.dailystruggle.rtp.common.playerData.FileBinStore fileBinStore;
   /**
-   * Teleport-limit guard seam (ADR-068). Fronts the usage cap and adds best-effort local
-   * persistence of the rolling window so it survives a restart (parity with the
-   * already-persisted cooldown). The cross-server durable/proxy layers of ADR-068 slot in
-   * behind {@link ActiveDatabase#teleportLimitStore()}.
-   */
-  private final io.github.dailystruggle.rtp.common.playerData.TeleportLimitStore limitStore =
-      new io.github.dailystruggle.rtp.common.playerData.LocalTeleportLimitStore(sessions.usageCaps, true);
-  private final Map<String, ScanTask> scanTaskMap = new ConcurrentHashMap<>();
-  private final ConcurrentLinkedQueue<RTPChunk<?>> unloadQueue = new ConcurrentLinkedQueue<>();
-  /**
    * Optional cross-server messaging bus. Field type is the {@code RTPNetworkManager}
    * interface so {@code rtp-core} carries no symbolic reference to any concrete driver
    * class (ADR-024). Constructed reflectively below when network YAML enables a backend.
@@ -1458,10 +1449,14 @@ public class RTP {
     }
     RTPAPI.setServerAccessor(RTPRuntime.serverAccessor());
     TeleportSessions.install(sessions);
-    ScanTasks.install(scanTaskMap);
+    ScanTasks.install(new ConcurrentHashMap<>());
     ActiveDatabase.setAccessor(null);
-    ActiveDatabase.setTeleportLimitStore(limitStore);
-    MiscTasks.setChunksToUnload(unloadQueue);
+    // Teleport-limit guard seam (ADR-068): usage cap plus best-effort local persistence of the
+    // rolling window across restarts; cross-server layers slot in behind
+    // ActiveDatabase#teleportLimitStore().
+    ActiveDatabase.setTeleportLimitStore(
+        new io.github.dailystruggle.rtp.common.playerData.LocalTeleportLimitStore(sessions.usageCaps, true));
+    MiscTasks.setChunksToUnload(new ConcurrentLinkedQueue<>());
     instance = this;
 
     registerDefaultShapes();
@@ -1584,6 +1579,8 @@ public class RTP {
 
     // The static initializer ran before the platform set the scheduler, so the wave
     // accumulator for batchInterval triggers (ADR-093) can only be scheduled here.
+    // Process-wide singleton, closed by RTP shutdown.
+    //noinspection resource
     PhysicalTriggerManager.instance().start();
 
     // Discover and load platform-agnostic addons once core init has settled. Deferred via a

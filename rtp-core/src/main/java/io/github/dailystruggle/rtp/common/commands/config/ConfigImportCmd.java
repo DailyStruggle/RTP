@@ -355,17 +355,18 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                 }
             }
 
-            if (reloadRejected) {
-                // The shared helper delivered the path-aware reloadRejected message.
-            } else if (reloaded) {
-                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                        + "&a file(s). Configuration reload completed!");
-            } else if (reloadFailure != null) {
-                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                        + "&a file(s). &eReload failed: " + reloadFailure.getMessage() + " - run &f/rtp reload&e.");
-            } else {
-                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                        + "&a file(s). Run &f/rtp reload&a to apply.");
+            // A rejected reload already got the path-aware reloadRejected message.
+            if (!reloadRejected) {
+                if (reloaded) {
+                    sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                            + "&a file(s). Configuration reload completed!");
+                } else if (reloadFailure != null) {
+                    sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                            + "&a file(s). &eReload failed: " + reloadFailure.getMessage() + " - run &f/rtp reload&e.");
+                } else {
+                    sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                            + "&a file(s). Run &f/rtp reload&a to apply.");
+                }
             }
 
             // Unified permission migration step

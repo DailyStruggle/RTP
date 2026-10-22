@@ -44,7 +44,7 @@ public final class BitRunner {
         Objects.requireNonNull(executor, "executor must not be null");
         BitComponent resultComponent = components.getOrDefault(component.id(), component);
         long startedNanos = System.nanoTime();
-        FutureTask<BitReport> task = new FutureTask<>(component.check()::call);
+        FutureTask<BitReport> task = new FutureTask<>(component.check());
         BitReport report;
         try {
             executor.execute(task);
@@ -100,15 +100,13 @@ public final class BitRunner {
     }
 
     private static boolean matches(BitSelector selector, BitComponent component) {
-        if (selector.kind() == BitSelector.Kind.COMPONENT) {
-            return component.id().equals(selector.value());
-        }
-        if (component.sideEffect() != BitSideEffect.SAFE) return false;
+        // Only a selector naming one component may run a check with side effects.
+        boolean safe = component.sideEffect() == BitSideEffect.SAFE;
         return switch (selector.kind()) {
-            case ALL -> true;
-            case TIER -> component.tier() == selector.tier();
-            case SUBSYSTEM -> component.subsystem().equals(selector.value());
-            case COMPONENT -> false;
+            case COMPONENT -> component.id().equals(selector.value());
+            case ALL -> safe;
+            case TIER -> safe && component.tier() == selector.tier();
+            case SUBSYSTEM -> safe && component.subsystem().equals(selector.value());
         };
     }
 

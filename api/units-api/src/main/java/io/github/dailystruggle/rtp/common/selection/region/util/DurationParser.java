@@ -48,7 +48,7 @@ public final class DurationParser {
     int idx = 0;
     int len = trimmed.length();
     // Optional sign
-    if (idx < len && (trimmed.charAt(idx) == '+' || trimmed.charAt(idx) == '-')) {
+    if (trimmed.charAt(idx) == '+' || trimmed.charAt(idx) == '-') {
       idx++;
     }
     int numStart = idx;
@@ -57,6 +57,7 @@ public final class DurationParser {
     }
     if (idx < len && trimmed.charAt(idx) == '.') {
       idx++;
+      //noinspection WhileCanBeDoWhile
       while (idx < len && Character.isDigit(trimmed.charAt(idx))) {
         idx++;
       }
@@ -123,6 +124,7 @@ public final class DurationParser {
       }
       if (idx < len && trimmed.charAt(idx) == '.') {
         idx++;
+        //noinspection WhileCanBeDoWhile
         while (idx < len && Character.isDigit(trimmed.charAt(idx))) {
           idx++;
         }

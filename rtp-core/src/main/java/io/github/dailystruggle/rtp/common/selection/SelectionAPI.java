@@ -53,17 +53,15 @@ public class SelectionAPI {
   public Factory<Shape<?>> shapeFactory;
 
   public SelectionAPI() {
-    if (FactoryRegistry.map() != null) {
-      @SuppressWarnings("unchecked")
-      Factory<Shape<?>> sf = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
-      if (sf != null) {
-        this.shapeFactory = sf;
-      }
+    @SuppressWarnings("unchecked")
+    Factory<Shape<?>> sf = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
+    if (sf != null) {
+      this.shapeFactory = sf;
     }
   }
 
   public Factory<Shape<?>> getShapeFactory() {
-    if (shapeFactory == null && FactoryRegistry.map() != null) {
+    if (shapeFactory == null) {
       @SuppressWarnings("unchecked")
       Factory<Shape<?>> sf = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
       shapeFactory = sf;

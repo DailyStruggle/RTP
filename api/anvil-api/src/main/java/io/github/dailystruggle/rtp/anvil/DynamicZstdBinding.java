@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.anvil;
 
-import io.github.dailystruggle.rtp.anvil.bit.BitHealth;
-import io.github.dailystruggle.rtp.anvil.bit.BuiltInTestable;
-import io.github.dailystruggle.rtp.anvil.bit.PbitResult;
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.BuiltInTestable;
+import io.github.dailystruggle.bit.PbitResult;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;

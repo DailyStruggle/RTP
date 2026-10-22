@@ -238,7 +238,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
         return;
       }
 
-      if (migrationFrom != null && migrationTo != null) {
+      if (migrationFrom != null) {
         RTP.handleMigration(migrationFrom, migrationTo);
       }
 

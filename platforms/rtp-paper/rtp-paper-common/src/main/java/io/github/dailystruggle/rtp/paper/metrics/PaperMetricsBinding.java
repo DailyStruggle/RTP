@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.paper.metrics;
 
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
-import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 

@@ -58,6 +58,8 @@ public class TriggerCreateCmd extends BaseTriggerCmd {
         maxX, maxY, maxZ,
         actionId, 5L);
 
+    // Process-wide singleton, closed by RTP shutdown.
+    //noinspection resource
     PhysicalTriggerManager.instance().registerTrigger(spec);
     RTPRuntime.serverAccessor().sendMessage(
         senderId, senderId, "[RTP] Physical trigger '" + id + "' created for action '" + actionId + "'! (["

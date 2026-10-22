@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.folia.maps;
 
 import io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding;
-import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 
 /**
  * Folia-specific {@code MapBinding} override. Thin subclass of

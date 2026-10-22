@@ -29,6 +29,8 @@ public class TriggerListCmd extends BaseTriggerCmd {
 
   @Override
   protected boolean execute(UUID senderId, Map<String, List<String>> parameterValues) {
+    // Process-wide singleton, closed by RTP shutdown.
+    //noinspection resource
     Collection<PhysicalTriggerSpec> triggers = PhysicalTriggerManager.instance().getTriggers();
     if (triggers.isEmpty()) {
       RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] No physical triggers registered.");

@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jetbrains.annotations.NotNull;
 import java.util.function.IntUnaryOperator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,13 +193,14 @@ class PregenTaskTerrainRecheckTest {
     // Picks the centre column of the candidate chunk at its floor; terrain is read by the recheck.
     vert = new LinearAdjustor(new ArrayList<>()) {
       @Override
-      public RTPCoords adjust(RTPChunk input) {
+      public RTPCoords adjust(@NotNull RTPChunk input) {
         int wx = input.x() * 16 + 8;
         return new RTPCoords(world.name(), wx, world.floor.applyAsInt(wx), input.z() * 16 + 8);
       }
 
       @Override
-      public RTPCoords adjustFromProbe(io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe, String w) {
+      public RTPCoords adjustFromProbe(
+          @NotNull io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe, @NotNull String w) {
         int wx = probe.chunkX() * 16 + 8;
         return new RTPCoords(w, wx, world.floor.applyAsInt(wx), probe.chunkZ() * 16 + 8);
       }

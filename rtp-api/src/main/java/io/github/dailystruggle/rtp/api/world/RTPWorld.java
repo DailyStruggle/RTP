@@ -449,8 +449,8 @@ public abstract class RTPWorld<T> {
    * @return the job's result, {@code null} when this world has no Anvil store (job not run), or
    *     exceptionally with the job's failure
    */
-  public <T> CompletableFuture<T> probeChunkSquare(int cx, int cz, int minY, int maxY,
-      java.util.function.Function<io.github.dailystruggle.rtp.anvil.ChunkSquare, T> job) {
+  public <R> CompletableFuture<R> probeChunkSquare(int cx, int cz, int minY, int maxY,
+      java.util.function.Function<io.github.dailystruggle.rtp.anvil.ChunkSquare, R> job) {
     return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.squareJobAsync(
         anvilWorldFolder(), anvilDimensionSubpath(), cx, cz, minY, maxY, job);
   }

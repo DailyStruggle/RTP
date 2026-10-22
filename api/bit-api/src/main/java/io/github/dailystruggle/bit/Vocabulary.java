@@ -57,7 +57,7 @@ public final class Vocabulary {
                 best = entry.getValue();
             }
         }
-        return bestDistance <= maxDistance ? Optional.of(best) : Optional.empty();
+        return bestDistance <= maxDistance ? Optional.ofNullable(best) : Optional.empty();
     }
 
     private static String normalize(String value) {

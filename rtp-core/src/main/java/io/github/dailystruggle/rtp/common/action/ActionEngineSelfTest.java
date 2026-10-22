@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 /** SAFE initiated test of bundled action definitions through the real parser, gates, and session. */
 public final class ActionEngineSelfTest {
@@ -144,7 +145,7 @@ public final class ActionEngineSelfTest {
     if (value == null) return List.of();
     if (value instanceof String string) {
       if (string.isBlank()) return List.of();
-      return List.of(string.split(",", -1)).stream().map(String::trim).toList();
+      return Stream.of(string.split(",", -1)).map(String::trim).toList();
     }
     if (!(value instanceof List<?> values)) return null;
     List<String> result = new ArrayList<>(values.size());

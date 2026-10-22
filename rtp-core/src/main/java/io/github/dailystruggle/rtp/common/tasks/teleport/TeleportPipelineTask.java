@@ -1571,14 +1571,12 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         // includes queue-wait time and would false-positive; their degradation signal is the
         // queue-growth audit (section 2b). The counter/WARN live on CoreMetrics; the audit is opt-out
         // (slowPipelineThresholdMs <= 0 disables) and never aborts cleanup (S-004 posture).
-        if (immediateTeleport
-                && CoreMetrics.instance() instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {
+        if (immediateTeleport) {
           UUID auditId = (context != null && context.player() != null)
                   ? context.player().uuid() : null;
           String auditCtx = "player=" + auditId
                   + " region=" + (region != null ? region.name : "null");
-          ((io.github.dailystruggle.rtp.common.metrics.CoreMetrics) CoreMetrics.instance())
-                  .auditImmediateTeleport(elapsedMs, auditCtx);
+          CoreMetrics.instance().auditImmediateTeleport(elapsedMs, auditCtx);
         }
       } catch (Throwable ignored) {
         // intentionally swallowed: metrics must not interfere with teardown.

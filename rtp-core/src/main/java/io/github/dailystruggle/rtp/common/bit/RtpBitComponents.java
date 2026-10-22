@@ -28,13 +28,13 @@ public final class RtpBitComponents {
             COMPONENT_TIMEOUT_MILLIS, ActionCbitCounters::report);
     private static final BitComponent ANVIL_ZSTD = anvilComponent("anvil-zstd",
             () -> bitReport("anvil-zstd",
-                    io.github.dailystruggle.rtp.anvil.DynamicZstdBinding.INSTANCE.asBit()));
+                    io.github.dailystruggle.rtp.anvil.DynamicZstdBinding.INSTANCE));
     private static final BitComponent ANVIL_LINEAR = anvilComponent("anvil-linear",
             () -> bitReport("anvil-linear",
-                    io.github.dailystruggle.rtp.anvil.LinearRegionReader.INSTANCE.asBit()));
+                    io.github.dailystruggle.rtp.anvil.LinearRegionReader.INSTANCE));
     private static final BitComponent ANVIL_FORMAT_DETECTOR = anvilComponent("anvil-format-detector",
             () -> bitReport("anvil-format-detector",
-                    io.github.dailystruggle.rtp.anvil.RegionFormatDetector.INSTANCE.asBit()));
+                    io.github.dailystruggle.rtp.anvil.RegionFormatDetector.INSTANCE));
 
     private static final List<BitComponent> DEFAULTS = List.of(
             ACTION_DEFINITIONS, ANVIL_ZSTD, ANVIL_LINEAR, ANVIL_FORMAT_DETECTOR);

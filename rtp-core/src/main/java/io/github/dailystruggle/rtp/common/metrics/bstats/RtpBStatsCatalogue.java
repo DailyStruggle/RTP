@@ -446,9 +446,7 @@ public final class RtpBStatsCatalogue {
     /** Point-in-time p99 of host MSPT from the core snapshot ring; NaN when unavailable. */
     public static double msptP99Ms() {
         try {
-            if (CoreMetrics.instance() instanceof CoreMetrics) {
-                return percentile(((CoreMetrics) CoreMetrics.instance()).snapshotRing().msptSnapshot(), 0.99);
-            }
+            return percentile(CoreMetrics.instance().snapshotRing().msptSnapshot(), 0.99);
         } catch (Throwable ignored) {
             // fall through to NaN
         }

@@ -92,6 +92,7 @@ public class OnWorldLoadUnload implements Listener {
         String worldName = event.getWorld().getName();
 
         // 1. Remove the world's parser from MultiConfigParser internal maps
+        @SuppressWarnings("unchecked")
         MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) ActiveConfigs.get().multiConfigParserMap.get(WorldKeys.class);
         if (worldParsers != null) {
             worldParsers.removeParser(worldName);

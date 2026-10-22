@@ -74,7 +74,7 @@ public final class OnPlayerMove implements Listener {
    */
   static double movedSquared(
       RTPCoords origin, String worldName, double x, double y, double z, boolean horizontalOnly) {
-    if (worldName == null || !origin.worldName().equals(worldName)) return Double.MAX_VALUE;
+    if (!origin.worldName().equals(worldName)) return Double.MAX_VALUE;
     double dx = origin.x() - x;
     double dy = horizontalOnly ? 0 : origin.y() - y;
     double dz = origin.z() - z;

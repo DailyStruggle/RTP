@@ -48,10 +48,8 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
               CMD_PERMISSION, "action ID to cancel (omit for all)", (uuid, s) -> true) {
             @Override
             public Set<String> values() {
-              ActionService service = RTPAPI.actions();
-              if (service == null && ActionServices.actionManager() != null) {
-                service = ActionServices.actionManager();
-              }
+              // actions() throws before core loads; fall back to the core manager.
+              ActionService service = RTPAPI.hasActions() ? RTPAPI.actions() : ActionServices.actionManager();
               return (service != null) ? service.getActionIds() : Collections.emptySet();
             }
           });
@@ -96,10 +94,7 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
 
     RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
 
-    ActionService actionService = RTPAPI.actions();
-    if (actionService == null && ActionServices.actionManager() != null) {
-      actionService = ActionServices.actionManager();
-    }
+    ActionService actionService = RTPAPI.hasActions() ? RTPAPI.actions() : ActionServices.actionManager();
 
     if (actionService == null) {
       RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Action service is unavailable.");

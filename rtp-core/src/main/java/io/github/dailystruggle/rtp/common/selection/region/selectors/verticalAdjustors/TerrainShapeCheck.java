@@ -266,27 +266,26 @@ public final class TerrainShapeCheck {
     double g = planeGrade(r, lx, lz, y, minY, maxY);
     boolean planeKnown = !Double.isNaN(g);
     if (planeKnown && g >= tanMax) return new Verdict(0, measured, g, true);
-    // undecided: measured directions that may still turn steep; open[i]: 32-block sample pending.
+    // undecided: measured directions that may still turn steep; far[i]: 32-block sample pending.
     int steep = 0, undecided = measured;
-    boolean[] open = far;
     for (int k = 1; k <= 2; k++) {
       for (int i = 0; i < DIRECTIONS; i++) {
-        if (k == 1 ? !near[i] : !open[i]) continue;
+        if (k == 1 ? !near[i] : !far[i]) continue;
         if (!r.readable(x0 + DIRS[i][0] * 16 * k, z0 + DIRS[i][1] * 16 * k)) {
-          if (k == 2) open[i] = false;
-          if (k == 2 || !open[i]) {
+          if (k == 2) far[i] = false;
+          if (k == 2 || !far[i]) {
             undecided--;
             if (!nearRead[i]) measured--;
           }
         } else if (isSteep(r, x0, z0, i, k, y, tanMax, minY, maxY)) {
           steep++;
           undecided--;
-          open[i] = false;
+          far[i] = false;
         } else {
           if (k == 1) nearRead[i] = true;
-          if (k == 2 || !open[i]) {
+          if (k == 2 || !far[i]) {
             undecided--;
-            open[i] = false;
+            far[i] = false;
           }
         }
         if (steep * 2 >= measured || (steep + undecided) * 2 < measured) {

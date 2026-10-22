@@ -6,7 +6,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Small, YAML-library-independent validators for map-shaped configuration.
@@ -66,7 +65,7 @@ public final class MapValidator {
             if (!allowed.contains(key)) {
                 findings.add(new BitFinding(Level.ERROR, code, source, path.key(key).toString(),
                         "Unknown " + allowed.name() + " value: " + key,
-                        allowed.values().stream().collect(Collectors.joining(", ")),
+                        String.join(", ", allowed.values()),
                         allowed.suggest(key).orElse("")));
             }
         }
