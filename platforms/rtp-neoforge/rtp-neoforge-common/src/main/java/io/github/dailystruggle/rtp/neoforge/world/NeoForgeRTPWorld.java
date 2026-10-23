@@ -499,7 +499,9 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public boolean isChunkLoaded(int cx, int cz) {
         try {
-            ServerChunkCache cache = world.getChunkSource();
+            ServerLevel level = world;
+            if (level == null) return false;
+            ServerChunkCache cache = level.getChunkSource();
             return cache != null && cache.hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;

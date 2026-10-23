@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.anvil;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,6 +87,9 @@ class ChunkDecodeCostBenchmarkTest {
         n++;
       }
       if (pass == 1) {
+        assertTrue(bytes > 0, "benchmark must decode chunk bytes");
+        assertTrue(hashNs >= 0, "hash timing must be non-negative");
+        for (long bucket : ns) assertTrue(bucket >= 0, "timing buckets must be non-negative");
         double k = 1e3 * picks.size();
         System.out.printf("%n[DEBUG_LOG] === ADR-120 CHUNK DECODE COST (%s, %d chunks, zlib/LZ4) ===%n", regionDir,
             picks.size());

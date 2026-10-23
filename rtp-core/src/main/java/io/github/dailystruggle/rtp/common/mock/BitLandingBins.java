@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.mock;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -83,6 +84,33 @@ public final class BitLandingBins {
             double[] values = new double[counts.length];
             for (int i = 0; i < counts.length; i++) values[i] = counts[i];
             return values;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) return true;
+            if (!(other instanceof Bins bins)) return false;
+            return width == bins.width
+                    && height == bins.height
+                    && Arrays.equals(counts, bins.counts)
+                    && minX == bins.minX
+                    && maxX == bins.maxX
+                    && minZ == bins.minZ
+                    && maxZ == bins.maxZ
+                    && sampleCount == bins.sampleCount;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(width, height, minX, maxX, minZ, maxZ, sampleCount);
+            return 31 * result + Arrays.hashCode(counts);
+        }
+
+        @Override
+        public String toString() {
+            return "Bins[width=" + width + ", height=" + height + ", counts=" + Arrays.toString(counts)
+                    + ", minX=" + minX + ", maxX=" + maxX + ", minZ=" + minZ + ", maxZ=" + maxZ
+                    + ", sampleCount=" + sampleCount + "]";
         }
     }
 }

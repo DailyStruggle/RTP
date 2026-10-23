@@ -35,14 +35,19 @@ class BitRunnerTest {
         BitComponent safe = component("safe", "actions", BitSideEffect.SAFE, () -> healthy());
         BitComponent world = component("world", "actions", BitSideEffect.NEEDS_WORLD, () -> healthy());
         BitComponent mutating = component("mutating", "other", BitSideEffect.MUTATING, () -> healthy());
+        BitComponent pbit = new BitComponent("pbit", "diagnostics", BitTier.PBIT, BitSideEffect.SAFE, 1_000,
+                () -> healthy());
         runner.register(safe);
         runner.register(world);
         runner.register(mutating);
+        runner.register(pbit);
 
         List<BitResult> group = runner.run(BitSelector.parse("subsystem:actions"), DIRECT);
         assertEquals(List.of("safe"), group.stream().map(result -> result.component().id()).toList());
-        assertEquals(1, runner.run(BitSelector.parse("all"), DIRECT).size());
+        assertEquals(2, runner.run(BitSelector.parse("all"), DIRECT).size());
         assertEquals("mutating", runner.run(BitSelector.parse("mutating"), DIRECT).get(0).component().id());
+        assertEquals(List.of("pbit"), runner.run(BitSelector.parse("tier:pbit"), DIRECT).stream()
+                .map(result -> result.component().id()).toList());
     }
 
     @Test
@@ -60,7 +65,9 @@ class BitRunnerTest {
         assertEquals(List.of(component), runner.components());
         assertTrue(runner.unregister("probe"));
         assertFalse(runner.unregister("probe"));
+        assertFalse(runner.unregister(null));
         assertNull(runner.last("probe"));
+        assertNull(runner.last(null));
         assertTrue(runner.components().isEmpty());
     }
 
@@ -75,6 +82,25 @@ class BitRunnerTest {
         assertEquals(BitHealth.FAILED, result.report().health());
         assertEquals("BIT_COMPONENT_THROWN", result.report().findings().get(0).code());
         assertTrue(result.report().findings().get(0).message().contains("probe exploded"));
+
+        BitComponent withoutMessage = component("no-message", "test", BitSideEffect.SAFE,
+                () -> { throw new IllegalStateException(); });
+        BitResult fallback = runner.run(withoutMessage, DIRECT);
+        assertEquals("java.lang.IllegalStateException", fallback.report().findings().get(0).message());
+
+    }
+
+    @Test
+    void interruptedWaitBecomesFindingAndRestoresInterruptStatus() {
+        BitComponent component = component("interrupted", "test", BitSideEffect.SAFE, () -> healthy());
+        try {
+            Thread.currentThread().interrupt();
+            BitResult result = new BitRunner().run(component, ignored -> {});
+            assertEquals("BIT_COMPONENT_THROWN", result.report().findings().get(0).code());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test
@@ -125,19 +151,25 @@ class BitRunnerTest {
         BitResult result = runner.run(component, DIRECT);
         List<String> text = new ArrayList<>();
         List<String> json = new ArrayList<>();
+        BitFinding finding = new BitFinding(Level.WARNING, "NOTE", "output", "path", "message", "", "");
+        BitResult withFinding = new BitResult(component, BitReport.of(List.of(finding)), 1, 1);
 
         BitOutputs.text("[RTP test/status] ").write(result, text::add);
+        BitOutputs.text("[RTP test/status] ").write(withFinding, text::add);
         BitOutputs.text("[RTP test/status] ").writeNotRun(component, text::add);
         BitOutputs.json("[RTP bit/test.").write(result, json::add);
         BitOutputs.json("[RTP bit/test.").writeNotRun(component, json::add);
         BitOutputs.text("[RTP test/status] ").writeEmpty("all", text::add);
+        BitOutputs.json("[RTP bit/test.").writeEmpty("none", json::add);
 
         assertTrue(text.get(0).contains("health=HEALTHY"));
-        assertTrue(text.get(1).contains("status=NOT_RUN"));
-        assertTrue(text.get(2).contains("no components"));
+        assertTrue(text.stream().anyMatch(line -> line.contains(" NOTE ")));
+        assertTrue(text.stream().anyMatch(line -> line.contains("status=NOT_RUN")));
+        assertTrue(text.stream().anyMatch(line -> line.contains("no components")));
         assertTrue(json.get(0).startsWith("[RTP bit/test.probe] "));
         assertTrue(json.get(0).contains("\"component\":\"probe\""));
         assertTrue(json.get(1).contains("\"status\":\"NOT_RUN\""));
+        assertTrue(json.get(2).contains("\"status\":\"NO_COMPONENTS\""));
         assertFalse(json.get(0).contains("[RTP test/"));
         assertNotNull(result.toJson());
     }

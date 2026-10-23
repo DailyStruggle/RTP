@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -91,6 +92,7 @@ class ConfigImportCmdExtendedTest {
     Path sourceDir = rtpDir.getParent().resolve("PbitRejectSource");
     Files.createDirectories(sourceDir);
     Files.writeString(sourceDir.resolve("config.yml"), "source: test\n");
+    List<Path> importerDestinations = new ArrayList<>();
     Path destinationConfig = rtpDir.resolve("config.yml");
     String originalConfig = Files.exists(destinationConfig) ? Files.readString(destinationConfig) : null;
 
@@ -107,6 +109,7 @@ class ConfigImportCmdExtendedTest {
 
       @Override
       public ImportResult importConfiguration(Path sourcePluginDir, Path destinationDir, boolean overwrite) {
+        importerDestinations.add(destinationDir);
         Path target = destinationDir.resolve("config.yml");
         try {
           Files.createDirectories(target.getParent());
@@ -127,6 +130,9 @@ class ConfigImportCmdExtendedTest {
     );
 
     assertTrue(cmd.onCommand(UUID.randomUUID(), params, null));
+    assertEquals(1, importerDestinations.size());
+    assertTrue(importerDestinations.get(0).startsWith(rtpDir.resolve("cache")),
+        "Import staging must stay under the RTP data directory cache");
 
     if (originalConfig == null) {
       assertFalse(Files.exists(destinationConfig), "Rejected importer output must not create config.yml");

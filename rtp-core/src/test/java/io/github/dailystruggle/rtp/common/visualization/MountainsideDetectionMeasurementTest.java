@@ -1,5 +1,9 @@
 package io.github.dailystruggle.rtp.common.visualization;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
 import io.github.dailystruggle.rtp.anvil.AnvilPrefilter;
 import io.github.dailystruggle.rtp.anvil.AnvilReader;
@@ -96,6 +100,8 @@ public class MountainsideDetectionMeasurementTest {
         MIN_STEEP_DIRS, t30, 100.0 * t30 / n, t45, 100.0 * t45 / n);
     long[] hist = new long[9];
     for (int i = 0; i < truthSteep.length; i++) if (truthGrid.y[i] != NONE) hist[truthSteep[i]]++;
+    assertEquals(n, Arrays.stream(hist).sum(), "histogram must cover every readable chunk");
+    assertTrue(t45 <= t30, "45-degree mountainsides must be a subset of 30-degree mountainsides");
     StringBuilder sb = new StringBuilder();
     for (int k = 0; k <= 8; k++) sb.append(String.format(" %d:%.1f%%", k, 100.0 * hist[k] / n));
     System.out.printf("[DEBUG_LOG] steep-direction histogram (truth, 30deg):%s%n", sb);
@@ -122,6 +128,8 @@ public class MountainsideDetectionMeasurementTest {
       }
     }
 
+    assertNotNull(idwImage, "expected IDW comparison image");
+    assertNotNull(planeImage, "expected plane-fit comparison image");
     boolean[][] biomePanels = biomeComparison(truthGrid, truth, truthSteep);
     BufferedImage bimg = render(truthGrid, truth, biomePanels[0], biomePanels[1], new String[] {
         "Truth: >=30deg toward >=4/8 neighbours, all chunks",
@@ -374,7 +382,8 @@ public class MountainsideDetectionMeasurementTest {
       for (int gx = 0; gx < w; gx++) {
         int i = gz * w + gx;
         if (y[i] == NONE) continue;
-        double n = 0, sx = 0, sz = 0, sy = 0, sxx = 0, szz = 0, sxz = 0, sxy = 0, szy = 0;
+        int n = 0;
+        double sx = 0, sz = 0, sy = 0, sxx = 0, szz = 0, sxz = 0, sxy = 0, szy = 0;
         for (int dz = -r; dz <= r; dz++) {
           int nz = gz + dz;
           if (nz < 0 || nz >= h) continue;

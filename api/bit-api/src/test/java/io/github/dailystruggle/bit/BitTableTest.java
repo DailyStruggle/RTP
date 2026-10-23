@@ -1,6 +1,7 @@
 package io.github.dailystruggle.bit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -44,10 +45,31 @@ class BitTableTest {
         BitTable.Row notRun = BitTable.rows(component, null).get(0);
         assertEquals("NOT_RUN", notRun.cells().get(BitTable.HEALTH));
 
+        BitReport empty = BitReport.of(List.of());
+        BitTable.Row completed = BitTable.rows(component, new BitResult(component, empty, 1, 1)).get(0);
+        assertEquals("HEALTHY", completed.cells().get(BitTable.HEALTH));
+
         BitFinding finding = new BitFinding(Level.WARNING, "TEST_NOTE", "test", "a", "line one\nline two", "", "");
         BitReport report = BitReport.of(List.of(finding));
         BitTable.Row row = BitTable.rows(component, new BitResult(component, report, 1, 1)).get(0);
         assertEquals("line one line two", row.cells().get(BitTable.MESSAGE));
+    }
+
+    @Test
+    void csvQuotesWhitespaceAndQuoteOnlyCells() {
+        BitComponent component = component("accessor");
+        BitReport report = BitReport.of(List.of(
+                new BitFinding(Level.WARNING, "NOTE", "test", " padded ", "say \"go\"", "", ""),
+                new BitFinding(Level.WARNING, "NOTE", "test", "trailing ", "plain", "", "")));
+
+        List<String> rendered = BitTable.render(
+                BitTable.rows(component, new BitResult(component, report, 1, 1)),
+                List.of(BitTable.PATH, BitTable.MESSAGE),
+                BitTable.Decorator.NONE);
+
+        assertTrue(rendered.stream().anyMatch(line -> line.contains("\" padded \"")));
+        assertTrue(rendered.stream().anyMatch(line -> line.contains("\"trailing \"")));
+        assertTrue(rendered.stream().anyMatch(line -> line.contains("\"say \"\"go\"\"\"")));
     }
 
     @Test

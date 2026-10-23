@@ -348,7 +348,7 @@ public final class TerrainShapeCheck {
           missing++;
           continue;
         }
-        double v = f - y;
+        double v = (double) f - y;
         sx += dx;
         sz += dz;
         sy += v;
@@ -361,7 +361,7 @@ public final class TerrainShapeCheck {
     }
     if (pts < outside) return Double.NaN;
     if (missing * 4 > pts) return Double.POSITIVE_INFINITY;
-    double n = pts - missing;
+    double n = (double) pts - missing;
     double cxx = sxx - sx * sx / n, czz = szz - sz * sz / n, cxz = sxz - sx * sz / n;
     double cxy = sxy - sx * sy / n, czy = szy - sz * sy / n;
     double det = cxx * czz - cxz * cxz;

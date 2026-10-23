@@ -20,7 +20,7 @@ public record BitCode(
         String messageKey,
         String remediation) {
 
-    static final Pattern KEY_PATTERN = Pattern.compile("[A-Z][A-Z0-9]*(_[A-Z0-9]+)*");
+    static final Pattern KEY_PATTERN = Pattern.compile("[A-Z][A-Z0-9]*+(?:_[A-Z0-9]++)*+");
 
     public BitCode {
         if (id < 1) throw new IllegalArgumentException("id must be positive: " + id);

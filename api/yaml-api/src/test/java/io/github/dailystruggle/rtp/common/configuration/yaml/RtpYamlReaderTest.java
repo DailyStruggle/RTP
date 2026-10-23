@@ -322,12 +322,30 @@ class RtpYamlReaderTest {
                 + "  two\n"
                 + "\n"
                 + "  three\n"
+                + "foldedLeadingBlankLines: >-\n"
+                + "\n"
+                + "\n"
+                + "  start\n"
+                + "foldedIndented: >-\n"
+                + "  normal\n"
+                + "   indented\n"
+                + "  final\n"
                 + "stripped: |-\n"
                 + "  last\n"
                 + "clipped: |\n"
                 + "  last\n"
                 + "kept: |+2\n"
                 + "  last\n"
+                + "\n"
+                + "foldedBlankLines: >-\n"
+                + "  alpha\n"
+                + "\n"
+                + "\n"
+                + "  beta\n"
+                + "foldedKeep: >+\n"
+                + "  red\n"
+                + "  blue\n"
+                + "\n"
                 + "\n"
                 + "explicit: |2-\n"
                 + "  exact\n"
@@ -342,9 +360,13 @@ class RtpYamlReaderTest {
         assertEquals("first\n---\n# body comment\n\tdata\n",
                 ((RtpYamlScalar) root.get("literal")).rawValue());
         assertEquals("one two\nthree", ((RtpYamlScalar) root.get("folded")).rawValue());
+        assertEquals("\n\nstart", ((RtpYamlScalar) root.get("foldedLeadingBlankLines")).rawValue());
+        assertEquals("normal\n indented\nfinal", ((RtpYamlScalar) root.get("foldedIndented")).rawValue());
         assertEquals("last", ((RtpYamlScalar) root.get("stripped")).rawValue());
         assertEquals("last\n", ((RtpYamlScalar) root.get("clipped")).rawValue());
         assertEquals("last\n\n", ((RtpYamlScalar) root.get("kept")).rawValue());
+        assertEquals("alpha\n\nbeta", ((RtpYamlScalar) root.get("foldedBlankLines")).rawValue());
+        assertEquals("red blue\n\n\n", ((RtpYamlScalar) root.get("foldedKeep")).rawValue());
         assertEquals("exact", ((RtpYamlScalar) root.get("explicit")).rawValue());
         RtpYamlSequence items = (RtpYamlSequence) root.get("items");
         assertEquals("sequence\nvalue\n", ((RtpYamlScalar) items.get(0)).rawValue());

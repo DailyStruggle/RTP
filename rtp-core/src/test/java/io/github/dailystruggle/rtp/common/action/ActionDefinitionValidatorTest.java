@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -175,7 +176,8 @@ class ActionDefinitionValidatorTest {
     void externalScoreboardObjectiveIsWarningOnlyWhenAccessorConfirmsAbsence() {
         Map<String, Object> definition = Map.of("gate", List.of(Map.of("scoreboard", Map.of(
                 "objective", "external_objective", "matches", "1..5"))));
-        var environment = new ActionDefinitionValidator.Environment(ignored -> false, Set.of(), null);
+        var environment = new ActionDefinitionValidator.Environment(
+                ignored -> Optional.of(false), Set.of(), null);
 
         BitReport report = ActionDefinitionValidator.validate("koth", definition, "koth.yml", environment);
 

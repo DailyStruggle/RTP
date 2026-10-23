@@ -22,7 +22,9 @@ public interface RegionTaskDispatcher {
   /** Used until the composition root installs a dispatcher: no scan resume, teleports throw. */
   RegionTaskDispatcher NONE = new RegionTaskDispatcher() {
     @Override
-    public void resumeScan(Region region) {}
+    public void resumeScan(Region region) {
+      // No scan can be resumed before the composition root installs the dispatcher.
+    }
 
     @Override
     public void dispatchTeleport(TeleportData data, GenerationContext context, Region region,
