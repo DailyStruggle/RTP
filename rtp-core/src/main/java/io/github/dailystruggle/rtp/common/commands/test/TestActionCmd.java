@@ -82,7 +82,7 @@ public class TestActionCmd extends BaseRTPCmdImpl {
       }
     }
     String[] normalized = args;
-    if (i < args.length && args[i] != null && !args[i].contains("=") && !args[i].contains(":")) {
+    if (i < args.length && !args[i].contains("=") && !args[i].contains(":")) {
       normalized = args.clone();
       normalized[i] = "id=" + normalized[i];
     }
