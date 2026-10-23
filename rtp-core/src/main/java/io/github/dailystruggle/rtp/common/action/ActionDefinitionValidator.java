@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -97,7 +98,8 @@ public final class ActionDefinitionValidator {
     private static final Set<String> SCALAR_EXPRESSION_GATES = Set.of("players", "participants", "queue", "participantcount");
 
     /** Live inputs are optional: an unavailable host/region snapshot is deliberately not treated as missing. */
-    public record Environment(Function<String, Boolean> objectiveLookup, Set<String> regionNames, Path pluginDirectory) {
+    public record Environment(
+            Function<String, Optional<Boolean>> objectiveLookup, Set<String> regionNames, Path pluginDirectory) {
         public static final Environment NONE = new Environment(null, Set.of(), null);
 
         public Environment {
@@ -415,7 +417,8 @@ public final class ActionDefinitionValidator {
                     String.join(", ", ActionSessionImpl.MANAGED_OBJECTIVES.values()), suggestion));
             return;
         }
-        if (environment.objectiveLookup() != null && Boolean.FALSE.equals(environment.objectiveLookup().apply(objective))) {
+        if (environment.objectiveLookup() != null
+                && Optional.of(false).equals(environment.objectiveLookup().apply(objective))) {
             findings.add(BitFinding.of(SCOREBOARD_OBJECTIVE_MISSING, source, path.toString(),
                     "Scoreboard objective is absent: " + objective, "an existing scoreboard objective", ""));
         }

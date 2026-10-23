@@ -46,13 +46,13 @@ class ProbeComponentsTest {
 
   @Test
   void everySchedulerAndEventFailureHasARegisteredFinding() throws Exception {
-    assertAllCodesFail(TestSchedulerCmd.class, "TEST_SCHEDULER_UNAVAILABLE");
-    assertAllCodesFail(TestEventsCmd.class, "TEST_EVENTS_THREW");
+    assertAllCodesFail(TestSchedulerCmd.class, TestSchedulerCmd.Result.class, "TEST_SCHEDULER_UNAVAILABLE");
+    assertAllCodesFail(TestEventsCmd.class, TestEventsCmd.Result.class, "TEST_EVENTS_THREW");
   }
 
   @Test
   void unavailableSchedulerMapsOnlyItsUnavailableFinding() throws Exception {
-    Object probe = failingResult(TestSchedulerCmd.class);
+    Object probe = failingResult(TestSchedulerCmd.Result.class);
     Field available = probe.getClass().getDeclaredField("available");
     available.setAccessible(true);
     available.setBoolean(probe, false);
@@ -90,8 +90,9 @@ class ProbeComponentsTest {
     }
   }
 
-  private static void assertAllCodesFail(Class<?> owner, String... excludedKeys) throws Exception {
-    BitReport report = toBitReport(owner, failingResult(owner));
+  private static void assertAllCodesFail(Class<?> owner, Class<?> resultType, String... excludedKeys)
+      throws Exception {
+    BitReport report = toBitReport(owner, failingResult(resultType));
     List<Integer> expected = codes(owner).stream()
         .filter(code -> Arrays.stream(excludedKeys).noneMatch(key -> key.equals(code.key())))
         .map(BitCode::id)
@@ -125,11 +126,7 @@ class ProbeComponentsTest {
         .toList();
   }
 
-  private static Object failingResult(Class<?> owner) throws Exception {
-    Class<?> resultType = Arrays.stream(owner.getDeclaredClasses())
-        .filter(type -> type.getSimpleName().equals("Result"))
-        .findFirst()
-        .orElseThrow(() -> new NoSuchFieldException(owner.getName() + "$Result"));
+  private static Object failingResult(Class<?> resultType) throws Exception {
     Constructor<?> constructor = resultType.getDeclaredConstructor();
     constructor.setAccessible(true);
     Object result = constructor.newInstance();

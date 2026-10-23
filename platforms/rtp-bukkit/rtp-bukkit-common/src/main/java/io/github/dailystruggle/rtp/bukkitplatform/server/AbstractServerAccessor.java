@@ -344,11 +344,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public Boolean hasScoreboardObjective(String objective) {
-    if (objective == null || objective.isBlank()) return null;
+  public Optional<Boolean> hasScoreboardObjective(String objective) {
+    if (objective == null || objective.isBlank()) return Optional.empty();
     org.bukkit.scoreboard.ScoreboardManager manager = Bukkit.getScoreboardManager();
-    if (manager == null) return null;
-    return manager.getMainScoreboard().getObjective(objective) != null;
+    if (manager == null) return Optional.empty();
+    return Optional.of(manager.getMainScoreboard().getObjective(objective) != null);
   }
 
   @Override

@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.visualization;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import io.github.dailystruggle.rtp.anvil.AnvilPrefilter;
 import io.github.dailystruggle.rtp.anvil.AnvilReader;
@@ -116,6 +118,9 @@ class TerrainSquareProbeBenchmarkTest {
         rejected += rej;
       }
     }
+    assertTrue(candidates > 0, "benchmark must process candidates");
+    assertTrue(passed <= candidates, "prefilter passes cannot exceed candidates");
+    assertTrue(rejected <= passed, "terrain rejects cannot exceed prefilter passes");
     long decodes = AnvilPrefilter.squareJobDecodes() - decodes0;
     if (!print) return;
     System.out.printf("[DEBUG_LOG] %-13s %8.1f us/candidate | square decodes %5.2f/candidate %5.2f/square job"

@@ -166,6 +166,9 @@ class ProjectTreeTest(unittest.TestCase):
 
 
 class AffectedSetsTest(unittest.TestCase):
+    def test_server_api_belongs_to_core_set(self):
+        self.assertEqual(ci_scope.set_of("server-api"), "core")
+
     def test_core_change_flags_dependents_not_helpers(self):
         self.assertEqual(flags(["rtp-core/src/main/java/A.java"]),
                          {"core", "bukkit", "neoforge", "plugin", "addons"})

@@ -18,6 +18,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Level;
@@ -277,7 +278,9 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             sendMessage(callerId, "&7[RTP] Importing from &f" + finalSourceDir.getFileName() + "&7 (overwrite=" + finalOverwrite + ")...");
             Path stagingDir = null;
             try {
-                stagingDir = java.nio.file.Files.createTempDirectory("rtp-config-import-");
+                Path cacheDir = destinationDir.resolve("cache");
+                Files.createDirectories(cacheDir);
+                stagingDir = Files.createTempDirectory(cacheDir, "config-import-");
                 copyYamlSnapshot(ConfigSnapshot.read(destinationDir), stagingDir);
                 ImportResult stagedResult = finalImporter.importConfiguration(finalSourceDir, stagingDir, finalOverwrite);
 

@@ -87,8 +87,8 @@ class PluginProbeComponentsTest {
 
   @Test
   void disconnectAndSafetyFailuresMapToEveryRegisteredCode() throws Exception {
-    assertEveryCodeFails(DisconnectTestJob.class);
-    assertEveryCodeFails(SafetyVerifierTestJob.class);
+    assertEveryCodeFails(DisconnectTestJob.class, DisconnectTestJob.Result.class);
+    assertEveryCodeFails(SafetyVerifierTestJob.class, SafetyVerifierTestJob.Result.class);
   }
 
   @Test
@@ -175,8 +175,8 @@ class PluginProbeComponentsTest {
     }
   }
 
-  private static void assertEveryCodeFails(Class<?> owner) throws Exception {
-    Object probe = probeResult(owner);
+  private static void assertEveryCodeFails(Class<?> owner, Class<?> resultType) throws Exception {
+    Object probe = probeResult(resultType);
     BitReport report = toBitReport(owner, probe);
     List<Integer> expected = codes(owner).stream().map(BitCode::id).sorted().toList();
     List<Integer> actual = report.findings().stream().map(finding -> finding.codeId()).sorted().toList();
@@ -207,11 +207,7 @@ class PluginProbeComponentsTest {
         .toList();
   }
 
-  private static Object probeResult(Class<?> owner) throws Exception {
-    Class<?> resultType = Arrays.stream(owner.getDeclaredClasses())
-        .filter(type -> type.getSimpleName().equals("Result"))
-        .findFirst()
-        .orElseThrow(() -> new NoSuchFieldException(owner.getName() + "$Result"));
+  private static Object probeResult(Class<?> resultType) throws Exception {
     Constructor<?> constructor = resultType.getDeclaredConstructor();
     constructor.setAccessible(true);
     Object result = constructor.newInstance();

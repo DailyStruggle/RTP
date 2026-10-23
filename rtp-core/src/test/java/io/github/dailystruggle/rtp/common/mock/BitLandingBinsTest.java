@@ -38,6 +38,19 @@ class BitLandingBinsTest {
         assertEquals(2, bins.sampleCount());
     }
 
+    @Test
+    void binsUseValueSemanticsForCounts() {
+        BitLandingBins.Bins first =
+                BitLandingBins.bin(List.of(landing(7, -4), landing(7, -4)), 1, 1);
+        BitLandingBins.Bins second =
+                BitLandingBins.bin(List.of(landing(7, -4), landing(7, -4)), 1, 1);
+
+        assertEquals(first, second);
+        assertEquals(first.hashCode(), second.hashCode());
+        assertEquals("Bins[width=1, height=1, counts=[2], minX=7, maxX=7, minZ=-4, maxZ=-4, sampleCount=2]",
+                first.toString());
+    }
+
     private static MockTeleportRecord landing(int x, int z) {
         return new MockTeleportRecord(UUID.randomUUID(), "world", x, 64, z, "default", 3, 125, 1);
     }

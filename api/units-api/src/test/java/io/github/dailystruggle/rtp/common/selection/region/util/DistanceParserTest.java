@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,6 +57,9 @@ class DistanceParserTest {
     assertEquals(256.0, parsed.magnitude());
     assertEquals(SpatialUnit.CHUNK, parsed.unit());
     assertEquals(4096.0, parsed.toBlocks(), 0.001);
+    assertEquals(256.0, parsed.toChunks(), 0.001);
+    assertEquals(8.0, parsed.toRegions(), 0.001);
+    assertEquals(SpatialUnit.BLOCK, DistanceParser.parse("3", null).unit());
   }
 
   @Test
@@ -67,6 +72,10 @@ class DistanceParserTest {
     DistanceParser.ParsedDistance reinterpreted = DistanceParser.autoInterpret(parsed, 10000.0, "test radius");
     assertEquals(SpatialUnit.REGION, reinterpreted.unit());
     assertEquals(2048.0, reinterpreted.toBlocks(), 0.001);
+
+    List<String> messages = new ArrayList<>();
+    DistanceParser.autoInterpret(parsed, 10_000.0, null, messages::add);
+    assertTrue(messages.get(0).contains("distance '4'"));
   }
 
   @Test
@@ -89,5 +98,30 @@ class DistanceParserTest {
     DistanceParser.ParsedDistance reinterpreted = DistanceParser.autoInterpret(parsed, 10000.0, "test radius");
     assertEquals(SpatialUnit.BLOCK, reinterpreted.unit());
     assertEquals(4.0, reinterpreted.toBlocks(), 0.001);
+  }
+
+  @Test
+  void testLargeChunkDefaultAndInvalidInputs() {
+    assertNull(DistanceParser.parse(null, SpatialUnit.BLOCK));
+    assertNull(DistanceParser.parse("not-a-number", SpatialUnit.BLOCK));
+    assertNull(DistanceParser.parse("10unknownunit", SpatialUnit.BLOCK));
+
+    DistanceParser.ParsedDistance parsed = DistanceParser.parse("1000", SpatialUnit.CHUNK);
+    List<String> messages = new ArrayList<>();
+    DistanceParser.ParsedDistance reinterpreted =
+        DistanceParser.autoInterpret(parsed, 10_000, "test radius", messages::add);
+
+    assertEquals(SpatialUnit.BLOCK, reinterpreted.unit());
+    assertEquals(1000.0, reinterpreted.toBlocks(), 0.001);
+    assertEquals(1, messages.size());
+
+    DistanceParser.ParsedDistance zero = DistanceParser.parse("0", SpatialUnit.BLOCK);
+    DistanceParser.ParsedDistance negative = DistanceParser.parse("-4", SpatialUnit.BLOCK);
+    assertNull(DistanceParser.autoInterpret(null, 10_000, "test radius", messages::add));
+    assertSame(zero, DistanceParser.autoInterpret(zero, 10_000, "test radius", messages::add));
+    assertSame(negative, DistanceParser.autoInterpret(negative, 10_000, "test radius", messages::add));
+
+    DistanceParser.ParsedDistance noFit = DistanceParser.parse("32", SpatialUnit.BLOCK);
+    assertSame(noFit, DistanceParser.autoInterpret(noFit, 256, "test radius", messages::add));
   }
 }

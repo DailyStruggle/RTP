@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -125,6 +127,13 @@ class DurationParserTest {
     assertEquals(5000.0, reinterpreted.magnitude());
     assertEquals(5.0, reinterpreted.toSeconds(), 0.001);
     assertEquals(100.0, reinterpreted.toTicks(), 0.001);
+    List<String> messages = new ArrayList<>();
+    DurationParser.autoInterpret(parsedTick, TemporalUnit.TICK, null, messages::add);
+    assertTrue(messages.get(0).contains("duration '5000'"));
+    DurationParser.ParsedDuration nonMultipleTick =
+        new DurationParser.ParsedDuration(1001, TemporalUnit.TICK, false);
+    assertSame(nonMultipleTick,
+        DurationParser.autoInterpret(nonMultipleTick, TemporalUnit.TICK, "queue period"));
 
     // Explicit unit must never be reinterpreted
     DurationParser.ParsedDuration explicit = DurationParser.parse("5000t", TemporalUnit.TICK);
@@ -151,10 +160,16 @@ class DurationParserTest {
     // Default return when condition not met
     DurationParser.ParsedDuration small = new DurationParser.ParsedDuration(50, TemporalUnit.SECOND, false);
     assertSame(small, DurationParser.autoInterpret(small, TemporalUnit.SECOND, "ctx"));
+    DurationParser.ParsedDuration nonMultipleSecond =
+        new DurationParser.ParsedDuration(1001, TemporalUnit.SECOND, false);
+    assertSame(nonMultipleSecond,
+        DurationParser.autoInterpret(nonMultipleSecond, TemporalUnit.SECOND, "ctx"));
   }
 
   @Test
   void testCompositeEdgeCases() {
+    assertNull(DurationParser.parse(null, TemporalUnit.SECOND));
+    assertNull(DurationParser.parse(" ", TemporalUnit.SECOND));
     // Missing digits in segment
     assertNull(DurationParser.parse("10s +m", TemporalUnit.SECOND));
     // Segment without suffix
@@ -163,6 +178,8 @@ class DurationParserTest {
     assertNull(DurationParser.parse("10s 20xyz", TemporalUnit.SECOND));
     // Number format exception branch with malformed number
     assertNull(DurationParser.parse("..s", TemporalUnit.SECOND));
+    assertNull(DurationParser.parse("-.s", TemporalUnit.SECOND));
+    assertNull(DurationParser.parse("-.s +1s", TemporalUnit.SECOND));
     // Default unit null falls back to SECOND in single token
     DurationParser.ParsedDuration singleNullUnit = DurationParser.parse("25", null);
     assertNotNull(singleNullUnit);
@@ -207,6 +224,14 @@ class DurationParserTest {
     assertNotNull(spaced);
     assertTrue(spaced.explicitUnit());
     assertEquals(5.0, spaced.toSeconds(), 0.0001);
+
+    assertEquals(-5.0, DurationParser.parse("-5s", TemporalUnit.SECOND).toSeconds(), 0.0001);
+    assertEquals(5.0, DurationParser.parse("+5s", TemporalUnit.SECOND).toSeconds(), 0.0001);
+    assertEquals(5.0, DurationParser.parse("5\ts", TemporalUnit.SECOND).toSeconds(), 0.0001);
+    assertEquals(5_400.0, DurationParser.parse("1h\t30m", TemporalUnit.SECOND).toSeconds(), 0.0001);
+    assertEquals(5_400.0, DurationParser.parse("1h 30 m", TemporalUnit.SECOND).toSeconds(), 0.0001);
+    assertEquals(5_400.0, DurationParser.parse("1h 30m\u2003", TemporalUnit.SECOND).toSeconds(), 0.0001);
+    assertNull(DurationParser.parse("\u2003", TemporalUnit.SECOND));
   }
 
   @Test

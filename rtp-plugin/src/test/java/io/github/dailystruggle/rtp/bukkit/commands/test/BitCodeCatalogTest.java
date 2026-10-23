@@ -73,14 +73,7 @@ class BitCodeCatalogTest {
             "TEST_CHUNK_TICKET_SENTINEL_UNTRACK",
             "TEST_CHUNK_TICKET_TRACKER_LEAK",
             "TEST_ECONOMY_ISOLATION_UNAVAILABLE",
-            "TEST_EVENTS_COMMAND_FAIL",
-            "TEST_EVENTS_COMMAND_SUCCESS",
-            "TEST_EVENTS_PLAYER_MOVE",
-            "TEST_EVENTS_PREFAB",
             "TEST_NETWORK_UNAVAILABLE",
-            "TEST_SCHEDULER_ASYNC",
-            "TEST_SCHEDULER_PRIMARY",
-            "TEST_SCHEDULER_REGION",
             "TEST_COMMANDS_NO_TREE");
 
     @Test
@@ -154,7 +147,7 @@ class BitCodeCatalogTest {
             throws IOException {
         String fieldReference = owner.getSimpleName() + "." + field.getName();
         Pattern ownerWideTest = Pattern.compile("(?s)assert(?:EveryCodeFails|AllCodesFail)\\s*\\(\\s*"
-                + Pattern.quote(owner.getSimpleName()) + "\\.class\\s*\\)");
+                + Pattern.quote(owner.getSimpleName()) + "\\.class\\s*(?:,|\\))");
         for (Path testSource : testSources) {
             String source = Files.readString(testSource, StandardCharsets.UTF_8);
             if (ownerWideTest.matcher(source).find()) return true;

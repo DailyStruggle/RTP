@@ -12,6 +12,7 @@ import io.github.dailystruggle.server.api.ServerAccessor;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -280,9 +281,9 @@ public interface RTPServerAccessor extends ServerAccessor {
     return null;
   }
 
-  /** Returns whether the host exposes a scoreboard objective, or {@code null} when unknown. */
-  default Boolean hasScoreboardObjective(String objective) {
-    return null;
+  /** Returns whether the host exposes a scoreboard objective, or an empty optional when unknown. */
+  default Optional<Boolean> hasScoreboardObjective(String objective) {
+    return Optional.empty();
   }
 
   /**

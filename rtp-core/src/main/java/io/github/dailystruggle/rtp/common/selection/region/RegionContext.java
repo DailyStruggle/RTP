@@ -14,6 +14,11 @@ public final class RegionContext {
   private RegionContext() {
   }
 
+  public static void clear() {
+    REGION.remove();
+    WORLD.remove();
+  }
+
   /** Region being selected on this thread; callers set and clear it around selection work. */
   public static ThreadLocal<Region> region() {
     return REGION;
