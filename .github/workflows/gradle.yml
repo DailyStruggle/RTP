@@ -104,10 +104,10 @@ jobs:
 
       # Writes the cache on PR runs too (see gradle-set.yml).
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: true
+          cache-cleanup: on-success
 
       - name: Grant execute permission for scripts
         run: chmod +x gradlew scripts/check_traceability.sh
@@ -144,10 +144,10 @@ jobs:
 
       # Writes the cache on PR runs too (see gradle-set.yml).
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: true
+          cache-cleanup: on-success
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -263,10 +263,10 @@ jobs:
 
       # Writes the cache on PR runs too (see gradle-set.yml).
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: true
+          cache-cleanup: on-success
 
       - name: Cache SonarQube packages
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
