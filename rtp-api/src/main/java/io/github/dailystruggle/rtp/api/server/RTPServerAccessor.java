@@ -281,7 +281,13 @@ public interface RTPServerAccessor extends ServerAccessor {
     return null;
   }
 
-  /** Returns whether the host exposes a scoreboard objective, or an empty optional when unknown. */
+  /**
+   * Returns whether the host exposes a scoreboard objective.
+   *
+   * @param objective the objective name; must not be {@code null}
+   * @return {@link Optional#of(Object)} containing {@code true} when present or {@code false} when
+   *     absent, or {@link Optional#empty()} when the host cannot determine whether it is present
+   */
   default Optional<Boolean> hasScoreboardObjective(String objective) {
     return Optional.empty();
   }

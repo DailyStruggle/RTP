@@ -676,6 +676,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             GET_DISTANCE_MANAGER_METHOD = m;
             return m.invoke(cache);
         }
+        f = GET_DISTANCE_MANAGER_FIELD;
         if (f == null) throw new NoSuchFieldException("ServerChunkCache distance manager field was not found");
         return f.get(cache);
     }
