@@ -1246,9 +1246,6 @@ public class RTP {
     }
   }
 
-  // ADR-115 seam 4: per-instance state lives in its owning package; installed when this
-  // instance becomes current (see the constructor). Field-init order is unchanged.
-  private final TeleportSessions sessions = new TeleportSessions();
   public io.github.dailystruggle.rtp.common.playerData.FileBinStore fileBinStore;
   /**
    * Optional cross-server messaging bus. Field type is the {@code RTPNetworkManager}
@@ -1448,6 +1445,9 @@ public class RTP {
       timeBoundTaskPipe.setAvailableTime(Long.MAX_VALUE);
     }
     RTPAPI.setServerAccessor(RTPRuntime.serverAccessor());
+    // ADR-115 seam 4: per-instance state lives in its owning package; installed when this
+    // instance becomes current.
+    TeleportSessions sessions = new TeleportSessions();
     TeleportSessions.install(sessions);
     ScanTasks.install(new ConcurrentHashMap<>());
     ActiveDatabase.setAccessor(null);
