@@ -106,6 +106,8 @@
  *     k * join-delay and spaces its own joins by workers * join-delay).
  */
 const mineflayer = require('mineflayer');
+const minecraftData = require('minecraft-data');
+const minecraftProtocol = require('minecraft-protocol');
 const childProcess = require('child_process');
 const os = require('os');
 const fs = require('fs');
@@ -131,7 +133,9 @@ const port = intArg('--port', 'BENCH_PORT', 25565);
 const count = Math.max(1, intArg('--count', 'BENCH_COUNT', 64));
 const prefix = getArg('--prefix', 'BENCH_PREFIX', 'bench_');
 const startIndex = Math.max(0, intArg('--start-index', 'BENCH_START_INDEX', 0));
-const version = getArg('--version', 'BENCH_VERSION', '') || false;
+const requestedVersion = getArg('--version', 'BENCH_VERSION', '') || false;
+let activeVersion = requestedVersion;
+let resolvedAutoVersion = null;
 const joinDelayMs = Math.max(0, intArg('--join-delay-ms', 'BENCH_JOIN_DELAY_MS', 4500));
 const viewDistanceRaw = getArg('--view-distance', 'BENCH_VIEW_DISTANCE', '2');
 const viewDistance = /^\d+$/.test(viewDistanceRaw) ? Math.max(2, parseInt(viewDistanceRaw, 10)) : viewDistanceRaw;
@@ -186,6 +190,33 @@ const LEAN_DISABLED = [
 ];
 const pluginOverrides = {};
 if (!fullPlugins) for (const p of LEAN_DISABLED) pluginOverrides[p] = false;
+
+async function resolveVersion() {
+  if (requestedVersion) return requestedVersion;
+  if (resolvedAutoVersion) return resolvedAutoVersion;
+  try {
+    const status = await minecraftProtocol.ping({ host, port, timeout: 5000 });
+    const serverVersion = status && status.version && status.version.name;
+    if (!serverVersion) throw new Error('server ping did not report a version');
+    if (minecraftData(serverVersion)) {
+      resolvedAutoVersion = serverVersion;
+      activeVersion = serverVersion;
+      return activeVersion;
+    }
+    const latestSupported = minecraftData.versions.pc.find((v) => v.releaseType === 'release'
+      && minecraftData(v.minecraftVersion));
+    if (!latestSupported) throw new Error(`no supported PC client version for server ${serverVersion}`);
+    resolvedAutoVersion = latestSupported.minecraftVersion;
+    activeVersion = resolvedAutoVersion;
+    console.warn(`[bench] server reports ${serverVersion}, which minecraft-data does not support; `
+      + `using ${activeVersion}. The bench server needs ViaVersion/ViaBackwards.`);
+    return activeVersion;
+  } catch (err) {
+    console.warn(`[bench] could not resolve server version (${err && err.message ? err.message : err}); `
+      + 'keeping Mineflayer auto-detect for this connection');
+    return false;
+  }
+}
 
 // Plugin-side rejection phrases seen in chat. Out-of-band evidence only: the
 // harness counts busy rejections from console lines, which player-directed
@@ -323,7 +354,7 @@ function connect(state) {
       port,
       username: state.username,
       auth: 'offline',
-      version,
+      version: activeVersion,
       viewDistance,
       physicsEnabled,
       respawn: true,
@@ -564,14 +595,15 @@ function runParent() {
   process.on('SIGTERM', () => stopAll('SIGTERM'));
 }
 
-function runBots() {
+async function runBots() {
+  await resolveVersion();
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('message', (m) => { if (m && m.cmd === 'shutdown') shutdown('parent'); });
   process.on('disconnect', () => shutdown('parent gone'));
 
   console.log(`[bench] ${workerLabel}${count} bot(s) ${nameFor(0)}..${nameFor(count - 1)} -> ${host}:${port}`
-    + ` version=${version || 'auto'} join-delay=${joinDelayMs}ms view-distance=${viewDistance}`
+    + ` version=${activeVersion || 'auto'} join-delay=${joinDelayMs}ms view-distance=${viewDistance}`
     + ` physics=${physicsEnabled ? 'on' : 'off'} plugins=${fullPlugins ? 'full' : 'lean'}`
     + ` world-decode=${keepWorld ? 'on' : 'off'}`);
   if (!isWorker) {
@@ -728,6 +760,7 @@ function finishConn(ep, bs, conn, text, forced) {
 
 /** Join as bs.username; resolves 'spawn', 'end' or 'aborted'. */
 async function fuzzConnect(ep, bs) {
+  await resolveVersion();
   await joinSlot(ep);
   if (ep.aborted) return 'aborted';
   const conn = { username: bs.username, bot: null, spawned: false, ended: false, waiters: [], spawnTimer: null };
@@ -746,7 +779,7 @@ async function fuzzConnect(ep, bs) {
     conn.waiters.push(settle);
     let bot;
     try {
-      bot = mineflayer.createBot({ host, port, username: bs.username, auth: 'offline', version, viewDistance,
+      bot = mineflayer.createBot({ host, port, username: bs.username, auth: 'offline', version: activeVersion, viewDistance,
         physicsEnabled, respawn: true, hideErrors: true, checkTimeoutInterval: 60 * 1000, plugins: pluginOverrides });
     } catch (err) {
       ep.emit({ ev: 'bot_error', bot: bs.username, text: String(err && err.message ? err.message : err) });
@@ -889,6 +922,7 @@ async function runFuzzProgram(ep, bs) {
 }
 
 async function runFuzzEpisode(sock, spec) {
+  await resolveVersion();
   const ep = { id: spec.id, cmd: spec.cmd, start: Date.now(), aborted: null, wakers: new Set(), sock };
   ep.emit = (obj) => fuzzSend(ep.sock, { ...obj, id: ep.id, t: Date.now() - ep.start });
   fuzzEpisode = ep;
@@ -993,7 +1027,7 @@ function runFuzz() {
   });
   fuzzServer.listen(listenPort, '127.0.0.1', () => {
     console.log(`[fuzz] listening on 127.0.0.1:${fuzzServer.address().port} -> ${host}:${port}`
-      + ` version=${version || 'auto'} join-delay=${joinDelayMs}ms spawn-timeout=${fuzzSpawnTimeoutMs}ms`);
+      + ` version=${activeVersion || 'auto'} join-delay=${joinDelayMs}ms spawn-timeout=${fuzzSpawnTimeoutMs}ms`);
   });
   process.on('SIGINT', () => (shuttingDown ? process.exit(1) : stopFuzz(fuzzEpisode && fuzzEpisode.sock, 'SIGINT')));
   process.on('SIGTERM', () => stopFuzz(fuzzEpisode && fuzzEpisode.sock, 'SIGTERM'));
@@ -1006,4 +1040,7 @@ function runFuzz() {
   process.stdin.resume();
 }
 
-if (fuzzMode) runFuzz(); else if (workers > 1) runParent(); else runBots();
+if (fuzzMode) runFuzz(); else if (workers > 1) runParent(); else runBots().catch((err) => {
+  console.error(`[bench] startup failed: ${err && err.message ? err.message : err}`);
+  process.exit(2);
+});

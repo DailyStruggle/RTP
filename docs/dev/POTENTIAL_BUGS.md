@@ -460,16 +460,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Route WARNING and SEVERE through the plugin logger at their level (keep the console sender for color at INFO and below), and cover it with a MockBukkit level assertion.
 - **Linear:** RTP-95
 
-### 2026-10-23 - `bench_fuzz.py` scores episodes in which no bot ever spawned
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** kicking off the `direct,rtp` leak run on the 26.2 bench copy
-- **Location:** `scripts/bench_fuzz.py` episode loop (swarm `done ... (complete)` handling); `devstack/clients/bench-swarm.js` fuzz-control mode
-- **Symptom / hypothesis:** With the swarm unable to log in (`No data available for version 26.2` from auto-detect, or whitelist on), every bot hit the 30 s spawn timeout, the swarm reported each episode `complete`, and the driver checkpointed and scored it (`states=0 departed=0`, probe `joins_total=0`). Nothing checks that the planned bots actually joined.
-- **Impact:** A misconfigured bench silently produces a full control fit of empty episodes, so later targets are screened against a meaningless control.
-- **Suggested next step:** Fail the episode (and abort after N in a row) when the swarm reports zero spawns or the probe's `joins_total` delta is 0 for a program that has bots; surface the swarm's per-bot `error:` lines in `fuzz.log`.
-
 ### 2026-10-13 - Block-list rejection log still names `safety.yml`
 
 - **Severity:** Cosmetic

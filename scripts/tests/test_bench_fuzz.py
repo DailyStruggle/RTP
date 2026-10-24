@@ -569,6 +569,8 @@ class FakeSwarm:
         self.fail_next = False
         self.after = None  # hook(req) run once the episode's events are produced
         self.leak_quit = True  # quit right after rtp retains one LEAKY instance
+        self.spawn_sequence = []  # optional per-episode spawn outcome
+        self.no_spawn_error = "No data available for version 26.2"
 
     def run_episode(self, req, timeout_s):
         self.requests.append((req, timeout_s))
@@ -578,7 +580,12 @@ class FakeSwarm:
             self.fail_next = False
             raise bf.SwarmError("no done")
         events = []
+        spawned = self.spawn_sequence.pop(0) if self.spawn_sequence else True
         for b in req["bots"]:
+            if not spawned:
+                events.append({"ev": "bot_error", "id": req["id"], "bot": b["name"],
+                               "text": self.no_spawn_error})
+                continue
             last, online = None, True
             t = bf.SPAWN_EST_MS
             events.append({"ev": "spawn", "id": req["id"], "bot": b["name"], "t": t})
@@ -637,6 +644,81 @@ class LoopFixture:
 
 
 class EpisodeLoopTest(LoopFixture, unittest.TestCase):
+    def test_empty_spawn_episode_is_excluded_and_not_counted_as_executed(self):
+        self.a.episodes = 2
+        self.swarm.spawn_sequence = [False, True]
+        self.tr.run_seed(1)
+        recs = self.records()
+
+        self.assertEqual(recs[0]["excluded"], "no bot spawned")
+        self.assertNotIn("ms", recs[0])
+        self.assertEqual(recs[0]["bot_errors"], [self.swarm.no_spawn_error])
+        self.assertIsNone(recs[0]["deltas"])
+        self.assertEqual(self.tr.coverage["executed"], 1)
+        self.assertEqual(len(self.swarm.requests), 2)
+        labels = [c.split()[2] for c in self.server.cmds if c.startswith("rtpstress leakcheck ")]
+        self.assertFalse(any("-e0" in label for label in labels))
+        self.assertTrue(any("-e1" in label for label in labels))
+
+    def test_empty_spawn_limit_counts_consecutive_episodes_and_resets_after_spawn(self):
+        self.a.episodes = 4
+        self.a.max_empty = 2
+        self.swarm.spawn_sequence = [False, True, False, False]
+
+        with self.assertRaisesRegex(bf.NoSpawnError, "2 consecutive episodes"):
+            self.tr.run_seed(1)
+
+        recs = self.records()
+        self.assertEqual([r.get("excluded") for r in recs],
+                         ["no bot spawned", None, "no bot spawned", "no bot spawned"])
+        self.assertEqual(self.tr.coverage["executed"], 1)
+        self.assertEqual(len(self.swarm.requests), 4)
+
+    def test_warm_up_is_unscored_and_runs_before_the_baseline(self):
+        self.a.warmup = 2
+        run_dir = os.path.join(self.dir, "run")
+        os.makedirs(run_dir)
+        self.a.settle_s = 0
+
+        with unittest.mock.patch.object(bf.lc, "prepare_target", return_value=True), \
+                unittest.mock.patch.object(bf.time, "sleep"):
+            bf.run_target(self.a, self.server, self.swarm, "direct", [1], run_dir,
+                          "20261010-200000", unittest.mock.Mock())
+
+        self.assertEqual(len(self.swarm.requests), self.a.episodes + 2)
+        self.assertIn("warm0", self.swarm.requests[0][0]["id"])
+        self.assertIn("warm1", self.swarm.requests[1][0]["id"])
+        first_baseline = next(i for i, cmd in enumerate(self.server.cmds)
+                              if cmd.startswith("rtpstress leakcheck "))
+        self.assertLess(self.server.cmds.index("list"), first_baseline)
+        trace = os.path.join(run_dir, "direct", "episodes.jsonl")
+        self.assertEqual(len(bf.read_trace(trace)), self.a.episodes)
+        self.assertFalse(any("warm" in str(r) for r in bf.read_trace(trace)))
+
+    def test_warm_up_with_no_spawn_fails_before_a_baseline(self):
+        self.a.warmup = 1
+        self.swarm.spawn_sequence = [False]
+
+        with self.assertRaisesRegex(bf.NoSpawnError, "No data available for version 26.2"):
+            self.tr.warm_up(1)
+
+        self.assertEqual(len(self.swarm.requests), 1)
+        self.assertFalse(any(c.startswith("rtpstress leakcheck ") for c in self.server.cmds))
+
+    def test_repetition_with_no_spawn_is_not_checkpointed(self):
+        self.a.episodes = 1
+        self.a.reps = 2
+        self.swarm.spawn_sequence = [True, False]
+
+        self.tr.run_seed(1)
+
+        rec = self.records()[0]
+        self.assertEqual(rec["reps_error"], "no bot spawned")
+        self.assertEqual(rec["reps_bot_errors"], [self.swarm.no_spawn_error])
+        self.assertEqual(rec["reps"], 1)
+        self.assertFalse(any("-e0k1" in label for label in
+                             [c.split()[2] for c in self.server.cmds if c.startswith("rtpstress leakcheck ")]))
+
     def test_loop_writes_traces_with_exact_deltas(self):
         self.tr.run_seed(1)
         recs = self.records()
