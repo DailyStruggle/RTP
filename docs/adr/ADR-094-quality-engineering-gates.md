@@ -199,6 +199,10 @@ task on production sources.
    in the editor. External PMD issues are server-side only; locally, run
    `.\gradlew.bat :<module>:pmdRegexMain -PregexAnalysis` or point an IDE PMD plugin
    at `config/pmd/regex.xml`.
+   Connected-mode issue exclusions are synchronized from the root `build.gradle`
+   with [`scripts/sonar-sync-exclusions.py`](../../scripts/sonar-sync-exclusions.py)
+   so the IDE and scanner apply the same deliberate exceptions. This configures the
+   existing IDE binding; it does not add a remote quality gate or CI check.
 
 ## References
 

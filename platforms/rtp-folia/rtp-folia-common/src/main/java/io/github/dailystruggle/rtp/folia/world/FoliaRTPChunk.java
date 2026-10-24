@@ -249,8 +249,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
         // the RTP-config-comparable form ("PLAINS"). `PaletteNormalizer` is
         // for blocks (Material registry); biomes use the pure-string
         // namespace-strip + upper-case helper from `rtp-api`.
-        String normalized = io.github.dailystruggle.rtp.api.configuration
-            .PaletteIdentifierNormalizer.normalize(id);
+        String normalized = io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(id);
         return (normalized != null && !normalized.isEmpty()) ? normalized : id;
       }
       // Anvil view had no biome container at this Y; fall back to the world
@@ -293,11 +292,12 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
       if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
     }
     if (anvilView != null) {
-      Set<String> effective = (reconciledUnsafe != null)
-          ? reconciledUnsafe
-          : ((RTPRuntime.serverAccessor() != null)
-              ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(unsafeBlocks)
-              : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks));
+      Set<String> effective = reconciledUnsafe;
+      if (effective == null) {
+        effective = RTPRuntime.serverAccessor() != null
+            ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(unsafeBlocks)
+            : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks);
+      }
       return anvilView.isSafe(x & 0xF, y, z & 0xF, effective);
     }
     if (chunk == null) return true;

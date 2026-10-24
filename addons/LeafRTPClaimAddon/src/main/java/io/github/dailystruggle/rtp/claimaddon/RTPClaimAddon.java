@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
-import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import java.util.logging.Level;
 
 /**
@@ -28,5 +29,10 @@ public final class RTPClaimAddon implements RTPAddon {
       return;
     }
     ClaimIntegrations.setup(this.getClass().getClassLoader());
+  }
+
+  @Override
+  public void onUnload() {
+    RtpBit.RUNNER.unregister(ClaimSetupBit.COMPONENT.id());
   }
 }

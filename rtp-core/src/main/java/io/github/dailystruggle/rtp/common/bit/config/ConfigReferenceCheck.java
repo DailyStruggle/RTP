@@ -155,7 +155,7 @@ public final class ConfigReferenceCheck implements ConfigOwnerCheck {
             return;
         }
         Optional<Boolean> resolves = resolves(snapshot, env, file, setting);
-        if (resolves.isPresent() && !resolves.get()) {
+        if (Boolean.FALSE.equals(resolves.orElse(null))) {
             String expected = "config".equals(file) ? "config.yml defaults." + setting : file + ".yml " + setting;
             findings.add(BitFinding.of(REFERENCE_SETTING_MISSING, source, path.toString(),
                     "Reference " + token + " has no " + expected + "; the loader uses a hard-coded fallback",
@@ -254,19 +254,21 @@ public final class ConfigReferenceCheck implements ConfigOwnerCheck {
                         suggest("region", regions, name, WORLD_UNKNOWN_REGION)));
             }
             Object override = world.get(WorldKeys.override.name());
-            if (!isName(override)) continue;
-            String name = String.valueOf(override).trim();
-            if (!WORLD_INDEX.matcher(name).matches() && containsIgnoreCase(worldFiles, name)) continue;
-            Optional<Set<String>> loaded = env.worlds();
-            if (loaded.isEmpty()) {
-                unverified.add(world.path());
-            } else if (!worldResolves(name, loaded.get())) {
-                Set<String> known = new TreeSet<>(loaded.get());
-                known.addAll(worldFiles);
-                findings.add(BitFinding.of(WORLD_UNKNOWN_OVERRIDE, world.path(),
-                        world.localizedKey(WorldKeys.override.name()),
-                        "World override names no loaded world or world file: " + name, describe(known),
-                        suggest("world", known, name, WORLD_UNKNOWN_OVERRIDE)));
+            if (isName(override)) {
+                String name = String.valueOf(override).trim();
+                if (WORLD_INDEX.matcher(name).matches() || !containsIgnoreCase(worldFiles, name)) {
+                    Optional<Set<String>> loaded = env.worlds();
+                    if (loaded.isEmpty()) {
+                        unverified.add(world.path());
+                    } else if (!worldResolves(name, loaded.get())) {
+                        Set<String> known = new TreeSet<>(loaded.get());
+                        known.addAll(worldFiles);
+                        findings.add(BitFinding.of(WORLD_UNKNOWN_OVERRIDE, world.path(),
+                                world.localizedKey(WorldKeys.override.name()),
+                                "World override names no loaded world or world file: " + name, describe(known),
+                                suggest("world", known, name, WORLD_UNKNOWN_OVERRIDE)));
+                    }
+                }
             }
         }
     }
@@ -276,14 +278,16 @@ public final class ConfigReferenceCheck implements ConfigOwnerCheck {
         String prefix = RegionSchematicService.SCHEMATICS_DIRNAME + "/";
         Set<String> actionSchematics = actionSchematics(snapshot);
         for (String file : snapshot.files()) {
-            if (!file.startsWith(prefix)) continue;
-            String name = stripSchematicExtension(file.substring(prefix.length()));
-            if (name == null) continue;
-            if (name.indexOf('/') < 0 && containsIgnoreCase(regions, name)) continue;
-            if (actionSchematics.contains(name.toLowerCase(Locale.ROOT))) continue;
-            findings.add(BitFinding.of(SCHEMATIC_ORPHAN, file, "",
-                    "Schematic matches no region and no action placement.schematic: " + name,
-                    "<region>.schem for one of: " + describe(regions), SCHEMATIC_ORPHAN.remediation()));
+            if (file.startsWith(prefix)) {
+                String name = stripSchematicExtension(file.substring(prefix.length()));
+                if (name != null
+                        && !(name.indexOf('/') < 0 && containsIgnoreCase(regions, name))
+                        && !actionSchematics.contains(name.toLowerCase(Locale.ROOT))) {
+                    findings.add(BitFinding.of(SCHEMATIC_ORPHAN, file, "",
+                            "Schematic matches no region and no action placement.schematic: " + name,
+                            "<region>.schem for one of: " + describe(regions), SCHEMATIC_ORPHAN.remediation()));
+                }
+            }
         }
     }
 

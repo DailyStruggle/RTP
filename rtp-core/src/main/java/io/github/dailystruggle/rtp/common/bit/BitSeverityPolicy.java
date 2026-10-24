@@ -39,13 +39,15 @@ public final class BitSeverityPolicy {
     /** Config codes registered through {@link #stagedConfig}; WARNING unless {@code strictConfig}. */
     private static final Set<String> STAGED_CONFIG_CODES = ConcurrentHashMap.newKeySet();
 
-    private static volatile State state = new State(false, false, Map.of());
+    private static volatile boolean startupComplete;
+    private static volatile State state = new State(false, false, Map.of(), Map.of());
 
     private BitSeverityPolicy() {}
 
     /** Resets policy to this release's staged defaults: structural action and config findings are warnings. */
     public static void resetDefaults() {
-        state = new State(false, false, Map.of());
+        startupComplete = false;
+        state = new State(false, false, Map.of(), Map.of());
         ActionCbitCounters.setMinimumGateSamples(ActionCbitCounters.DEFAULT_GATE_OUTCOME_SAMPLES);
     }
 
@@ -86,35 +88,45 @@ public final class BitSeverityPolicy {
         Vocabulary registeredCodes = new Vocabulary("registered BIT code",
                 registry.codes().stream().map(BitCode::key).toList());
         Map<String, Level> overrides = new TreeMap<>();
+        Map<String, String> unresolved = new TreeMap<>();
         if (rawOverrides != null) {
             for (Map.Entry<?, ?> entry : rawOverrides.entrySet()) {
                 String key = String.valueOf(entry.getKey()).trim().toUpperCase(Locale.ROOT);
                 Optional<BitCode> code = registry.byKey(key);
-                if (code.isEmpty()) {
-                    String suggestion = registeredCodes.suggest(key).map(value -> "; did you mean " + value + "?")
-                            .orElse("");
-                    RTP.log(java.util.logging.Level.WARNING,
-                            "[RTP BIT] advanced/bit.yml overrides." + entry.getKey()
-                                    + " ignored: unregistered BIT code" + suggestion);
-                    continue;
-                }
-
                 String configuredLevel = String.valueOf(entry.getValue()).trim().toUpperCase(Locale.ROOT);
-                Level level;
+                Level level = null;
                 try {
                     level = Level.valueOf(configuredLevel);
                 } catch (IllegalArgumentException invalidLevel) {
                     logInvalidLevel(entry.getKey(), configuredLevel);
-                    continue;
                 }
+                if (level == null) continue;
                 if (!CONFIGURABLE_LEVELS.contains(level)) {
                     logInvalidLevel(entry.getKey(), configuredLevel);
                     continue;
                 }
-                overrides.put(code.get().key(), level);
+                if (code.isPresent()) {
+                    overrides.put(code.get().key(), level);
+                } else {
+                    String suggestion = registeredCodes.suggest(key).orElse("");
+                    overrides.put(key, level);
+                    unresolved.put(key, suggestion);
+                    if (startupComplete) logUnregisteredOverride(String.valueOf(entry.getKey()), suggestion);
+                }
             }
         }
-        state = new State(strictActions, strictConfig, Map.copyOf(overrides));
+        state = new State(strictActions, strictConfig, Map.copyOf(overrides), Map.copyOf(unresolved));
+    }
+
+    /** Reports addon overrides that remained unresolved after startup owners had registered. */
+    public static void reportUnresolvedOverrides() {
+        boolean alreadyComplete = startupComplete;
+        startupComplete = true;
+        if (alreadyComplete) return;
+        var registry = RtpBitCodes.initialiseOwners();
+        state.unresolvedOverrides().forEach((key, suggestion) -> {
+            if (registry.byKey(key).isEmpty()) logUnregisteredOverride(key, suggestion);
+        });
     }
 
     /** Loads the active {@code advanced/bit.yml} parser. */
@@ -140,14 +152,14 @@ public final class BitSeverityPolicy {
             value = raw instanceof Number number ? number.intValue() : Integer.parseInt(String.valueOf(raw).trim());
         } catch (NumberFormatException invalidValue) {
             RTP.log(java.util.logging.Level.WARNING,
-                    "[RTP BIT] advanced/bit.yml gateOutcomeSamples must be a positive integer; using "
+                    "[RTP bit] advanced/bit.yml gateOutcomeSamples must be a positive integer; using "
                             + ActionCbitCounters.DEFAULT_GATE_OUTCOME_SAMPLES,
                     invalidValue);
             return ActionCbitCounters.DEFAULT_GATE_OUTCOME_SAMPLES;
         }
         if (value > 0) return value;
         RTP.log(java.util.logging.Level.WARNING,
-                "[RTP BIT] advanced/bit.yml gateOutcomeSamples must be positive; using "
+                "[RTP bit] advanced/bit.yml gateOutcomeSamples must be positive; using "
                         + ActionCbitCounters.DEFAULT_GATE_OUTCOME_SAMPLES);
         return ActionCbitCounters.DEFAULT_GATE_OUTCOME_SAMPLES;
     }
@@ -173,7 +185,7 @@ public final class BitSeverityPolicy {
         Optional<Level> severity = effective(finding);
         if (severity.isEmpty()) return Optional.empty();
         if (severity.get() == finding.severity()) return Optional.of(finding);
-        BitCode code = RtpBitCodes.REGISTRY.byId(finding.codeId()).orElse(null);
+        BitCode code = RtpBitCodes.REGISTRY.byKey(finding.code()).orElse(null);
         if (code == null) return Optional.of(finding);
         return Optional.of(BitFinding.of(code, severity.get(), finding.source(), finding.path(),
                 finding.message(), finding.expected(), finding.suggestion()));
@@ -186,9 +198,18 @@ public final class BitSeverityPolicy {
 
     private static void logInvalidLevel(Object key, String configuredLevel) {
         RTP.log(java.util.logging.Level.WARNING,
-                "[RTP BIT] advanced/bit.yml overrides." + key + " ignored: invalid severity "
+                "[RTP bit] advanced/bit.yml overrides." + key + " ignored: invalid severity "
                         + configuredLevel + "; use ERROR, WARNING, INFO, DEBUG, TRACE or OFF");
     }
 
-    private record State(boolean strictActions, boolean strictConfig, Map<String, Level> overrides) {}
+    private static void logUnregisteredOverride(String key, String suggestion) {
+        String didYouMean = suggestion.isBlank() ? "" : "; did you mean " + suggestion + "?";
+        RTP.log(java.util.logging.Level.WARNING,
+                "[RTP bit] advanced/bit.yml overrides." + key
+                        + " ignored: unregistered BIT code" + didYouMean);
+    }
+
+    private record State(
+            boolean strictActions, boolean strictConfig, Map<String, Level> overrides,
+            Map<String, String> unresolvedOverrides) {}
 }

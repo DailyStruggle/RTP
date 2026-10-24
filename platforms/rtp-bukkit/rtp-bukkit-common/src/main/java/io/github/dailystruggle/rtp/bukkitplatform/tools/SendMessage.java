@@ -46,6 +46,8 @@ public class SendMessage {
    */
   private static final Pattern miniMessageTagPattern =
       Pattern.compile("<(/?[a-zA-Z#][^<>]*)>");
+  private static final Pattern fontTagPattern =
+      Pattern.compile("<(?:font:[^<>]*|/font(?::[^<>]*)?)>", Pattern.CASE_INSENSITIVE);
   /**
    * Whether Adventure (and the MiniMessage + Gson serializer it relies on) is
    * present on the runtime classpath. Paper, Folia, and their forks bundle it;
@@ -316,7 +318,12 @@ public class SendMessage {
     // so they render on servers that do not bundle Adventure (e.g. pure Spigot).
     // On Paper/Folia the MiniMessage path above already handled them; this only
     // fires when MINIMESSAGE_AVAILABLE is false or the MiniMessage render threw.
-    return legacyFinisher.apply(format(player, GradientExpander.expand(resolved)));
+    return legacyFinisher.apply(format(player, stripFontTags(GradientExpander.expand(resolved))));
+  }
+
+  static String stripFontTags(String text) {
+    if (text == null) return "";
+    return fontTagPattern.matcher(text).replaceAll("");
   }
 
   /**
@@ -542,7 +549,7 @@ public class SendMessage {
     // to per-character legacy hex so a "<rainbow>[RTP]</rainbow>" prefix never
     // prints literally to the console when Adventure is absent or
     // MiniMessageRenderer.render threw above.
-    return TextComponent.fromLegacyText(GradientExpander.expand(legacyText));
+    return TextComponent.fromLegacyText(stripFontTags(GradientExpander.expand(legacyText)));
   }
 
   public static void log(Level level, String message, Throwable throwable) {

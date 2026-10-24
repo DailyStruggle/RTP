@@ -166,27 +166,29 @@ public final class TerrainShapeCheck {
         if (Math.abs(dx) <= r && Math.abs(dz) <= r && local != null) {
           grid[slot] = local[(dx + r) * L + (dz + r)];
         }
-        if (grid[slot] != null || (dx == 0 && dz == 0) || Math.abs(dx) > radius || Math.abs(dz) > radius) continue;
-        int cx = ccx + dx, cz = ccz + dz;
-        CompletableFuture<Long> key;
-        try {
-          if (!world.isChunkLoaded(cx, cz)) continue;
-          key = world.getChunkIfReadable(cx, cz);
-        } catch (RuntimeException e) {
-          continue; // adapter refused the query: unmeasured
+        if (grid[slot] == null && !(dx == 0 && dz == 0)
+            && Math.abs(dx) <= radius && Math.abs(dz) <= radius) {
+          int cx = ccx + dx, cz = ccz + dz;
+          CompletableFuture<Long> key = null;
+          try {
+            if (world.isChunkLoaded(cx, cz)) key = world.getChunkIfReadable(cx, cz);
+          } catch (RuntimeException e) {
+            // Adapter refused the query: unmeasured.
+          }
+          if (key != null) {
+            pending.add(key.thenApply(k -> k)
+                .completeOnTimeout(null, RESIDENT_WAIT_MS, TimeUnit.MILLISECONDS)
+                .handle((k, ex) -> {
+                  if (ex != null || k == null) return null;
+                  try {
+                    grid[slot] = world.getCachedChunk(k);
+                  } catch (RuntimeException e) {
+                    grid[slot] = null; // unloaded or refused meanwhile: unmeasured
+                  }
+                  return null;
+                }));
+          }
         }
-        if (key == null) continue;
-        pending.add(key.thenApply(k -> k)
-            .completeOnTimeout(null, RESIDENT_WAIT_MS, TimeUnit.MILLISECONDS)
-            .handle((k, ex) -> {
-              if (ex != null || k == null) return null;
-              try {
-                grid[slot] = world.getCachedChunk(k);
-              } catch (RuntimeException e) {
-                grid[slot] = null; // unloaded or refused meanwhile: unmeasured
-              }
-              return null;
-            }));
       }
     }
     if (pending.isEmpty()) return CompletableFuture.completedFuture(grid);
@@ -312,15 +314,18 @@ public final class TerrainShapeCheck {
     for (int[] d : DIRS) {
       double step = 16.0 * Math.hypot(d[0], d[1]);
       boolean seen = false;
+      boolean steepDirection = false;
       for (int k = 1; k <= 2; k++) {
         int sx = x0 + d[0] * 16 * k, sz = z0 + d[1] * 16 * k;
-        if (!r.readable(sx, sz)) continue;
-        seen = true;
-        int f = floorNear(r, sx, sz, y, minY, maxY);
-        if (f == Integer.MIN_VALUE || Math.abs(f - y) >= tanMax * step * k) {
-          steep++;
-          break;
+        if (r.readable(sx, sz)) {
+          seen = true;
+          int f = floorNear(r, sx, sz, y, minY, maxY);
+          if (f == Integer.MIN_VALUE || Math.abs(f - y) >= tanMax * step * k) {
+            steep++;
+            steepDirection = true;
+          }
         }
+        if (steepDirection) break;
       }
       if (seen) measured++;
     }

@@ -124,16 +124,17 @@ public final class EffectsGroupValidator implements ConfigOwnerCheck {
             KeyPath base = KeyPath.root(document.localizedKey(EffectsGroupKeys.inherit.name()));
             for (int i = 0; i < inherit.size(); i++) {
                 String parent = inherit.get(i);
-                if (parent == null || parent.isBlank()) continue;
-                String name = parent.trim().toLowerCase(Locale.ROOT);
-                if (groupNames.contains(name)) {
-                    parents.add(name);
-                    continue;
+                if (parent != null && !parent.isBlank()) {
+                    String name = parent.trim().toLowerCase(Locale.ROOT);
+                    if (groupNames.contains(name)) {
+                        parents.add(name);
+                    } else {
+                        findings.add(BitFinding.of(INHERIT_UNRESOLVED, source, base.index(i).toString(),
+                                "inherit references undefined group '" + parent.trim() + "'",
+                                String.join(", ", new TreeSet<>(groupNames)),
+                                new Vocabulary("group", groupNames).suggest(name).orElse(INHERIT_UNRESOLVED.remediation())));
+                    }
                 }
-                findings.add(BitFinding.of(INHERIT_UNRESOLVED, source, base.index(i).toString(),
-                        "inherit references undefined group '" + parent.trim() + "'",
-                        String.join(", ", new TreeSet<>(groupNames)),
-                        new Vocabulary("group", groupNames).suggest(name).orElse(INHERIT_UNRESOLVED.remediation())));
             }
         }
 
@@ -143,13 +144,15 @@ public final class EffectsGroupValidator implements ConfigOwnerCheck {
             KeyPath base = KeyPath.root(document.localizedKey(EffectsGroupKeys.effects.name()));
             for (int i = 0; i < tokens.size(); i++) {
                 String token = tokens.get(i);
-                if (token == null || token.isBlank()) continue;
-                String type = effectType(token);
-                if (type.isEmpty() || registered.contains(type)) continue;
-                findings.add(BitFinding.of(UNKNOWN_EFFECT, source, base.index(i).toString(),
-                        "Unknown effect '" + type + "' in token '" + token.trim() + "'",
-                        String.join(", ", new TreeSet<>(registered.values())),
-                        registered.suggest(type).orElse(UNKNOWN_EFFECT.remediation())));
+                if (token != null && !token.isBlank()) {
+                    String type = effectType(token);
+                    if (!type.isEmpty() && !registered.contains(type)) {
+                        findings.add(BitFinding.of(UNKNOWN_EFFECT, source, base.index(i).toString(),
+                                "Unknown effect '" + type + "' in token '" + token.trim() + "'",
+                                String.join(", ", new TreeSet<>(registered.values())),
+                                registered.suggest(type).orElse(UNKNOWN_EFFECT.remediation())));
+                    }
+                }
             }
         }
         return parents;
@@ -183,6 +186,7 @@ public final class EffectsGroupValidator implements ConfigOwnerCheck {
      * Reads a list-or-scalar field as strings (scalar = one-element list, as {@code EffectsResolver}
      * does). Returns {@code null} when absent; non-scalar values become {@link #BAD_TYPE} findings.
      */
+    @SuppressWarnings("java:S1168") // Null distinguishes an absent optional field from an explicit empty list.
     private static List<String> stringList(ConfigSnapshot.Document document, EffectsGroupKeys key,
                                            Map<String, Object> values, List<BitFinding> findings) {
         Object value = values.get(key.name());

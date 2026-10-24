@@ -32,11 +32,25 @@ class BitTableTest {
         assertEquals("chunk-ticket", parsed.get(1).get(0));
         assertEquals("FAILED", parsed.get(1).get(3));
         assertEquals("1", parsed.get(1).get(4));
+        assertEquals("TEST:3103", parsed.get(1).get(7));
         assertEquals("TEST_CHUNK_TICKET_TRACKER_LEAK", parsed.get(1).get(8));
         assertEquals("residual=1, expected \"zero\"", parsed.get(1).get(10));
         assertEquals(
                 delimiterPositions(rendered.get(0)),
                 delimiterPositions(rendered.get(1)));
+    }
+
+    @Test
+    void sameLocalIdInDifferentNamespacesRendersUnambiguously() {
+        BitComponent component = component("accessor");
+        BitReport report = BitReport.of(List.of(
+                new BitFinding(Level.ERROR, 1, "DEMO_FAILURE", "test", "", "demo", "", ""),
+                new BitFinding(Level.WARNING, 1, "OTHER_FAILURE", "test", "", "other", "", "")));
+
+        List<BitTable.Row> rows = BitTable.rows(component, new BitResult(component, report, 1, 1));
+
+        assertEquals(List.of("DEMO:1", "OTHER:1"), rows.stream()
+                .map(row -> row.cells().get(BitTable.ID)).toList());
     }
 
     @Test

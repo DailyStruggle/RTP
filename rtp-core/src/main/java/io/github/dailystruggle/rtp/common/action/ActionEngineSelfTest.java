@@ -141,6 +141,7 @@ public final class ActionEngineSelfTest {
     }
   }
 
+  @SuppressWarnings("java:S1168") // Null signals a non-string-list value and produces a validation finding.
   private static List<String> parseStringList(Object value) {
     if (value == null) return List.of();
     if (value instanceof String string) {

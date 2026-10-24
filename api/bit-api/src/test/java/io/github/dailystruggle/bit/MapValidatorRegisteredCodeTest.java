@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 @DisplayName("ADR-121 section 10: MapValidator BitCode overloads keep the registered id")
 class MapValidatorRegisteredCodeTest {
-    private static final BitCodeNamespace NS = new BitCodeRegistry().reserve("CFG", 1000, 1099);
+    private static final BitCodeNamespace NS = new BitCodeRegistry().reserve("CFG");
     private static final BitCode CODE = NS.register(1001, "CFG_CHECK", Level.WARNING, BitTier.PBIT,
             "config", "", "Fix it.");
     private static final KeyPath ROOT = KeyPath.root("root");

@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider;
 import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
 import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
@@ -15,6 +16,8 @@ import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
@@ -30,9 +33,32 @@ import org.bukkit.plugin.Plugin;
  * enabled, so only installed-and-enabled integrations register.
  */
 public final class ClaimIntegrations {
+  private static final String LANDS = "Lands";
+
   private ClaimIntegrations() {}
 
   private static final List<AutoCloseable> registeredProviders = new ArrayList<>();
+  private static final Map<IntegrationsKeys, IntegrationStatus> integrationStatuses = new ConcurrentHashMap<>();
+
+  public enum Outcome {
+    REGISTERED,
+    FAILED,
+    SKIPPED
+  }
+
+  public record IntegrationStatus(String plugin, IntegrationsKeys key, boolean flag, Outcome outcome, String message) {
+    public IntegrationStatus {
+      plugin = plugin == null ? "" : plugin.trim();
+      java.util.Objects.requireNonNull(key, "key must not be null");
+      java.util.Objects.requireNonNull(outcome, "outcome must not be null");
+      message = message == null ? "" : message.trim();
+    }
+  }
+
+  public static List<IntegrationStatus> integrationStatuses() {
+    return integrationStatuses.values().stream()
+        .sorted(java.util.Comparator.comparing(status -> status.key().name())).toList();
+  }
 
   /**
    * Load {@code integrations.yml}, install the reload hook, and register each enabled verifier.
@@ -47,7 +73,7 @@ public final class ClaimIntegrations {
 
     // Lands needs a Bukkit plugin instance to register its API; reuse the RTP plugin.
     Plugin host = Bukkit.getPluginManager().getPlugin("RTP");
-    if (host != null && Bukkit.getPluginManager().isPluginEnabled("Lands")) {
+    if (host != null && Bukkit.getPluginManager().isPluginEnabled(LANDS)) {
       LandsChecker.landsSetup(host);
     }
 
@@ -59,6 +85,7 @@ public final class ClaimIntegrations {
 
     registerVerifiers();
     registerBoundaryProviders();
+    RtpBit.RUNNER.register(ClaimSetupBit.COMPONENT);
   }
 
   private static ConfigParser<IntegrationsKeys> buildParser(ClassLoader resourceLoader) {
@@ -126,7 +153,7 @@ public final class ClaimIntegrations {
     register(parser, verifiers, IntegrationsKeys.rerollFactionsBridge, FactionsBridgeChecker.PLUGIN_NAME, FactionsBridgeChecker.class, () -> FactionsBridgeChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollGriefDefender, "GriefDefender", GriefDefenderChecker.class, () -> GriefDefenderChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollGriefPrevention, "GriefPrevention", GriefPreventionChecker.class, () -> GriefPreventionChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollLands, "Lands", LandsChecker.class, () -> LandsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollLands, LANDS, LandsChecker.class, () -> LandsChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollRedProtect, "RedProtect", RedProtectChecker.class, () -> RedProtectChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollResidence, ResidenceChecker.PLUGIN_NAME, ResidenceChecker.class, () -> ResidenceChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollCrashClaim, CrashClaimChecker.PLUGIN_NAME, CrashClaimChecker.class, () -> CrashClaimChecker::isInClaim);
@@ -157,13 +184,20 @@ public final class ClaimIntegrations {
       String pluginName,
       Class<?> checkerClass,
       java.util.function.Supplier<ClaimCheck> checkSupplier) {
-    if (!flag(parser, key) || !Bukkit.getPluginManager().isPluginEnabled(pluginName)) {
+    boolean configured = flag(parser, key);
+    boolean enabled = Bukkit.getPluginManager().isPluginEnabled(pluginName);
+    if (!configured || !enabled) {
+      integrationStatuses.put(key, new IntegrationStatus(pluginName, key, configured, Outcome.SKIPPED, ""));
       return;
     }
     try {
       ClaimCheck check = checkSupplier.get();
       verifiers.register(checkerClass, loc -> !check.isInClaim(loc));
+      integrationStatuses.put(key, new IntegrationStatus(pluginName, key, true, Outcome.REGISTERED, ""));
     } catch (Throwable t) {
+      String message = t.getMessage() == null || t.getMessage().isBlank()
+          ? t.getClass().getName() : t.getMessage();
+      integrationStatuses.put(key, new IntegrationStatus(pluginName, key, true, Outcome.FAILED, message));
       RTP.log(
           java.util.logging.Level.WARNING,
           "[RTP] claim integration for "
@@ -175,7 +209,7 @@ public final class ClaimIntegrations {
 
   private static boolean flag(ConfigParser<IntegrationsKeys> parser, IntegrationsKeys key) {
     Object v = parser.getConfigValue(key, false);
-    if (v instanceof Boolean) return (Boolean) v;
+    if (v instanceof Boolean booleanValue) return booleanValue;
     return Boolean.parseBoolean(String.valueOf(v));
   }
 
@@ -192,7 +226,11 @@ public final class ClaimIntegrations {
     for (AutoCloseable handle : registeredProviders) {
       try {
         handle.close();
-      } catch (Throwable ignored) {
+      } catch (Exception e) {
+        RTP.log(
+            java.util.logging.Level.WARNING,
+            "[RTP] failed to close claim boundary provider handle " + handle.getClass().getName(),
+            e);
       }
     }
     registeredProviders.clear();
@@ -200,7 +238,7 @@ public final class ClaimIntegrations {
     registerProvider(parser, registry, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyBoundaryProvider::new);
     registerProvider(parser, registry, IntegrationsKeys.rerollGriefPrevention, "GriefPrevention", GriefPreventionBoundaryProvider::new);
     registerProvider(parser, registry, IntegrationsKeys.rerollSaberFactions, "Factions", FactionsBoundaryProvider::new);
-    registerProvider(parser, registry, IntegrationsKeys.rerollLands, "Lands", () -> new ClaimBoundaryProvider() {
+    registerProvider(parser, registry, IntegrationsKeys.rerollLands, LANDS, () -> new ClaimBoundaryProvider() {
       @Override
       public String namespace() {
         return "lands";

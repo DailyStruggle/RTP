@@ -112,8 +112,8 @@ Where:
 - **Valuation Weights:**
   - $w_{\text{isolation}} = +0.95$: Premium on absolute distance from strangers ($d > 1,500$ blocks).
   - $w_{\text{flatness}} = +0.80$: Low elevation variance ($\sigma_Y < 8$) to minimize terraforming overhead.
-  - $w_{\text{aesthetic\_biome}} = +0.85$: Vibrant foliage colors and scenic terrain backdrops.
-  - $c_{\text{prior\_activity}} = 1.0$ (Hard Veto): Chopped trees, floating leaves, torches, or nearby claims trigger an instant reroll.
+  - $w_{\text{aesthetic biome}} = +0.85$: Vibrant foliage colors and scenic terrain backdrops.
+  - $c_{\text{prior activity}} = 1.0$ (Hard Veto): Chopped trees, floating leaves, torches, or nearby claims trigger an instant reroll.
   - $c_{\text{hazard}} = 0.90$: Heavy penalty for ravines, cliffs, or surface lava pools.
 
 $$\mathcal{U}_{\text{homestead}} = 0.95 \cdot D_{\text{isolation}} + 0.85 \cdot B_{\text{aesthetic}} + 0.80 \cdot T_{\text{flat}} - 1.0 \cdot \mathbb{I}_{\text{defaced}} - 0.90 \cdot H_{\text{hazard}}$$
@@ -122,8 +122,8 @@ $$\mathcal{U}_{\text{homestead}} = 0.95 \cdot D_{\text{isolation}} + 0.85 \cdot 
 - **Psychological Profile:** High Achiever, high Miner. Motivated by inventory accumulation and material hoarding.
 - **Preferred Biomes:** Badlands (terracotta/gold), Deserts (sand), Warm/Deep Oceans (gravel/sponges), Dark Forest / Old Growth Taiga (dense wood), Deep Caves / Stony Peaks (exposed iron/coal).
 - **Valuation Weights:**
-  - $w_{\text{resource\_density}} = +1.0$: Volume of harvestable blocks per cubic meter.
-  - $w_{\text{cave\_exposure}} = +0.85$: Open ravines or cave mouths descending into deepslate ($Y < 0$).
+  - $w_{\text{resource density}} = +1.0$: Volume of harvestable blocks per cubic meter.
+  - $w_{\text{cave exposure}} = +0.85$: Open ravines or cave mouths descending into deepslate ($Y < 0$).
   - $w_{\text{isolation}} = 0.0$: Indifferent to neighboring builds, provided local resources are intact.
   - $c_{\text{depleted}} = 1.0$ (Hard Veto): Chopped tree stumps or mined quarry pits yield zero value -> instant reroll.
 
@@ -133,7 +133,7 @@ $$\mathcal{U}_{\text{extract}} = 1.0 \cdot R_{\text{density}} + 0.85 \cdot C_{\t
 - **Psychological Profile:** Pure Explorer. Motivated by discovery, rare loot (Armor Trims, Heavy Cores, Elytra), and world completion.
 - **Preferred Targets:** Ancient Cities, Trial Chambers, Villages, Woodland Mansions, Nether Fortresses, End Cities.
 - **Valuation Weights:**
-  - $w_{\text{structure\_proximity}} = +1.0$: Distance to nearest generated structure ($d \le 150$ blocks).
+  - $w_{\text{structure proximity}} = +1.0$: Distance to nearest generated structure ($d \le 150$ blocks).
   - $w_{\text{unlooted}} = +0.95$: Structure must contain intact chests and spawners.
   - $w_{\text{traversability}} = +0.60$: Open terrain or waterways facilitating high-speed flight or boat transit.
   - $c_{\text{permanence}} = 0.0$: Zero value placed on base-building suitability.
@@ -144,39 +144,39 @@ $$\mathcal{U}_{\text{hunter}} = 1.0 \cdot S_{\text{structure}} + 0.95 \cdot \mat
 - **Psychological Profile:** High Mastery / Systemic Achiever. Treats the Minecraft world as an engine to be optimized.
 - **Preferred Biomes:** Deep Ocean (eliminates surface and cave mob spawning within render distance), Swamps (Witch huts / low-slime rules), Deserts (Husk farms / low passive mob interference), Nether Soul Sand Valleys (Wither Skeleton / Ghast spawn concentration).
 - **Valuation Weights:**
-  - $w_{\text{mobcap\_isolation}} = +1.0$: Minimizes unlit subterranean volume within a 128-block spherical radius from the AFK platform.
-  - $w_{\text{low\_y}} = +0.90$: Surface elevation as close to bedrock as possible (exploiting the sub-chunk spawning algorithm: lower Y levels yield higher mob spawning rates).
-  - $w_{\text{chunk\_alignment}} = +0.70$: Natural alignment with slime chunks or bounding boxes of witch huts / nether structures.
-  - $c_{\text{entity\_clutter}} = 0.90$: Rejects chunks with excessive passive mob entities, tile entities, or overlapping village centers.
+  - $w_{\text{mobcap isolation}} = +1.0$: Minimizes unlit subterranean volume within a 128-block spherical radius from the AFK platform.
+  - $w_{\text{low y}} = +0.90$: Surface elevation as close to bedrock as possible (exploiting the sub-chunk spawning algorithm: lower Y levels yield higher mob spawning rates).
+  - $w_{\text{chunk alignment}} = +0.70$: Natural alignment with slime chunks or bounding boxes of witch huts / nether structures.
+  - $c_{\text{entity clutter}} = 0.90$: Rejects chunks with excessive passive mob entities, tile entities, or overlapping village centers.
 
-$$\mathcal{U}_{\text{technical}} = 1.0 \cdot M_{\text{isolation}} + 0.90 \cdot (1 - \hat{Y}_{\text{surface}}) + 0.70 \cdot A_{\text{structure\_box}} - 0.90 \cdot E_{\text{clutter}}$$
+$$\mathcal{U}_{\text{technical}} = 1.0 \cdot M_{\text{isolation}} + 0.90 \cdot (1 - \hat{Y}_{\text{surface}}) + 0.70 \cdot A_{\text{structure box}} - 0.90 \cdot E_{\text{clutter}}$$
 
 ### Archetype 5: The Anarchy Survivor (Concealment Specialist)
 - **Psychological Profile:** Paranoia-driven Survivalist. Operates under zero grief rules or theft protection.
 - **Valuation Weights:**
-  - $w_{\text{spawn\_distance}} = +1.0$: Distance from world spawn ($d > 50,000$ blocks).
+  - $w_{\text{spawn distance}} = +1.0$: Distance from world spawn ($d > 50,000$ blocks).
   - $w_{\text{concealment}} = +0.95$: Natural camouflage (deep ocean floor, under ocean monuments with mining fatigue, hollow mountain interiors).
-  - $c_{\text{rtp\_landing\_zone}} = 1.0$ (Hard Veto): Rejects any location where another player could casually land via `/rtp` (e.g., standard flat plains, hills, or land within the core RTP radius).
+  - $c_{\text{rtp landing zone}} = 1.0$ (Hard Veto): Rejects any location where another player could casually land via `/rtp` (e.g., standard flat plains, hills, or land within the core RTP radius).
   - $c_{\text{trail}} = 1.0$: Any visible entry path or coordinate marker is an immediate disqualifier.
 
-$$\mathcal{U}_{\text{survivor}} = 1.0 \cdot D_{\text{spawn}} + 0.95 \cdot C_{\text{camouflage}} - 1.0 \cdot \mathbb{I}_{\text{rtp\_reachable}}$$
+$$\mathcal{U}_{\text{survivor}} = 1.0 \cdot D_{\text{spawn}} + 0.95 \cdot C_{\text{camouflage}} - 1.0 \cdot \mathbb{I}_{\text{rtp reachable}}$$
 
 ### Archetype 6: The Competitive Raider / Faction Scout
 - **Psychological Profile:** High Killer / Competitor. Seeks confrontation, dominance, and economic looting.
 - **Valuation Weights:**
-  - $w_{\text{target\_proximity}} = +1.0$: Prefers landing between $150$ and $400$ blocks from a target base (close enough to infiltrate, far enough to avoid claim-detection alarms or anti-RTP claim protection).
-  - $w_{\text{radar\_signals}} = +0.80$: Detects tile-entity clusters, animal pens, or custom player blocks via client rendering or map markers.
-  - $c_{\text{empty\_wilderness}} = 0.85$: Pristine, untouched wilderness has low utility -> triggers another `/rtp` jump to continue scanning the perimeter ring.
+  - $w_{\text{target proximity}} = +1.0$: Prefers landing between $150$ and $400$ blocks from a target base (close enough to infiltrate, far enough to avoid claim-detection alarms or anti-RTP claim protection).
+  - $w_{\text{radar signals}} = +0.80$: Detects tile-entity clusters, animal pens, or custom player blocks via client rendering or map markers.
+  - $c_{\text{empty wilderness}} = 0.85$: Pristine, untouched wilderness has low utility -> triggers another `/rtp` jump to continue scanning the perimeter ring.
 
 $$\mathcal{U}_{\text{raider}} = 1.0 \cdot P_{\text{target}} + 0.80 \cdot S_{\text{radar}} - 0.85 \cdot \mathbb{I}_{\text{pristine}}$$
 
 ### Archetype 7: The Co-op Guild Pioneer (Group Settlement)
 - **Psychological Profile:** Socializer / Collaborative Builder. Plays with a dedicated group of friends or guildmates.
 - **Valuation Weights:**
-  - $w_{\text{spatial\_capacity}} = +1.0$: Contiguous usable land area ($> 500 \times 500$ blocks without severe mountains or ravines dividing the plots).
-  - $w_{\text{biome\_diversity}} = +0.80$: Multiple biome borders within 250 blocks to support diverse aesthetic tastes among group members.
-  - $w_{\text{isolation\_external}} = +0.90$: High distance from non-guild strangers.
-  - $c_{\text{boundary\_clamping}} = 1.0$: Landing near the server's world border or near foreign claims that restrict outward expansion.
+  - $w_{\text{spatial capacity}} = +1.0$: Contiguous usable land area ($> 500 \times 500$ blocks without severe mountains or ravines dividing the plots).
+  - $w_{\text{biome diversity}} = +0.80$: Multiple biome borders within 250 blocks to support diverse aesthetic tastes among group members.
+  - $w_{\text{isolation external}} = +0.90$: High distance from non-guild strangers.
+  - $c_{\text{boundary clamping}} = 1.0$: Landing near the server's world border or near foreign claims that restrict outward expansion.
 
 $$\mathcal{U}_{\text{guild}} = 1.0 \cdot A_{\text{capacity}} + 0.80 \cdot B_{\text{diversity}} + 0.90 \cdot D_{\text{strangers}} - 1.0 \cdot \mathbb{I}_{\text{cramped}}$$
 

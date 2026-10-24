@@ -37,62 +37,69 @@ import java.util.regex.Pattern;
 
 /** Structural checks for action definitions, sharing allowed values with their runtime consumers. */
 public final class ActionDefinitionValidator {
+    private static final String ACTION_CODE_SCOPE = "action";
+    private static final String ACTIONS_KEY = "actions";
+    private static final String COMMAND_KEY = "command";
+    private static final String EXECUTE_KEY = "execute";
+    private static final String RUN_KEY = "run";
+    private static final String REGION_KEY = "region";
     static final Vocabulary TRIGGER_TYPES = new Vocabulary("trigger type",
             java.util.Arrays.stream(PhysicalTriggerSpec.TriggerType.values()).map(Enum::name).toList());
 
     public static final BitCode UNKNOWN_LIFECYCLE_STAGE = RtpBitCodes.ACTION.register(2001,
-            "ACTION_UNKNOWN_LIFECYCLE_STAGE", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_UNKNOWN_LIFECYCLE_STAGE", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Rename the stage to one listed in expected; unknown stages never run.");
     public static final BitCode UNKNOWN_STEP_KEY = RtpBitCodes.ACTION.register(2002,
-            "ACTION_UNKNOWN_STEP_KEY", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_UNKNOWN_STEP_KEY", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Rename the step key to one listed in expected; unknown keys are dropped at load.");
     public static final BitCode UNKNOWN_ACTION_NAME = RtpBitCodes.ACTION.register(2003,
-            "ACTION_UNKNOWN_ACTION_NAME", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_UNKNOWN_ACTION_NAME", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Use an ACTION: name listed in expected; unknown names are ignored during loading.");
     public static final BitCode UNKNOWN_GATE_TYPE = RtpBitCodes.ACTION.register(2004,
-            "ACTION_UNKNOWN_GATE_TYPE", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_UNKNOWN_GATE_TYPE", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Use a gate type listed in expected; unknown gates always evaluate false.");
     public static final BitCode UNKNOWN_TRIGGER_TYPE = RtpBitCodes.ACTION.register(2005,
-            "ACTION_UNKNOWN_TRIGGER_TYPE", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_UNKNOWN_TRIGGER_TYPE", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Use a trigger type listed in expected; triggers with unknown types are skipped.");
     public static final BitCode PLACEHOLDER_OUT_OF_SCOPE = RtpBitCodes.ACTION.register(2006,
-            "ACTION_PLACEHOLDER_OUT_OF_SCOPE", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_PLACEHOLDER_OUT_OF_SCOPE", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Use this placeholder only in the lifecycle stage or action scope that provides it.");
     public static final BitCode PLACEHOLDER_UNKNOWN = RtpBitCodes.ACTION.register(2007,
-            "ACTION_PLACEHOLDER_UNKNOWN", Level.WARNING, BitTier.PBIT, "action", "",
+            "ACTION_PLACEHOLDER_UNKNOWN", Level.WARNING, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Check the placeholder spelling; metadata-defined tokens are not validated as known tokens.");
     public static final BitCode SCOREBOARD_MANAGED_TYPO = RtpBitCodes.ACTION.register(2008,
-            "ACTION_SCOREBOARD_MANAGED_TYPO", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_SCOREBOARD_MANAGED_TYPO", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Use the suggested RTP-managed scoreboard objective or choose an external objective.");
     public static final BitCode SCOREBOARD_OBJECTIVE_MISSING = RtpBitCodes.ACTION.register(2009,
-            "ACTION_SCOREBOARD_OBJECTIVE_MISSING", Level.WARNING, BitTier.PBIT, "action", "",
+            "ACTION_SCOREBOARD_OBJECTIVE_MISSING", Level.WARNING, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Create the scoreboard objective on the server or correct its name.");
     public static final BitCode GATE_EXPRESSION_INVALID = RtpBitCodes.ACTION.register(2010,
-            "ACTION_GATE_EXPRESSION_INVALID", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_GATE_EXPRESSION_INVALID", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Use a numeric comparison, exact number, or inclusive min..max range accepted by GateExpressionParser.");
     public static final BitCode UNKNOWN_GATE_SUBKEY = RtpBitCodes.ACTION.register(2011,
-            "ACTION_UNKNOWN_GATE_SUBKEY", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_UNKNOWN_GATE_SUBKEY", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Use a gate field listed in expected; gate field names are case-sensitive.");
     public static final BitCode MISSING_GATE_SUBKEY = RtpBitCodes.ACTION.register(2012,
-            "ACTION_MISSING_GATE_SUBKEY", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_MISSING_GATE_SUBKEY", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Add the required gate field or one of the listed alternatives.");
     public static final BitCode UNKNOWN_REGION = RtpBitCodes.ACTION.register(2013,
-            "ACTION_UNKNOWN_REGION", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_UNKNOWN_REGION", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Choose a region present in the loaded region configuration.");
     public static final BitCode SCHEMATIC_UNRESOLVED = RtpBitCodes.ACTION.register(2014,
-            "ACTION_SCHEMATIC_UNRESOLVED", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_SCHEMATIC_UNRESOLVED", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Place the schematic under advanced/schematics and reference an existing file.");
     public static final BitCode PAYLOAD_UNBALANCED = RtpBitCodes.ACTION.register(2015,
-            "ACTION_PAYLOAD_UNBALANCED", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_PAYLOAD_UNBALANCED", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Balance quotes, brackets and braces in the vanilla command payload.");
     public static final BitCode PAYLOAD_JSON_INVALID = RtpBitCodes.ACTION.register(2016,
-            "ACTION_PAYLOAD_JSON_INVALID", Level.ERROR, BitTier.PBIT, "action", "",
+            "ACTION_PAYLOAD_JSON_INVALID", Level.ERROR, BitTier.PBIT, ACTION_CODE_SCOPE, "",
             "Provide a valid JSON text component where tellraw or title expects one.");
 
     private static final Pattern TELLRAW_COMPONENT = Pattern.compile(
-            "(?i)^\\s*/?(?:minecraft:)?tellraw\\s+\\S+\\s+(.+)$");
+            "(?i)^\\s*/?(?:minecraft:)?tellraw\\s+\\S+\\s+(.++)$");
     private static final Pattern TITLE_COMPONENT = Pattern.compile(
-            "(?i)^\\s*/?(?:minecraft:)?title\\s+\\S+\\s+(?:title|subtitle|actionbar)\\s+(.+)$");
+            "(?i)^\\s*/?(?:minecraft:)?title\\s+\\S+\\s+(?:title|subtitle|actionbar)\\s+(.++)$");
+    private static final Pattern INTEGER_TOKEN = Pattern.compile("\\d+");
     private static final Set<String> EXPRESSION_SUB_KEYS = Set.of(
             "matches", "range", "distance", "elevationDelta", "elapsed", "remaining", "playerCount", "count");
     private static final Set<String> SCALAR_EXPRESSION_GATES = Set.of("players", "participants", "queue", "participantcount");
@@ -130,20 +137,36 @@ public final class ActionDefinitionValidator {
         if (definition == null) return BitReport.of(findings);
         Environment inputs = environment == null ? Environment.NONE : environment;
         String actionId = id == null || id.isBlank() ? "<unknown>" : id;
-        KeyPath root = KeyPath.root("actions").key(actionId);
+        KeyPath root = KeyPath.root(ACTIONS_KEY).key(actionId);
         inspectLifecycle(value(definition, "lifecycle"), source, root.key("lifecycle"), inputs, findings);
-        inspectCommand(value(definition, "command"), source, root.key("command"), inputs, findings);
+        inspectCommand(value(definition, COMMAND_KEY), source, root.key(COMMAND_KEY), inputs, findings);
         inspectConfinement(value(definition, "confinement"), source, root.key("confinement"), inputs, findings);
-        Object gate = value(definition, "gate");
-        String gateKey = gate == null ? "gates" : "gate";
-        inspectGateValue(gate == null ? value(definition, "gates") : gate, source, root.key(gateKey),
-                scope(ActionPlaceholderSanitizer.PRE_GATE), inputs, findings);
+        inspectGateDefinition(definition, source, root, inputs, findings);
         inspectPlacement(value(definition, "placement"), source, root.key("placement"), inputs, findings);
-        Object triggers = value(definition, "trigger");
-        String triggerKey = triggers == null ? "triggers" : "trigger";
-        inspectTriggers(triggers == null ? value(definition, "triggers") : triggers,
-                source, root.key(triggerKey), findings);
+        inspectTriggerDefinition(definition, source, root, findings);
         return BitReport.of(findings);
+    }
+
+    private static void inspectGateDefinition(
+            Map<?, ?> definition, String source, KeyPath root, Environment environment, List<BitFinding> findings) {
+        Object gate = value(definition, "gate");
+        if (gate != null) {
+            inspectGateValue(gate, source, root.key("gate"),
+                    scope(ActionPlaceholderSanitizer.PRE_GATE), environment, findings);
+            return;
+        }
+        inspectGateValue(value(definition, "gates"), source, root.key("gates"),
+                scope(ActionPlaceholderSanitizer.PRE_GATE), environment, findings);
+    }
+
+    private static void inspectTriggerDefinition(
+            Map<?, ?> definition, String source, KeyPath root, List<BitFinding> findings) {
+        Object triggers = value(definition, "trigger");
+        if (triggers != null) {
+            inspectTriggers(triggers, source, root.key("trigger"), findings);
+            return;
+        }
+        inspectTriggers(value(definition, "triggers"), source, root.key("triggers"), findings);
     }
 
     private static void inspectLifecycle(
@@ -177,8 +200,8 @@ public final class ActionDefinitionValidator {
             Object actions = value(subcommand, "run");
             String actionKey = "run";
             if (actions == null) {
-                actions = value(subcommand, "actions");
-                actionKey = "actions";
+                actions = value(subcommand, ACTIONS_KEY);
+                actionKey = ACTIONS_KEY;
             }
             if (actions != null) {
                 inspectActions(actions, source,
@@ -325,36 +348,70 @@ public final class ActionDefinitionValidator {
                 findings.add(unknown(UNKNOWN_GATE_TYPE, source, path.key(type), type, GateEvaluator.GATE_TYPES));
                 continue;
             }
-
-            String canonicalType = type.toLowerCase(Locale.ROOT);
-            KeyPath gatePath = path.key(type);
-            Map<?, ?> gateValue = asMap(entry.getValue());
-            if (gateValue != null) {
-                inspectGateSubKeys(canonicalType, gateValue, source, gatePath, findings);
-                inspectGateExpressions(canonicalType, gateValue, source, gatePath, findings);
-                if (canonicalType.equals("scoreboard")) {
-                    inspectScoreboardObjective(value(gateValue, "objective"), source,
-                            gatePath.key("objective"), environment, findings);
-                } else if (canonicalType.equals("command")) {
-                    Object commands = value(gateValue, "execute");
-                    String commandKey = "execute";
-                    if (commands == null) {
-                        commands = value(gateValue, "run");
-                        commandKey = "run";
-                    }
-                    inspectPayloadValue(commands, source, gatePath.key(commandKey),
-                            scope(scope, ActionPlaceholderSanitizer.GATE_COMMAND), findings);
-                }
-            } else if (canonicalType.equals("command")) {
-                inspectPayloadValue(entry.getValue(), source, gatePath,
-                        scope(scope, ActionPlaceholderSanitizer.GATE_COMMAND), findings);
-            } else if (SCALAR_EXPRESSION_GATES.contains(canonicalType) && entry.getValue() != null
-                    && !GateExpressionParser.isValid(entry.getValue().toString())) {
-                findings.add(BitFinding.of(GATE_EXPRESSION_INVALID, source, gatePath.toString(),
-                        "Invalid gate expression: " + entry.getValue(),
-                        "comparison, exact number, or min..max range", ""));
-            }
+            inspectKnownGate(entry, type, source, path, scope, environment, findings);
         }
+    }
+
+    private static void inspectKnownGate(
+            Map.Entry<?, ?> entry,
+            String type,
+            String source,
+            KeyPath path,
+            Set<String> scope,
+            Environment environment,
+            List<BitFinding> findings) {
+        String canonicalType = type.toLowerCase(Locale.ROOT);
+        KeyPath gatePath = path.key(type);
+        Map<?, ?> gateValue = asMap(entry.getValue());
+        if (gateValue == null) {
+            inspectScalarGate(canonicalType, entry.getValue(), source, gatePath, scope, findings);
+            return;
+        }
+        inspectGateSubKeys(canonicalType, gateValue, source, gatePath, findings);
+        inspectGateExpressions(canonicalType, gateValue, source, gatePath, findings);
+        inspectStructuredGate(canonicalType, gateValue, source, gatePath, scope, environment, findings);
+    }
+
+    private static void inspectStructuredGate(
+            String gateType,
+            Map<?, ?> value,
+            String source,
+            KeyPath path,
+            Set<String> scope,
+            Environment environment,
+            List<BitFinding> findings) {
+        if (gateType.equals("scoreboard")) {
+            inspectScoreboardObjective(value(value, "objective"), source,
+                    path.key("objective"), environment, findings);
+        } else if (gateType.equals(COMMAND_KEY)) {
+            inspectCommandGateValue(value, source, path, scope, findings);
+        }
+    }
+
+    private static void inspectCommandGateValue(
+            Map<?, ?> value, String source, KeyPath path, Set<String> scope, List<BitFinding> findings) {
+        Object commands = value(value, EXECUTE_KEY);
+        String commandKey = EXECUTE_KEY;
+        if (commands == null) {
+            commands = value(value, RUN_KEY);
+            commandKey = RUN_KEY;
+        }
+        inspectPayloadValue(commands, source, path.key(commandKey),
+                scope(scope, ActionPlaceholderSanitizer.GATE_COMMAND), findings);
+    }
+
+    private static void inspectScalarGate(
+            String gateType, Object value, String source, KeyPath path, Set<String> scope,
+            List<BitFinding> findings) {
+        if (gateType.equals(COMMAND_KEY)) {
+            inspectPayloadValue(value, source, path, scope(scope, ActionPlaceholderSanitizer.GATE_COMMAND), findings);
+            return;
+        }
+        if (!SCALAR_EXPRESSION_GATES.contains(gateType) || value == null
+                || GateExpressionParser.isValid(value.toString())) return;
+        findings.add(BitFinding.of(GATE_EXPRESSION_INVALID, source, path.toString(),
+                "Invalid gate expression: " + value,
+                "comparison, exact number, or min..max range", ""));
     }
 
     private static void inspectGateSubKeys(
@@ -428,12 +485,12 @@ public final class ActionDefinitionValidator {
             Object raw, String source, KeyPath path, Environment environment, List<BitFinding> findings) {
         Map<?, ?> placement = asMap(raw);
         if (placement == null) return;
-        Object regionValue = value(placement, "region");
+        Object regionValue = value(placement, REGION_KEY);
         if (regionValue != null && !environment.regionNames().isEmpty()) {
             String region = regionValue.toString().trim();
             if (environment.regionNames().stream().noneMatch(name -> name.equalsIgnoreCase(region))) {
-                Vocabulary regions = new Vocabulary("region", environment.regionNames().stream().sorted().toList());
-                findings.add(BitFinding.of(UNKNOWN_REGION, source, path.key("region").toString(),
+                Vocabulary regions = new Vocabulary(REGION_KEY, environment.regionNames().stream().sorted().toList());
+                findings.add(BitFinding.of(UNKNOWN_REGION, source, path.key(REGION_KEY).toString(),
                         "Placement region is not loaded: " + region,
                         String.join(", ", environment.regionNames().stream().sorted().toList()),
                         regions.suggest(region).orElse("")));
@@ -519,7 +576,7 @@ public final class ActionDefinitionValidator {
     private static void inspectPlaceholders(String payload, String source, KeyPath path, Set<String> scope,
             List<BitFinding> findings) {
         for (String token : ActionPlaceholderSanitizer.placeholders(payload)) {
-            if (token.matches("\\d+")) continue;
+            if (INTEGER_TOKEN.matcher(token).matches()) continue;
             if (!ActionPlaceholderSanitizer.inScope(token, ActionPlaceholderSanitizer.knownTokens())) {
                 Vocabulary knownTokens = new Vocabulary("placeholder",
                         ActionPlaceholderSanitizer.knownTokens().stream().sorted().toList());
@@ -642,6 +699,7 @@ public final class ActionDefinitionValidator {
         return null;
     }
 
+    @SuppressWarnings("java:S1168") // Null identifies malformed non-mapping input so validators can skip it.
     private static Map<?, ?> asMap(Object value) {
         if (value instanceof Map<?, ?> map) return map;
         if (value instanceof RtpYamlSection section) return section.getValues(false);

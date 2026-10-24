@@ -10,7 +10,6 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -118,7 +117,6 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
             BitSideEffect.HEAVY,
             COMPONENT_TIMEOUT_MS,
             () -> ProbeBitReport.forProbe("queue-starvation").build());
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

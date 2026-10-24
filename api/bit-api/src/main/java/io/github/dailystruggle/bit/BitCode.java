@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * One row of a BIT table: a stable numeric id paired with a stable string key.
+ * One row of a BIT table: a namespace-local stable numeric id paired with a stable string key.
  *
  * <p>Invariant: once published, neither {@code id} nor {@code key} is renamed or reused; retired
  * codes stay reserved. {@code messageKey} is the owning plugin's localisation key and may be empty
@@ -33,5 +33,11 @@ public record BitCode(
         subsystem = subsystem == null ? "" : subsystem;
         messageKey = messageKey == null ? "" : messageKey;
         remediation = remediation == null ? "" : remediation;
+    }
+
+    /** Namespace prefix derived from this code's key. */
+    public String namespace() {
+        int separator = key.indexOf('_');
+        return separator < 1 ? "" : key.substring(0, separator);
     }
 }

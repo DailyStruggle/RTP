@@ -10,10 +10,13 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,25 +45,35 @@ public final class RtpBitCli {
         boolean scriptSpecified = false;
         boolean json = false;
         boolean strict = false;
-        for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
+        Iterator<String> arguments = Arrays.asList(args).iterator();
+        while (arguments.hasNext()) {
+            String argument = arguments.next();
+            switch (argument) {
                 case "--config" -> {
-                    if (++i >= args.length || args[i].isBlank() || configDirectory != null) {
+                    if (!arguments.hasNext()) {
                         return usage(errors, "--config requires one directory");
                     }
-                    configDirectory = new File(args[i]);
+                    String value = arguments.next();
+                    if (value.isBlank() || configDirectory != null) {
+                        return usage(errors, "--config requires one directory");
+                    }
+                    configDirectory = new File(value);
                 }
                 case "--action" -> {
-                    if (++i >= args.length || args[i].isBlank() || actionId != null) {
+                    if (!arguments.hasNext()) {
                         return usage(errors, "--action requires one action id");
                     }
-                    actionId = args[i];
+                    String value = arguments.next();
+                    if (value.isBlank() || actionId != null) {
+                        return usage(errors, "--action requires one action id");
+                    }
+                    actionId = value;
                 }
                 case "--players" -> {
                     playersSpecified = true;
-                    if (++i >= args.length) return usage(errors, "--players requires a number from 1 to 16");
+                    if (!arguments.hasNext()) return usage(errors, "--players requires a number from 1 to 16");
                     try {
-                        players = Integer.parseInt(args[i]);
+                        players = Integer.parseInt(arguments.next());
                     } catch (NumberFormatException failure) {
                         return usage(errors, "--players requires a number from 1 to 16");
                     }
@@ -68,14 +81,14 @@ public final class RtpBitCli {
                 }
                 case "--script" -> {
                     scriptSpecified = true;
-                    if (++i >= args.length) return usage(errors, "--script requires comma-separated events");
-                    script = parseScript(args[i]);
+                    if (!arguments.hasNext()) return usage(errors, "--script requires comma-separated events");
+                    script = parseScript(arguments.next());
                     if (script == null) return usage(errors, "--script supports violate,die,expire");
                 }
                 case "--json" -> json = true;
                 case "--strict" -> strict = true;
                 default -> {
-                    return usage(errors, "unknown argument: " + args[i]);
+                    return usage(errors, "unknown argument: " + argument);
                 }
             }
         }
@@ -88,7 +101,7 @@ public final class RtpBitCli {
 
         try {
             loadSeverityPolicy(configDirectory, strict);
-        } catch (Exception failure) {
+        } catch (IOException | RuntimeException failure) {
             errors.accept("Unable to read BIT configuration: " + failure.getMessage());
             return 2;
         }
@@ -110,7 +123,7 @@ public final class RtpBitCli {
         return bitExitCode;
     }
 
-    private static void loadSeverityPolicy(File configDirectory, boolean strict) throws Exception {
+    private static void loadSeverityPolicy(File configDirectory, boolean strict) throws IOException {
         File bitConfig = new File(configDirectory, "advanced/bit.yml");
         if (!bitConfig.isFile()) {
             BitSeverityPolicy.load(strict, Map.of());
@@ -143,6 +156,7 @@ public final class RtpBitCli {
         return 2;
     }
 
+    @SuppressWarnings("java:S1168") // Null signals invalid CLI script syntax; an empty list is valid.
     private static List<String> parseScript(String value) {
         if (value == null || value.isBlank()) return List.of();
         List<String> parsed = new ArrayList<>();

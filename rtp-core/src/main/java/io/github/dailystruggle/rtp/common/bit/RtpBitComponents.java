@@ -28,16 +28,22 @@ public final class RtpBitComponents {
             COMPONENT_TIMEOUT_MILLIS, ActionCbitCounters::report);
     private static final BitComponent ANVIL_ZSTD = anvilComponent("anvil-zstd",
             () -> bitReport("anvil-zstd",
-                    io.github.dailystruggle.rtp.anvil.DynamicZstdBinding.INSTANCE));
+                    io.github.dailystruggle.rtp.anvil.DynamicZstdBinding.INSTANCE,
+                    io.github.dailystruggle.rtp.anvil.DynamicZstdBinding.hostEngineMissing()));
     private static final BitComponent ANVIL_LINEAR = anvilComponent("anvil-linear",
             () -> bitReport("anvil-linear",
-                    io.github.dailystruggle.rtp.anvil.LinearRegionReader.INSTANCE));
+                    io.github.dailystruggle.rtp.anvil.LinearRegionReader.INSTANCE,
+                    io.github.dailystruggle.rtp.anvil.DynamicZstdBinding.hostEngineMissing()));
     private static final BitComponent ANVIL_FORMAT_DETECTOR = anvilComponent("anvil-format-detector",
             () -> bitReport("anvil-format-detector",
                     io.github.dailystruggle.rtp.anvil.RegionFormatDetector.INSTANCE));
 
+    private static final BitComponent BIT_NAMESPACES = new BitComponent(
+            "bit-namespaces", "bit", BitTier.PBIT, BitSideEffect.SAFE,
+            COMPONENT_TIMEOUT_MILLIS, () -> namespaceReport(RtpBitCodes.REGISTRY));
+
     private static final List<BitComponent> DEFAULTS = List.of(
-            ACTION_DEFINITIONS, ANVIL_ZSTD, ANVIL_LINEAR, ANVIL_FORMAT_DETECTOR);
+            ACTION_DEFINITIONS, ANVIL_ZSTD, ANVIL_LINEAR, ANVIL_FORMAT_DETECTOR, BIT_NAMESPACES);
 
     private RtpBitComponents() {}
 
@@ -76,6 +82,18 @@ public final class RtpBitComponents {
         return BitReport.of(findings);
     }
 
+    /** One ERROR per prefix reserved by two owners; such a clash would otherwise stay silent until keys collide. */
+    static BitReport namespaceReport(io.github.dailystruggle.bit.BitCodeRegistry registry) {
+        List<BitFinding> findings = new ArrayList<>();
+        for (io.github.dailystruggle.bit.NamespaceConflict conflict : registry.conflicts()) {
+            findings.add(BitFinding.of(BitCodes.NAMESPACE_CONFLICT, conflict.claimant(), conflict.prefix(),
+                    "BIT code prefix " + conflict.prefix() + " is reserved by " + conflict.owner()
+                            + " and also claimed by " + conflict.claimant() + ".",
+                    "one owner per prefix", BitCodes.NAMESPACE_CONFLICT.remediation()));
+        }
+        return BitReport.of(findings);
+    }
+
     static BitReport bitReport(String id, BuiltInTestable component) {
         PbitResult pbit = component.executePbit();
         BitHealth health = component.getHealthStatus();
@@ -98,5 +116,13 @@ public final class RtpBitComponents {
         BitHealth reportHealth = health;
         if (!pbit.passed() && health != BitHealth.DEGRADED) reportHealth = BitHealth.FAILED;
         return new BitReport(BitReport.CURRENT_SCHEMA, reportHealth, findings);
+    }
+
+    static BitReport bitReport(String id, BuiltInTestable component, boolean optionalMissing) {
+        if (!optionalMissing) return bitReport(id, component);
+        BitFinding finding = BitFinding.of(BitCodes.OPTIONAL_UNAVAILABLE, id, "",
+                "Host Zstandard engine is not present; safe live-load fallback is active.",
+                "Optional Zstandard engine available", BitCodes.OPTIONAL_UNAVAILABLE.remediation());
+        return new BitReport(BitReport.CURRENT_SCHEMA, BitHealth.HEALTHY, List.of(finding));
     }
 }

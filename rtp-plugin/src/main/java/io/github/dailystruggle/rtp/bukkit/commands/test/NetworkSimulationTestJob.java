@@ -221,7 +221,6 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
             BitSideEffect.SAFE,
             60_000,
             NetworkSimulationTestJob::runTokenCheck);
-    RtpBit.RUNNER.register(component);
     return component;
   }
   private static BitReport runTokenCheck() {

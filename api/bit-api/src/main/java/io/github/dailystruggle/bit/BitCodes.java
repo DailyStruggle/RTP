@@ -3,11 +3,11 @@ package io.github.dailystruggle.bit;
 import java.lang.System.Logger.Level;
 import java.util.List;
 
-/** Codes emitted by {@code bit-api} itself, in the reserved {@code BIT} namespace (ids 1..999). */
+/** Codes emitted by {@code bit-api} itself, in the reserved {@code BIT} namespace. */
 public final class BitCodes {
     public static final String PREFIX = "BIT";
-    public static final int FIRST_ID = 1;
-    public static final int LAST_ID = 999;
+    /** Owner recorded for the {@code BIT} namespace. */
+    public static final String OWNER = "bit-api";
 
     public static final BitCode PBIT_FAILED = new BitCode(1, "BIT_PBIT_FAILED", Level.ERROR,
             BitTier.PBIT, "bit", "", "Inspect the component diagnostic message and fix the failing check.");
@@ -23,11 +23,17 @@ public final class BitCodes {
             BitTier.IBIT, "bit", "", "Fix the component failure and return a BitReport instead of throwing.");
     public static final BitCode COMPONENT_UNKNOWN = new BitCode(7, "BIT_COMPONENT_UNKNOWN", Level.ERROR,
             BitTier.IBIT, "bit", "", "Select a registered component or a matching tier/subsystem.");
+    public static final BitCode OPTIONAL_UNAVAILABLE = new BitCode(8, "BIT_OPTIONAL_UNAVAILABLE", Level.INFO,
+            BitTier.PBIT, "bit", "", "Install zstd-jni to enable Zstandard-backed region-file support.");
+    public static final BitCode NAMESPACE_CONFLICT = new BitCode(9, "BIT_NAMESPACE_CONFLICT", Level.ERROR,
+            BitTier.PBIT, "bit", "",
+            "Two plugins reserved the same BIT code prefix; change one plugin's prefix or remove one of them.");
 
     private BitCodes() {}
 
     public static List<BitCode> all() {
         return List.of(PBIT_FAILED, PBIT_THROWN, HEALTH_FAILED, HEALTH_DEGRADED,
-                COMPONENT_TIMEOUT, COMPONENT_THROWN, COMPONENT_UNKNOWN);
+                COMPONENT_TIMEOUT, COMPONENT_THROWN, COMPONENT_UNKNOWN, OPTIONAL_UNAVAILABLE,
+                NAMESPACE_CONFLICT);
     }
 }

@@ -628,8 +628,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     // ADR-049: install the platform backend-heartbeat sampler factory so the
     // platform-neutral NetworkModeBootstrap (rtp-core) can build a sampler
     // without importing this Bukkit-family class. Idempotent across reloads.
-    NetworkHooks.setBackendStateSamplerFactory(lobbyMode ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode));
+    NetworkHooks.setBackendStateSamplerFactory(
+        io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler::new);
     // rtp-proxy-ADR-016: install the tier-1 (DB-free) plugin-message bridge
     // factory so NetworkModeBootstrap can open the plugin-message / auto
     // transports without importing this Bukkit-family class. Idempotent across
@@ -1491,7 +1491,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     } catch (Exception ignored) {
       // Material lookup threw; fall back to normalizer
     }
-    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+    return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
 
   // ---------------------------------------------------------------------------

@@ -1673,6 +1673,15 @@ tasks.register('generateBitCodes', JavaExec) {
     args '--write', rootProject.projectDir.absolutePath
 }
 
+tasks.register('updateBitCodeLock', JavaExec) {
+    group = 'documentation'
+    description = 'Appends BIT code identities and refreshes default severities in the release lock.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.dailystruggle.rtp.bukkit.commands.test.BitCodeCatalogExport'
+    args '--lock', rootProject.projectDir.absolutePath
+}
+
 tasks.register('checkBitCodes', JavaExec) {
     group = 'verification'
     description = 'Fails when the committed BIT code catalog differs from registered code owners (ADR-121).'

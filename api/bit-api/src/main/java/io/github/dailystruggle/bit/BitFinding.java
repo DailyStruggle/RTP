@@ -31,6 +31,13 @@ public record BitFinding(
         suggestion = emptyIfNull(suggestion);
     }
 
+    /** Namespace prefix derived from this finding's registered code, or empty for a legacy code. */
+    public String namespace() {
+        if (codeId == 0) return "";
+        int separator = code.indexOf('_');
+        return separator < 1 ? "" : code.substring(0, separator);
+    }
+
     /** Finding with an unregistered string code ({@code codeId == 0}). */
     public BitFinding(Level severity, String code, String source, String path,
                       String message, String expected, String suggestion) {

@@ -195,6 +195,7 @@ public class TestActionCmd extends BaseRTPCmdImpl {
     }
   }
 
+  @SuppressWarnings("java:S1168") // Null marks unsupported script tokens; empty is a valid no-op script.
   private static List<String> parseScript(@Nullable String value) {
     if (value == null || value.isBlank()) return List.of();
     String[] tokens = value.split(",", -1);

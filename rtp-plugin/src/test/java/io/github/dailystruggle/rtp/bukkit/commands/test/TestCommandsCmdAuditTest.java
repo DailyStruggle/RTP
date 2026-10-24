@@ -76,6 +76,46 @@ class TestCommandsCmdAuditTest {
   }
 
   @Test
+  @DisplayName("declared alias resolves when the child's canonical lookup key is present")
+  void declaredAliasIsAccepted() {
+    FakeNode root = new FakeNode(null, "root", "rtp");
+    FakeNode child = new FakeNode(root, "action", "rtp.action");
+    root.addChild(child);
+    root.commandLookup.put("RUN", child);
+
+    TestCommandsCmd.AuditReport r = TestCommandsCmd.auditForTest(root);
+
+    assertEquals(0, r.keyNameMismatch.size(), () -> dump(r));
+    assertEquals(0, r.totalIssues(), () -> dump(r));
+  }
+
+  @Test
+  @DisplayName("alias without the child's canonical lookup key is flagged")
+  void orphanAliasFlagged() {
+    FakeNode root = new FakeNode(null, "root", "rtp");
+    FakeNode child = new FakeNode(root, "scatter", "rtp.scatter");
+    root.commandLookup.put("WILD", child);
+
+    TestCommandsCmd.AuditReport r = TestCommandsCmd.auditForTest(root);
+
+    assertEquals(1, r.keyNameMismatch.size(), () -> dump(r));
+    assertTrue(r.keyNameMismatch.get(0).contains("key=WILD"));
+  }
+
+  @Test
+  @DisplayName("lowercase lookup keys are flagged as undispatchable")
+  void lowercaseLookupKeyFlagged() {
+    FakeNode root = new FakeNode(null, "root", "rtp");
+    FakeNode child = new FakeNode(root, "leaf", "rtp.leaf");
+    root.commandLookup.put("leaf", child);
+
+    TestCommandsCmd.AuditReport r = TestCommandsCmd.auditForTest(root);
+
+    assertEquals(1, r.keyNameMismatch.size(), () -> dump(r));
+    assertTrue(r.keyNameMismatch.get(0).contains("key=leaf"));
+  }
+
+  @Test
   @DisplayName("null child under a lookup key is flagged without crashing")
   void nullChildFlagged() {
     FakeNode root = new FakeNode(null, "root", "rtp");

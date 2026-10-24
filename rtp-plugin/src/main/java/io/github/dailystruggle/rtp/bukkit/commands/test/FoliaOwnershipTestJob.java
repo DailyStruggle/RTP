@@ -13,7 +13,6 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -83,7 +82,6 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
             BitSideEffect.NEEDS_WORLD,
             5_000,
             () -> ProbeBitReport.forProbe("folia-ownership").build());
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

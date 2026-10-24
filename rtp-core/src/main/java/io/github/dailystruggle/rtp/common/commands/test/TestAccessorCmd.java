@@ -155,7 +155,6 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
   private static BitComponent registerComponent() {
     BitComponent component = new BitComponent("accessor", "test.accessor", BitTier.IBIT,
         BitSideEffect.MUTATING, 60_000, () -> toBitReport(runProbe(RTPAPI.serverId)));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

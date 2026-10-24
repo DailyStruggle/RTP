@@ -55,10 +55,9 @@ public class ConfigCmd extends BaseRTPCmdImpl {
       addSubCommand(new LanguageCmd(this));
     }
 
-    if (!getCommandLookup().containsKey("IMPORT") && !getCommandLookup().containsKey("import")) {
+    if (!getCommandLookup().containsKey("IMPORT")) {
       ConfigImportCmd importCmd = new ConfigImportCmd(this);
       addSubCommand(importCmd);
-      getCommandLookup().put("import", importCmd);
     }
 
     // Register the submit-landing leaf for the menu config-search anvil prompt. The

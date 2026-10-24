@@ -21,6 +21,7 @@ class DynamicZstdBindingTest {
     @DisplayName("PBIT canary succeeds when host zstd is on classpath")
     void pbitCanarySucceedsWithHostZstd() {
         assertTrue(DynamicZstdBinding.isAvailable(), "Host Zstd should be available on test classpath");
+        assertFalse(DynamicZstdBinding.hostEngineMissing());
         assertEquals(BitHealth.HEALTHY, DynamicZstdBinding.health());
         assertEquals(BitHealth.HEALTHY, DynamicZstdBinding.INSTANCE.getHealthStatus());
 

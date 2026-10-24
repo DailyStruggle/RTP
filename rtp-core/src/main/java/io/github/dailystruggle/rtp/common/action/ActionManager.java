@@ -161,6 +161,12 @@ public final class ActionManager implements ActionService {
     default void onSync() {}
   }
 
+  public record RegistrationFailure(String kind, String actionId, String target, String message) {}
+
+  private record RegistrationFailureKey(String kind, String actionId, String target) {}
+
+  private static final Map<RegistrationFailureKey, RegistrationFailure> registrationFailures = new ConcurrentHashMap<>();
+
   private static volatile ActionCommandRegistrar commandRegistrar;
   private static volatile java.util.function.Consumer<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> triggerRegistrar;
 
@@ -186,6 +192,32 @@ public final class ActionManager implements ActionService {
     triggerRegistrar = registrar;
   }
 
+  public static void recordRegistrationFailure(String kind, String actionId, String target, String message) {
+    RegistrationFailure failure = new RegistrationFailure(
+        requiredRegistrationValue(kind), requiredRegistrationValue(actionId),
+        requiredRegistrationValue(target), message == null ? "" : message);
+    registrationFailures.put(new RegistrationFailureKey(failure.kind(), failure.actionId(), failure.target()), failure);
+  }
+
+  public static void clearRegistrationFailure(String kind, String actionId, String target) {
+    if (kind == null || actionId == null || target == null) return;
+    registrationFailures.remove(new RegistrationFailureKey(
+        kind.trim().toLowerCase(java.util.Locale.ROOT), actionId.trim().toLowerCase(java.util.Locale.ROOT),
+        target.trim().toLowerCase(java.util.Locale.ROOT)));
+  }
+
+  public static List<RegistrationFailure> registrationFailures() {
+    return registrationFailures.values().stream()
+        .sorted(java.util.Comparator.comparing(RegistrationFailure::kind)
+            .thenComparing(RegistrationFailure::actionId).thenComparing(RegistrationFailure::target))
+        .toList();
+  }
+
+  private static String requiredRegistrationValue(String value) {
+    if (value == null || value.isBlank()) throw new IllegalArgumentException("registration failure key must not be blank");
+    return value.trim().toLowerCase(java.util.Locale.ROOT);
+  }
+
   /**
    * Registers or updates an action definition in the registry, and registers its command if configured.
    */
@@ -196,8 +228,10 @@ public final class ActionManager implements ActionService {
         for (io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec trigger : definition.triggers()) {
           try {
             triggerRegistrar.accept(trigger);
+            clearRegistrationFailure("trigger", definition.id(), trigger.id());
             RTPRuntime.log(Level.FINE, "[RTP Action] Registered physical trigger: " + trigger.id() + " -> " + definition.id());
           } catch (Exception e) {
+            recordRegistrationFailure("trigger", definition.id(), trigger.id(), e.getMessage());
             RTPRuntime.log(Level.WARNING, "[RTP Action] Failed registering trigger " + trigger.id() + ": " + e.getMessage());
           }
         }
@@ -237,6 +271,7 @@ public final class ActionManager implements ActionService {
    */
   public void clearDefinitions() {
     definitions.clear();
+    registrationFailures.clear();
   }
 
   @Override

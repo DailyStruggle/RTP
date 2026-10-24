@@ -406,18 +406,21 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         Path stagingRoot = stagingDir.toAbsolutePath().normalize();
         Map<String, String> overlay = new TreeMap<>();
         for (Path writtenFile : result.getWrittenFiles()) {
-            if (writtenFile == null) continue;
-            Path stagedFile = (writtenFile.isAbsolute() ? writtenFile : stagingRoot.resolve(writtenFile))
-                    .toAbsolutePath().normalize();
-            if (!stagedFile.startsWith(stagingRoot)) {
-                throw new IOException("Importer reported a file outside its staging directory: " + writtenFile);
+            if (writtenFile != null) {
+                Path stagedFile = (writtenFile.isAbsolute() ? writtenFile : stagingRoot.resolve(writtenFile))
+                        .toAbsolutePath().normalize();
+                if (!stagedFile.startsWith(stagingRoot)) {
+                    throw new IOException("Importer reported a file outside its staging directory: " + writtenFile);
+                }
+                if (stagedFile.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".yml")) {
+                    if (!java.nio.file.Files.isRegularFile(stagedFile)) {
+                        throw new IOException("Importer-reported YAML file is missing from staging: " + writtenFile);
+                    }
+                    String relative = stagingRoot.relativize(stagedFile).toString().replace(File.separatorChar, '/');
+                    overlay.put(relative,
+                            java.nio.file.Files.readString(stagedFile, java.nio.charset.StandardCharsets.UTF_8));
+                }
             }
-            if (!stagedFile.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".yml")) continue;
-            if (!java.nio.file.Files.isRegularFile(stagedFile)) {
-                throw new IOException("Importer-reported YAML file is missing from staging: " + writtenFile);
-            }
-            String relative = stagingRoot.relativize(stagedFile).toString().replace(File.separatorChar, '/');
-            overlay.put(relative, java.nio.file.Files.readString(stagedFile, java.nio.charset.StandardCharsets.UTF_8));
         }
         return overlay;
     }

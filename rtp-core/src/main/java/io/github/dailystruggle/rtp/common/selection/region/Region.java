@@ -1043,32 +1043,35 @@ public class Region extends FactoryValue<RegionKeys> {
       // the source poll silent preserves the DB row through the promotion; the kept
       // offer's save callback then acts as an idempotent upsert on the same key.
       RTPLocation coldLoc = outOfTime ? null : queueManager.unkeptLocations.pollSilently();
-      if (coldLoc == null) break;
-
-      int cx = coldLoc.coords().x() >> 4;
-      int cz = coldLoc.coords().z() >> 4;
-      // ADR-087 regional circuit breaker: a backlogged or slow region keeps its candidate cold;
-      // the next candidate (usually another region) takes this slot, so load is divided, not stacked.
-      if (RTPRuntime.scheduler() != null
-          && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
-        queueManager.unkeptLocations.offerSilently(coldLoc);
-        RTPRuntime.log(Level.FINE,
-            "[Region:" + name + "] cold promotion deferred: generation budget full");
-        break;
-      }
-      if (RTPRuntime.scheduler() != null && RTPRuntime.scheduler().isRegionSaturated(getWorld(), cx, cz)) {
-        queueManager.unkeptLocations.offerSilently(coldLoc); // silent: the poll kept its DB row
-      } else {
-        io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot =
-            io.github.dailystruggle.rtp.common.tools.GenerationBudget.server().reserve();
-        if (generationSlot == null) {
+      boolean stopPromoting = coldLoc == null;
+      if (!stopPromoting) {
+        int cx = coldLoc.coords().x() >> 4;
+        int cz = coldLoc.coords().z() >> 4;
+        // ADR-087 regional circuit breaker: a backlogged or slow region keeps its candidate cold;
+        // the next candidate (usually another region) takes this slot, so load is divided, not stacked.
+        if (RTPRuntime.scheduler() != null
+            && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
           queueManager.unkeptLocations.offerSilently(coldLoc);
           RTPRuntime.log(Level.FINE,
               "[Region:" + name + "] cold promotion deferred: generation budget full");
-          break;
+          stopPromoting = true;
+        } else if (RTPRuntime.scheduler() != null
+            && RTPRuntime.scheduler().isRegionSaturated(getWorld(), cx, cz)) {
+          queueManager.unkeptLocations.offerSilently(coldLoc); // silent: the poll kept its DB row
+        } else {
+          io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot =
+              io.github.dailystruggle.rtp.common.tools.GenerationBudget.server().reserve();
+          if (generationSlot == null) {
+            queueManager.unkeptLocations.offerSilently(coldLoc);
+            RTPRuntime.log(Level.FINE,
+                "[Region:" + name + "] cold promotion deferred: generation budget full");
+            stopPromoting = true;
+          } else {
+            promoteCold(coldLoc, cx, cz, generationSlot);
+          }
         }
-        promoteCold(coldLoc, cx, cz, generationSlot);
       }
+      if (stopPromoting) break;
     }
 
     while (!queueManager.playerQueue.isEmpty()) {
@@ -1257,27 +1260,31 @@ public class Region extends FactoryValue<RegionKeys> {
       deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + queueManager.unkeptLocations.size() + inFlightCalculations.get() + pendingKeptPromotions.get());
 
       for (long i = 0; i < deficit; i++) {
-        if (RTPRuntime.scheduler() != null
-            && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
+        boolean stopFilling = RTPRuntime.scheduler() != null
+            && RTPRuntime.scheduler().isGenerationSaturated(getWorld());
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot = null;
+        if (stopFilling) {
           RTPRuntime.log(Level.FINE, "[Region:" + name + "] cold fill deferred: generation budget full");
-          break;
+        } else {
+          generationSlot = io.github.dailystruggle.rtp.common.tools.GenerationBudget.server().reserve();
+          stopFilling = generationSlot == null;
+          if (stopFilling) {
+            RTPRuntime.log(Level.FINE, "[Region:" + name + "] cold fill deferred: generation budget full");
+          }
         }
-        io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot =
-            io.github.dailystruggle.rtp.common.tools.GenerationBudget.server().reserve();
-        if (generationSlot == null) {
-          RTPRuntime.log(Level.FINE, "[Region:" + name + "] cold fill deferred: generation budget full");
-          break;
+        if (!stopFilling) {
+          RegionCacheTask task = null;
+          try {
+            task = new RegionCacheTask(this, availableTime - (System.nanoTime() - start));
+            task.holdGenerationSlot(generationSlot);
+            cachePipeline.add(task);
+          } catch (RuntimeException | Error failure) {
+            if (task != null) task.setCancelled(true);
+            else generationSlot.close();
+            throw failure;
+          }
         }
-        RegionCacheTask task = null;
-        try {
-          task = new RegionCacheTask(this, availableTime - (System.nanoTime() - start));
-          task.holdGenerationSlot(generationSlot);
-          cachePipeline.add(task);
-        } catch (RuntimeException | Error failure) {
-          if (task != null) task.setCancelled(true);
-          else generationSlot.close();
-          throw failure;
-        }
+        if (stopFilling) break;
       }
 
       // Schedule at most one observational RegionCacheTask when visitor mode is enabled.

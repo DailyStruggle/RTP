@@ -29,6 +29,7 @@ public final class RtpBitStartup {
     }
 
     static List<BitResult> runNow() {
+        BitSeverityPolicy.reportUnresolvedOverrides();
         List<BitResult> results = RtpBit.RUNNER.run(BitSelector.parse("tier:pbit"), Runnable::run);
         BitReport report = RtpBit.RUNNER.aggregate(results);
         RTPRuntime.log(report.health() == BitHealth.HEALTHY ? Level.INFO : Level.WARNING, summary(results));

@@ -66,6 +66,7 @@ class BitSeverityPolicyTest {
                 "ACTION_UNKNOWN_STEP_KEY", "OFF",
                 "ACTION_UNKNOWN_STEP_KYE", "ERROR",
                 "ACTION_UNKNOWN_ACTION_NAME", "LOUD"));
+        BitSeverityPolicy.reportUnresolvedOverrides();
 
         assertTrue(BitSeverityPolicy.effective(stepKeyFinding()).isEmpty());
         assertEquals(Level.ERROR, BitSeverityPolicy.effective(actionNameFinding()).orElseThrow());
@@ -73,6 +74,21 @@ class BitSeverityPolicyTest {
                 message.contains("advanced/bit.yml overrides.ACTION_UNKNOWN_STEP_KYE")));
         assertTrue(accessor.logMessages.stream().anyMatch(message ->
                 message.contains("overrides.ACTION_UNKNOWN_ACTION_NAME ignored: invalid severity LOUD")));
+    }
+
+    @Test
+    void addonOverrideLoadedBeforeItsCodeIsAppliedAfterRegistration() {
+        BitSeverityPolicy.load(false, Map.of("PENDING_POLICY_CHECK", "INFO"));
+
+        var code = RtpBitCodes.REGISTRY.reserve("PENDING", "bit-policy-test")
+                .register(1, "PENDING_POLICY_CHECK", Level.WARNING,
+                        io.github.dailystruggle.bit.BitTier.PBIT, "test", "", "");
+        BitFinding finding = BitFinding.of(code, "addon.yml", "check", "pending code", "", "");
+
+        assertEquals(Level.INFO, BitSeverityPolicy.effectiveFinding(finding).orElseThrow().severity());
+        BitSeverityPolicy.reportUnresolvedOverrides();
+        assertTrue(accessor.logMessages.stream().noneMatch(message ->
+                message.contains("overrides.PENDING_POLICY_CHECK ignored: unregistered BIT code")));
     }
 
     @Test

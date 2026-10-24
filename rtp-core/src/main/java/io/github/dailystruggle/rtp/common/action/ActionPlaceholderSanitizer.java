@@ -20,26 +20,43 @@ import java.util.regex.Pattern;
  */
 public final class ActionPlaceholderSanitizer {
 
-  private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[([a-zA-Z0-9_]+)\\]");
+  private static final String NAME_SUFFIX = "_name";
+  private static final String UUID_SUFFIX = "_uuid";
+  private static final String PLAYER = "player";
+  private static final String PLAYER_PREFIX = PLAYER + "_";
+  private static final String PLAYER_NAME = PLAYER + NAME_SUFFIX;
+  private static final String PLAYER_UUID = PLAYER + UUID_SUFFIX;
+  private static final String TARGET = "target";
+  private static final String TARGET_PREFIX = TARGET + "_";
+  private static final String TARGET_NAME = TARGET + NAME_SUFFIX;
+  private static final String TARGET_UUID = TARGET + UUID_SUFFIX;
+  private static final String VIOLATOR = "violator";
+  private static final String VIOLATOR_NAME = VIOLATOR + NAME_SUFFIX;
+  private static final String WINNER = "winner";
+  private static final String WINNER_NAME = WINNER + NAME_SUFFIX;
+  private static final String VICTIM = "victim";
+  private static final String VICTIM_NAME = VICTIM + NAME_SUFFIX;
+
+  private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[(\\w+)\\]");
   private static final Pattern SAFE_TOKEN_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+(?: [a-zA-Z0-9_-]+)*+$");
 
   public static final Set<String> COMMON_TOKENS = Set.of(
-      "session_id", "players", "participants", "all", "sender", "challenger", "target", "opponent",
-      "sender_name", "sender_uuid", "player_name", "player_uuid", "target_name", "target_uuid", "clusters");
+      "session_id", "players", "participants", "all", "sender", "challenger", TARGET, "opponent",
+      "sender_name", "sender_uuid", PLAYER_NAME, PLAYER_UUID, TARGET_NAME, TARGET_UUID, "clusters");
   public static final Map<String, Set<String>> STAGE_TOKENS = Map.of(
       "onStart", Set.of(),
-      "onBoundaryViolation", Set.of("violator"),
+      "onBoundaryViolation", Set.of(VIOLATOR),
       "onExpire", Set.of(),
-      "onDeath", Set.of("victim", "winner"),
-      "onEnqueue", Set.of("player"),
-      "onCancel", Set.of("player", "canceller"),
-      "onWait", Set.of("player"));
-  public static final Set<String> OUTSIDE_ACTION = Set.of("player", "violator", "world");
-  public static final Set<String> SUBCOMMAND = Set.of("player", "action_id");
-  public static final Set<String> PRE_GATE = Set.of("player");
-  public static final Set<String> FOR_EACH = Set.of("player");
-  public static final Set<String> GATE_COMMAND = Set.of("player", "violator");
-  public static final Set<String> FAN_OUT = Set.of("player", "player_name", "player_uuid");
+      "onDeath", Set.of(VICTIM, WINNER),
+      "onEnqueue", Set.of(PLAYER),
+      "onCancel", Set.of(PLAYER, "canceller"),
+      "onWait", Set.of(PLAYER));
+  public static final Set<String> OUTSIDE_ACTION = Set.of(PLAYER, VIOLATOR, "world");
+  public static final Set<String> SUBCOMMAND = Set.of(PLAYER, "action_id");
+  public static final Set<String> PRE_GATE = Set.of(PLAYER);
+  public static final Set<String> FOR_EACH = Set.of(PLAYER);
+  public static final Set<String> GATE_COMMAND = Set.of(PLAYER, VIOLATOR);
+  public static final Set<String> FAN_OUT = Set.of(PLAYER, PLAYER_NAME, PLAYER_UUID);
 
   private static final Set<String> KNOWN_TOKENS = knownTokenSet();
 
@@ -60,17 +77,33 @@ public final class ActionPlaceholderSanitizer {
     String normalized = token.toLowerCase(java.util.Locale.ROOT);
     if (scope.contains(normalized)) return true;
 
-    String withoutNumber = normalized.replaceFirst("_\\d+$", "");
+    String withoutNumber = withoutNumericSuffix(normalized);
     if (!withoutNumber.equals(normalized) && inScope(withoutNumber, scope)) return true;
 
-    for (String suffix : Set.of("_name", "_uuid")) {
+    for (String suffix : Set.of(NAME_SUFFIX, UUID_SUFFIX)) {
       if (normalized.endsWith(suffix)
           && inScope(normalized.substring(0, normalized.length() - suffix.length()), scope)) return true;
     }
 
-    return (normalized.matches("player_\\d+") && scope.contains("players"))
+    return (normalized.startsWith(PLAYER_PREFIX) && hasNumericSuffix(normalized, PLAYER_PREFIX.length())
+            && scope.contains("players"))
         || ((normalized.startsWith("cluster_") || normalized.startsWith("group_"))
         && (scope.contains("clusters") || scope.contains("cluster") || scope.contains("group")));
+  }
+
+  private static String withoutNumericSuffix(String value) {
+    int separator = value.lastIndexOf('_');
+    if (separator < 0 || !hasNumericSuffix(value, separator + 1)) return value;
+    return value.substring(0, separator);
+  }
+
+  private static boolean hasNumericSuffix(String value, int start) {
+    if (start >= value.length()) return false;
+    for (int index = start; index < value.length(); index++) {
+      char character = value.charAt(index);
+      if (character < '0' || character > '9') return false;
+    }
+    return true;
   }
 
   /** Canonical tokens recognized by the action engine, excluding arbitrary metadata keys. */
@@ -80,7 +113,7 @@ public final class ActionPlaceholderSanitizer {
 
   private static Set<String> knownTokenSet() {
     Set<String> tokens = new HashSet<>(COMMON_TOKENS);
-    tokens.addAll(Set.of("player", "victim", "winner", "violator", "canceller", "world", "action_id"));
+    tokens.addAll(Set.of(PLAYER, VICTIM, WINNER, VIOLATOR, "canceller", "world", "action_id"));
     return Collections.unmodifiableSet(tokens);
   }
 
@@ -122,7 +155,7 @@ public final class ActionPlaceholderSanitizer {
     Matcher matcher = PLACEHOLDER_PATTERN.matcher(command);
     while (matcher.find()) {
       String key = matcher.group(1).toLowerCase();
-      if (key.equals("target") || key.startsWith("target_")) {
+      if (key.equals(TARGET) || key.startsWith(TARGET_PREFIX)) {
         String resolved = (contextTokens != null) ? resolveToken(key, contextTokens) : null;
         if (resolved == null || resolved.isBlank() || resolved.equalsIgnoreCase("any")) {
           return true;
@@ -161,120 +194,112 @@ public final class ActionPlaceholderSanitizer {
   }
 
   private static String resolveToken(String key, Map<String, Object> contextTokens) {
-    // 1. Direct match in tokens map
     if (contextTokens.containsKey(key)) {
-      boolean preferName = isPlayerEntityKey(key);
-      return formatValue(contextTokens.get(key), preferName);
+      return formatValue(contextTokens.get(key), isPlayerEntityKey(key));
     }
+    String suffixed = resolveSuffix(key, contextTokens, NAME_SUFFIX, true);
+    if (suffixed != null) return suffixed;
+    suffixed = resolveSuffix(key, contextTokens, UUID_SUFFIX, false);
+    if (suffixed != null) return suffixed;
+    return resolveNumberedSuffix(key, contextTokens);
+  }
 
-    // 2. Specialized token suffixes: _name and _uuid
-    if (key.endsWith("_name")) {
-      String baseKey = key.substring(0, key.length() - 5);
-      if (contextTokens.containsKey(baseKey)) {
-        return formatValue(contextTokens.get(baseKey), true);
-      }
-    } else if (key.endsWith("_uuid")) {
-      String baseKey = key.substring(0, key.length() - 5);
-      if (contextTokens.containsKey(baseKey)) {
-        Object val = contextTokens.get(baseKey);
-        if (val instanceof UUID u) {
-          return u.toString();
-        } else if (val instanceof RTPCommandSender s) {
-          return s.uuid().toString();
-        }
-      }
-    }
+  private static String resolveSuffix(
+      String key, Map<String, Object> contextTokens, String suffix, boolean preferName) {
+    if (!key.endsWith(suffix)) return null;
+    String baseKey = key.substring(0, key.length() - suffix.length());
+    return resolveSuffixValue(baseKey, contextTokens, preferName);
+  }
 
-    // 3. Numbered patterns with suffix: e.g. sender_name_1 -> base sender_1
+  private static String resolveNumberedSuffix(String key, Map<String, Object> contextTokens) {
     int lastUnderscore = key.lastIndexOf('_');
-    if (lastUnderscore > 0 && lastUnderscore < key.length() - 1) {
-      String numSuffix = key.substring(lastUnderscore); // e.g. "_1"
-      String prefix = key.substring(0, lastUnderscore); // e.g. "sender_name"
-      if (prefix.endsWith("_name")) {
-        String basePrefix = prefix.substring(0, prefix.length() - 5); // e.g. "sender"
-        String fallbackKey = basePrefix + numSuffix; // e.g. "sender_1"
-        if (contextTokens.containsKey(fallbackKey)) {
-          return formatValue(contextTokens.get(fallbackKey), true);
-        }
-      } else if (prefix.endsWith("_uuid")) {
-        String basePrefix = prefix.substring(0, prefix.length() - 5);
-        String fallbackKey = basePrefix + numSuffix;
-        if (contextTokens.containsKey(fallbackKey)) {
-          Object val = contextTokens.get(fallbackKey);
-          if (val instanceof UUID u) {
-            return u.toString();
-          } else if (val instanceof RTPCommandSender s) {
-            return s.uuid().toString();
-          }
-        }
-      }
-      // Other numbered keys (prefix + numSuffix == key) were already tried by the direct lookup.
-    }
+    if (lastUnderscore <= 0 || lastUnderscore >= key.length() - 1) return null;
+    String prefix = key.substring(0, lastUnderscore);
+    String suffix = tokenSuffix(prefix);
+    if (suffix == null) return null;
+    String numberedBase = prefix.substring(0, prefix.length() - suffix.length())
+        + key.substring(lastUnderscore);
+    return resolveSuffixValue(numberedBase, contextTokens, NAME_SUFFIX.equals(suffix));
+  }
 
+  private static String tokenSuffix(String key) {
+    if (key.endsWith(NAME_SUFFIX)) return NAME_SUFFIX;
+    if (key.endsWith(UUID_SUFFIX)) return UUID_SUFFIX;
+    return null;
+  }
+
+  private static String resolveSuffixValue(
+      String baseKey, Map<String, Object> contextTokens, boolean preferName) {
+    if (!contextTokens.containsKey(baseKey)) return null;
+    Object value = contextTokens.get(baseKey);
+    return preferName ? formatValue(value, true) : formatUuid(value);
+  }
+
+  private static String formatUuid(Object value) {
+    if (value instanceof UUID uuid) return uuid.toString();
+    if (value instanceof RTPCommandSender sender) return sender.uuid().toString();
     return null;
   }
 
   private static boolean isPlayerEntityKey(String key) {
     if (key == null) return false;
-    return key.equals("player") || key.equals("player_name")
-        || key.equals("target") || key.equals("target_name")
+    return key.equals(PLAYER) || key.equals(PLAYER_NAME)
+        || key.equals(TARGET) || key.equals(TARGET_NAME)
         || key.equals("sender") || key.equals("sender_name")
-        || key.equals("violator") || key.equals("violator_name")
-        || key.equals("winner") || key.equals("winner_name")
-        || key.equals("victim") || key.equals("victim_name")
-        || key.endsWith("_name")
-        || key.startsWith("player_") || key.startsWith("target_")
+        || key.equals(VIOLATOR) || key.equals(VIOLATOR_NAME)
+        || key.equals(WINNER) || key.equals(WINNER_NAME)
+        || key.equals(VICTIM) || key.equals(VICTIM_NAME)
+        || key.endsWith(NAME_SUFFIX)
+        || key.startsWith(PLAYER_PREFIX) || key.startsWith(TARGET_PREFIX)
         || key.startsWith("sender_") || key.startsWith("violator_")
         || key.startsWith("winner_") || key.startsWith("victim_");
   }
 
   private static String formatValue(Object val, boolean preferNameOnly) {
     if (val == null) return "";
+    if (val instanceof RTPCommandSender sender) return formatSender(sender, preferNameOnly);
+    if (val instanceof UUID uuid) return formatPlayerUuid(uuid, preferNameOnly);
+    if (val instanceof java.util.Collection<?> coll) return formatCollection(coll, preferNameOnly);
+    return sanitizeValue(val.toString());
+  }
 
-    if (val instanceof RTPCommandSender sender) {
-      if (preferNameOnly) {
-        String name = sender.name();
-        if (name != null && SAFE_TOKEN_PATTERN.matcher(name).matches()) {
-          return name;
-        }
+  private static String formatSender(RTPCommandSender sender, boolean preferNameOnly) {
+    String name = preferNameOnly ? safeName(sender.name()) : null;
+    return name == null ? sender.uuid().toString() : name;
+  }
+
+  private static String formatPlayerUuid(UUID uuid, boolean preferNameOnly) {
+    String name = preferNameOnly ? onlinePlayerName(uuid) : null;
+    return name == null ? uuid.toString() : name;
+  }
+
+  private static String onlinePlayerName(UUID uuid) {
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    if (accessor == null) return null;
+    RTPCommandSender sender = accessor.getPlayer(uuid);
+    return sender == null ? null : safeName(sender.name());
+  }
+
+  private static String safeName(String name) {
+    return name != null && SAFE_TOKEN_PATTERN.matcher(name).matches() ? name : null;
+  }
+
+  private static String formatCollection(java.util.Collection<?> coll, boolean preferNameOnly) {
+    StringBuilder listSb = new StringBuilder();
+    for (Object item : coll) {
+      if (item == null) continue;
+      String formatted = formatValue(item, preferNameOnly);
+      if (!formatted.isBlank()) {
+        if (!listSb.isEmpty()) listSb.append(' ');
+        listSb.append(formatted);
       }
-      return sender.uuid().toString();
     }
+    return listSb.toString();
+  }
 
-    if (val instanceof UUID uuid) {
-      if (preferNameOnly) {
-        RTPServerAccessor accessor = RTPRuntime.serverAccessor();
-        if (accessor != null) {
-          RTPCommandSender sender = accessor.getPlayer(uuid);
-          if (sender != null) {
-            String name = sender.name();
-            if (name != null && SAFE_TOKEN_PATTERN.matcher(name).matches()) {
-              return name;
-            }
-          }
-        }
-      }
-      return uuid.toString();
-    }
-
-    if (val instanceof java.util.Collection<?> coll) {
-      StringBuilder listSb = new StringBuilder();
-      for (Object item : coll) {
-        if (item == null) continue;
-        String formatted = formatValue(item, preferNameOnly);
-        if (!formatted.isBlank()) {
-          if (!listSb.isEmpty()) listSb.append(' ');
-          listSb.append(formatted);
-        }
-      }
-      return listSb.toString();
-    }
-
-    String s = val.toString().trim();
+  private static String sanitizeValue(String value) {
+    String sanitized = value.trim();
     // Strict sanitization: allow alphanumeric, underscores, hyphens, and single spaces
-    if (SAFE_TOKEN_PATTERN.matcher(s).matches()) {
-      return s;
-    }
-    return ""; // Reject unsanitized token
+    return SAFE_TOKEN_PATTERN.matcher(sanitized).matches() ? sanitized : "";
   }
 }

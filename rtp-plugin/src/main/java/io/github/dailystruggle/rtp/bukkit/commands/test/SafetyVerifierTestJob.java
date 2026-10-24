@@ -119,7 +119,6 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
             BitSideEffect.SAFE,
             5_000,
             () -> toBitReport(runProbe()));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

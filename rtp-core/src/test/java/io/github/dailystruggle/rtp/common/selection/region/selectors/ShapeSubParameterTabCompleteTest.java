@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle_Normal;
@@ -16,6 +17,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import java.util.Collections;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +26,11 @@ import org.junit.jupiter.api.Test;
  * verifying parameter maps and suggestions on {@code ShapeParameter.subParams}.
  */
 public class ShapeSubParameterTabCompleteTest {
+
+    @BeforeAll
+    static void setUp() {
+        RTP.ensureInitialized();
+    }
 
     @Test
     @DisplayName("Square exposes V2 curated sub-parameters")

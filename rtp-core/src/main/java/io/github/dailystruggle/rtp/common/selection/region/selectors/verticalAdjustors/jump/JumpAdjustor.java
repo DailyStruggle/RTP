@@ -391,11 +391,12 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
           ? computeColumnSkyFloor(probe, lx, lz)
           : Integer.MIN_VALUE;
       for (int y = minY; y < maxY; y++) {
-        if (!acceptProbeY(probe, lx, lz, y, requireSkyLight, columnSkyFloor, snap)) continue;
-        if (slope != null && !slope.test(lx, y, lz)) continue; // ADR-119; sweep continues
-        int globalX = (probe.chunkX() << 4) + lx;
-        int globalZ = (probe.chunkZ() << 4) + lz;
-        return AdjustResult.ok(new MutableRTPCoords(worldName, globalX, y, globalZ).toImmutable());
+        if (acceptProbeY(probe, lx, lz, y, requireSkyLight, columnSkyFloor, snap)
+            && (slope == null || slope.test(lx, y, lz))) {
+          int globalX = (probe.chunkX() << 4) + lx;
+          int globalZ = (probe.chunkZ() << 4) + lz;
+          return AdjustResult.ok(new MutableRTPCoords(worldName, globalX, y, globalZ).toImmutable());
+        }
       }
     }
     return AdjustResult.SCAN_MISS_REJECT;

@@ -499,14 +499,15 @@ public class MemoryTracker {
           for (TicketCensusRegion sweepRegion : allRegions) {
             // Gate the sweep to prevent race conditions with asynchronous location generation
             // Pending kept promotions hold tickets not yet in keptLocations; sweeping would drop them.
-            if (sweepRegion.generationInFlight()) continue;
-
-            RTPWorld<?> sweepWorld = sweepRegion.world();
-            if (sweepWorld == null) continue;
-
-            java.util.Set<Long> keepAliveKeys = keepAliveByWorld.computeIfAbsent(sweepWorld, w -> new java.util.HashSet<>());
-            // Queued locations and pipeline teleport destinations
-            sweepRegion.collectKeepAliveChunkKeys(keepAliveKeys);
+            if (!sweepRegion.generationInFlight()) {
+              RTPWorld<?> sweepWorld = sweepRegion.world();
+              if (sweepWorld != null) {
+                java.util.Set<Long> keepAliveKeys = keepAliveByWorld.computeIfAbsent(
+                    sweepWorld, w -> new java.util.HashSet<>());
+                // Queued locations and pipeline teleport destinations
+                sweepRegion.collectKeepAliveChunkKeys(keepAliveKeys);
+              }
+            }
           }
 
           // 3b. Keep chunks pinned by pending post-arrival holds (worlds already being swept)

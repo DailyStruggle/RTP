@@ -135,7 +135,6 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
             BitSideEffect.SAFE,
             15_000,
             () -> toBitReport(runProbe(RTPAPI.serverId, false)));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

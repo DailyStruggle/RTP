@@ -117,7 +117,6 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
             BitSideEffect.SAFE,
             15_000,
             () -> toBitReport(auditForTest(treeAnchor)));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 
@@ -204,10 +203,16 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
         continue;
       }
       String childName = safeName(child);
-      // TreeCommand.addSubCommand upper-cases the key at insertion; it must
-      // still resolve to the child's own name.
-      if (!isBlank(childName) && !key.equalsIgnoreCase(childName)) {
-        report.keyNameMismatch.add(fullPath + " key=" + key + " name=" + childName);
+      // Dispatch upper-cases input, so lookup keys must be uppercase. Aliases
+      // are valid only while the child's canonical name resolves to that node.
+      if (!isBlank(childName)) {
+        String canonicalKey = childName.toUpperCase(java.util.Locale.ROOT);
+        boolean unreachableKey = key == null || !key.equals(key.toUpperCase(java.util.Locale.ROOT));
+        boolean orphanAlias = key != null && !key.equals(canonicalKey) && lookup.get(canonicalKey) != child;
+        if (unreachableKey || orphanAlias) {
+          report.keyNameMismatch.add(fullPath + " key=" + key + " name=" + childName
+              + " (lookup key is unreachable or is an alias without the node's own name)");
+        }
       }
       walk(child, depth + 1, fullPath, report, visited);
     }

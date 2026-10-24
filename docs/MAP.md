@@ -127,7 +127,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - `ADR-084` Layered learned-state index: coarse spiral directory over per-cell Hilbert RLE blobs.
 - `ADR-085` Spiral-addressed Hilbert key space for learned state.
 - `ADR-086` External web map integration via `anvil-api`, `maps-api`, and spatial memory.
-- `ADR-087` Adaptive tick-budget, memory backpressure, and dynamic workload regulation for Folia execution.
+- `ADR-087` Adaptive compute governor: automatic performance tuning, memory backpressure, and multi-region concurrency.
 - `ADR-088` Configurable downsampling stride filter for spatial candidate selection.
 - `ADR-089` Universal MapCanvas bridge, biome-hazard composite overlays, and visual pipeline gauges.
 - `ADR-090` Test-driver, synthetic MCA generator, and dimension benchmark dataset.

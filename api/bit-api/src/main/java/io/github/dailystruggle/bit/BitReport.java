@@ -34,6 +34,7 @@ public record BitReport(int schema, BitHealth health, List<BitFinding> findings)
             BitFinding finding = findings.get(i);
             json.append("{\"severity\":\"").append(finding.severity().name())
                     .append("\",\"id\":").append(finding.codeId())
+                    .append(",\"ns\":\"").append(escape(finding.namespace())).append('"')
                     .append(",\"code\":\"").append(escape(finding.code()))
                     .append("\",\"source\":\"").append(escape(finding.source()))
                     .append("\",\"path\":\"").append(escape(finding.path()))

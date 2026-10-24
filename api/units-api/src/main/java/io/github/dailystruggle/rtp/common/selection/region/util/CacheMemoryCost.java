@@ -50,8 +50,8 @@ public final class CacheMemoryCost {
       return num.longValue();
     }
 
-    if (rawValue instanceof Boolean bool) {
-      return bool ? 1L : 0L;
+    if (rawValue instanceof Boolean) {
+      return Boolean.TRUE.equals(rawValue) ? 1L : 0L;
     }
 
     String s = rawValue.toString().trim();

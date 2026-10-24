@@ -153,7 +153,6 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
             BitSideEffect.SAFE,
             15_000,
             () -> toBitReport(runProbe(RTPAPI.serverId, RTPRuntime.scheduler(), null, false)));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

@@ -13,7 +13,6 @@ import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -127,7 +126,6 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
             sideEffect,
             COMPONENT_TIMEOUT_MS,
             () -> ProbeBitReport.forProbe(id).build());
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

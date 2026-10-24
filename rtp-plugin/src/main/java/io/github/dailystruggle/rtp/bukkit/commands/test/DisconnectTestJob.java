@@ -168,7 +168,6 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
             BitSideEffect.SAFE,
             5_000,
             DisconnectTestJob::quietReport);
-    RtpBit.RUNNER.register(component);
     return component;
   }
 
