@@ -16,6 +16,7 @@ import java.util.Queue;
  */
 public final class MiscTasks {
   private static volatile RTPTaskPipe sync;
+  private static volatile RTPTaskPipe backgroundSync;
   private static volatile RTPTaskPipe async;
   private static volatile RTPTaskPipe startup;
   private static volatile RTPTaskPipe cancel;
@@ -24,13 +25,22 @@ public final class MiscTasks {
   private MiscTasks() {
   }
 
-  /** Pipe drained on the main / region thread each tick. */
+  /** Pipe drained on the main / region thread each tick (player-facing sync stage). */
   public static RTPTaskPipe sync() {
     return sync;
   }
 
   public static void setSync(RTPTaskPipe pipe) {
     sync = pipe;
+  }
+
+  /** Pipe drained on the main thread during the governed background sync span (ADR-087 Section 4.3 item 4). */
+  public static RTPTaskPipe backgroundSync() {
+    return backgroundSync;
+  }
+
+  public static void setBackgroundSync(RTPTaskPipe pipe) {
+    backgroundSync = pipe;
   }
 
   /** Pipe drained off the main thread. */

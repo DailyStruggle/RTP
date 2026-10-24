@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.predict.EwmaLinearFit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -151,21 +152,23 @@ class ProbeFirstGovernorTest {
     @Test
     @DisplayName("Fit Tp(g) = perChunk + open/g evaluates at any group size; flat group sizes fall back to the mean")
     void fitSeparatesOpenFromPerChunk() {
-        ProbeFirstGovernor.Fit fit = new ProbeFirstGovernor.Fit();
+        EwmaLinearFit fit = EwmaLinearFit.ofCoalescedCost(
+                ProbeFirstGovernor.WINDOW, ProbeFirstGovernor.MIN_SAMPLES, ProbeFirstGovernor.MIN_X_VAR);
         for (int i = 0; i < 64; i++) {
-            fit.add(1.0 / 16.0, 0.5 + 16.0 / 16.0);
-            fit.add(1.0, 0.5 + 16.0);
+            fit.record(1.0 / 16.0, 0.5 + 16.0 / 16.0);
+            fit.record(1.0, 0.5 + 16.0);
         }
-        assertTrue(fit.identified());
+        assertTrue(fit.isIdentified());
         assertEquals(16.0, fit.slope(), 1e-6);
-        assertEquals(1.5, fit.at(1.0 / 16.0), 1e-6);
-        assertEquals(0.5 + 16.0 / 4.0, fit.at(0.25), 1e-6);
+        assertEquals(1.5, fit.predict(1.0 / 16.0), 1e-6);
+        assertEquals(0.5 + 16.0 / 4.0, fit.predict(0.25), 1e-6);
 
-        ProbeFirstGovernor.Fit flat = new ProbeFirstGovernor.Fit();
-        for (int i = 0; i < 64; i++) flat.add(1.0, (i % 2 == 0) ? 8.0 : 10.0);
-        assertFalse(flat.identified());
+        EwmaLinearFit flat = EwmaLinearFit.ofCoalescedCost(
+                ProbeFirstGovernor.WINDOW, ProbeFirstGovernor.MIN_SAMPLES, ProbeFirstGovernor.MIN_X_VAR);
+        for (int i = 0; i < 64; i++) flat.record(1.0, (i % 2 == 0) ? 8.0 : 10.0);
+        assertFalse(flat.isIdentified());
         assertEquals(0.0, flat.slope());
-        assertEquals(flat.my, flat.at(1.0 / 16.0), 1e-9);
+        assertEquals(flat.meanY(), flat.predict(1.0 / 16.0), 1e-9);
     }
 
     @Test

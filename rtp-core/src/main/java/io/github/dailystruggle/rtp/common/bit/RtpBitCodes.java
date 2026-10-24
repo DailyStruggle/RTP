@@ -42,6 +42,10 @@ public final class RtpBitCodes {
             io.github.dailystruggle.rtp.common.action.ActionEngineSelfTest.class,
             ConfigPbit.class,
             DirectiveConfigCheck.class,
+            GovernorBitComponent.class,
+            PipelineCbitCounters.class,
+            TestBitCodes.class,
+            PlatformHookBitComponent.class,
             // config owners: directives
             io.github.dailystruggle.rtp.common.bit.config.ConfigReferenceCheck.class,
             io.github.dailystruggle.rtp.common.selection.region.RegionConfigConstraints.class,
@@ -71,6 +75,9 @@ public final class RtpBitCodes {
 
     /** Initiated mock teleport heatmap diagnostics. */
     public static final BitCodeNamespace HEATMAP = REGISTRY.reserve("HEATMAP", OWNER);
+
+    /** Adaptive compute governor CBIT diagnostics (ADR-087 section 6). */
+    public static final BitCodeNamespace GOVERNOR = REGISTRY.reserve("GOVERNOR", OWNER);
 
     /** Initialises every core owner and any additional plugin owners against the process registry. */
     public static BitCodeRegistry initialiseOwners(Collection<Class<?>> additionalOwners) {

@@ -77,7 +77,13 @@ class ServerAccessorsTest {
   @Test
   @DisplayName("REQ-API-NF-002: common server API signatures expose no RTP types")
   void commonApiTypesDoNotExposeRtpTypes() {
-    Class<?>[] apiTypes = {ServerAccessor.class, PlatformFamily.class, ServerAccessors.class};
+    Class<?>[] apiTypes = {
+      ServerAccessor.class,
+      PlatformFamily.class,
+      ServerAccessors.class,
+      TaskHandle.class,
+      TaskScheduler.class
+    };
     for (Class<?> apiType : apiTypes) {
       assertFalse(apiType.getName().startsWith("io.github.dailystruggle.rtp."));
       for (Method method : apiType.getDeclaredMethods()) {

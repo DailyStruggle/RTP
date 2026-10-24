@@ -39,6 +39,8 @@ public final class MenuRendererDiscovery {
         for (String id : ids) {
             MenuRendererProvider provider = byId.get(id);
             if (provider == null) {
+                io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordMenuRendererDegraded(
+                        id, "no-provider-on-platform");
                 RTPRuntime.log(
                         Level.WARNING,
                         "menu.renderer '" + id + "' has no provider on this platform");
@@ -48,12 +50,16 @@ public final class MenuRendererDiscovery {
                 MenuRenderer r = provider.create();
                 if (r != null) return r;
             } catch (RuntimeException | LinkageError ex) {
+                io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordMenuRendererDegraded(
+                        id, ex.getClass().getSimpleName() + ": " + ex.getMessage());
                 RTPRuntime.log(
                         Level.WARNING,
                         "failed to instantiate menu.renderer '" + id + "': " + ex,
                         ex);
             }
         }
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordMenuRendererDegraded(
+                ids.toString(), "renderer-list-exhausted");
         RTPRuntime.log(
                 Level.WARNING,
                 "menu.renderer list exhausted (" + ids + "); /rtp menu open-page disabled");

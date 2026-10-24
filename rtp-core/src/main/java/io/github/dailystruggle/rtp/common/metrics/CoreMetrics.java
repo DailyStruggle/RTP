@@ -265,6 +265,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
                 .liveLoadGates(io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll())
                 .immediateGovernors(io.github.dailystruggle.rtp.common.selection.region.ImmediateLoadGovernor.snapshotAll())
                 .actionCbit(io.github.dailystruggle.rtp.common.action.ActionCbitCounters.snapshot())
+                .computeGovernor(io.github.dailystruggle.rtp.common.governor.ComputeGovernor.currentSnapshot())
                 .build());
         // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
         // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.

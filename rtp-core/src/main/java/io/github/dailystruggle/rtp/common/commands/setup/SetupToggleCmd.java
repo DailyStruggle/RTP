@@ -16,7 +16,7 @@ import java.util.UUID;
  */
 public class SetupToggleCmd extends AbstractSetupStepCmd {
 
-    private static final Set<String> VALID_KEYS = Set.of("claimIntegrations", "cinematicEffects", "economyIntegration");
+    private static final Set<String> VALID_KEYS = Set.of("openGuiOnRtp", "claimIntegrations", "cinematicEffects", "economyIntegration");
 
     public SetupToggleCmd(
             @Nullable CommandsAPICommand parent,

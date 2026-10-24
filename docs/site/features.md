@@ -7,12 +7,12 @@ Everything LeafRTP does, by audience. The short version is on the project page; 
 These work without extra plugins:
 
 - [**Spawn portals & launch pads**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Step-in trigger zones over portal frames or launch pads run teleports, with an optional countdown hologram and effects.
-- [**Group & party scatter**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): The bundled `scatter.yml` action sends queued parties to safe spots at least `minSeparation` blocks apart.
+- [**Group & party scatter**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): The bundled `scatter.yml` action sends queued parties or teams into the wilderness at least `minSeparation` blocks apart.
+- [**Near-player & claim anchors**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `nearplayer.yml` and `nearclaim.yml` actions land players safely near teammates or outside town, claim, and faction perimeters (`anchor: entity`, `anchor: claimboundary`, `anchor: faction`) without inline claim-plugin overhead.
 - [**First-join random spawn**](https://dailystruggle.github.io/RTP/admin/RECIPES/#rtp-on-first-join-random-spawn-for-new-players): Grant `rtp.onevent.firstjoin` to send new players to random spots on login; the login reserve cache keeps a destination pre-warmed so arrival is quick.
-- [**1v1 and 2v2 PvP matchmaking**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `challenge.yml`, `arena.yml`, and `teams.yml` actions queue and pair players for 1v1 duels or 2v2 squad battles into temporary bounded arenas with countdowns and border constraints, cleaned up automatically.
-- [**Near-player & claim hunting**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `nearplayer.yml` and `nearclaim.yml` actions land players safely near random players or town and claim perimeters (`anchor: entity`, `anchor: claimboundary`) without inline claim-plugin overhead.
 - [**Sky drops**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/): A `Fixed` vertical adjustor at Y=250+ pairs with a slow-falling potion effect for aerial parachute drops.
 - [**Survival and resource worlds**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode): In two Paper 26.2 runs of 4,096 teleports each, no two landings were within 48 blocks and the closest pair was 70 blocks apart, without tracking players. The default `REROLL` mode doesn't repeat a spot until the shuffle has cycled; on `ACCUMULATE` a used spot can come up again at about the random-pick rate.
+- [**Optional duel & KOTH templates**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): The action addon also ships optional `challenge.yml`, `arena.yml`, `teams.yml`, and KOTH templates that queue players for 1v1 duels or 2v2 squad battles in temporary bounded areas with countdowns and automatic border cleanup.
 
 ## Setting it up
 
@@ -20,7 +20,7 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 
 - [**Web Workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/) (`/rtp editor`): Browser admin with no port forwarding. Drag region boundaries on a map and search YAML by intent with live setting docs beside each key. A diagnostics tab shows live tick, queue and latency stats.
 - [**In-Game Admin Book**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#1-the-interactive-admin-panel-rtp-admin) (`/rtp admin`): Clickable operator book for inspecting queues and reloading configs in game.
-- [**Chat Wizard**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#guided-setup-rtp-admin-setup) (`/rtp admin setup`): 60-second guided questionnaire sizing regions to world borders with automatic backups.
+- [**Chat Wizard**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#guided-setup-rtp-admin-setup) (`/rtp admin setup`): 60-second guided questionnaire configuring worlds, gameplay presets, region radius (via clickable presets or Anvil input), performance profiles, and addon toggles with automatic backups.
 - [**Config & Permission Import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin) (`/rtp config import`): Detects other rtp plugins' folders automatically, or takes any folder with `path=<dir>`. Maps worlds, radii, shapes, cooldowns, delays, prices, database, effects and portal zones; anything it can't map is listed as a warning. Dry-runs the LuckPerms commands for BetterRTP, JustRTP and EzRTP nodes.
 - [**Spatial Pregeneration**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/) (`/rtp scan`): Checks region files off-tick ahead of time, recording biomes, invalidity causes, and claims at chunk resolution.
 - [**Live Visualizations**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#c-diagnostics--monitoring) (`/rtp visualization`): Renders boundaries, biome layouts, and candidate heatmaps onto held in-game maps.
@@ -86,17 +86,17 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 - **PvP / combat-tag check**: off by default; refuses or delays `/rtp` for players who recently dealt or took PvP damage. Includes built-in tracking or hooks into PvPManager, CombatLogX, or Simple Combat Log if installed.
 - **Command blocks and console**: the same command parser handles player, console, and command-block callers.
 
-## Action engine: portals, party scatter & arenas
+## Action engine: wilderness portals, party scatter & anchor teleports
 
-An extensible action pipeline for group events, boundary confinement, and minigames:
+Built for survival SMP mechanics first, with optional scripted templates in the action addon:
 
-- **Step-in portals**: Configurable trigger zones for portals and launch pads with countdown holograms, particles, and sounds.
-- **Party & group scatter**: Sends a queued party out together, guaranteeing a minimum block spacing between teammates.
-- **1v1 & 2v2 arenas** (`/rtp action challenge <player>`): Matchmaking duels in temporary bounded arenas with countdowns and automated border cleanup.
-- **Anchor drops**: Land players relative to teammates (`anchor: entity`) or outside town claims (`anchor: claimboundary`).
-- **Event scripts**: Trigger console commands, titles, sounds, or potion effects on match start, boundary violation, or finish.
+- **Step-in wilderness portals & launch pads**: Configurable trigger zones over portal frames, pressure plates, or launch pads with countdown holograms, particles, and sounds.
+- **Party & team wilderness scatter**: Sends a queued party or team out into the wild together while guaranteeing at least `minSeparation` blocks between landings.
+- **Claim, faction & teammate anchor teleports**: Land players relative to teammates (`anchor: entity`) or just outside town, claim, or faction perimeters (`anchor: claimboundary`, `anchor: faction`).
+- **Event scripts**: Trigger console commands, titles, sounds, or potion effects on entry, arrival, boundary exit, or completion.
+- **Optional 1v1/2v2 duel queues & KOTH templates**: The action addon also includes optional scripted templates (`/rtp action challenge <player>`, `arena.yml`, `teams.yml`, KOTH) for temporary bounded duels with countdowns and automatic border cleanup.
 
-*Templates and configuration options: [Actions & arenas guide](https://dailystruggle.github.io/RTP/admin/ACTIONS/).*
+*Templates and configuration options: [Actions guide](https://dailystruggle.github.io/RTP/admin/ACTIONS/).*
 
 ## Claims and safety
 

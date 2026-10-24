@@ -1,15 +1,19 @@
 package io.github.dailystruggle.rtp.common.commands.setup;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.MenuRendererDiscovery;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 
 /**
  * The {@code setup} subtree under {@code /rtp admin}.
@@ -39,7 +43,15 @@ public class SetupCmd extends BaseRTPCmdImpl {
         this.bookBuilder = Objects.requireNonNull(bookBuilder, "bookBuilder");
         this.menuRenderer = (menuRenderer != null) ? menuRenderer : MenuRendererDiscovery.discoverRenderer();
 
+        addParameter("radius", new CommandParameter(CMD_PERMISSION, "region outer radius distance", (uuid, s) -> true) {
+            @Override
+            public Set<String> values() {
+                return SetupRadiusCmd.PRESET_RADII;
+            }
+        });
+
         addSubCommand(new SetupWorldCmd(this, this.sessionRegistry, this.bookBuilder, this.menuRenderer));
+        addSubCommand(new SetupRadiusCmd(this, this.sessionRegistry, this.bookBuilder, this.menuRenderer));
         addSubCommand(new SetupGameplayCmd(this, this.sessionRegistry, this.bookBuilder, this.menuRenderer));
         addSubCommand(new SetupPerfCmd(this, this.sessionRegistry, this.bookBuilder, this.menuRenderer));
         addSubCommand(new SetupNextCmd(this, this.sessionRegistry, this.bookBuilder, this.menuRenderer));
@@ -80,7 +92,20 @@ public class SetupCmd extends BaseRTPCmdImpl {
             return true;
         }
 
+        String radius = SetupHandlerSupport.getFirstParam(parameterValues, "radius").trim();
+        if (!radius.isEmpty()) {
+            if (!SetupSession.isValidRadius(radius)) {
+                RTPRuntime.log(Level.WARNING, "[setup] Rejected invalid radius input '" + radius + "' from caller=" + callerId);
+                SetupHandlerSupport.sendMessage(callerId,
+                        "&cInvalid radius distance: '" + radius + "'. Use a positive distance such as 2.5km, 5km, 10km, 25km, 4096b, or 500c.");
+                return false;
+            }
+        }
+
         SetupSession session = SetupHandlerSupport.resolveSession(callerId, sessionRegistry);
+        if (!radius.isEmpty()) {
+            session.setRadiusChoice(radius);
+        }
 
         MenuRenderer renderer = (this.menuRenderer != null) ? this.menuRenderer : MenuRendererDiscovery.discoverRenderer();
         return SetupHandlerSupport.renderCurrentStage(callerId, session, bookBuilder, renderer);

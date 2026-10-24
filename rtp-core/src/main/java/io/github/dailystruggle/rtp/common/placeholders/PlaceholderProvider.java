@@ -1233,10 +1233,145 @@ public class PlaceholderProvider {
             return s == null ? "N/A" : s.topCause();
         });
 
-        placeholders.put("memTopCausePct", uuid -> {
-            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
-            return s == null ? "N/A" : formatPercent(s.topCausePercent());
-        });
+        placeholders.put(
+                "memTopCausePct",
+                uuid -> {
+                    MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
+                    return s == null ? "N/A" : formatPercent(s.topCausePercent());
+                });
+
+        // --- Adaptive Compute Governor placeholders (ADR-087 Section 6.2, ADR-124 Section 7) ---
+        placeholders.put(
+                "govAsyncConfiguredMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredAsyncBudgetMs()));
+        placeholders.put(
+                "govAsyncEffectiveMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectiveAsyncBudgetMs()));
+        placeholders.put(
+                "govAsyncReason",
+                uuid -> currentRtpExt().computeGovernor.asyncReason().displayName());
+        placeholders.put(
+                "govSyncConfiguredMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredSyncBudgetMs()));
+        placeholders.put(
+                "govSyncEffectiveMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectiveSyncBudgetMs()));
+        placeholders.put(
+                "govSyncReason",
+                uuid -> currentRtpExt().computeGovernor.syncReason().displayName());
+        placeholders.put(
+                "govPeriodConfigured",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredPeriodTicks()));
+        placeholders.put(
+                "govPeriodEffective",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectivePeriodTicks()));
+        placeholders.put(
+                "govPeriodReason",
+                uuid -> currentRtpExt().computeGovernor.periodReason().displayName());
+        placeholders.put(
+                "govPromotionsConfigured",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredPromotionsPerTurn()));
+        placeholders.put(
+                "govPromotionsEffective",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectivePromotionsPerTurn()));
+        placeholders.put(
+                "govPromotionsReason",
+                uuid -> currentRtpExt().computeGovernor.promotionsReason().displayName());
+        placeholders.put(
+                "govGenConfigured",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredGenerationCap()));
+        placeholders.put(
+                "govGenEffective",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectiveGenerationCap()));
+        placeholders.put(
+                "govGenReason",
+                uuid -> currentRtpExt().computeGovernor.generationReason().displayName());
+        placeholders.put(
+                "govRegionalInflight",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.regionalInflightCount()));
+        placeholders.put(
+                "govRegionalInflightCap",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.regionalInflightCeiling()));
+        placeholders.put(
+                "govHotCapConfigured",
+                uuid -> String.valueOf(resolveGovHotCapConfigured()));
+        placeholders.put(
+                "govHotCapEffective",
+                uuid -> String.valueOf(resolveGovHotCapEffective()));
+        placeholders.put(
+                "govHotCapReason",
+                uuid -> resolveGovHotCapReason().displayName());
+        placeholders.put(
+                "govUnitsPerTurn",
+                uuid -> String.valueOf(resolveGovUnitsPerTurn()));
+        placeholders.put(
+                "govConstrainedEvalShare",
+                uuid -> String.format(java.util.Locale.ROOT, "%.1f%%",
+                        currentRtpExt().computeGovernor.constrainedEvaluationShare() * 100.0));
+        placeholders.put(
+                "govMaxConsumerSkew",
+                uuid -> String.format(java.util.Locale.ROOT, "%.2fx",
+                        currentRtpExt().computeGovernor.maxConsumerSkewRatio()));
+    }
+
+    private static int resolveGovHotCapConfigured() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Integer cfg = gov.regionConfiguredHotCaps().get(region.name);
+            return (cfg != null) ? cfg : region.getSettings().activeChunkCap();
+        }
+        if (!gov.regionConfiguredHotCaps().isEmpty()) {
+            return gov.regionConfiguredHotCaps().values().iterator().next();
+        }
+        if (ActiveSelection.get() != null && !ActiveSelection.get().permRegionLookup.isEmpty()) {
+            Region first = ActiveSelection.get().permRegionLookup.values().iterator().next();
+            if (first != null && first.getSettings() != null) {
+                return first.getSettings().activeChunkCap();
+            }
+        }
+        return 10;
+    }
+
+    private static int resolveGovHotCapEffective() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Integer eff = gov.regionHotCaps().get(region.name);
+            return (eff != null) ? eff : region.getSettings().activeChunkCap();
+        }
+        if (!gov.regionHotCaps().isEmpty()) {
+            return gov.regionHotCaps().values().iterator().next();
+        }
+        return resolveGovHotCapConfigured();
+    }
+
+    private static io.github.dailystruggle.rtp.common.governor.GovernorReason resolveGovHotCapReason() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            io.github.dailystruggle.rtp.common.governor.GovernorReason r = gov.regionHotCapReasons().get(region.name);
+            return (r != null) ? r : io.github.dailystruggle.rtp.common.governor.GovernorReason.CONFIGURED;
+        }
+        for (io.github.dailystruggle.rtp.common.governor.GovernorReason r : gov.regionHotCapReasons().values()) {
+            if (r != null && r != io.github.dailystruggle.rtp.common.governor.GovernorReason.CONFIGURED) {
+                return r;
+            }
+        }
+        return io.github.dailystruggle.rtp.common.governor.GovernorReason.CONFIGURED;
+    }
+
+    private static int resolveGovUnitsPerTurn() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Integer u = gov.regionUnitsPerTurn().get(region.name);
+            return (u != null) ? u : 0;
+        }
+        if (!gov.regionUnitsPerTurn().isEmpty()) {
+            return gov.regionUnitsPerTurn().values().iterator().next();
+        }
+        return 0;
     }
 
     /**

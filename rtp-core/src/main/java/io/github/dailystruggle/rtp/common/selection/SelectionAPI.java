@@ -12,6 +12,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -228,22 +230,17 @@ public class SelectionAPI {
   }
 
   /**
-   * Drains the urgent queue, then the standard queue, until {@code availableNanos} is spent.
-   * {@link RTP#minRTPExecutions} tasks always run so selection progresses under load.
+   * Drains the urgent (player-facing/biome) selection queue until {@code availableNanos} is spent.
+   * {@link RTP#minRTPExecutions} tasks always run so urgent selection progresses under load (ADR-087 Invariant I4).
    *
    * @param availableNanos budget for this drain in nanoseconds
+   * @return number of urgent tasks executed
    */
-  public void compute(long availableNanos) {
-    if (selectionPipelineUrgent.isEmpty() && selectionPipeline.isEmpty()) return;
+  public int computeUrgent(long availableNanos) {
+    if (selectionPipelineUrgent.isEmpty()) return 0;
     long deadline = System.nanoTime() + Math.max(0L, availableNanos);
     int urgentReq = RTP.minRTPExecutions;
-    int standardReq = RTP.minRTPExecutions;
-
-    // Diagram 02: drain the urgent (private/biome) queue first, then the
-    // standard pipeline. FINER traces every individual task; FINE summarises
-    // the pulse's overall throughput.
     int urgentRan = 0;
-    int standardRan = 0;
 
     while (urgentReq > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipelineUrgent.poll();
@@ -254,16 +251,79 @@ public class SelectionAPI {
       urgentRan++;
       urgentReq--;
     }
+    return urgentRan;
+  }
 
-    while (standardReq > 0 || System.nanoTime() < deadline) {
+  /**
+   * Drains the standard (background) selection queue until {@code availableNanos} is spent.
+   *
+   * <p>When {@code enforceMinExecutions} is {@code false} (governed background mode, ADR-087 Section 4.3 item 3),
+   * checks the deadline before every task including the first, starting zero tasks when {@code availableNanos <= 0}
+   * (Invariant I2).
+   *
+   * @param availableNanos       budget for this drain in nanoseconds
+   * @param enforceMinExecutions whether to enforce {@link RTP#minRTPExecutions}
+   * @return number of standard tasks executed
+   */
+  public int computeStandard(long availableNanos, boolean enforceMinExecutions) {
+    return computeStandard(availableNanos, enforceMinExecutions, null);
+  }
+
+  /**
+   * Drains the standard (background) selection queue until {@code availableNanos} is spent,
+   * optionally sharing a pulse-wide {@code sharedRanAny} flag (ADR-087 Section 4.3 item 3, Invariant I2).
+   *
+   * @param availableNanos       budget for this drain in nanoseconds
+   * @param enforceMinExecutions whether to enforce {@link RTP#minRTPExecutions}
+   * @param sharedRanAny         pulse-wide background progress flag (when non-null and false with positive budget,
+   *                             starts the first background task of the pulse and sets the flag to true)
+   * @return number of standard tasks executed
+   */
+  public int computeStandard(
+      long availableNanos,
+      boolean enforceMinExecutions,
+      @Nullable java.util.concurrent.atomic.AtomicBoolean sharedRanAny) {
+    if (selectionPipeline.isEmpty()) return 0;
+    if (!enforceMinExecutions && availableNanos <= 0L) return 0;
+    long deadline = System.nanoTime() + Math.max(0L, availableNanos);
+    int standardReq = enforceMinExecutions ? RTP.minRTPExecutions : 0;
+    int standardRan = 0;
+
+    while (standardReq > 0
+        || (sharedRanAny != null && !sharedRanAny.get() && availableNanos > 0L)
+        || System.nanoTime() < deadline) {
       Runnable task = selectionPipeline.poll();
       if (task == null) break;
       RTPRuntime.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running standard pipeline task " + task.getClass().getSimpleName());
       runSelectionTask(task);
+      if (sharedRanAny != null) {
+        sharedRanAny.set(true);
+      }
       standardRan++;
       standardReq--;
     }
+    return standardRan;
+  }
+
+  public int computeStandard(long availableNanos) {
+    ComputeBudget b = ComputeGovernor.currentBudget();
+    boolean enforceMin = b == null || !b.isActuating();
+    return computeStandard(availableNanos, enforceMin);
+  }
+
+  /**
+   * Drains the urgent queue, then the standard queue, until {@code availableNanos} is spent.
+   * {@link RTP#minRTPExecutions} tasks always run so selection progresses under load.
+   *
+   * @param availableNanos budget for this drain in nanoseconds
+   */
+  public void compute(long availableNanos) {
+    if (selectionPipelineUrgent.isEmpty() && selectionPipeline.isEmpty()) return;
+    long start = System.nanoTime();
+    int urgentRan = computeUrgent(availableNanos);
+    long rem = availableNanos - (System.nanoTime() - start);
+    int standardRan = computeStandard(rem, true);
 
     if (urgentRan > 0 || standardRan > 0) {
       RTPRuntime.log(java.util.logging.Level.FINE,

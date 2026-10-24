@@ -1,9 +1,12 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
 import io.github.dailystruggle.rtp.common.predict.BernoulliEstimator;
 import io.github.dailystruggle.rtp.common.predict.ComparativeCostGovernor;
 import io.github.dailystruggle.rtp.common.predict.CostContext;
 import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 
 import java.util.Collections;
@@ -89,10 +92,39 @@ public final class ImmediateLoadGovernor {
         return GLOBAL_IN_FLIGHT.get();
     }
 
+    /**
+     * Effective server-wide generation permit cap {@code g_eff}, shared with {@link GenerationBudget}
+     * through {@link ComputeBudget#generationCap()} (ADR-087 Section 4.3 item 7 & 7.3, ADR-114 Decision 4).
+     */
+    public static int effectiveGlobalPermitCap() {
+        ComputeBudget budget = ComputeGovernor.currentBudget();
+        if (budget != null) {
+            return Math.max(1, budget.generationCap());
+        }
+        return MAX_GLOBAL_PERMITS;
+    }
+
+    /**
+     * Effective CPU target knee {@code min(35 ms, T_cpu)} from {@link ComputeBudget#cpuTarget()}
+     * ({@code 35.0} when {@code autoTune} is disabled; ADR-087 Section 4.3 item 7 & 7.3, ADR-114).
+     */
+    public static double effectiveCpuTargetMs() {
+        ComputeBudget budget = ComputeGovernor.currentBudget();
+        return budget != null ? budget.cpuTarget() : ComputeBudget.DEFAULT_PREFILTER_KNEE_MS;
+    }
+
     /** Computes dynamic shadow price multiplier of main-thread tick time W_tick(MSPT). */
     public static double computeTickWeight(double mspt) {
+        return computeTickWeight(mspt, effectiveCpuTargetMs());
+    }
+
+    /** Computes dynamic shadow price multiplier of main-thread tick time W_tick(MSPT) with explicit knee. */
+    public static double computeTickWeight(double mspt, double cpuTargetMs) {
         if (Double.isNaN(mspt) || mspt <= 0.0) mspt = 20.0;
-        double excess = Math.max(0.0, mspt - 35.0) / 10.0;
+        double knee = (Double.isNaN(cpuTargetMs) || cpuTargetMs <= 0.0)
+                ? ComputeBudget.DEFAULT_PREFILTER_KNEE_MS
+                : Math.min(ComputeBudget.DEFAULT_PREFILTER_KNEE_MS, cpuTargetMs);
+        double excess = Math.max(0.0, mspt - knee) / 10.0;
         return 5.0 + 100.0 * (excess * excess);
     }
 
@@ -105,13 +137,14 @@ public final class ImmediateLoadGovernor {
     private static final ComparativeCostGovernor<Decision> COMPARATIVE_GOVERNOR = ComparativeCostGovernor.of(ctx -> {
         if (ctx.get("isPredicateConstrained", 0.0) > 0.5) return Decision.PREFILTER;
         double mspt = ctx.get("mspt", 20.0);
-        if (mspt > 35.0) return Decision.PREFILTER;
+        double knee = ctx.get("cpuTarget", ComputeBudget.DEFAULT_PREFILTER_KNEE_MS);
+        if (mspt > knee) return Decision.PREFILTER;
 
         double pReject = ctx.get("pReject", 0.0);
         double cFile = ctx.get("cFile", DEFAULT_FILE_READ_MS);
         double cNative = ctx.get("cNative", DEFAULT_NATIVE_LOAD_MS);
         double cSync = ctx.get("cSync", DEFAULT_NATIVE_SYNC_MS);
-        double wTick = computeTickWeight(mspt);
+        double wTick = computeTickWeight(mspt, knee);
 
         double denom = cNative + wTick * cSync;
         double threshold = (denom <= 0.0) ? 0.0 : (cFile / denom);
@@ -184,9 +217,11 @@ public final class ImmediateLoadGovernor {
      */
     public boolean shouldPrefilter(boolean isPredicateConstrained, double currentMspt) {
         double mspt = Double.isNaN(currentMspt) || currentMspt <= 0.0 ? 20.0 : currentMspt;
+        double knee = effectiveCpuTargetMs();
         CostContext ctx = CostContext.builder()
                 .with("isPredicateConstrained", isPredicateConstrained ? 1.0 : 0.0)
                 .with("mspt", mspt)
+                .with("cpuTarget", knee)
                 .with("pReject", pReject())
                 .with("cFile", ewmaFileReadMs())
                 .with("cNative", ewmaNativeLoadMs())
@@ -214,6 +249,7 @@ public final class ImmediateLoadGovernor {
         if (Double.isNaN(syncMs) || syncMs < 0.0) syncMs = DEFAULT_NATIVE_SYNC_MS;
         nativeLoadCost.recordSample(asyncMs);
         nativeSyncCost.recordSample(syncMs);
+        GenerationBudget.server().recordLoadLatencyMs(asyncMs + syncMs);
     }
 
     public void recordOutcome(boolean rejected) {
@@ -222,14 +258,13 @@ public final class ImmediateLoadGovernor {
 
     /**
      * Non-blocking attempt to acquire a native generation permit subject to regional (1)
-     * and global (2, damped to 1 when MSPT > 35) limits.
+     * and global ({@link ComputeBudget#generationCap()}) limits (ADR-087 Section 4.3 item 7 & 7.3, ADR-114).
      *
-     * @param currentMspt current MSPT for tick damping
+     * @param currentMspt current MSPT (retained for signature compatibility)
      * @return permit if acquired, or {@code null} if slots are occupied
      */
     public GenerationPermit tryAcquirePermit(double currentMspt) {
-        double mspt = Double.isNaN(currentMspt) || currentMspt <= 0.0 ? 20.0 : currentMspt;
-        int maxGlobal = (mspt > 35.0) ? 1 : MAX_GLOBAL_PERMITS;
+        int maxGlobal = effectiveGlobalPermitCap();
 
         if (regionalInFlight.get() >= MAX_REGIONAL_PERMITS) {
             throttledGenerations.increment();
@@ -290,8 +325,7 @@ public final class ImmediateLoadGovernor {
     }
 
     public int permitsAvailable(double currentMspt) {
-        double mspt = Double.isNaN(currentMspt) || currentMspt <= 0.0 ? 20.0 : currentMspt;
-        int maxGlobal = (mspt > 35.0) ? 1 : MAX_GLOBAL_PERMITS;
+        int maxGlobal = effectiveGlobalPermitCap();
         if (regionalInFlight.get() >= MAX_REGIONAL_PERMITS || GLOBAL_IN_FLIGHT.get() >= maxGlobal) {
             return 0;
         }
@@ -300,10 +334,11 @@ public final class ImmediateLoadGovernor {
 
     public ImmediateGovernorRow snapshot() {
         double mspt = ServerHealthGate.lastMspt();
+        double knee = effectiveCpuTargetMs();
         double threshold = computeDedupThreshold(mspt);
         String curMode = this.mode;
         if (bypassedAnvilReads.sum() == 0 && prefilteredAnvilReads.sum() == 0) {
-            curMode = (pReject() > threshold || (!Double.isNaN(mspt) && mspt > 35.0)) ? "PREFILTER" : "BYPASS";
+            curMode = (pReject() > threshold || (!Double.isNaN(mspt) && mspt > knee)) ? "PREFILTER" : "BYPASS";
         }
         return new ImmediateGovernorRow(
                 region,

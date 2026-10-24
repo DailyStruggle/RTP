@@ -44,6 +44,7 @@ public final class GuiRenderers {
       return;
     }
     RENDERERS.put(key, renderer);
+    RTPGuiCommonAddon.onRenderersChanged();
   }
 
   /**
@@ -117,12 +118,14 @@ public final class GuiRenderers {
     String k = normalize(key);
     if (k != null) {
       RENDERERS.remove(k);
+      RTPGuiCommonAddon.onRenderersChanged();
     }
   }
 
   /** Clears every registered renderer (e.g. when the addon unloads). */
   public static void clear() {
     RENDERERS.clear();
+    RTPGuiCommonAddon.onRenderersChanged();
   }
 
   /**

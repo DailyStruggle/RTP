@@ -112,6 +112,7 @@ subprojects {
     def java17Modules = [
             ':rtp-api', ':server-api', ':rtp-core', ':anvil-api', ':bit-api', ':yaml-api', ':units-api', ':commands-api',
             ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
+            ':predict-api', ':config-bit-api', ':menu-api',
             ':rtp-proxy:rtp-proxy-common',
             ':rtp-bukkit:rtp-bukkit-common', ':rtp-bukkit:rtp-bukkit-v1_20_R1',
             ':rtp-paper:rtp-paper-common', ':rtp-paper:rtp-paper-v1_20_R1',
@@ -542,6 +543,9 @@ def publishedModulePaths = [
         ':metrics-api',
         ':bstats-api',
         ':maps-api',
+        ':predict-api',
+        ':config-bit-api',
+        ':menu-api',
         ':rtp-proxy:rtp-proxy-common',
 ]
 

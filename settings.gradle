@@ -176,25 +176,34 @@ include 'anvil-api'
 // JSON lib), so it groups under api/ with the other non-rtp-exclusive modules.
 // Renamed from the former ':rtp-tags' coordinate; on-disk at api/tags-api.
 include 'tags-api'
+// predict-api -- zero-dependency stochastic estimation and control toolkit (ADR-115).
+include 'predict-api'
+// config-bit-api -- declarative YAML directive and constraint PBIT library (ADR-064, ADR-121).
+include 'config-bit-api'
+// menu-api -- cross-platform declarative menu, session, token, and prompt SPI (ADR-035, ADR-044, ADR-048).
+include 'menu-api'
 
 // Relocate the grouped api/ modules on disk while keeping their flat Gradle
 // project paths (see the comment block above the include lines). The nested
 // unobf carrier inherits no projectDir from its parent in Gradle, so it is
 // overridden explicitly.
-project(':commands-api').projectDir = file('api/commands-api')
-project(':server-api').projectDir   = file('api/server-api')
-project(':bit-api').projectDir     = file('api/bit-api')
-project(':effects-api').projectDir  = file('api/effects-api')
+project(':commands-api').projectDir   = file('api/commands-api')
+project(':server-api').projectDir     = file('api/server-api')
+project(':bit-api').projectDir        = file('api/bit-api')
+project(':effects-api').projectDir    = file('api/effects-api')
 if (!excludeJdk25) {
     project(':effects-api:effects-api-fabric-unobf').projectDir = file('api/effects-api/effects-api-fabric-unobf')
 }
-project(':yaml-api').projectDir     = file('api/yaml-api')
-project(':units-api').projectDir    = file('api/units-api')
-project(':maps-api').projectDir     = file('api/maps-api')
-project(':metrics-api').projectDir  = file('api/metrics-api')
-project(':bstats-api').projectDir   = file('api/bstats-api')
-project(':anvil-api').projectDir    = file('api/anvil-api')
-project(':tags-api').projectDir     = file('api/tags-api')
+project(':yaml-api').projectDir       = file('api/yaml-api')
+project(':units-api').projectDir      = file('api/units-api')
+project(':maps-api').projectDir       = file('api/maps-api')
+project(':metrics-api').projectDir    = file('api/metrics-api')
+project(':bstats-api').projectDir     = file('api/bstats-api')
+project(':anvil-api').projectDir      = file('api/anvil-api')
+project(':tags-api').projectDir       = file('api/tags-api')
+project(':predict-api').projectDir    = file('api/predict-api')
+project(':config-bit-api').projectDir = file('api/config-bit-api')
+project(':menu-api').projectDir       = file('api/menu-api')
 
 include 'rtp-core'
 

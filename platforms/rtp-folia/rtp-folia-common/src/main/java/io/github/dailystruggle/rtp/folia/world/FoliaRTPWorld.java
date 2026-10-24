@@ -43,6 +43,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           int z = location.getBlockZ();
           return world.getBiome(x, y, z).name();
         } catch (Throwable t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+              "World#getBiome", t.getClass().getSimpleName() + ": " + t.getMessage());
           return Biome.PLAINS.name();
         }
       };

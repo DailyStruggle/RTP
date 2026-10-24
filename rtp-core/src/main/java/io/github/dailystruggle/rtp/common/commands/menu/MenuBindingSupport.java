@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,6 +57,8 @@ public final class MenuBindingSupport {
         // See discoverRenderer: a platform opener may link a runtime type absent
         // on this server (LinkageError / NoClassDefFoundError), which is not a
         // RuntimeException. Catch both so discovery degrades gracefully.
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAnvilInputDegraded(
+            provider.getClass().getName(), ex.getClass().getSimpleName() + ": " + ex.getMessage());
         RTPRuntime.log(
             Level.WARNING,
             "failed to instantiate menu anvil-input opener: " + ex,
@@ -111,25 +112,7 @@ public final class MenuBindingSupport {
    * {@link java.util.ServiceConfigurationError} to safely skip mismatched platform classes in universal jars.
    */
   private static <T> List<T> loadProvidersSafely(ServiceLoader<T> loader, String what) {
-    List<T> providers = new ArrayList<>();
-    Iterator<T> it = loader.iterator();
-    while (true) {
-      T provider;
-      try {
-        if (!it.hasNext()) break;
-        provider = it.next();
-      } catch (java.util.ServiceConfigurationError | LinkageError err) {
-        // Unloadable on this platform (wrong-family provider in a universal
-        // jar). The lazy iterator has already advanced past the bad entry, so
-        // continue to surface any remaining valid providers.
-        RTPRuntime.log(
-            Level.FINE,
-            "skipping unloadable " + what + ": " + err);
-        continue;
-      }
-      providers.add(provider);
-    }
-    return providers;
+    return io.github.dailystruggle.menu.api.MenuBindingSupport.loadProvidersSafely(loader, what);
   }
 
   /**
@@ -153,8 +136,7 @@ public final class MenuBindingSupport {
    */
   static boolean matchesPlatform(
       @Nullable PlatformFamily providerFamily, @Nullable PlatformFamily running) {
-    if (providerFamily == null) return true;
-    if (running == null || running == PlatformFamily.UNKNOWN) return true;
-    return providerFamily == running;
+    return io.github.dailystruggle.menu.api.MenuBindingSupport.matchesPlatform(
+        providerFamily, running);
   }
 }

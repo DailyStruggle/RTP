@@ -8,6 +8,7 @@ configurations {
 
 dependencies {
     api project(':server-api')
+    api project(':menu-api')
     // commands-api + yaml-api: rtp-api hosts the extensible selection model
     // (FactoryValue + the Shape / VerticalAdjustor hierarchy). Shapes expose
     // CommandParameter-typed config (commands-api) and FactoryValue loads its

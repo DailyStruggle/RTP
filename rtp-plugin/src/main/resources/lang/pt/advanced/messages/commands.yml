@@ -81,6 +81,12 @@ infoTopRejectionCause: "&7Principal causa de rejeição: #7E9CC8[genTopRejection
 # Espaço reservado: [genFailureBreakdown] - lista causa=N separada por vírgula, mais frequentes primeiro.
 infoFailureBreakdown: "&7Rejeições por causa: #7E9CC8[genFailureBreakdown]"
 
+# Governador adaptativo: orçamentos configurados vs. efetivos e motivo.
+infoGovernorAsync: "&7Async em segundo plano: #7E9CC8[govAsyncConfiguredMs]&7 ms (efetivo #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Sync em segundo plano: #7E9CC8[govSyncConfiguredMs]&7 ms (efetivo #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Limite quente: #7E9CC8[govHotCapConfigured]&7 (efetivo #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Geração: #7E9CC8[govGenConfigured]&7 (efetivo #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; em voo regional #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Limiares de faixa de cor de integridade. Usados para colorir as variantes coloridas
 # de espaços reservados (ex. [tps1mColoured]) em verde/amarelo/vermelho.
 infoThresholdTpsGreen: 19.5

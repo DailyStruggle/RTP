@@ -1,7 +1,12 @@
 package io.github.dailystruggle.rtp.common.tools;
 
+import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
+import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,8 +39,13 @@ public final class GenerationBudget {
   public static final int MODERN_CAP = 4;
   /** Safety lifetime for an admission reservation whose task is lost before dispatch. */
   public static final long RESERVATION_TTL_MILLIS = 30_000L;
+  /** Five-minute window for tracking minimum native chunk-load latency (ADR-087 Section 4.1 & 4.3 item 7). */
+  public static final long LATENCY_WINDOW_NANOS = TimeUnit.MINUTES.toNanos(5);
 
-  private static volatile IntSupplier serverCap = () -> VANILLA_CAP;
+  private record LatencySample(long timestampNanos, double latencyMs) {}
+
+  private static volatile IntSupplier baseServerCap = () -> VANILLA_CAP;
+  private static volatile IntSupplier serverCap = GenerationBudget::effectiveServerCap;
   private static volatile boolean serverAdmissionEnabled = true;
   private static final GenerationBudget SERVER = new GenerationBudget(() -> serverCap.getAsInt());
   private static final ThreadLocal<Reservation> CURRENT_RESERVATION = new ThreadLocal<>();
@@ -46,6 +56,17 @@ public final class GenerationBudget {
   private final AtomicInteger inFlight = new AtomicInteger();
   private final AtomicLong resetEpoch = new AtomicLong();
   private final Set<Reservation> reservations = ConcurrentHashMap.newKeySet();
+  private final EwmaEstimator loadLatencyMs = EwmaEstimator.ofWindow(32);
+  private final ConcurrentLinkedDeque<LatencySample> latencyWindow = new ConcurrentLinkedDeque<>();
+
+  private static int effectiveServerCap() {
+    int versionCap = Math.max(1, baseServerCap.getAsInt());
+    ComputeBudget budget = ComputeGovernor.currentBudget();
+    if (budget != null && budget.isActuating()) {
+      return Math.max(1, Math.min(versionCap, budget.generationCap()));
+    }
+    return versionCap;
+  }
 
   /** The server-wide budget platform world adapters count their live loads in. */
   public static GenerationBudget server() {
@@ -55,9 +76,16 @@ public final class GenerationBudget {
   /**
    * Sets how the server-wide cap is resolved; read on every check, so a platform can pass a
    * supplier that consults a version adapter installed later. {@code null} restores the default.
+   * When {@code autoTune} is active, bounded by {@link ComputeBudget#generationCap()} (ADR-087 Section 7.3).
    */
   public static void configureServerCap(IntSupplier cap) {
-    serverCap = cap == null ? () -> VANILLA_CAP : cap;
+    baseServerCap = cap == null ? () -> VANILLA_CAP : cap;
+    serverCap = GenerationBudget::effectiveServerCap;
+  }
+
+  /** Configured base server cap before governor clamping. */
+  public static int configuredServerCap() {
+    return Math.max(1, baseServerCap.getAsInt());
   }
 
   /** Sets whether background admission reservations affect the server-wide budget. */
@@ -250,6 +278,49 @@ public final class GenerationBudget {
     for (Reservation reservation : reservations) reservation.state.set(Reservation.RELEASED);
     reservations.clear();
     inFlight.set(0);
+    latencyWindow.clear();
+  }
+
+  /**
+   * Records a native chunk-load latency sample in milliseconds, shared with {@code ImmediateLoadGovernor}
+   * and {@link ComputeGovernor} (ADR-087 Section 4.1 & 4.3 item 7).
+   */
+  public void recordLoadLatencyMs(double ms) {
+    recordLoadLatencyMs(ms, nanoTime.getAsLong());
+  }
+
+  public void recordLoadLatencyMs(double ms, long nowNanos) {
+    if (Double.isNaN(ms) || Double.isInfinite(ms) || ms <= 0.0) return;
+    loadLatencyMs.recordSample(ms);
+    latencyWindow.addLast(new LatencySample(nowNanos, ms));
+    pruneLatencyWindow(nowNanos);
+  }
+
+  /** Current EWMA of native chunk-load latency in milliseconds, or {@code Double.NaN} if unsampled. */
+  public double ewmaLoadLatencyMs() {
+    return loadLatencyMs.mean();
+  }
+
+  /** Minimum native chunk-load latency observed within the last 5 minutes, or {@code Double.NaN} if unsampled. */
+  public double minWindowedLoadLatencyMs(long nowNanos) {
+    pruneLatencyWindow(nowNanos);
+    double min = Double.POSITIVE_INFINITY;
+    for (LatencySample s : latencyWindow) {
+      if (s.latencyMs() < min) {
+        min = s.latencyMs();
+      }
+    }
+    return Double.isInfinite(min) ? Double.NaN : min;
+  }
+
+  private void pruneLatencyWindow(long nowNanos) {
+    while (!latencyWindow.isEmpty()) {
+      LatencySample head = latencyWindow.peekFirst();
+      if (head == null || nowNanos - head.timestampNanos() <= LATENCY_WINDOW_NANOS) {
+        break;
+      }
+      latencyWindow.pollFirst();
+    }
   }
 
   private void expireReservations() {

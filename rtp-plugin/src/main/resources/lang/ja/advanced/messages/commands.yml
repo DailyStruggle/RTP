@@ -77,6 +77,12 @@ infoTopRejectionCause: "&7主な拒否理由: #7E9CC8[genTopRejectionCause]&7 (#
 # プレースホルダー: [genFailureBreakdown] - カンマ区切りの cause=N リスト（多い順）。
 infoFailureBreakdown: "&7理由別の拒否: #7E9CC8[genFailureBreakdown]"
 
+# アダプティブ計算ガバナーの設定値・実効値および理由。
+infoGovernorAsync: "&7バックグラウンド非同期: #7E9CC8[govAsyncConfiguredMs]&7 ms (実効 #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7バックグラウンド同期: #7E9CC8[govSyncConfiguredMs]&7 ms (実効 #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7ホット上限: #7E9CC8[govHotCapConfigured]&7 (実効 #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7チャンク生成上限: #7E9CC8[govGenConfigured]&7 (実効 #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; リージョン実行中 #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # 健全性カラーバンドのしきい値。色付きバリアントプレースホルダー
 # (例: [tps1mColoured]) を緑/黄/赤で着色するために使用されます。
 infoThresholdTpsGreen: 19.5

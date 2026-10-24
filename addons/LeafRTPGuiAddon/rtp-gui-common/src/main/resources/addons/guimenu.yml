@@ -11,6 +11,11 @@
 #
 # A chest menu does not use the parchment background, so bright colors are fine.
 
+# When true, bare /rtp opens the region picker GUI. Setting openOnBareRtp: false
+# makes bare /rtp teleport immediately in the player's current world while keeping
+# /rtp gui and /rtp menu active.
+openOnBareRtp: true
+
 # Renderer style opened by a bare /rtp. Each platform module registers one or more
 # styles (the Bukkit module ships 'chest'); a book renderer registers as 'book'.
 # Set this to the style you want; an unknown value falls back to any available one.

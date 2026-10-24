@@ -87,6 +87,22 @@ infoTopRejectionCause: "&7Top Rejection Cause: #7E9CC8[genTopRejectionCause]&7 (
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Rejections by Cause: #7E9CC8[genFailureBreakdown]"
 
+# Adaptive compute governor configured vs. effective budgets and reason.
+# Placeholders: [govAsyncConfiguredMs] [govAsyncEffectiveMs] [govAsyncReason].
+infoGovernorAsync: "&7Background async: #7E9CC8[govAsyncConfiguredMs]&7 ms (effective #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+
+# Configured vs. effective background sync budget and reason.
+# Placeholders: [govSyncConfiguredMs] [govSyncEffectiveMs] [govSyncReason].
+infoGovernorSync: "&7Background sync: #7E9CC8[govSyncConfiguredMs]&7 ms (effective #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+
+# Configured vs. effective hot-cache capacity and reason.
+# Placeholders: [govHotCapConfigured] [govHotCapEffective] [govHotCapReason].
+infoGovernorHotCap: "&7Hot cap: #7E9CC8[govHotCapConfigured]&7 (effective #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+
+# Configured vs. effective generation cap, reason, and Folia regional in-flight vs. ceiling.
+# Placeholders: [govGenConfigured] [govGenEffective] [govGenReason] [govRegionalInflight] [govRegionalInflightCap].
+infoGovernorGeneration: "&7Generation: #7E9CC8[govGenConfigured]&7 (effective #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; regional in-flight #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Health colour-band thresholds. Used to colour the coloured-variant
 # placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5

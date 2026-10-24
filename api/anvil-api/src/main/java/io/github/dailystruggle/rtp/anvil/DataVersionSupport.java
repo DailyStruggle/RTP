@@ -27,11 +27,17 @@ public final class DataVersionSupport {
    */
   public static final int MC_26_1_DATA_VERSION = 4788;
 
+  /**
+   * Parity-validated against {@code api/anvil-api/src/test/resources/anvil/real/26_3_R1/r.0.0.mca}.
+   * Produced by Minecraft 26.3; covered by {@code AnvilFixtureParityTest}.
+   */
+  public static final int MC_26_3_DATA_VERSION = 5023;
+
   /** Lower bound of the historic supported range (1.20 RC; retained for parity tests). */
   public static final int MIN_SUPPORTED_DATA_VERSION = 3454;
 
   /** Upper bound of the historic supported range; tighten when chunk NBT layout breaks (ADR-016 section 8.2). */
-  public static final int MAX_SUPPORTED_DATA_VERSION = 5000;
+  public static final int MAX_SUPPORTED_DATA_VERSION = 5100;
 
   private DataVersionSupport() {
     // Utility class.

@@ -19,10 +19,13 @@ The RTP (Random Teleport) plugin is built with a multi-module architecture to en
 * **bit-api** (`api/bit-api`): Standalone, plugin-agnostic Built-In Test (PBIT/CBIT/IBIT) contract, findings model, code registry, and CLI runner ([ADR-121](../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)).
 * **bstats-api** (`api/bstats-api`): Dependency-free bStats v2 metrics client SPI ([bstats-api-ADR-001](../../api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)).
 * **commands-api** (`api/commands-api`): Unified platform-neutral command-tree framework and Brigadier bridge ([commands-api-ADR-001](../../api/commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)).
+* **config-bit-api** (`api/config-bit-api`): Declarative YAML comment-directive (`@type`, `@options`, `@range`, `@pattern`), cross-file reference, distance-constraint, and locale-key parity PBIT validation library layered on `yaml-api`, `bit-api`, and `units-api` ([ADR-064](../adr/ADR-064-comment-directives-for-finite-value-domains.md), [ADR-121](../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)).
 * **effects-api** (`api/effects-api`): Unified cross-platform visual, sound, potion, and hologram effects framework ([effects-api-ADR-003](../../api/effects-api/docs/adr/effects-api-ADR-003-platform-split-bukkit-fabric.md), including the `effects-api-fabric-unobf` carrier per [effects-api-ADR-006](../../api/effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md)).
 * **maps-api** (`api/maps-api`): Platform-neutral runtime cartography, heatmap, and Mermaid chart rendering SPI ([ADR-046](../adr/ADR-046-maps-api-module.md)).
+* **menu-api** (`api/menu-api`): Cross-platform declarative menu descriptor, session, token redemption, and anvil/text prompt SPI layered on `server-api` and `commands-api` ([ADR-035](../adr/ADR-035-interactive-menu-command-mirrors.md), [ADR-044](../adr/ADR-044-written-book-menu-renderer.md), [ADR-048](../adr/ADR-048-menu-builders-behind-server-accessor.md)).
 * **metrics-api** (`api/metrics-api`): Platform-portable runtime telemetry SPI (`Metrics`, `MetricsBinding`, `MetricsSnapshot`, `FoliaRegionSample`; [metrics-api-ADR-001](../../api/metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md)).
-* **server-api** (`api/server-api`): Platform-neutral server identity, `PlatformFamily` capability gating, and logging SPI (`ServerAccessor`, `ServerAccessors`; [ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md)).
+* **predict-api** (`api/predict-api`): Zero-dependency stochastic estimation (`EwmaEstimator`, `BernoulliEstimator`, `EwmaLinearFit`) and adaptive control (`ComparativeCostGovernor`, `BudgetPacer`, `AimdLimiter`) library ([ADR-109](../adr/ADR-109-empirical-cost-governor-for-anvil-prefilter.md), [ADR-114](../adr/ADR-114-thread-weighted-inflight-deduplication-cost-model.md), [ADR-115](../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph.md)).
+* **server-api** (`api/server-api`): Platform-neutral server identity, `PlatformFamily` capability gating, logging, and regional/async task scheduling SPI (`ServerAccessor`, `ServerAccessors`, `TaskScheduler`, `TaskHandle`; [ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md)).
 * **tags-api** (`api/tags-api`): Zero-dependency Minecraft block and biome tag JSON resolver ([ADR-017](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md)).
 * **units-api** (`api/units-api`): Dependency-free temporal, spatial (`DistanceParser`), and data-size unit parsers re-exported by `rtp-api` ([ADR-113](../adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)).
 * **yaml-api** (`api/yaml-api`): In-house zero-dependency YAML parser, writer, and comment-preserving configuration substrate ([ADR-025](../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md), [ADR-042](../adr/ADR-042-yaml-comment-preservation-block-only.md)).
@@ -61,6 +64,9 @@ graph TD
         yaml-api
         commands-api
         bit-api
+        config-bit-api
+        menu-api
+        predict-api
         effects-api
         maps-api
         metrics-api
@@ -70,10 +76,13 @@ graph TD
     end
 
     server-api --> rtp-api
+    menu-api --> rtp-api
     units-api --> rtp-api
     yaml-api --> rtp-api
     commands-api --> rtp-api
     bit-api --> rtp-api
+    config-bit-api --> rtp-core
+    predict-api --> rtp-core
 
     rtp-api --> rtp-core
     SPI --> rtp-core

@@ -8,6 +8,9 @@
       "prefix": "BIT"
     },
     {
+      "prefix": "GOVERNOR"
+    },
+    {
       "prefix": "HEATMAP"
     },
     {
@@ -350,6 +353,46 @@
       "subsystem": "bit",
       "messageKey": "",
       "remediation": "Two plugins reserved the same BIT code prefix; change one plugin's prefix or remove one of them."
+    },
+    {
+      "id": 1,
+      "ns": "GOVERNOR",
+      "key": "GOVERNOR_KNOB_REDUCED",
+      "severity": "INFO",
+      "tier": "CBIT",
+      "subsystem": "governor",
+      "messageKey": "",
+      "remediation": "Inspect /rtp info and server load; the governor reduced background compute below configured ceilings."
+    },
+    {
+      "id": 2,
+      "ns": "GOVERNOR",
+      "key": "GOVERNOR_KNOB_AT_FLOOR",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "governor",
+      "messageKey": "",
+      "remediation": "A background compute knob has been held at its floor for over 10 minutes; check server overload or metrics health."
+    },
+    {
+      "id": 3,
+      "ns": "GOVERNOR",
+      "key": "GOVERNOR_SIGNAL_STALE",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "governor",
+      "messageKey": "",
+      "remediation": "A previously sampled telemetry signal has been stale for over 60 seconds; governed knobs are held."
+    },
+    {
+      "id": 4,
+      "ns": "GOVERNOR",
+      "key": "GOVERNOR_EVALUATION_FAILED",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "governor",
+      "messageKey": "",
+      "remediation": "Governor control-law evaluation threw an exception and retained the previous snapshot; inspect server logs."
     },
     {
       "id": 4700,
@@ -1222,6 +1265,46 @@
       "remediation": "Use one of the listed values; unrecognised values silently fall back to the default."
     },
     {
+      "id": 1801,
+      "ns": "RTP",
+      "key": "RTP_CBIT_PREFILTER_COMPRESSION_UNSUPPORTED",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "pipeline",
+      "messageKey": "",
+      "remediation": "Check region-file-compression in server configuration or update anvil-api for the new chunk compression mode."
+    },
+    {
+      "id": 1802,
+      "ns": "RTP",
+      "key": "RTP_CBIT_PREFILTER_SECTION_UNPARSEABLE",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "pipeline",
+      "messageKey": "",
+      "remediation": "Inspect the reported region file and chunk coordinate or update anvil-api for the new chunk NBT section layout."
+    },
+    {
+      "id": 1803,
+      "ns": "RTP",
+      "key": "RTP_CBIT_STALE_CHUNK_GUARD_TRIPPED",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "pipeline",
+      "messageKey": "",
+      "remediation": "Check region-thread backlog or tune staleChunkRetryLimit in safety.yml (ADR-015)."
+    },
+    {
+      "id": 1804,
+      "ns": "RTP",
+      "key": "RTP_CBIT_CHUNK_TICKET_HIGH_WATER",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "pipeline",
+      "messageKey": "",
+      "remediation": "Inspect active chunk ticket counts and activeChunkCap / memory tracker diagnostics (S-002)."
+    },
+    {
       "id": 3001,
       "ns": "TEST",
       "key": "TEST_ACCESSOR_UNAVAILABLE",
@@ -1890,6 +1973,86 @@
       "subsystem": "test.api-compat",
       "messageKey": "",
       "remediation": "Pre-generate destination worlds or use Paper/Folia for asynchronous chunk loading."
+    },
+    {
+      "id": 4011,
+      "ns": "TEST",
+      "key": "TEST_ANVIL_WORLD_UNAVAILABLE",
+      "severity": "INFO",
+      "tier": "PBIT",
+      "subsystem": "anvil",
+      "messageKey": "",
+      "remediation": "Generate or save at least one world region file before running live Anvil parity verification."
+    },
+    {
+      "id": 4012,
+      "ns": "TEST",
+      "key": "TEST_ANVIL_DATA_VERSION_UNRECOGNIZED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "anvil",
+      "messageKey": "",
+      "remediation": "Verify compatibility with the server's chunk DataVersion and section NBT schema."
+    },
+    {
+      "id": 4013,
+      "ns": "TEST",
+      "key": "TEST_ANVIL_SECTION_DECODE_FAILED",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "anvil",
+      "messageKey": "",
+      "remediation": "Inspect region file integrity or update anvil-api for the new chunk section/heightmap layout."
+    },
+    {
+      "id": 4014,
+      "ns": "TEST",
+      "key": "TEST_ANVIL_BIOME_PALETTE_MISMATCH",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "anvil",
+      "messageKey": "",
+      "remediation": "Verify that block and biome palette entries use valid namespace:id identifiers."
+    },
+    {
+      "id": 4021,
+      "ns": "TEST",
+      "key": "TEST_PLATFORM_ANVIL_INPUT_DEGRADED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "platform",
+      "messageKey": "",
+      "remediation": "Check AnvilInputOpenerProvider linkage for this server version; chat/command fallback is active."
+    },
+    {
+      "id": 4022,
+      "ns": "TEST",
+      "key": "TEST_PLATFORM_MENU_RENDERER_DEGRADED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "platform",
+      "messageKey": "",
+      "remediation": "Check MenuRendererProvider / Adventure book support on this server; fallback rendering is active."
+    },
+    {
+      "id": 4023,
+      "ns": "TEST",
+      "key": "TEST_PLATFORM_WORLD_BORDER_DEGRADED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "platform",
+      "messageKey": "",
+      "remediation": "Verify WorldBorder packet or native border API compatibility for this server version."
+    },
+    {
+      "id": 4024,
+      "ns": "TEST",
+      "key": "TEST_PLATFORM_PALETTE_RECONCILER_DEGRADED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "platform",
+      "messageKey": "",
+      "remediation": "Verify platform Material/Biome registry lookup compatibility; string normalization fallback is active."
     }
   ],
   "retired": []

@@ -1,15 +1,23 @@
 package io.github.dailystruggle.rtp.guiaddon.common;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
+import io.github.dailystruggle.rtp.api.hooks.RootActionRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
 import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
@@ -44,14 +52,34 @@ import java.util.logging.Level;
  */
 public final class RTPGuiCommonAddon implements RTPAddon {
 
+  private static volatile RTPGuiCommonAddon activeInstance;
+
   /** Style keys this addon registered via the SPI hook, detached again on unload. */
   private final java.util.List<String> serviceStyles = new java.util.ArrayList<>();
+  private volatile boolean loaded;
+  private GuiOpenCommand guiSubCommand;
+  private GuiOpenCommand menuSubCommand;
+  private CommandsAPICommand previousGuiCommand;
+  private CommandsAPICommand previousMenuCommand;
 
   @Override
   public void onLoad() {
+    loaded = true;
+    activeInstance = this;
     // Register addons/guimenu.yml with RTP's config system (first-boot create + /rtp reload).
-    ActiveConfigs.get().putParser(registerParser());
-    Configs.onReload(() -> ActiveConfigs.get().putParser(registerParser()));
+    if (ActiveConfigs.get() != null) {
+      ActiveConfigs.get().putParser(registerParser());
+    }
+    Configs.onReload(() -> {
+      if (!loaded) {
+        return;
+      }
+      if (ActiveConfigs.get() != null) {
+        ActiveConfigs.get().putParser(registerParser());
+      }
+      registerSubcommands();
+      syncRootActionBinding();
+    });
     // /rtp test config-guimenu: directives come from this jar, not RTP's (ADR-121).
     ConfigPbit.register(DirectiveConfigCheck.bound(
         "guimenu", "addons/guimenu.yml", getClass().getClassLoader()));
@@ -67,43 +95,20 @@ public final class RTPGuiCommonAddon implements RTPAddon {
     // GuiRenderers keys by style.
     registerServiceRenderers();
 
-    // Bind bare /rtp to open the menu. Returning false (no renderer, or offline)
-    // defers to RTP's classic teleport so the command never silently no-ops.
-    try {
-      RTP.log(Level.FINE, "[RTP-GUI] bare /rtp root action bound");
-      RTPAPI.hooks().rootAction().bind((playerId, feedback) -> {
-        String style = GuiMenuConfig.INSTANCE.menuStyle();
-        MenuRenderer renderer = GuiRenderers.resolve(style);
-        RTP.log(Level.FINE, "[RTP-GUI] bare /rtp for " + playerId + ": menuStyle=" + style
-            + ", registeredStyles=" + GuiRenderers.registeredStyles()
-            + ", resolvedRenderer=" + (renderer == null ? "null" : renderer.key())
-            + ", available=" + (renderer != null && renderer.isAvailable()));
-        if (renderer == null || !renderer.isAvailable()) {
-          RTP.log(Level.FINE, "[RTP-GUI] bare /rtp for " + playerId
-              + ": no available renderer (resolved=" + (renderer == null ? "null" : renderer.key())
-              + "); deferring to classic teleport");
-          return false; // no platform renderer installed; classic teleport
-        }
-        if (RTPRuntime.serverAccessor() == null || RTPRuntime.serverAccessor().getPlayer(playerId) == null) {
-          RTP.log(Level.FINE, "[RTP-GUI] bare /rtp for " + playerId
-              + ": player not resolvable (serverAccessor="
-              + (RTPRuntime.serverAccessor() == null ? "null" : "present")
-              + "); deferring to classic teleport");
-          return false; // offline / not resolvable; classic teleport
-        }
-        RTP.log(Level.FINE, "[RTP-GUI] bare /rtp for " + playerId
-            + ": opening menu via renderer " + renderer.key());
-        renderer.open(playerId, MenuModel.build(playerId, GuiMenuConfig.INSTANCE));
-        return true; // handled: suppress the classic teleport
-      });
-    } catch (IllegalStateException coreNotLoaded) {
-      RTP.log(Level.WARNING,
-          "[RTP-GUI] core not loaded; bare /rtp will not open the menu", coreNotLoaded);
-    }
+    // Always register explicit /rtp gui and /rtp menu subcommands so players, portals,
+    // or spawn NPCs can open the picker even when bare /rtp is configured to teleport.
+    registerSubcommands();
+
+    // Bind or unbind bare /rtp according to openOnBareRtp and renderer availability.
+    syncRootActionBinding();
   }
 
   @Override
   public void onUnload() {
+    loaded = false;
+    if (activeInstance == this) {
+      activeInstance = null;
+    }
     // Detach the SPI-discovered renderers so they do not outlive this addon
     // (e.g. across a reload); the Bukkit plugin detaches its own chest style.
     for (String style : serviceStyles) {
@@ -111,11 +116,209 @@ public final class RTPGuiCommonAddon implements RTPAddon {
     }
     serviceStyles.clear();
 
+    unregisterSubcommands();
+
     // Release the bare-/rtp binding so it does not outlive this addon.
     try {
-      RTPAPI.hooks().rootAction().clear();
+      RootActionRegistry registry = RTPAPI.hooks().rootAction();
+      if (registry != null) {
+        registry.clear();
+      }
     } catch (IllegalStateException ignored) {
       // core already gone; nothing to clear
+    }
+  }
+
+  static void onRenderersChanged() {
+    RTPGuiCommonAddon instance = activeInstance;
+    if (instance != null && instance.loaded) {
+      instance.syncRootActionBinding();
+    }
+  }
+
+  void syncRootActionBinding() {
+    try {
+      RootActionRegistry registry = RTPAPI.hooks().rootAction();
+      if (registry == null) {
+        return;
+      }
+      boolean openOnBare = GuiMenuConfig.INSTANCE.openOnBareRtp();
+      String style = GuiMenuConfig.INSTANCE.menuStyle();
+      MenuRenderer renderer = GuiRenderers.resolve(style);
+      if (openOnBare && renderer != null && renderer.isAvailable()) {
+        RTP.log(Level.FINE, "[RTP-GUI] bare /rtp root action bound");
+        registry.bind(this::handleBareRtp);
+      } else {
+        RTP.log(Level.FINE, "[RTP-GUI] bare /rtp root action unbound (openOnBareRtp="
+            + openOnBare + ", resolvedRenderer=" + (renderer == null ? "null" : renderer.key()) + ")");
+        registry.clear();
+      }
+    } catch (IllegalStateException coreNotLoaded) {
+      RTP.log(Level.WARNING,
+          "[RTP-GUI] core not loaded; bare /rtp will not open the menu", coreNotLoaded);
+    }
+  }
+
+  private boolean handleBareRtp(UUID playerId, Consumer<String> feedback) {
+    if (!GuiMenuConfig.INSTANCE.openOnBareRtp()) {
+      RTP.log(Level.FINE, "[RTP-GUI] bare /rtp for " + playerId
+          + ": openOnBareRtp is false; deferring to classic teleport");
+      return false;
+    }
+    return openPickerMenu(playerId);
+  }
+
+  static boolean openPickerMenu(UUID playerId) {
+    if (playerId == null || playerId.equals(new UUID(0L, 0L))) {
+      return false;
+    }
+    String style = GuiMenuConfig.INSTANCE.menuStyle();
+    MenuRenderer renderer = GuiRenderers.resolve(style);
+    RTP.log(Level.FINE, "[RTP-GUI] menu open for " + playerId + ": menuStyle=" + style
+        + ", registeredStyles=" + GuiRenderers.registeredStyles()
+        + ", resolvedRenderer=" + (renderer == null ? "null" : renderer.key())
+        + ", available=" + (renderer != null && renderer.isAvailable()));
+    if (renderer == null || !renderer.isAvailable()) {
+      RTP.log(Level.FINE, "[RTP-GUI] menu open for " + playerId
+          + ": no available renderer (resolved=" + (renderer == null ? "null" : renderer.key())
+          + "); deferring to classic teleport");
+      return false;
+    }
+    if (RTPRuntime.serverAccessor() == null || RTPRuntime.serverAccessor().getPlayer(playerId) == null) {
+      RTP.log(Level.FINE, "[RTP-GUI] menu open for " + playerId
+          + ": player not resolvable (serverAccessor="
+          + (RTPRuntime.serverAccessor() == null ? "null" : "present")
+          + "); deferring to classic teleport");
+      return false;
+    }
+    RTP.log(Level.FINE, "[RTP-GUI] menu open for " + playerId
+        + ": opening menu via renderer " + renderer.key());
+    renderer.open(playerId, MenuModel.build(playerId, GuiMenuConfig.INSTANCE));
+    return true;
+  }
+
+  private void registerSubcommands() {
+    TreeCommand root = RTP.baseCommand;
+    if (root == null) {
+      return;
+    }
+    Map<String, CommandsAPICommand> lookup = root.getCommandLookup();
+    if (lookup == null) {
+      return;
+    }
+    CommandsAPICommand currentGui = lookup.get("GUI");
+    if (!(currentGui instanceof GuiOpenCommand)) {
+      previousGuiCommand = currentGui;
+    }
+    guiSubCommand = new GuiOpenCommand(root, "gui", "rtp.gui", previousGuiCommand);
+    root.addSubCommand(guiSubCommand);
+
+    CommandsAPICommand currentMenu = lookup.get("MENU");
+    if (!(currentMenu instanceof GuiOpenCommand)) {
+      previousMenuCommand = currentMenu;
+    }
+    menuSubCommand = new GuiOpenCommand(root, "menu", "rtp.menu", previousMenuCommand);
+    root.addSubCommand(menuSubCommand);
+  }
+
+  private void unregisterSubcommands() {
+    TreeCommand root = RTP.baseCommand;
+    if (root != null && root.getCommandLookup() != null) {
+      Map<String, CommandsAPICommand> lookup = root.getCommandLookup();
+      if (guiSubCommand != null && lookup.get("GUI") == guiSubCommand) {
+        if (previousGuiCommand != null) {
+          lookup.put("GUI", previousGuiCommand);
+        } else {
+          lookup.remove("GUI");
+        }
+      }
+      if (menuSubCommand != null && lookup.get("MENU") == menuSubCommand) {
+        if (previousMenuCommand != null) {
+          lookup.put("MENU", previousMenuCommand);
+        } else {
+          lookup.remove("MENU");
+        }
+      }
+    }
+    guiSubCommand = null;
+    menuSubCommand = null;
+    previousGuiCommand = null;
+    previousMenuCommand = null;
+  }
+
+  private static final class GuiOpenCommand extends BaseRTPCmdImpl {
+    private final String commandName;
+    private final String permissionNode;
+    private final CommandsAPICommand delegate;
+
+    GuiOpenCommand(
+        CommandsAPICommand parent,
+        String commandName,
+        String permissionNode,
+        CommandsAPICommand delegate) {
+      super(parent);
+      this.commandName = commandName;
+      this.permissionNode = permissionNode;
+      this.delegate = delegate;
+    }
+
+    @Override
+    public String name() {
+      return commandName;
+    }
+
+    @Override
+    public String permission() {
+      return permissionNode;
+    }
+
+    @Override
+    public Map<String, CommandParameter> getParameterLookup() {
+      if (delegate instanceof TreeCommand tc && tc.getParameterLookup() != null) {
+        return tc.getParameterLookup();
+      }
+      return super.getParameterLookup();
+    }
+
+    @Override
+    public Map<String, CommandsAPICommand> getCommandLookup() {
+      if (delegate instanceof TreeCommand tc && tc.getCommandLookup() != null) {
+        return tc.getCommandLookup();
+      }
+      return super.getCommandLookup();
+    }
+
+    @Override
+    public boolean onCommand(
+        UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+      return onCommand(senderId, parameterValues, nextCommand, null);
+    }
+
+    @Override
+    public boolean onCommand(
+        UUID senderId,
+        Map<String, List<String>> parameterValues,
+        CommandsAPICommand nextCommand,
+        Consumer<String> messageMethod) {
+      if (nextCommand != null || (parameterValues != null && !parameterValues.isEmpty())) {
+        if (delegate != null) {
+          return delegate.onCommand(senderId, parameterValues, nextCommand, messageMethod);
+        }
+        if (nextCommand != null) {
+          return nextCommand.onCommand(senderId, parameterValues, null, messageMethod);
+        }
+      }
+      if (openPickerMenu(senderId)) {
+        return true;
+      }
+      if (delegate != null) {
+        return delegate.onCommand(senderId, parameterValues, null, messageMethod);
+      }
+      CommandsAPICommand root = parent();
+      if (root != null) {
+        return root.onCommand(senderId, parameterValues, null, messageMethod);
+      }
+      return true;
     }
   }
 

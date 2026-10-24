@@ -58,6 +58,7 @@ public final class RTPTestSetup {
             ActiveDatabase.setAccessor(null);
             MiscTasks.setCancel((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
             MiscTasks.setSync((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
+            MiscTasks.setBackgroundSync((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
             MiscTasks.setAsync((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
             MiscTasks.setStartup((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
             if (MiscTasks.cancel() instanceof io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe timeBoundCancel) {

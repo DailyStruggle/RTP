@@ -464,4 +464,33 @@ public class RTPArchitectureTest {
                                             "io.github.dailystruggle.rtp.common.runtime..")))
                     .because("ADR-115 seam 4: the runtime holder is Tier 1; the composition root "
                             + "injects config-dependent behaviour such as the log buffer gate.");
+
+    /**
+     * Rule 21 - Governor Package Must Not Create Threads or Acquire Locks (ADR-087 Invariant I8).
+     */
+    @ArchTest
+    static final ArchRule governor_package_must_not_create_threads_or_use_locks =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.governor..")
+                    .should().dependOnClassesThat().areAssignableTo(Thread.class)
+                    .orShould().dependOnClassesThat().areAssignableTo(java.util.concurrent.ExecutorService.class)
+                    .orShould().dependOnClassesThat().haveFullyQualifiedName("java.util.concurrent.Executors")
+                    .orShould().dependOnClassesThat().resideInAPackage("java.util.concurrent.locks..")
+                    .because("ADR-087 Invariant I8: ComputeGovernor and ComputeBudget must not create threads or acquire locks on actuation paths.");
+
+    /**
+     * Rule 22 - Governor Package Is Tier 2 Below Selection, Tasks, and Tools (ADR-115, ADR-087).
+     */
+    @ArchTest
+    static final ArchRule governor_package_must_not_depend_on_selection_tasks_or_tools =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.governor..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.selection..",
+                            "io.github.dailystruggle.rtp.common.tasks..",
+                            "io.github.dailystruggle.rtp.common.tools..",
+                            "io.github.dailystruggle.rtp.common.configuration.."
+                    )
+                    .because("ADR-115: common.governor is consumed by selection, tasks, and tools, so it must not depend back on them.");
 }

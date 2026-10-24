@@ -401,4 +401,67 @@ public class InfoCmdTest {
                 player.sentMessages.stream().anyMatch(s -> s.contains("DRM:")),
                 "Expected DRM line in /rtp info output for admin/support, got: " + player.sentMessages);
     }
+
+    @Test
+    void onCommand_rendersGovernorBudgetsAndReasons() {
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "gov-player", null);
+        accessor.addPlayer(player);
+
+        io.github.dailystruggle.rtp.common.governor.ComputeGovernor gov =
+                io.github.dailystruggle.rtp.common.governor.ComputeGovernor.active();
+        gov.reset();
+        try {
+            long ms = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1);
+            long sec = java.util.concurrent.TimeUnit.SECONDS.toNanos(1);
+            gov.setUnitCostsForTesting(5 * ms, ms, ms);
+            io.github.dailystruggle.rtp.common.governor.ComputeSignals signals =
+                    io.github.dailystruggle.rtp.common.governor.ComputeSignals.builder()
+                            .autoTune(true)
+                            .configuredAsyncNanos(25 * ms)
+                            .configuredSyncNanos(5 * ms)
+                            .configuredGenerationCap(2)
+                            .maxMspt(50.0)
+                            .mspt(io.github.dailystruggle.rtp.common.governor.ComputeSignals.SampledSignal.fresh(36.0, sec))
+                            .chunkLoadLatencyMs(io.github.dailystruggle.rtp.common.governor.ComputeSignals.SampledSignal.fresh(50.0, sec))
+                            .minWindowedChunkLoadLatencyMs(10.0)
+                            .generationInFlight(1)
+                            .region(new io.github.dailystruggle.rtp.common.governor.ComputeSignals.RegionDemand(
+                                    "default", 50L, 1.0, 5, 10, 0, false))
+                            .build();
+            gov.evaluate(signals, sec);
+
+            @SuppressWarnings("unchecked")
+            ConfigParser<CommandMessages> lang =
+                    (ConfigParser<CommandMessages>) ActiveConfigs.get().getParser(CommandMessages.class);
+            lang.setData(java.util.Map.of(
+                    "infoGovernorAsync",
+                    "Background async: [govAsyncConfiguredMs] ms (effective [govAsyncEffectiveMs], [govAsyncReason])",
+                    "infoGovernorSync",
+                    "Background sync: [govSyncConfiguredMs] ms (effective [govSyncEffectiveMs], [govSyncReason])",
+                    "infoGovernorHotCap",
+                    "Hot cap: [govHotCapConfigured] (effective [govHotCapEffective], [govHotCapReason])",
+                    "infoGovernorGeneration",
+                    "Generation: [govGenConfigured] (effective [govGenEffective], [govGenReason]; regional in-flight [govRegionalInflight]/[govRegionalInflightCap])"
+            ));
+
+            List<String> sent = new ArrayList<>();
+            RTP.messageTap.set(sent::add);
+            try {
+                boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
+                assertTrue(result);
+            } finally {
+                RTP.messageTap.remove();
+            }
+
+            assertTrue(
+                    sent.stream().anyMatch(s -> s.contains("Background async: 25 ms") && s.contains("cpu headroom")),
+                    "Expected governor async line with cpu headroom reason, got: " + sent);
+            assertTrue(
+                    sent.stream().anyMatch(s -> s.contains("Generation: 2 (effective 1, chunk latency; regional in-flight 1/2)")),
+                    "Expected governor generation line with chunk latency and regional in-flight, got: " + sent);
+        } finally {
+            gov.reset();
+        }
+    }
 }

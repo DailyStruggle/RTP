@@ -72,6 +72,25 @@ public final class HeapSampler {
     }
 
     /**
+     * Returns post-GC retained tenured/old generation used bytes from
+     * {@link MemoryPoolMXBean#getCollectionUsage()} ONLY, or {@code -1L} when no post-GC
+     * collection usage reading is available (ADR-087 Section 4.1).
+     */
+    public static long postGcTenuredUsedBytes() {
+        MemoryPoolMXBean pool = getTenuredPool();
+        if (pool != null) {
+            try {
+                MemoryUsage col = pool.getCollectionUsage();
+                if (col != null && col.getUsed() > 0L) {
+                    return col.getUsed();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return -1L;
+    }
+
+    /**
      * Returns the retained tenured/old generation used bytes, or total heap used bytes
      * if the tenured pool is not available.
      * Prioritizes {@link MemoryPoolMXBean#getCollectionUsage()} (post-GC retained memory)

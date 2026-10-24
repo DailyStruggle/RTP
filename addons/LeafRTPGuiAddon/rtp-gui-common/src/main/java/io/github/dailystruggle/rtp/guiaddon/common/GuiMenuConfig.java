@@ -62,6 +62,22 @@ public final class GuiMenuConfig {
     return str(GuiMenuKeys.menuStyle, "chest");
   }
 
+  /**
+   * Whether bare {@code /rtp} opens the destination picker GUI rather than teleporting
+   * immediately. Defaults to {@code true}, and also returns {@code false} when
+   * {@link #menuStyle()} is {@code "none"} or {@code "off"}.
+   */
+  public boolean openOnBareRtp() {
+    String style = menuStyle();
+    if (style != null) {
+      String trimmed = style.trim();
+      if ("none".equalsIgnoreCase(trimmed) || "off".equalsIgnoreCase(trimmed)) {
+        return false;
+      }
+    }
+    return bool(GuiMenuKeys.openOnBareRtp, Boolean.TRUE);
+  }
+
   public String title() {
     return str(GuiMenuKeys.menuTitle, "&1&lRandom Teleport");
   }

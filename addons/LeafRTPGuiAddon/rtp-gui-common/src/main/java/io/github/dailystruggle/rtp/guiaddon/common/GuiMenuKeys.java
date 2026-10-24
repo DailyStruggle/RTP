@@ -16,6 +16,12 @@ package io.github.dailystruggle.rtp.guiaddon.common;
  */
 public enum GuiMenuKeys {
   /**
+   * When true (default {@link Boolean#TRUE}), a bare {@code /rtp} opens the destination picker
+   * GUI; when false, bare {@code /rtp} teleports immediately in the player's current world while
+   * keeping {@code /rtp gui} and {@code /rtp menu} active.
+   */
+  openOnBareRtp,
+  /**
    * Renderer style to open for a bare {@code /rtp} (e.g. {@code chest}, {@code book}).
    * Matched against each installed renderer's {@code key()}; an unknown value falls
    * back to any available renderer.

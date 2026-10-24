@@ -10,6 +10,7 @@ One jar runs on Paper, Spigot, Folia, Fabric and NeoForge. It's free and MIT-lic
 [![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
 [![SpigotMC](https://img.shields.io/badge/SpigotMC-RTP-orange)](https://www.spigotmc.org/resources/leafrtp.94812/)
 [![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/leafrtp-pro.105418/)
+[![Discord](https://img.shields.io/badge/Discord-%23support%20Forum-5865F2)](docs/publishing/DISCORD_LAYOUT.md)
 
 **[Download](https://modrinth.com/plugin/leafrtp)** · **[Documentation](https://dailystruggle.github.io/RTP/)** · **[Quick start](docs/admin/QUICK_START.md)** · **[Commands](docs/admin/COMMANDS.md)** · **[FAQ](docs/admin/FAQ.md)** · **[Get help](SUPPORT.md)**
 
@@ -247,13 +248,14 @@ Bug fixes, translations, docs and addons are all welcome. Read [CONTRIBUTING.md]
 
 ## Support
 
-- Questions: [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions)
-- Bugs: [open an issue](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md), after checking the [FAQ](docs/admin/FAQ.md) and confirming it still happens on the latest release (`/rtp version`)
-- Security problems: see [SECURITY.md](SECURITY.md); please don't open a public issue
+- Interactive setup help & `[RTP bit]` log triage: **LeafCraft Plugin Support** Discord `#support` Forum ([server guide](docs/publishing/DISCORD_LAYOUT.md))
+- Questions: [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) or the Discord `#support` Forum
+- Bugs: [open an issue](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md) or post in the Discord `#support` Forum with `/rtp version`, `/version`, `/rtp test` output, and an `mclo.gs` log link, after checking the [FAQ](docs/admin/FAQ.md)
+- Security problems: see [SECURITY.md](SECURITY.md); please don't open a public issue or Discord thread
 
 The full guide is in [SUPPORT.md](SUPPORT.md).
 
-**[RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** buys priority support, including fixes for the problems you report, and funds development. It's the same MIT-licensed code as the free build.
+**[RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** buys priority support (`@Pro Supporter` role with automatic `💎 Pro Priority` routing in the Discord `#support` Forum), including fixes for the problems you report, and funds development. It's the same MIT-licensed code as the free build.
 
 ---
 

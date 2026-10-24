@@ -1,5 +1,6 @@
 package io.github.dailystruggle.server.api;
 
+import java.util.Optional;
 import java.util.logging.Level;
 
 /** Platform-neutral information and logging supplied by the running server. */
@@ -124,4 +125,13 @@ public interface ServerAccessor {
    * @param throwable the exception to log; must not be {@code null}
    */
   void log(Level level, String message, Throwable throwable);
+
+  /**
+   * Returns the platform-neutral {@link TaskScheduler} provided by this server, if available.
+   *
+   * @return optional task scheduler; never {@code null}
+   */
+  default Optional<TaskScheduler> scheduler() {
+    return Optional.empty();
+  }
 }

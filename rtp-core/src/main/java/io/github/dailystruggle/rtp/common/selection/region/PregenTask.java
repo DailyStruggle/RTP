@@ -91,14 +91,15 @@ final class PregenTask implements Runnable {
         return LiveLoadGate.of((r == null) ? null : r.name);
     }
 
-    /** Claims a pin slot bounded by the kept queue's capacity; idempotent per attempt. */
+    /** Claims a pin slot bounded by the kept queue's capacity (governed by ComputeBudget#hotCap); idempotent per attempt. */
     private boolean tryPin() {
         if (pinHeld.get()) return true;
         Region r = state.region;
         if (r == null || r.queueManager == null) return false;
         int cap;
         try {
-            cap = Math.min(Integer.MAX_VALUE, r.getSettings().activeChunkCap());
+            int cfgCap = Math.min(Integer.MAX_VALUE, r.getSettings().activeChunkCap());
+            cap = gate().effectiveHotCap(cfgCap);
         } catch (Throwable t) {
             return false;
         }
@@ -1196,6 +1197,8 @@ final class PregenTask implements Runnable {
                     // Stale-chunk guard on the region-owning thread, where
                     // isChunkLoaded is authoritative and legal to call.
                     if (!state.world.isChunkLoaded(cx, cz)) {
+                        io.github.dailystruggle.rtp.common.bit.PipelineCbitCounters.recordStaleChunkGuardTripped(
+                                state.world.name(), cx, cz);
                         closeIfPresent(reservation);
                         if (staleRetries < state.staleChunkRetryLimit) {
                             RTPRuntime.log(Level.FINE,

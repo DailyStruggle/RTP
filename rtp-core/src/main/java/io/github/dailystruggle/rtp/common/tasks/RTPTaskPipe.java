@@ -24,6 +24,29 @@ public abstract class RTPTaskPipe {
    */
   public abstract boolean execute(long availableTime);
 
+  /**
+   * Executes due tasks against {@code availableTime} sharing a pulse/tick-wide {@code sharedRanAny}
+   * progress flag across background stages (ADR-087 Section 4.3 items 3 & 4, Invariants I2 & I5).
+   *
+   * @param availableTime remaining nanoseconds before the shared deadline
+   * @param sharedRanAny  pulse/tick-wide progress flag (if {@code null}, behaves like {@link #execute(long)})
+   * @return true if the pipeline completed all tasks in the queue
+   */
+  public boolean execute(long availableTime, java.util.concurrent.atomic.AtomicBoolean sharedRanAny) {
+    if (sharedRanAny == null) {
+      return execute(availableTime);
+    }
+    if (availableTime <= 0L) {
+      return runnables.isEmpty();
+    }
+    boolean hadTasks = !runnables.isEmpty();
+    boolean res = execute(availableTime);
+    if (hadTasks) {
+      sharedRanAny.set(true);
+    }
+    return res;
+  }
+
   public long size() {
     return runnables.size();
   }

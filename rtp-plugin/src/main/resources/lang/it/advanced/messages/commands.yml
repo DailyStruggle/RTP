@@ -83,6 +83,12 @@ infoTopRejectionCause: "&7Causa principale di rifiuto: #7E9CC8[genTopRejectionCa
 # Segnaposto: [genFailureBreakdown] - lista causa=N separata da virgole, più frequente per prima.
 infoFailureBreakdown: "&7Rifiuti per causa: #7E9CC8[genFailureBreakdown]"
 
+# Governatore adattivo: budget configurati vs effettivi e motivo.
+infoGovernorAsync: "&7Async in background: #7E9CC8[govAsyncConfiguredMs]&7 ms (effettivo #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Sync in background: #7E9CC8[govSyncConfiguredMs]&7 ms (effettivo #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Limite cache calda: #7E9CC8[govHotCapConfigured]&7 (effettivo #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Generazione: #7E9CC8[govGenConfigured]&7 (effettivo #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; in volo regionale #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Soglie delle fasce colore di salute. Usate per colorare i segnaposto
 # di varianti colorate (es. [tps1mColoured]) in verde/giallo/rosso.
 infoSogliaTpsVerde: 19.5

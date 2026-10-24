@@ -21,7 +21,7 @@ RTP is **MIT-licensed** ([ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-suppo
 | Module / Component | License | Permitted Commercial Usage | Governed By |
 |---|---|:---:|---|
 | **`rtp-api`**, **`rtp-core`** | **MIT** | Yes | `LICENSE` / `rtp-api/LICENSE` / `rtp-core/LICENSE` |
-| **SPI modules** (`anvil-api`, `bit-api`, `bstats-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `server-api`, `tags-api`, `units-api`, `yaml-api`) | **MIT** | Yes | `LICENSE` |
+| **SPI modules** (`anvil-api`, `bit-api`, `bstats-api`, `commands-api`, `config-bit-api`, `effects-api`, `maps-api`, `menu-api`, `metrics-api`, `predict-api`, `server-api`, `tags-api`, `units-api`, `yaml-api`) | **MIT** | Yes | `LICENSE` |
 | **Platform Adapters** (Spigot/Paper, Folia, Fabric) | **MIT** | Yes | `LICENSE` |
 | **Network & Proxy Modules** (plugin-message transport, `RespRedisClient`, SQL/Redis bindings, `rtp-proxy-*`) | **MIT** | Yes | `LICENSE` |
 | **SQL Persistence & Pool** (SQLite / H2 / MySQL / PostgreSQL accessors, in-house pool per ADR-101) | **MIT** | Yes | `LICENSE` |

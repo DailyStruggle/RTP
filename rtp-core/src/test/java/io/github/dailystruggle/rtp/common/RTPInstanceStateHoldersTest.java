@@ -59,6 +59,7 @@ class RTPInstanceStateHoldersTest {
     assertNull(ActiveDatabase.accessor(), "a new instance starts without a database accessor");
     assertNotNull(ActiveDatabase.teleportLimitStore());
     assertNotNull(MiscTasks.sync());
+    assertNotNull(MiscTasks.backgroundSync());
     assertNotNull(MiscTasks.async());
     assertNotNull(MiscTasks.startup());
     assertNotNull(MiscTasks.cancel());

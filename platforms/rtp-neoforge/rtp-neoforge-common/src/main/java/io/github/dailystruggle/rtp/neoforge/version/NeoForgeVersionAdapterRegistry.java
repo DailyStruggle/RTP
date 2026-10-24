@@ -43,6 +43,21 @@ public final class NeoForgeVersionAdapterRegistry {
                             + "; refusing to overwrite with " + adapter.mcVersion());
         }
         try {
+            io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.registerProbeSupplier(
+                    "neoforge",
+                    () -> {
+                        java.util.List<io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.ApiProbe> probes =
+                                new java.util.ArrayList<>(io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.neoForgeProbes());
+                        NeoForgeVersionAdapter active = ACTIVE.get();
+                        if (active != null) {
+                            probes.add(new io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.ApiProbe(
+                                    active.getClass().getName(),
+                                    "mcVersion",
+                                    java.util.Collections.emptyList(),
+                                    "Active NeoForgeVersionAdapter carrier class"));
+                        }
+                        return probes;
+                    });
             RTP.log(Level.INFO, "[RTP][NeoForge] Active version adapter: " + adapter.mcVersion()
                     + " (" + adapter.getClass().getName() + ")");
         } catch (Throwable ignored) {

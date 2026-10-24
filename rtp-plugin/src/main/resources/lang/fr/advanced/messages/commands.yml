@@ -80,6 +80,12 @@ infoTopRejectionCause: "&7Principale cause de rejet : #7E9CC8[genTopRejectionCau
 # Espace réservé : [genFailureBreakdown] - liste cause=N séparée par des virgules, les plus fréquentes en premier.
 infoFailureBreakdown: "&7Rejets par cause : #7E9CC8[genFailureBreakdown]"
 
+# Gouverneur adaptatif : budgets configurés vs effectifs et motif.
+infoGovernorAsync: "&7Async en arrière-plan : #7E9CC8[govAsyncConfiguredMs]&7 ms (effectif #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Sync en arrière-plan : #7E9CC8[govSyncConfiguredMs]&7 ms (effectif #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Limite cache chaud : #7E9CC8[govHotCapConfigured]&7 (effectif #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Génération : #7E9CC8[govGenConfigured]&7 (effectif #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; en cours régional #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Seuils de bande de couleur d'état. Utilisés pour colorer les variantes
 # d'espaces réservés colorées (ex. [tps1mColoured]) en vert/jaune/rouge.
 infoThresholdTpsGreen: 19.5

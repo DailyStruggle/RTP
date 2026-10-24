@@ -1,3 +1,9 @@
+# Adapts background zoomie compute, warm-spot size, and kibble generation to server headroom and kitty demand.
+# Configured values below act as ceilings while active. Set false to run at fixed configured values.
+# @type: boolean
+# @default: true
+auto_purr_tune: true
+
 # Pause background cache filling when TPS drops below this.
 # On Folia, the slowest region counts. Waiting players are still served. 0 = off.
 # @type: number

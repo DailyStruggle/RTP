@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.configuration.enums;
 
 public enum PerformanceKeys {
+  autoTune,
   maxAttempts,
   period,
   syncAllottedTime,

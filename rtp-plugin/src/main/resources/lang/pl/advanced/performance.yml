@@ -1,3 +1,9 @@
+# Dostosowuje obliczenia w tle, rozmiar goracego bufora i wspolbieznosc generowania do zapasu serwera i popytu.
+# Skonfigurowane ponizej wartosci dzialaja jako limity. Ustaw false dla stalych wartosci.
+# @type: boolean
+# @default: true
+automatyczneDostrajanie: true
+
 # Wstrzymaj wypełnianie pamięci podręcznej w tle, gdy TPS spadnie poniżej tej wartości.
 # Na Folii liczy się najwolniejszy region. Oczekujący gracze nadal są obsługiwani. 0 = wył.
 # @type: number

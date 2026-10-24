@@ -222,6 +222,11 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoFailureRate = ActiveConfigs.get().getConfigValue(CommandMessages.infoFailureRate, "").toString();
       String infoFailureBreakdown = ActiveConfigs.get().getConfigValue(CommandMessages.infoFailureBreakdown, "").toString();
       String infoTopRejectionCause = ActiveConfigs.get().getConfigValue(CommandMessages.infoTopRejectionCause, "").toString();
+      // ADR-087 Section 6.2: adaptive compute governor configured vs. effective budgets + reason.
+      String infoGovernorAsync = ActiveConfigs.get().getConfigValue(CommandMessages.infoGovernorAsync, "").toString();
+      String infoGovernorSync = ActiveConfigs.get().getConfigValue(CommandMessages.infoGovernorSync, "").toString();
+      String infoGovernorHotCap = ActiveConfigs.get().getConfigValue(CommandMessages.infoGovernorHotCap, "").toString();
+      String infoGovernorGeneration = ActiveConfigs.get().getConfigValue(CommandMessages.infoGovernorGeneration, "").toString();
       String infoDisclaimerHeader = ActiveConfigs.get().getConfigValue(CommandMessages.infoDisclaimerHeader, "").toString();
       String infoDisclaimer = ActiveConfigs.get().getConfigValue(CommandMessages.infoDisclaimer, "").toString();
 
@@ -260,6 +265,11 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoFailureRate.isEmpty()) emit(callerId, infoFailureRate);
       if (!infoTopRejectionCause.isEmpty()) emit(callerId, infoTopRejectionCause);
       if (!infoFailureBreakdown.isEmpty()) emit(callerId, infoFailureBreakdown);
+      // ADR-087 Section 6.2 / REQ-RTP-OPS-002: adaptive compute governor diagnostics.
+      if (!infoGovernorAsync.isEmpty()) emit(callerId, infoGovernorAsync);
+      if (!infoGovernorSync.isEmpty()) emit(callerId, infoGovernorSync);
+      if (!infoGovernorHotCap.isEmpty()) emit(callerId, infoGovernorHotCap);
+      if (!infoGovernorGeneration.isEmpty()) emit(callerId, infoGovernorGeneration);
 
       // Folia aggregation - render the per-region table when the active
       // MetricsBinding publishes per-region detail (Folia).
