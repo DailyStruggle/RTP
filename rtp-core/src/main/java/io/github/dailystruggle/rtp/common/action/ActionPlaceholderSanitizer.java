@@ -269,6 +269,7 @@ public final class ActionPlaceholderSanitizer {
   }
 
   private static String formatPlayerUuid(UUID uuid, boolean preferNameOnly) {
+    if (uuid == null) return "";
     String name = preferNameOnly ? onlinePlayerName(uuid) : null;
     return name == null ? uuid.toString() : name;
   }

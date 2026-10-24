@@ -109,15 +109,13 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "commands",
             "test.commands",
             BitTier.IBIT,
             BitSideEffect.SAFE,
             15_000,
             () -> toBitReport(auditForTest(treeAnchor)));
-    return component;
   }
 
   static BitReport toBitReport(AuditReport probe) {

@@ -281,12 +281,15 @@ class ActionDefinitionValidatorTest {
     @Test
     void invalidJsonTextComponentReportsError() {
         Map<String, Object> definition = Map.of("lifecycle", Map.of("onStart",
-                List.of(Map.of("CONSOLE", "tellraw @a {\"text\":}"))));
+                List.of(Map.of("CONSOLE", "tellraw @a {\"text\":}"),
+                        Map.of("CONSOLE", "  /minecraft:tellraw @a {\"text\":}"))));
 
         BitReport report = validate("koth", definition, "koth.yml");
 
         assertFinding(report, "ACTION_PAYLOAD_JSON_INVALID",
                 "actions.koth.lifecycle.onStart[0].CONSOLE", "", Level.ERROR);
+        assertFinding(report, "ACTION_PAYLOAD_JSON_INVALID",
+                "actions.koth.lifecycle.onStart[1].CONSOLE", "", Level.ERROR);
     }
 
     @Test

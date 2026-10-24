@@ -60,7 +60,7 @@ public final class DirectiveConfigCheck implements ConfigOwnerCheck {
      * Addon-owned files are bound by the addon itself via {@link #bound}, since their defaults live in
      * the addon jar, not on {@link ConfigEnvironment#resources()}.
      */
-    protected static final Map<String, String> OWNER_FILES = ownerFiles();
+    static final Map<String, String> OWNER_FILES = ownerFiles();
 
     private final String id;
     private final String path;

@@ -90,6 +90,15 @@ class RtpBitCodeLockTest {
                 () -> RtpBitCodeLock.parse("DEMO 1 DEMO_ONE INFO\nDEMO 2 DEMO_ONE INFO"));
     }
 
+    @Test
+    void rejectsMalformedKeysWithoutRecursiveRegexMatching() {
+        assertThrows(IllegalArgumentException.class, () -> entry("DEMO", 1, "DEMO__X", Level.INFO));
+        assertThrows(IllegalArgumentException.class, () -> entry("DEMO", 1, "DEMO_", Level.INFO));
+        assertThrows(IllegalArgumentException.class, () -> entry("DEMO", 1, "DEMO_lower", Level.INFO));
+        assertThrows(IllegalArgumentException.class,
+                () -> entry("DEMO", 1, "DEMO_" + "A_".repeat(10_000) + "_", Level.INFO));
+    }
+
     private static RtpBitCodeLock.Entry entry(String namespace, int id, String key, Level severity) {
         return new RtpBitCodeLock.Entry(namespace, id, key, severity);
     }

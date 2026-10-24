@@ -24,4 +24,21 @@ class DriftCheckTest {
         assertEquals(List.of("spatial"), SwitchLabels.extract(source, "gate"));
         assertTrue(SwitchLabels.extract(source, "missing").isEmpty());
     }
+
+    @Test
+    void extractorHandlesMultilineCaseAndSkipsUnterminatedCaseLine() {
+        String source = """
+                switch (key) {
+                    case
+                        "FIRST" -> dispatch();
+                    case MULTILINE
+                        -> dispatch();
+                    case UNTERMINATED
+                    case SECOND:
+                        dispatch();
+                }
+                """;
+
+        assertEquals(List.of("FIRST", "MULTILINE", "SECOND"), SwitchLabels.extract(source, "key"));
+    }
 }

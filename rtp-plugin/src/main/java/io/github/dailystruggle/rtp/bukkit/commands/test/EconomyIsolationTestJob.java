@@ -175,15 +175,13 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "economy-isolation",
             "test.economy-isolation",
             BitTier.IBIT,
             BitSideEffect.SAFE,
             5_000,
             EconomyIsolationTestJob::quietReport);
-    return component;
   }
 
   private static BitReport quietReport() {

@@ -27,7 +27,7 @@ Pull requests touching `MemoryTracker`, chunk ticket retention, or player sessio
      ```powershell
      python scripts/bench_fuzz.py --mode leak --episodes 24 --reps 3
      ```
-   - Must prove **`retained+0`** player session objects post-GC across all disconnected client runs.
+   - Must prove that no class is flagged by the per-departure or cumulative class screen against the `direct` control (`departure_screen` and `screen` in the target's `fit.json`) across all disconnected client runs.
 2. **Heap Residency Trajectory:**
    - Demonstrate that the post-GC heap residency slope remains flat relative to the `direct` control baseline.
 3. **Oracle Exception Audit:**

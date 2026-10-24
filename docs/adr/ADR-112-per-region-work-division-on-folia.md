@@ -52,5 +52,5 @@ Divide RTP's region-thread work per region and bound each region's share, implem
 
 - [ADR-004](ADR-004-countbound-taskpipe-on-folia.md): CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads (amended by this ADR)
 - [ADR-054](ADR-054-rtprunnable-self-scheduling-thread-routing.md): RTPRunnable Self-Scheduling Thread Routing
-- [ADR-087](ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia.md): Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution (sections 3.4 and 3.6 implemented here)
+- [ADR-087](ADR-087-adaptive-compute-governor.md): Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency (sections 3.4 and 3.6 implemented here)
 - [`PERFORMANCE.md`](../admin/configuration/PERFORMANCE.md)

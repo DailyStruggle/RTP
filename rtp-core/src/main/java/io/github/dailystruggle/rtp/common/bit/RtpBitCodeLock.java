@@ -24,7 +24,7 @@ public final class RtpBitCodeLock {
             namespace = Objects.requireNonNull(namespace, "namespace must not be null").trim();
             key = Objects.requireNonNull(key, "key must not be null").trim();
             if (!namespace.matches("[A-Z][A-Z0-9]*") || id < 1 || !key.startsWith(namespace + "_")
-                    || !key.matches("[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*")) {
+                    || !isUpperSnake(key)) {
                 throw new IllegalArgumentException("invalid BIT lock identity: " + namespace + " " + id + " " + key);
             }
             Objects.requireNonNull(severity, "severity must not be null");
@@ -185,6 +185,26 @@ public final class RtpBitCodeLock {
 
     private static String normalizeNamespace(String namespace) {
         return namespace == null || namespace.isBlank() ? null : namespace.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private static boolean isUpperSnake(String key) {
+        if (key.isEmpty() || !isUppercaseLetter(key.charAt(0))) return false;
+        boolean previousWasUnderscore = false;
+        for (int i = 1; i < key.length(); i++) {
+            char character = key.charAt(i);
+            if (isUppercaseLetter(character) || character >= '0' && character <= '9') {
+                previousWasUnderscore = false;
+            } else if (character == '_' && !previousWasUnderscore && i < key.length() - 1) {
+                previousWasUnderscore = true;
+            } else {
+                return false;
+            }
+        }
+        return !previousWasUnderscore;
+    }
+
+    private static boolean isUppercaseLetter(char character) {
+        return character >= 'A' && character <= 'Z';
     }
 
     private record Violation(boolean identity, String message) {}

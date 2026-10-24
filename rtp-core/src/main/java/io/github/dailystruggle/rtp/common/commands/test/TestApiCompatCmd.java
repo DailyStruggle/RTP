@@ -177,15 +177,13 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "api-compat",
             "test.api-compat",
             BitTier.IBIT,
             BitSideEffect.SAFE,
             60_000,
             () -> toBitReport(runProbes(defaultProbes())));
-    return component;
   }
 
   static BitReport toBitReport(ProbeReport probe) {

@@ -43,13 +43,15 @@ An episode is 2 to 8 bots, each running a seeded program for 20 to 60 s:
 - **Bot actions:** `rtp`, `rtp2` (two in a row), `wait<ms>`, `move<ms>`, `quit`, `rejoin` (same name or `+rename`, which gives a new UUID), `die`.
 - **Console actions (opt-in):** `--console "rtp=rtp reload,..."` fires allow-listed console commands over RCON at random times while the bots are active (about 30 % of episodes, up to 2 commands). They are carried through replays, shrink and the ladder.
 - **Repetitions (`--reps`, default 3):** the episode's programs run `reps` times with fresh bot names, with a checkpoint after each. `slope.<metric>` is the growth per repetition. A cache that fills during the first repetition has slope about 0; a leak keeps rising.
-- **Checkpoint:** `/rtpstress leakcheck <label> quick` forces a full GC and reports retained players (`ServerPlayer`/`CraftPlayer` alive minus players online), heap after GC, live histogram bytes, RSS, memory pools (metaspace, compressed class space), loaded classes, direct and mapped buffers, threads, file descriptors, and per plugin its live instances, listeners and pending tasks. It also writes every class's instance delta to `classes.jsonl`.
+- **Checkpoint:** `/rtpstress leakcheck <label> quick` forces a full GC and reports churn counters (joins, quits, distinct UUIDs), heap after GC, live histogram bytes, RSS, memory pools (metaspace, compressed class space), loaded classes, direct and mapped buffers, threads, file descriptors, and per plugin its live instances, listeners and pending tasks. It also writes every class's instance delta to `classes.jsonl`.
 - **States:** each bot's chat reply or kick reason, normalised (digits to `#`, colours stripped). An episode joins the corpus when it reaches a new `(action, state)` pair, a new finding signature, or changes a count.
 
 ### Learning
 
 - **Prediction:** a ridge fit per count against behaviour features (action counts, quits by time since the last `/rtp`, moves during a pending teleport, renamed rejoins, console commands). A feature is **flagged** when its interval excludes 0 and the control's does not.
-- **Classes:** all histogram classes go through a cumulative screen against the control, with a Bonferroni-corrected z, so thousands of noise classes produce no flags.
+- **Classes:** no class is named anywhere in the probe or the scripts. Every histogram class goes through two screens against the control, each with a Bonferroni-corrected z, so thousands of noise classes produce no flags:
+  - **cumulative:** post-GC growth summed over episodes;
+  - **per departure:** post-GC growth per ended player session (`departures` = the probe's quit counter delta), fitted through the origin. Whatever a plugin keeps per quit player shows up here under its own class names, on any platform or mapping.
 - **Search:** a cross-entropy method over the generator's parameters, plus mutation of corpus episodes and novelty episodes. While nothing reproduces, the state is `searching` and novelty rises each stalled generation (up to `--novelty-max`), with restarts from fresh points. A reproduced candidate switches it to `exploiting`.
 
 ### Confirmation
@@ -128,7 +130,8 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz faults" \
 
 ### Reading a run
 
-- Episode line: `retained+N` is quit players still alive; `live/rep` and `classes/rep` are growth per repetition; `score` is net leak per minute against the control.
+- Episode line: `departed=N` is player sessions that ended in the episode; `live/rep` and `classes/rep` are growth per repetition; `score` is net leak per minute against the control.
+- `fit.json` and `optimiser.jsonl` carry `screen` (cumulative) and `departure_screen` (`per_departure` instances per ended session, `z`).
 - `gen N` lines list the top flags as `<count>~<feature> <coef>`. A flag names the behaviour that predicts the growth; it is the trigger, not the cause.
 - Per target, under `scripts/tmp/runs/fuzz-<stamp>/<target>/`: `episodes.jsonl` (replayable with `--replay FILE --ep K`), `classes.jsonl`, `fit.json`, `surprises.jsonl`, `shrunk.jsonl`, `ladder.jsonl`, `verdict.json`, and `owner.txt` after a FAIL with `--mat`. `report.txt` puts the targets side by side.
 - Before believing a score, check its units: a score driven by a count with no bytes behind it (see *Known limitations*) is not a leak.
@@ -136,6 +139,8 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz faults" \
 ---
 
 ## Findings
+
+Runs before 2026-10-23 also scored a fixed player census (`retained_player_objects`, `retained+N`: live `CraftPlayer`/`ServerPlayer` minus online). That census named classes and biased the search toward player objects, so it was removed; the per-departure class screen replaces it. Results below and above quote it as recorded. Corpora and `control.json` files from those runs carry the old keys, which the scripts ignore; start a fresh control run.
 
 ### BetterRTP 3.6.13 retains quit players (confirmed, run `fuzz-20261010-213747`)
 
@@ -204,4 +209,4 @@ No growth in loaded classes or metaspace per repetition across the reload episod
 1. Rerun `direct,rtp` for a formal 3.3.0 verdict now that byte-based scoring and attribution filtering are in place.
 2. Confirmation by amplification (shrunk segment 1x, 2x, 4x, 8x), with dumps at 1x and 8x compared by dominator tree, in place of the bots x reps ladder.
 3. Command discovery, GUI and chat actions, n-gram features and a bandit over action types; continuous mode until the heap guard trips. Coverage feedback from the live server and the fast fault-only mode: [`BEHAVIOUR_FUZZING_PLAN.md`](../../docs/dev/BEHAVIOUR_FUZZING_PLAN.md).
-4. Run all plugins with the same `--reps` setup for the front-page memory comparison ([`docs/publishing/FRONT_PAGE.md`](../../docs/publishing/FRONT_PAGE.md)). Report per plugin: verdict, players retained per episode, live MB and classes per repetition above the control, and starting heap, and state that PASS means "not found within budget".
+4. Run all plugins with the same `--reps` setup for the front-page memory comparison ([`docs/publishing/FRONT_PAGE.md`](../../docs/publishing/FRONT_PAGE.md)). Report per plugin: verdict, departure-screened classes with their instances per ended session, live MB and classes per repetition above the control, and starting heap, and state that PASS means "not found within budget".

@@ -497,9 +497,8 @@ public final class GateEvaluator {
     if (trace == null) ActionCbitCounters.recordUnresolvedPlaceholders(substituted);
     if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, TARGET_KEY)) return true;
     if (trace != null) return trace.simulateCommand(substituted);
-    Optional<Boolean> nativeResult = evaluateEntityPredicate(substituted, accessor);
-    if (nativeResult.isPresent()) return !Boolean.FALSE.equals(nativeResult.get());
-    return accessor.executeCommand(new UUID(0, 0), substituted);
+    return evaluateEntityPredicate(substituted, accessor)
+        .orElseGet(() -> accessor.executeCommand(new UUID(0, 0), substituted));
   }
 
   private static boolean completeGateEvaluation(

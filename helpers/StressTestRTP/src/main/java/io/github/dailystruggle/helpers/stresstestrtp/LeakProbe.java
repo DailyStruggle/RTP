@@ -55,14 +55,13 @@ import java.util.regex.Pattern;
  * <p>Why: a heap-used curve cannot tell a leak from GC sawtooth, and reading a
  * competitor's private maps would make the proof plugin-specific. The class
  * histogram from the {@code DiagnosticCommand} MBean runs a full GC first, so
- * every instance it counts is strongly reachable. After every bot has
- * quit and rejoined, live server-side player objects ({@code CraftPlayer},
- * {@code ServerPlayer}) above the online count are sessions something still
- * references. Repeating this per churn cycle turns "is there a leak" into a
- * slope: retained player objects and post-GC heap per departed session. The
- * same probe runs unchanged against every arm (LeafRTP included) and against
- * a no-RTP-plugin control, so the platform's own retention is subtracted, not
- * assumed to be zero.
+ * every instance it counts is strongly reachable. Each checkpoint records that
+ * histogram plus churn counters (joins, quits, distinct UUIDs) and resource
+ * kinds (pools, threads, native memory, per-plugin census). No class is named
+ * here: which classes leak is decided offline by screening every histogram
+ * class against a no-RTP-plugin control and against departures, so the
+ * platform's own retention is subtracted, not assumed to be zero, and the
+ * same probe runs unchanged against every arm (LeafRTP included).
  *
  * <p>Churn accounts for identity two ways: same-name rejoin (same offline
  * UUID, new {@code Player} object) exposes {@code Player}-keyed retention;
@@ -80,19 +79,7 @@ public final class LeakProbe implements Listener {
     /** Kick reason marker; bench-swarm keys {@code --churn-rename} on it. */
     public static final String CHURN_KICK_REASON = "StressTestRTP churn";
 
-    /** Live-instance class suffixes for one server-side player session.
-     *  Suffix match covers versioned CraftBukkit packages and both Mojang
-     *  ({@code ServerPlayer}) and Spigot ({@code EntityPlayer}) mappings. */
-    static final String[] CRAFT_PLAYER = {".entity.CraftPlayer"};
-    static final String[] SERVER_PLAYER = {
-            "net.minecraft.server.level.ServerPlayer",
-            "net.minecraft.server.level.EntityPlayer"};
-    static final String[] CONNECTION = {
-            "net.minecraft.server.network.ServerGamePacketListenerImpl",
-            "net.minecraft.server.network.PlayerConnection"};
-
     static final String CSV_HEADER = "epoch_ms,label,online,joins_total,quits_total,distinct_uuids,"
-            + "craftplayer_live,serverplayer_live,game_listener_live,retained_player_objects,"
             + "heap_used_after_gc_mb,old_gen_after_gc_mb,histogram_ms,histogram_file";
 
     /** Long-format sidecar: every checkpoint metric beyond the fixed
@@ -127,7 +114,7 @@ public final class LeakProbe implements Listener {
     /**
      * Checkpoint options. {@code quick} keeps only the exact counts a
      * per-episode delta needs (heap, memory and buffer pools, loaded classes,
-     * retained players, workload counters, per-plugin census, thread count,
+     * workload counters, per-plugin census, thread count,
      * open files) and skips the slow
      * diagnostics: NMT, the thread census and {@code threadPrint} file. The
      * full GC, histogram file and {@code leak.csv} row are always written.
@@ -150,31 +137,21 @@ public final class LeakProbe implements Listener {
 
     /** One checkpoint row; {@code -1} marks a value the JVM did not report. */
     record Checkpoint(long epochMs, String label, int online, long joins, long quits, int distinctUuids,
-                      long craftPlayers, long serverPlayers, long gameListeners,
                       double heapAfterGcMb, double oldGenAfterGcMb, long histogramMs, String histogramFile) {
-        /** Player sessions kept alive beyond those online. The larger of the
-         *  two player classes is used: either alone proves retention. */
-        long retainedPlayerObjects() {
-            long live = Math.max(craftPlayers, serverPlayers);
-            return live < 0 ? -1L : Math.max(0L, live - online);
-        }
-
         String csvRow() {
             return String.join(",",
                     Long.toString(epochMs), csvSafe(label), Integer.toString(online),
                     Long.toString(joins), Long.toString(quits), Integer.toString(distinctUuids),
-                    Long.toString(craftPlayers), Long.toString(serverPlayers), Long.toString(gameListeners),
-                    Long.toString(retainedPlayerObjects()),
                     fmt(heapAfterGcMb), fmt(oldGenAfterGcMb), Long.toString(histogramMs),
                     csvSafe(histogramFile));
         }
 
         String describe() {
             return String.format(Locale.ROOT,
-                    "leakcheck %s: online=%d joins=%d quits=%d distinct=%d craftplayer=%d serverplayer=%d "
-                            + "retained=%d heapAfterGC=%sMB oldGen=%sMB (gc+histogram %dms)",
-                    label, online, joins, quits, distinctUuids, craftPlayers, serverPlayers,
-                    retainedPlayerObjects(), fmt(heapAfterGcMb), fmt(oldGenAfterGcMb), histogramMs);
+                    "leakcheck %s: online=%d joins=%d quits=%d distinct=%d "
+                            + "heapAfterGC=%sMB oldGen=%sMB (gc+histogram %dms)",
+                    label, online, joins, quits, distinctUuids,
+                    fmt(heapAfterGcMb), fmt(oldGenAfterGcMb), histogramMs);
         }
     }
 
@@ -380,8 +357,7 @@ public final class LeakProbe implements Listener {
         }
         appendMetrics(t0, label, m);
         return new Checkpoint(t0, label, online, joins.get(), quits.get(), distinct.size(),
-                sumInstances(counts, CRAFT_PLAYER, true), sumInstances(counts, SERVER_PLAYER, false),
-                sumInstances(counts, CONNECTION, false), heapMb, oldMb, histoMs, file);
+                heapMb, oldMb, histoMs, file);
     }
 
     /** Memory pools (read right after the full GC), buffer pools, class loading. */
@@ -752,24 +728,6 @@ public final class LeakProbe implements Listener {
             }
         }
         return out;
-    }
-
-    /** Sum of live instances whose class name equals (or, with {@code suffix},
-     *  ends with) any of {@code names}; {@code -1} when no class matched, so a
-     *  remapped server reads as not-measured rather than as zero retention. */
-    static long sumInstances(List<ClassCount> counts, String[] names, boolean suffix) {
-        long sum = 0;
-        boolean seen = false;
-        for (ClassCount c : counts) {
-            for (String n : names) {
-                if (suffix ? c.name().endsWith(n) : c.name().equals(n)) {
-                    sum += c.instances();
-                    seen = true;
-                    break;
-                }
-            }
-        }
-        return seen ? sum : -1L;
     }
 
     private void appendCsv(Checkpoint c) throws IOException {
