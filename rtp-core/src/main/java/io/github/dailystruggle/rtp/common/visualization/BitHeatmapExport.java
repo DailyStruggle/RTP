@@ -14,12 +14,14 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Writes BIT mock landing records and their ADR-121 heatmap to standalone files.
  */
 public final class BitHeatmapExport {
     private static final String CSV_HEADER = "world,x,y,z,region,attempts,durationMillis";
+    private static final Pattern UNSAFE_REGION_CHARACTERS = Pattern.compile("[^A-Za-z0-9._-]");
 
     private BitHeatmapExport() {
     }
@@ -91,7 +93,7 @@ public final class BitHeatmapExport {
     }
 
     private static String safeRegion(String region) {
-        String safe = Objects.requireNonNull(region, "region").replaceAll("[^A-Za-z0-9._-]", "_");
+        String safe = UNSAFE_REGION_CHARACTERS.matcher(Objects.requireNonNull(region, "region")).replaceAll("_");
         return safe.isBlank() ? "region" : safe;
     }
 

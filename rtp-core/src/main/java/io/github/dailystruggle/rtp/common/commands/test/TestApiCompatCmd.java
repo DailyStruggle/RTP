@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * Bukkit/Paper/Folia API method RTP relies on; surfaces {@link NoSuchMethodError}
  * risk at test time (ADR-121 section 11). Curated list (not bytecode-scanned)
  * to stay in lock-step with adapter notes. Missing classes report as {@code skipped}
- * (expected for platform-conditional APIs); missing methods report as failures.
+ * (expected for platform-conditional APIs); missing required methods report as failures.
  * S-004 (warn + send on miss), S-005 (pure reflection), no method is invoked.
  */
 public class TestApiCompatCmd extends BaseRTPCmdImpl {
@@ -49,6 +49,15 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
           "test.api-compat",
           "",
           "Resolve the reported class-loading or reflection error for this platform.");
+  public static final BitCode MISSING_OPTIONAL_METHOD =
+      RtpBitCodes.TEST.register(
+          4003,
+          "TEST_API_COMPAT_OPTIONAL_METHOD_MISSING",
+          java.lang.System.Logger.Level.WARNING,
+          BitTier.IBIT,
+          "test.api-compat",
+          "",
+          "Pre-generate destination worlds or use Paper/Folia for asynchronous chunk loading.");
   public static final BitComponent COMPONENT = registerComponent();
 
   /**
@@ -62,9 +71,19 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     public final List<String> paramTypeNames;
     /** Free-form hint describing where RTP calls this method. */
     public final String callSiteHint;
+    public final boolean optional;
 
     public ApiProbe(
         String className, String methodName, List<String> paramTypeNames, String callSiteHint) {
+      this(className, methodName, paramTypeNames, callSiteHint, false);
+    }
+
+    public ApiProbe(
+        String className,
+        String methodName,
+        List<String> paramTypeNames,
+        String callSiteHint,
+        boolean optional) {
       this.className = className;
       this.methodName = methodName;
       this.paramTypeNames =
@@ -72,6 +91,7 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
               ? Collections.emptyList()
               : Collections.unmodifiableList(new ArrayList<>(paramTypeNames));
       this.callSiteHint = callSiteHint;
+      this.optional = optional;
     }
 
     @Override
@@ -87,6 +107,8 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     public final List<String> skipped = new ArrayList<>();
     /** Class is present but the method signature no longer resolves. */
     public final List<String> missingMethod = new ArrayList<>();
+    /** Optional method is absent on a platform that has a safe fallback. */
+    public final List<String> missingOptional = new ArrayList<>();
     /** Something else blew up during resolution. */
     public final List<String> errors = new ArrayList<>();
 
@@ -133,12 +155,14 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             + report.skipped.size()
             + " missing-method="
             + report.missingMethod.size()
+            + " missing-optional="
+            + report.missingOptional.size()
             + " errors="
             + report.errors.size();
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
       RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
-    if (report.failures() == 0) {
+    if (report.failures() == 0 && report.missingOptional.isEmpty()) {
       RTPRuntime.log(Level.INFO, summary);
     } else {
       RTPRuntime.log(Level.WARNING, summary);
@@ -146,6 +170,7 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
 
     emitDetail(callerId, "skipped (class not on classpath)", report.skipped, Level.INFO);
     emitDetail(callerId, "MISSING method", report.missingMethod, Level.WARNING);
+    emitDetail(callerId, "OPTIONAL method missing", report.missingOptional, Level.WARNING);
     emitDetail(callerId, "resolution ERROR", report.errors, Level.WARNING);
     ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
     return true;
@@ -160,7 +185,6 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             BitSideEffect.SAFE,
             60_000,
             () -> toBitReport(runProbes(defaultProbes())));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 
@@ -168,6 +192,10 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     ProbeBitReport.Builder report = ProbeBitReport.forProbe("api-compat");
     for (String item : probe.missingMethod) {
       report.check(MISSING_METHOD, false, item, "Required platform API method could not be resolved.");
+    }
+    for (String item : probe.missingOptional) {
+      report.check(MISSING_OPTIONAL_METHOD, false, item,
+          "Optional platform API method is absent; the safe fallback remains active.");
     }
     for (String item : probe.errors) {
       report.check(RESOLUTION_ERROR, false, item, "Reflective platform API resolution failed.");
@@ -219,7 +247,8 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
       if (m != null) {
         report.ok.add(p.toString());
       } else {
-        report.missingMethod.add(p + " [" + p.callSiteHint + "]");
+        List<String> missing = p.optional ? report.missingOptional : report.missingMethod;
+        missing.add(p + " [" + p.callSiteHint + "]");
       }
     }
     return report;
@@ -276,6 +305,8 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
    */
   public static List<ApiProbe> defaultProbes() {
     List<ApiProbe> p = new ArrayList<>();
+    String platform = RTPRuntime.serverAccessor().getPlatform();
+    boolean paperOrFolia = platform.equalsIgnoreCase("Paper") || platform.equalsIgnoreCase("Folia");
 
     // --- Bukkit core (all platforms) ---------------------------------
     p.add(
@@ -283,7 +314,8 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             "org.bukkit.World",
             "getChunkAtAsync",
             List.of("int", "int"),
-            "LocationGenerator/Region/RegionQueueManager async chunk load"));
+            "LocationGenerator/Region/RegionQueueManager async chunk load",
+            !paperOrFolia));
     p.add(
         new ApiProbe(
             "org.bukkit.Bukkit",
@@ -304,8 +336,7 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             "fallback teleport path on platforms without teleportAsync"));
 
     // --- Paper (optional on Spigot) ----------------------------------
-    if (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Paper")
-        || RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia")) {
+    if (paperOrFolia) {
       p.add(
           new ApiProbe(
               "org.bukkit.entity.Player",
@@ -315,7 +346,7 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     }
 
     // --- Folia (optional on Paper/Spigot) ----------------------------
-    if (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia")) {
+    if (platform.equalsIgnoreCase("Folia")) {
       p.add(
           new ApiProbe(
               "org.bukkit.Bukkit",

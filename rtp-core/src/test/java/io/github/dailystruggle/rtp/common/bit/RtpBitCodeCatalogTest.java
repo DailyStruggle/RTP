@@ -27,8 +27,8 @@ class RtpBitCodeCatalogTest {
         String markdown = RtpBitCodeCatalog.markdown(registry);
 
         assertTrue(markdown.contains("## Namespaces"));
-        assertTrue(markdown.contains("| `TEST` | 50000-50099 |"));
-        assertTrue(markdown.contains("## Codes"));
+        assertTrue(markdown.contains("| `TEST` |"));
+        assertTrue(markdown.contains("## `TEST`"));
         assertTrue(markdown.contains("| 50000 | `TEST_SAMPLE` | WARNING | PBIT | owner\\|system<br>subsystem | - | replace \\| with<br>nothing |"));
     }
 
@@ -73,9 +73,18 @@ class RtpBitCodeCatalogTest {
         assertTrue(json.contains("A \\\"quoted\\\" path \\\\ folder"));
     }
 
+    @Test
+    void emptyRetiredListRendersInlineWithoutWhitespaceOnlyLines() {
+        String json = RtpBitCodeCatalog.json(registryWithCode("", "", ""));
+
+        assertTrue(json.contains("\"retired\": []"), json);
+        assertTrue(json.lines().noneMatch(line -> !line.isEmpty() && line.isBlank()),
+                "generated catalog must not contain whitespace-only lines");
+    }
+
     private static BitCodeRegistry registryWithCode(String subsystem, String messageKey, String remediation) {
         BitCodeRegistry registry = new BitCodeRegistry();
-        BitCodeNamespace namespace = registry.reserve("TEST", 50000, 50099);
+        BitCodeNamespace namespace = registry.reserve("TEST");
         namespace.register(50000, "TEST_SAMPLE", Level.WARNING, BitTier.PBIT,
                 subsystem, messageKey, remediation);
         return registry;

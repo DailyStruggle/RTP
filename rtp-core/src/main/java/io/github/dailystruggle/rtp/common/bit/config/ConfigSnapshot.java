@@ -30,7 +30,7 @@ public final class ConfigSnapshot {
     private static final int MAX_DEPTH = 4;
     private static final Set<String> SKIPPED_DIRECTORIES = Set.of(
             "lang", "logs", "reports", "backups", "database", "cache", "docs", "libraries");
-    private static final Pattern ROTATED_BACKUP = Pattern.compile(".*\\.(?:old\\d*|bak.*|tmp)$");
+    private static final Pattern ROTATED_BACKUP = Pattern.compile("\\.(?:old\\d*+|bak.*+|tmp)$");
 
     /** One parsed YAML file; {@link #canonical()} maps localized top-level keys to enum names. */
     public record Document(String path, RtpYamlConfig yaml, Map<String, String> canonical) {
@@ -151,17 +151,18 @@ public final class ConfigSnapshot {
         Map<String, String> langTexts = new TreeMap<>();
         for (Map.Entry<String, String> entry : texts.entrySet()) {
             String path = entry.getKey();
-            if (!isYaml(path)) continue;
-            if (isLangMap(path)) {
-                langTexts.put(path, entry.getValue());
-                continue;
-            }
-            try {
-                parsed.put(path, RtpYamlConfig.parse(entry.getValue() == null ? "" : entry.getValue()));
-            } catch (RuntimeException e) {
-                unparsable.put(path, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
-                if (e instanceof RtpYamlParseException parseException) {
-                    unparsableKeys.put(path, parseException.messageKey());
+            if (isYaml(path)) {
+                if (isLangMap(path)) {
+                    langTexts.put(path, entry.getValue());
+                } else {
+                    try {
+                        parsed.put(path, RtpYamlConfig.parse(entry.getValue() == null ? "" : entry.getValue()));
+                    } catch (RuntimeException e) {
+                        unparsable.put(path, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                        if (e instanceof RtpYamlParseException parseException) {
+                            unparsableKeys.put(path, parseException.messageKey());
+                        }
+                    }
                 }
             }
         }
@@ -258,7 +259,7 @@ public final class ConfigSnapshot {
 
     private static boolean isYaml(String path) {
         String lower = path.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".yml") && !ROTATED_BACKUP.matcher(lower).matches();
+        return lower.endsWith(".yml") && !ROTATED_BACKUP.matcher(lower).find();
     }
 
     private static boolean isLangMap(String path) {

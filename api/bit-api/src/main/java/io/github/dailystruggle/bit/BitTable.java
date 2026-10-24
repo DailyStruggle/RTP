@@ -7,9 +7,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /** Platform-neutral aligned CSV representation of BIT component results. */
 public final class BitTable {
+    private static final Pattern LINE_BREAKS = Pattern.compile("[\\r\\n]+");
     public static final String COMPONENT = "component";
     public static final String TIER = "tier";
     public static final String SIDE_EFFECT = "sideEffect";
@@ -42,7 +44,8 @@ public final class BitTable {
         for (BitFinding finding : report.findings()) {
             LinkedHashMap<String, String> cells = baseCells(component, report.health().name(), errors, warnings);
             cells.put(SEVERITY, finding.severity().name());
-            cells.put(ID, Integer.toString(finding.codeId()));
+            String namespace = finding.namespace();
+            cells.put(ID, namespace.isBlank() ? Integer.toString(finding.codeId()) : namespace + ":" + finding.codeId());
             cells.put(CODE, finding.code());
             cells.put(PATH, singleLine(finding.path()));
             cells.put(MESSAGE, singleLine(finding.message()));
@@ -112,7 +115,7 @@ public final class BitTable {
     }
 
     private static String singleLine(String value) {
-        return value.replaceAll("[\\r\\n]+", " ");
+        return LINE_BREAKS.matcher(value).replaceAll(" ");
     }
 
     private static String csvCell(String value) {
@@ -131,7 +134,7 @@ public final class BitTable {
         public Row {
             Objects.requireNonNull(cells, "cells must not be null");
             cells = Collections.unmodifiableMap(new LinkedHashMap<>(cells));
-            tone = Objects.requireNonNull(tone, "tone must not be null");
+            Objects.requireNonNull(tone, "tone must not be null");
         }
     }
 

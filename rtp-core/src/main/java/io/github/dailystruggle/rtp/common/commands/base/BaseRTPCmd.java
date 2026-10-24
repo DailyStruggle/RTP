@@ -141,10 +141,8 @@ public interface BaseRTPCmd extends TreeCommand {
         return;
       }
     }
-    if (ActiveConfigs.get() != null) {
-      if (!ActiveConfigs.get().reload()) {
-        RTPRuntime.log(Level.WARNING, "[RTP] configuration reload failed during command dispatch for " + callerId);
-      }
+    if (ActiveConfigs.get() != null && !ActiveConfigs.get().reload()) {
+      RTPRuntime.log(Level.WARNING, "[RTP] configuration reload failed during command dispatch for " + callerId);
     }
   }
 

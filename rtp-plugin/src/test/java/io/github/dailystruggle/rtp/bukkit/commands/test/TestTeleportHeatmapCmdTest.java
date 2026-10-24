@@ -10,6 +10,7 @@ import io.github.dailystruggle.bit.BitResult;
 import io.github.dailystruggle.bit.BitSideEffect;
 import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,9 @@ class TestTeleportHeatmapCmdTest {
         assertEquals(BitTier.IBIT, TestTeleportHeatmapCmd.COMPONENT.tier());
         assertEquals(BitSideEffect.HEAVY, TestTeleportHeatmapCmd.COMPONENT.sideEffect());
         assertEquals(4700, TestTeleportHeatmapCmd.HEATMAP_MOCKED.id());
-        assertTrue(RtpBit.RUNNER.components().contains(TestTeleportHeatmapCmd.COMPONENT));
+        RtpBitCodes.initialiseOwners(BukkitBitCodeOwners.OWNERS);
+        assertTrue(RtpBit.RUNNER.components().contains(TestTeleportHeatmapCmd.COMPONENT),
+                "the owner bootstrap registers the declared component");
     }
 
     @Test

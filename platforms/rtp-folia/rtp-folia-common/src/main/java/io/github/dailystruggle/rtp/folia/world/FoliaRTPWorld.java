@@ -217,7 +217,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
               s -> (RTPRuntime.serverAccessor() != null)
                   ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
-                  : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(s))
+                  : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s))
           .thenCompose(result -> {
             io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
             if (view != null) {
@@ -815,7 +815,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       int cz = (int) (key >> 32);
       java.util.Set<String> reconciled = (RTPRuntime.serverAccessor() != null)
           ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+          : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
       return new FoliaRTPChunk(view, cx, cz, id, reconciled);
     }
     return null;
@@ -824,11 +824,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   public RTPChunk<?> createChunk(Object preformedData, int cx, int cz, Set<String> reconciledUnsafe) {
     if (preformedData instanceof io.github.dailystruggle.rtp.anvil.AnvilChunkView view) {
-      java.util.Set<String> reconciled = (reconciledUnsafe != null)
-          ? reconciledUnsafe
-          : ((RTPRuntime.serverAccessor() != null)
-              ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
-              : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks()));
+      java.util.Set<String> reconciled = reconciledUnsafe;
+      if (reconciled == null) {
+        reconciled = RTPRuntime.serverAccessor() != null
+            ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
+            : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+      }
       return new FoliaRTPChunk(view, cx, cz, id, reconciled);
     }
     throw new IllegalArgumentException("Unsupported preformed chunk data: " + (preformedData == null ? "null" : preformedData.getClass().getName()));

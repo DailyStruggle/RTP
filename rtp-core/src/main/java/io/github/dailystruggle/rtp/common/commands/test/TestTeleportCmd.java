@@ -171,7 +171,6 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
     BitComponent component = new BitComponent("teleport", OWNER, BitTier.IBIT,
         BitSideEffect.HEAVY, 120_000,
         () -> runProbe(DEFAULT_REGION, MIN_COUNT, RTPAPI::teleport, AWAIT_MILLIS, () -> false));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

@@ -193,7 +193,6 @@ public final class TestTeleportHeatmapCmd extends BaseRTPCmdImpl {
                 () -> ProbeBitReport.forProbe("teleport-heatmap")
                         .note(HEATMAP_MOCKED, "heatmap.mocked", "No real player is teleported by this probe.")
                         .build());
-        RtpBit.RUNNER.register(component);
         return component;
     }
 

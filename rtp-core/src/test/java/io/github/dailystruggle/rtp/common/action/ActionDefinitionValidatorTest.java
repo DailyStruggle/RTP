@@ -353,9 +353,9 @@ class ActionDefinitionValidatorTest {
                 ActionDefinitionValidator.SCHEMATIC_UNRESOLVED, ActionDefinitionValidator.PAYLOAD_UNBALANCED,
                 ActionDefinitionValidator.PAYLOAD_JSON_INVALID);
         for (BitCode code : codes) {
-            assertSame(code, RtpBitCodes.REGISTRY.byId(code.id()).orElseThrow());
+            assertSame(code, RtpBitCodes.REGISTRY.byId(code.namespace(), code.id()).orElseThrow());
             assertSame(code, RtpBitCodes.REGISTRY.byKey(code.key()).orElseThrow());
-            assertTrue(RtpBitCodes.ACTION.containsId(code.id()) && RtpBitCodes.ACTION.ownsKey(code.key()));
+            assertTrue(code.namespace().equals(RtpBitCodes.ACTION.prefix()) && RtpBitCodes.ACTION.ownsKey(code.key()));
             assertFalse(code.remediation().isBlank(), code.key() + " needs remediation text");
         }
         assertTrue(BitSeverityPolicy.isStructuralActionCode(ActionDefinitionValidator.PLACEHOLDER_OUT_OF_SCOPE.key()));
@@ -413,7 +413,7 @@ class ActionDefinitionValidatorTest {
         assertEquals(suggestion, finding.suggestion());
         assertEquals("koth.yml", finding.source());
         if (severity != null) assertEquals(severity, finding.severity());
-        assertEquals(code, RtpBitCodes.REGISTRY.keyOf(finding.codeId()).orElse(null),
+        assertEquals(code, RtpBitCodes.REGISTRY.keyOf(finding.namespace(), finding.codeId()).orElse(null),
                 "finding id must map back to its registered key");
         return finding;
     }

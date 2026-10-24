@@ -839,7 +839,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * Reconciles a raw on-disk block or biome palette identifier against the platform registry.
    *
    * <p>The default implementation applies namespace-stripping and uppercase normalization
-   * via {@link io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer#normalize(String)}.
+   * via {@link io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer#normalize(String)}.
    * Platform adapters (e.g. Bukkit, Paper, Folia, Fabric, NeoForge) should override this to
    * reconcile against live platform registries (e.g. Material/Registry.BIOME or BuiltInRegistries).
    *
@@ -847,7 +847,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @return canonical identifier for lookups, or null if raw is null
    */
   default String reconcilePaletteIdentifier(String raw) {
-    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+    return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
 
   /**

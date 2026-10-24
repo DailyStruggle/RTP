@@ -88,6 +88,7 @@ public record ConfigConstraint(String scope, String block, String lower, String 
         return blocks == Math.rint(blocks) ? Long.toString((long) blocks) : Double.toString(blocks);
     }
 
+    @SuppressWarnings("java:S1168") // Null identifies non-mapping config values and stops nested lookup.
     static Map<?, ?> asMap(Object value) {
         if (value instanceof RtpYamlSection section) return section.getValues(false);
         if (value instanceof Map<?, ?> map) return map;

@@ -106,11 +106,11 @@ class ProbeBitReportTest {
   }
 
   @Test
-  void probeCodesUseDisjointRegisteredTestRanges() {
-    assertTrue(RtpBitCodes.TEST.containsId(TestAccessorCmd.TEST_ACCESSOR_UNAVAILABLE.id()));
-    assertTrue(RtpBitCodes.TEST.containsId(TestAccessorCmd.TEST_ACCESSOR_WORLD_BORDER.id()));
-    assertTrue(RtpBitCodes.TEST.containsId(TestChunkTicketCmd.TEST_CHUNK_TICKET_OPEN.id()));
-    assertTrue(RtpBitCodes.TEST.containsId(TestChunkTicketCmd.TEST_CHUNK_TICKET_STALE_SENTINEL.id()));
+  void probeCodesUseTheRegisteredTestNamespace() {
+    assertEquals("TEST", TestAccessorCmd.TEST_ACCESSOR_UNAVAILABLE.namespace());
+    assertEquals("TEST", TestAccessorCmd.TEST_ACCESSOR_WORLD_BORDER.namespace());
+    assertEquals("TEST", TestChunkTicketCmd.TEST_CHUNK_TICKET_OPEN.namespace());
+    assertEquals("TEST", TestChunkTicketCmd.TEST_CHUNK_TICKET_STALE_SENTINEL.namespace());
     assertEquals(3001, TestAccessorCmd.TEST_ACCESSOR_UNAVAILABLE.id());
     assertEquals(3101, TestChunkTicketCmd.TEST_CHUNK_TICKET_OPEN.id());
   }
@@ -129,9 +129,9 @@ class ProbeBitReportTest {
     for (int i = 0; i < codes.size(); i++) {
       io.github.dailystruggle.bit.BitCode code = codes.get(i);
       assertEquals(3201 + i, code.id(), code.key());
-      assertTrue(RtpBitCodes.TEST.containsId(code.id()), code.key());
+      assertEquals("TEST", code.namespace(), code.key());
       assertTrue(code.key().startsWith("TEST_TELEPORT_"), code.key());
-      assertEquals(code, RtpBitCodes.REGISTRY.byId(code.id()).orElseThrow());
+      assertEquals(code, RtpBitCodes.REGISTRY.byId("TEST", code.id()).orElseThrow());
       assertEquals(code, RtpBitCodes.REGISTRY.byKey(code.key()).orElseThrow());
       assertEquals("test.teleport", code.subsystem());
       java.lang.System.Logger.Level expected = i == 0

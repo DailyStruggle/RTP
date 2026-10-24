@@ -91,13 +91,13 @@ public final class ConfigReloadCoordinator implements ConfigReloadLifecycle {
     ConfigParser<LoggingKeys> logging =
             (ConfigParser<LoggingKeys>) configs.configParserMap.get(LoggingKeys.class);
 
-    boolean detailed_region_init = true;
+    boolean detailedRegionInit = true;
     if (logging != null) {
       Object o = logging.getConfigValue(LoggingKeys.detailed_region_init, false);
-      if (o instanceof Boolean) {
-        detailed_region_init = (Boolean) o;
+      if (o instanceof Boolean enabled) {
+        detailedRegionInit = enabled;
       } else {
-        detailed_region_init = Boolean.parseBoolean(o.toString());
+        detailedRegionInit = Boolean.parseBoolean(o.toString());
       }
     }
 
@@ -143,7 +143,7 @@ public final class ConfigReloadCoordinator implements ConfigReloadLifecycle {
       Region region = new Region(name, settings, worldFallback, configuredWorldName);
 
       ActiveSelection.get().permRegionLookup.put(region.name, region);
-      if (detailed_region_init) {
+      if (detailedRegionInit) {
         RTPRuntime.log(
                 Level.INFO,
                 "&#00FFFF[RTP] [" + name + "] successfully created teleport region - " + region.name);

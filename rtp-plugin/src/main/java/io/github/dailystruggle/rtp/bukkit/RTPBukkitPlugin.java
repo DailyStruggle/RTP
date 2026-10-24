@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.bukkit;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
 import io.github.dailystruggle.rtp.common.bit.RtpBitStartup;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
+import io.github.dailystruggle.rtp.bukkit.commands.test.BukkitBitCodeOwners;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
@@ -163,6 +165,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
       try {
         RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable BukkitDatabaseHandler.setupDatabase");
+        RtpBitCodes.addOwners(BukkitBitCodeOwners.OWNERS);
         BukkitDatabaseHandler.setupDatabase(rtp);
         RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable database setup complete");
         // Boot backend-side network mode AFTER the DB is up

@@ -470,8 +470,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     // without importing a platform class. BukkitBackendStateSampler is on the
     // Folia classpath (rtp-folia-common -> rtp-paper-common -> rtp-bukkit-common)
     // and uses only Folia-safe Bukkit API (Bukkit.getWorlds() + RTP internals).
-    NetworkHooks.setBackendStateSamplerFactory(lobbyMode ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode));
+    NetworkHooks.setBackendStateSamplerFactory(
+        io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler::new);
   }
 
   @Override
@@ -825,7 +825,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     } catch (Exception ignored) {
       // Material lookup threw; fall back to normalizer
     }
-    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+    return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
 
   // ---------------------------------------------------------------------------

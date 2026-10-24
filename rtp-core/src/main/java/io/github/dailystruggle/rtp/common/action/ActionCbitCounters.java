@@ -26,7 +26,7 @@ public final class ActionCbitCounters {
   private static final int MAX_TRACKED_OBJECTIVES = 128;
   private static final int MAX_TRACKED_GATES = 512;
   private static final String OBJECTIVE_OVERFLOW = "<overflow>";
-  private static final Pattern UNRESOLVED_TOKEN = Pattern.compile("\\[[A-Za-z_][A-Za-z0-9_]*]");
+  private static final Pattern UNRESOLVED_TOKEN = Pattern.compile("\\[[A-Za-z_]\\w*]");
 
   public static final BitCode OBJECTIVE_MISSING = RtpBitCodes.ACTION.register(2101,
       "ACTION_CBIT_OBJECTIVE_MISSING", Level.WARNING, BitTier.CBIT, "action", "",
@@ -75,7 +75,7 @@ public final class ActionCbitCounters {
     if (gateConfig == null || gateConfig.isEmpty()) return;
     GateKey key = new GateKey(actionId == null || actionId.isBlank() ? "<unknown>" : actionId, gateConfig);
     GateOutcomeCounter counter = gateCounter(key);
-    if (counter != null) counter.record(passed);
+    if (counter != null) counter.recordOutcome(passed);
   }
 
   /** Counts unresolved placeholder occurrences in a fully substituted payload. */

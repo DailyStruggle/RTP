@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.factory;
 
 import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * Owner of the process-wide factory map, keyed by {@link FactoryNames} (ADR-115 seam 4).
@@ -17,7 +18,7 @@ public final class FactoryRegistry {
   }
 
   /** The live, mutable factory map. */
-  public static EnumMap<FactoryNames, Factory<?>> map() {
+  public static Map<FactoryNames, Factory<?>> map() {
     return MAP;
   }
 

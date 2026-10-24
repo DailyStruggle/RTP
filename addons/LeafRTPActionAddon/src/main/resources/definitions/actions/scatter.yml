@@ -6,7 +6,6 @@
 # The anchor is the default RegionQueueAnchorSource: a verified spot is drawn from the
 # region's pre-warmed hot/cold caches (no live target, no landmark).
 
-alias: "wild"
 permission: "rtp.action.scatter"
 description: "Random safe teleport (single player or group scatter)."
 

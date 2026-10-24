@@ -40,7 +40,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -70,13 +72,50 @@ import static org.mockito.Mockito.when;
  */
 class RtpBStatsCatalogueDetectorsTest {
 
-    /** Name-bearing accessor stand-ins: the backend detector keys off the class simple name. */
-    abstract static class H2Accessor extends DatabaseAccessor<Object> { }
-    abstract static class SqliteAccessor extends DatabaseAccessor<Object> { }
-    abstract static class PostgresAccessor extends DatabaseAccessor<Object> { }
-    abstract static class MysqlAccessor extends DatabaseAccessor<Object> { }
-    abstract static class MariadbAccessor extends DatabaseAccessor<Object> { }
-    abstract static class PlainAccessor extends DatabaseAccessor<Object> { }
+    /** Concrete named types keep Mockito's randomized generated suffix out of detector inputs. */
+    static class StubAccessor extends DatabaseAccessor<Object> {
+        @Override public String name() { return "stub"; }
+        @Override public List<StoredLocation> loadCachedLocations(String regionName) { return List.of(); }
+        @Override public void startup() {
+            // Database operations are outside this detector fixture.
+        }
+        @Override public Object connect() { return null; }
+        @Override public Optional<Map<String, Object>> read(Object connection, String tableName,
+                Map.Entry<String, Object> lookup) { return Optional.empty(); }
+        @Override public void write(Object connection, String tableName, Map<TableObj, TableObj> values) {
+            // Database operations are outside this detector fixture.
+        }
+        @Override public void delete(Object connection, String tableName, Map.Entry<String, Object> lookup) {
+            // Database operations are outside this detector fixture.
+        }
+        @Override public void disconnect(Object connection) {
+            // Database operations are outside this detector fixture.
+        }
+    }
+
+    static final class H2Accessor extends StubAccessor {
+        @Override public String name() { return "h2"; }
+    }
+
+    static final class SqliteAccessor extends StubAccessor {
+        @Override public String name() { return "sqlite"; }
+    }
+
+    static final class PostgresAccessor extends StubAccessor {
+        @Override public String name() { return "postgresql"; }
+    }
+
+    static final class MysqlAccessor extends StubAccessor {
+        @Override public String name() { return "mysql"; }
+    }
+
+    static final class MariadbAccessor extends StubAccessor {
+        @Override public String name() { return "mariadb"; }
+    }
+
+    static final class PlainAccessor extends StubAccessor {
+        @Override public String name() { return "plain"; }
+    }
 
     @TempDir
     Path tmp;
@@ -244,17 +283,17 @@ class RtpBStatsCatalogueDetectorsTest {
 
         ActiveDatabase.setAccessor(new YamlFileDatabase(tmp.toFile()));
         assertEquals("yaml", RtpBStatsCatalogue.detectDatabaseBackend());
-        ActiveDatabase.setAccessor(mock(H2Accessor.class));
+        ActiveDatabase.setAccessor(new H2Accessor());
         assertEquals("h2", RtpBStatsCatalogue.detectDatabaseBackend());
-        ActiveDatabase.setAccessor(mock(SqliteAccessor.class));
+        ActiveDatabase.setAccessor(new SqliteAccessor());
         assertEquals("sqlite", RtpBStatsCatalogue.detectDatabaseBackend());
-        ActiveDatabase.setAccessor(mock(PostgresAccessor.class));
+        ActiveDatabase.setAccessor(new PostgresAccessor());
         assertEquals("postgresql", RtpBStatsCatalogue.detectDatabaseBackend());
-        ActiveDatabase.setAccessor(mock(MysqlAccessor.class));
+        ActiveDatabase.setAccessor(new MysqlAccessor());
         assertEquals("mysql", RtpBStatsCatalogue.detectDatabaseBackend());
-        ActiveDatabase.setAccessor(mock(MariadbAccessor.class));
+        ActiveDatabase.setAccessor(new MariadbAccessor());
         assertEquals("mysql", RtpBStatsCatalogue.detectDatabaseBackend());
-        ActiveDatabase.setAccessor(mock(PlainAccessor.class));
+        ActiveDatabase.setAccessor(new PlainAccessor());
         assertEquals("other", RtpBStatsCatalogue.detectDatabaseBackend());
     }
 

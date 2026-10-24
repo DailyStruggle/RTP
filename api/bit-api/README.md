@@ -3,7 +3,7 @@
 `bit-api` is a platform- and plugin-neutral contract for power-on, continuous, and initiated built-in tests. It has no RTP, platform, or YAML dependencies, and does not schedule work or write to a global logger. Callers provide execution and output context.
 
 The JSON report format is versioned by the `schema` field in `BitReport`.
-Finding codes are registered, not enumerated. An owner reserves a key prefix and id range with `BitCodeRegistry.reserve(...)`, registers each `BitCode` next to the check that emits it, and builds findings with `BitFinding.of(code, ...)`. The registry maps ids and keys in both directions and rejects collisions at registration. The `BIT` namespace (ids 1-999) belongs to `bit-api` itself; see ADR-121 section 10 for the allocation table.
+Finding codes are registered, not enumerated. An owner reserves a unique key prefix with `BitCodeRegistry.reserve(...)`, registers each `BitCode` next to the check that emits it, and builds findings with `BitFinding.of(code, ...)`. A code's stable identity is `(namespace, id, key)`: ids are local to their namespace, while keys are unique in the registry. The registry resolves ids with both namespace and id and rejects identity collisions at registration. `BitCodeNamespace.retire(...)` retains removed identities so they cannot be reused. The `BIT` namespace belongs to `bit-api` itself; RTP's release lock and allocation policy are documented in ADR-121 section 10.
 
 Severities are JDK `java.lang.System.Logger.Level` values (`ERROR`, `WARNING`, `INFO`, `DEBUG`, `TRACE`); `ALL` and `OFF` are rejected. `BitLevels` maps a level to `BitHealth` and to `java.util.logging.Level` for hosts that log through JUL.
 

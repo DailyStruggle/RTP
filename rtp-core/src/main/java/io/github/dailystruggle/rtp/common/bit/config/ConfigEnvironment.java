@@ -60,6 +60,7 @@ public record ConfigEnvironment(Set<String> worldNames, Set<String> effectNames,
     }
 
     /** Upper-case registered effect names; {@code null} (unknown) before any platform registers effects. */
+    @SuppressWarnings("java:S1168") // Null means the platform has not supplied an effect-name snapshot.
     static Set<String> registeredEffects() {
         try {
             Set<String> names = new LinkedHashSet<>();

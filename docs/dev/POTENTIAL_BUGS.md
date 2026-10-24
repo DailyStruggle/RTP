@@ -67,6 +67,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** The crash is gone, but the join still stalls about 13 s where vanilla stalls 0 s. Find what fills the chunk workers in the first minute: count ticket applications and generation-cascade chunks against the budget during the A/B, and try a lower budget cap or a later fill start after boot on hold-back hosts. Clears when a rerun shows a join tick comparable to the no-RTP baseline.
 - **Linear:** RTP-80
 
+### 2026-10-23 - Root task configuration assumes a single plugin jar
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** SonarQube IDE pre-commit cleanup
+- **Location:** `build.gradle:1006-1016`, `jacocoServerReport`
+- **Symptom / hypothesis:** When `rtp-plugin/build/libs` contains more than one matching `LeafRTP-Pro-*.jar`, configuring `jacocoServerReport` fails at `pluginJar.singleFile`, even for a root `tasks --all` request. The matching-file count may vary with the local artifact state.
+- **Impact:** Gradle configuration and task discovery can fail in a working tree with multiple matching plugin artifacts.
+- **Suggested next step:** Confirm whether multiple matching jars are a normal build output; if so, select the intended artifact deterministically instead of requiring a single match.
+
 ### 2026-10-21 - ConfigParser recompiles a regex in a hot string operation
 
 - **Severity:** Low
@@ -86,17 +96,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** All reflective checkers were compared with plugin source, fixed (UltimateClaims, PlotSquared, HuskClaims, KingdomsX), and now fail closed while the plugin is enabled; `ReflectiveClaimCheckerApiShapeS003Test` runs each against a hand-copied stub. These five plugins publish API artifacts (`net.william278.huskclaims:huskclaims-bukkit` and `net.william278.husktowns:husktowns-bukkit` on repo.william278.net, PlotSquared core on Maven Central / PaperMC, `com.github.Zrips:Residence` and `com.github.SaberLLC:Saber-Factions` on JitPack), so ADR-118 rule 1 wants them compiled against directly. A stub can drift from the real API without failing the build.
 - **Impact:** None known today; a future upstream rename would be caught only at runtime (fail closed, SEVERE log), not at build time.
 - **Suggested next step:** Per plugin, add the artifact as `compileOnly`/`testImplementation` with `content { includeGroup ... }`, call the API types directly, and delete the matching stub package (it would clash on the test classpath). UltimateClaims (repo.craftaro.com unresolvable), CrashClaim, KingdomsX and FactionsBridge publish nothing usable and stay reflective.
-
-### 2026-10-20 - `JumpAdjustorExpandTokensTest` fails when run on its own
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** ADR-119 slope check (filtered `:rtp-core:test --tests "*JumpAdjustor*"` run)
-- **Location:** `rtp-core/src/test/.../verticalAdjustors/jump/JumpAdjustorExpandTokensTest.java` `nullWorldGuards`, `keysAndParameters`; `VerticalAdjustor.<init>` line 45
-- **Symptom / hypothesis:** Run alone (or with only adjustor tests), both tests throw `NullPointerException: vertAdjustorFactory is null` in the `VerticalAdjustor` constructor; they pass in the full suite. The test likely relied on `RTP.<clinit>` filling the factory registry, which the package-hub refactor made explicit (`RTP.ensureInitialized()`).
-- **Impact:** Test-only; filtered runs report false failures.
-- **Suggested next step:** Call `RTP.ensureInitialized()` (or `RTPTestSetup.install`) in the test's setup, as was done for the other tests listed in `docs/dev/RTP-HUB-RESUME.md` Wave 2.
-- **Linear:** RTP-85
 
 ### 2026-10-21 - Countdown boss bar appears after an instant console `/rtp player=<name>`
 
@@ -438,6 +437,28 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
   3. After publish, if a buffer's length is over `4 * recentPeak` and above a floor (~1,024 entries), reallocate it to `2 * recentPeak` (or `new long[0]` and let it regrow). The 4x shrink vs 2x grow gap prevents thrashing; large steady tables keep their buffers, so the humongous-allocation rationale holds.
   4. Time-based exit for shapes that stop rebuilding after a burst: idle for N minutes replaces `scratch` with a fresh `RebuildScratch`.
   - Constants from data: count `need` per rebuild over one stress run and one scan; pick the shrink factor so steady state never trims, and the decay from burst length. Verify with the fixed `RetainedFootprintBenchmarkTest` (dual-layer shape, chunk coordinates): one burst then several small rebuilds should return retained size to ~18 KB, with no extra steady-state allocation.
+
+### 2026-10-23 - Fabric/NeoForge write ANSI escapes into `latest.log`
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** devstack BIT output capture (`/rtp test` on Paper, Folia, Spigot, Fabric and NeoForge 1.21.x)
+- **Location:** `platforms/rtp-fabric/rtp-fabric-common/.../server/FabricServerAccessor.java` `log` / `formatForLog`; `platforms/rtp-neoforge/rtp-neoforge-common/.../server/NeoForgeServerAccessor.java` `log`
+- **Symptom / hypothesis:** RTP lines reach the log file with `ESC[..m` color sequences (Fabric 1.21.11: 241 of 409 lines, including `[RTP] loaded guimenu.yml`). Bukkit-family logs are clean because the console sender strips color before the file appender.
+- **Impact:** `grep -F '[RTP bit] '` still matches, but stripping `&` codes no longer yields the CSV documented in `BIT.md`, and log viewers show raw escapes.
+- **Suggested next step:** Emit ANSI only to an interactive console appender (or not at all) and write plain text to the file logger; check with `grep -c $'\x1b\[' logs/latest.log` on a sweep row.
+- **Linear:** RTP-96
+
+### 2026-10-23 - Bukkit-family BIT problem tables log at INFO
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** devstack BIT output capture (`/rtp test` on Paper, Folia, Spigot, Fabric and NeoForge 1.21.x)
+- **Location:** `platforms/rtp-bukkit/rtp-bukkit-common/.../tools/SendMessage.java` `log(Level, String)` (console-sender path for version > 12)
+- **Symptom / hypothesis:** `BitTableOutput.emit` logs a table with FAILED/DEGRADED rows at WARNING, but `SendMessage.log` sends it through `Bukkit.getConsoleSender()`, which writes `[Server thread/INFO]`; WARNING survives only as a yellow color that the file log strips. Fabric/NeoForge keep `/WARN`.
+- **Impact:** On Paper/Folia/Spigot, filtering `latest.log` by level misses failing BIT tables and other RTP warnings.
+- **Suggested next step:** Route WARNING and SEVERE through the plugin logger at their level (keep the console sender for color at INFO and below), and cover it with a MockBukkit level assertion.
+- **Linear:** RTP-95
 
 ### 2026-10-13 - Block-list rejection log still names `safety.yml`
 

@@ -91,7 +91,8 @@ class BitCodeCatalogTest {
             for (Field field : owner.getDeclaredFields()) {
                 if (field.getType() != BitCode.class || !Modifier.isStatic(field.getModifiers())) continue;
                 BitCode code = (BitCode) field.get(null);
-                assertSame(code, registry.byId(code.id()).orElse(null), owner.getSimpleName() + "." + field.getName());
+                assertSame(code, registry.byId(code.namespace(), code.id()).orElse(null),
+                        owner.getSimpleName() + "." + field.getName());
                 assertSame(code, registry.byKey(code.key()).orElse(null), owner.getSimpleName() + "." + field.getName());
             }
         }
@@ -161,7 +162,8 @@ class BitCodeCatalogTest {
                     if (line.trim().endsWith(");")) inKnownGapList = false;
                     continue;
                 }
-                if (line.contains(".containsId(") || line.contains(".byId(") || line.contains(".byKey(")) continue;
+                if (line.contains(".containsId(") || line.contains(".byId(") || line.contains(".byKey(")
+                        || line.contains(".namespace()")) continue;
                 if (line.contains("\"" + code.key() + "\"") || line.contains(fieldReference)) return true;
             }
         }

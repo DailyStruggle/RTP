@@ -32,12 +32,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       # Both toolchains: the 26.x Fabric/NeoForge carriers (and the GUI renderers
       # and effects-api unobf module built against them) pin Java 25.
       - name: Set up JDK 21 and 25
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           java-version: |
             21
@@ -72,7 +72,7 @@ jobs:
           ./gradlew $TASKS -Pcoverage -PstaticAnalysis
 
       - name: Publish test results
-        uses: mikepenz/action-junit-report@db71d41eb79864e25ab0337e395c352e84523afe # v4.3.1
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6.6.1
         if: always()
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
@@ -92,14 +92,14 @@ jobs:
           tar -czf "reports-$SET.tgz" -T report-files.txt
 
       - name: Upload reports and classes
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: reports-${{ inputs.set }}
           path: reports-${{ inputs.set }}.tgz
           retention-days: 3
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: jacoco-coverage-${{ inputs.set }}
@@ -109,7 +109,7 @@ jobs:
 
       - name: Upload artifacts
         if: inputs.artifact-name != ''
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ${{ inputs.artifact-name }}
           path: ${{ inputs.artifact-path }}

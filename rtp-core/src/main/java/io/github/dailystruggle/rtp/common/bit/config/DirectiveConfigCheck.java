@@ -60,12 +60,12 @@ public final class DirectiveConfigCheck implements ConfigOwnerCheck {
      * Addon-owned files are bound by the addon itself via {@link #bound}, since their defaults live in
      * the addon jar, not on {@link ConfigEnvironment#resources()}.
      */
-    public static final Map<String, String> OWNER_FILES = ownerFiles();
+    protected static final Map<String, String> OWNER_FILES = ownerFiles();
 
     private final String id;
     private final String path;
     /** Bundled-default source; null = {@link ConfigEnvironment#resources()}. */
-    private final ClassLoader resources;
+    private final ClassLoader resourceLoader;
 
     public DirectiveConfigCheck(String id, String path) {
         this(id, path, null);
@@ -74,7 +74,7 @@ public final class DirectiveConfigCheck implements ConfigOwnerCheck {
     private DirectiveConfigCheck(String id, String path, ClassLoader resources) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.path = Objects.requireNonNull(path, "path must not be null");
-        this.resources = resources;
+        this.resourceLoader = resources;
     }
 
     /**
@@ -128,9 +128,12 @@ public final class DirectiveConfigCheck implements ConfigOwnerCheck {
         Optional<ConfigSnapshot.Document> found = snapshot == null ? Optional.empty() : snapshot.document(path);
         if (found.isEmpty()) return List.of();
         ConfigSnapshot.Document document = found.get();
-        ClassLoader resources = this.resources != null ? this.resources
-                : environment == null ? ConfigEnvironment.HEADLESS.resources() : environment.resources();
-        String bundledText = readResource(resources, path);
+        ClassLoader resourceLoader = this.resourceLoader;
+        if (resourceLoader == null) {
+            resourceLoader = environment == null
+                    ? ConfigEnvironment.HEADLESS.resources() : environment.resources();
+        }
+        String bundledText = readResource(resourceLoader, path);
         if (bundledText == null) return List.of();
         List<BitFinding> findings = new ArrayList<>();
         String bundledSource = "bundled:" + path;
@@ -144,24 +147,26 @@ public final class DirectiveConfigCheck implements ConfigOwnerCheck {
         }
         for (String key : bundled.getKeys(true)) {
             ConfigDirectives directives = ConfigDirectives.parse(bundled.getComment(key));
-            if (!hasChecks(directives)) continue;
-            if (directives.rangeMalformed()) {
-                findings.add(BitFinding.of(MALFORMED, bundledSource, key,
-                        "@range is not [min, max] with numeric or null bounds and min <= max",
-                        "[min, max]", MALFORMED.remediation()));
-            }
-            validate(directives, bundled.get(key)).ifPresent(v -> findings.add(BitFinding.of(DEFAULT_INVALID,
-                    bundledSource, key + v.suffix(), "Bundled value: " + v.message(), v.expected(),
-                    DEFAULT_INVALID.remediation())));
-            if (directives.defaultValue() != null) {
-                validate(directives, directives.defaultValue()).ifPresent(v -> findings.add(BitFinding.of(
-                        DEFAULT_INVALID, bundledSource, key, "@default: " + v.message(), v.expected(),
+            if (hasChecks(directives)) {
+                if (directives.rangeMalformed()) {
+                    findings.add(BitFinding.of(MALFORMED, bundledSource, key,
+                            "@range is not [min, max] with numeric or null bounds and min <= max",
+                            "[min, max]", MALFORMED.remediation()));
+                }
+                validate(directives, bundled.get(key)).ifPresent(v -> findings.add(BitFinding.of(DEFAULT_INVALID,
+                        bundledSource, key + v.suffix(), "Bundled value: " + v.message(), v.expected(),
                         DEFAULT_INVALID.remediation())));
+                if (directives.defaultValue() != null) {
+                    validate(directives, directives.defaultValue()).ifPresent(v -> findings.add(BitFinding.of(
+                            DEFAULT_INVALID, bundledSource, key, "@default: " + v.message(), v.expected(),
+                            DEFAULT_INVALID.remediation())));
+                }
+                String diskKey = diskKey(document, key);
+                if (document.yaml().contains(diskKey)) {
+                    validate(directives, document.yaml().get(diskKey)).ifPresent(v -> findings.add(BitFinding.of(
+                            v.code(), path, diskKey + v.suffix(), v.message(), v.expected(), v.suggestion())));
+                }
             }
-            String diskKey = diskKey(document, key);
-            if (!document.yaml().contains(diskKey)) continue;
-            validate(directives, document.yaml().get(diskKey)).ifPresent(v -> findings.add(BitFinding.of(v.code(),
-                    path, diskKey + v.suffix(), v.message(), v.expected(), v.suggestion())));
         }
         Set<String> known = bundled.getKeys(false);
         Vocabulary vocabulary = new Vocabulary("keys", known);

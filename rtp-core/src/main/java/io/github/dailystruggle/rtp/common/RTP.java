@@ -150,7 +150,7 @@ public class RTP {
         if (members != null) raw.addAll(members);
         else raw.add(token);
       }
-      Set<String> reconciled = io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(raw);
+      Set<String> reconciled = io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(raw);
       AIR_BLOCKS_CACHE.set(reconciled);
       return reconciled;
     } catch (Throwable ignored) {

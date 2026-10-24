@@ -15,8 +15,12 @@ This document defines the actors who interact with the RTP plugin, their roles, 
 - Integrate RTP with existing land-protection plugins (GriefPrevention, WorldGuard, Towny) to prevent players from landing in claimed areas.
 - Optionally charge players an economy cost per teleport via Vault.
 - Reload or adjust region settings at runtime without restarting the server.
+- Run RTP on the shipped configuration, with setup limited to installing it (REQ-RTP-OPS-001).
+- See why RTP paused or reduced its background work, without reading source code (REQ-RTP-OPS-002).
+- Find every config key, command, permission and message key documented for the installed release (Rule D-009).
+- Never need to change performance settings to match host hardware, platform or load. Goal only, with no REQ ID: promotion to a requirement needs a measurable criterion and the observe-only evidence of ADR-087 section 8.
 
-**Primary requirements:** REQ-RTP-F-001 through REQ-RTP-F-011, REQ-RTP-NF-001, REQ-RTP-NF-002.
+**Primary requirements:** REQ-RTP-F-001 through REQ-RTP-F-011, REQ-RTP-NF-001, REQ-RTP-NF-002, REQ-RTP-OPS-001, REQ-RTP-OPS-002.
 
 ---
 
@@ -26,9 +30,9 @@ This document defines the actors who interact with the RTP plugin, their roles, 
 **Goals:**
 - Receive a teleport response within 0–2 ticks (imperceptibly fast).
 - Land in a safe, accessible location — not inside a block, underwater, in a claimed area, or in a disallowed biome.
-- Understand why a teleport was denied (permission, cost, cooldown) via a clear message.
+- Get a message for every outcome of a request: teleported, delayed, waiting in line, or denied (permission, cost, cooldown).
 
-**Primary requirements:** REQ-RTP-F-001, REQ-RTP-F-007, REQ-RTP-F-011.
+**Primary requirements:** REQ-RTP-F-001, REQ-RTP-F-007, REQ-RTP-F-011, REQ-RTP-S-004.
 
 ---
 
@@ -53,6 +57,7 @@ This document defines the actors who interact with the RTP plugin, their roles, 
 - Add features or fix bugs without breaking the API contract for addon developers.
 - Write tests that are automatically enforced by CI (architecture rules, unit tests, traceability check).
 - Follow the requirement → traceability → test workflow when adding new requirements.
+- Update operator docs and `CHANGELOG.md` with every operator-visible change (Rule D-009).
 
 **Primary requirements:** All REQ-CORE-ARCH-* and REQ-API-ARCH-* requirements; see also `CONTRIBUTING.md` and `TRACEABILITY.md`.
 
@@ -74,8 +79,8 @@ This document defines the actors who interact with the RTP plugin, their roles, 
 
 | Actor | Key Requirement Prefixes |
 |---|---|
-| Server Administrator | REQ-RTP-F, REQ-RTP-NF, REQ-CORE-F, REQ-SPIGOT-F |
-| End-User Player | REQ-RTP-F-001, REQ-RTP-F-007, REQ-RTP-F-011 |
+| Server Administrator | REQ-RTP-F, REQ-RTP-NF, REQ-RTP-OPS, REQ-CORE-F, REQ-SPIGOT-F |
+| End-User Player | REQ-RTP-F-001, REQ-RTP-F-007, REQ-RTP-F-011, REQ-RTP-S-004 |
 | Addon Developer | REQ-API-F, REQ-API-NF, REQ-API-ARCH |
 | Core Contributor | REQ-CORE-ARCH, REQ-API-ARCH |
 | Server Platform | REQ-RTP-NF-002, REQ-SPIGOT-ARCH, REQ-PAPER-ARCH, REQ-FOLIA-ARCH |

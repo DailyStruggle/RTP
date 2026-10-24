@@ -44,11 +44,10 @@ class ConfigPbitTest {
     }
 
     @Test
-    @DisplayName("RTP namespace 1000-1999 is reserved and owns RTP_YAML_UNPARSABLE")
+    @DisplayName("RTP namespace owns RTP_YAML_UNPARSABLE with its stable local id")
     void rtpNamespaceIsReserved() {
-        assertTrue(RtpBitCodes.RTP.containsId(1000));
-        assertTrue(RtpBitCodes.RTP.containsId(1999));
-        assertFalse(RtpBitCodes.RTP.containsId(2000));
+        assertEquals("RTP", ConfigPbit.YAML_UNPARSABLE.namespace());
+        assertEquals(1001, ConfigPbit.YAML_UNPARSABLE.id());
         assertTrue(RtpBitCodes.RTP.ownsKey(ConfigPbit.YAML_UNPARSABLE.key()));
         assertTrue(RtpBitCodes.OWNERS.contains(ConfigPbit.class));
     }

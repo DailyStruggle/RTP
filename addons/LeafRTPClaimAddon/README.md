@@ -21,6 +21,12 @@ and run `/rtp reload`.
 A checker only registers when **both** its `integrations.yml` toggle is enabled **and** the named
 plugin is installed and enabled, so leaving the jar in place with everything off costs nothing.
 
+The SAFE PBIT component `/rtp test claim-integrations` shows whether enabled plugins were integrated,
+whether a configured plugin is absent, and whether an integration failed or was enabled too late.
+An installed plugin with its integration toggle off is a warning; an absent plugin with its toggle
+off is healthy. Codes use the addon-owned `CLAIM` namespace and are documented in
+[`docs/BIT_CODES.md`](docs/BIT_CODES.md), with stable identities retained in `docs/bit-codes.lock`.
+
 ## Platform
 
 Every checker is `org.bukkit.*`-based, so the addon only acts on Bukkit-family servers

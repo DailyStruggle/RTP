@@ -183,7 +183,6 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
             BitSideEffect.SAFE,
             5_000,
             EconomyIsolationTestJob::quietReport);
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

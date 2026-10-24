@@ -20,18 +20,24 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("REQ-API-F-009 platform probe components")
 class PluginProbeComponentsTest {
+  @BeforeEach
+  void initialiseProbeOwners() {
+    RtpBitCodes.initialiseOwners(BukkitBitCodeOwners.OWNERS);
+  }
+
   @Test
-  void componentsAreRegisteredSafeAndUseTheirAssignedTestBlocks() throws Exception {
-    assertComponent(TestCommandsCmd.class, "commands", 3300);
-    assertComponent(EconomyIsolationTestJob.class, "economy-isolation", 3600);
-    assertComponent(DisconnectTestJob.class, "disconnect-job", 3700);
-    assertComponent(NetworkSimulationTestJob.class, "network", 3800);
-    assertComponent(SafetyVerifierTestJob.class, "safety-verifier", 3900);
+  void componentsAreRegisteredSafeAndCodesUseTheTestNamespace() throws Exception {
+    assertComponent(TestCommandsCmd.class, "commands");
+    assertComponent(EconomyIsolationTestJob.class, "economy-isolation");
+    assertComponent(DisconnectTestJob.class, "disconnect-job");
+    assertComponent(NetworkSimulationTestJob.class, "network");
+    assertComponent(SafetyVerifierTestJob.class, "safety-verifier");
   }
 
   @Test
@@ -159,7 +165,7 @@ class PluginProbeComponentsTest {
     assertFalse(componentIds.contains("chunk-ticket"));
   }
 
-  private static void assertComponent(Class<?> owner, String id, int blockStart) throws Exception {
+  private static void assertComponent(Class<?> owner, String id) throws Exception {
     BitComponent component = component(owner);
     assertEquals(id, component.id());
     assertEquals("test." + id, component.subsystem());
@@ -170,8 +176,8 @@ class PluginProbeComponentsTest {
     List<BitCode> codes = codes(owner);
     assertFalse(codes.isEmpty(), id + " must declare registered finding codes");
     for (BitCode code : codes) {
-      assertTrue(code.id() >= blockStart && code.id() < blockStart + 100, code.key());
-      assertTrue(RtpBitCodes.TEST.containsId(code.id()), code.key());
+      assertEquals("TEST", code.namespace(), code.key());
+      assertEquals(code, RtpBitCodes.REGISTRY.byId("TEST", code.id()).orElseThrow());
     }
   }
 

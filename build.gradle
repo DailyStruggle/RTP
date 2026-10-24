@@ -368,7 +368,8 @@ subprojects {
             // baseline because a partially-recompiled tree makes JaCoCo discard stale execution
             // data, which can read several points low.
             ':rtp-proxy:rtp-proxy-common': [instruction: 0.85, branch: 0.67],
-            // commands-api measured: 93.6% instruction / 80.3% branch.
+            // commands-api measured via jacocoTestReport (2026-10-23): 96.5% instruction /
+            // 90.4% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':commands-api': [instruction: 0.90, branch: 0.80],
             ':bit-api': [instruction: 0.90, branch: 0.80],

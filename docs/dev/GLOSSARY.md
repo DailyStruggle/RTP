@@ -195,6 +195,13 @@ In network mode, the immutable value object (`NetworkSnapshot`) that aggregates 
 
 ---
 
+## O
+
+**Operator Surface**
+A place where the *operator* can read what RTP is doing without reading source code: the console log, `/rtp info`, the built-in test report (`/rtp test`, ADR-121) or the metrics snapshot (REQ-RTP-OBS-001). Player chat is not an operator surface. Used by REQ-RTP-OPS-002.
+
+---
+
 ## P
 
 **Proxy**

@@ -299,9 +299,10 @@ public final class NeoForgeEventBridge {
             if (RTP.getInstance() == null || ActiveSelection.get() == null) return;
             for (Region region : ActiveSelection.get().permRegionLookup.values()) {
                 try {
-                    if (region == null || region.queueManager == null) continue;
-                    if (region.queueManager.loginLocations == null) continue;
-                    new LoginCacheTask(region).promoteUpTo(1);
+                    if (region != null && region.queueManager != null
+                            && region.queueManager.loginLocations != null) {
+                        new LoginCacheTask(region).promoteUpTo(1);
+                    }
                 } catch (Throwable t) {
                     RTP.log(Level.WARNING,
                             "[ADR-023] login reserve refill failed for region '"

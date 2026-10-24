@@ -271,11 +271,12 @@ public final class MessageKeyParity {
         if (!reader.isDirectory(LANG_ROOT)) return out;
         for (String dir : List.of("", "advanced", MESSAGES_DIR)) {
             for (String child : reader.list(dir)) {
-                if (child.endsWith("/") || child.startsWith(".") || !child.endsWith(".yml")) continue;
-                if (child.endsWith(".lang.yml")) continue;
-                String stem = child.substring(0, child.length() - ".yml".length());
-                String category = dir.isEmpty() ? stem : dir + "/" + stem;
-                if (reader.exists(baselineLangPath(category)) && !out.contains(category)) out.add(category);
+                if (!child.endsWith("/") && !child.startsWith(".") && child.endsWith(".yml")
+                        && !child.endsWith(".lang.yml")) {
+                    String stem = child.substring(0, child.length() - ".yml".length());
+                    String category = dir.isEmpty() ? stem : dir + "/" + stem;
+                    if (reader.exists(baselineLangPath(category)) && !out.contains(category)) out.add(category);
+                }
             }
         }
         out.sort(null);

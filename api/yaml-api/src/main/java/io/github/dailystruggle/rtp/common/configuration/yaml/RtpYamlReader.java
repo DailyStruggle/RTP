@@ -220,17 +220,13 @@ public final class RtpYamlReader {
             String content = raw.substring(indent);
             boolean blank = content.isEmpty();
             boolean comment = !blank && content.charAt(0) == '#';
-            if (!blank && (content.equals("---") || content.startsWith("--- "))) {
-                if (deferredError == null) {
-                    deferredError = new RtpYamlParseException("rtpYaml.unsupported.docSep",
-                            "document separators are not supported", lineNo, indent);
-                }
+            if (deferredError == null && !blank && (content.equals("---") || content.startsWith("--- "))) {
+                deferredError = new RtpYamlParseException("rtpYaml.unsupported.docSep",
+                        "document separators are not supported", lineNo, indent);
             }
-            if (!blank && (content.equals("...") || content.startsWith("... "))) {
-                if (deferredError == null) {
-                    deferredError = new RtpYamlParseException("rtpYaml.unsupported.docSep",
-                            "document separators are not supported", lineNo, indent);
-                }
+            if (deferredError == null && !blank && (content.equals("...") || content.startsWith("... "))) {
+                deferredError = new RtpYamlParseException("rtpYaml.unsupported.docSep",
+                        "document separators are not supported", lineNo, indent);
             }
             out.add(new RawLine(lineNo, indent, raw, content, blank, comment, deferredError));
         }
@@ -592,17 +588,17 @@ public final class RtpYamlReader {
                 if (pendingBlankStart < 0) pendingBlankStart = pos;
                 pendingBlankLines.add(ln);
                 pos++;
-                continue;
+            } else if (ln.indent <= parentIndent
+                    || (contentIndent >= 0 && ln.indent < contentIndent)) {
+                break;
+            } else {
+                if (contentIndent < 0) contentIndent = ln.indent;
+                for (int i = 0; i < pendingBlankLines.size(); i++) contentLines.add("");
+                pendingBlankLines.clear();
+                pendingBlankStart = -1;
+                contentLines.add(ln.raw.substring(contentIndent));
+                pos++;
             }
-            if (ln.indent <= parentIndent) break;
-            if (contentIndent < 0) contentIndent = ln.indent;
-            if (ln.indent < contentIndent) break;
-
-            for (int i = 0; i < pendingBlankLines.size(); i++) contentLines.add("");
-            pendingBlankLines.clear();
-            pendingBlankStart = -1;
-            contentLines.add(ln.raw.substring(contentIndent));
-            pos++;
         }
 
         if (!pendingBlankLines.isEmpty()) {

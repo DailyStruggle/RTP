@@ -45,7 +45,7 @@ class RtpBitComponentsTest {
         RtpBitComponents.registerDefaults();
         List<BitComponent> registered = RtpBit.RUNNER.components();
 
-        assertEquals(4, RtpBitComponents.defaults().size());
+        assertEquals(5, RtpBitComponents.defaults().size());
         for (BitComponent expected : RtpBitComponents.defaults()) {
             BitComponent actual = registered.stream()
                     .filter(component -> component.id().equals(expected.id()))
@@ -86,6 +86,29 @@ class RtpBitComponentsTest {
     }
 
     @Test
+    @DisplayName("REQ-API-F-009 a prefix reserved by two owners reports BIT_NAMESPACE_CONFLICT")
+    void namespaceConflictIsAStartupError() {
+        io.github.dailystruggle.bit.BitCodeRegistry registry = new io.github.dailystruggle.bit.BitCodeRegistry();
+        registry.reserve("GUI", "LeafRTPGuiAddon");
+        registry.reserve("GUI", "LeafRTPGuiAddon");
+        registry.reserve("SHOP");
+        registry.reserve("SHOP", "ShopAddon");
+        assertEquals(BitHealth.HEALTHY, RtpBitComponents.namespaceReport(registry).health());
+
+        registry.reserve("GUI", "OtherGui");
+        BitReport report = RtpBitComponents.namespaceReport(registry);
+
+        assertEquals(BitHealth.FAILED, report.health());
+        assertEquals(1, report.findings().size());
+        var finding = report.findings().get(0);
+        assertEquals("BIT_NAMESPACE_CONFLICT", finding.code());
+        assertEquals("GUI", finding.path());
+        assertTrue(finding.message().contains("LeafRTPGuiAddon") && finding.message().contains("OtherGui"));
+        assertEquals(BitHealth.HEALTHY, RtpBitComponents.namespaceReport(RtpBitCodes.REGISTRY).health(),
+                "core namespaces must not conflict");
+    }
+
+    @Test
     void emptyActionSnapshotIsHealthy() throws Exception {
         Files.createDirectories(tempDir.resolve("definitions/actions"));
         ActionConfigLoader.loadActions(tempDir.toFile(), new ActionManager());
@@ -108,6 +131,17 @@ class RtpBitComponentsTest {
         assertEquals(Level.ERROR, failed.findings().get(0).severity());
         assertEquals(BitHealth.HEALTHY, passed.health());
         assertTrue(passed.findings().isEmpty());
+    }
+
+    @Test
+    void optionalUnavailableAnvilEngineIsInformationalAndHealthy() {
+        BitReport report = RtpBitComponents.bitReport("stub-optional", stub(false, BitHealth.DEGRADED), true);
+
+        assertEquals(BitHealth.HEALTHY, report.health());
+        assertEquals(1, report.findings().size());
+        assertEquals(io.github.dailystruggle.bit.BitCodes.OPTIONAL_UNAVAILABLE.key(),
+                report.findings().get(0).code());
+        assertEquals(Level.INFO, report.findings().get(0).severity());
     }
 
     @Test

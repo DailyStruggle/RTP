@@ -44,11 +44,11 @@ class MockProbeComponentsTest {
   }
 
   @Test
-  void probeNamespaceOwnsItsReservedBlock() {
-    assertEquals(4100, RtpBitCodes.PROBE.firstId());
-    assertEquals(4699, RtpBitCodes.PROBE.lastId());
-    assertTrue(RtpBitCodes.PROBE.containsId(TestStressCmd.STRESS_MOCKED.id()));
-    assertTrue(RtpBitCodes.PROBE.containsId(TestHologramCmd.CONSOLE_STATUS.id()));
+  void probeCodesCarryTheReservedNamespace() {
+    assertEquals("PROBE", TestStressCmd.STRESS_MOCKED.namespace());
+    assertEquals("PROBE", TestHologramCmd.CONSOLE_STATUS.namespace());
+    assertSame(TestStressCmd.STRESS_MOCKED, RtpBitCodes.REGISTRY.byId("PROBE", TestStressCmd.STRESS_MOCKED.id()).orElseThrow());
+    assertSame(TestHologramCmd.CONSOLE_STATUS, RtpBitCodes.REGISTRY.byId("PROBE", TestHologramCmd.CONSOLE_STATUS.id()).orElseThrow());
   }
 
   @Test

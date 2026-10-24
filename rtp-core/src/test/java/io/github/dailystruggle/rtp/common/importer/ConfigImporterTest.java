@@ -334,8 +334,8 @@ public class ConfigImporterTest {
         ConfigCmd configCmd = new ConfigCmd(null);
         configCmd.addCommands();
 
-        assertTrue(configCmd.getCommandLookup().containsKey("import"), "ConfigCmd must register 'import' subcommand");
-        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("import");
+        assertTrue(configCmd.getCommandLookup().containsKey("IMPORT"), "ConfigCmd must register 'import' subcommand");
+        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("IMPORT");
         assertNotNull(importCmd);
 
         // Execute auto-detect with no params
@@ -510,7 +510,7 @@ public class ConfigImporterTest {
 
         ConfigCmd configCmd = new ConfigCmd(null);
         configCmd.addCommands();
-        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("import");
+        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("IMPORT");
 
         Map<String, List<String>> params = new HashMap<>();
         params.put("source", List.of("betterrtp"));

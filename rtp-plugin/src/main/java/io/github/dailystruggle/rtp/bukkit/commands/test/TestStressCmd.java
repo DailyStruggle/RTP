@@ -17,7 +17,6 @@ import io.github.dailystruggle.rtp.api.RTPResult;
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -169,7 +168,6 @@ public class TestStressCmd extends BaseRTPCmdImpl {
             sideEffect,
             COMPONENT_TIMEOUT_MS,
             () -> ProbeBitReport.forProbe(id).build());
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

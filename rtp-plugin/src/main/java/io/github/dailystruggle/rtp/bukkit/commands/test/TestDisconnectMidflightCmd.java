@@ -10,7 +10,6 @@ import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.mock.MockPlayerSession;
@@ -153,7 +152,6 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
             BitSideEffect.NEEDS_WORLD,
             5_000,
             () -> ProbeBitReport.forProbe("disconnect-midflight").build());
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

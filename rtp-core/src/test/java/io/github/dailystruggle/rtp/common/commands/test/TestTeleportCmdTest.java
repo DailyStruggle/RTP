@@ -398,7 +398,7 @@ class TestTeleportCmdTest {
   @Test
   @DisplayName("ADR-121: teleport codes are registered in the TEST namespace")
   void codesAreRegistered() {
-    assertSame(TestTeleportCmd.TEST_TELEPORT_MOCKED, RtpBitCodes.REGISTRY.byId(3201).orElseThrow());
-    assertSame(TestTeleportCmd.TEST_TELEPORT_TIMEOUT, RtpBitCodes.REGISTRY.byId(3207).orElseThrow());
+    assertSame(TestTeleportCmd.TEST_TELEPORT_MOCKED, RtpBitCodes.REGISTRY.byId("TEST", 3201).orElseThrow());
+    assertSame(TestTeleportCmd.TEST_TELEPORT_TIMEOUT, RtpBitCodes.REGISTRY.byId("TEST", 3207).orElseThrow());
   }
 }

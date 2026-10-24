@@ -18,7 +18,6 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.bukkitplatform.commands.parameters.OnlinePlayerParameter;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
@@ -100,7 +99,6 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
             BitSideEffect.NEEDS_PLAYER,
             COMPONENT_TIMEOUT_MS,
             () -> ProbeBitReport.forProbe("hologram").build());
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

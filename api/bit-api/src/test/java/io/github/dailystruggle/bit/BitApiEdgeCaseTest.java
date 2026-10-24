@@ -102,7 +102,7 @@ class BitApiEdgeCaseTest {
         assertEquals(0L, new SimulatedClock().nanoTime());
 
         GateOutcomeCounter always = new GateOutcomeCounter();
-        always.record(true);
+        always.recordOutcome(true);
         assertEquals(GateOutcomeCounter.Outcome.ALWAYS_PASSED, always.outcome(1));
         assertEquals(1, always.passed());
     }

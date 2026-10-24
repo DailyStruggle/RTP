@@ -9,7 +9,7 @@ public final class GateOutcomeCounter {
     private final LongAdder evaluated = new LongAdder();
     private final LongAdder passed = new LongAdder();
 
-    public void record(boolean didPass) {
+    public void recordOutcome(boolean didPass) {
         evaluated.increment();
         if (didPass) passed.increment();
     }

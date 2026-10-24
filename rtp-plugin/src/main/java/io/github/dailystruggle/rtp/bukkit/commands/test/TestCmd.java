@@ -7,6 +7,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.test.TestAllCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestEventsCmd;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -106,7 +107,6 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new TestConfigSetCmd(this));
     addSubCommand(new TestCommandsCmd(this));
     addSubCommand(new TestApiCompatCmd(this));
-    addSubCommand(new TestCommandsCmd(this));
     addSubCommand(new EconomyIsolationTestJob(this));
     addSubCommand(new DisconnectTestJob(this));
     addSubCommand(new NetworkSimulationTestJob(this));
@@ -122,15 +122,18 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new TestTeleportCmd(this));
     addSubCommand(new TestTeleportHeatmapCmd(this));
     addSubCommand(new QueueStarvationTestJob(this));
-    addSubCommand(new EconomyIsolationTestJob(this));
     addSubCommand(new FoliaOwnershipTestJob(this));
-    addSubCommand(new DisconnectTestJob(this));
-    addSubCommand(new SafetyVerifierTestJob(this));
-    addSubCommand(new NetworkSimulationTestJob(this));
 
     // Bukkit-bound subcommands and `full` are registered by BukkitTestCmd,
     // so this class stays class-load-safe on Fabric.
     registerPlatformSpecificChildren();
+    // Probe classes only declare their components; this tree names the ones loaded on this
+    // platform, so Fabric and NeoForge list them in status/all without class-load side effects.
+    RtpBitCodes.initialiseOwners(
+        getCommandLookup().values().stream()
+            .<Class<?>>map(child -> child.getClass())
+            .distinct()
+            .collect(Collectors.toList()));
   }
 
   /**

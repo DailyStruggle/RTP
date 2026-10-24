@@ -28,7 +28,8 @@ class RtpBitCodeOwnersTest {
             for (Field field : owner.getDeclaredFields()) {
                 if (field.getType() != BitCode.class || !Modifier.isStatic(field.getModifiers())) continue;
                 BitCode code = (BitCode) field.get(null);
-                assertSame(code, registry.byId(code.id()).orElse(null), owner.getSimpleName() + "." + field.getName());
+                assertSame(code, registry.byId(code.namespace(), code.id()).orElse(null),
+                        owner.getSimpleName() + "." + field.getName());
                 assertSame(code, registry.byKey(code.key()).orElse(null), owner.getSimpleName() + "." + field.getName());
             }
         }

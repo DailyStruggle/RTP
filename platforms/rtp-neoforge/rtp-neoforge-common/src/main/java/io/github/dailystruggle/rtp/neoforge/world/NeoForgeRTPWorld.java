@@ -907,9 +907,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         // Ownership passes to the caller, which closes it from the poll loop.
         //noinspection resource
         TicketGenerationWatch watch = new TicketGenerationWatch(GenerationBudget.server(), () -> {
-            for (long footprintKey : missing) {
-                int footprintX = (int) footprintKey;
-                int footprintZ = (int) (footprintKey >> 32);
+            for (Long footprintKey : missing) {
+                long packed = footprintKey;
+                int footprintX = (int) packed;
+                int footprintZ = (int) (packed >> 32);
                 if (!cache.hasChunk(footprintX, footprintZ)) return false;
             }
             return true;
@@ -967,7 +968,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     }
 
     private static long chunkKey(int cx, int cz) {
-        return ((long) cx & 0xffffffffL) | ((long) cz << 32);
+        return (cx & 0xffffffffL) | ((long) cz << 32);
     }
 
     @Override

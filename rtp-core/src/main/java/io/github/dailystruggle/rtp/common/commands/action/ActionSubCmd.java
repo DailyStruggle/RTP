@@ -28,14 +28,22 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
     ActionManager.setCommandRegistrar(new ActionManager.ActionCommandRegistrar() {
       @Override
       public void onActionRegistered(ActionDefinition definition) {
-        if (definition.command().isConfigured() && RTPRuntime.serverAccessor() != null) {
+        if (definition.command().isConfigured()) {
+          String commandName = definition.command().name();
+          if (RTPRuntime.serverAccessor() == null) {
+            ActionManager.recordRegistrationFailure("command", definition.id(), commandName,
+                "RTP server accessor is unavailable");
+            return;
+          }
           try {
             ActionCommand actionCmd = new ActionCommand(definition);
             java.util.List<String> names = new java.util.ArrayList<>();
             names.add(definition.command().name());
             names.addAll(definition.command().aliases());
             RTPRuntime.serverAccessor().registerCommands(actionCmd, names.toArray(new String[0]));
+            ActionManager.clearRegistrationFailure("command", definition.id(), commandName);
           } catch (Exception e) {
+            ActionManager.recordRegistrationFailure("command", definition.id(), commandName, e.getMessage());
             RTPRuntime.log(java.util.logging.Level.WARNING, "[RTP Action] Failed registering command for action " + definition.id() + ": " + e.getMessage());
           }
         }

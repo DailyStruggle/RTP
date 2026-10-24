@@ -66,6 +66,21 @@ class TestApiCompatCmdTest {
   }
 
   @Test
+  void missingOptionalMethodIsWarningButNotAFailure() {
+    TestApiCompatCmd.ApiProbe optionalProbe =
+        new TestApiCompatCmd.ApiProbe("java.lang.String", "definitelyNotAMethod", List.of(), "optional", true);
+
+    TestApiCompatCmd.ProbeReport report = TestApiCompatCmd.runProbes(List.of(optionalProbe));
+
+    assertEquals(0, report.missingMethod.size());
+    assertEquals(1, report.missingOptional.size());
+    assertEquals(0, report.failures());
+    var finding = TestApiCompatCmd.toBitReport(report).findings().get(0);
+    assertEquals(TestApiCompatCmd.MISSING_OPTIONAL_METHOD.key(), finding.code());
+    assertEquals(java.lang.System.Logger.Level.WARNING, finding.severity());
+  }
+
+  @Test
   void runProbes_resolvesEveryPrimitiveParamType_andDeclaredMethods() {
     List<TestApiCompatCmd.ApiProbe> probes =
         List.of(

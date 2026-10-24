@@ -116,11 +116,11 @@ class BitApiContractTest {
         assertThrows(IllegalArgumentException.class, () -> counter.add(-1));
 
         GateOutcomeCounter outcomes = new GateOutcomeCounter();
-        outcomes.record(false);
+        outcomes.recordOutcome(false);
         assertEquals(GateOutcomeCounter.Outcome.INSUFFICIENT, outcomes.outcome(2));
-        outcomes.record(false);
+        outcomes.recordOutcome(false);
         assertEquals(GateOutcomeCounter.Outcome.NEVER_PASSED, outcomes.outcome(2));
-        outcomes.record(true);
+        outcomes.recordOutcome(true);
         assertEquals(GateOutcomeCounter.Outcome.MIXED, outcomes.outcome(2));
         assertThrows(IllegalArgumentException.class, () -> outcomes.outcome(0));
 

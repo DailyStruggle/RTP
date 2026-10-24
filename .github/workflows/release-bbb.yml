@@ -74,7 +74,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
@@ -130,7 +130,7 @@ jobs:
           echo "Prepared release version: ${VERSION} with tag: ${TAG}"
 
       - name: Set up JDK 21 and 25
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           java-version: |
             21
@@ -316,7 +316,7 @@ jobs:
       # no duplicate GitHub Release).
 
       - name: Generate SLSA Build Provenance (Pro jar)
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           # Only the Pro jar is published from this workflow (to BuiltByBit).
           # The Lite jar is attested by release.yml where it is published.
@@ -324,7 +324,7 @@ jobs:
             ${{ steps.artifacts.outputs.pro_jar }}
 
       - name: Archive Pro Release Deliverables
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: leaf-rtp-pro-deliverables
           path: |

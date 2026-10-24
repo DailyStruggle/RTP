@@ -24,11 +24,10 @@ import org.junit.jupiter.api.Test;
 @DisplayName("REQ-API-F-009 runtime probe components")
 class ProbeComponentsTest {
   @Test
-  void componentsAreRegisteredSafeAndUseTheirAssignedTestBlocks() throws Exception {
-    assertComponent(TestApiCompatCmd.class, "api-compat", 4000);
-    assertComponent(TestSchedulerCmd.class, "scheduler", 3400);
-    assertComponent(TestEventsCmd.class, "events", 3500);
-    assertTrue(RtpBitCodes.TEST.containsId(4001), "the approved API-compat block is in TEST");
+  void componentsAreRegisteredSafeAndCodesUseTheTestNamespace() throws Exception {
+    assertComponent(TestApiCompatCmd.class, "api-compat");
+    assertComponent(TestSchedulerCmd.class, "scheduler");
+    assertComponent(TestEventsCmd.class, "events");
   }
 
   @Test
@@ -74,7 +73,7 @@ class ProbeComponentsTest {
     assertTrue(output.contains(BitTableOutput.PREFIX), output);
   }
 
-  private static void assertComponent(Class<?> owner, String id, int blockStart) throws Exception {
+  private static void assertComponent(Class<?> owner, String id) throws Exception {
     BitComponent component = component(owner);
     assertEquals(id, component.id());
     assertEquals("test." + id, component.subsystem());
@@ -85,8 +84,8 @@ class ProbeComponentsTest {
     List<BitCode> codes = codes(owner);
     assertFalse(codes.isEmpty(), id + " must declare registered finding codes");
     for (BitCode code : codes) {
-      assertTrue(code.id() >= blockStart && code.id() < blockStart + 100, code.key());
-      assertTrue(RtpBitCodes.TEST.containsId(code.id()), code.key());
+      assertEquals("TEST", code.namespace(), code.key());
+      assertEquals(code, RtpBitCodes.REGISTRY.byId("TEST", code.id()).orElseThrow());
     }
   }
 

@@ -127,7 +127,6 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
   private static BitComponent registerComponent() {
     BitComponent component = new BitComponent("chunk-ticket", "test.chunk-ticket", BitTier.IBIT,
         BitSideEffect.NEEDS_WORLD, 60_000, () -> toBitReport(runProbe()));
-    RtpBit.RUNNER.register(component);
     return component;
   }
 

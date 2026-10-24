@@ -366,10 +366,11 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
   static Factory<?> ownedTypeFactoryForKey(String key) {
     if (key == null) return null;
     for (FactoryNames fn : FactoryNames.values()) {
-      if (fn == FactoryNames.singleConfig || fn == FactoryNames.multiConfig) continue;
-      if (!fn.name().equalsIgnoreCase(key)) continue;
-      Factory<?> factory = FactoryRegistry.get(fn);
-      if (factory != null) return factory;
+      if (fn != FactoryNames.singleConfig && fn != FactoryNames.multiConfig
+          && fn.name().equalsIgnoreCase(key)) {
+        Factory<?> factory = FactoryRegistry.get(fn);
+        if (factory != null) return factory;
+      }
     }
     return null;
   }
