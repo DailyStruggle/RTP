@@ -10,11 +10,19 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -69,6 +77,106 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   /**
+   * Returns the local region explicitly requested via {@code region:<name>} / {@code region=<name>}
+   * when the sender may use it and it carries a cooldown override; {@code null} otherwise.
+   * Permission mirrors the {@code region} parameter: {@code rtp.region}, plus
+   * {@code rtp.regions.<name>|*} when the region sets requirePermission. Network
+   * ({@code server:region}) and multi-value requests return {@code null}; compute() decides those.
+   *
+   * @param sender the command sender
+   * @param args   raw {@code /rtp} arguments, may be {@code null}
+   * @return the permitted requested region with a cooldown override, or {@code null}
+   */
+  static Region requestedRegionWithOverride(RTPCommandSender sender, String[] args) {
+    if (sender == null || args == null || ActiveSelection.get() == null) return null;
+    String regionName = null;
+    for (String a : args) {
+      if (a == null || a.length() < 7) continue;
+      String prefix = a.substring(0, 7).toLowerCase(Locale.ROOT);
+      if (!prefix.equals("region:") && !prefix.equals("region=")) continue;
+      if (regionName != null) return null;
+      regionName = a.substring(7).trim();
+    }
+    if (regionName == null || regionName.isEmpty()
+        || regionName.indexOf(',') >= 0 || regionName.indexOf(':') >= 0) {
+      return null;
+    }
+    Region region = ActiveSelection.get().getRegion(regionName);
+    if (region == null) return null;
+    RegionSettings settings = region.getSettings();
+    if (settings == null || settings.cooldownMillis() == null || settings.cooldownMillis() < 0) {
+      return null;
+    }
+    if (!sender.hasPermission("rtp.region")) return null;
+    if (settings.requirePermission()
+        && !sender.hasPermission("rtp.regions." + regionName)
+        && !sender.hasPermission("rtp.regions.*")) {
+      return null;
+    }
+    return region;
+  }
+
+  /**
+   * Resolves the world-default region a bare {@code /rtp} would target (as {@code compute()} does
+   * without a {@code region}/{@code world} argument), or {@code null} when it cannot be resolved.
+   *
+   * @param sender the command sender; only an {@link RTPPlayer} with a location resolves
+   * @return the sender's world-default region, or {@code null}
+   */
+  static Region worldDefaultRegion(RTPCommandSender sender) {
+    if (!(sender instanceof RTPPlayer player) || ActiveConfigs.get() == null || ActiveSelection.get() == null) {
+      return null;
+    }
+    var location = player.getLocation();
+    if (location == null || location.world() == null) return null;
+    ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(location.world().name());
+    if (worldParser == null) return null;
+    Object regionName = worldParser.getConfigValue(WorldKeys.region, "default");
+    return (regionName == null) ? null : ActiveSelection.get().getRegion(regionName.toString());
+  }
+
+  /**
+   * Remaining cooldown (ms) before {@code playerId} may teleport into {@code region}; 0 = allowed.
+   * A requested region with a cooldown override uses that override alone. An unrequested
+   * (world-default) region with an override passes once either its override or the global
+   * cooldown has expired: the shorter wait wins (RTP-32). Without an override the global
+   * cooldown applies. Region time falls back to {@code prior} when no per-region time is recorded.
+   *
+   * @param subject   sender whose permissions and global cooldown apply
+   * @param playerId  the teleported player
+   * @param region    destination region, may be {@code null} (global cooldown only)
+   * @param requested whether the region was named explicitly ({@code region:<name>})
+   * @param prior     the player's previous teleport data, may be {@code null}
+   * @param now       current epoch millis
+   * @return remaining milliseconds, never negative
+   */
+  static long cooldownRemaining(RTPCommandSender subject, UUID playerId, Region region,
+      boolean requested, TeleportData prior, long now) {
+    if (subject == null) return 0L;
+    long localLast = (prior != null && prior.time > 0L) ? prior.time : 0L;
+    long globalLast = Math.max(localLast, RTP.getSharedLastTeleportTime(playerId));
+    long globalRemaining = remainingAfter(RTP.getCooldown(subject, null), globalLast, now);
+    RegionSettings settings = (region == null) ? null : region.getSettings();
+    if (settings == null || settings.cooldownMillis() == null || settings.cooldownMillis() < 0) {
+      return globalRemaining;
+    }
+    long regionLast = RTP.getLastRegionTeleportTime(playerId, region.name);
+    if (regionLast <= 0L && prior != null && prior.completed
+        && (prior.targetRegion == null || region.name.equalsIgnoreCase(prior.targetRegion.name))) {
+      regionLast = prior.time;
+    }
+    long regionRemaining = remainingAfter(RTP.getCooldown(subject, settings), regionLast, now);
+    return requested ? regionRemaining : Math.min(regionRemaining, globalRemaining);
+  }
+
+  private static long remainingAfter(long cooldown, long last, long now) {
+    if (cooldown <= 0L || last <= 0L) return 0L;
+    long elapsed = now - last;
+    if (elapsed < 0L) return 0L; // clock skew: treat as elapsed, as the dt overflow guard did
+    return Math.max(0L, cooldown - elapsed);
+  }
+
+  /**
    * Resolves relative coordinate tokens (~, ~n, -~, -~n) against a base coordinate.
    * Tokens without ~ are parsed as absolute numbers.
    *
@@ -102,33 +210,33 @@ public interface RTPCmd extends BaseRTPCmd {
       if (rootActionRegistry != null) rootAction = rootActionRegistry.current();
     } catch (IllegalStateException coreNotLoaded) {
       // hooks facade not published yet (REQ-RTP-S-006); fall through to classic teleport.
-      RTP.log(Level.FINE, "[RTP-GUI] bare /rtp: hooks facade not published yet; "
+      RTPRuntime.log(Level.FINE, "[RTP-GUI] bare /rtp: hooks facade not published yet; "
               + "falling back to classic teleport for " + senderId);
       return false;
     }
     if (rootAction == null) {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
               "[RTP-GUI] bare /rtp: no root action bound; classic teleport for " + senderId);
       return false;
     }
     java.util.function.Consumer<String> feedback =
-            messageMethod != null ? messageMethod : (m -> RTP.serverAccessor.sendMessage(senderId, m));
-    RTP.log(Level.FINE, "[RTP-GUI] bare /rtp: invoking bound root action for " + senderId);
+            messageMethod != null ? messageMethod : (m -> RTPRuntime.serverAccessor().sendMessage(senderId, m));
+    RTPRuntime.log(Level.FINE, "[RTP-GUI] bare /rtp: invoking bound root action for " + senderId);
     boolean handled = false;
     try {
       handled = rootAction.run(senderId, feedback);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
               "[RTP] bound /rtp root action threw; unbinding it and resetting to the"
                       + " classic teleport so future invocations are not affected", t);
       clearFailedRootAction();
     }
-    RTP.log(Level.FINE,
+    RTPRuntime.log(Level.FINE,
             "[RTP-GUI] bare /rtp: root action handled=" + handled + " for " + senderId);
     if (handled && releaseProcessingLock && !senderId.equals(CommandsAPI.serverId)) {
       // Release the processingPlayers lock the outer onCommand acquired, so the
       // GUI-handled bare /rtp does not leave the player flagged "busy".
-      RTP.getInstance().processingPlayers.remove(senderId);
+      TeleportSessions.current().processingPlayers.remove(senderId);
     }
     return handled;
   }
@@ -143,11 +251,11 @@ public interface RTPCmd extends BaseRTPCmd {
               io.github.dailystruggle.rtp.api.RTPAPI.hooks().rootAction();
       if (registry != null) {
         registry.clear();
-        RTP.log(Level.INFO,
+        RTPRuntime.log(Level.INFO,
                 "[RTP] unbound failing /rtp root action; bare /rtp reset to the classic teleport");
       }
     } catch (Throwable clearError) {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
               "[RTP] could not unbind the failing /rtp root action", clearError);
     }
   }
@@ -160,7 +268,7 @@ public interface RTPCmd extends BaseRTPCmd {
         java.util.function.Consumer<String> messageMethod = sender::sendMessage;
 
         if (RTP.reloading.get()) {
-            String msg = (String) RTP.configs.getConfigValue(PlayerMessages.busy, "");
+            String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.busy, "");
             messageMethod.accept(msg);
             return true;
         }
@@ -168,7 +276,7 @@ public interface RTPCmd extends BaseRTPCmd {
     // ------------------------D--------------------------------------------------------------------------------------
     // guard command perms with custom message
     if (!sender.hasPermission("rtp.use")) {
-      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.noPerms, "");
+      String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.noPerms, "");
       messageMethod.accept(msg);
       return true;
     }
@@ -207,7 +315,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
     // --------------------------------------------------------------------------------------------------------------
     // guard last teleport time synchronously to prevent spam
-    TeleportData senderData = RTP.getInstance().latestTeleportData.get(senderId);
+    TeleportData senderData = TeleportSessions.current().latestTeleportData.get(senderId);
 
     if (senderData != null) {
       if (senderData.sender == null) {
@@ -232,16 +340,23 @@ public interface RTPCmd extends BaseRTPCmd {
         }
       }
 
-      if (!hasSubCommand && !hasTargetArg) {
-        long cd = sender.cooldown();
-        if (dt < cd) {
-          String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
+      // Same rules as compute() (cooldownRemaining): a permitted requested region with an override
+      // uses that override; bare /rtp uses the shorter of global and world-default override.
+      // Other target args are left to compute().
+      Region requestedRegion = hasSubCommand ? null : requestedRegionWithOverride(sender, args);
+      if (!hasSubCommand && (!hasTargetArg || requestedRegion != null)) {
+        Region guardRegion = (requestedRegion != null) ? requestedRegion : worldDefaultRegion(sender);
+        long remaining = cooldownRemaining(sender, senderId, guardRegion, requestedRegion != null,
+            senderData, System.currentTimeMillis());
+        if (remaining > 0L) {
+          String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.cooldownMessage, "");
           messageMethod.accept(msg);
-          RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT cooldown senderId=" + senderId
-                  + " dtMs=" + dt + " cooldownMs=" + cd);
+          RTPRuntime.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT cooldown senderId=" + senderId
+                  + " dtMs=" + dt + " remainingMs=" + remaining
+                  + " region=" + (guardRegion == null ? "null" : guardRegion.name));
           return true;
         } else if (senderData.completed) { // resolve command bugs preemptively
-          RTP.getInstance().processingPlayers.remove(senderId);
+          TeleportSessions.current().processingPlayers.remove(senderId);
         }
       }
     }
@@ -252,17 +367,18 @@ public interface RTPCmd extends BaseRTPCmd {
     // TeleportPipelineTask; here we only reject when the player is already locked out.
     if (!hasSubCommand && !sender.hasPermission("rtp.nolock")) {
       ConfigParser<ConfigKeys> cfg =
-              (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+              (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       if (cfg != null) {
         long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
         if (cap > 0) {
           long resetMillis =
-                  cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
-          if (RTP.getInstance().teleportLimitStore.isLocked(
+                  ConfigParser.parseSecondsDurationMillis(
+                          cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
+          if (ActiveDatabase.teleportLimitStore().isLocked(
                   senderId, cap, resetMillis, System.currentTimeMillis())) {
-            String msg = (String) RTP.configs.getConfigValue(PlayerMessages.lockedAfterUses, "");
+            String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.lockedAfterUses, "");
             messageMethod.accept(msg);
-            RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT lockAfterUses senderId="
+            RTPRuntime.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT lockAfterUses senderId="
                     + senderId + " cap=" + cap);
             return true;
           }
@@ -271,20 +387,20 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     if (RTP.reloading.get()) {
-      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.teleportDeniedReloading, "");
+      String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.teleportDeniedReloading, "");
       messageMethod.accept(msg);
-      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT reloading senderId=" + senderId);
+      RTPRuntime.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT reloading senderId=" + senderId);
       return true;
     }
 
-    if (!hasSubCommand && RTP.getInstance().processingPlayers.contains(senderId)) {
-      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.alreadyTeleporting, "");
+    if (!hasSubCommand && TeleportSessions.current().processingPlayers.contains(senderId)) {
+      String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.alreadyTeleporting, "");
       messageMethod.accept(msg);
-      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT alreadyTeleporting senderId=" + senderId);
+      RTPRuntime.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT alreadyTeleporting senderId=" + senderId);
       return true;
     }
 
-    if (!hasSubCommand && !senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
+    if (!hasSubCommand && !senderId.equals(CommandsAPI.serverId)) TeleportSessions.current().processingPlayers.add(senderId);
 
     java.util.function.Consumer<String> effectiveMsg = (messageMethod != null) ? messageMethod : msg -> {};
     try {
@@ -292,31 +408,31 @@ public interface RTPCmd extends BaseRTPCmd {
           .whenComplete((aBoolean, throwable) -> {
             if (throwable != null || Boolean.FALSE.equals(aBoolean)) {
               if (throwable != null) {
-                RTP.log(Level.WARNING, throwable.getMessage(), throwable);
+                RTPRuntime.log(Level.WARNING, throwable.getMessage(), throwable);
               }
-              RTP.getInstance().processingPlayers.remove(senderId);
+              TeleportSessions.current().processingPlayers.remove(senderId);
             }
           });
     } catch (Throwable throwable) {
-      RTP.log(Level.WARNING, throwable.getMessage(), throwable);
-      RTP.getInstance().processingPlayers.remove(senderId);
+      RTPRuntime.log(Level.WARNING, throwable.getMessage(), throwable);
+      TeleportSessions.current().processingPlayers.remove(senderId);
     }
     return true;
   }
 
   @Override
   default boolean onCommand(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand, java.util.function.Consumer<String> messageMethod) {
-    RTP.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) ENTER senderId=" + senderId
+    RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) ENTER senderId=" + senderId
             + " rtpArgs=" + rtpArgs
             + " nextCommand=" + (nextCommand == null ? "null" : nextCommand.name())
             + " thread=" + Thread.currentThread().getName());
     if (nextCommand != null) {
-      RTP.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) returning early (nextCommand != null)");
+      RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) returning early (nextCommand != null)");
       return true;
     }
 
     boolean res = compute(senderId, rtpArgs, nextCommand, messageMethod);
-    RTP.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) compute returned " + res);
+    RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) compute returned " + res);
     return res;
   }
 
@@ -341,10 +457,10 @@ public interface RTPCmd extends BaseRTPCmd {
 
     if (senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {
       if(messageMethod != null) {
-        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.consoleCmdNotAllowed, "");
+        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.consoleCmdNotAllowed, "");
         messageMethod.accept(msg);
       }
-      else RTP.serverAccessor.sendMessage(senderId, PlayerMessages.consoleCmdNotAllowed);
+      else RTPRuntime.serverAccessor().sendMessage(senderId, PlayerMessages.consoleCmdNotAllowed);
       return true;
     }
 
@@ -356,18 +472,18 @@ public interface RTPCmd extends BaseRTPCmd {
     // or Local (fall through unchanged). S-004: hook throws degrade to
     // local fall-through with a WARNING log, never silent-swallow.
     if (!senderId.equals(new java.util.UUID(0, 0))) {
-      io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = RTP.networkCommandHook;
+      io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = NetworkHooks.commandHook();
       if (hook != null && hook != io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
         io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult decision;
         try {
           decision = hook.route(senderId, rtpArgs);
         } catch (Throwable t) {
-          RTP.log(Level.WARNING,
+          RTPRuntime.log(Level.WARNING,
                   "[RTP] command hook threw; falling back to local pipeline: " + t.getMessage(), t);
           decision = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.local();
         }
         if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.CrossServer cross) {
-          String tmpl = (String) RTP.configs.getConfigValue(NetworkMessages.networkQueued, "");
+          String tmpl = (String) ActiveConfigs.get().getConfigValue(NetworkMessages.networkQueued, "");
           // Empty-template fallback: a stale messages.yml (pre-network-mode
           // install missing the new key) must NEVER produce silent
           // dispatch, otherwise the player sees no response and spams
@@ -382,7 +498,7 @@ public interface RTPCmd extends BaseRTPCmd {
                   .replace("[region]", cross.regionKey().orElse(""))
                   .replace("[server]", cross.serverHint().orElse(""));
           if (messageMethod != null) messageMethod.accept(msg);
-          else RTP.serverAccessor.sendMessage(senderId, msg);
+          else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
           // Retain processingPlayers lock for cross-server queue as anti-spam guard.
           // Released on disconnect, shutdown, or via terminal status listeners.
           return true;
@@ -390,17 +506,17 @@ public interface RTPCmd extends BaseRTPCmd {
         if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {
           Enum<?> key = Messages.byName(reject.messageKey());
           if (key == null) key = NetworkMessages.networkRegionUnavailable;
-          String tmpl = (String) RTP.configs.getConfigValue(key, "");
+          String tmpl = (String) ActiveConfigs.get().getConfigValue(key, "");
           String msg = tmpl == null ? "" : tmpl
                   .replace("[region]", reject.placeholder())
                   .replace("[reason]", reject.placeholder());
           if (!msg.isEmpty()) {
             if (messageMethod != null) messageMethod.accept(msg);
-            else RTP.serverAccessor.sendMessage(senderId, msg);
+            else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
           }
           // Release the processingPlayers lock acquired by the outer
           // onCommand. See CrossServer branch comment above.
-          if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.remove(senderId);
+          if (!senderId.equals(CommandsAPI.serverId)) TeleportSessions.current().processingPlayers.remove(senderId);
           return true;
         }
         // RoutingResult.Local -> fall through to local pipeline
@@ -408,8 +524,8 @@ public interface RTPCmd extends BaseRTPCmd {
     }
     // --- end cross-server hook -----------------------------------------------
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
-    RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute ENTER senderId=" + senderId
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
+    RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute ENTER senderId=" + senderId
             + " senderName=" + (sender != null ? sender.name() : "null")
             + " args=" + rtpArgs
             + " thread=" + Thread.currentThread().getName());
@@ -428,41 +544,41 @@ public interface RTPCmd extends BaseRTPCmd {
         pvpAction = io.github.dailystruggle.rtp.common.pvp.PvPGate.evaluate(senderId);
       } catch (Throwable t) {
         // Defensive: the gate is fail-open, but guard the call site too.
-        RTP.log(Level.WARNING, "[RTP] PvP gate evaluation threw; allowing teleport", t);
+        RTPRuntime.log(Level.WARNING, "[RTP] PvP gate evaluation threw; allowing teleport", t);
         pvpAction = io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW;
       }
       if (pvpAction != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW) {
         // DENY / CANCEL / DELAY all collapse to "refuse this new request" at the
         // pre-dispatch surface (there is no in-progress teleport to abort yet).
-        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.pvpInCombat,
+        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.pvpInCombat,
                 "&c[RTP] You cannot use /rtp while in combat.");
         if (msg != null && !msg.isEmpty()) {
           if (messageMethod != null) messageMethod.accept(msg);
-          else RTP.serverAccessor.sendMessage(senderId, PlayerMessages.pvpInCombat);
+          else RTPRuntime.serverAccessor().sendMessage(senderId, PlayerMessages.pvpInCombat);
         }
         // S-004: the refusal is never silent.
-        RTP.log(Level.WARNING, "[RTP] PvP gate refused /rtp for " + senderId
+        RTPRuntime.log(Level.WARNING, "[RTP] PvP gate refused /rtp for " + senderId
                 + " (action=" + pvpAction + ", in combat)");
         // Terminal refuse: release the lock the outer onCommand acquired.
-        RTP.getInstance().processingPlayers.remove(senderId);
+        TeleportSessions.current().processingPlayers.remove(senderId);
         return true;
       } else if (io.github.dailystruggle.rtp.common.pvp.PvPGate.isEnabled()
               && io.github.dailystruggle.rtp.common.pvp.PvPGate.isInCombat(senderId)) {
         // ALLOW-and-audit: operator wants visibility without changing behaviour.
-        RTP.log(Level.INFO, "[RTP] PvP gate: " + senderId
+        RTPRuntime.log(Level.INFO, "[RTP] PvP gate: " + senderId
                 + " is in combat but pvpOnCombat=ALLOW; permitting /rtp");
       }
     }
     // --- end PvP gate --------------------------------------------------------
 
-    if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
+    if (!senderId.equals(CommandsAPI.serverId)) TeleportSessions.current().processingPlayers.add(senderId);
 
     List<String> toggletargetpermsList = rtpArgs.get("toggletargetperms");
     boolean toggleTargetPerms =
         toggletargetpermsList != null && Boolean.parseBoolean(toggletargetpermsList.get(0));
 
     ConfigParser<LoggingKeys> logging =
-        (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
     boolean verbose = false;
     if (logging != null) {
       Object o = logging.getConfigValue(LoggingKeys.command, false);
@@ -474,13 +590,13 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     if (verbose) {
-      RTP.log(Level.INFO, "#0080ff[RTP] RTP command triggered by " + sender.name() + ".");
+      RTPRuntime.log(Level.INFO, "#0080ff[RTP] RTP command triggered by " + sender.name() + ".");
     }
 
     ConfigParser<EconomyKeys> eco =
-        (ConfigParser<EconomyKeys>) RTP.configs.getParser(EconomyKeys.class);
+        (ConfigParser<EconomyKeys>) ActiveConfigs.get().getParser(EconomyKeys.class);
     ConfigParser<PerformanceKeys> perf =
-        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     boolean syncLoading = false;
     Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
     if (configValue instanceof String) {
@@ -496,15 +612,15 @@ public interface RTPCmd extends BaseRTPCmd {
       List<String> playerNames = rtpArgs.get("player");
       for (String playerName : playerNames) {
         // double check the player is still valid by the time we get here
-        RTPPlayer p = RTP.serverAccessor.getPlayer(playerName);
+        RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(playerName);
         if (p == null) {
           String msg =
               (String)
-                  RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
+                  ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
           msg = msg.replace("[arg]", "player=" + playerName);
           if(messageMethod != null) messageMethod.accept(msg);
-          else RTP.serverAccessor.sendMessage(senderId, msg);
-          RTP.log(Level.WARNING, msg);
+          else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
+          RTPRuntime.log(Level.WARNING, msg);
           continue;
         }
 
@@ -515,10 +631,10 @@ public interface RTPCmd extends BaseRTPCmd {
       players = new ArrayList<>(1);
       players.add((RTPPlayer) sender);
     } else { // if no players and sender isn't a player, idk who to send
-      String msg = (String) RTP.configs.getConfigValue(PlayerMessages.consoleCmdNotAllowed, "");
+      String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.consoleCmdNotAllowed, "");
       if(messageMethod != null) messageMethod.accept(msg);
       failEvent(sender, msg);
-      RTP.getInstance().processingPlayers.remove(senderId);
+      TeleportSessions.current().processingPlayers.remove(senderId);
       return true;
     }
 
@@ -526,7 +642,7 @@ public interface RTPCmd extends BaseRTPCmd {
     List<String> shapeNames = rtpArgs.get("shape");
     List<String> vertNames = rtpArgs.get("vert");
     double price = 0.0;
-    RTPEconomy economy = RTP.economy;
+    RTPEconomy economy = RTPRuntime.economy();
     if (economy != null) {
       if (!senderId.equals(CommandsAPI.serverId) && !sender.hasPermission("rtp.free")) {
         for (RTPPlayer player : players) {
@@ -542,11 +658,11 @@ public interface RTPCmd extends BaseRTPCmd {
       double bal = economy.bal(senderId);
       double floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0d).doubleValue();
       if ((bal - price) < floor) {
-        String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
+        String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
         s = s.replace("[money]", String.valueOf(price));
         if(messageMethod != null) messageMethod.accept(s);
-        else RTP.serverAccessor.sendMessage(senderId, s);
-        RTP.getInstance().processingPlayers.remove(senderId);
+        else RTPRuntime.serverAccessor().sendMessage(senderId, s);
+        TeleportSessions.current().processingPlayers.remove(senderId);
         return true;
       }
     }
@@ -558,19 +674,19 @@ public interface RTPCmd extends BaseRTPCmd {
       RTPPlayer player = players.get(i);
 
       if (verbose && rtpArgs.containsKey("player")) {
-        RTP.log(Level.INFO, "#0080ff[RTP] RTP processing player:" + player.name());
+        RTPRuntime.log(Level.INFO, "#0080ff[RTP] RTP processing player:" + player.name());
       }
 
       // get their data
-      TeleportData data = RTP.getInstance().latestTeleportData.get(player.uuid());
-      RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute per-player loop playerId=" + player.uuid()
+      TeleportData data = TeleportSessions.current().latestTeleportData.get(player.uuid());
+      RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute per-player loop playerId=" + player.uuid()
               + " priorData=" + (data == null ? "null" : ("completed=" + data.completed + " age=" + (System.currentTimeMillis() - data.time) + "ms")));
       // if player has an incomplete teleport
       if (data != null) {
         if (!data.completed) {
-          RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId=" + player.uuid() + " -> skipping pipeline (sending alreadyTeleporting message via serverAccessor)");
-          String msg = (String) RTP.configs.getConfigValue(PlayerMessages.alreadyTeleporting, "");
-          RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
+          RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId=" + player.uuid() + " -> skipping pipeline (sending alreadyTeleporting message via serverAccessor)");
+          String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.alreadyTeleporting, "");
+          RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), msg);
           failEvent(sender, msg);
           continue;
         }
@@ -580,18 +696,19 @@ public interface RTPCmd extends BaseRTPCmd {
           long dt = (lastTpTime > 0) ? (System.currentTimeMillis() - lastTpTime) : (System.currentTimeMillis() - data.time);
           if (dt < 0) dt = Long.MAX_VALUE + dt;
           if (dt < player.cooldown()) {
-            RTP.serverAccessor.sendMessage(senderId, player.uuid(), PlayerMessages.cooldownMessage);
+            RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), PlayerMessages.cooldownMessage);
             continue;
           }
         }
 
-        RTP.getInstance().priorTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().priorTeleportData.put(player.uuid(), data);
       }
 
+      TeleportData prior = data;
       data = new TeleportData();
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(data, "TeleportData-" + player.uuid().toString(), 120000L);
       data.sender = sender;
-      RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+      TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
       String regionName;
       List<String> regionNames = rtpArgs.get("region");
@@ -609,17 +726,17 @@ public interface RTPCmd extends BaseRTPCmd {
           worldName = player.getLocation().world().name();
         }
 
-        ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(worldName);
+        ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(worldName);
 
         if (worldParser == null) {
-          String msg = (String) RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
+          String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
           msg = msg.replace("[arg]", "world=" + worldName);
           if(messageMethod != null) messageMethod.accept(msg);
-          else RTP.serverAccessor.sendMessage(senderId, msg);
-          RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg world senderId=" + senderId
+          else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
+          RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg world senderId=" + senderId
                   + " worldName=" + worldName);
-          RTP.log(Level.WARNING, msg);
-          RTP.getInstance().processingPlayers.remove(senderId);
+          RTPRuntime.log(Level.WARNING, msg);
+          TeleportSessions.current().processingPlayers.remove(senderId);
           return true;
         }
 
@@ -639,7 +756,7 @@ public interface RTPCmd extends BaseRTPCmd {
                   senderId, requestedBiome, regionName);
           if (resolved != null) {
             if (!resolved.equals(regionName)) {
-              RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute auto-region by biome senderId="
+              RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute auto-region by biome senderId="
                   + senderId + " biome=" + requestedBiome + " worldDefaultRegion=" + regionName
                   + " -> resolvedRegion=" + resolved);
             }
@@ -648,22 +765,22 @@ public interface RTPCmd extends BaseRTPCmd {
         }
       }
 
-      SelectionAPI selectionAPI = RTP.selectionAPI;
+      SelectionAPI selectionAPI = ActiveSelection.get();
 
       Region region;
       try {
         region = selectionAPI.getRegionOrDefault(regionName);
-        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute region resolved senderId=" + senderId
+        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute region resolved senderId=" + senderId
                 + " requestedRegion=" + regionName + " resolvedRegion=" + region.name);
       } catch (IllegalArgumentException | IllegalStateException exception) {
-        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
+        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
         msg = msg.replace("[arg]", "region=" + regionName);
-        RTP.serverAccessor.sendMessage(senderId, msg);
-        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg region senderId=" + senderId
+        RTPRuntime.serverAccessor().sendMessage(senderId, msg);
+        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg region senderId=" + senderId
                 + " regionName=" + regionName + " cause=" + exception.getClass().getSimpleName());
-        RTP.log(Level.WARNING, msg);
-        RTP.getInstance().processingPlayers.remove(senderId);
-        RTP.getInstance().latestTeleportData.remove(senderId);
+        RTPRuntime.log(Level.WARNING, msg);
+        TeleportSessions.current().processingPlayers.remove(senderId);
+        TeleportSessions.current().latestTeleportData.remove(senderId);
         return true;
       }
 
@@ -674,7 +791,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (worldOverride != null && !worldOverride.isEmpty()) {
           Region worldRegion = selectionAPI.worldRegion(region.name, worldOverride);
           if (worldRegion != null && worldRegion != region) {
-            RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute world-override senderId=" + senderId
+            RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute world-override senderId=" + senderId
                 + " baseRegion=" + region.name + " world=" + worldOverride
                 + " -> region=" + worldRegion.name);
             region = worldRegion;
@@ -684,12 +801,12 @@ public interface RTPCmd extends BaseRTPCmd {
 
       RTPWorld rtpWorld = region.getWorld();
       if (rtpWorld == null) {
-        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
+        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
         msg = msg.replace("[arg]", "region=" + regionName);
-        RTP.serverAccessor.sendMessage(senderId, msg);
-        RTP.log(Level.WARNING, msg);
-        RTP.getInstance().processingPlayers.remove(senderId);
-        RTP.getInstance().latestTeleportData.remove(senderId);
+        RTPRuntime.serverAccessor().sendMessage(senderId, msg);
+        RTPRuntime.log(Level.WARNING, msg);
+        TeleportSessions.current().processingPlayers.remove(senderId);
+        TeleportSessions.current().latestTeleportData.remove(senderId);
         return true;
       }
 
@@ -702,39 +819,23 @@ public interface RTPCmd extends BaseRTPCmd {
 
         if (doWBO) {
           region = region.clone();
-          region.set(RegionKeys.shape, RTP.serverAccessor.getShape(rtpWorld.name()));
+          region.set(RegionKeys.shape, RTPRuntime.serverAccessor().getShape(rtpWorld.name()));
         }
       }
 
       // Cooldown guard:
       RTPCommandSender cooldownSubject = (toggleTargetPerms) ? player : sender;
-      RegionSettings regSettings = region.getSettings();
-      boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
-      long targetCooldown = RTP.getCooldown(cooldownSubject, regSettings);
-      if (targetCooldown > 0) {
-        long lastTpTime;
-        if (hasRegionOverride) {
-          lastTpTime = RTP.getLastRegionTeleportTime(player.uuid(), region.name);
-        } else if (data != null && data.time > 0) {
-          lastTpTime = data.time;
-        } else {
-          lastTpTime = RTP.getEffectiveLastTeleportTime(player.uuid());
-        }
-        if (hasRegionOverride && lastTpTime <= 0L && data != null && data.completed && (data.targetRegion == null || region.name.equalsIgnoreCase(data.targetRegion.name))) {
-          lastTpTime = data.time;
-        }
-        if (lastTpTime > 0L) {
-          long dtReg = System.currentTimeMillis() - lastTpTime;
-          if (dtReg < 0) dtReg = Long.MAX_VALUE + dtReg;
-          if (dtReg < targetCooldown) {
-            String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
-            if (messageMethod != null) messageMethod.accept(msg);
-            else RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
-            RTP.getInstance().processingPlayers.remove(senderId);
-            RTP.getInstance().latestTeleportData.remove(player.uuid());
-            return true;
-          }
-        }
+      // Requested region -> its override; world-default region -> shorter of override and global.
+      // Measured against the previous teleport (prior), not the TeleportData created above.
+      long remainingCooldown = RTPCmd.cooldownRemaining(cooldownSubject, player.uuid(), region,
+          rtpArgs.containsKey("region"), prior, System.currentTimeMillis());
+      if (remainingCooldown > 0L) {
+        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.cooldownMessage, "");
+        if (messageMethod != null) messageMethod.accept(msg);
+        else RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), msg);
+        TeleportSessions.current().processingPlayers.remove(senderId);
+        TeleportSessions.current().latestTeleportData.remove(player.uuid());
+        return true;
       }
 
       // Sender charge. Routes through the single EconomyGate so the price math,
@@ -757,10 +858,10 @@ public interface RTPCmd extends BaseRTPCmd {
                 shapeNames != null || vertNames != null || doWBO, biomeList != null);
         if (senderCharge.result()
             == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
-          String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
+          String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, s);
-          RTP.getInstance().processingPlayers.remove(senderId);
+          RTPRuntime.serverAccessor().sendMessage(senderId, s);
+          TeleportSessions.current().processingPlayers.remove(senderId);
           return true;
         }
         data.cost += senderCharge.cost();
@@ -781,10 +882,10 @@ public interface RTPCmd extends BaseRTPCmd {
                 shapeNames != null || vertNames != null || doWBO, biomeList != null);
         if (targetCharge.result()
             == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
-          String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
+          String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, player.uuid(), s);
-          RTP.getInstance().processingPlayers.remove(senderId);
+          RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), s);
+          TeleportSessions.current().processingPlayers.remove(senderId);
           return true;
         }
         data.cost += targetCharge.cost();
@@ -811,13 +912,13 @@ public interface RTPCmd extends BaseRTPCmd {
         for (int j = 0; j < 1 && shapeNames != null && !shapeNames.isEmpty(); j++) {
           Shape<?> originalShape = region.getShape();
 
-          RTP.selectionAPI.tempRegions.put(senderId, region);
+          ActiveSelection.get().tempRegions.put(senderId, region);
           String shapeName = pickOne(shapeNames, "CIRCLE");
 
-          Factory<?> factory = RTP.factoryMap.get(RTP.factoryNames.shape);
+          Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
           FactoryValue<?> factoryValue = factory.get(shapeName);
           if (!(factoryValue instanceof Shape<?>)) {
-            RTP.log(
+            RTPRuntime.log(
                 Level.SEVERE,
                 "",
                 new IllegalArgumentException("shape factory did not return a shape"));
@@ -870,7 +971,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 } else if (parsedDist != null) {
                   double worldBorderRad = 0.0;
                   try {
-                    Object wbObj = RTP.serverAccessor.getWorldBorder(rtpWorld.name());
+                    Object wbObj = RTPRuntime.serverAccessor().getWorldBorder(rtpWorld.name());
                     if (wbObj instanceof io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder wb
                         && wb.getShape() != null
                         && wb.getShape().get() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square bs) {
@@ -882,7 +983,7 @@ public interface RTPCmd extends BaseRTPCmd {
                   }
                   io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance interpreted =
                       io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.autoInterpret(
-                          parsedDist, worldBorderRad, name);
+                          parsedDist, worldBorderRad, name, msg -> RTPRuntime.log(Level.INFO, msg));
                   if (interpreted != null && interpreted.unit() != io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK) {
                     double chunks = interpreted.toChunks();
                     value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
@@ -935,7 +1036,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
       TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, biomes), region);
       data.nextTask = pipelineTask;
-      RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute TeleportPipelineTask constructed playerId=" + player.uuid()
+      RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute TeleportPipelineTask constructed playerId=" + player.uuid()
               + " region=" + region.name
               + " biomes=" + biomes
               + " syncLoading=" + syncLoading);
@@ -943,8 +1044,8 @@ public interface RTPCmd extends BaseRTPCmd {
       long delay = RTP.getDelay((toggleTargetPerms) ? player : sender, region.getSettings());
       data.delay = delay;
       if (delay > 0) {
-        String msg = RTP.configs.getConfigValue(PlayerMessages.delayMessage, "").toString();
-        RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
+        String msg = ActiveConfigs.get().getConfigValue(PlayerMessages.delayMessage, "").toString();
+        RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), msg);
       }
 
       if (!syncLoading) {
@@ -953,18 +1054,18 @@ public interface RTPCmd extends BaseRTPCmd {
 
       if (player.uuid().equals(senderId)) senderDispatched = true;
       if (syncLoading) {
-        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute SUBMIT pipelineTask SYNC playerId=" + player.uuid());
+        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute SUBMIT pipelineTask SYNC playerId=" + player.uuid());
         region.inFlightCalculations.incrementAndGet();
         pipelineTask.run();
       } else {
-        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute SUBMIT pipelineTask ASYNC playerId=" + player.uuid());
+        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute SUBMIT pipelineTask ASYNC playerId=" + player.uuid());
         region.inFlightCalculations.incrementAndGet();
-        RTP.scheduler.runTaskAsynchronously(pipelineTask);
+        RTPRuntime.scheduler().runTaskAsynchronously(pipelineTask);
       }
     }
 
     if (!senderDispatched && !senderId.equals(CommandsAPI.serverId)) {
-      RTP.getInstance().processingPlayers.remove(senderId);
+      TeleportSessions.current().processingPlayers.remove(senderId);
     }
     return true;
   }

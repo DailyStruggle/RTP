@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.trigger;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -33,13 +33,13 @@ public class TriggerSubCmd extends BaseTriggerCmd {
 
   @Override
   protected boolean execute(UUID senderId, Map<String, List<String>> parameterValues) {
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
     if (sender == null || (!sender.hasPermission("rtp.trigger") && !sender.hasPermission("rtp.*"))) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] You don't have permission to manage triggers.");
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] You don't have permission to manage triggers.");
       return true;
     }
 
-    RTP.serverAccessor.sendMessage(
+    RTPRuntime.serverAccessor().sendMessage(
         senderId, senderId, "[RTP] Usage: /rtp trigger <create|remove|list> [args...]");
     return true;
   }

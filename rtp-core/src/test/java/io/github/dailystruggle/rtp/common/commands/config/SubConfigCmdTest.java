@@ -9,6 +9,7 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.parameters.*;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -16,6 +17,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
@@ -40,9 +42,9 @@ public class SubConfigCmdTest {
     @BeforeEach
     void setUp() throws Exception {
         RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
 
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
 
         mockDb = mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
         Field cachedLookupField = io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class.getDeclaredField("cachedLookup");

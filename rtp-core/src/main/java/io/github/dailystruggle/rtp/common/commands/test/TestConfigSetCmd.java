@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,20 +45,20 @@ public class TestConfigSetCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    if (RTP.scheduler == null || RTP.configs == null) {
+    if (RTPRuntime.scheduler() == null || ActiveConfigs.get() == null) {
       String msg = "&c[RTP test/config-set] core not yet loaded (scheduler or configs null)";
       report(callerId, msg, Level.WARNING, null);
       return false;
     }
 
-    RTP.scheduler.runTaskAsynchronously(() -> runProbe(callerId));
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> runProbe(callerId));
     return true;
   }
 
   @SuppressWarnings("unchecked")
   private void runProbe(UUID callerId) {
     ConfigParser<PerformanceKeys> parser =
-        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     if (parser == null) {
       report(callerId, "&c[RTP test/config-set] PerformanceKeys parser not found", Level.WARNING, null);
       return;
@@ -140,12 +141,12 @@ public class TestConfigSetCmd extends BaseRTPCmdImpl {
 
   private void report(UUID callerId, String msg, Level level, Throwable t) {
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
     if (t != null) {
-      RTP.log(level, msg, t);
+      RTPRuntime.log(level, msg, t);
     } else {
-      RTP.log(level, msg);
+      RTPRuntime.log(level, msg);
     }
   }
 }

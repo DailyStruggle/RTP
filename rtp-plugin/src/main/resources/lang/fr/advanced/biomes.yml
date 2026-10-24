@@ -1,5 +1,5 @@
 # --- RTP Biome Filter (advanced) ---
-# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Documentation: docs/admin/configuration/SAFETY.md
 
 # Split out of safety.yml so the common safety knobs stay uncluttered.
 #

@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -108,11 +108,11 @@ class TestSchedulerCmdTest {
   void nullScheduler_reportsCoreNotLoaded() {
     MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "p", null);
     accessor.addPlayer(player);
-    RTP.scheduler = null;
+    RTPRuntime.setScheduler(null);
     try {
       new TestSchedulerCmd(null).onCommand(player.uuid(), noArgs(), null);
     } finally {
-      RTP.scheduler = accessor.getMockScheduler();
+      RTPRuntime.setScheduler(accessor.getMockScheduler());
     }
     assertTrue(
         player.sentMessages.stream().anyMatch(m -> m.contains("scheduler is null")),

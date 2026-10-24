@@ -1,7 +1,7 @@
 # Deprecation and API Evolution Policy
 
-> **Scope:** Public API (`rtp-api`, SPI frameworks: `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`), platform carriers, and configuration keys.
-> **Related:** ADR-000 (development workflow), ADR-011 (`rtp-api` separate module), ADR-051 (two-tier API extension model), ADR-022 (Fabric), ADR-033 (NeoForge).
+> **Scope:** Public API (`rtp-api`, SPI frameworks: `anvil-api`, `bit-api`, `bstats-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `server-api`, `tags-api`, `units-api`, `yaml-api`), platform carriers, and configuration keys.
+> **Related:** [ADR-000](../adr/ADR-000-development-workflow.md) (development workflow), [ADR-011](../adr/ADR-011-rtp-api-separate-module.md) (`rtp-api` separate module), [ADR-051](../adr/ADR-051-two-tier-api-extension-model.md) (two-tier API extension model), [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (Fabric), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) (NeoForge).
 
 ---
 
@@ -33,12 +33,17 @@
 
 Public API comprises all public classes, interfaces, and methods in:
 - `rtp-api`
+- `anvil-api`
+- `bit-api`
+- `bstats-api`
 - `commands-api`
 - `effects-api`
 - `maps-api`
 - `metrics-api`
-- `anvil-api`
+- `server-api`
 - `tags-api`
+- `units-api`
+- `yaml-api`
 
 Internal implementation packages (e.g. `rtp-core`, internal platform carrier adapters `io.github.dailystruggle.rtp.<platform>.v*`) are not public API and may evolve with semantic internal guarantees, but carrier retirements follow the specific carrier lifecycle below.
 

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -10,6 +11,7 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,7 +43,7 @@ public class ReqRtpSubConfigCmdCoverageTest {
         tempDir = Files.createTempDirectory("rtp-subconfig-cov-");
         pluginDir = tempDir.toFile();
         RTPTestSetup.install(pluginDir);
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
 
         mockDb = mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
         Field cachedLookupField = io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class.getDeclaredField("cachedLookup");
@@ -71,7 +73,7 @@ public class ReqRtpSubConfigCmdCoverageTest {
             return performanceData.getOrDefault(k, def);
         });
 
-        RTP.configs.configParserMap.put(PerformanceKeys.class, performanceConfig);
+        ActiveConfigs.get().configParserMap.put(PerformanceKeys.class, performanceConfig);
 
         RTP.baseCommand = mock(io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand.class);
         Map<String, CommandsAPICommand> commandLookup = new HashMap<>();

@@ -24,6 +24,9 @@ Effects used per-platform initializers because effects-api could not depend on t
 ## Decision
 
 1. **A neutral platform-seam module.** The server accessor contract (`RTPServerAccessor` and the player, world and location types it needs) moves out of `rtp-api` into a new module with no `io.github.dailystruggle.rtp` dependency. `rtp-api` depends on it and re-exports it, so addon source stays compatible. effects-api depends on this module and on nothing RTP-specific.
+
+   **Foundation implemented 2026-10-21:** `ServerAccessor`, `PlatformFamily` and the `ServerAccessors` holder now live in `api/server-api`; `RTPServerAccessor` extends the neutral interface, and the existing RTP registration sites also install the common holder. RTP-specific player, world and location types remain in `rtp-api` for the later extraction.
+
 2. **Platform code implements effect primitives on the accessor.** The accessor gains the primitives effects need: title, glide start/stop, sound / particle / potion by string key, note, firework, inventory and experience drop, kill, and command dispatch. Each platform implements them once in its existing accessor. `HandleRegistry`, `PlayerHandle` and the effect registration in the per-platform initializers are removed. Registry lookups (`Sound`, `Particle`, `PotionEffectType`, Minecraft registries) stay platform-side behind string keys, which also replaces the `ValueCoercer` binding.
 3. **One registration.** effects-api registers every built-in effect once. A platform that cannot run a primitive reports that explicitly (logged once per primitive, visible from `/effectsapi`). An empty method body is not allowed.
 4. **effects-api carries no platform code.** `effectsapi/bukkit` (`BukkitHandles`, Bukkit listeners, `/effectsapi` Bukkit commands) moves to the Bukkit carrier, and `spigot-api` leaves `effects-api/build.gradle`. The Fabric and NeoForge effect classes stay in their carriers as accessor implementations.

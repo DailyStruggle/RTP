@@ -80,6 +80,12 @@ infoTopRejectionCause: "&7Häufigste Ablehnungsursache: #7E9CC8[genTopRejectionC
 # Platzhalter: [genFailureBreakdown] - kommagetrennte Liste Ursache=N, häufigste zuerst.
 infoFailureBreakdown: "&7Ablehnungen nach Ursache: #7E9CC8[genFailureBreakdown]"
 
+# Adaptiver Compute-Governor: konfiguriertes vs. effektives Budget und Ursache.
+infoGovernorAsync: "&7Hintergrund-Async: #7E9CC8[govAsyncConfiguredMs]&7 ms (effektiv #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Hintergrund-Sync: #7E9CC8[govSyncConfiguredMs]&7 ms (effektiv #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Hot-Cache-Limit: #7E9CC8[govHotCapConfigured]&7 (effektiv #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Generierung: #7E9CC8[govGenConfigured]&7 (effektiv #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; regional aktiv #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Schwellenwerte der Zustands-Farbbänder. Werden verwendet, um farbige Platzhalter-
 # Varianten (z. B. [tps1mColoured]) grün/gelb/rot einzufärben.
 infoSchwelleTpsGruen: 19.5
@@ -512,6 +518,7 @@ editorApplyFetching: "&7[P0] Konfigurations-Nutzlast wird abgerufen..."
 editorApplyValidating: "&7[P0] Integrität und Syntax der Nutzlast werden geprüft..."
 editorApplySuccess: "&a[P0] Konfiguration angewendet und im laufenden Betrieb neu geladen! (.bak-Kopien für geänderte Dateien erstellt)"
 editorApplyFailed: "&c[P0] Die Nutzlast konnte nicht angewendet werden: [reason]"
+editorApplyRejected: "&c[P0] Anwenden abgelehnt: [count] Konfigurationsfehler; es wurde nichts geschrieben. Erster: [code] in [source] bei [path]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.guiaddon.neoforge;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuLayout;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuModel;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuRenderer;
@@ -81,7 +82,7 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
     if (s != null) {
       return s;
     }
-    Object accessor = RTP.serverAccessor;
+    Object accessor = RTPRuntime.serverAccessor();
     if (accessor == null) {
       RTP.log(java.util.logging.Level.WARNING,
           "[RTP-GUI] NeoForge renderer: RTP.serverAccessor is null; cannot resolve server");
@@ -116,7 +117,7 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
 
   /**
    * Resolves the live {@link ServerPlayer} for {@code playerId}. Primary path: RTP's own
-   * player registry ({@code RTP.serverAccessor.getPlayer(uuid).handle()}), which holds the
+   * player registry ({@code RTPRuntime.serverAccessor().getPlayer(uuid).handle()}), which holds the
    * {@code ServerPlayer} directly and does not depend on the accessor's typed
    * {@code getServer()} resolving cleanly across the addon's classloader. Fallback: the
    * resolved {@link MinecraftServer}'s player list. The {@code handle()} method is invoked
@@ -124,7 +125,7 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
    */
   private static ServerPlayer resolvePlayer(UUID playerId) {
     try {
-      Object accessor = RTP.serverAccessor;
+      Object accessor = RTPRuntime.serverAccessor();
       if (accessor != null) {
         Object rtpPlayer = accessor.getClass().getMethod("getPlayer", UUID.class)
             .invoke(accessor, playerId);
@@ -155,7 +156,7 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
     // Defer by 1 tick so that if open() was triggered from an active container
     // click (sub-menu navigation / pagination), the current click packet finishes
     // processing completely before the new container screen is opened.
-    RTP.scheduler.runTaskLater(() -> {
+    RTPRuntime.scheduler().runTaskLater(() -> {
       ServerPlayer player = resolvePlayer(playerId);
       if (player == null) {
         RTP.log(java.util.logging.Level.FINE,
@@ -194,8 +195,8 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
                 + " threw" + (model.isRoot() ? "; falling back to a classic teleport" : ""), cannotOpen);
         if (model.isRoot()) {
           fallbackTeleport(playerId);
-        } else if (RTP.serverAccessor != null) {
-          RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Could not open menu.");
+        } else if (RTPRuntime.serverAccessor() != null) {
+          RTPRuntime.serverAccessor().sendMessage(playerId, "&c[RTP] Could not open menu.");
         }
       }
     }, 1L);
@@ -215,13 +216,13 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
             if (error != null) {
               RTP.log(java.util.logging.Level.WARNING,
                   "[RTP-GUI] NeoForge renderer: fallback teleport for " + playerId + " failed", error);
-              if (RTP.serverAccessor != null) {
-                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + error.getMessage());
+              if (RTPRuntime.serverAccessor() != null) {
+                RTPRuntime.serverAccessor().sendMessage(playerId, "&c[RTP] Teleport failed: " + error.getMessage());
               }
             } else if (result != null && !result.isSuccess()) {
               String msg = result.message() != null ? result.message() : (result.reason() != null ? result.reason().name() : "unknown");
-              if (RTP.serverAccessor != null) {
-                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + msg);
+              if (RTPRuntime.serverAccessor() != null) {
+                RTPRuntime.serverAccessor().sendMessage(playerId, "&c[RTP] Teleport failed: " + msg);
               }
             }
           });

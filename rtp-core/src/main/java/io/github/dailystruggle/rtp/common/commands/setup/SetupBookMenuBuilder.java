@@ -22,6 +22,7 @@ public final class SetupBookMenuBuilder {
 
     private static final int MAX_DIFF_LINES_PER_FILE = 12;
     private static final int LINES_PER_PAGE = 13;
+    private static final List<String> RADIUS_PRESETS = List.of("2.5km", "5km", "10km", "25km");
 
     public MenuModel build(SetupSession session, Map<String, List<PrefabApplier.Change>> diffPreview) {
         Objects.requireNonNull(session, "session");
@@ -39,7 +40,6 @@ public final class SetupBookMenuBuilder {
         List<MenuLine> lines = new ArrayList<>();
         lines.add(header("Step 1/5: World Topology"));
         lines.add(hint("Choose how RTP configures your worlds:"));
-        lines.add(emptyLine());
 
         boolean isSingle = "single".equalsIgnoreCase(session.worldChoice());
         boolean isMulti = "multi".equalsIgnoreCase(session.worldChoice());
@@ -54,11 +54,54 @@ public final class SetupBookMenuBuilder {
                 "Synthesise one region per loaded world",
                 new String[]{"admin", "setup", "world", "choice=multi"}
         ));
+        if (isMulti) {
+            lines.add(hint("Route: /rtp world=<name> or /rtp region=<name>"));
+        }
+
+        lines.add(emptyLine());
+        lines.add(hint("Region Radius (" + session.radiusChoice() + "):"));
+        lines.add(buildRadiusPresetsLine(session));
+        lines.add(buildRadiusAnvilLine(session));
 
         lines.add(emptyLine());
         addNavigationFooter(lines, false, true, "gameplay");
 
         return new MenuModel("RTP Setup: World Topology", List.of(new MenuPage(lines)));
+    }
+
+    private static MenuLine buildRadiusPresetsLine(SetupSession session) {
+        List<MenuFragment> fragments = new ArrayList<>();
+        String currentRadius = session.radiusChoice();
+        for (int i = 0; i < RADIUS_PRESETS.size(); i++) {
+            String preset = RADIUS_PRESETS.get(i);
+            boolean selected = preset.equalsIgnoreCase(currentRadius);
+            String label = (selected ? "&2&l[" + preset + "]" : "&0[" + preset + "]")
+                    + (i < RADIUS_PRESETS.size() - 1 ? " " : "");
+            fragments.add(new MenuFragment(
+                    label,
+                    "Set region radius to " + preset,
+                    new MenuAction.RunRtpCommand(new String[]{"admin", "setup", "radius", "radius=" + preset})
+            ));
+        }
+        return new MenuLine(fragments);
+    }
+
+    private static MenuLine buildRadiusAnvilLine(SetupSession session) {
+        String currentRadius = session.radiusChoice();
+        boolean isCustom = RADIUS_PRESETS.stream().noneMatch(p -> p.equalsIgnoreCase(currentRadius));
+        String label = isCustom
+                ? "&2&l[✎ Other...] &8(" + currentRadius + ")"
+                : "&1&l[✎ Other...] &8(" + currentRadius + ")";
+        return MenuLine.of(new MenuFragment(
+                label,
+                "Open Anvil input to type a custom radius (e.g. 4096b, 500c, 7.5km)",
+                new MenuAction.PromptAnvilInput(
+                        new String[]{"admin", "setup", "radius"},
+                        "radius",
+                        currentRadius,
+                        MenuAction.Mode.RUN
+                )
+        ));
     }
 
     private MenuModel buildGameplayPage(SetupSession session) {
@@ -131,9 +174,15 @@ public final class SetupBookMenuBuilder {
         lines.add(emptyLine());
 
         Map<String, Boolean> toggles = session.addonToggles();
+        boolean openGui = toggles.getOrDefault("openGuiOnRtp", true);
         boolean claims = toggles.getOrDefault("claimIntegrations", true);
         boolean cinematic = toggles.getOrDefault("cinematicEffects", false);
 
+        lines.add(choiceLine(
+                openGui ? "&2&l☑ [Bare /rtp Opens GUI Menu]" : "&8☐ [Bare /rtp Opens GUI Menu]",
+                "When enabled, bare /rtp opens the region picker GUI instead of teleporting immediately",
+                new String[]{"admin", "setup", "toggle", "key=openGuiOnRtp"}
+        ));
         lines.add(choiceLine(
                 claims ? "&2&l☑ [Claim Protection Gating]" : "&8☐ [Claim Protection Gating]",
                 "Prevent RTP into Towny/GriefDefender/etc claims",

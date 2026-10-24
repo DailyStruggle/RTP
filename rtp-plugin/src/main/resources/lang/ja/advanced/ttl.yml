@@ -1,5 +1,5 @@
 # --- RTP 空間メモリ TTL 設定 ---
-# ドキュメント: plugins/RTP/docs/admin/configuration/TTL.md
+# ドキュメント: docs/admin/configuration/TTL.md
 
 # 空間メモリ内で拒否された座標試行の基本保持期間。
 # 対応期間形式: 例 14d, 12h, 30m, 3600s, 40t, 2500ms、または複合形式 1d12h。

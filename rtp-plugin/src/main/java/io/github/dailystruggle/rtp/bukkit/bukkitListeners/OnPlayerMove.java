@@ -3,8 +3,11 @@ package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import io.github.dailystruggle.rtp.common.playerData.MoveCancelGrace;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import java.util.UUID;
 import org.bukkit.event.EventHandler;
@@ -43,30 +46,38 @@ public final class OnPlayerMove implements Listener {
     RTP rtp = RTP.getInstance();
     if (rtp == null) return;
 
-    if (rtp.queuedPlayers.contains(id)) return;
+    if (TeleportSessions.current().queuedPlayers.contains(id)) return;
 
-    TeleportData data = rtp.latestTeleportData.get(id);
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(id);
     if (data == null || data.completed) return;
 
-    double cancelDistanceSquared = Math.pow(RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.cancelDistance, 2).doubleValue(), 2);
+    double cancelDistanceSquared = Math.pow(ActiveConfigs.get().getParser(ConfigKeys.class).getNumber(ConfigKeys.cancelDistance, 2).doubleValue(), 2);
 
     RTPCoords originalCoords = data.originalCoords;
     if (originalCoords == null) {
       return;
     }
 
-    double distanceSquared;
-    if (to.getWorld() == null || !originalCoords.worldName().equals(to.getWorld().getName())) {
-      distanceSquared = Double.MAX_VALUE;
-    } else {
-      double dx = originalCoords.x() - to.getX();
-      double dy = originalCoords.y() - to.getY();
-      double dz = originalCoords.z() - to.getZ();
-      distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
-    }
+    String worldName = (to.getWorld() == null) ? null : to.getWorld().getName();
+    double distanceSquared = movedSquared(originalCoords, worldName, to.getX(), to.getY(), to.getZ(),
+        MoveCancelGrace.isActive(id));
 
     if (distanceSquared < cancelDistanceSquared) return;
 
     new RTPTeleportCancel(id).run();
+  }
+
+  /**
+   * Squared distance from the teleport origin; {@link Double#MAX_VALUE} in another world. With
+   * {@code horizontalOnly} (an effect such as the Rift fall moves the player, RTP-71) the Y axis
+   * is ignored, so falling does not cancel but walking away still does.
+   */
+  static double movedSquared(
+      RTPCoords origin, String worldName, double x, double y, double z, boolean horizontalOnly) {
+    if (!origin.worldName().equals(worldName)) return Double.MAX_VALUE;
+    double dx = origin.x() - x;
+    double dy = horizontalOnly ? 0 : origin.y() - y;
+    double dz = origin.z() - z;
+    return (dx * dx) + (dy * dy) + (dz * dz);
   }
 }

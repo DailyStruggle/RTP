@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ public class MemoryShapeChunkToLocationsTest {
 
     static {
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
@@ -330,7 +330,7 @@ public class MemoryShapeChunkToLocationsTest {
         long p2 = preimage[1];
         long rep = shape.xzToLocation(twoChunk[0], twoChunk[1]);
 
-        io.github.dailystruggle.rtp.common.tasks.ScanTask.recordBiomeForChunk(shape, p1, twoChunk[0], twoChunk[1], "minecraft:desert");
+        io.github.dailystruggle.rtp.common.tasks.scan.ScanTask.recordBiomeForChunk(shape, p1, twoChunk[0], twoChunk[1], "minecraft:desert");
         shape.flushAndRebuild(1L);
 
         assertEquals("DESERT", shape.biomeAt(p1));

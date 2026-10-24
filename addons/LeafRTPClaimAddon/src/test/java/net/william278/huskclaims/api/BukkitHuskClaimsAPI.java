@@ -1,35 +1,37 @@
 package net.william278.huskclaims.api;
 
-import org.bukkit.Location;
 import java.util.function.Predicate;
+import net.william278.huskclaims.position.Position;
+import org.bukkit.Location;
 
-public class BukkitHuskClaimsAPI {
-  private static BukkitHuskClaimsAPI instance;
-  private Predicate<Location> claimPredicate = loc -> false;
+/**
+ * Test stand-in of {@code BukkitHuskClaimsAPI} (huskclaims-bukkit 1.5.10): static
+ * {@code getInstance()} throwing while unregistered, {@code getPosition(Location)} and
+ * {@code isClaimAt(Position)}.
+ */
+public class BukkitHuskClaimsAPI extends HuskClaimsAPI {
+  private final Predicate<Location> claimed;
+
+  public BukkitHuskClaimsAPI(Predicate<Location> claimed) {
+    this.claimed = claimed;
+  }
 
   public static BukkitHuskClaimsAPI getInstance() {
-    if (instance == null) {
-      instance = new BukkitHuskClaimsAPI();
+    if (!(instance instanceof BukkitHuskClaimsAPI api)) {
+      throw new IllegalStateException("HuskClaims API is not registered");
     }
-    return instance;
+    return api;
   }
 
-  public static void setInstance(BukkitHuskClaimsAPI inst) {
-    instance = inst;
+  public static void register(BukkitHuskClaimsAPI api) {
+    instance = api;
   }
 
-  public void setClaimPredicate(Predicate<Location> predicate) {
-    this.claimPredicate = predicate != null ? predicate : loc -> false;
+  public Position getPosition(Location location) {
+    return new Position(location);
   }
 
-  public Object getPosition(Location location) {
-    return location;
-  }
-
-  public Boolean isClaimAt(Object position) {
-    if (position instanceof Location loc) {
-      return claimPredicate.test(loc);
-    }
-    return false;
+  public boolean isClaimAt(Position position) {
+    return claimed.test(position.location());
   }
 }

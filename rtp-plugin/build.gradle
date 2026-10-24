@@ -1664,7 +1664,34 @@ tasks.register('liteJarStructureCheck') {
     }
 }
 
-tasks.named('check') { dependsOn 'liteJarStructureCheck' }
+tasks.register('generateBitCodes', JavaExec) {
+    group = 'documentation'
+    description = 'Regenerates the committed BIT code catalog from the registered code owners (ADR-121).'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.dailystruggle.rtp.bukkit.commands.test.BitCodeCatalogExport'
+    args '--write', rootProject.projectDir.absolutePath
+}
+
+tasks.register('updateBitCodeLock', JavaExec) {
+    group = 'documentation'
+    description = 'Appends BIT code identities and refreshes default severities in the release lock.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.dailystruggle.rtp.bukkit.commands.test.BitCodeCatalogExport'
+    args '--lock', rootProject.projectDir.absolutePath
+}
+
+tasks.register('checkBitCodes', JavaExec) {
+    group = 'verification'
+    description = 'Fails when the committed BIT code catalog differs from registered code owners (ADR-121).'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.dailystruggle.rtp.bukkit.commands.test.BitCodeCatalogExport'
+    args '--check', rootProject.projectDir.absolutePath
+}
+
+tasks.named('check') { dependsOn 'liteJarStructureCheck', 'checkBitCodes' }
 
 // `archives` configuration is deprecated for artifact declaration in Gradle 9
 // (removed in Gradle 10). The `assemble.dependsOn` wiring below is the

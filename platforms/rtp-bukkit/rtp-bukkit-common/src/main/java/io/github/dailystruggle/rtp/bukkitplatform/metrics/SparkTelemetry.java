@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.bukkitplatform.metrics;
 
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+
 /** Engine telemetry dataset for the spark metadata provider; shared by binding and accessor. */
 final class SparkTelemetry {
 
@@ -28,9 +31,9 @@ final class SparkTelemetry {
             long l3BacklogBins = 0;
 
             try {
-                if (io.github.dailystruggle.rtp.common.RTP.selectionAPI != null) {
+                if (ActiveSelection.get() != null) {
                     java.util.Map<String, io.github.dailystruggle.rtp.common.selection.region.Region> perm =
-                            io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup;
+                            ActiveSelection.get().permRegionLookup;
                     if (perm != null) {
                         for (io.github.dailystruggle.rtp.common.selection.region.Region r : perm.values()) {
                             if (r != null && r.queueManager != null) {
@@ -50,7 +53,7 @@ final class SparkTelemetry {
                     }
 
                     java.util.Map<java.util.UUID, io.github.dailystruggle.rtp.common.selection.region.Region> temp =
-                            io.github.dailystruggle.rtp.common.RTP.selectionAPI.tempRegions;
+                            ActiveSelection.get().tempRegions;
                     if (temp != null) {
                         for (io.github.dailystruggle.rtp.common.selection.region.Region r : temp.values()) {
                             if (r != null && r.queueManager != null) {
@@ -89,7 +92,7 @@ final class SparkTelemetry {
             }
 
             try {
-                io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm = io.github.dailystruggle.rtp.common.RTP.metrics;
+                io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm = CoreMetrics.instance();
                 if (cm != null) {
                     avgLatency = cm.pipelineHistogram().mean();
                     slowCount = cm.slowPipelineCount();

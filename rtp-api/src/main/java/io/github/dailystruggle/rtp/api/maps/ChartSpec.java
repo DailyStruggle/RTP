@@ -78,7 +78,7 @@ public record ChartSpec(
         METRIC_SPARKLINE,
         /**
          * Composite pipeline status map (ADR-089): desaturated biomes, red hazard wash,
-         * candidate markers & arrival trajectory, and L1/L2/L3 queue capacity health bars.
+         * candidate markers and arrival trajectory, and L1/L2/L3 queue capacity health bars.
          */
         REGION_COMPOSITE,
         /**

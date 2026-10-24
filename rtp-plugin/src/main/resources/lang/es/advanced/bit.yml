@@ -1,0 +1,21 @@
+# --- Configuración de pruebas integradas (BIT) ---
+# Documentación: docs/admin/configuration/BIT.md
+
+# Registra los hallazgos estructurales de acciones como avisos sin impedir su registro.
+# Establécelo en true para impedir el registro de acciones con algún error efectivo.
+strictActions: false
+
+# Registra como avisos los hallazgos de configuración que versiones anteriores aceptaban, sin rechazar /rtp reload.
+# Ponlo en true para tratarlos como errores; una recarga o Hot-Apply con errores mantiene la configuración actual.
+strictConfig: false
+
+# Número mínimo de muestras antes de clasificar una condición como siempre o nunca superada.
+gateOutcomeSamples: 200
+
+# Niveles para códigos BIT registrados; prevalecen sobre strictActions.
+# Permitidos: ERROR, WARNING, INFO, DEBUG, TRACE y OFF. OFF suprime el hallazgo.
+# Los códigos y niveles desconocidos se ignoran y se registran.
+overrides:
+
+# NO CAMBIES EL NÚMERO DE VERSIÓN
+version: 1.0

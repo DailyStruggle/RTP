@@ -1,10 +1,13 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -24,8 +27,8 @@ public class OnWorldLoadUnload implements Listener {
         String worldName = event.getWorld().getName();
         // Proactively trigger configuration instantiation in a background task, then rebind any
         // region that was previously fallback-bound because this world wasn't loaded yet.
-        RTP.scheduler.runTaskAsynchronously(() -> {
-            RTP.configs.getWorldParser(worldName);
+        RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+            ActiveConfigs.get().getWorldParser(worldName);
             rebindFallbackRegionsForWorld(worldName);
         });
     }
@@ -33,13 +36,13 @@ public class OnWorldLoadUnload implements Listener {
     /**
      * One-shot scan over every dormant (world-fallback-bound) region, attempting to rebind each
      * one against its configured world if that world is already resolvable via
-     * {@link RTP#serverAccessor}. Used at plugin-enable time so that {@link WorldLoadEvent}s
+     * {@link RTPRuntime#serverAccessor()}. Used at plugin-enable time so that {@link WorldLoadEvent}s
      * which fired before this listener was registered (e.g. worlds loaded by bukkit.yml or by a
      * previously-enabled plugin's {@code onEnable}) still activate dormant regions without
      * waiting for another event.
      */
     public static void rebindFallbackRegionsForAllLoadedWorlds() {
-        for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+        for (Region region : ActiveSelection.get().permRegionLookup.values()) {
             if (!region.worldFallbackBound) continue;
             String configured = region.configuredWorldName;
             if (configured == null) continue;
@@ -56,10 +59,10 @@ public class OnWorldLoadUnload implements Listener {
     private static void rebindFallbackRegionsForWorld(String worldName) {
         @SuppressWarnings("unchecked")
         MultiConfigParser<RegionKeys> regionParsers =
-            (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+            (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
         if (regionParsers == null) return;
 
-        for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+        for (Region region : ActiveSelection.get().permRegionLookup.values()) {
             if (!region.worldFallbackBound) continue;
             String configured = region.configuredWorldName;
             if (configured == null || !configured.equalsIgnoreCase(worldName)) continue;
@@ -89,14 +92,15 @@ public class OnWorldLoadUnload implements Listener {
         String worldName = event.getWorld().getName();
 
         // 1. Remove the world's parser from MultiConfigParser internal maps
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+        @SuppressWarnings("unchecked")
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) ActiveConfigs.get().multiConfigParserMap.get(WorldKeys.class);
         if (worldParsers != null) {
             worldParsers.removeParser(worldName);
         }
 
         // 2. Clear references and shut down regions associated with this world
         List<String> regionsToShutdown = new ArrayList<>();
-        RTP.selectionAPI.permRegionLookup.forEach((name, region) -> {
+        ActiveSelection.get().permRegionLookup.forEach((name, region) -> {
             // Dormant regions (awaiting WorldLoadEvent for their configured world) have a
             // null world; they cannot be bound to the world being unloaded, so skip them.
             io.github.dailystruggle.rtp.api.world.RTPWorld<?> rw = region.getWorld();
@@ -106,7 +110,7 @@ public class OnWorldLoadUnload implements Listener {
         });
 
         for (String regionName : regionsToShutdown) {
-            Region region = RTP.selectionAPI.permRegionLookup.get(regionName);
+            Region region = ActiveSelection.get().permRegionLookup.get(regionName);
             if (region != null) {
                 // Manually clear queues and close reservations without deleting from DB
                 region.queueManager.keptLocations.setCallbacks(null, null); // Disable DB removal
@@ -124,7 +128,7 @@ public class OnWorldLoadUnload implements Listener {
                 });
                 region.queueManager.perPlayerLocationQueue.clear();
 
-                RTP.selectionAPI.permRegionLookup.remove(regionName);
+                ActiveSelection.get().permRegionLookup.remove(regionName);
                 region.shutDown();
             }
         }

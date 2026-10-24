@@ -1,7 +1,11 @@
 package io.github.dailystruggle.rtp.common;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.server.api.ServerAccessor;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,20 +22,24 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Regression test for the bootstrap log buffer.
  *
- * <p>Verifies sub-INFO log buffering prior to config loading and subsequent flush/replay.
+ * <p>Verifies sub-INFO log buffering prior to config loading and subsequent flush/replay through
+ * the {@code RTP.log} / {@code RTP.flushPendingLogs} delegates and the config-backed gate that
+ * {@code RTP} installs into {@link RTPRuntime} (ADR-115 seam 4).
  */
 class BootstrapLogBufferTest {
 
     private RTPServerAccessor previousAccessor;
+    private ServerAccessor previousCommonAccessor;
     private MockRTPServerAccessor accessor;
 
     @BeforeEach
     void setUp() throws Exception {
-        previousAccessor = RTP.serverAccessor;
+        previousAccessor = RTPRuntime.serverAccessor();
+        previousCommonAccessor = ServerAccessors.get();
         File tempDir = Files.createTempDirectory("rtp-boot-log-buffer-test").toFile();
         tempDir.deleteOnExit();
         accessor = new MockRTPServerAccessor(tempDir);
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         // Ensure the buffer is armed and empty for every test.
         resetBufferState();
     }
@@ -40,15 +48,22 @@ class BootstrapLogBufferTest {
     void tearDown() throws Exception {
         // Drain anything we left buffered so other tests aren't affected.
         RTP.flushPendingLogs();
-        RTP.serverAccessor = previousAccessor;
+        RTPRuntime.setServerAccessor(previousAccessor);
+        ServerAccessors.set(previousCommonAccessor);
         resetBufferState();
+    }
+
+    @Test
+    @DisplayName("REQ-API-NF-002: runtime registration installs the common server bridge")
+    void runtimeRegistrationInstallsCommonServerBridge() {
+        assertSame(accessor, ServerAccessors.get());
     }
 
     @Test
     @DisplayName("Sub-INFO records emitted before configs are buffered, not forwarded")
     void subInfoBuffered_whenConfigsAbsent() {
         // Configs unavailable: nullify so loggingParserUnavailable() is true.
-        RTP.configs = null;
+        ActiveConfigs.set(null);
 
         RTP.log(Level.FINE, "fine-1");
         RTP.log(Level.FINER, "finer-1");
@@ -63,7 +78,7 @@ class BootstrapLogBufferTest {
     @Test
     @DisplayName("INFO and above bypass the buffer even when configs are absent")
     void infoAndAboveBypassBuffer() {
-        RTP.configs = null;
+        ActiveConfigs.set(null);
 
         RTP.log(Level.INFO, "info-1");
         RTP.log(Level.WARNING, "warn-1");
@@ -82,7 +97,7 @@ class BootstrapLogBufferTest {
     @Test
     @DisplayName("flushPendingLogs replays buffered records to the live sink in order")
     void flushReplaysBufferedRecords() {
-        RTP.configs = null;
+        ActiveConfigs.set(null);
 
         RTP.log(Level.FINE, "fine-A");
         RTP.log(Level.FINER, "finer-B");
@@ -106,7 +121,7 @@ class BootstrapLogBufferTest {
     @Test
     @DisplayName("After flush, subsequent sub-INFO records bypass the buffer")
     void afterFlushBypassesBuffer() {
-        RTP.configs = null;
+        ActiveConfigs.set(null);
 
         RTP.log(Level.FINE, "before-flush");
         RTP.flushPendingLogs();
@@ -123,11 +138,11 @@ class BootstrapLogBufferTest {
 
     /** Resets the static buffer/gate so each test sees a fresh bootstrap window. */
     private static void resetBufferState() throws Exception {
-        Field gate = RTP.class.getDeclaredField("logsBuffered");
+        Field gate = RTPRuntime.class.getDeclaredField("logsBuffered");
         gate.setAccessible(true);
         gate.setBoolean(null, true);
 
-        Field queue = RTP.class.getDeclaredField("pendingLogs");
+        Field queue = RTPRuntime.class.getDeclaredField("pendingLogs");
         queue.setAccessible(true);
         ((java.util.Queue<?>) queue.get(null)).clear();
     }

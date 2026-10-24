@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaSender;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,12 +25,12 @@ class NeoForgeTestUmbrellaSenderTest {
 
   @BeforeEach
   void setUp() {
-    previousAccessor = RTP.serverAccessor;
+    previousAccessor = RTPRuntime.serverAccessor();
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = previousAccessor;
+    RTPRuntime.setServerAccessor(previousAccessor);
   }
 
   @Test
@@ -55,7 +56,7 @@ class NeoForgeTestUmbrellaSenderTest {
     RTPPlayer player = mock(RTPPlayer.class);
     when(player.name()).thenReturn("TestPlayer");
     when(accessor.getPlayer(uuid)).thenReturn(player);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     assertEquals("TestPlayer", sender.resolveCallerName(uuid));
   }
@@ -67,7 +68,7 @@ class NeoForgeTestUmbrellaSenderTest {
     UUID uuid = UUID.randomUUID();
     RTPServerAccessor accessor = mock(RTPServerAccessor.class);
     when(accessor.getPlayer(uuid)).thenReturn(null);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     assertEquals(uuid.toString(), sender.resolveCallerName(uuid));
   }
@@ -79,7 +80,7 @@ class NeoForgeTestUmbrellaSenderTest {
     UUID uuid = UUID.randomUUID();
     RTPServerAccessor accessor = mock(RTPServerAccessor.class);
     when(accessor.getPlayer(uuid)).thenThrow(new RuntimeException("boom"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     assertEquals(uuid.toString(), sender.resolveCallerName(uuid));
   }

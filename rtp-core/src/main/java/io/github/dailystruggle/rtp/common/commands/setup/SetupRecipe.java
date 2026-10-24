@@ -27,13 +27,35 @@ public final class SetupRecipe {
     }
 
     /**
+     * Sparse configuration overlay step targeting a specific configuration file ID.
+     *
+     * @param targetFileId target config file identifier (e.g. "definitions/regions/default", "addons/guimenu")
+     * @param overlay      key-value overlay map
+     */
+    public record PrefabStep(String targetFileId, Map<String, Object> overlay) {
+        public PrefabStep {
+            Objects.requireNonNull(targetFileId, "targetFileId");
+            Objects.requireNonNull(overlay, "overlay");
+        }
+    }
+
+    /**
+     * Resolves the ordered chain of prefabs corresponding to the given setup session
+     * using the active runtime world list.
+     */
+    public static List<Prefab> compileRecipe(SetupSession session) {
+        return compileRecipe(session, SetupHandlerSupport.collectWorldNames());
+    }
+
+    /**
      * Resolves the ordered chain of prefabs corresponding to the given setup session
      * and list of active worlds.
      * Order of precedence:
      * 1. Topology (Single world default / MultiWorld expansion with dimension vert overrides)
      * 2. Gameplay Style (Survival, Skyblock, OneBlock, Arena)
-     * 3. Performance Profile (Low, High, Folia)
-     * 4. Addons and Effects overlay
+     * 3. Region Radius overlay (sets shape.radius on default and per-world regions in multi mode)
+     * 4. Performance Profile (Low, High, Folia)
+     * 5. Addons and Effects overlay (including addons/guimenu when openGuiOnRtp is false)
      */
     public static List<Prefab> compileRecipe(SetupSession session, List<String> worldNames) {
         Objects.requireNonNull(session, "session");
@@ -53,6 +75,9 @@ public final class SetupRecipe {
             default -> recipe.add(SurvivalDefault.INSTANCE);
         }
 
+        // Region Radius overlay
+        recipe.add(createRadiusPrefab(session, worldNames));
+
         // Stage 3: Performance Profile
         switch (session.performanceChoice().toLowerCase()) {
             case "low" -> recipe.add(LowPerformance.INSTANCE);
@@ -65,6 +90,9 @@ public final class SetupRecipe {
         Prefab addonOverlay = createAddonsPrefab(session.addonToggles());
         if (hasAnyOverlay(addonOverlay)) {
             recipe.add(addonOverlay);
+        }
+        if (!Boolean.TRUE.equals(session.addonToggles().getOrDefault("openGuiOnRtp", true))) {
+            recipe.add(createGuiMenuPrefab());
         }
 
         return recipe;
@@ -85,15 +113,62 @@ public final class SetupRecipe {
         Objects.requireNonNull(baselineTrees, "baselineTrees");
         Objects.requireNonNull(recipe, "recipe");
 
+        boolean isMultiWorld = recipe.stream().anyMatch(p -> "multi-world".equals(p.id()));
         MultiWorldExpander.RegionOverlayAmender amender = MultiWorldExpander.defaultDimensionVertAmender();
-        Map<String, Map<String, Object>> currentTrees = baselineTrees;
+        Map<String, Map<String, Object>> currentTrees = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, Object>> e : baselineTrees.entrySet()) {
+            currentTrees.put(e.getKey(), new LinkedHashMap<>(e.getValue()));
+        }
+
         for (Prefab p : recipe) {
-            PrefabApplier.Result stepResult = PrefabApplier.apply(currentTrees, p, worldNames, amender);
+            Prefab effectivePrefab = prepareStepPrefab(p, currentTrees, worldNames, isMultiWorld);
+            PrefabApplier.Result stepResult = PrefabApplier.apply(currentTrees, effectivePrefab, worldNames, amender);
             currentTrees = stepResult.newTrees();
         }
 
         // Compute cumulative diff against the original baseline
         return computeCumulativeDiff(baselineTrees, currentTrees);
+    }
+
+    private static Prefab prepareStepPrefab(
+            Prefab p,
+            Map<String, Map<String, Object>> currentTrees,
+            List<String> worldNames,
+            boolean isMultiWorld) {
+        Map<String, Map<String, Object>> filteredRegionOverlays = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, Object>> entry : p.regionOverlays().entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("addons/")) {
+                Map<String, Object> targetTree = currentTrees.computeIfAbsent(key, k -> new LinkedHashMap<>());
+                targetTree.putAll(entry.getValue());
+            } else if (key.startsWith("definitions/regions/")) {
+                filteredRegionOverlays.put(key.substring("definitions/regions/".length()), entry.getValue());
+            } else {
+                filteredRegionOverlays.put(key, entry.getValue());
+            }
+        }
+
+        if ("setup-radius".equals(p.id()) && isMultiWorld && worldNames != null) {
+            Map<String, Object> defOverlay = filteredRegionOverlays.get("default");
+            if (defOverlay != null) {
+                for (String world : worldNames) {
+                    if (world != null && !world.isEmpty()) {
+                        filteredRegionOverlays.putIfAbsent(world, new LinkedHashMap<>(defOverlay));
+                    }
+                }
+            }
+        }
+
+        return new Prefab(
+                p.id(),
+                p.displayKey(),
+                p.hoverKey(),
+                p.description(),
+                p.performanceOverlay(),
+                p.safetyOverlay(),
+                filteredRegionOverlays,
+                p.expandPerWorld()
+        );
     }
 
     private static PrefabApplier.Result computeCumulativeDiff(
@@ -158,6 +233,32 @@ public final class SetupRecipe {
         );
     }
 
+    private static Prefab createRadiusPrefab(SetupSession session, List<String> worldNames) {
+        String radius = session.radiusChoice();
+        Map<String, Object> radiusOverlay = Map.of("shape.radius", radius);
+        Map<String, Map<String, Object>> regionOverlays = new LinkedHashMap<>();
+        regionOverlays.put("default", radiusOverlay);
+
+        if ("multi".equalsIgnoreCase(session.worldChoice()) && worldNames != null) {
+            for (String world : worldNames) {
+                if (world != null && !world.isEmpty()) {
+                    regionOverlays.put(world, radiusOverlay);
+                }
+            }
+        }
+
+        return new Prefab(
+                "setup-radius",
+                "setupRadiusRow",
+                "setupRadiusHover",
+                "Region radius overlay from setup wizard choice (" + radius + ").",
+                Map.of(),
+                Map.of(),
+                regionOverlays,
+                false
+        );
+    }
+
     private static Prefab createAddonsPrefab(Map<String, Boolean> toggles) {
         Map<String, Object> perfOverlay = new LinkedHashMap<>();
         Map<String, Object> safetyOverlay = new LinkedHashMap<>();
@@ -176,6 +277,19 @@ public final class SetupRecipe {
                 perfOverlay,
                 safetyOverlay,
                 Map.of(),
+                false
+        );
+    }
+
+    private static Prefab createGuiMenuPrefab() {
+        return new Prefab(
+                "addons/guimenu",
+                "setupGuiMenuRow",
+                "setupGuiMenuHover",
+                "Configure bare /rtp GUI menu behavior.",
+                Map.of(),
+                Map.of(),
+                Map.of("addons/guimenu", Map.of("openOnBareRtp", false)),
                 false
         );
     }

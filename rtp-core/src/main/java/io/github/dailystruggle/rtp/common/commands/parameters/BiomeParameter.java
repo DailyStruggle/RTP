@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -26,7 +26,7 @@ public class BiomeParameter extends CommandParameter {
   // todo: store and update
   @Override
   public Set<String> values() {
-    return RTP.serverAccessor.getBiomes();
+    return RTPRuntime.serverAccessor().getBiomes();
   }
 
   /**

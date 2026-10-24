@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,18 +27,18 @@ class TeleportPipelineTaskOffRegionTest {
 
     @BeforeEach
     void setUp() {
-        previousAccessor = RTP.serverAccessor;
-        previousScheduler = RTP.scheduler;
+        previousAccessor = RTPRuntime.serverAccessor();
+        previousScheduler = RTPRuntime.scheduler();
         accessor = mock(RTPServerAccessor.class);
         scheduler = mock(RTPScheduler.class);
-        RTP.serverAccessor = accessor;
-        RTP.scheduler = scheduler;
+        RTPRuntime.setServerAccessor(accessor);
+        RTPRuntime.setScheduler(scheduler);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = previousAccessor;
-        RTP.scheduler = previousScheduler;
+        RTPRuntime.setServerAccessor(previousAccessor);
+        RTPRuntime.setScheduler(previousScheduler);
     }
 
     @Test

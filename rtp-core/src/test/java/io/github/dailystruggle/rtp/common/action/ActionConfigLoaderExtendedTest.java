@@ -166,7 +166,7 @@ public class ActionConfigLoaderExtendedTest {
 
         // Triggers
         assertFalse(def.triggers().isEmpty());
-        assertEquals(2, def.triggers().size());
+        assertEquals(1, def.triggers().size());
     }
 
     @Test

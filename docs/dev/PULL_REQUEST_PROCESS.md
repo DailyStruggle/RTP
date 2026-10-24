@@ -187,37 +187,54 @@ GitHub automatically populates `.github/PULL_REQUEST_TEMPLATE.md`. Complete all 
 
 ## 7. Continuous Integration (CI) Pipeline Anatomy
 
-Pull requests trigger automated GitHub Actions workflows configured in `.github/workflows/gradle.yml`:
+Pull requests trigger automated GitHub Actions workflows configured in `.github/workflows/gradle.yml`. Each project set has its own job (defined once in the reusable `.github/workflows/gradle-set.yml`), chained along the Gradle project graph:
 
 ```mermaid
 flowchart LR
-    subgraph CI["GitHub Actions (gradle.yml)"]
-        direction TB
-        A["build-reduced-jdk21\n(JDK 21 Sandbox & Exclusion Assemble)"]
-        B["build-full\n(JDK 21 + 25, Toolchains, All Carriers)"]
-        B --> C["Spotless & Binary Compatibility"]
-        B --> D["Full Build & ShadowJar"]
-        B --> E["Static Analysis (PMD) & JaCoCo Coverage"]
-        B --> F["Changed-Line Coverage Gate (>= 80%)"]
-        B --> G["SonarCloud Analysis (when token present)"]
-    end
+    S["changes\n(scripts/ci-scope.py)"]
+    S --> K["checks\n(traceability, mojibake, front pages, Spotless)"]
+    S -->|full| R["build-reduced-jdk21"]
+    S --> CORE["core\n(+ japicmp)"]
+    S --> H["helpers"]
+    CORE --> PX["proxy"]
+    CORE --> BK["bukkit"]
+    CORE --> FB["fabric"]
+    CORE --> NF["neoforge"]
+    CORE --> AD["addons"]
+    H --> AD
+    PX & BK & FB & NF & AD -->|full| PL["plugin\n(shaded jar)"]
+    PL --> AN["analysis\n(changed-line coverage, SonarCloud)"]
+    AN --> OK["ci-ok\n(required check)"]
 ```
 
 ### Job Descriptions
 
-1. **`build-reduced-jdk21`:**
+0. **`changes`:**
+   - On a pull request, runs `scripts/ci-scope.py` over the diff against the PR base and emits a scope:
+     - `full`: any path outside `addons/<Name>/` and `helpers/<Name>/` (core, APIs, platforms, `rtp-plugin`, Gradle or CI config, `scripts/`), or no usable baseline (failed diff).
+     - `leaf`: every change is inside addon/helper projects.
+     - `none`: only ignorable paths (docs, root markdown). Runs nothing but `ci-ok`.
+   - Pushes to `V1`/`V2`/`V3` (merges) and `workflow_dispatch` always emit `full` with every set flagged, so the shaded `rtp-plugin` jar that bundles the addons is rebuilt on every merge.
+   - Emits one `true`/`false` flag per project set (`core`, `bukkit`, `fabric`, `neoforge`, `proxy`, `plugin`, `addons`, `helpers`), `full` (every set affected), and `<set>_tasks`: `:<p>:build` for each affected project of the set, or `:<p>:test` for a module whose tests only read a touched addon by path (e.g. `rtp-core` tests loading the shipped `LeafRTPActionAddon` action definitions). A set is flagged when a changed file lies in one of its projects, or one of its projects references an affected project through `project(':...')` or `findProject(':...')`, transitively; a parent project's change flags its children. Paths outside every project (root Gradle files, `gradle/`, `.github/`, `scripts/`) flag every set, so a PR that edits CI or scripts always builds everything.
+   - Runs `scripts/ci-scope.py --check-workflow .github/workflows/gradle.yml` first, which fails when a set job does not (transitively) `needs:` the job of a set its projects reference. Adding a project dependency across sets without updating the job chain therefore fails CI.
+1. **`checks`:** traceability, mojibake, front-page and Spotless checks; runs unless the scope is `none`.
+2. **`build-reduced-jdk21`:** (`full` scope only)
    - Runs on Ubuntu with Temurin JDK 21.
    - Validates the reduced build variant using exclusion flags:
      `-PexcludeJdk25 -PexcludeNeoforge`
-   - Executes `./gradlew assemble` to guard against silent degradation of offline sandbox and JitPack environments without duplicating full test suites.
-2. **`build-full`:**
-   - Provisions both JDK 21 and JDK 25 toolchains with `gradle/actions/setup-gradle`.
-   - Compiles the full unified JAR, including modern Fabric and NeoForge deobfuscation carriers.
-   - Executes Spotless verification, japicmp public API compatibility checks, and full multi-module tests.
-   - Enables coverage and static analysis via `-Pcoverage -PstaticAnalysis`.
-   - Executes SonarCloud analysis (when `SONAR_TOKEN` is present), reusing build bytecode, PMD reports, and JaCoCo XML.
-   - Executes `scripts/diff-coverage.py` against the base ref (`origin/V3`), enforcing the 80% coverage threshold on modified code.
-   - Publishes test reports and uploads coverage and binary artifacts.
+   - Executes `./gradlew assemble` and the ADR-113 bytecode gate to guard against silent degradation of offline sandbox and JitPack environments without duplicating full test suites.
+3. **Set jobs (`core`, `proxy`, `bukkit`, `fabric`, `neoforge`, `helpers`, `addons`, `plugin`):**
+   - Each calls `gradle-set.yml`: JDK 21 and 25, then `./gradlew <set>_tasks -Pcoverage -PstaticAnalysis`, test report publishing, and an artifact `reports-<set>` holding the JaCoCo / PMD XML and compiled classes for `analysis`.
+   - A set job runs when its flag is true and no job it needs failed or was cancelled; a skipped upstream job does not block it. Each job is a fresh runner, so it recompiles (but does not re-test) the modules it depends on.
+   - `core` also runs japicmp (`checkBinaryCompatibility`) in `full` scope. `proxy`, `bukkit`, `fabric` and `neoforge` run in parallel after `core`; `addons` waits for `core` and `helpers`.
+   - `plugin` builds the shaded `rtp-plugin` jar after every other set and only in `full` scope; addon/helper-only PRs skip it, and the merge build verifies the bundled copy.
+   - Artifacts: `RTP-Artifacts` (root `build/libs`), `RTP-Addon-Artifacts`, `RTP-Helper-Artifacts`, `jacoco-coverage-<set>`.
+4. **`analysis`:** (`full` scope only)
+   - Unpacks every `reports-<set>` artifact, then runs `scripts/diff-coverage.py` against the PR base (`origin/V3`) or the previous commit, enforcing the 80% changed-line threshold.
+   - Runs SonarCloud (when `SONAR_TOKEN` is present) on the unpacked coverage, PMD reports and classes without re-running tests. When not every set ran, the missing classes are compiled first (`classes testClasses`).
+5. **`ci-ok`:**
+   - Always runs and fails if any job failed or was cancelled; skipped jobs count as passing.
+   - The only job branch protection needs to require; the job split can change without touching branch protection. `pull_request` has no `paths-ignore`, so `ci-ok` reports on docs-only PRs too.
 
 ### Auxiliary Workflows
 

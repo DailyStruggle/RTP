@@ -14,6 +14,8 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -100,8 +102,8 @@ public final class ActionManager implements ActionService {
    */
   public ActionManager() {
     try {
-      if (RTP.serverAccessor != null && RTP.serverAccessor.getPlayerLifecycleHook() != null) {
-        RTP.serverAccessor.getPlayerLifecycleHook().onPlayerQuit(this::handlePlayerQuit);
+      if (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPlayerLifecycleHook() != null) {
+        RTPRuntime.serverAccessor().getPlayerLifecycleHook().onPlayerQuit(this::handlePlayerQuit);
       }
     } catch (Throwable ignored) {
     }
@@ -159,6 +161,12 @@ public final class ActionManager implements ActionService {
     default void onSync() {}
   }
 
+  public record RegistrationFailure(String kind, String actionId, String target, String message) {}
+
+  private record RegistrationFailureKey(String kind, String actionId, String target) {}
+
+  private static final Map<RegistrationFailureKey, RegistrationFailure> registrationFailures = new ConcurrentHashMap<>();
+
   private static volatile ActionCommandRegistrar commandRegistrar;
   private static volatile java.util.function.Consumer<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> triggerRegistrar;
 
@@ -184,6 +192,32 @@ public final class ActionManager implements ActionService {
     triggerRegistrar = registrar;
   }
 
+  public static void recordRegistrationFailure(String kind, String actionId, String target, String message) {
+    RegistrationFailure failure = new RegistrationFailure(
+        requiredRegistrationValue(kind), requiredRegistrationValue(actionId),
+        requiredRegistrationValue(target), message == null ? "" : message);
+    registrationFailures.put(new RegistrationFailureKey(failure.kind(), failure.actionId(), failure.target()), failure);
+  }
+
+  public static void clearRegistrationFailure(String kind, String actionId, String target) {
+    if (kind == null || actionId == null || target == null) return;
+    registrationFailures.remove(new RegistrationFailureKey(
+        kind.trim().toLowerCase(java.util.Locale.ROOT), actionId.trim().toLowerCase(java.util.Locale.ROOT),
+        target.trim().toLowerCase(java.util.Locale.ROOT)));
+  }
+
+  public static List<RegistrationFailure> registrationFailures() {
+    return registrationFailures.values().stream()
+        .sorted(java.util.Comparator.comparing(RegistrationFailure::kind)
+            .thenComparing(RegistrationFailure::actionId).thenComparing(RegistrationFailure::target))
+        .toList();
+  }
+
+  private static String requiredRegistrationValue(String value) {
+    if (value == null || value.isBlank()) throw new IllegalArgumentException("registration failure key must not be blank");
+    return value.trim().toLowerCase(java.util.Locale.ROOT);
+  }
+
   /**
    * Registers or updates an action definition in the registry, and registers its command if configured.
    */
@@ -194,9 +228,11 @@ public final class ActionManager implements ActionService {
         for (io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec trigger : definition.triggers()) {
           try {
             triggerRegistrar.accept(trigger);
-            RTP.log(Level.FINE, "[RTP Action] Registered physical trigger: " + trigger.id() + " -> " + definition.id());
+            clearRegistrationFailure("trigger", definition.id(), trigger.id());
+            RTPRuntime.log(Level.FINE, "[RTP Action] Registered physical trigger: " + trigger.id() + " -> " + definition.id());
           } catch (Exception e) {
-            RTP.log(Level.WARNING, "[RTP Action] Failed registering trigger " + trigger.id() + ": " + e.getMessage());
+            recordRegistrationFailure("trigger", definition.id(), trigger.id(), e.getMessage());
+            RTPRuntime.log(Level.WARNING, "[RTP Action] Failed registering trigger " + trigger.id() + ": " + e.getMessage());
           }
         }
       }
@@ -235,6 +271,7 @@ public final class ActionManager implements ActionService {
    */
   public void clearDefinitions() {
     definitions.clear();
+    registrationFailures.clear();
   }
 
   @Override
@@ -421,7 +458,7 @@ public final class ActionManager implements ActionService {
    * Sweeps and removes lingering rtp_session_* tags and ephemeral objectives.
    */
   public void sweepStartupOrphans() {
-    RTPServerAccessor accessor = RTP.serverAccessor;
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
     if (accessor == null) return;
     try {
       UUID serverId = new UUID(0, 0);
@@ -440,7 +477,7 @@ public final class ActionManager implements ActionService {
       }
       accessor.executeCommand(serverId, "tag @a remove rtp_session_*");
     } catch (Exception e) {
-      RTP.log(Level.WARNING, "[RTP Action] Failed sweeping startup orphan scoreboards: " + e.getMessage());
+      RTPRuntime.log(Level.WARNING, "[RTP Action] Failed sweeping startup orphan scoreboards: " + e.getMessage());
     }
   }
 
@@ -488,7 +525,7 @@ public final class ActionManager implements ActionService {
   private void processWaitQueue(ActionDefinition def, java.util.Queue<ActionWaitQueueEntry> queue) {
     if (def == null || queue == null || queue.isEmpty()) return;
 
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[action] processing wait queue for '"
             + def.id()
@@ -509,8 +546,8 @@ public final class ActionManager implements ActionService {
           entry.future.complete(ActionSessionResult.failure("Participant joined another session: " + pid));
           return true;
         }
-        if (RTP.serverAccessor != null) {
-          io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTP.serverAccessor.getPlayer(pid);
+        if (RTPRuntime.serverAccessor() != null) {
+          io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(pid);
           if (p != null && !p.isOnline()) {
             entry.future.complete(ActionSessionResult.failure("Participant offline: " + pid));
             return true;
@@ -571,8 +608,8 @@ public final class ActionManager implements ActionService {
             tokens.put("player_uuid_" + num, pUuid);
             tokens.put("sender_" + num, pUuid);
             tokens.put("sender_uuid_" + num, pUuid);
-            if (RTP.serverAccessor != null) {
-              io.github.dailystruggle.rtp.api.entity.RTPCommandSender sender = RTP.serverAccessor.getPlayer(pUuid);
+            if (RTPRuntime.serverAccessor() != null) {
+              io.github.dailystruggle.rtp.api.entity.RTPCommandSender sender = RTPRuntime.serverAccessor().getPlayer(pUuid);
               if (sender != null && sender.name() != null) {
                 tokens.put("player_name_" + num, sender.name());
                 tokens.put("sender_name_" + num, sender.name());
@@ -608,7 +645,7 @@ public final class ActionManager implements ActionService {
 
         boolean passed = GateEvaluator.evaluateAll(def.gates(), preGateCtx, externalPredicates, tokens);
         if (passed) {
-          RTP.log(
+          RTPRuntime.log(
               Level.FINE,
               "[action] wait queue satisfied for '"
                   + def.id()
@@ -677,12 +714,12 @@ public final class ActionManager implements ActionService {
 
     ActionDefinition def = definitions.get(actionId.trim().toLowerCase());
     if (def == null) {
-      RTP.log(Level.WARNING, "[action] trigger failed - definition not found for: " + actionId);
+      RTPRuntime.log(Level.WARNING, "[action] trigger failed - definition not found for: " + actionId);
       return CompletableFuture.completedFuture(
           ActionSessionResult.failure("Action definition not found: " + actionId));
     }
 
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[action] trigger: action="
             + def.id()
@@ -701,9 +738,9 @@ public final class ActionManager implements ActionService {
         for (UUID r : reserved) {
           participantToSession.remove(r, pendingSessionId);
         }
-        io.github.dailystruggle.rtp.api.server.RTPServerAccessor acc = RTP.serverAccessor;
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor acc = RTPRuntime.serverAccessor();
         String pName = (acc != null && acc.getPlayer(pid) != null) ? acc.getPlayer(pid).name() : pid.toString();
-        RTP.log(Level.WARNING, "[action] participant " + pName + " (" + pid + ") already in active session");
+        RTPRuntime.log(Level.WARNING, "[action] participant " + pName + " (" + pid + ") already in active session");
         return CompletableFuture.completedFuture(
             ActionSessionResult.failure("Participant is already in an active session: " + pName));
       }
@@ -737,7 +774,7 @@ public final class ActionManager implements ActionService {
       }
 
       boolean gatePassed = GateEvaluator.evaluateAll(def.gates(), preGateCtx, externalPredicates, tokens);
-      RTP.log(
+      RTPRuntime.log(
           Level.FINE,
           "[action] pre-execution gates evaluation for '" + def.id() + "': passed=" + gatePassed);
       if (!gatePassed) {
@@ -748,7 +785,7 @@ public final class ActionManager implements ActionService {
         CompletableFuture<ActionSessionResult> waitFuture = new CompletableFuture<>();
         ActionWaitQueueEntry entry = new ActionWaitQueueEntry(participants, effectiveContext, waitFuture);
         waitQueues.computeIfAbsent(def.id().toLowerCase(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(entry);
-        RTP.log(
+        RTPRuntime.log(
             Level.FINE,
             "[action] enqueued participants "
                 + participants
@@ -769,7 +806,7 @@ public final class ActionManager implements ActionService {
       return executeDirectInternal(def, participants, effectiveContext, pendingSessionId);
     } catch (Throwable t) {
       rollbackReservation(reserved, pendingSessionId);
-      RTP.log(Level.WARNING, "[action] trigger failed for '" + def.id() + "'", t);
+      RTPRuntime.log(Level.WARNING, "[action] trigger failed for '" + def.id() + "'", t);
       return CompletableFuture.completedFuture(
           ActionSessionResult.failure("Action trigger failed: " + t.getMessage()));
     }
@@ -799,12 +836,12 @@ public final class ActionManager implements ActionService {
       Map<String, Object> tokens,
       List<UUID> participants) {
     if (action == null) return;
-    io.github.dailystruggle.rtp.api.server.RTPServerAccessor accessor = RTP.serverAccessor;
+    io.github.dailystruggle.rtp.api.server.RTPServerAccessor accessor = RTPRuntime.serverAccessor();
     if (accessor == null) return;
 
     // Any command with a target placeholder should be dropped if there is no target
     if (ActionPlaceholderSanitizer.hasMissingTarget(action.payload(), tokens)) {
-      RTP.log(Level.FINE, "[RTP Action] Dropping enqueue command due to missing target: " + action.payload());
+      RTPRuntime.log(Level.FINE, "[RTP Action] Dropping enqueue command due to missing target: " + action.payload());
       return;
     }
 
@@ -812,13 +849,13 @@ public final class ActionManager implements ActionService {
       case CONSOLE -> {
         String substituted = ActionPlaceholderSanitizer.substitute(action.payload(), tokens);
         if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, "target")) {
-          RTP.log(Level.FINE, "[RTP Action] Dropping enqueue console command with unresolved target: " + substituted);
+          RTPRuntime.log(Level.FINE, "[RTP Action] Dropping enqueue console command with unresolved target: " + substituted);
           return;
         }
         try {
           accessor.executeCommand(new UUID(0, 0), substituted);
         } catch (Throwable t) {
-          RTP.log(Level.WARNING, "[RTP Action] Enqueue command execution failed: " + substituted, t);
+          RTPRuntime.log(Level.WARNING, "[RTP Action] Enqueue command execution failed: " + substituted, t);
         }
       }
       case PLAYER -> {
@@ -836,7 +873,7 @@ public final class ActionManager implements ActionService {
           try {
             accessor.executeCommand(pid, substituted);
           } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP Action] Enqueue player command execution failed: " + substituted, t);
+            RTPRuntime.log(Level.WARNING, "[RTP Action] Enqueue player command execution failed: " + substituted, t);
           }
         }
       }
@@ -911,7 +948,7 @@ public final class ActionManager implements ActionService {
       ActionContext effectiveContext,
       UUID preReservedSessionId) {
 
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[action] executeDirect: action="
             + def.id()
@@ -930,7 +967,7 @@ public final class ActionManager implements ActionService {
       for (UUID pid : participants) {
         if (participantToSession.putIfAbsent(pid, sessionId) != null) {
           rollbackReservation(localReserved, sessionId);
-          io.github.dailystruggle.rtp.api.server.RTPServerAccessor acc = RTP.serverAccessor;
+          io.github.dailystruggle.rtp.api.server.RTPServerAccessor acc = RTPRuntime.serverAccessor();
           String pName = (acc != null && acc.getPlayer(pid) != null) ? acc.getPlayer(pid).name() : pid.toString();
           return CompletableFuture.completedFuture(
               ActionSessionResult.failure("Participant is already in an active session: " + pName));
@@ -984,8 +1021,8 @@ public final class ActionManager implements ActionService {
         if (mr != null && !mr.toString().isBlank()) effectiveRegion = mr.toString().trim();
       }
 
-      final Region parentRegion = (effectiveRegion != null && !effectiveRegion.isBlank() && RTP.selectionAPI != null)
-          ? RTP.selectionAPI.getRegion(effectiveRegion)
+      final Region parentRegion = (effectiveRegion != null && !effectiveRegion.isBlank() && ActiveSelection.get() != null)
+          ? ActiveSelection.get().getRegion(effectiveRegion)
           : null;
 
       // Check if a pre-validated placement is cached for this action (ADR-097)
@@ -997,7 +1034,7 @@ public final class ActionManager implements ActionService {
           });
     } catch (Throwable t) {
       rollbackReservation(participants, sessionId);
-      RTP.log(Level.WARNING, "[action] executeDirect failed for '" + def.id() + "'", t);
+      RTPRuntime.log(Level.WARNING, "[action] executeDirect failed for '" + def.id() + "'", t);
       return CompletableFuture.completedFuture(
           ActionSessionResult.failure("Action execution failed: " + t.getMessage()));
     }
@@ -1130,8 +1167,7 @@ public final class ActionManager implements ActionService {
                     long locKey = memShape.xzToLocation(cx, cz);
                     memShape.addBadChunk(
                         locKey,
-                        io.github.dailystruggle.rtp.common.selection.region.LocationGenerator
-                            .FailTypes.safetyExternal);
+                        io.github.dailystruggle.rtp.common.selection.model.FailTypes.safetyExternal);
                   }
                 }
                 cached.release();
@@ -1144,9 +1180,9 @@ public final class ActionManager implements ActionService {
               Map<UUID, int[]> assignedSlots = new HashMap<>();
               String worldName = locList.get(0).world().name();
 
-              if (RTP.serverAccessor != null) {
+              if (RTPRuntime.serverAccessor() != null) {
                 for (UUID pid : participants) {
-                  var p = RTP.serverAccessor.getPlayer(pid);
+                  var p = RTPRuntime.serverAccessor().getPlayer(pid);
                   if (p != null && !p.isOnline()) {
                     cached.release();
                     rollbackReservation(participants, sessionId);
@@ -1161,8 +1197,8 @@ public final class ActionManager implements ActionService {
                 UUID pid = participants.get(i);
                 RTPLocation loc = locList.get(i);
                 assignedSlots.put(pid, new int[] {loc.x(), loc.y(), loc.z()});
-                if (RTP.serverAccessor != null) {
-                  io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTP.serverAccessor.getPlayer(pid);
+                if (RTPRuntime.serverAccessor() != null) {
+                  io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(pid);
                   if (player != null) {
                     CompletableFuture<Boolean> done = new CompletableFuture<>();
                     teleports.add(done);
@@ -1247,8 +1283,8 @@ public final class ActionManager implements ActionService {
                           session.arm();
                           session.triggerStart();
                         };
-                        if (RTP.scheduler != null) {
-                          RTP.scheduler.runTask(startAction);
+                        if (RTPRuntime.scheduler() != null) {
+                          RTPRuntime.scheduler().runTask(startAction);
                         } else {
                           startAction.run();
                         }
@@ -1295,7 +1331,7 @@ public final class ActionManager implements ActionService {
     GroupPlacementRequest request =
         GroupPlacementRequest.of(targetRegion, profile, participants, anchorSource);
 
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[action] live placement request: action="
             + def.id()
@@ -1310,7 +1346,7 @@ public final class ActionManager implements ActionService {
         .place(request)
         .thenApply(
             result -> {
-              RTP.log(
+              RTPRuntime.log(
                   Level.FINE,
                   "[action] live placement result: action="
                   + def.id()
@@ -1376,8 +1412,8 @@ public final class ActionManager implements ActionService {
                 session.arm();
                 session.triggerStart();
               };
-              if (RTP.scheduler != null) {
-                RTP.scheduler.runTask(startAction);
+              if (RTPRuntime.scheduler() != null) {
+                RTPRuntime.scheduler().runTask(startAction);
               } else {
                 startAction.run();
               }
@@ -1444,7 +1480,7 @@ public final class ActionManager implements ActionService {
             }
           }
         } catch (Throwable t) {
-          io.github.dailystruggle.rtp.common.RTP.log(
+          io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
               java.util.logging.Level.WARNING,
               "[RTP] Failed to resolve claim boundary for action anchor",
               t);
@@ -1466,10 +1502,10 @@ public final class ActionManager implements ActionService {
       case "player":
       case "nearplayer": {
         RTPCoords c = readCoords(ctx, pSpec);
-        if (c == null && RTP.serverAccessor != null) {
+        if (c == null && RTPRuntime.serverAccessor() != null) {
           // Auto-discover a random online player (excluding participants if possible)
           List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> online =
-              new ArrayList<>(RTP.serverAccessor.getOnlinePlayers());
+              new ArrayList<>(RTPRuntime.serverAccessor().getOnlinePlayers());
           if (participants != null && !participants.isEmpty()) {
             online.removeIf(p -> participants.contains(p.uuid()));
           }
@@ -1634,8 +1670,8 @@ public final class ActionManager implements ActionService {
     if (senderName != null && tStr.equalsIgnoreCase(senderName.toString().trim())) {
       return true;
     }
-    if (RTP.serverAccessor != null && senderUuid != null) {
-      io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTP.serverAccessor.getPlayer(senderUuid);
+    if (RTPRuntime.serverAccessor() != null && senderUuid != null) {
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(senderUuid);
       if (p != null && p.name() != null && tStr.equalsIgnoreCase(p.name().trim())) {
         return true;
       }

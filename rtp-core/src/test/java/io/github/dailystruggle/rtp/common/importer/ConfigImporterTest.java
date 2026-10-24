@@ -3,11 +3,14 @@ package io.github.dailystruggle.rtp.common.importer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigImportCmd;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -39,8 +42,8 @@ public class ConfigImporterTest {
         Files.createDirectories(rtpDir);
 
         RTPTestSetup.install(rtpDir.toFile());
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
-        RTP.configs = new Configs(rtpDir.toFile());
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
+        ActiveConfigs.set(new Configs(rtpDir.toFile()));
 
         RTP.addShape(new Circle("CIRCLE"));
         RTP.addShape(new Square("SQUARE"));
@@ -51,7 +54,7 @@ public class ConfigImporterTest {
         MockRTPWorld worldNether = new MockRTPWorld("world_nether");
         mockAccessor.addWorld(world);
         mockAccessor.addWorld(worldNether);
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
     }
 
     @org.junit.jupiter.api.AfterEach
@@ -331,8 +334,8 @@ public class ConfigImporterTest {
         ConfigCmd configCmd = new ConfigCmd(null);
         configCmd.addCommands();
 
-        assertTrue(configCmd.getCommandLookup().containsKey("import"), "ConfigCmd must register 'import' subcommand");
-        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("import");
+        assertTrue(configCmd.getCommandLookup().containsKey("IMPORT"), "ConfigCmd must register 'import' subcommand");
+        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("IMPORT");
         assertNotNull(importCmd);
 
         // Execute auto-detect with no params
@@ -507,7 +510,7 @@ public class ConfigImporterTest {
 
         ConfigCmd configCmd = new ConfigCmd(null);
         configCmd.addCommands();
-        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("import");
+        ConfigImportCmd importCmd = (ConfigImportCmd) configCmd.getCommandLookup().get("IMPORT");
 
         Map<String, List<String>> params = new HashMap<>();
         params.put("source", List.of("betterrtp"));

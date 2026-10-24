@@ -642,7 +642,7 @@ The canonical wording for every `REQ-RTP-NET-NNN` requirement lives in [`REQUIRE
 | `REQ-RTP-NET-012` | Exactly-once reservation claim | *Reservation Tokens — Lifecycle ownership matrix* (`CLAIMED → CONSUMED` row); *Sufficiency Audit* |
 | `REQ-RTP-NET-013` | Multi-flavour persistence compatibility | *Storage — Reuse `AbstractSQLDatabaseAccessor`*; *Sufficiency Audit* |
 | `REQ-RTP-NET-014` | Multi-proxy concurrency and reanimation | *Multi-Proxy Deployment*; *Reservation tokens under multiple proxies*; *Phase 2 acceptance* |
-| `REQ-RTP-NET-015` | Shared network waitlist for cross-server `/rtp` (parks unservable enrolments; per-player point-remove; per-backend `networkKeptCount`-sized batch drain) | [rtp-proxy-ADR-015](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md); [`CHECKLIST-network-waitlist.md`](scratch/CHECKLIST-network-waitlist.md). Slice 1 (SPI + in-memory reference impl) landed 2026-05-21; Slices 2-5 (dispatcher rewiring, Redis impl + Lua, lobby-side notify/lock/quit-remove, locale parity) deferred. |
+| `REQ-RTP-NET-015` | Shared network waitlist for cross-server `/rtp` (parks unservable enrolments; per-player point-remove; per-backend `networkKeptCount`-sized batch drain) | [rtp-proxy-ADR-015](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md). Slice 1 (SPI + in-memory reference impl) landed 2026-05-21; Slices 2-5 (dispatcher rewiring, Redis impl + Lua, lobby-side notify/lock/quit-remove, locale parity) deferred. |
 
 > Authoring rules for any future amendments: see [`docs/dev/RULES.md`](RULES.md) and the *Requirement Documentation Rules* section of [`AGENTS.md`](../../.junie/AGENTS.md) (use `shall` / `shall not`, no implementation actions, no temporal framing).
 
@@ -903,7 +903,7 @@ Choice is deferred until the proxy-side `commands-api` surface is concrete (an e
 
 ## Deferred: extract `proxy-api/` sibling module
 
-Tracked here (moved 2026-05-29 from the now-completed metrics-api extraction proposal, which mirrored this decision; see [metrics-api-ADR-001](../../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md) *Deferred sibling extraction*). Once `metrics-api` had shipped, `rtp-proxy-common` was slated for the same plugin-agnostic split, as a *simple file transfer* with no reshaping:
+Tracked here (moved 2026-05-29 from the now-completed metrics-api extraction proposal, which mirrored this decision; see [metrics-api-ADR-001](../../api/metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md) *Deferred sibling extraction*). Once `metrics-api` had shipped, `rtp-proxy-common` was slated for the same plugin-agnostic split, as a *simple file transfer* with no reshaping:
 
 - **Extract** into a new `proxy-api/` subproject (neutral root `io.github.dailystruggle.proxy.api.*`, mirroring the `metrics-api` neutral-root decision):
   - Generic transport SPI: `NetworkTransport`, `ProxySender`, `ProxyHeartbeat`, `BackendHeartbeat`, `Subscription`.

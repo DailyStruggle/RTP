@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
@@ -49,8 +50,10 @@ class FoliaSchedulerTest {
 
     mockFoliaScheduler = new MockFoliaScheduler();
 
-    RTP.serverAccessor = serverAccessor;
-    RTP.scheduler = mockFoliaScheduler;
+    // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+    RTP.ensureInitialized();
+    RTPRuntime.setServerAccessor(serverAccessor);
+    RTPRuntime.setScheduler(mockFoliaScheduler);
     RTPAPI.serverAccessor = serverAccessor;
   }
 
@@ -149,8 +152,8 @@ class FoliaSchedulerTest {
 
   @Test
   void testMockSchedulerInjection() {
-    Assertions.assertEquals(mockFoliaScheduler, RTP.scheduler);
-    Assertions.assertTrue(RTP.scheduler instanceof MockFoliaScheduler);
+    Assertions.assertEquals(mockFoliaScheduler, RTPRuntime.scheduler());
+    Assertions.assertTrue(RTPRuntime.scheduler() instanceof MockFoliaScheduler);
   }
 
   @Test
@@ -171,7 +174,7 @@ class FoliaSchedulerTest {
     });
 
     // This call uses MockFoliaScheduler and executes deterministically
-    RTP.scheduler.runTaskForPlayer(player, teleportTask, 20L);
+    RTPRuntime.scheduler().runTaskForPlayer(player, teleportTask, 20L);
 
     Assertions.assertFalse(ran.get(), "Task should not have run yet (delayed by 20 ticks)");
 
@@ -199,13 +202,13 @@ class FoliaSchedulerTest {
       chunkGenerated.set(true);
 
       // 2. Schedule player teleport
-      RTP.scheduler.runTask(() -> {
+      RTPRuntime.scheduler().runTask(() -> {
         player.setLocation(targetLocation);
         playerTeleported.set(true);
       });
     });
 
-    RTP.scheduler.runTaskLater(commandTask, 10);
+    RTPRuntime.scheduler().runTaskLater(commandTask, 10);
 
     Assertions.assertFalse(chunkGenerated.get());
     Assertions.assertFalse(playerTeleported.get());

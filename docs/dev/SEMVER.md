@@ -1,7 +1,7 @@
 # Semantic Versioning (SemVer) Contract
 
 > **Scope:** Repository-wide versioning policy, public API definition, internal boundary classification, and binary compatibility commitments.
-> **Related:** [DEPRECATION_POLICY.md](DEPRECATION_POLICY.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ADR-011](../adr/ADR-011-rtp-api-module.md), [ADR-094](../adr/ADR-094-quality-engineering-gates.md).
+> **Related:** [DEPRECATION_POLICY.md](DEPRECATION_POLICY.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ADR-011](../adr/ADR-011-rtp-api-separate-module.md), [ADR-094](../adr/ADR-094-quality-engineering-gates.md).
 
 ---
 
@@ -40,11 +40,15 @@ The public API is designed for third-party addon developers, external integratio
    - Addon self-registration interfaces via `RTPServerAccessor`.
 2. **Platform-Neutral SPI Modules:**
    - **`commands-api` (`io.github.dailystruggle.commandsapi.common.*`):** Command tree abstractions, parameter parsers, command contexts.
+   - **`bit-api` (`io.github.dailystruggle.bit.*`):** Built-In Test (PBIT/CBIT/IBIT) contract, findings model, and code registry.
    - **`effects-api` (`io.github.dailystruggle.effectsapi.common.*`):** Platform-neutral visual/auditory effect models.
    - **`maps-api` (`io.github.dailystruggle.mapsapi.common.*`):** Minimap/chart rendering models and specs.
-   - **`metrics-api` (`io.github.dailystruggle.metricsapi.common.*`):** Telemetry SPI interfaces.
-   - **`anvil-api` (`io.github.dailystruggle.anvilapi.*`):** Platform-neutral Anvil chunk and region file decoders, and the `RegionFileReader` SPI for addon-supplied region formats.
-   - **`tags-api` (`io.github.dailystruggle.tagsapi.*`):** Block and biome tag query interfaces.
+   - **`metrics-api` (`io.github.dailystruggle.metrics.api.*`):** Telemetry SPI interfaces.
+   - **`bstats-api` (`io.github.dailystruggle.bstats.api.*`):** Dependency-free bStats v2 client SPI.
+   - **`server-api` (`io.github.dailystruggle.server.api.*`):** Platform-neutral server identity, `PlatformFamily`, and logging SPI.
+   - **`units-api` (`io.github.dailystruggle.rtp.common.selection.region.util.*`):** Temporal, spatial, and data-size unit parsers.
+   - **`anvil-api` (`io.github.dailystruggle.rtp.anvil.*`):** Platform-neutral Anvil chunk and region file decoders, and the `RegionFileReader` SPI for addon-supplied region formats.
+   - **`tags-api` (`io.github.dailystruggle.rtp.tags.*`):** Block and biome tag query interfaces.
    - **`yaml-api` (`io.github.dailystruggle.rtp.common.configuration.yaml.*`):** Hand-rolled zero-dependency YAML parser AST types (`RtpYaml*`).
 
 **Public API Guarantees:**

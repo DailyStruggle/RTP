@@ -8,7 +8,13 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
@@ -52,10 +58,23 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       RTPWorld<?> rtpWorld = getRTPWorld(s);
       if (!(rtpWorld instanceof FoliaRTPWorld)) return null;
       World world = ((FoliaRTPWorld) rtpWorld).world();
-      org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
+      org.bukkit.WorldBorder worldBorder;
+      try {
+        worldBorder = world.getWorldBorder();
+      } catch (Throwable t) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, t.getClass().getSimpleName() + ": " + t.getMessage());
+        log(Level.WARNING, "[RTP] (Folia) Failed to resolve native WorldBorder for world " + s + ": " + t.getMessage(), t);
+        return null;
+      }
+      if (worldBorder == null) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, "world.getWorldBorder() returned null");
+        return null;
+      }
       return new WorldBorder(
           () -> {
-            Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+            Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
             if (shape instanceof Square square) {
               square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
               square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
@@ -171,6 +190,9 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   @GlobalRegionThread
   public @Nullable RTPPlayer getPlayer(UUID uuid) {
+    // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return null;
     return new FoliaRTPPlayer(player);
@@ -179,6 +201,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   @GlobalRegionThread
   public @Nullable RTPPlayer getPlayer(String name) {
+    RTPPlayer mock = MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(name);
     if (player == null) return null;
     return new FoliaRTPPlayer(player);
@@ -192,6 +216,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public @NotNull RTPCommandSender getSender(UUID uuid) {
     if (uuid.equals(RTPAPI.serverId)) return new FoliaRTPCommandSender(Bukkit.getConsoleSender());
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return new FoliaRTPCommandSender(Bukkit.getConsoleSender());
     return new FoliaRTPPlayer(player);
@@ -209,13 +235,13 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target, Enum<?> msgType, String tag) {
-    String message = String.valueOf(RTP.configs.getConfigValue(msgType, ""));
+    String message = String.valueOf(ActiveConfigs.get().getConfigValue(msgType, ""));
     sendMessage(target, message, tag);
   }
 
   @Override
   public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
-    String message = String.valueOf(RTP.configs.getConfigValue(msgType, ""));
+    String message = String.valueOf(ActiveConfigs.get().getConfigValue(msgType, ""));
     sendMessage(target1, target2, message, tag);
   }
 
@@ -385,6 +411,9 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
         try {
           values = tag.getValues();
         } catch (Throwable t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+              key.getNamespace() + ":" + key.getKey(),
+              t.getClass().getSimpleName() + ": " + t.getMessage());
           log(Level.WARNING,
               "[RTP] (Folia) tag.getValues() threw for key="
                   + key.getNamespace() + ":" + key.getKey()
@@ -403,12 +432,16 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
             Collections.unmodifiableSet(members));
       }
     } catch (Throwable e) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", e.getClass().getSimpleName() + ": " + e.getMessage());
       log(Level.WARNING,
           "[RTP] (Folia) Failed to snapshot block tag registry: "
               + e.getClass().getName() + ": " + e.getMessage(), e);
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", "empty-tag-snapshot(iterated=" + totalTags + ",empty=" + totalEmpty + ")");
       log(Level.WARNING,
           "[RTP] (Folia) Bukkit block-tag registry yielded no usable tags (iterated="
               + totalTags + ", empty=" + totalEmpty
@@ -457,8 +490,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     // without importing a platform class. BukkitBackendStateSampler is on the
     // Folia classpath (rtp-folia-common -> rtp-paper-common -> rtp-bukkit-common)
     // and uses only Folia-safe Bukkit API (Bukkit.getWorlds() + RTP internals).
-    RTP.backendStateSamplerFactory = lobbyMode ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode);
+    NetworkHooks.setBackendStateSamplerFactory(
+        io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler::new);
   }
 
   @Override
@@ -502,7 +535,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() { // @AnyThread - returns stored field
-    return io.github.dailystruggle.rtp.common.RTP.scheduler;
+    return io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
   }
 
   @Override
@@ -512,7 +545,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     // global TPS; fall back to the nominal constant only on the NOOP path.
     try {
       io.github.dailystruggle.metrics.api.MetricsSnapshot s =
-          io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
+          CoreMetrics.instance().snapshot();
       double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
       if (!Double.isNaN(v)) return v;
     } catch (Throwable ignored) {
@@ -812,7 +845,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     } catch (Exception ignored) {
       // Material lookup threw; fall back to normalizer
     }
-    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+    return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
 
   // ---------------------------------------------------------------------------

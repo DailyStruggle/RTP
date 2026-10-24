@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -78,7 +78,7 @@ public final class NetworkEnrolmentBuffer {
     public int pendingDepth() { return deque.size(); }
 
     /**
-     * Start the periodic flush timer on {@link RTP#scheduler}'s async tier.
+     * Start the periodic flush timer on {@link RTPRuntime#scheduler()}'s async tier.
      * Idempotent: a second call returns the existing handle. {@code period}
      * is in server ticks (20 ticks per second) to match
      * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTaskTimerAsynchronously}.
@@ -88,13 +88,13 @@ public final class NetworkEnrolmentBuffer {
     public void start(long periodTicks) {
         synchronized (this) {
             if (timerTaskHandle != null) return;
-            if (RTP.scheduler == null) {
-                RTP.log(Level.WARNING,
+            if (RTPRuntime.scheduler() == null) {
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] NetworkEnrolmentBuffer.start called before scheduler available; "
                                 + "flush timer not started.");
                 return;
             }
-            timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::flushOnce, periodTicks, periodTicks);
+            timerTaskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(this::flushOnce, periodTicks, periodTicks);
         }
     }
 
@@ -120,7 +120,7 @@ public final class NetworkEnrolmentBuffer {
             for (int i = batch.size() - 1; i >= 0; i--) {
                 deque.addFirst(batch.get(i));
             }
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] enrolment flush failed (" + batch.size()
                             + " records re-queued): " + t.getMessage(), t);
         }
@@ -129,8 +129,8 @@ public final class NetworkEnrolmentBuffer {
     /** Idempotent. */
     public void shutdown() {
         synchronized (this) {
-            if (timerTaskHandle != null && RTP.scheduler != null) {
-                try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
+            if (timerTaskHandle != null && RTPRuntime.scheduler() != null) {
+                try { RTPRuntime.scheduler().cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
             }
             timerTaskHandle = null;
         }

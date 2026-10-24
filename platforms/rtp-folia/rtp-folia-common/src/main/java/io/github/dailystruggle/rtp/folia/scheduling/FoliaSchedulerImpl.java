@@ -5,7 +5,9 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.tasks.tick.TickBudget;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
@@ -167,6 +169,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     this.defaultInteractiveTimeoutMs = Math.max(100L, defaultInteractiveTimeoutMs);
     this.budget = budget;
     this.health = health;
+    GenerationBudget.configureServerAdmission(false);
   }
 
   /** Fails open: a missing or throwing metrics source never stalls regional work. */
@@ -550,7 +553,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
 
   private static void observeRegionForMetrics(RTPWorld<?> world, int cx, int cz) {
     try {
-      RTP.metrics.getBinding().observeRegion(world, cx, cz);
+      CoreMetrics.instance().getBinding().observeRegion(world, cx, cz);
     } catch (Throwable t) {
       RTP.log(Level.FINER, "[RTP] Folia region metrics observe failed: " + t);
     }
@@ -685,6 +688,12 @@ public class FoliaSchedulerImpl implements RTPScheduler {
             periodMs,
             TimeUnit.MILLISECONDS
     );
+  }
+
+  @Override
+  public boolean isGenerationSaturated(RTPWorld<?> world) {
+    GenerationBudget.configureServerAdmission(false);
+    return false;
   }
 
   /** Backlogged (deep queue or late slice) or unhealthy region: background work should go elsewhere. */

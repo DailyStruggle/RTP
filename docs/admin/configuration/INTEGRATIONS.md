@@ -25,7 +25,7 @@ All keys are booleans defaulting to `false`. Set a key to `true` to avoid telepo
 | `rerollTownyAdvanced` | Towny Advanced | `false` | Reroll if the location lands inside a Towny Advanced claim. |
 | `rerollWorldGuard` | WorldGuard | `false` | Reroll if the location lands inside a WorldGuard region. |
 | `rerollUltimateClaims` | UltimateClaims | `false` | Reroll if the location lands inside an UltimateClaims claim. |
-| `rerollMinePlots` | MinePlots | `false` | Reroll if the location lands inside a MinePlots plot or claim. |
+| `rerollMinePlots` | minePlots (mineCodes) | `false` | Reroll if the location lands inside a minePlots plot. Best effort: tested against the documented API, not yet a live server. |
 
 ## Versioning
 

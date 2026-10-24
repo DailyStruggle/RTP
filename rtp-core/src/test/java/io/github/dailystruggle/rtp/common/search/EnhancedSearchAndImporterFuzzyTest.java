@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.search;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -35,7 +35,7 @@ class EnhancedSearchAndImporterFuzzyTest {
     @BeforeEach
     void setUp() throws IOException {
         RTPTestSetup.install(tempDir.toFile());
-        RTP.configs = new Configs(tempDir.toFile());
+        ActiveConfigs.set(new Configs(tempDir.toFile()));
         Files.createDirectories(tempDir.resolve("regions"));
     }
 
@@ -44,14 +44,14 @@ class EnhancedSearchAndImporterFuzzyTest {
         ConfigParser<EconomyKeys> economyParser =
                 new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", tempDir.toFile(),
                         new YamlFileDatabase(tempDir.toFile()), "en");
-        RTP.configs.configParserMap.put(EconomyKeys.class, economyParser);
+        ActiveConfigs.get().configParserMap.put(EconomyKeys.class, economyParser);
     }
 
     private void seedRegion(String fileName, String body) throws IOException {
         Files.writeString(tempDir.resolve("regions").resolve(fileName), body);
         MultiConfigParser<RegionKeys> mcp =
                 new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", tempDir.toFile());
-        RTP.configs.multiConfigParserMap.put(RegionKeys.class, mcp);
+        ActiveConfigs.get().multiConfigParserMap.put(RegionKeys.class, mcp);
     }
 
     @Test
@@ -65,7 +65,7 @@ class EnhancedSearchAndImporterFuzzyTest {
                 """);
 
         // Search with Spanish synonym 'dinero'
-        List<Hit> hits = ConfigSearchResultsBuilder.search("dinero", RTP.configs);
+        List<Hit> hits = ConfigSearchResultsBuilder.search("dinero", ActiveConfigs.get());
         assertFalse(hits.isEmpty(), "Searching 'dinero' must return synonym hits for price");
         Hit priceHit = hits.stream()
                 .filter(h -> h.keyName().equalsIgnoreCase("price"))
@@ -75,7 +75,7 @@ class EnhancedSearchAndImporterFuzzyTest {
         assertTrue(priceHit.matchReason().startsWith("Similar:"), "Match reason should describe similarity");
 
         // Search with English synonym 'cost'
-        List<Hit> costHits = ConfigSearchResultsBuilder.search("cost", RTP.configs);
+        List<Hit> costHits = ConfigSearchResultsBuilder.search("cost", ActiveConfigs.get());
         assertFalse(costHits.isEmpty(), "Searching 'cost' must return synonym hits for price");
         assertTrue(costHits.stream().anyMatch(h -> h.keyName().equalsIgnoreCase("price")));
     }
@@ -91,7 +91,7 @@ class EnhancedSearchAndImporterFuzzyTest {
                 """);
 
         // Typo search 'raduis'
-        List<Hit> typoHits = ConfigSearchResultsBuilder.search("raduis", RTP.configs);
+        List<Hit> typoHits = ConfigSearchResultsBuilder.search("raduis", ActiveConfigs.get());
         assertFalse(typoHits.isEmpty(), "Searching typo 'raduis' must find 'shape.radius'");
         Hit radiusHit = typoHits.stream()
                 .filter(h -> h.keyName().equalsIgnoreCase("shape.radius"))
@@ -102,7 +102,7 @@ class EnhancedSearchAndImporterFuzzyTest {
                 "Match reason should indicate similarity or fuzzy match: " + radiusHit.matchReason());
 
         // Exact search 'radius' should rank higher than fuzzy typo
-        List<Hit> exactHits = ConfigSearchResultsBuilder.search("radius", RTP.configs);
+        List<Hit> exactHits = ConfigSearchResultsBuilder.search("radius", ActiveConfigs.get());
         assertFalse(exactHits.isEmpty());
         Hit topHit = exactHits.get(0);
         assertTrue(topHit.score() >= 80, "Exact/Key match should score >= 80");

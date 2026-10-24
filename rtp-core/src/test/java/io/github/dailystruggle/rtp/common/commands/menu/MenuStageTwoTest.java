@@ -48,8 +48,8 @@ public class MenuStageTwoTest {
 
     @BeforeEach
     void setUp() {
-        // Many of the rejection paths in MenuRedeemSubcommand call RTP.log and
-        // RTP.serverAccessor; RTPTestSetup gives both a non-null mock.
+        // Many of the rejection paths in MenuRedeemSubcommand call RTPRuntime.log and
+        // RTPRuntime.serverAccessor(); RTPTestSetup gives both a non-null mock.
         RTPTestSetup.install(tempDir.toFile());
     }
 

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.api.menu;
 
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import org.jetbrains.annotations.Nullable;
 
 /**

@@ -3,6 +3,12 @@ package io.github.dailystruggle.rtp.fabric.server;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
@@ -20,7 +26,7 @@ import io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer;
 import io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler;
 import io.github.dailystruggle.rtp.fabric.tools.FabricAnsiText;
 import io.github.dailystruggle.rtp.fabric.world.FabricRTPWorld;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import net.fabricmc.loader.api.FabricLoader;
@@ -448,8 +454,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
-    return io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC;
+  public io.github.dailystruggle.server.api.PlatformFamily getPlatformFamily() {
+    return io.github.dailystruggle.server.api.PlatformFamily.FABRIC;
   }
 
   @Override
@@ -509,6 +515,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public RTPPlayer getPlayer(UUID uuid) {
     if (uuid == null) return null;
+    // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     RTPPlayer cached = playersById.get(uuid);
     if (cached != null) return cached;
     // Lazy fallback: JOIN event registration may have failed silently
@@ -519,6 +528,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public RTPPlayer getPlayer(String name) {
     if (name == null) return null;
+    RTPPlayer mock = MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
     RTPPlayer cached = playersByName.get(name);
     if (cached != null) return cached;
     return lazyResolveAndRegisterByName(name);
@@ -714,6 +725,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (uuid.equals(RTPAPI.serverId)) {
       return new FabricConsoleSender(server);
     }
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     RTPPlayer cached = playersById.get(uuid);
     if (cached != null) return cached;
     // Same lazy fallback as getPlayer(uuid): allow command-time recovery when
@@ -930,7 +943,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   /** Whether the config tree has been loaded (messages resolvable). */
   private static boolean configsLoaded() {
-    return RTP.configs != null;
+    return ActiveConfigs.get() != null;
   }
 
   @Override
@@ -1002,10 +1015,10 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @SuppressWarnings("unchecked")
   private static Level resolveMinLevel() {
     try {
-      if (RTP.configs == null) return Level.ALL;
+      if (ActiveConfigs.get() == null) return Level.ALL;
       ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
           (ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
-              RTP.configs.getParser(
+              ActiveConfigs.get().getParser(
                   io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
       if (logging == null) return Level.ALL;
       Object raw =
@@ -1838,7 +1851,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       return new WorldBorder(
           () -> {
             Shape<?> shape =
-                (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+                (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
             if (shape instanceof Square square) {
               square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
               square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
@@ -1872,7 +1885,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (!(rtpWorld instanceof FabricRTPWorld fabricWorld)) return null;
     ServerLevel level = fabricWorld.level();
     net.minecraft.world.level.border.WorldBorder mcBorder = level.getWorldBorder();
-    Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+    Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
     if (shape instanceof Square square) {
       square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
       square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
@@ -1953,7 +1966,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // Mojang-API probe documented below.
     try {
       io.github.dailystruggle.metrics.api.MetricsSnapshot snap =
-          RTP.metrics.snapshot();
+          CoreMetrics.instance().snapshot();
       double v = (ticks >= 600) ? snap.tps15m : (ticks >= 100 ? snap.tps5m : snap.tps1m);
       if (!Double.isNaN(v)) return v;
     } catch (Throwable ignored) {
@@ -2429,8 +2442,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   /** Look up a {@code messages.yml} template by key, returning null if unset. */
   private static @Nullable String lookupMessageTemplate(Enum<?> key) {
-    if (RTP.configs == null) return null;
-    Object v = RTP.configs.getConfigValue(key, "");
+    if (ActiveConfigs.get() == null) return null;
+    Object v = ActiveConfigs.get().getConfigValue(key, "");
     return v == null ? null : v.toString();
   }
 
@@ -2527,10 +2540,10 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (commandLine == null || commandLine.isBlank()) return false;
     MinecraftServer s = server;
     if (s == null) return false;
-    if (!isPrimaryThread() && RTP.scheduler != null) {
+    if (!isPrimaryThread() && RTPRuntime.scheduler() != null) {
       // Command dispatch mutates single-threaded server state; queue it onto the server thread.
       // Off-thread, true means "dispatched"; failures are logged by dispatchCommandNow.
-      RTP.scheduler.runTask(() -> dispatchCommandNow(s, senderId, commandLine));
+      RTPRuntime.scheduler().runTask(() -> dispatchCommandNow(s, senderId, commandLine));
       return true;
     }
     return dispatchCommandNow(s, senderId, commandLine);
@@ -2558,7 +2571,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (commandLine == null || commandLine.isBlank()) return false;
     MinecraftServer s = server;
     if (s == null) return false;
-    if (!isPrimaryThread() && RTP.scheduler != null) {
+    if (!isPrimaryThread() && RTPRuntime.scheduler() != null) {
       // Callers consume the captured lines synchronously, so block on the server-thread run.
       java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean(false);
       java.util.function.Consumer<String> guardedConsumer = sLine -> {
@@ -2567,7 +2580,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         }
       };
       java.util.concurrent.CompletableFuture<Boolean> done = new java.util.concurrent.CompletableFuture<>();
-      RTP.scheduler.runTask(() -> {
+      RTPRuntime.scheduler().runTask(() -> {
         if (!timedOut.get()) {
           done.complete(captureCommandNow(s, commandLine, guardedConsumer));
         }

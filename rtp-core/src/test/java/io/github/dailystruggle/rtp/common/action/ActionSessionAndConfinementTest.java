@@ -5,8 +5,10 @@ import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ActionGateContext;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,8 +31,8 @@ class ActionSessionAndConfinementTest {
   void setUp() {
     ActionSessionImpl.resetScoreboardObjectivesInitializedForTesting();
     serverAccessor = new MockRTPServerAccessor(new java.io.File("."));
-    RTP.serverAccessor = serverAccessor;
-    RTP.scheduler = serverAccessor.getMockScheduler();
+    RTPRuntime.setServerAccessor(serverAccessor);
+    RTPRuntime.setScheduler(serverAccessor.getMockScheduler());
     MemoryTracker.reset();
   }
 
@@ -256,7 +258,7 @@ class ActionSessionAndConfinementTest {
     io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
         new io.github.dailystruggle.rtp.common.factory.Factory<>();
     shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
-    RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
+    FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
     // Waiting room lobby shape centered at chunk (6, 6) [~96, 96] with radius 1 chunk
     Map<String, Object> lobbyGateConfig = Map.of(
@@ -595,7 +597,7 @@ class ActionSessionAndConfinementTest {
     io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
         new io.github.dailystruggle.rtp.common.factory.Factory<>();
     shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
-    RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
+    FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
     // Spatial gate for lobby room shape (playerCount >= 2)
     Map<String, Object> lobbyGateConfig = Map.of(

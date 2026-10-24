@@ -4,10 +4,11 @@ import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -28,7 +29,10 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @DisplayName("ADR-023: LoginCacheTask Unit Tests")
@@ -42,6 +46,9 @@ class LoginCacheTaskTest {
 
     @BeforeEach
     void setUp() {
+        GenerationBudget.server().resetForTesting();
+        GenerationBudget.configureServerAdmission(true);
+        GenerationBudget.configureServerCap(null);
         serverAccessor = RTPTestSetup.install(tempDir);
         world = new MockRTPWorld("login_world");
         serverAccessor.addWorld(world);
@@ -49,8 +56,11 @@ class LoginCacheTaskTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
+        GenerationBudget.server().resetForTesting();
+        GenerationBudget.configureServerAdmission(true);
+        GenerationBudget.configureServerCap(null);
     }
 
     private Region createRegion(String name) {
@@ -74,6 +84,53 @@ class LoginCacheTaskTest {
                 "",
                 false);
         return new Region(name, settings);
+    }
+
+    @Test
+    @DisplayName("RTP-80: login promotion preserves cold entries when the generation budget is full")
+    void promotionDefersWhenGenerationBudgetIsFull() {
+        GenerationBudget budget = GenerationBudget.server();
+        GenerationBudget.configureServerCap(() -> 1);
+        GenerationBudget.Reservation occupied = budget.reserve();
+        org.junit.jupiter.api.Assertions.assertNotNull(occupied);
+
+        Region region = createRegion("budget_full");
+        RTPWorld<?> spyWorld = spy(world);
+        Region spyRegion = spy(region);
+        doReturn(spyWorld).when(spyRegion).getWorld();
+        region.queueManager.loginLocations = new LockFreeLocationBuffer(10);
+        RTPLocation coldLoc = new RTPLocation(new RTPCoords("login_world", 16, 0, 16), 1, null);
+        region.queueManager.unkeptLocations.offer(coldLoc);
+
+        new LoginCacheTask(spyRegion).promoteUpTo(1);
+
+        verify(spyWorld, never()).getChunkAtAsync(anyInt(), anyInt());
+        assertEquals(1, region.queueManager.unkeptLocations.size());
+        assertEquals(1, budget.inFlight());
+        occupied.close();
+    }
+
+    @Test
+    @DisplayName("RTP-80: startup promotion burst stops at the generation budget")
+    void promotionBurstStopsAtGenerationBudget() {
+        GenerationBudget budget = GenerationBudget.server();
+        GenerationBudget.configureServerCap(() -> 1);
+        Region region = createRegion("budget_burst");
+        RTPWorld<?> spyWorld = spy(world);
+        Region spyRegion = spy(region);
+        doReturn(spyWorld).when(spyRegion).getWorld();
+        region.queueManager.loginLocations = new LockFreeLocationBuffer(10);
+        region.queueManager.unkeptLocations.offer(
+                new RTPLocation(new RTPCoords("login_world", 16, 0, 16), 1, null));
+        region.queueManager.unkeptLocations.offer(
+                new RTPLocation(new RTPCoords("login_world", 32, 0, 32), 1, null));
+        doReturn(new CompletableFuture<>()).when(spyWorld).getChunkAtAsync(anyInt(), anyInt());
+
+        new LoginCacheTask(spyRegion).promoteUpTo(2);
+
+        verify(spyWorld, times(1)).getChunkAtAsync(anyInt(), anyInt());
+        assertEquals(1, region.queueManager.unkeptLocations.size());
+        assertEquals(1, budget.inFlight());
     }
 
     @Test

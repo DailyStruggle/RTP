@@ -1,8 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Question / "how do I…" — GitHub Discussions
+  - name: "Discord #support Forum (LeafCraft Plugin Support)"
+    url: https://github.com/DailyStruggle/RTP/blob/V3/docs/publishing/DISCORD_LAYOUT.md
+    about: "Ask setup questions, paste [RTP bit] or mclo.gs output for instant triage, or use @Pro Supporter priority routing."
+  - name: 'Question / "how do I..." - GitHub Discussions'
     url: https://github.com/DailyStruggle/RTP/discussions
-    about: The issue tracker is for bugs. Ask usage questions and propose ideas in Discussions first.
+    about: "The issue tracker is for bugs. Ask usage questions and propose ideas in Discussions or the Discord #support Forum first."
   - name: How to get support (read before opening an issue)
     url: https://github.com/DailyStruggle/RTP/blob/V3/SUPPORT.md
     about: Where to ask, how to ask well, and what will be closed without a reply.

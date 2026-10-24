@@ -6,8 +6,8 @@ import io.github.dailystruggle.rtp.api.event.PlayerMoveDispatcher;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -41,18 +41,18 @@ public final class PlayerMoveSampler {
             if (!lastSeen.isEmpty()) lastSeen.clear();
             return;
         }
-        if (RTP.serverAccessor == null) return;
+        if (RTPRuntime.serverAccessor() == null) return;
 
         Set<UUID> watched = dispatcher.watchedPlayers();
         if (watched.isEmpty() && dispatcher.hasWatchers()) {
             // Global watchers are active: sample all online players
-            java.util.Collection<RTPPlayer> online = RTP.serverAccessor.getOnlinePlayers();
+            java.util.Collection<RTPPlayer> online = RTPRuntime.serverAccessor().getOnlinePlayers();
             for (RTPPlayer p : online) {
                 if (p == null) continue;
                 try {
                     sampleOne(p.uuid(), dispatcher);
                 } catch (Throwable t) {
-                    RTP.log(Level.FINER, "[RTP] PlayerMoveSampler: sampling " + p.uuid() + " raised: " + t.getMessage());
+                    RTPRuntime.log(Level.FINER, "[RTP] PlayerMoveSampler: sampling " + p.uuid() + " raised: " + t.getMessage());
                 }
             }
             return;
@@ -69,7 +69,7 @@ public final class PlayerMoveSampler {
             } catch (Throwable t) {
                 // A single player's sampling failure must not break the loop
                 // (S-004: never silently swallow -> log at FINER).
-                RTP.log(Level.FINER,
+                RTPRuntime.log(Level.FINER,
                         "[RTP] PlayerMoveSampler: sampling " + id + " raised "
                                 + t.getClass().getSimpleName() + ": " + t.getMessage());
             }
@@ -77,7 +77,7 @@ public final class PlayerMoveSampler {
     }
 
     private void sampleOne(UUID id, PlayerMoveDispatcher dispatcher) {
-        RTPPlayer player = RTP.serverAccessor.getPlayer(id);
+        RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(id);
         if (player == null || !player.isOnline()) {
             lastSeen.remove(id);
             return;

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -168,7 +168,7 @@ class PrefabCommandTest {
                         + "shape:\n  name: \"CIRCLE\"\n  radius: 256\n"
                         + "vert:\n  name: \"LINEAR\"\n  minY: 32\n  maxY: 255\n"
                         + "  direction: 2\n  requireSkyLight: true\n");
-        RTP.configs.reloadConfigs();
+        ActiveConfigs.get().reloadConfigs();
 
         accessor.addWorld(new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world"));
         accessor.addWorld(new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world_nether"));

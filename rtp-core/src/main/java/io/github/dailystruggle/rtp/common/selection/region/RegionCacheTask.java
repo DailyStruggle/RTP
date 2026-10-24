@@ -6,12 +6,14 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.CompletionPaced;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import io.github.dailystruggle.rtp.common.tools.PerformanceTracker;
 
@@ -40,6 +42,8 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
      * Idempotency latch for {@link #releaseInFlight()} across multiple terminal branches.
      */
     private final AtomicBoolean released = new AtomicBoolean(false);
+    private final AtomicBoolean generationSlotReleased = new AtomicBoolean(false);
+    private volatile GenerationBudget.Reservation generationSlot;
 
     /**
      * Fill deadline in ticks (30 s); matches the per-player chunk-set failsafe. Releases the slot
@@ -53,8 +57,8 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
     private long dispatchNanos;
 
     private static long resolveSelectRadius() {
-        if (RTP.configs == null) return 0L;
-        var parser = RTP.configs.getParser(PerformanceKeys.class);
+        if (ActiveConfigs.get() == null) return 0L;
+        var parser = ActiveConfigs.get().getParser(PerformanceKeys.class);
         if (parser == null) return 0L;
         Number num = parser.getNumber(PerformanceKeys.viewDistanceSelect, 0L);
         return num != null ? num.longValue() : 0L;
@@ -106,6 +110,21 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
         return new RegionCacheTask(region, true);
     }
 
+    public void holdGenerationSlot(GenerationBudget.Reservation generationSlot) {
+        this.generationSlot = generationSlot;
+    }
+
+    private void releaseGenerationSlot() {
+        GenerationBudget.Reservation slot = generationSlot;
+        if (slot != null && generationSlotReleased.compareAndSet(false, true)) slot.close();
+    }
+
+    @Override
+    public void setCancelled(boolean cancel) {
+        super.setCancelled(cancel);
+        if (cancel) releaseGenerationSlot();
+    }
+
     /** Spark-profiler frame tag (diagram 02). See {@link RTPRunnable#sparkFrameName()}. */
     @Override
     protected String sparkFrameName() { return "rtp_cache_generator"; }
@@ -120,7 +139,10 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
      */
     @Override
     public void run() {
-        if (isCancelled()) return;
+        if (isCancelled()) {
+            releaseGenerationSlot();
+            return;
+        }
 
         if (playerId == null) {
             long cacheCap = region.getSettings().cacheCap();
@@ -133,10 +155,12 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                 // candidate. Skip when the cold stage has headroom; the default-mode
                 // deficit loop will fill that headroom on this pulse.
                 if (!cacheFull) {
+                    releaseGenerationSlot();
                     MemoryTracker.untrack(this);
                     return;
                 }
             } else if (cacheFull) {
+                releaseGenerationSlot();
                 MemoryTracker.untrack(this);
                 return;
             }
@@ -165,16 +189,17 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
             // ADR-110: fill is speculative - verify from resident chunks / region files first; native
             // loads pin into the kept queue when it has room, else stay unpinned (no ring) for the
             // cold queue. Third-party generators keep their own contract.
-            ILocationGenerator generator = RTP.serverAccessor.getLocationGenerator();
+            ILocationGenerator generator = RTPRuntime.serverAccessor().getLocationGenerator();
             CompletableFuture<GenerationResult> locationFuture = (generator instanceof LocationGenerator)
-                    ? LocationGenerator.getLocationFuture(region, null, LoadPurpose.SPECULATIVE, backlog)
+                    ? LocationGenerator.getLocationFuture(
+                            region, null, LoadPurpose.SPECULATIVE, backlog, generationSlot)
                     : generator.getLocation(region, (java.util.Set<String>) null);
 
             locationFuture = locationFuture.exceptionally(e -> {
                 if (playerId != null) {
-                    RTP.log(Level.SEVERE, "Failed to generate location for player " + playerId, e);
+                    RTPRuntime.log(Level.SEVERE, "Failed to generate location for player " + playerId, e);
                 } else {
-                    RTP.log(Level.SEVERE, "Failed to generate location", e);
+                    RTPRuntime.log(Level.SEVERE, "Failed to generate location", e);
                 }
                 // Cleanup is owned by processResult(null) below - keeping the
                 // decrement here as well would race with processResult on a future
@@ -198,16 +223,16 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                 });
             }
         } catch (Throwable t) {
-            RTP.log(Level.SEVERE, "Failed to dispatch location generation", t);
+            RTPRuntime.log(Level.SEVERE, "Failed to dispatch location generation", t);
             releaseInFlight();
         }
     }
 
     private void scheduleDeadline() {
-        if (RTP.scheduler == null) return;
-        RTP.scheduler.runTaskLater(() -> {
+        if (RTPRuntime.scheduler() == null) return;
+        RTPRuntime.scheduler().runTaskLater(() -> {
             if (released.get()) return;
-            RTP.log(playerId != null ? Level.WARNING : Level.FINE,
+            RTPRuntime.log(playerId != null ? Level.WARNING : Level.FINE,
                     "[Region:" + region.name + "] cache fill"
                             + (playerId != null ? " for player " + playerId : "")
                             + " did not finish within " + FILL_DEADLINE_TICKS + " ticks; slot released");
@@ -278,7 +303,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                         chunkSet = new ChunkSet(world, cx, cz, chunks, new CompletableFuture<>());
 
                         final ChunkSet finalSet = chunkSet;
-                        RTP.scheduler.runTaskLater(() -> {
+                        RTPRuntime.scheduler().runTaskLater(() -> {
                             if (finalSet.complete() != null && !finalSet.complete().isDone()) {
                                 finalSet.complete().complete(false);
                             }
@@ -294,7 +319,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                         long elapsed = System.nanoTime() - chunkLoadStart;
                         try {
                             if (ex != null) {
-                                RTP.log(Level.WARNING, "Chunk preload failed for player " + playerId, ex);
+                                RTPRuntime.log(Level.WARNING, "Chunk preload failed for player " + playerId, ex);
                                 if (reservation != null) reservation.close();
                                 return;
                             }
@@ -341,7 +366,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                 releaseInFlight();
             }
         } catch (Exception e) {
-            RTP.log(Level.SEVERE, "Error in processResult", e);
+            RTPRuntime.log(Level.SEVERE, "Error in processResult", e);
             // Fail-safe: a thrown exception inside processResult must still
             // release the in-flight slot, otherwise a single buggy reservation
             // close or buffer offer can permanently freeze the cache deficit.
@@ -352,7 +377,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                 try {
                     reservation.close();
                 } catch (RuntimeException e) {
-                    RTP.log(Level.SEVERE, "Failed to release chunk reservation in processResult", e);
+                    RTPRuntime.log(Level.SEVERE, "Failed to release chunk reservation in processResult", e);
                 }
             }
         }
@@ -369,6 +394,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
 
     private void releaseInFlight(long minChargeNanos) {
         if (released.compareAndSet(false, true)) {
+            releaseGenerationSlot();
             region.inFlightCalculations.decrementAndGet();
             BudgetPacer p = pacer;
             if (p != null) p.recordDuration(Math.max(minChargeNanos, System.nanoTime() - dispatchNanos));

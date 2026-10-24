@@ -3,9 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.scan;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,13 +28,13 @@ public abstract class ScanSubCmd extends BaseRTPCmdImpl {
   public List<Region> getRegions(UUID callerId, List<String> regionParameter) {
     List<Region> regions = new ArrayList<>();
     if (regionParameter != null) {
-      for (String name : regionParameter) regions.add(RTP.selectionAPI.getRegion(name));
+      for (String name : regionParameter) regions.add(ActiveSelection.get().getRegion(name));
     } else {
-      RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
+      RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(callerId);
       if (sender instanceof RTPPlayer)
-        regions.add(RTP.selectionAPI.getRegion((RTPPlayer) sender));
+        regions.add(ActiveSelection.get().getRegion((RTPPlayer) sender));
       else
-        regions.add(RTP.selectionAPI.getRegion("default"));
+        regions.add(ActiveSelection.get().getRegion("default"));
     }
     return regions;
   }

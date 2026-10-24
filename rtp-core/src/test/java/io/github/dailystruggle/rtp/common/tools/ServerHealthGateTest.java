@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.tools;
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +25,7 @@ class ServerHealthGateTest {
     @AfterEach
     void tearDown() {
         ServerHealthGate.resetForTesting();
-        RTP.metrics.setBinding(null);
+        CoreMetrics.instance().setBinding(null);
     }
 
     private static final UUID WORLD = UUID.randomUUID();
@@ -100,20 +100,20 @@ class ServerHealthGateTest {
     @Test
     @DisplayName("ADR-087 regional circuit breaker: global gate on a regional binding reads the mean TPS and ignores MSPT")
     void globalGateOnRegionalBindingUsesMean() {
-        RTP.metrics.setBinding(regional(19.6));
+        CoreMetrics.instance().setBinding(regional(19.6));
         assertFalse(ServerHealthGate.shouldPause(), "one 1.4 TPS region must not pause healthy regions");
         assertEquals(19.6, ServerHealthGate.lastTps());
         assertTrue(Double.isNaN(ServerHealthGate.lastMspt()), "regional tick intervals are not work time");
 
         ServerHealthGate.resetForTesting();
-        RTP.metrics.setBinding(regional(12.0));
+        CoreMetrics.instance().setBinding(regional(12.0));
         assertTrue(ServerHealthGate.shouldPause(), "a low mean still pauses server-wide");
     }
 
     @Test
     @DisplayName("ADR-087 regional circuit breaker: slow region is unhealthy; healthy and unsampled regions are not")
     void regionUnhealthyPerCell() {
-        RTP.metrics.setBinding(regional(19.6));
+        CoreMetrics.instance().setBinding(regional(19.6));
         assertTrue(ServerHealthGate.regionUnhealthy(WORLD, 0, 0));
         assertFalse(ServerHealthGate.regionUnhealthy(WORLD, 64, 0));
         assertFalse(ServerHealthGate.regionUnhealthy(WORLD, 640, 640), "unsampled region fails open");
@@ -123,7 +123,7 @@ class ServerHealthGateTest {
     @Test
     @DisplayName("ADR-087 regional circuit breaker: region MSPT overrun alone marks the region unhealthy")
     void regionMsptOverrun() {
-        RTP.metrics.setBinding(new MetricsBinding() {
+        CoreMetrics.instance().setBinding(new MetricsBinding() {
             @Override public boolean regionalTicking() { return true; }
             @Override public double regionTps1m(UUID w, int x, int z) { return 20.0; }
             @Override public double regionMspt(UUID w, int x, int z) { return 80.0; }
@@ -134,7 +134,7 @@ class ServerHealthGateTest {
     @Test
     @DisplayName("ADR-087 regional circuit breaker: single-loop bindings answer regionUnhealthy with shouldPause")
     void regionUnhealthyEqualsShouldPauseOnSingleLoop() {
-        RTP.metrics.setBinding(new MetricsBinding() {
+        CoreMetrics.instance().setBinding(new MetricsBinding() {
             @Override public double tps1m() { return 12.0; }
             @Override public double mspt() { return 30.0; }
         });
@@ -142,7 +142,7 @@ class ServerHealthGateTest {
         assertEquals(ServerHealthGate.shouldPause(), ServerHealthGate.regionUnhealthy(WORLD, 64, 0));
 
         ServerHealthGate.resetForTesting();
-        RTP.metrics.setBinding(new MetricsBinding() {
+        CoreMetrics.instance().setBinding(new MetricsBinding() {
             @Override public double tps1m() { return 20.0; }
             @Override public double mspt() { return 30.0; }
         });

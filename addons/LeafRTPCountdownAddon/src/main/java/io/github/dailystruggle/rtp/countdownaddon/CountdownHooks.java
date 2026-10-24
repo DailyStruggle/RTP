@@ -1,9 +1,11 @@
 package io.github.dailystruggle.rtp.countdownaddon;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
@@ -16,7 +18,7 @@ import java.util.function.Consumer;
 /**
  * Reference implementation of two distinct RTP countdowns, demonstrating why a single delay-based
  * countdown is not sufficient. Fully platform-agnostic: it uses only `rtp-core` / `rtp-api`
- * primitives ({@code RTP.scheduler}, {@code RTP.serverAccessor}, and the {@link
+ * primitives ({@code RTPRuntime.scheduler()}, {@code RTPRuntime.serverAccessor()}, and the {@link
  * TeleportPipelineTask} / {@link Region} hook lists) and contains no {@code org.bukkit.*} imports,
  * so it runs on every RTP platform.
  *
@@ -43,8 +45,8 @@ import java.util.function.Consumer;
  * </ol>
  *
  * <p><b>Threading:</b> the RTP hook lists and pipeline pre-actions may fire off the main thread, so
- * every player-facing action (scheduling, messaging) is routed through {@code RTP.scheduler} and
- * {@code RTP.serverAccessor}, which dispatch onto the correct thread per platform.
+ * every player-facing action (scheduling, messaging) is routed through {@code RTPRuntime.scheduler()} and
+ * {@code RTPRuntime.serverAccessor()}, which dispatch onto the correct thread per platform.
  *
  * <p><b>Presentation:</b> both countdowns render as a personal boss-bar via
  * {@link RTPPlayer#showProgressBar(String, String, double)} / {@link RTPPlayer#clearProgressBar(String)}
@@ -90,8 +92,8 @@ public final class CountdownHooks {
     RTPTeleportCancel.postActions.remove(cancelHook);
     Region.onPlayerQueuePush.remove(pushHook);
     Region.onPlayerQueuePop.remove(popHook);
-    delayTasks.values().forEach(RTP.scheduler::cancelTask);
-    queueTasks.values().forEach(RTP.scheduler::cancelTask);
+    delayTasks.values().forEach(RTPRuntime.scheduler()::cancelTask);
+    queueTasks.values().forEach(RTPRuntime.scheduler()::cancelTask);
     // Clear any boss-bars still showing for players with an in-flight countdown.
     clearBars(delayTasks.keySet(), DELAY_BAR);
     clearBars(queueTasks.keySet(), QUEUE_BAR);
@@ -101,7 +103,7 @@ public final class CountdownHooks {
 
   private void clearBars(Iterable<UUID> ids, String barId) {
     for (UUID id : ids) {
-      RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+      RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(id);
       if (p != null) p.clearProgressBar(barId);
     }
   }
@@ -120,14 +122,14 @@ public final class CountdownHooks {
     int seconds = (int) (delayMillis / 1000L);
     if (seconds <= 0) return;
 
-    RTP.scheduler.runTask(() -> startDelayCountdown(id, seconds, task));
+    RTPRuntime.scheduler().runTask(() -> startDelayCountdown(id, seconds, task));
   }
 
   /** The teleport was cancelled: drop both bars now instead of letting them count down. */
   private void onCancel(RTPTeleportCancel cancel) {
     if (cancel == null || cancel.getPlayerId() == null) return;
     UUID id = cancel.getPlayerId();
-    RTP.scheduler.runTask(
+    RTPRuntime.scheduler().runTask(
         () -> {
           stop(delayTasks, id, DELAY_BAR);
           stop(queueTasks, id, QUEUE_BAR);
@@ -137,30 +139,30 @@ public final class CountdownHooks {
   private void stop(Map<UUID, Object> tasks, UUID id, String barId) {
     Object task = tasks.remove(id);
     if (task == null) return;
-    RTP.scheduler.cancelTask(task);
-    RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+    RTPRuntime.scheduler().cancelTask(task);
+    RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(id);
     if (p != null) p.clearProgressBar(barId);
   }
 
   private void startDelayCountdown(UUID id, int seconds, TeleportPipelineTask pipeline) {
     // Cancelled between the setup hook and this scheduled start.
     if (pipeline.isCancelled()) return;
-    if (RTP.serverAccessor.getPlayer(id) == null) return;
+    if (RTPRuntime.serverAccessor().getPlayer(id) == null) return;
 
     // Replace any stale countdown for this player.
     Object previous = delayTasks.remove(id);
-    if (previous != null) RTP.scheduler.cancelTask(previous);
+    if (previous != null) RTPRuntime.scheduler().cancelTask(previous);
 
     int total = seconds;
     int[] remaining = {seconds};
     Object task =
-        RTP.scheduler.runTaskTimer(
+        RTPRuntime.scheduler().runTaskTimer(
             () -> {
-              RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+              RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(id);
               if (p == null || remaining[0] <= 0 || pipeline.isCancelled()) {
                 if (p != null) p.clearProgressBar(DELAY_BAR);
                 Object self = delayTasks.remove(id);
-                if (self != null) RTP.scheduler.cancelTask(self);
+                if (self != null) RTPRuntime.scheduler().cancelTask(self);
                 return;
               }
               double progress = total <= 0 ? 0.0 : (double) remaining[0] / total;
@@ -178,22 +180,22 @@ public final class CountdownHooks {
 
   private void onQueuePush(Region region, UUID id) {
     if (!flag(CountdownKeys.queueCountdown)) return;
-    RTP.scheduler.runTask(() -> startQueueCountdown(id));
+    RTPRuntime.scheduler().runTask(() -> startQueueCountdown(id));
   }
 
   private void onQueuePop(Region region, UUID id) {
     if (!flag(CountdownKeys.queueCountdown)) return;
-    RTP.scheduler.runTask(
+    RTPRuntime.scheduler().runTask(
         () -> {
           Object task = queueTasks.remove(id);
-          if (task != null) RTP.scheduler.cancelTask(task);
-          RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+          if (task != null) RTPRuntime.scheduler().cancelTask(task);
+          RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(id);
           if (p != null) {
             // Flash a full bar, then clear it shortly after so it doesn't linger on screen.
             p.showProgressBar(QUEUE_BAR, "&aYou're up! Teleporting now...", 1.0);
-            RTP.scheduler.runTaskLater(
+            RTPRuntime.scheduler().runTaskLater(
                 () -> {
-                  RTPPlayer later = RTP.serverAccessor.getPlayer(id);
+                  RTPPlayer later = RTPRuntime.serverAccessor().getPlayer(id);
                   if (later != null) later.clearProgressBar(QUEUE_BAR);
                 },
                 40L);
@@ -202,27 +204,27 @@ public final class CountdownHooks {
   }
 
   private void startQueueCountdown(UUID id) {
-    if (RTP.serverAccessor.getPlayer(id) == null) return;
+    if (RTPRuntime.serverAccessor().getPlayer(id) == null) return;
 
     Object previous = queueTasks.remove(id);
-    if (previous != null) RTP.scheduler.cancelTask(previous);
+    if (previous != null) RTPRuntime.scheduler().cancelTask(previous);
 
     Object task =
-        RTP.scheduler.runTaskTimer(
+        RTPRuntime.scheduler().runTaskTimer(
             () -> {
-              RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+              RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(id);
               if (p == null) {
                 Object self = queueTasks.remove(id);
-                if (self != null) RTP.scheduler.cancelTask(self);
+                if (self != null) RTPRuntime.scheduler().cancelTask(self);
                 return;
               }
-              TeleportData data = RTP.getInstance().latestTeleportData.get(id);
+              TeleportData data = TeleportSessions.current().latestTeleportData.get(id);
               // No longer queued (popped, cancelled, or completed): stop. The pop hook
               // delivers the "you're up!" bar on the normal path.
               if (data == null || data.completed || data.queueLocation <= 0) {
                 p.clearProgressBar(QUEUE_BAR);
                 Object self = queueTasks.remove(id);
-                if (self != null) RTP.scheduler.cancelTask(self);
+                if (self != null) RTPRuntime.scheduler().cancelTask(self);
                 return;
               }
               // No fixed total for a wait queue, so approximate fill from the position:
@@ -243,7 +245,7 @@ public final class CountdownHooks {
   @SuppressWarnings("unchecked")
   private boolean flag(CountdownKeys key) {
     ConfigParser<CountdownKeys> parser =
-        (ConfigParser<CountdownKeys>) RTP.configs.getParser(CountdownKeys.class);
+        (ConfigParser<CountdownKeys>) ActiveConfigs.get().getParser(CountdownKeys.class);
     if (parser == null) return false;
     Object value = parser.getConfigValue(key, false);
     return (value instanceof Boolean) ? (Boolean) value : Boolean.parseBoolean(String.valueOf(value));

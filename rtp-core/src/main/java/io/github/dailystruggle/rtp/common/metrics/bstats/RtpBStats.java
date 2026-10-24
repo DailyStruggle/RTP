@@ -7,6 +7,7 @@ import io.github.dailystruggle.bstats.api.BStatsService;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.logging.Level;
 
@@ -18,7 +19,7 @@ import java.util.logging.Level;
  * install base; the {@code platform} chart and the software name keep loaders
  * separable. Platforms differ only in their {@link RtpBStatsCatalogue.Host}.
  *
- * <p>Threading: scheduling goes through {@link RTP#scheduler} (rule F-001), logging
+ * <p>Threading: scheduling goes through {@link RTPRuntime#scheduler()} (rule F-001), logging
  * through {@link RTP#log}. No chunk I/O.
  */
 public final class RtpBStats {
@@ -28,7 +29,7 @@ public final class RtpBStats {
     /** Lite assembly service id (ADR-024). */
     public static final int LITE_SERVICE_ID = 12277;
 
-    static final BStatsLog LOG = (level, message) -> RTP.log(level, "[RTP]" + message);
+    static final BStatsLog LOG = (level, message) -> RTPRuntime.log(level, "[RTP]" + message);
 
     private static volatile BStatsService service;
 
@@ -46,20 +47,20 @@ public final class RtpBStats {
     public static synchronized BStatsService start(RtpBStatsCatalogue.Host host, int serviceId,
                                                    String assemblyVariant, File pluginDirectory) {
         if (service != null) return service;
-        if (RTP.scheduler == null) {
-            RTP.log(Level.FINE, "[RTP][bStats] no scheduler wired; bStats not started");
+        if (RTPRuntime.scheduler() == null) {
+            RTPRuntime.log(Level.FINE, "[RTP][bStats] no scheduler wired; bStats not started");
             return null;
         }
         try {
-            BStatsService s = create(host, serviceId, assemblyVariant, pluginDirectory, RTP.scheduler);
+            BStatsService s = create(host, serviceId, assemblyVariant, pluginDirectory, RTPRuntime.scheduler());
             if (s.start()) {
-                RTP.log(Level.INFO, "[RTP][bStats] Enabled bStats telemetry for " + s.charts().size()
+                RTPRuntime.log(Level.INFO, "[RTP][bStats] Enabled bStats telemetry for " + s.charts().size()
                         + " charts (" + host.platform() + ", id=" + serviceId + ").");
             }
             service = s;
             return s;
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP][bStats] setup failed; continuing without metrics", t);
+            RTPRuntime.log(Level.WARNING, "[RTP][bStats] setup failed; continuing without metrics", t);
             return null;
         }
     }

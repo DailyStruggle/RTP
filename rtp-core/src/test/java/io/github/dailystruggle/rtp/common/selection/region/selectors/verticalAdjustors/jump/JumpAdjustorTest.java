@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump;
 
+import org.junit.jupiter.api.DisplayName;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.ProbeBackedMockChunk;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.ConfigurableMockChunk;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
@@ -387,7 +390,7 @@ public class JumpAdjustorTest {
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>
                 safety = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
                         io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
-                io.github.dailystruggle.rtp.common.RTP.configs.getParser(
+                io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(
                         io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
         java.lang.reflect.Field dataField =
                 io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("data");
@@ -404,7 +407,7 @@ public class JumpAdjustorTest {
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 2);
 
         // No static cache to reset - JumpAdjustor reads safety config directly
-        // from RTP.configs at the top of each adjust(...) call now.
+        // from ActiveConfigs.get() at the top of each adjust(...) call now.
 
         try {
         // y=63 safe crust, y=62 unsafe (fluid analogue), y=71 higher safe floor.
@@ -665,5 +668,71 @@ public class JumpAdjustorTest {
                 adj.adjustFromProbeWithReason(probe, "test_world");
         assertNotNull(res.picked());
         assertEquals(71, res.picked().y());
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-RTP-F-015 / ADR-119 - landing-spot slope check
+    // -----------------------------------------------------------------------
+
+    /** Flat floor at 64 everywhere except a 6-block ledge two blocks east of (7,7). */
+    private static FakeChunkColumnProbe ledgeEastOfCenter() {
+        FakeChunkColumnProbe p = new FakeChunkColumnProbe(0, 0, 0, 255);
+        p.setSolidRange(0, 63);
+        p.setAirRange(64, 255);
+        for (int y = 64; y <= 69; y++) p.setColumnSolid(9, 7, y);
+        return p;
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: jump maxSlope skips the ledge column (7,7) and picks flat (2,2)")
+    void maxSlope_skipsLedgeColumn() {
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        adj.set(JumpAdjustorKeys.maxSlope, 2);
+        RTPCoords r = adj.adjust(new ProbeBackedMockChunk(ledgeEastOfCenter(), world));
+        assertNotNull(r);
+        assertEquals(2, r.x());
+        assertEquals(2, r.z());
+        assertEquals(64, r.y());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: jump without maxSlope keeps the first stencil column (7,7)")
+    void noMaxSlope_keepsFirstColumn() {
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        RTPCoords r = adj.adjust(new ProbeBackedMockChunk(ledgeEastOfCenter(), world));
+        assertNotNull(r);
+        assertEquals(7, r.x());
+        assertEquals(7, r.z());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: jump adjustColumn applies the slope check")
+    void adjustColumn_appliesSlopeCheck() {
+        ProbeBackedMockChunk chunk = new ProbeBackedMockChunk(ledgeEastOfCenter(), world);
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        assertNotNull(adj.adjustColumn(chunk, 7, 7));
+        adj.set(JumpAdjustorKeys.maxSlope, 2);
+        assertNull(adj.adjustColumn(chunk, 7, 7));
+        adj.set(JumpAdjustorKeys.maxSlope, 6);
+        assertNotNull(adj.adjustColumn(chunk, 7, 7), "a 6-block step is within maxSlope 6");
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: jump live and probe slope verdicts match for the same blocks")
+    void slopeCheck_liveProbeParity() {
+        FakeChunkColumnProbe probe = ledgeEastOfCenter();
+        for (int y = 0; y <= 63; y++) probe.setColumnAir(4, 2, y); // cliff east of (2,2)
+        for (int maxSlope : new int[] {-1, 0, 2, 6}) {
+            JumpAdjustor adj = buildAdjustor(60, 80, 1);
+            adj.set(JumpAdjustorKeys.maxSlope, maxSlope);
+            RTPCoords live = adj.adjust(new ProbeBackedMockChunk(probe, world));
+            RTPCoords probed = adj.adjustFromProbe(probe, "test_world");
+            String ctx = "maxSlope=" + maxSlope;
+            assertNotNull(live, ctx);
+            assertNotNull(probed, ctx);
+            assertEquals(live.x(), probed.x(), ctx);
+            assertEquals(live.y(), probed.y(), ctx);
+            assertEquals(live.z(), probed.z(), ctx);
+        }
     }
 }

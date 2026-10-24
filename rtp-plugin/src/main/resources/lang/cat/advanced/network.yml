@@ -52,11 +52,13 @@ transport:
 # Backend heartbeat / peer-staleness cadence (shared by every transport tier).
 heartbeat:
   # how often dis box meows out its state row (ms).
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 1000
   intervalMs: 1000
 
   # how long a fren-box's last-seen state stays trusted afore it goes mystery-cat (ms); keep it above intervalMs.
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
@@ -82,11 +84,13 @@ queue:
   maxDepth: 50
 
   # box messy-write flush beat (ms); lower = quicker pounce, higher = fewer trips down da tunnel.
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
 
   # box status-stash peek beat (ms); how often each hooman's progress gets a fresh lick.
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
@@ -114,11 +118,13 @@ queue:
 # Reservation-token lifecycle.
 reservation:
   # proxy-side TTL sweeper beat (ms); shoos stale tokens n frees their spots.
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
 
   # per-token TTL (ms); a called-dibs-but-unused hold older than dis gets freed as abandoned.
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 60000
   ttlMs: 60000
@@ -304,6 +310,7 @@ editor:
   # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
   trust:
     # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # Supports duration units (e.g. 24h, 1d).
     # @type: integer
     # @default: 0
     maxAgeDays: 0

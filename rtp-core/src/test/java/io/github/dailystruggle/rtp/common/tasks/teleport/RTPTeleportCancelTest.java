@@ -2,12 +2,14 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,9 +45,9 @@ class RTPTeleportCancelTest {
     void tearDown() {
         RTPTeleportCancel.preActions.clear();
         RTPTeleportCancel.postActions.clear();
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().priorTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().priorTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     @Test
@@ -78,7 +80,7 @@ class RTPTeleportCancelTest {
         data.completed = false;
         TeleportPipelineTask task = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null));
         data.nextTask = task;
-        RTP.getInstance().latestTeleportData.put(id, data);
+        TeleportSessions.current().latestTeleportData.put(id, data);
 
         RTPTeleportCancel cancel = new RTPTeleportCancel(id);
         cancel.run();
@@ -101,15 +103,15 @@ class RTPTeleportCancelTest {
         TeleportPipelineTask task = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null));
         data.nextTask = task;
         data.selectedCoords = new io.github.dailystruggle.rtp.api.world.RTPCoords(world.name(), 10, 64, 10);
-        RTP.getInstance().latestTeleportData.put(id, data);
-        RTP.getInstance().processingPlayers.add(id);
+        TeleportSessions.current().latestTeleportData.put(id, data);
+        TeleportSessions.current().processingPlayers.add(id);
 
         RTPTeleportCancel cancel = new RTPTeleportCancel(id);
         cancel.run();
 
         // 1. refund removes latestTeleportData and removes processingPlayers
-        assertFalse(RTP.getInstance().processingPlayers.contains(id), "refund should remove player from processingPlayers");
-        assertNull(RTP.getInstance().latestTeleportData.get(id), "refund should remove latestTeleportData");
+        assertFalse(TeleportSessions.current().processingPlayers.contains(id), "refund should remove player from processingPlayers");
+        assertNull(TeleportSessions.current().latestTeleportData.get(id), "refund should remove latestTeleportData");
 
         // 2. message sends teleportCancel message to player
         assertFalse(player.sentMessages.isEmpty(), "Player should receive cancel message during run");
@@ -134,17 +136,17 @@ class RTPTeleportCancelTest {
 
         TeleportData currentData = new TeleportData();
         currentData.completed = false;
-        RTP.getInstance().latestTeleportData.put(id, currentData);
+        TeleportSessions.current().latestTeleportData.put(id, currentData);
 
         TeleportData priorData = new TeleportData();
         priorData.completed = true;
         priorData.attempts = 42;
-        RTP.getInstance().priorTeleportData.put(id, priorData);
+        TeleportSessions.current().priorTeleportData.put(id, priorData);
 
         RTPTeleportCancel.refund(id);
 
-        assertFalse(RTP.getInstance().priorTeleportData.containsKey(id));
-        assertSame(priorData, RTP.getInstance().latestTeleportData.get(id));
+        assertFalse(TeleportSessions.current().priorTeleportData.containsKey(id));
+        assertSame(priorData, TeleportSessions.current().latestTeleportData.get(id));
     }
 
     @Test
@@ -157,11 +159,11 @@ class RTPTeleportCancelTest {
         currentData.completed = false;
         currentData.cost = 50.0;
         currentData.sender = player;
-        RTP.getInstance().latestTeleportData.put(id, currentData);
+        TeleportSessions.current().latestTeleportData.put(id, currentData);
 
         AtomicReference<UUID> refundedUser = new AtomicReference<>();
         AtomicReference<Double> refundedAmount = new AtomicReference<>(0.0);
-        RTP.economy = new RTPEconomy() {
+        RTPRuntime.setEconomy(new RTPEconomy() {
             @Override
             public void give(UUID player, double amount) {
                 refundedUser.set(player);
@@ -172,7 +174,7 @@ class RTPTeleportCancelTest {
             public boolean take(UUID player, double amount) { return false; }
             @Override
             public double bal(UUID player) { return 100.0; }
-        };
+        });
 
         RTPTeleportCancel.refund(id);
 
@@ -197,7 +199,7 @@ class RTPTeleportCancelTest {
         data.completed = false;
         TeleportPipelineTask task = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null));
         data.nextTask = task;
-        RTP.getInstance().latestTeleportData.put(id, data);
+        TeleportSessions.current().latestTeleportData.put(id, data);
 
         RTPTeleportCancel cancel = new RTPTeleportCancel(id);
         cancel.run();
@@ -216,10 +218,10 @@ class RTPTeleportCancelTest {
         UUID id = UUID.randomUUID();
         TeleportData data = new TeleportData();
         data.completed = true;
-        RTP.getInstance().latestTeleportData.put(id, data);
+        TeleportSessions.current().latestTeleportData.put(id, data);
 
         RTPTeleportCancel.refund(id);
-        assertSame(data, RTP.getInstance().latestTeleportData.get(id));
+        assertSame(data, TeleportSessions.current().latestTeleportData.get(id));
     }
 
     @Test
@@ -227,12 +229,12 @@ class RTPTeleportCancelTest {
         UUID id = UUID.randomUUID();
         TeleportData data = new TeleportData();
         data.completed = false;
-        RTP.getInstance().latestTeleportData.put(id, data);
-        RTP.getInstance().processingPlayers.add(id);
+        TeleportSessions.current().latestTeleportData.put(id, data);
+        TeleportSessions.current().processingPlayers.add(id);
 
         RTPTeleportCancel.refund(id);
-        assertNull(RTP.getInstance().latestTeleportData.get(id));
-        assertFalse(RTP.getInstance().processingPlayers.contains(id));
+        assertNull(TeleportSessions.current().latestTeleportData.get(id));
+        assertFalse(TeleportSessions.current().processingPlayers.contains(id));
     }
 
     @Test
@@ -245,14 +247,14 @@ class RTPTeleportCancelTest {
         currentData.completed = false;
         currentData.cost = 0.0;
         currentData.sender = player;
-        RTP.getInstance().latestTeleportData.put(id, currentData);
+        TeleportSessions.current().latestTeleportData.put(id, currentData);
 
         AtomicInteger giveCalls = new AtomicInteger(0);
-        RTP.economy = new RTPEconomy() {
+        RTPRuntime.setEconomy(new RTPEconomy() {
             @Override public void give(UUID player, double amount) { giveCalls.incrementAndGet(); }
             @Override public boolean take(UUID player, double amount) { return false; }
             @Override public double bal(UUID player) { return 0; }
-        };
+        });
 
         RTPTeleportCancel.refund(id);
         assertEquals(0, giveCalls.get());
@@ -266,7 +268,7 @@ class RTPTeleportCancelTest {
 
         TeleportData data = new TeleportData();
         data.completed = true;
-        RTP.getInstance().latestTeleportData.put(id, data);
+        TeleportSessions.current().latestTeleportData.put(id, data);
         assertDoesNotThrow(cancel::run);
 
         data.completed = false;
@@ -277,19 +279,19 @@ class RTPTeleportCancelTest {
     @Test
     void refund_handles_null_configs_and_missing_eco_parser() {
         UUID id = UUID.randomUUID();
-        io.github.dailystruggle.rtp.common.configuration.Configs savedConfigs = RTP.configs;
+        io.github.dailystruggle.rtp.common.configuration.Configs savedConfigs = ActiveConfigs.get();
         try {
-            RTP.configs = null;
+            ActiveConfigs.set(null);
             assertDoesNotThrow(() -> RTPTeleportCancel.refund(id));
 
-            RTP.configs = new io.github.dailystruggle.rtp.common.configuration.Configs(tempDir);
-            RTP.configs.configParserMap = null;
+            ActiveConfigs.set(new io.github.dailystruggle.rtp.common.configuration.Configs(tempDir));
+            ActiveConfigs.get().configParserMap = null;
             assertDoesNotThrow(() -> RTPTeleportCancel.refund(id));
 
-            RTP.configs.configParserMap = new java.util.concurrent.ConcurrentHashMap<>();
+            ActiveConfigs.get().configParserMap = new java.util.concurrent.ConcurrentHashMap<>();
             assertDoesNotThrow(() -> RTPTeleportCancel.refund(id));
         } finally {
-            RTP.configs = savedConfigs;
+            ActiveConfigs.set(savedConfigs);
         }
     }
 
@@ -301,14 +303,14 @@ class RTPTeleportCancelTest {
 
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
             (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
-                RTP.configs.configParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
+                ActiveConfigs.get().configParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
 
         AtomicInteger refundCalls = new AtomicInteger();
-        RTP.economy = new RTPEconomy() {
+        RTPRuntime.setEconomy(new RTPEconomy() {
             @Override public void give(UUID player, double amount) { refundCalls.incrementAndGet(); }
             @Override public boolean take(UUID player, double amount) { return false; }
             @Override public double bal(UUID player) { return 0; }
-        };
+        });
 
         // 1. String configValue "true"
         eco.set(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.refundOnCancel, "true");
@@ -325,7 +327,7 @@ class RTPTeleportCancelTest {
             new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
                 "dummy", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         data.targetRegion = new io.github.dailystruggle.rtp.common.selection.region.Region("dummy", settings);
-        RTP.getInstance().latestTeleportData.put(id, data);
+        TeleportSessions.current().latestTeleportData.put(id, data);
         RTPTeleportCancel.refund(id);
         assertEquals(1, refundCalls.get());
 
@@ -337,7 +339,7 @@ class RTPTeleportCancelTest {
         data2.completed = false;
         data2.cost = 10.0;
         data2.sender = player;
-        RTP.getInstance().latestTeleportData.put(id, data2);
+        TeleportSessions.current().latestTeleportData.put(id, data2);
         RTPTeleportCancel.refund(id);
         assertEquals(1, refundCalls.get(), "False refundOnCancel should not issue refund");
 
@@ -347,7 +349,7 @@ class RTPTeleportCancelTest {
         data3.completed = false;
         data3.cost = 10.0;
         data3.sender = new io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender(UUID.randomUUID(), "CONSOLE");
-        RTP.getInstance().latestTeleportData.put(id, data3);
+        TeleportSessions.current().latestTeleportData.put(id, data3);
         RTPTeleportCancel.refund(id);
         assertEquals(1, refundCalls.get(), "Non-player sender should not receive player refund");
     }
@@ -360,7 +362,7 @@ class RTPTeleportCancelTest {
         data.completed = false;
         TeleportPipelineTask task = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(null, null, null));
         data.nextTask = task;
-        RTP.getInstance().latestTeleportData.put(id, data);
+        TeleportSessions.current().latestTeleportData.put(id, data);
 
         RTPTeleportCancel cancel = new RTPTeleportCancel(id);
         cancel.run();
@@ -378,7 +380,7 @@ class RTPTeleportCancelTest {
         data2.completed = false;
         TeleportPipelineTask task2 = new TeleportPipelineTask(new io.github.dailystruggle.rtp.api.selection.GenerationContext(offlinePlayer, offlinePlayer, null));
         data2.nextTask = task2;
-        RTP.getInstance().latestTeleportData.put(id2, data2);
+        TeleportSessions.current().latestTeleportData.put(id2, data2);
 
         RTPTeleportCancel cancel2 = new RTPTeleportCancel(id2);
         cancel2.run();

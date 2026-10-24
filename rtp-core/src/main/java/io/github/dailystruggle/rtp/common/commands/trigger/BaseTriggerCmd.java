@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.commands.trigger;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -53,9 +53,9 @@ public abstract class BaseTriggerCmd extends BaseRTPCmdImpl {
    */
   @Nullable
   protected RTPPlayer requirePlayer(UUID senderId, String notPlayerMessage) {
-    RTPPlayer player = RTP.serverAccessor.getPlayer(senderId);
+    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(senderId);
     if (player == null) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, notPlayerMessage);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, notPlayerMessage);
       return null;
     }
     return player;

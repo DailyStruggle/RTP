@@ -3,11 +3,11 @@ package io.github.dailystruggle.rtp.common.commands.trigger;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,7 +67,7 @@ class TriggerCommandsTest {
     accessor.addPlayer(player);
 
     assertTrue(createCmd.onCommand(playerId, Collections.emptyMap(), null));
-    assertFalse(RTP.triggerManager.getTriggers().isEmpty());
+    assertFalse(PhysicalTriggerManager.instance().getTriggers().isEmpty());
   }
 
   @Test
@@ -82,11 +82,11 @@ class TriggerCommandsTest {
     accessor.addSender(sender);
 
     // Empty list
-    RTP.triggerManager.clear();
+    PhysicalTriggerManager.instance().clear();
     assertTrue(listCmd.onCommand(playerId, Collections.emptyMap(), null));
 
     // Populated list
-    RTP.triggerManager.registerTrigger(new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
+    PhysicalTriggerManager.instance().registerTrigger(new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
         "t1", io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.PORTAL,
         "world", 0, 60, 0, 5, 70, 5, "arena", 5L));
     assertTrue(listCmd.onCommand(playerId, Collections.emptyMap(), null));

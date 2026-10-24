@@ -20,15 +20,56 @@ repositories {
     mavenCentral()
     // Soft-dep repos for the bundled claim-plugin APIs (compile-only).
     maven { url = 'https://maven.enginehub.org/repo/' }
-    maven { url = 'https://jitpack.io' }
+    maven {
+        url = 'https://jitpack.io'
+        content { includeGroupByRegex 'com\\.github\\..*' }
+    }
     maven { url = 'https://repo.glaremasters.me/repository/bloodshot/' }
     maven { url = 'https://raw.githubusercontent.com/FabioZumbi12/RedProtect/mvn-repo/' }
     maven { url = 'https://repo.spongepowered.org/maven/' }
     maven { url = 'https://ci.ender.zone/plugin/repository/everything/' }
     maven { url = 'https://repo.dmulloy2.net/repository/public/' }
+    maven {
+        url = 'https://maven.minecodes.pl/releases/'
+        content { includeGroup 'pl.minecodes.plots' }
+        // Its Gradle metadata pins org.gradle.jvm.version=21; this module targets 17. The API is
+        // only linked when minePlots (itself Java 21+) is enabled, so resolve from the POM.
+        metadataSources { mavenPom(); artifact() }
+    }
+    maven {
+        url = 'https://repo.william278.net/releases/'
+        content {
+            includeGroup 'net.william278.huskclaims'
+            includeGroup 'net.william278.husktowns'
+        }
+    }
+}
+
+configurations {
+    // Claim plugins whose API ships only inside the shaded plugin jar (ADR-118 rule 1).
+    shadedClaimPlugins { transitive = false }
+}
+
+// Only the plugins' own packages: the shaded jars also carry unrelocated Guava, Gson and
+// Adventure, which would shadow the spigot-api copies on the test classpath.
+def shadedClaimPluginJars = configurations.shadedClaimPlugins
+def claimPluginApiClasses = tasks.register('claimPluginApiClasses', Sync) {
+    from({ shadedClaimPluginJars.collect { zipTree(it) } }) {
+        include 'net/william278/huskclaims/**'
+        include 'net/william278/husktowns/**'
+        include 'com/bekvon/**'
+        include 'com/massivecraft/factions/**'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    into layout.buildDirectory.dir('claim-plugin-api')
 }
 
 dependencies {
+    shadedClaimPlugins 'net.william278.huskclaims:huskclaims-bukkit:1.5.10'
+    shadedClaimPlugins 'net.william278.husktowns:husktowns-bukkit:3.1.4'
+    shadedClaimPlugins 'com.github.Zrips:Residence:6.0.2.3'
+    shadedClaimPlugins 'com.github.SaberLLC:Saber-Factions:4.1.4-STABLE'
+
     // RTP SPI + core config/hook surface the addon registers through.
     compileOnly project(':rtp-api')
     compileOnly project(':rtp-core')
@@ -51,6 +92,9 @@ dependencies {
         exclude group: 'de.keyle', module: 'mypet'
         exclude group: 'net.ess3', module: 'EssentialsX'
     }
+    compileOnly 'pl.minecodes.plots:plugin-api:4.6.2'
+    compileOnly 'com.intellectualsites.plotsquared:plotsquared-core:7.6.0', { transitive = false }
+    compileOnly files(claimPluginApiClasses)
 
     testImplementation project(':rtp-api')
     testImplementation project(':rtp-core')
@@ -61,6 +105,11 @@ dependencies {
     testImplementation 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
     testImplementation 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
     testImplementation 'net.kyori:adventure-api:4.17.0'
+    testImplementation 'pl.minecodes.plots:plugin-api:4.6.2'
+    // HuskClaims, HuskTowns, Residence, SaberFactions, PlotSquared, GriefDefender, RedProtect,
+    // Lands, CrashClaim, KingdomsX, UltimateClaims and FactionsBridge run against test-source
+    // stand-ins with the API's class names and call shapes: the real classes need their plugin's
+    // runtime (CMILib, MiniMessage, a Bukkit plugin loader) to load or be mocked.
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

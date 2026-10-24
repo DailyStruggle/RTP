@@ -80,6 +80,12 @@ infoTopRejectionCause: "&7Causa principal de rechazo: #7E9CC8[genTopRejectionCau
 # Marcador: [genFailureBreakdown] - lista causa=N separada por comas, más frecuente primero.
 infoFailureBreakdown: "&7Rechazos por causa: #7E9CC8[genFailureBreakdown]"
 
+# Gobernador adaptativo: presupuestos configurados vs. efectivos y motivo.
+infoGovernorAsync: "&7Async en segundo plano: #7E9CC8[govAsyncConfiguredMs]&7 ms (efectivo #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Sync en segundo plano: #7E9CC8[govSyncConfiguredMs]&7 ms (efectivo #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Límite caliente: #7E9CC8[govHotCapConfigured]&7 (efectivo #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Generación: #7E9CC8[govGenConfigured]&7 (efectivo #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; en vuelo regional #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Umbrales de franjas de color para el estado de salud. Se usan para colorear las variantes
 # coloreadas de los marcadores (p. ej. [tps1mColoured]) en verde/amarillo/rojo.
 infoThresholdTpsGreen: 19.5
@@ -509,5 +515,6 @@ editorApplyFetching: "&7[P0] Obteniendo la carga de configuración..."
 editorApplyValidating: "&7[P0] Validando la integridad y la sintaxis de la carga..."
 editorApplySuccess: "&a[P0] ¡Configuración aplicada y recargada en caliente! (se crearon copias .bak de los archivos modificados)"
 editorApplyFailed: "&c[P0] No se pudo aplicar la carga: [reason]"
+editorApplyRejected: "&c[P0] Aplicación rechazada: [count] error(es) de configuración; no se escribió nada. Primero: [code] en [source] en [path]."
 
 version: 1.0

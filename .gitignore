@@ -17,6 +17,9 @@ build/
 *.ipr
 *.iws
 
+# SonarQube for IDE (SonarLint) per-source-set cache
+.sonar/
+
 /*.txt
 
 # IntelliJ

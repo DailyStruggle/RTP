@@ -52,11 +52,13 @@ transport:
 # Backend heartbeat / peer-staleness cadence (shared by every transport tier).
 heartbeat:
   # How often this backend publishes its state row.
+  # 支持持续时间单位（例如 24h, 1d）。
   # @type: integer
   # @default: 1000
   intervalMs: 1000
 
   # 对等节点的最后可见状态在被视为未知之前保持可信的时长。 在插件消息层，这也是快照陈旧窗口：变为未知的对等节点仍被接受为目标， 只是不再被建议。保持远高于 intervalMs，以免单次心跳丢失导致对等节点状态抖动。
+  # 支持持续时间单位（例如 24h, 1d）。
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
@@ -82,11 +84,13 @@ queue:
   maxDepth: 50
 
   # 后端脏写刷新节奏（毫秒）。越低端到端延迟越低，越高往返传输次数越少。默认 250ms。
+  # 支持持续时间单位（例如 24h, 1d）。
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
 
   # 后端状态缓存轮询节奏（毫秒）。驱动后端读取 rtp:net:wq:status:<pid> 刷新每玩家进度的频率。
+  # 支持持续时间单位（例如 24h, 1d）。
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
@@ -114,11 +118,13 @@ queue:
 # 预留令牌生命周期。
 reservation:
  # 代理端 TTL 回收器节奏（毫秒）。回收器清除过期令牌，使同位后端可将坐标归还给 networkKeptLocations。
+  # 支持持续时间单位（例如 24h, 1d）。
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
 
   # 每个令牌的 TTL（毫秒）。已认领但未消费且超过此时长的预留被视为已放弃并释放。
+  # 支持持续时间单位（例如 24h, 1d）。
   # @type: integer
   # @default: 60000
   ttlMs: 60000
@@ -304,6 +310,7 @@ editor:
   # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
   trust:
     # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # 支持持续时间单位（例如 24h, 1d）。
     # @type: integer
     # @default: 0
     maxAgeDays: 0

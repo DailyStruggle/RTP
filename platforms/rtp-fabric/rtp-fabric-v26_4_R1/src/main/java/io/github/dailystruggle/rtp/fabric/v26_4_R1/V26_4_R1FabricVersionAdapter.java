@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.fabric.v26_4_R1;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.unobf.effects.FabricEffectsHandlerUnobf;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle;
@@ -129,7 +130,7 @@ public final class V26_4_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     private static final java.util.concurrent.Executor RTP_CONTINUATION_EXECUTOR =
-            r -> RTP.scheduler.runTaskAsynchronously(r);
+            r -> RTPRuntime.scheduler().runTaskAsynchronously(r);
 
     private CompletableFuture<RTPChunkHandle> requestFullChunkAsyncRaw(ServerLevel level, int cx, int cz) {
         try {
@@ -313,8 +314,8 @@ public final class V26_4_R1FabricVersionAdapter implements FabricVersionAdapter 
                 () -> {
                     io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape =
                             (io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>)
-                                    io.github.dailystruggle.rtp.common.RTP.factoryMap
-                                            .get(io.github.dailystruggle.rtp.common.RTP.factoryNames.shape)
+                                    io.github.dailystruggle.rtp.common.factory.FactoryRegistry
+                                            .get(io.github.dailystruggle.rtp.common.factory.FactoryNames.shape)
                                             .get("SQUARE");
                     if (shape instanceof io.github.dailystruggle.rtp.common.selection
                             .region.selectors.memory.shapes.Square square) {

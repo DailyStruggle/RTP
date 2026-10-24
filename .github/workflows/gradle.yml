@@ -10,85 +10,104 @@ on:
       - 'mkdocs.yml'
       - '.github/ISSUE_TEMPLATE/**'
       - 'LICENSE*'
+  # No paths-ignore on pull_request: `ci-ok` must report on every PR, or a
+  # required check stays "Expected". Docs-only PRs get scope `none` instead.
   pull_request:
     branches: [ V3, V2, V1 ]
-    paths-ignore:
-      - 'docs/**'
-      - 'site/**'
-      - '*.md'
-      - 'mkdocs.yml'
-      - '.github/ISSUE_TEMPLATE/**'
-      - 'LICENSE*'
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Job graph (one job per project set, chained along project(':...') edges;
+# `changes` verifies the chain against the Gradle graph on every run):
+#
+#   changes -> checks, build-reduced-jdk21
+#   changes -> core -> proxy, bukkit, fabric, neoforge
+#   changes -> helpers
+#   core + helpers -> addons
+#   core + proxy + bukkit + fabric + neoforge + addons -> plugin
+#   every set job -> analysis (changed-line coverage gate, SonarCloud)
+#   everything -> ci-ok (the single required status check)
+#
+# A set job runs when its flag is true and no job it needs failed; a skipped
+# upstream job does not block it. Each job is a fresh runner, so a downstream
+# job recompiles (but does not re-test) the modules it depends on.
 jobs:
-  # Reduced graph: the offline / JDK-21-only build variant. Exercises the
-  # exclusion machinery (-PexcludeJdk25 / -PexcludeNeoforge) so that fallback
-  # path cannot rot silently. Matches what a JDK-21-only host (JitPack, an
-  # offline sandbox) actually builds. Full tests and pre-flight checks run in build-full.
-  build-reduced-jdk21:
+  # Build scope (scripts/ci-scope.py): `full` for anything touching core, APIs,
+  # platforms, rtp-plugin or build/CI config; `leaf` when every change is inside
+  # addons/<Name>/ or helpers/<Name>/; `none` when nothing buildable changed.
+  # Pull requests are scoped against their base. Pushes to V1/V2/V3 (merges) and
+  # workflow_dispatch always build in full, so the shaded rtp-plugin jar that
+  # bundles the addons is rebuilt on every merge.
+  # Per-set flags apply the project(':...') dependency closure; `<set>_tasks`
+  # lists `:<p>:build` for each affected project of the set.
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+      full: ${{ steps.scope.outputs.full }}
+      core: ${{ steps.scope.outputs.core }}
+      bukkit: ${{ steps.scope.outputs.bukkit }}
+      fabric: ${{ steps.scope.outputs.fabric }}
+      neoforge: ${{ steps.scope.outputs.neoforge }}
+      proxy: ${{ steps.scope.outputs.proxy }}
+      plugin: ${{ steps.scope.outputs.plugin }}
+      addons: ${{ steps.scope.outputs.addons }}
+      helpers: ${{ steps.scope.outputs.helpers }}
+      core_tasks: ${{ steps.scope.outputs.core_tasks }}
+      bukkit_tasks: ${{ steps.scope.outputs.bukkit_tasks }}
+      fabric_tasks: ${{ steps.scope.outputs.fabric_tasks }}
+      neoforge_tasks: ${{ steps.scope.outputs.neoforge_tasks }}
+      proxy_tasks: ${{ steps.scope.outputs.proxy_tasks }}
+      plugin_tasks: ${{ steps.scope.outputs.plugin_tasks }}
+      addons_tasks: ${{ steps.scope.outputs.addons_tasks }}
+      helpers_tasks: ${{ steps.scope.outputs.helpers_tasks }}
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Assemble reduced graph
-        run: ./gradlew assemble -PexcludeJdk25 -PexcludeNeoforge
-
-      # ADR-113 classfile gate. `assemble` skips `check`, so run it explicitly here. It inspects
-      # bytecode only, so the JDK 21 host is sufficient and no JDK 17 install is needed.
-      - name: Verify Java 17 bytecode (ADR-113)
-        run: ./gradlew verifyJava17Bytecode -PexcludeJdk25 -PexcludeNeoforge
-
-  # Full graph: the complete unified-jar build, including the JDK-25 deobf
-  # 26.x Fabric/NeoForge carriers (which pin their own Java 25 toolchain) and
-  # the shaded plugin jar. Both JDK 21 and 25 are provisioned; Gradle selects
-  # the right toolchain per module.
-  build-full:
-    runs-on: ubuntu-latest
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          # Full history so scripts/diff-coverage.py can diff against the PR
-          # base (or the previous commit on push) rather than a shallow tip.
           fetch-depth: 0
 
+      - name: Check job order against the project graph
+        run: python3 scripts/ci-scope.py --check-workflow .github/workflows/gradle.yml
+
+      - name: Classify changed paths
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            python3 scripts/ci-scope.py --base "$PR_BASE_SHA" --head HEAD
+          else
+            python3 scripts/ci-scope.py --force-full
+          fi
+
+  # Repo-wide pre-flight checks; independent of which sets changed.
+  checks:
+    needs: changes
+    if: needs.changes.outputs.scope != 'none'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
       - name: Set up JDK 21 and 25
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           java-version: |
             21
             25
           distribution: 'temurin'
 
+      # Writes the cache on PR runs too (see gradle-set.yml).
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
-
-      - name: Cache SonarQube packages
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
         with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
+          cache-read-only: false
+          cache-cleanup: on-success
 
       - name: Grant execute permission for scripts
         run: chmod +x gradlew scripts/check_traceability.sh
@@ -105,29 +124,186 @@ jobs:
       - name: Check code style (Spotless)
         run: ./gradlew spotlessCheck
 
-      - name: Verify public API binary compatibility
-        run: ./gradlew checkBinaryCompatibility
+  # Reduced graph: the offline / JDK-21-only build variant. Exercises the
+  # exclusion machinery (-PexcludeJdk25 / -PexcludeNeoforge) so that fallback
+  # path cannot rot silently. Matches what a JDK-21-only host (JitPack, an
+  # offline sandbox) actually builds. Tests run in the set jobs.
+  build-reduced-jdk21:
+    needs: changes
+    if: needs.changes.outputs.scope == 'full'
+    runs-on: ubuntu-latest
 
-      # -Pcoverage wires JaCoCo report + the jacocoTestCoverageVerification
-      # floors into check; -PstaticAnalysis runs the opt-in PMD gate
-      # (incl. PreferNonLockingExecution). Both were previously local-only.
-      - name: Build and test (with coverage + static analysis gates)
-        run: ./gradlew build shadowJar -Pcoverage -PstaticAnalysis
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      # SonarCloud analysis (ADR-094): reuses compiled bytecode, JaCoCo XML, and
-      # PMD reports already generated by build above, avoiding redundant compilation.
-      - name: Run SonarQube Analysis
-        if: env.SONAR_TOKEN != ''
-        run: ./gradlew sonar -Pcoverage -PstaticAnalysis
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # Writes the cache on PR runs too (see gradle-set.yml).
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          cache-read-only: false
+          cache-cleanup: on-success
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Assemble reduced graph
+        run: ./gradlew assemble -PexcludeJdk25 -PexcludeNeoforge
+
+      # ADR-113 classfile gate. `assemble` skips `check`, so run it explicitly here. It inspects
+      # bytecode only, so the JDK 21 host is sufficient and no JDK 17 install is needed.
+      - name: Verify Java 17 bytecode (ADR-113)
+        run: ./gradlew verifyJava17Bytecode -PexcludeJdk25 -PexcludeNeoforge
+
+  # rtp-api, rtp-core and the api/* SPI modules, plus the public API binary
+  # compatibility check (japicmp) against the last release. In `leaf` scope the
+  # job only runs core tests that read a touched addon's files, without japicmp.
+  core:
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: core
+      tasks: ${{ needs.changes.outputs.core_tasks }} ${{ needs.changes.outputs.scope == 'full' && 'checkBinaryCompatibility' || '' }}
+
+  proxy:
+    needs: [changes, core]
+    if: ${{ !cancelled() && needs.changes.outputs.proxy == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: proxy
+      tasks: ${{ needs.changes.outputs.proxy_tasks }}
+
+  bukkit:
+    needs: [changes, core]
+    if: ${{ !cancelled() && needs.changes.outputs.bukkit == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: bukkit
+      tasks: ${{ needs.changes.outputs.bukkit_tasks }}
+
+  fabric:
+    needs: [changes, core]
+    if: ${{ !cancelled() && needs.changes.outputs.fabric == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: fabric
+      tasks: ${{ needs.changes.outputs.fabric_tasks }}
+
+  neoforge:
+    needs: [changes, core]
+    if: ${{ !cancelled() && needs.changes.outputs.neoforge == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: neoforge
+      tasks: ${{ needs.changes.outputs.neoforge_tasks }}
+
+  helpers:
+    needs: changes
+    if: needs.changes.outputs.helpers == 'true'
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: helpers
+      tasks: ${{ needs.changes.outputs.helpers_tasks }}
+      artifact-name: RTP-Helper-Artifacts
+      artifact-path: helpers/*/build/libs/
+
+  addons:
+    needs: [changes, core, helpers]
+    if: ${{ !cancelled() && needs.changes.outputs.addons == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: addons
+      tasks: ${{ needs.changes.outputs.addons_tasks }}
+      artifact-name: RTP-Addon-Artifacts
+      artifact-path: |
+        addons/*/build/libs/
+        addons/*/*/build/libs/
+
+  # Shaded rtp-plugin jar (bundles the platforms and addons). Skipped for
+  # addon/helper-only PRs (scope `leaf`); every merge to V1/V2/V3 builds it.
+  plugin:
+    needs: [changes, core, proxy, bukkit, fabric, neoforge, addons]
+    if: ${{ !cancelled() && needs.changes.outputs.plugin == 'true' && needs.changes.outputs.scope == 'full' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: plugin
+      tasks: ${{ needs.changes.outputs.plugin_tasks }} :rtp-plugin:shadowJar copyPluginJars copyAddonAndHelperJars
+      artifact-name: RTP-Artifacts
+      artifact-path: build/libs/
+
+  # Merges the JaCoCo / PMD XML of every set job that ran, then gates
+  # changed-line coverage and runs SonarCloud (ADR-094) over the whole project.
+  analysis:
+    needs: [changes, core, proxy, bukkit, fabric, neoforge, helpers, addons, plugin]
+    if: ${{ !cancelled() && needs.changes.outputs.scope == 'full' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Full history so scripts/diff-coverage.py can diff against the PR
+          # base (or the previous commit on push) rather than a shallow tip.
+          fetch-depth: 0
+
+      - name: Set up JDK 21 and 25
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: |
+            21
+            25
+          distribution: 'temurin'
+
+      # Writes the cache on PR runs too (see gradle-set.yml).
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          cache-read-only: false
+          cache-cleanup: on-success
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Download set reports
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: reports-*
+          path: set-reports
+
+      - name: Unpack set reports
+        run: |
+          shopt -s nullglob
+          for archive in set-reports/*/*.tgz; do
+            echo "Unpacking $archive"
+            tar -xzf "$archive"
+          done
 
       # Changed-line coverage gate: fails when < 80% of instrumented changed
       # lines are covered, measured against the PR base (pull_request) or the
-      # previous commit (push). Reads the JaCoCo XML produced above.
+      # previous commit (push).
       - name: Changed-line coverage gate
         env:
           BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
+          if [ -z "$(find . -path ./.git -prune -o -path '*/build/reports/jacoco/test/jacocoTestReport.xml' -type f -print -quit)" ]; then
+            echo "No JaCoCo reports from the set jobs; nothing to gate."
+            exit 0
+          fi
           if [ -n "$BASE_REF" ]; then
             BASELINE="origin/$BASE_REF"
           else
@@ -139,25 +315,34 @@ jobs:
           echo "Gating changed-line coverage against $BASELINE"
           python3 scripts/diff-coverage.py --baseline "$BASELINE" --min 0.80
 
-      - name: Publish test results
-        uses: mikepenz/action-junit-report@db71d41eb79864e25ab0337e395c352e84523afe # v4.3.1
-        if: always()
-        with:
-          report_paths: '**/build/test-results/test/TEST-*.xml'
-          check_name: 'Test Results'
+      # Coverage, PMD XML and classes come from the unpacked set reports; tests
+      # are not re-run. The sonar task has no implicit compile dependency
+      # (scanner 5+). When every set ran, every project's classes are present;
+      # otherwise the sets that did not run are compiled here.
+      - name: Run SonarQube Analysis
+        if: env.SONAR_TOKEN != ''
+        env:
+          ALL_SETS: ${{ needs.changes.outputs.full }}
+        run: |
+          if [ "$ALL_SETS" = "true" ]; then
+            ./gradlew sonar -PstaticAnalysis
+          else
+            ./gradlew classes testClasses sonar -PstaticAnalysis
+          fi
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
-        if: always()
-        with:
-          name: jacoco-coverage
-          path: '**/build/reports/jacoco/'
-          retention-days: 14
+  # The single required status check. Fails when any job failed or was
+  # cancelled; skipped jobs count as passing.
+  ci-ok:
+    needs: [changes, checks, build-reduced-jdk21, core, proxy, bukkit, fabric, neoforge, helpers, addons, plugin, analysis]
+    if: always()
+    runs-on: ubuntu-latest
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
-        with:
-          name: RTP-Artifacts
-          path: |
-            build/libs/
-            addons/*/build/libs/
+    steps:
+      - name: Check job results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) echo "A required job failed or was cancelled."; exit 1 ;;
+          esac

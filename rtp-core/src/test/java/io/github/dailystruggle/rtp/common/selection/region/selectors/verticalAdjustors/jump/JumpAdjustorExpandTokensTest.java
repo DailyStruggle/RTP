@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +27,11 @@ import org.junit.jupiter.api.Test;
  * (ADR-017 section 1), plus the unloaded-world guards of the live adjust paths.
  */
 class JumpAdjustorExpandTokensTest {
+
+  @BeforeAll
+  static void setUp() {
+    RTP.ensureInitialized();
+  }
 
   @SuppressWarnings("unchecked")
   private static Set<String> expand(Map<String, Set<String>> tags, String... tokens) throws Exception {

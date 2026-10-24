@@ -3,9 +3,11 @@ package io.github.dailystruggle.rtp.common.platform;
 import io.github.dailystruggle.rtp.api.platform.PendingPlatformRestore;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,14 +35,14 @@ public final class PlatformRestoreManager {
 
   /**
    * Constructs (if needed) and starts the process-wide manager, loading any persisted jobs and
-   * scheduling the 1 Hz reaper through {@code RTP.scheduler}.
+   * scheduling the 1 Hz reaper through {@code RTPRuntime.scheduler()}.
    */
   public static void startGlobal() {
     synchronized (PlatformRestoreManager.class) {
       if (instance != null) return;
       PlatformRestoreSqlStore store = null;
-      if (RTP.getInstance() != null
-          && RTP.getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+      if (TeleportSessions.current() != null
+          && ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
         store = new PlatformRestoreSqlStore(sql);
       }
       PlatformRestoreManager m = new PlatformRestoreManager(store);
@@ -69,14 +71,14 @@ public final class PlatformRestoreManager {
 
   /** Schedules the 1 Hz (20-tick) reaper pulse. */
   public void start() {
-    if (RTP.scheduler == null) return;
-    reaperTask = RTP.scheduler.runTaskTimerAsynchronously(this::pulse, 20L, 20L);
+    if (RTPRuntime.scheduler() == null) return;
+    reaperTask = RTPRuntime.scheduler().runTaskTimerAsynchronously(this::pulse, 20L, 20L);
   }
 
   /** Cancels the reaper pulse. */
   public void stop() {
-    if (reaperTask != null && RTP.scheduler != null) {
-      RTP.scheduler.cancelTask(reaperTask);
+    if (reaperTask != null && RTPRuntime.scheduler() != null) {
+      RTPRuntime.scheduler().cancelTask(reaperTask);
     }
     reaperTask = null;
   }
@@ -106,7 +108,7 @@ public final class PlatformRestoreManager {
   public void pulse() {
     for (PendingPlatformRestore entry : entries.values()) {
       if (inFlight.contains(entry.id())) continue;
-      RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(entry.worldName());
+      RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(entry.worldName());
       if (world == null) {
         // World not loaded: nothing to tidy, freeze the countdown (no force-load, S-005).
         continue;
@@ -142,21 +144,21 @@ public final class PlatformRestoreManager {
           try {
             boolean ok = world.restoreBlocks(blocks);
             if (ok) {
-              RTP.log(
+              RTPRuntime.log(
                   Level.INFO,
                   "[RTP] restored emergency platform footprint ("
                       + blocks.size()
                       + " blocks) in "
                       + entry.worldName());
             } else {
-              RTP.log(
+              RTPRuntime.log(
                   Level.WARNING,
                   "[RTP] platform restore for "
                       + entry.worldName()
                       + " was not applied (unsupported platform or failure); retiring entry");
             }
           } catch (Throwable t) {
-            RTP.log(
+            RTPRuntime.log(
                 Level.WARNING,
                 "[RTP] platform restore failed for " + entry.worldName() + "; retiring entry",
                 t);
@@ -165,9 +167,9 @@ public final class PlatformRestoreManager {
           }
         };
     try {
-      RTP.scheduler.runTask(at, restore);
+      RTPRuntime.scheduler().runTask(at, restore);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[RTP] failed to schedule platform restore; retiring entry", t);
+      RTPRuntime.log(Level.WARNING, "[RTP] failed to schedule platform restore; retiring entry", t);
       retire(entry.id());
     }
   }

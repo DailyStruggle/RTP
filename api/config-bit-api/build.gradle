@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+// config-bit-api -- declarative YAML directive and constraint PBIT library (ADR-064, ADR-121).
+// Pure Java 17 layered strictly on yaml-api, bit-api, and units-api: zero rtp-core or rtp-api dependency.
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withJavadocJar()
+    withSourcesJar()
+}
+
+dependencies {
+    api project(':yaml-api')
+    api project(':bit-api')
+    api project(':units-api')
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}
+
+test {
+    useJUnitPlatform()
+}

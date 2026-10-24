@@ -2,23 +2,22 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.EllipseMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -34,13 +33,13 @@ class ShapeBoundaryAndClampingTest {
     @BeforeAll
     static void setUp() {
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(new File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
     @org.junit.jupiter.api.AfterAll
     static void tearDown() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
     }
 
@@ -231,7 +230,7 @@ class ShapeBoundaryAndClampingTest {
         borderSquare.set(GenericMemoryShapeParams.centerZ, 0L);
         WorldBorder border = new WorldBorder(() -> borderSquare, loc -> true);
 
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.setWorldBorderFunction(s -> border);
 
         RTPWorld<?> world = mock(RTPWorld.class);
@@ -256,7 +255,7 @@ class ShapeBoundaryAndClampingTest {
         borderSquare.set(GenericMemoryShapeParams.centerZ, 0L);
         WorldBorder border = new WorldBorder(() -> borderSquare, loc -> true);
 
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.setWorldBorderFunction(s -> border);
 
         RTPWorld<?> world = mock(RTPWorld.class);
@@ -286,12 +285,12 @@ class ShapeBoundaryAndClampingTest {
         assertEquals(0, circle.badKeysSnapshot().length);
 
         // Add multiple distinct bad locations with specific fail types
-        circle.addBadLocation(100L, LocationGenerator.FailTypes.safety);
-        circle.addBadLocation(101L, LocationGenerator.FailTypes.safety);
-        circle.addBadLocation(102L, LocationGenerator.FailTypes.safety);
-        circle.addBadLocation(500L, LocationGenerator.FailTypes.vert);
-        circle.addBadLocation(501L, LocationGenerator.FailTypes.vert);
-        circle.addBadLocation(1200L, LocationGenerator.FailTypes.biome);
+        circle.addBadLocation(100L, FailTypes.safety);
+        circle.addBadLocation(101L, FailTypes.safety);
+        circle.addBadLocation(102L, FailTypes.safety);
+        circle.addBadLocation(500L, FailTypes.vert);
+        circle.addBadLocation(501L, FailTypes.vert);
+        circle.addBadLocation(1200L, FailTypes.biome);
 
         // Verify isKnownBad checks pending locations even before rebuild
         assertTrue(circle.isKnownBad(100L));
@@ -312,17 +311,17 @@ class ShapeBoundaryAndClampingTest {
         // Verify contiguous keys 100, 101, 102 are coalesced into a single run at key 100 with delta length 3
         assertEquals(100L, badKeys[0]);
         assertEquals(3L, prefixSums[0]);
-        assertEquals((byte) LocationGenerator.FailTypes.safety.ordinal(), badCauses[0]);
+        assertEquals((byte) FailTypes.safety.ordinal(), badCauses[0]);
 
         // Key 500 with length 2
         assertEquals(500L, badKeys[1]);
         assertEquals(3L + 2L, prefixSums[1]);
-        assertEquals((byte) LocationGenerator.FailTypes.vert.ordinal(), badCauses[1]);
+        assertEquals((byte) FailTypes.vert.ordinal(), badCauses[1]);
 
         // Key 1200 with length 1
         assertEquals(1200L, badKeys[2]);
         assertEquals(5L + 1L, prefixSums[2]);
-        assertEquals((byte) LocationGenerator.FailTypes.biome.ordinal(), badCauses[2]);
+        assertEquals((byte) FailTypes.biome.ordinal(), badCauses[2]);
 
         // All points remain known bad post rebuild
         assertTrue(circle.isKnownBad(100L));
@@ -342,18 +341,16 @@ class ShapeBoundaryAndClampingTest {
         RTPTestSetup.install(testDir);
 
         YamlFileDatabase db = new YamlFileDatabase(testDir);
-        Field daField = RTP.class.getDeclaredField("databaseAccessor");
-        daField.setAccessible(true);
-        daField.set(RTP.getInstance(), db);
+        io.github.dailystruggle.rtp.common.database.ActiveDatabase.setAccessor(db);
 
         Square original = new Square();
         original.set(GenericMemoryShapeParams.radius, 500L);
         original.set(GenericMemoryShapeParams.centerRadius, 0L);
 
         // Populate bad locations and biome locations
-        original.addBadLocation(50L, LocationGenerator.FailTypes.safety);
-        original.addBadLocation(51L, LocationGenerator.FailTypes.safety);
-        original.addBadLocation(200L, LocationGenerator.FailTypes.vert);
+        original.addBadLocation(50L, FailTypes.safety);
+        original.addBadLocation(51L, FailTypes.safety);
+        original.addBadLocation(200L, FailTypes.vert);
         original.addBiomeLocation(300L, 10L, "PLAINS");
         original.addBiomeLocation(400L, 5L, "FOREST");
 
@@ -411,14 +408,14 @@ class ShapeBoundaryAndClampingTest {
     void exportDebugJson_validStructure(@TempDir Path tempDir) throws Exception {
         File testDir = tempDir.toFile();
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(testDir);
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
 
         Circle circle = new Circle();
         circle.set(GenericMemoryShapeParams.radius, 800L);
-        circle.addBadLocation(42L, LocationGenerator.FailTypes.safety);
-        circle.addBadLocation(43L, LocationGenerator.FailTypes.safety);
-        circle.addBadLocation(100L, LocationGenerator.FailTypes.vert);
+        circle.addBadLocation(42L, FailTypes.safety);
+        circle.addBadLocation(43L, FailTypes.safety);
+        circle.addBadLocation(100L, FailTypes.vert);
         circle.addBiomeLocation(200L, 8L, "DESERT");
         circle.flushAndRebuild(circle.spatialResolution());
 

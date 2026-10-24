@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.effects;
 import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -59,7 +59,7 @@ public class EffectsResolverTest {
     @BeforeEach
     void setUp() throws IOException {
         RTPTestSetup.install(tempDir.toFile());
-        RTP.configs = new Configs(tempDir.toFile());
+        ActiveConfigs.set(new Configs(tempDir.toFile()));
         Files.createDirectories(tempDir.resolve("effects"));
     }
 
@@ -73,7 +73,7 @@ public class EffectsResolverTest {
     private MultiConfigParser<EffectsGroupKeys> rebuildParser() {
         MultiConfigParser<EffectsGroupKeys> mcp =
                 new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", tempDir.toFile());
-        RTP.configs.multiConfigParserMap.put(EffectsGroupKeys.class, mcp);
+        ActiveConfigs.get().multiConfigParserMap.put(EffectsGroupKeys.class, mcp);
         return mcp;
     }
 
@@ -298,7 +298,7 @@ public class EffectsResolverTest {
 
     @Test
     void noEffectsParserYieldsEmpty() {
-        RTP.configs.multiConfigParserMap.remove(EffectsGroupKeys.class);
+        ActiveConfigs.get().multiConfigParserMap.remove(EffectsGroupKeys.class);
         RTPPlayer p = player("ivy", UUID.randomUUID(), Collections.emptySet());
         List<String> tokens = EffectsResolver.resolveTokens(
                 "postteleport", p, "rtp.effect.postteleport");
@@ -402,7 +402,7 @@ public class EffectsResolverTest {
 
     @Test
     void nullConfigsYieldsEmpty() {
-        RTP.configs = null;
+        ActiveConfigs.set(null);
         RTPPlayer p = player("nate", UUID.randomUUID(), Collections.emptySet());
         List<String> tokens = EffectsResolver.resolveTokens(
                 "postteleport", p, "rtp.effect.postteleport");

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * REQ-RTP-S-004 / ADR-016 verification: nullChunk attribution in pregen diagnostics.
- * Asserts that rejected/null chunk loads are tracked in {@link LocationGenerator.FailTypes#nullChunk}
+ * Asserts that rejected/null chunk loads are tracked in {@link FailTypes#nullChunk}
  * with {@code reason=asyncLoadNull} rather than silently dropped.
  */
 @DisplayName("REQ-RTP-S-004 / ADR-016: null-chunk drops are attributed to FailTypes.nullChunk")
@@ -61,7 +62,7 @@ public class ReqRtpS004NullChunkAttributionTest {
 
             @SuppressWarnings("unchecked")
             ConfigParser<SafetyKeys> safety =
-                    (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                    (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
             @SuppressWarnings("unchecked")
             java.util.EnumMap<SafetyKeys, Object> safetyData =
                     (java.util.EnumMap<SafetyKeys, Object>) dataField.get(safety);
@@ -69,7 +70,7 @@ public class ReqRtpS004NullChunkAttributionTest {
 
             @SuppressWarnings("unchecked")
             ConfigParser<LoggingKeys> logging =
-                    (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+                    (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
             @SuppressWarnings("unchecked")
             java.util.EnumMap<LoggingKeys, Object> loggingData =
                     (java.util.EnumMap<LoggingKeys, Object>) dataField.get(logging);

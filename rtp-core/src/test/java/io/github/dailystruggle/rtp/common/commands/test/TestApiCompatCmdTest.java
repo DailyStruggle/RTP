@@ -30,6 +30,7 @@ class TestApiCompatCmdTest {
 
   @BeforeEach
   void setUp() {
+    TestApiCompatCmd.clearProbeSuppliers();
     accessor = RTPTestSetup.install(tempDir);
   }
 
@@ -63,6 +64,21 @@ class TestApiCompatCmdTest {
     assertEquals(2, report.skipped.size(), report.skipped.toString());
     assertEquals(0, report.errors.size());
     assertEquals(1, report.failures(), "only missing-method + errors count as failures");
+  }
+
+  @Test
+  void missingOptionalMethodIsWarningButNotAFailure() {
+    TestApiCompatCmd.ApiProbe optionalProbe =
+        new TestApiCompatCmd.ApiProbe("java.lang.String", "definitelyNotAMethod", List.of(), "optional", true);
+
+    TestApiCompatCmd.ProbeReport report = TestApiCompatCmd.runProbes(List.of(optionalProbe));
+
+    assertEquals(0, report.missingMethod.size());
+    assertEquals(1, report.missingOptional.size());
+    assertEquals(0, report.failures());
+    var finding = TestApiCompatCmd.toBitReport(report).findings().get(0);
+    assertEquals(TestApiCompatCmd.MISSING_OPTIONAL_METHOD.key(), finding.code());
+    assertEquals(java.lang.System.Logger.Level.WARNING, finding.severity());
   }
 
   @Test
@@ -138,5 +154,112 @@ class TestApiCompatCmdTest {
     assertEquals("api-compat", cmd.name());
     assertEquals("rtp.test", cmd.permission());
     assertTrue(cmd.description().length() > 0);
+  }
+
+  @Test
+  void platformAwareProbeSelection_coversBukkitPaperFoliaFabricNeoForge() {
+    // 1. Spigot / Bukkit: getChunkAtAsync, teleportAsync, and Folia schedulers are optional
+    accessor.setPlatform("Spigot");
+    List<TestApiCompatCmd.ApiProbe> spigotProbes = TestApiCompatCmd.defaultProbes();
+    assertTrue(
+        spigotProbes.stream()
+            .anyMatch(p -> p.className.equals("org.bukkit.World") && p.methodName.equals("addPluginChunkTicket")));
+    assertTrue(
+        spigotProbes.stream()
+            .anyMatch(p -> p.className.equals("org.bukkit.inventory.InventoryView") && p.methodName.equals("getTopInventory")));
+    assertTrue(
+        spigotProbes.stream()
+            .anyMatch(p -> p.className.equals("org.bukkit.Registry") && p.methodName.equals("BIOME")));
+    assertTrue(
+        spigotProbes.stream()
+            .filter(p -> p.className.equals("org.bukkit.Bukkit") && p.methodName.equals("getRegionScheduler"))
+            .allMatch(p -> p.optional),
+        "Folia scheduler probes must be optional on Spigot");
+
+    // 2. Paper: getChunkAtAsync and teleportAsync are required; Folia schedulers remain optional
+    accessor.setPlatform("Paper");
+    List<TestApiCompatCmd.ApiProbe> paperProbes = TestApiCompatCmd.defaultProbes();
+    assertTrue(
+        paperProbes.stream()
+            .filter(p -> p.className.equals("org.bukkit.World") && p.methodName.equals("getChunkAtAsync"))
+            .noneMatch(p -> p.optional),
+        "World#getChunkAtAsync must be required on Paper");
+    assertTrue(
+        paperProbes.stream()
+            .filter(p -> p.className.equals("org.bukkit.entity.Entity") && p.methodName.equals("teleportAsync"))
+            .noneMatch(p -> p.optional),
+        "Entity#teleportAsync must be required on Paper");
+    assertTrue(
+        paperProbes.stream()
+            .filter(p -> p.className.equals("org.bukkit.Bukkit") && p.methodName.equals("getRegionScheduler"))
+            .allMatch(p -> p.optional),
+        "Folia scheduler probes must be optional on Paper");
+
+    // 3. Folia: Folia regional threading surfaces are required (optional == false)
+    accessor.setPlatform("Folia");
+    List<TestApiCompatCmd.ApiProbe> foliaProbes = TestApiCompatCmd.defaultProbes();
+    assertTrue(
+        foliaProbes.stream()
+            .filter(p -> p.className.equals("org.bukkit.Bukkit") && p.methodName.equals("getRegionScheduler"))
+            .noneMatch(p -> p.optional),
+        "Bukkit#getRegionScheduler must be required on Folia");
+    assertTrue(
+        foliaProbes.stream()
+            .filter(p -> p.className.equals("org.bukkit.entity.Entity") && p.methodName.equals("getScheduler"))
+            .noneMatch(p -> p.optional),
+        "Entity#getScheduler must be required on Folia");
+
+    // 4. Fabric: probes FabricVersionAdapter and net.minecraft.server.level.*
+    accessor.setPlatform("fabric");
+    List<TestApiCompatCmd.ApiProbe> fabricProbes = TestApiCompatCmd.defaultProbes();
+    assertTrue(
+        fabricProbes.stream()
+            .anyMatch(
+                p ->
+                    p.className.equals("io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter")
+                        && p.methodName.equals("requestFullChunkAsync")));
+    assertTrue(
+        fabricProbes.stream()
+            .anyMatch(
+                p ->
+                    p.className.equals("net.minecraft.server.level.ServerLevel")
+                        && p.methodName.equals("getChunkSource")));
+    assertTrue(
+        fabricProbes.stream()
+            .anyMatch(
+                p ->
+                    p.className.equals("net.minecraft.core.RegistryAccess")
+                        && p.methodName.equals("lookupOrThrow")));
+
+    // 5. NeoForge: probes NeoForgeVersionAdapter and net.minecraft.server.level.*
+    accessor.setPlatform("neoforge");
+    List<TestApiCompatCmd.ApiProbe> neoForgeProbes = TestApiCompatCmd.defaultProbes();
+    assertTrue(
+        neoForgeProbes.stream()
+            .anyMatch(
+                p ->
+                    p.className.equals("io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter")
+                        && p.methodName.equals("requestFullChunkAsync")));
+    assertTrue(
+        neoForgeProbes.stream()
+            .anyMatch(
+                p ->
+                    p.className.equals("net.minecraft.server.level.ServerChunkCache")
+                        && p.methodName.equals("addTicketWithRadius")));
+  }
+
+  @Test
+  void registerProbeSupplier_overridesAndResolvesStaticFields() {
+    TestApiCompatCmd.ApiProbe fieldProbe =
+        new TestApiCompatCmd.ApiProbe("java.lang.Integer", "MAX_VALUE", List.of(), "static field probe");
+    TestApiCompatCmd.registerProbeSupplier("custom-platform", () -> List.of(fieldProbe));
+    accessor.setPlatform("custom-platform");
+
+    List<TestApiCompatCmd.ApiProbe> probes = TestApiCompatCmd.defaultProbes();
+    assertEquals(1, probes.size());
+    TestApiCompatCmd.ProbeReport report = TestApiCompatCmd.runProbes(probes);
+    assertEquals(1, report.ok.size());
+    assertEquals(0, report.failures());
+    TestApiCompatCmd.clearProbeSuppliers();
   }
 }

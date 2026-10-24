@@ -8,8 +8,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -263,7 +264,7 @@ public final class FrontPageBuilder {
         try {
             return permission.test(perm);
         } catch (RuntimeException e) {
-            RTP.log(java.util.logging.Level.WARNING,
+            RTPRuntime.log(java.util.logging.Level.WARNING,
                     "front-page permission probe threw for '" + perm + "': " + e.getMessage(), e);
             return false;
         }
@@ -296,7 +297,7 @@ public final class FrontPageBuilder {
             java.util.Set<String> rel = param.relevantValues(viewer);
             return rel != null && !rel.isEmpty();
         } catch (RuntimeException e) {
-            RTP.log(java.util.logging.Level.WARNING,
+            RTPRuntime.log(java.util.logging.Level.WARNING,
                     "front-page suggestion probe threw: " + e.getMessage(), e);
             return false;
         }
@@ -304,8 +305,8 @@ public final class FrontPageBuilder {
 
     @SuppressWarnings("unchecked")
     private static String lookupMsg(Enum<?> key, String fallback) {
-        if (RTP.configs == null) return fallback;
-        Object v = RTP.configs.getConfigValue(key, fallback);
+        if (ActiveConfigs.get() == null) return fallback;
+        Object v = ActiveConfigs.get().getConfigValue(key, fallback);
         return v == null ? fallback : v.toString();
     }
 }

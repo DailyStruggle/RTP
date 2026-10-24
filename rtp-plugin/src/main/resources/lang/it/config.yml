@@ -1,5 +1,5 @@
 # --- Configurazione principale di RTP ---
-# Documentazione: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# Documentazione: docs/admin/configuration/CORE_CONFIG.md
 # La selezione della lingua ora risiede in language.yml (caricato prima di config.yml).
 # Tempo di attesa prima che un teletrasporto in coda venga eseguito.
 # 0 teletrasporta immediatamente (salta la finestra di annullamento per movimento).
@@ -123,6 +123,14 @@ defaults:
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
+    # Rifiuta atterraggi su pendii o bordi di scogliera con questa pendenza o più, in gradi.
+    # "off" è il più veloce. 30 rifiuta circa 1 punto a terra su 5, 45 circa 1 su 12, 60 circa 1 su 60.
+    # Va bene anche qualsiasi numero da 0 a 89. Se attivo, la ricerca legge i chunk attorno a ogni punto.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
 
   # How many safe spots to pre-calculate.
   cacheCap: 50

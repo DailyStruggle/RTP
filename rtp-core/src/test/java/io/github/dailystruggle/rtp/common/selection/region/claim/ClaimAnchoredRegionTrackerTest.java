@@ -5,14 +5,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
+import io.github.dailystruggle.rtp.common.selection.region.SubspaceShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -30,10 +32,10 @@ public class ClaimAnchoredRegionTrackerTest {
   void beforeEach() {
     MockRTPServerAccessor accessor =
         io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     if (RTP.getInstance() != null) {
-      RTP.getInstance().databaseAccessor = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class);
+      ActiveDatabase.setAccessor(org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class));
     }
   }
 
@@ -208,7 +210,7 @@ public class ClaimAnchoredRegionTrackerTest {
     sourceCircle.set(GenericMemoryShapeParams.centerX, 0L);
     sourceCircle.set(GenericMemoryShapeParams.centerZ, 0L);
     sourceCircle.set(GenericMemoryShapeParams.expand, false);
-    RTPWorld mockWorld = RTP.serverAccessor.getRTPWorld("world");
+    RTPWorld mockWorld = RTPRuntime.serverAccessor().getRTPWorld("world");
     Region sourceRegion = createTestRegion("source_world", sourceCircle, mockWorld);
 
     // Target shape for the claim
@@ -221,7 +223,7 @@ public class ClaimAnchoredRegionTrackerTest {
 
     // Shape keys are chunk units: mark chunk (2, 2) (blocks 32..47) as bad in source
     long loc1D = sourceCircle.xzToLocation(2, 2);
-    sourceCircle.addBadChunk(loc1D, LocationGenerator.FailTypes.biome);
+    sourceCircle.addBadChunk(loc1D, FailTypes.biome);
     assertTrue(sourceCircle.isKnownBad(2, 2));
 
     assertFalse(targetCircle.isKnownBad(2, 2));
@@ -246,7 +248,7 @@ public class ClaimAnchoredRegionTrackerTest {
     RectangularClaimBoundary boundary = new RectangularClaimBoundary("faction_d", "world", 100, 100, 300, 300);
 
     Circle parentCircle = new Circle();
-    RTPWorld mockWorld = RTP.serverAccessor.getRTPWorld("world");
+    RTPWorld mockWorld = RTPRuntime.serverAccessor().getRTPWorld("world");
     Region parentRegion = createTestRegion("parent_world", parentCircle, mockWorld);
 
     SubspaceShape subspace = tracker.createClaimSubspace(boundary, 64, parentRegion, 10_000L);

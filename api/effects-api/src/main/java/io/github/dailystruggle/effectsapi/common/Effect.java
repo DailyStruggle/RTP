@@ -260,7 +260,10 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
                 continue;
             }
             Class<?> type = defVal.getClass();
-            if (!(type.isAssignableFrom(val.getClass()))) {
+            if (type.isAssignableFrom(val.getClass())) {
+                // Already the default's type (e.g. a String TITLE token): keep it, not the default.
+                res = val;
+            } else {
                 if (val instanceof String) {
                     try {
                         res = str2Obj(entry.getKey(), (String) val);

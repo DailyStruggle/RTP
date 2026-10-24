@@ -4,38 +4,41 @@
 
 **Minimum:** drop the jar in `plugins/` (or `mods/`), restart, type `/rtp`. That works as-is. RTP learns the terrain as players teleport; the only cost of skipping the rest is that its memory of bad terrain builds up over time instead of up front.
 
-**Recommended:**
+**Primary setup paths (pick either - both are self-contained):**
 
-1. [`/rtp admin setup`](#guided-setup-rtp-admin-setup) - answer the wizard's questions.
-2. Set each region's radius for how players will use it. The wizard doesn't ask about distance, so do this yourself: `/rtp config regions default shape.radius=10km` (or the map in `/rtp editor`, or [Step 4](#step-4-adjust-the-teleport-area)).
-3. `/rtp scan start` to check the terrain ahead of time ([Step 9](#step-9-build-spatial-memory-with-rtp-scan)).
-4. A stress test if you expect heavy traffic ([Step 10](#step-10-verify-with-rtp-info-and-rtp-test)).
+- **Browser map workspace (`/rtp editor`):** Opens your config and world map in the browser with no port forwarding. Draw and resize region borders directly on the map, edit settings with each key's docs beside it, and review a diff before applying ([Web Editor Guide](WEB_EDITOR_GUIDE.md)).
+- **In-game guided wizard ([`/rtp admin setup`](#guided-setup-rtp-admin-setup)):** Walks through world layout, gameplay presets, region radius (via clickable presets or Anvil input), performance profile, and addon toggles, then previews every file change before writing.
 
-Everything else below is optional: pregeneration, per-world files, permissions beyond the defaults, economy, extra regions. Each step links to the full doc.
+**Recommended after setup:**
+
+1. `/rtp scan start` to check the terrain ahead of time ([Step 9](#step-9-build-spatial-memory-with-rtp-scan)).
+2. A stress test if you expect heavy traffic ([Step 10](#step-10-verify-with-rtp-info-and-rtp-test)).
+
+Everything else below is optional: pregeneration, manual YAML or `/rtp config` edits, per-world files, permissions beyond the defaults, economy, extra regions. Each step links to the full doc.
 
 ---
 
 ## Guided setup (`/rtp admin setup`)
 
-Run `/rtp admin setup` in game (permission `rtp.admin.setup`). It walks you through:
+Run `/rtp admin setup` in game (permission `rtp.admin.setup`) for the guided wizard, or `/rtp editor` (permission `rtp.editor`) to configure visually in your browser. `/rtp admin setup` walks you through:
 
 1. **Worlds:** `single` or `multi`.
-2. **Gameplay:** `survival`, `arena`, `skyblock` or `oneblock`.
+2. **Gameplay & Region Radius:** `survival`, `arena`, `skyblock` or `oneblock`, plus your region `radius` and `centerRadius` (via clickable distance presets or Anvil input).
 3. **Performance:** `high`, `low` or `folia`.
-4. **Extras:** claim checks, teleport effects, economy on or off.
+4. **Extras:** bare-`/rtp` GUI behavior (`openOnBareRtp`), claim checks, teleport effects, economy on or off.
 5. **Preview:** `/rtp admin setup preview` shows every file change before anything is written.
 6. **Confirm:** `/rtp admin setup confirm` writes the files (with backups) and reloads.
 
 `back`, `next`, `status` and `cancel` move around or abandon the wizard.
 
-**The wizard does not set the teleport distance.** Every region keeps its default (4,096 blocks, nobody within 1,024 blocks of the centre). Set it afterwards, for example:
+You can also adjust region distances at any time by dragging the border on the map in `/rtp editor`, running a one-line command, or editing the file by hand ([Step 4](#step-4-adjust-the-teleport-area)):
 
 ```
 /rtp config regions default shape.radius=10km --dry-run   # preview
 /rtp config regions default shape.radius=10km shape.centerRadius=1km
 ```
 
-Or drag the region border on the map in `/rtp editor`, or edit the file by hand ([Step 4](#step-4-adjust-the-teleport-area)). Then run `/rtp scan start`.
+Once your region radius is set, run `/rtp scan start`.
 
 ---
 
@@ -73,7 +76,11 @@ Run this in your server console or as an operator:
 /rtp
 ```
 
-With the bundled GUI addon, `/rtp` opens a picker listing your regions, with links to the map visualizations and the admin panel; pick a region to teleport. Without it, `/rtp` teleports straight away. If you land somewhere random, the plugin is working. If you see a permission error, make sure your account has `rtp.use` (operators have all permissions by default).
+With the bundled GUI addon active, regular players typing `/rtp` only see the regions they have permission to use, while the admin panel and map visualization links are strictly permission-gated (`rtp.admin` / OP) and hidden from regular players. Pick a region to teleport.
+
+If you want bare `/rtp` to teleport straight away instead of opening the menu (while keeping `/rtp gui` available), set `openOnBareRtp: false` in `plugins/RTP/addons/guimenu.yml` or toggle it in `/rtp admin setup` - you do not need to delete `LeafRTPGuiAddon.jar`.
+
+If you land somewhere random, the plugin is working. If you see a permission error, make sure your account has `rtp.use` (operators have all permissions by default).
 
 ---
 
@@ -106,7 +113,7 @@ and look for the `shape:` block:
 ```yaml
 shape:
   name: "CIRCLE"       # CIRCLE, SQUARE, or RECTANGLE
-  mode: "ACCUMULATE"   # selection algorithm (see CONFIGURATION.md for options)
+  mode: "REROLL"       # default selection mode (see CONFIGURATION.md for REROLL vs ACCUMULATE)
   radius: 4096b        # maximum distance from centre (4096b, 4km, 256c all work)
   centerRadius: 1024b  # minimum distance - players won't land closer than this
   centerX: 0
@@ -137,6 +144,10 @@ override: "[0]"              # fallback world if the player lacks permission
 - **Replace `[0]` / `[1]` / `[2]` placeholders with case-sensitive world names** (e.g. `override: "world"`). Placeholders resolve by load order and can shift when worlds are added or removed.
 - Set `requirePermission: true` to gate the world behind `rtp.worlds.<world>`.
 - Point `override` at the world to redirect to when permission is missing.
+
+**`/rtp world=<world>` vs `/rtp region=<region>` (and BetterRTP permissions):**
+- `/rtp world=<world>` routes through `<world>`'s world file (`definitions/worlds/<world>.yml`) to whichever region that world is configured to use. `/rtp region=<region>` targets a specific region file (`definitions/regions/<region>.yml`) directly, using that region's own `world`, shape, and radius.
+- **Migrating from BetterRTP:** LeafRTP does **not** require a second per-world permission node (like `betterrtp.world.<world>`) alongside `rtp.use` out of the box. Because `requirePermission: false` is the default in both world and region files, `rtp.use` alone is enough for players to use `/rtp` in any allowed world. You only grant `rtp.worlds.<world>` or `rtp.regions.<region>` if you set `requirePermission: true` on that file or want players to pass explicit `world=<world>` / `region=<region>` command arguments (`rtp.world` / `rtp.region`).
 
 Full reference: [WORLDS.md](configuration/WORLDS.md).
 
@@ -277,17 +288,18 @@ Shows queue depth, latency and per-region state:
 
 ### Stress test
 
-Optional; worth doing if you expect many teleports at once. It runs real teleports on a player with every normal check on (cooldown, economy, claims):
+Optional; useful when checking either the pipeline without moving a real account or real-player platform behavior. Mock mode exercises the RTP pipeline; `player=<name>` selects real teleports with normal checks (cooldown, economy, claims):
 
 ```
+/rtp test stress count=4 iterations=3
 /rtp test stress player=Alice
 /rtp test stress player=Alice iterations=50 intervalTicks=60
 /rtp test stress player=Alice player=Bob region=mining
 ```
 
-- `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`).
+- Mock `count` is clamped to `[1, 16]` (default `4`); `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`). Use `player=<name>` for the real-player variant.
 - Per-iteration failures log at `WARNING` — watch the console.
-- `stress` is the only sub-command available today; `queue`, `safety`, `verifiers`, `memory`, `platform`, `full` are planned.
+- Additional diagnostics are listed in [COMMANDS.md](COMMANDS.md) section `/rtp test`.
 
 Full reference: [COMMANDS.md](COMMANDS.md) section `/rtp test`.
 

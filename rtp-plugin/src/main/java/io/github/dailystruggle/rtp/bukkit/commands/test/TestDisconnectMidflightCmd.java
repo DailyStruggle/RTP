@@ -1,9 +1,22 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerSession;
+import io.github.dailystruggle.rtp.common.mock.RuntimeMockRTPPlayer;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import java.util.List;
@@ -26,11 +39,27 @@ import org.jetbrains.annotations.Nullable;
  */
 public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
 
+  public static final BitCode PROCESSING = registerCode(4301, "PROBE_DISCONNECT_MIDFLIGHT_PROCESSING");
+  public static final BitCode INVULNERABLE = registerCode(4302, "PROBE_DISCONNECT_MIDFLIGHT_INVULNERABLE");
+  public static final BitCode NEXT_TASK = registerCode(4303, "PROBE_DISCONNECT_MIDFLIGHT_NEXT_TASK");
+  public static final BitCode TELEPORT_DATA = registerCode(4304, "PROBE_DISCONNECT_MIDFLIGHT_TELEPORT_DATA");
+  public static final BitCode THREW = registerCode(4305, "PROBE_DISCONNECT_MIDFLIGHT_THREW");
+  public static final BitCode NO_WORLD = RtpBitCodes.PROBE.register(
+      4306,
+      "PROBE_DISCONNECT_MIDFLIGHT_NO_WORLD",
+      java.lang.System.Logger.Level.INFO,
+      BitTier.IBIT,
+      "test.disconnect-midflight",
+      "",
+      "Load the default region world to use a registered BIT mock player.");
+  public static final BitComponent COMPONENT = registerComponent();
+
   /** Prefix for the synthetic probe UUID label, for log-scraping friendliness. */
   static final String PROBE_TAG = "rtp-test-disconnect-midflight";
 
   public TestDisconnectMidflightCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
   }
 
   @Override
@@ -54,20 +83,87 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    State live = new State(
-        RTP.getInstance().processingPlayers,
-        RTP.getInstance().invulnerablePlayers.keySet(),
-        RTP.getInstance().invulnerablePlayers,
-        RTP.getInstance().latestTeleportData,
-        RTP.getInstance().priorTeleportData);
-
-    // Production cancel path exercises the real RTPTeleportCancel so a
-    // regression in its singleton-dependent logic is caught at runtime.
-    Consumer<UUID> prodCancel = id -> new RTPTeleportCancel(id).run();
-
-    Result r = runProbe(live, prodCancel);
-    emit(callerId, r);
+    Runnable unregister =
+        ActiveTestJobs.register(callerId, new ActiveTestJobs.Job("disconnect-midflight", () -> {}));
+    ProbeVerdict.runAsync(COMPONENT, () -> runBitProbe(callerId))
+        .whenComplete(
+            (result, failure) -> {
+              try {
+                if (failure != null) {
+                  RTP.log(Level.WARNING, "[RTP test/disconnect-midflight] BIT verdict failed", failure);
+                } else {
+                  ProbeBitReport.emit(callerId, parameterValues, COMPONENT, result);
+                }
+              } finally {
+                unregister.run();
+              }
+            });
     return true;
+  }
+
+  private BitReport runBitProbe(UUID callerId) {
+    Result result;
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) {
+      result = new Result();
+      result.threw = "TeleportSessions is unavailable";
+      emit(callerId, result);
+      return toBitReport(result);
+    }
+    State live = new State(
+        sessions.processingPlayers,
+        sessions.invulnerablePlayers.keySet(),
+        sessions.invulnerablePlayers,
+        sessions.latestTeleportData,
+        sessions.priorTeleportData);
+    Consumer<UUID> prodCancel = id -> new RTPTeleportCancel(id).run();
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world =
+        MockProbeWorld.resolve(MockProbeWorld.DEFAULT_REGION);
+    if (world == null) {
+      result = runProbe(live, prodCancel, freshUuid(live));
+      result.noWorld = true;
+    } else {
+      try (MockPlayerSession session = MockPlayerSession.open(MockProbeWorld.spawn(world))) {
+        RuntimeMockRTPPlayer mock = session.player();
+        result = runProbe(live, prodCancel, mock.uuid());
+      }
+    }
+    emit(callerId, result);
+    return toBitReport(result);
+  }
+
+  private static BitCode registerCode(int id, String key) {
+    return RtpBitCodes.PROBE.register(
+        id,
+        key,
+        java.lang.System.Logger.Level.ERROR,
+        BitTier.IBIT,
+        "test.disconnect-midflight",
+        "",
+        "Verify the disconnect cleanup releases this player state.");
+  }
+
+  private static BitComponent registerComponent() {
+    return new BitComponent(
+            "disconnect-midflight",
+            "test.disconnect-midflight",
+            BitTier.IBIT,
+            BitSideEffect.NEEDS_WORLD,
+            5_000,
+            () -> ProbeBitReport.forProbe("disconnect-midflight").build());
+  }
+
+  static BitReport toBitReport(Result result) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("disconnect-midflight");
+    report.check(PROCESSING, result.processingCleared, "disconnect.processingPlayers", "Probe UUID remains in processingPlayers.");
+    report.check(INVULNERABLE, result.invulnerableCleared, "disconnect.invulnerablePlayers", "Probe UUID remains invulnerable.");
+    report.check(NEXT_TASK, result.nextTaskCancelled, "disconnect.nextTask", "Pending teleport task was not cancelled.");
+    report.check(TELEPORT_DATA, result.teleportDataCleared, "disconnect.teleportData", "Probe teleport data was not cleared.");
+    report.check(THREW, result.threw == null, "disconnect.cleanup", result.threw == null ? "" : result.threw);
+    if (result.noWorld) {
+      report.note(NO_WORLD, "disconnect.mock", "No default region world was available; used an isolated synthetic UUID.");
+    }
+    return report.build();
   }
 
   /**
@@ -87,9 +183,14 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
    * refactored, {@link #fakeCancelMirror} must be updated in lock-step.
    */
   static Result runProbe(State s, Consumer<UUID> cancelAction) {
-    Result r = new Result();
+    return runProbe(s, cancelAction, freshUuid(s));
+  }
 
-    UUID probeId = freshUuid(s);
+  static Result runProbe(State s, Consumer<UUID> cancelAction, UUID probeId) {
+    Result r = new Result();
+    if (collides(s, probeId)) {
+      throw new IllegalArgumentException("probe UUID already exists in teleport state: " + probeId);
+    }
     r.probeId = probeId;
 
     // --- stage: simulate a player mid-teleport ------------------------
@@ -177,18 +278,20 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
   private static UUID freshUuid(State s) {
     for (int i = 0; i < 16; i++) {
       UUID candidate = UUID.randomUUID();
-      if (!s.processingPlayers.contains(candidate)
-          && !s.invulnerableContains(candidate)
-          && !s.latestTeleportData.containsKey(candidate)
-          && !s.priorTeleportData.containsKey(candidate)) {
-        return candidate;
-      }
+      if (!collides(s, candidate)) return candidate;
     }
     // Unreachable on any realistic RNG; if it triggers, something else is
     // very wrong and we want the probe to fail loudly rather than collide
     // with a real player's state.
     throw new IllegalStateException(
         "could not allocate a non-colliding probe UUID after 16 attempts");
+  }
+
+  private static boolean collides(State state, UUID candidate) {
+    return state.processingPlayers.contains(candidate)
+        || state.invulnerableContains(candidate)
+        || state.latestTeleportData.containsKey(candidate)
+        || state.priorTeleportData.containsKey(candidate);
   }
 
   private void emit(UUID callerId, Result r) {
@@ -208,7 +311,7 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
             + (r.threw == null ? "" : " threw=" + r.threw);
 
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     // S-004: a failing run logs at WARNING; a clean run logs at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);
@@ -262,5 +365,6 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
     boolean teleportDataCleared;
     String threw;
     boolean pass;
+    boolean noWorld;
   }
 }

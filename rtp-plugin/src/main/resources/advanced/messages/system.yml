@@ -21,6 +21,10 @@ newWorld: "&b[P0] detected a new world '[world]'"
 # placeholder: [filename] - name of file
 reloading: "&b[P0] loading [filename]..."
 reloaded: "&b[P0] successfully loaded [filename]."
+reloadFailed: "&c[P0] Failed to reload configs. Check the server log."
+# Sent when /rtp reload (or Hot-Apply) is rejected by config PBIT; the running config is kept.
+# Placeholders: [count] error count, [code] [source] [path] of the first error.
+reloadRejected: "&c[P0] Reload rejected: [count] config error(s); the running config is kept. First: [code] in [source] at [path]. Details: /rtp test subsystem=config"
 updating: "&a[P0] updating [filename]..."
 updated: "&a[P0] successfully updated [filename]."
 
@@ -43,4 +47,4 @@ showDevTag: false
 # Section 13: Metadata
 # ###############################################################################
 # DO NOT TOUCH VERSION NUMBER
-version: 1.1
+version: 1.2

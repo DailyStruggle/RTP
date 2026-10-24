@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.action;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,13 +28,13 @@ class ActionPlaceholderSanitizerBranchesTest {
 
   @BeforeEach
   void saveAccessor() {
-    savedAccessor = RTP.serverAccessor;
-    RTP.serverAccessor = null;
+    savedAccessor = RTPRuntime.serverAccessor();
+    RTPRuntime.setServerAccessor(null);
   }
 
   @AfterEach
   void restoreAccessor() {
-    RTP.serverAccessor = savedAccessor;
+    RTPRuntime.setServerAccessor(savedAccessor);
   }
 
   private static RTPCommandSender sender(UUID id, String name) {
@@ -159,7 +159,7 @@ class ActionPlaceholderSanitizerBranchesTest {
     assertEquals("say " + id, ActionPlaceholderSanitizer.substitute("say [player]", Map.of("player", id)));
 
     RTPServerAccessor accessor = mock(RTPServerAccessor.class);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     assertEquals("say " + id, ActionPlaceholderSanitizer.substitute("say [player]", Map.of("player", id)));
 
     RTPPlayer nullName = mock(RTPPlayer.class);

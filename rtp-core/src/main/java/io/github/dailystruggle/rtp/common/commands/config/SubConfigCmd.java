@@ -6,21 +6,29 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.ConfigSubtreeRegistrar;
 import io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender;
 import io.github.dailystruggle.rtp.common.commands.parameters.*;
 import io.github.dailystruggle.rtp.common.commands.config.list.ListCmd;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -114,22 +122,24 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
     // recursive walk runs child exactly once without duplicating execution.
     if (nextCommand != null) return true;
 
-    String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
+    String updateMsg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", factoryValue.name);
-    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg);
+    RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, updateMsg);
 
-    RTP.scheduler.runTaskAsynchronously(() -> {
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
       if (factoryValue instanceof ConfigParser) {
         ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
 
       if (parameterValues.containsKey("world") && configParser.myClass.equals(RegionKeys.class)) {
         ConfigParser<RegionKeys> regionParser = (ConfigParser<RegionKeys>) configParser;
-        RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(parameterValues.get("world").get(0));
+        RTPWorld rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(parameterValues.get("world").get(0));
         if (rtpWorld != null) {
           NetherEndConfigAmender.amend(parameterValues, regionParser, rtpWorld);
         }
       }
 
+      String migrationFrom = null;
+      String migrationTo = null;
       for (Map.Entry<String, List<String>> e : parameterValues.entrySet()) {
         String key = e.getKey();
         Object value = e.getValue().get(0);
@@ -139,14 +149,13 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
 
         if (configParser.myClass.equals(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class) && key.equalsIgnoreCase("database.type")) {
           Object oldValue = ((ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)configParser).getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.database, "yaml");
-          String oldStr = String.valueOf(oldValue);
-          String newStr = value.toString();
-          RTP.handleMigration(oldStr, newStr);
+          migrationFrom = String.valueOf(oldValue);
+          migrationTo = value.toString();
         }
 
         // A key that names one of the type-bearing factories we own
         // (shape/vert today; any future FactoryValue-backed factory
-        // registered under RTP.factoryNames is picked up automatically) is
+        // registered under FactoryNames is picked up automatically) is
         // not a plain scalar - it is a type discriminator (`name`) plus a
         // block of sub-parameters. Expand the chosen type into its full
         // materialized block so the write path stores a complete nested
@@ -222,15 +231,26 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
         }
       }
 
+      ConfigCandidateGate.Result gate = evaluateCandidate(configParser);
+      if (gate.rejected()) {
+        restoreParserFromDisk(configParser);
+        ReloadSupport.sendReloadRejected(callerId, gate);
+        return;
+      }
+
+      if (migrationFrom != null) {
+        RTP.handleMigration(migrationFrom, migrationTo);
+      }
+
       try {
         configParser.save();
       } catch (IOException ex) {
-        RTP.log(java.util.logging.Level.WARNING, "Failed to save configuration parser " + configParser.name, ex);
+        RTPRuntime.log(java.util.logging.Level.WARNING, "Failed to save configuration parser " + configParser.name, ex);
       }
 
-      String updatedMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updated, ""));
+      String updatedMsg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, updatedMsg);
 
       BaseRTPCmd.dispatchReload(callerId);
     } else if (factoryValue instanceof MultiConfigParser) {
@@ -272,6 +292,51 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
     return true;
   }
 
+  private static ConfigCandidateGate.Result evaluateCandidate(ConfigParser<?> parser) {
+    Configs configs = ActiveConfigs.get();
+    if (configs == null || configs.pluginDirectory == null) {
+      throw new IllegalStateException("Active config directory is unavailable");
+    }
+
+    Map<String, String> overlays = new HashMap<>();
+    if (parser.fileDatabase != null && parser.fileDatabase.cachedLookup.get() != null) {
+      RtpYamlConfig yaml = parser.fileDatabase.cachedLookup.get().get(parser.name);
+      if (yaml != null && yaml.getConfigurationFile() != null) {
+        Path root = configs.pluginDirectory.toPath().toAbsolutePath().normalize();
+        Path target = yaml.getConfigurationFile().toPath().toAbsolutePath().normalize();
+        if (!target.startsWith(root)) {
+          throw new IllegalArgumentException("Configuration file is outside plugin directory: " + target);
+        }
+        overlays.put(root.relativize(target).toString().replace('\\', '/'), yaml.saveToString());
+      }
+    }
+    return ConfigCandidateGate.evaluate(configs.pluginDirectory.toPath(), overlays);
+  }
+
+  private static void restoreParserFromDisk(ConfigParser<?> parser) {
+    if (parser.fileDatabase == null) return;
+    RtpYamlConfig yaml = parser.fileDatabase.cachedLookup.get() == null
+            ? null : parser.fileDatabase.cachedLookup.get().get(parser.name);
+    java.io.File target = yaml == null
+            ? new java.io.File(parser.pluginDirectory, parser.subDir.isEmpty()
+                    ? parser.name : parser.subDir + java.io.File.separator + parser.name)
+            : yaml.getConfigurationFile();
+    if (target != null) {
+      String cacheKey = target.getName();
+      Map<String, RtpYamlConfig> cache = parser.fileDatabase.cachedLookup.get();
+      if (cache != null) cache.remove(cacheKey);
+      Map<String, Long> modified = parser.fileDatabase.cachedLookupLastModified.get();
+      if (modified != null) modified.remove(cacheKey);
+    }
+    try {
+      parser.check(parser.version, parser.pluginDirectory, parser.langFile);
+    } catch (RuntimeException restoreFailure) {
+      RTPRuntime.log(java.util.logging.Level.SEVERE,
+              "Failed to restore configuration parser " + parser.name + " after PBIT rejection",
+              restoreFailure);
+    }
+  }
+
   @Override
   public void registerChildParser(ConfigParser<?> configParser) {
     if (configParser == null) return;
@@ -300,11 +365,12 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
   @Nullable
   static Factory<?> ownedTypeFactoryForKey(String key) {
     if (key == null) return null;
-    for (RTP.factoryNames fn : RTP.factoryNames.values()) {
-      if (fn == RTP.factoryNames.singleConfig || fn == RTP.factoryNames.multiConfig) continue;
-      if (!fn.name().equalsIgnoreCase(key)) continue;
-      Factory<?> factory = RTP.factoryMap.get(fn);
-      if (factory != null) return factory;
+    for (FactoryNames fn : FactoryNames.values()) {
+      if (fn != FactoryNames.singleConfig && fn != FactoryNames.multiConfig
+          && fn.name().equalsIgnoreCase(key)) {
+        Factory<?> factory = FactoryRegistry.get(fn);
+        if (factory != null) return factory;
+      }
     }
     return null;
   }
@@ -448,7 +514,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
    * Registers dotted sub-knob leaves for a {@code shape}/{@code vert} key whose stored value is an
    * inheritance reference (e.g. {@code @config}), registering the union across all factory variants.
    */
-  private void addFactoryReferenceDottedParameters(String prefix, RTP.factoryNames factoryName) {
+  private void addFactoryReferenceDottedParameters(String prefix, FactoryNames factoryName) {
     addParameter(
         prefix + ".name",
         new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
@@ -457,7 +523,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
             return new HashSet<>();
           }
         });
-    Factory<?> factory = RTP.factoryMap.get(factoryName);
+    Factory<?> factory = FactoryRegistry.get(factoryName);
     if (factory == null) return;
     for (Object v : factory.map.values()) {
       Map<String, CommandParameter> params = null;
@@ -537,11 +603,11 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
         } else if (o instanceof String && keyName.equalsIgnoreCase("shape")) {
           // Referenced shape (@config or bare name): register ShapeParameter and factory dotted leaves.
           addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
-          addFactoryReferenceDottedParameters(s, RTP.factoryNames.shape);
+          addFactoryReferenceDottedParameters(s, FactoryNames.shape);
         } else if (o instanceof String && keyName.equalsIgnoreCase("vert")) {
           // Referenced vert (@config or bare name): register VertParameter and factory dotted leaves.
           addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
-          addFactoryReferenceDottedParameters(s, RTP.factoryNames.vert);
+          addFactoryReferenceDottedParameters(s, FactoryNames.vert);
         } else if (o instanceof String) {
           final String desc_ = desc;
           addParameter(
@@ -583,14 +649,14 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
         } else if (o instanceof List) {
           Supplier<Set<String>> values = HashSet::new;
           if (keyName.contains("block")) {
-            values = () -> RTP.serverAccessor.materials();
+            values = () -> RTPRuntime.serverAccessor().materials();
           } else if (keyName.contains("biome")) {
             values =
                 () -> {
                   Set<String> res = new HashSet<>();
-                  List<RTPWorld<?>> rtpWorlds = RTP.serverAccessor.getRTPWorlds();
+                  List<RTPWorld<?>> rtpWorlds = RTPRuntime.serverAccessor().getRTPWorlds();
                   for (RTPWorld<?> rtpWorld : rtpWorlds) {
-                    res.addAll(RTP.serverAccessor.getBiomes(rtpWorld));
+                    res.addAll(RTPRuntime.serverAccessor().getBiomes(rtpWorld));
                   }
                   return res;
                 };

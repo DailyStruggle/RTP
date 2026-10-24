@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -475,7 +475,7 @@ final class EditorSecurity {
 
     // ---- scheduling ----
 
-    /** {@code task} on {@code RTP.scheduler}'s async pool; the common pool only without a platform (unit tests). */
+    /** {@code task} on {@code RTPRuntime.scheduler()}'s async pool; the common pool only without a platform (unit tests). */
     static CompletableFuture<Void> runAsync(Runnable task) {
         return supplyAsync(() -> {
             task.run();
@@ -485,7 +485,7 @@ final class EditorSecurity {
 
     /** As {@link #runAsync}, completing with {@code task}'s result or failure. */
     static <T> CompletableFuture<T> supplyAsync(Supplier<T> task) {
-        RTPScheduler scheduler = RTP.scheduler;
+        RTPScheduler scheduler = RTPRuntime.scheduler();
         if (scheduler == null) return CompletableFuture.supplyAsync(task);
         CompletableFuture<T> f = new CompletableFuture<>();
         try {

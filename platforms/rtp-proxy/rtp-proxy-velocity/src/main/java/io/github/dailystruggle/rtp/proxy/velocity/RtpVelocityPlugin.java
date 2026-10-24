@@ -12,6 +12,8 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import io.github.dailystruggle.rtp.proxy.common.RtpProxy;
 import io.github.dailystruggle.rtp.proxy.common.config.NetworkConfig;
 import io.github.dailystruggle.rtp.proxy.common.config.NetworkConfigException;
@@ -1099,20 +1101,19 @@ public final class RtpVelocityPlugin {
      */
     @SuppressWarnings("unchecked")
     private Duration readQueuePollTimeout(Map<String, Object> raw) {
-        try {
-            Object networkObj = raw.get("network");
-            if (!(networkObj instanceof Map<?, ?>)) return Duration.ofSeconds(2);
-            Object queueObj = ((Map<String, Object>) networkObj).get("queue");
-            if (!(queueObj instanceof Map<?, ?>)) return Duration.ofSeconds(2);
-            Object v = ((Map<String, Object>) queueObj).get("pollIntervalMs");
-            long ms;
-            if (v instanceof Number n) ms = n.longValue();
-            else if (v instanceof String s) ms = Long.parseLong(s.trim());
-            else return Duration.ofSeconds(2);
-            if (ms < 100L) ms = 100L;
-            return Duration.ofMillis(ms);
-        } catch (RuntimeException ignored) {
+        Object networkObj = raw.get("network");
+        if (!(networkObj instanceof Map<?, ?>)) return Duration.ofSeconds(2);
+        Object queueObj = ((Map<String, Object>) networkObj).get("queue");
+        if (!(queueObj instanceof Map<?, ?>)) return Duration.ofSeconds(2);
+        Object value = ((Map<String, Object>) queueObj).get("pollIntervalMs");
+        if (value == null) return Duration.ofSeconds(2);
+        DurationParser.ParsedDuration parsed =
+                DurationParser.parse(String.valueOf(value), TemporalUnit.MILLISECOND);
+        double millis = parsed == null ? Double.NaN : parsed.toMillis();
+        if (!Double.isFinite(millis) || millis < -0x1.0p63 || millis >= 0x1.0p63) {
+            logger.warn("Invalid network.queue.pollIntervalMs duration '{}'; using 2000 ms", value);
             return Duration.ofSeconds(2);
         }
+        return Duration.ofMillis(Math.max(100L, Math.round(millis)));
     }
 }

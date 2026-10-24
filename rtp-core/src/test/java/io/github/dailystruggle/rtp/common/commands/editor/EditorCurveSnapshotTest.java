@@ -3,10 +3,11 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
@@ -19,6 +20,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,12 +45,12 @@ class EditorCurveSnapshotTest {
 
     @BeforeEach
     void accessor() {
-        RTP.serverAccessor = new MockRTPServerAccessor(tempDir.toFile());
+        RTPRuntime.setServerAccessor(new MockRTPServerAccessor(tempDir.toFile()));
     }
 
     @AfterEach
     void clearAccessor() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     /** A shape type with no helper anywhere in its hierarchy (stands in for Chunky / add-ons). */
@@ -65,10 +67,10 @@ class EditorCurveSnapshotTest {
 
     @SuppressWarnings("unchecked")
     private static Factory<Shape<?>> shapes() {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapes = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapes == null) {
             shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
+            FactoryRegistry.map().put(FactoryNames.shape, shapes);
         }
         return shapes;
     }
@@ -269,10 +271,10 @@ class EditorCurveSnapshotTest {
     @Test
     @DisplayName("Runs are [deltaStart, len, cause+1] varints; uniquePlacement is filtered, overlaps clipped")
     void hazardRunEncoding() {
-        int biome = LocationGenerator.FailTypes.biome.ordinal();
-        int unique = LocationGenerator.FailTypes.uniquePlacement.ordinal();
-        int border = LocationGenerator.FailTypes.worldBorder.ordinal();
-        int misc = LocationGenerator.FailTypes.misc.ordinal();
+        int biome = FailTypes.biome.ordinal();
+        int unique = FailTypes.uniquePlacement.ordinal();
+        int border = FailTypes.worldBorder.ordinal();
+        int misc = FailTypes.misc.ordinal();
         long[] keys = {10, 20, 40, 42, 300};
         long[] sums = {5, 8, 12, 17, 217}; // lengths 5, 3, 4, 5, 200
         byte[] causes = {(byte) biome, (byte) unique, (byte) border, (byte) border};
@@ -319,9 +321,9 @@ class EditorCurveSnapshotTest {
         long a = square.xzToLocation(5, 6);
         long b = square.xzToLocation(-20, 11);
         long c = square.xzToLocation(30, -30);
-        square.addBadLocation(a, LocationGenerator.FailTypes.biome);
-        square.addBadLocation(b, LocationGenerator.FailTypes.uniquePlacement);
-        square.addBadLocation(c, LocationGenerator.FailTypes.worldBorder);
+        square.addBadLocation(a, FailTypes.biome);
+        square.addBadLocation(b, FailTypes.uniquePlacement);
+        square.addBadLocation(c, FailTypes.worldBorder);
         square.flushAndRebuild(1L);
 
         JsonObject m = json(new EditorSessionManager().generateVisualizationPayload(region("curve_runs_reg", square), new TreeMap<>()));
@@ -331,11 +333,11 @@ class EditorCurveSnapshotTest {
         for (long[] run : decoded) {
             for (long p = run[0]; p < run[0] + run[1]; p++) causeAt.put(p, run[2]);
         }
-        assertEquals(LocationGenerator.FailTypes.biome.ordinal() + 1L, causeAt.get(a), decoded.toString());
-        assertEquals(LocationGenerator.FailTypes.worldBorder.ordinal() + 1L, causeAt.get(c));
+        assertEquals(FailTypes.biome.ordinal() + 1L, causeAt.get(a), decoded.toString());
+        assertEquals(FailTypes.worldBorder.ordinal() + 1L, causeAt.get(c));
         assertFalse(causeAt.containsKey(b), "uniquePlacement filtered");
         for (long[] run : decoded) {
-            assertNotEquals(LocationGenerator.FailTypes.uniquePlacement.ordinal() + 1L, run[2]);
+            assertNotEquals(FailTypes.uniquePlacement.ordinal() + 1L, run[2]);
         }
     }
 }

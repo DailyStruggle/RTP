@@ -9,7 +9,12 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -18,7 +23,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
 import io.github.dailystruggle.rtp.neoforge.scheduling.NeoForgeScheduler;
 import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeAnsiText;
@@ -173,8 +178,8 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
-        return io.github.dailystruggle.rtp.api.server.PlatformFamily.NEOFORGE;
+    public io.github.dailystruggle.server.api.PlatformFamily getPlatformFamily() {
+        return io.github.dailystruggle.server.api.PlatformFamily.NEOFORGE;
     }
 
     @Override
@@ -238,6 +243,9 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     @Override
     public RTPPlayer getPlayer(UUID uuid) {
         if (uuid == null) return null;
+        // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+        RTPPlayer mock = MockPlayerRegistry.get(uuid);
+        if (mock != null) return mock;
         RTPPlayer cached = playersById.get(uuid);
         if (cached != null) return cached;
         return lazyResolveByUuid(uuid);
@@ -246,6 +254,8 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     @Override
     public RTPPlayer getPlayer(String name) {
         if (name == null) return null;
+        RTPPlayer mock = MockPlayerRegistry.getByName(name);
+        if (mock != null) return mock;
         RTPPlayer cached = playersByName.get(name);
         if (cached != null) return cached;
         MinecraftServer s = server;
@@ -278,6 +288,8 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (uuid.equals(RTPAPI.serverId)) {
             return new NeoForgeConsoleSender(server);
         }
+        RTPPlayer mock = MockPlayerRegistry.get(uuid);
+        if (mock != null) return mock;
         RTPPlayer cached = playersById.get(uuid);
         if (cached != null) return cached;
         return lazyResolveByUuid(uuid);
@@ -432,12 +444,12 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     private static boolean configsLoaded() {
-        return RTP.configs != null;
+        return ActiveConfigs.get() != null;
     }
 
     private static @Nullable String lookupMessageTemplate(Enum<?> key) {
-        if (RTP.configs == null) return null;
-        Object v = RTP.configs.getConfigValue(key, "");
+        if (ActiveConfigs.get() == null) return null;
+        Object v = ActiveConfigs.get().getConfigValue(key, "");
         return v == null ? null : v.toString();
     }
 
@@ -480,10 +492,10 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     @SuppressWarnings("unchecked")
     private static Level resolveMinLevel() {
         try {
-            if (RTP.configs == null) return Level.ALL;
+            if (ActiveConfigs.get() == null) return Level.ALL;
             ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
                     (ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
-                            RTP.configs.getParser(
+                            ActiveConfigs.get().getParser(
                                     io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
             if (logging == null) return Level.ALL;
             Object raw = logging.getConfigValue(
@@ -739,7 +751,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             return new WorldBorder(
                     () -> {
                         Shape<?> shape =
-                                (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+                                (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
                         if (shape instanceof Square square) {
                             square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
                             square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
@@ -764,7 +776,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (!(rtpWorld instanceof NeoForgeRTPWorld nw)) return null;
         ServerLevel level = nw.level();
         net.minecraft.world.level.border.WorldBorder mcBorder = level.getWorldBorder();
-        Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+        Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
         if (shape instanceof Square square) {
             square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
             square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
@@ -846,7 +858,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     @Override
     public double getTPS(int ticks) {
         try {
-            io.github.dailystruggle.metrics.api.MetricsSnapshot snap = RTP.metrics.snapshot();
+            io.github.dailystruggle.metrics.api.MetricsSnapshot snap = CoreMetrics.instance().snapshot();
             double v = (ticks >= 600) ? snap.tps15m : (ticks >= 100 ? snap.tps5m : snap.tps1m);
             if (!Double.isNaN(v)) return v;
         } catch (Throwable ignored) {

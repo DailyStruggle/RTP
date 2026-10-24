@@ -13,6 +13,9 @@ plugins {
 
 dependencies {
     api project(':rtp-api')
+    api project(':predict-api')
+    api project(':config-bit-api')
+    api project(':menu-api')
     // anvil-api -- platform-neutral vanilla Anvil region-file decode (ADR-016).
     // rtp-core hosts the platform-neutral palette reconciler (PaletteNormalizer)
     // and the ColumnProbe -> ChunkColumnProbe adapter (AnvilColumnProbeAdapter)
@@ -20,6 +23,8 @@ dependencies {
     // instead of carrying a per-carrier copy. The reverse edge stays forbidden:
     // anvil-api must not depend on any RTP module.
     api project(':anvil-api')
+    // bit-api -- generic built-in test contract (ADR-121); action config findings use it.
+    api project(':bit-api')
     // yaml-api -- in-house zero-dependency YAML substrate (ADR-025), extracted
     // from this module so rtp-api can host the configurable selection model.
     // 'api' so downstream consumers keep seeing the YAML types transitively.
@@ -150,6 +155,30 @@ test {
     // the only override docker-java honours here (the DOCKER_API_VERSION env var is
     // not mapped into its client config, and the api.version system property is not
     // consulted by the ping). See that file and testcontainers/testcontainers-java#11212.
+}
+
+tasks.register('bit', JavaExec) {
+    group = 'verification'
+    description = 'Runs RTP PBIT checks against a configuration or action-definition directory (ADR-121).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'io.github.dailystruggle.rtp.common.bit.RtpBitCli'
+    workingDir = rootProject.projectDir
+
+    doFirst {
+        if (!project.hasProperty('config') || project.property('config').toString().isBlank()) {
+            throw new GradleException('The bit task requires -Pconfig=<directory>.')
+        }
+        List<String> cliArgs = ['--config', project.property('config').toString()]
+        String actionId = project.providers.gradleProperty('action').getOrNull()
+        String players = project.providers.gradleProperty('players').getOrNull()
+        String script = project.providers.gradleProperty('script').getOrNull()
+        if (actionId != null) cliArgs.addAll(['--action', actionId])
+        if (players != null) cliArgs.addAll(['--players', players])
+        if (script != null) cliArgs.addAll(['--script', script])
+        if (project.hasProperty('json')) cliArgs.add('--json')
+        if (project.hasProperty('strict')) cliArgs.add('--strict')
+        setArgs(cliArgs)
+    }
 }
 
 // Opt-in benchmark tier (ADR-080).
@@ -287,9 +316,10 @@ spotbugsTestFixtures.enabled = false
 // (selection/worldborder) -- because those carry the S-001..S-005 prohibitions
 // where a surviving mutant is a genuine safety gap, not cosmetic.
 //
-// Opt-in ONLY via `-Pmutation`, matching the `-Pcoverage` / `-PstaticAnalysis`
-// pattern: a routine `.\gradlew.bat build` never resolves the PIT toolchain nor
-// pays its (large) run cost. When enabled, `pitest` runs the mutation analysis
+// Opt-in ONLY via `-Pmutation`: a routine `.\gradlew.bat build` never resolves
+// the PIT toolchain nor pays its (large) run cost. Unlike `-Pcoverage` /
+// `-PstaticAnalysis`, per-push CI does not pass it; mutation-testing.yml runs it
+// weekly and on demand. When enabled, `pitest` runs the mutation analysis
 // and FAILS the build below the 60% score floor (the item's target).
 //   Run the gate : .\gradlew.bat :rtp-core:pitest -Pmutation
 if (project.hasProperty('mutation')) {

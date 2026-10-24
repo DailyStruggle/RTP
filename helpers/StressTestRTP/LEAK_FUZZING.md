@@ -43,13 +43,15 @@ An episode is 2 to 8 bots, each running a seeded program for 20 to 60 s:
 - **Bot actions:** `rtp`, `rtp2` (two in a row), `wait<ms>`, `move<ms>`, `quit`, `rejoin` (same name or `+rename`, which gives a new UUID), `die`.
 - **Console actions (opt-in):** `--console "rtp=rtp reload,..."` fires allow-listed console commands over RCON at random times while the bots are active (about 30 % of episodes, up to 2 commands). They are carried through replays, shrink and the ladder.
 - **Repetitions (`--reps`, default 3):** the episode's programs run `reps` times with fresh bot names, with a checkpoint after each. `slope.<metric>` is the growth per repetition. A cache that fills during the first repetition has slope about 0; a leak keeps rising.
-- **Checkpoint:** `/rtpstress leakcheck <label> quick` forces a full GC and reports retained players (`ServerPlayer`/`CraftPlayer` alive minus players online), heap after GC, live histogram bytes, RSS, memory pools (metaspace, compressed class space), loaded classes, direct and mapped buffers, threads, file descriptors, and per plugin its live instances, listeners and pending tasks. It also writes every class's instance delta to `classes.jsonl`.
+- **Checkpoint:** `/rtpstress leakcheck <label> quick` forces a full GC and reports churn counters (joins, quits, distinct UUIDs), heap after GC, live histogram bytes, RSS, memory pools (metaspace, compressed class space), loaded classes, direct and mapped buffers, threads, file descriptors, and per plugin its live instances, listeners and pending tasks. It also writes every class's instance delta to `classes.jsonl`.
 - **States:** each bot's chat reply or kick reason, normalised (digits to `#`, colours stripped). An episode joins the corpus when it reaches a new `(action, state)` pair, a new finding signature, or changes a count.
 
 ### Learning
 
 - **Prediction:** a ridge fit per count against behaviour features (action counts, quits by time since the last `/rtp`, moves during a pending teleport, renamed rejoins, console commands). A feature is **flagged** when its interval excludes 0 and the control's does not.
-- **Classes:** all histogram classes go through a cumulative screen against the control, with a Bonferroni-corrected z, so thousands of noise classes produce no flags.
+- **Classes:** no class is named anywhere in the probe or the scripts. Every histogram class goes through two screens against the control, each with a Bonferroni-corrected z, so thousands of noise classes produce no flags:
+  - **cumulative:** post-GC growth summed over episodes;
+  - **per departure:** post-GC growth per ended player session (`departures` = the probe's quit counter delta), fitted through the origin. Whatever a plugin keeps per quit player shows up here under its own class names, on any platform or mapping.
 - **Search:** a cross-entropy method over the generator's parameters, plus mutation of corpus episodes and novelty episodes. While nothing reproduces, the state is `searching` and novelty rises each stalled generation (up to `--novelty-max`), with restarts from fresh points. A reproduced candidate switches it to `exploiting`.
 
 ### Confirmation
@@ -75,6 +77,20 @@ The histogram says *what* is retained, never *who* holds it. Ownership needs a G
 
 ## Running it
 
+### Create an isolated Paper bench
+
+`bench_setup.py` creates a new server copy; it does not modify the play server. It omits logs, crash dumps and `plugins/playit-gg`, moves unselected plugin jars to `plugins-disabled/`, enables RCON, disables online-mode/whitelist/query, and creates a restart loop. The source must have `server.properties`, `spigot.yml`, `start.sh` and `plugins/`; the destination must not exist.
+
+```
+python3 scripts/bench_setup.py /path/to/play-server /path/to/play-server-bench \
+  --port 25566 --rcon-port 25576 --heap 12G \
+  --keep 'LuckPerms*' --keep 'Vault*' --keep 'ViaVersion*' --keep 'ViaBackwards*' \
+  --add /path/to/StressTestRTP.jar --add /path/to/LeafRTP-Pro.jar \
+  --via --game-version 26.2
+```
+
+The repeated `--keep` and `--add` options select the jars copied to the bench; `--via` downloads Paper-compatible ViaVersion and ViaBackwards builds from Modrinth. Start the printed `bench-loop.sh` command, then point `bench_fuzz.py --server-dir` at the new copy.
+
 ```
 systemd-inhibit --what=sleep:idle --why="bench_fuzz" \
   python3 scripts/bench_fuzz.py --server-dir /mnt/threadripper-dir/26.2 --host <bench> \
@@ -85,6 +101,9 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz" \
 - **Keep the driver machine awake** (`systemd-inhibit`, or run it on the server host inside `tmux`). A sleeping driver freezes the bots and RCON while the server keeps running, which causes `no done ... within 96s` swarm restarts and gaps in the log.
 - **Stop any passive swarm first:** the script refuses to run with non-fuzz players online unless `--allow-online`.
 - **Bot cap:** the swarm is started with a cap that covers the largest rung, and the script refuses to start if that exceeds `max-players` in `server.properties`.
+- **Warm-up:** one unscored target episode runs before the first baseline (`--warmup 1`); set `--warmup 0` to disable it. Warm-up episodes are not checkpointed or included in traces.
+- **Empty episodes:** episodes with no swarm `spawn` events are excluded before checkpointing and report bot errors in `fuzz.log`. The run aborts with exit code 3 after three consecutive empty episodes by default; tune the threshold with `--max-empty N`.
+- **Version compatibility:** auto-detect pings the server. If `minecraft-data` has no data for the reported release, the swarm selects its newest supported PC release and warns that the bench needs ViaVersion/ViaBackwards. An explicit `--mc-version` remains available.
 - **Cost:** with `--reps 3` an episode takes about 2 to 2.5 minutes. A clean target with 24 episodes takes about 1 to 1.5 h; a target that produces candidates adds hours of shrink and ladder.
 - **Screening pass across plugins:** `--episodes 8 --explore-extra 0 --shrink 1 --rungs 4x1,8x3`. Too small to catch an intermittent leak (see BetterRTP below); use it only to decide which plugins get a full run.
 
@@ -92,7 +111,7 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz" \
 
 `--mode faults` (ADR-111 Stage 3) runs one repetition per episode with no leak checkpoints, and runs the leak check only on promoted episodes. Finding replays run without a checkpoint and confirm by signature. It needs `--coverage`.
 
-- **Status: accepted.** Live Paper 26.2 bench server runs completed back-to-back on Threadripper host `leaf26` for both `--mode faults` (`fuzz-20261015-214736`) and `--mode leak` (`fuzz-20261016-020101`). Pure fault-mode exploration achieved ~96 episodes/hour (~5.0x the 19.22 episodes/hour leak baseline, meeting and exceeding the 3x acceptance threshold); with 4 promotions to 3-rep leak checks, net fault-mode throughput was 25.65 episodes/hour (1.33x net). Both modes verified zero retained player sessions (`retained+0`) and zero target-attributed exceptions.
+- **Status: accepted (historical runs).** Live Paper 26.2 bench server runs completed back-to-back on Threadripper host `leaf26` for both `--mode faults` (`fuzz-20261015-214736`) and `--mode leak` (`fuzz-20261016-020101`). Pure fault-mode exploration achieved ~96 episodes/hour (~5.0x the 19.22 episodes/hour leak baseline, meeting and exceeding the 3x acceptance threshold); with 4 promotions to 3-rep leak checks, net fault-mode throughput was 25.65 episodes/hour (1.33x net). These runs predate the emergent-only census and their `retained+0` values are historical; both reported zero target-attributed exceptions.
 - **Metric (per target, `verdict.json` `coverage`):** `episodes_per_hour = executed * 3600 / explore_s`. `executed` counts planned exploration episodes that ran bots (records with `ms`); episodes excluded before they start (dirty start, no baseline) are not counted. `explore_s` is the wall clock of the `run_seed` exploration loop for that target. It includes each episode, its surprise and finding replays, the leak re-runs of promoted episodes (`--promote-max`) and the generation refits. It excludes the `direct` control, the shrink and the ladder climb.
 - **Method when run:** same server, same seeds, same `--episodes`, back to back. **Compare only the `rtp` target's `coverage.episodes_per_hour`** from each run's `rtp/verdict.json`, leak against faults. `direct` always runs in leak mode in both runs and only supplies the fit, so its time is in neither rate. Whole-command durations include that control and understate the speed-up; do not use them.
 - **Commands (operator, opt-in, local):**
@@ -128,7 +147,8 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz faults" \
 
 ### Reading a run
 
-- Episode line: `retained+N` is quit players still alive; `live/rep` and `classes/rep` are growth per repetition; `score` is net leak per minute against the control.
+- Episode line: `departed=N` is player sessions that ended in the episode; `live/rep` and `classes/rep` are growth per repetition; `score` is net leak per minute against the control.
+- `fit.json` and `optimiser.jsonl` carry `screen` (cumulative) and `departure_screen` (`per_departure` instances per ended session, `z`).
 - `gen N` lines list the top flags as `<count>~<feature> <coef>`. A flag names the behaviour that predicts the growth; it is the trigger, not the cause.
 - Per target, under `scripts/tmp/runs/fuzz-<stamp>/<target>/`: `episodes.jsonl` (replayable with `--replay FILE --ep K`), `classes.jsonl`, `fit.json`, `surprises.jsonl`, `shrunk.jsonl`, `ladder.jsonl`, `verdict.json`, and `owner.txt` after a FAIL with `--mat`. `report.txt` puts the targets side by side.
 - Before believing a score, check its units: a score driven by a count with no bytes behind it (see *Known limitations*) is not a leak.
@@ -136,6 +156,8 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz faults" \
 ---
 
 ## Findings
+
+Runs before 2026-10-23 also scored a fixed player census (`retained_player_objects`, `retained+N`: live `CraftPlayer`/`ServerPlayer` minus online). That census named classes and biased the search toward player objects, so it was removed; the per-departure class screen replaces it. Results below and above quote it as recorded. Corpora and `control.json` files from those runs carry the old keys, which the scripts ignore; start a fresh control run.
 
 ### BetterRTP 3.6.13 retains quit players (confirmed, run `fuzz-20261010-213747`)
 
@@ -204,4 +226,4 @@ No growth in loaded classes or metaspace per repetition across the reload episod
 1. Rerun `direct,rtp` for a formal 3.3.0 verdict now that byte-based scoring and attribution filtering are in place.
 2. Confirmation by amplification (shrunk segment 1x, 2x, 4x, 8x), with dumps at 1x and 8x compared by dominator tree, in place of the bots x reps ladder.
 3. Command discovery, GUI and chat actions, n-gram features and a bandit over action types; continuous mode until the heap guard trips. Coverage feedback from the live server and the fast fault-only mode: [`BEHAVIOUR_FUZZING_PLAN.md`](../../docs/dev/BEHAVIOUR_FUZZING_PLAN.md).
-4. Run all plugins with the same `--reps` setup for the front-page memory comparison ([`docs/publishing/FRONT_PAGE.md`](../../docs/publishing/FRONT_PAGE.md)). Report per plugin: verdict, players retained per episode, live MB and classes per repetition above the control, and starting heap, and state that PASS means "not found within budget".
+4. Run all plugins with the same `--reps` setup for the front-page memory comparison ([`docs/publishing/FRONT_PAGE.md`](../../docs/publishing/FRONT_PAGE.md)). Report per plugin: verdict, departure-screened classes with their instances per ended session, live MB and classes per repetition above the control, and starting heap, and state that PASS means "not found within budget".

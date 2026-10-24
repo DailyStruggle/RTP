@@ -48,7 +48,7 @@ class ActionConfigLoaderDeepCoverageTest {
         RtpYamlConfig yaml = RtpYamlConfig.parse(yamlText);
         ActionDefinition def = ActionConfigLoader.parseDefinition("trigger_test", yaml);
         assertNotNull(def);
-        assertEquals(3, def.triggers().size());
+        assertEquals(2, def.triggers().size());
 
         PhysicalTriggerSpec t1 = def.triggers().get(0);
         assertEquals("trigger_one", t1.id());
@@ -72,10 +72,7 @@ class ActionConfigLoaderDeepCoverageTest {
         assertEquals(50, t2.maxY());
         assertEquals(60, t2.maxZ());
 
-        PhysicalTriggerSpec t3 = def.triggers().get(2);
-        assertEquals(PhysicalTriggerSpec.TriggerType.STEP_IN, t3.type());
-        assertEquals(1, t3.minX());
-        assertEquals(4, t3.maxX());
+        assertEquals(PhysicalTriggerSpec.TriggerType.STEP_IN, t1.type());
     }
 
     @Test
@@ -84,7 +81,7 @@ class ActionConfigLoaderDeepCoverageTest {
         String yamlText = """
                 trigger:
                   - id: "list_t1"
-                    type: "SENSOR"
+                    type: "STEP_IN"
                     world: "custom"
                     pos1:
                       x: 100

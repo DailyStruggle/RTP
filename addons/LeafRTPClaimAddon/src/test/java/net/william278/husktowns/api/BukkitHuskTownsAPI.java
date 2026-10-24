@@ -1,32 +1,33 @@
 package net.william278.husktowns.api;
 
-import org.bukkit.Location;
 import java.util.Optional;
 import java.util.function.Predicate;
+import net.william278.husktowns.claim.TownClaim;
+import org.bukkit.Location;
 
-public class BukkitHuskTownsAPI {
-  private static BukkitHuskTownsAPI instance;
-  private Predicate<Location> claimPredicate = loc -> false;
+/**
+ * Test stand-in of {@code BukkitHuskTownsAPI} (husktowns-bukkit 3.1.4): static
+ * {@code getInstance()} throwing while unregistered and {@code getClaimAt(Location)}.
+ */
+public class BukkitHuskTownsAPI extends HuskTownsAPI {
+  private final Predicate<Location> claimed;
+
+  public BukkitHuskTownsAPI(Predicate<Location> claimed) {
+    this.claimed = claimed;
+  }
 
   public static BukkitHuskTownsAPI getInstance() {
-    if (instance == null) {
-      instance = new BukkitHuskTownsAPI();
+    if (!(instance instanceof BukkitHuskTownsAPI api)) {
+      throw new IllegalStateException("HuskTowns API is not registered");
     }
-    return instance;
+    return api;
   }
 
-  public static void setInstance(BukkitHuskTownsAPI inst) {
-    instance = inst;
+  public static void register(BukkitHuskTownsAPI api) {
+    instance = api;
   }
 
-  public void setClaimPredicate(Predicate<Location> predicate) {
-    this.claimPredicate = predicate != null ? predicate : loc -> false;
-  }
-
-  public Optional<?> getClaimAt(Location location) {
-    if (claimPredicate.test(location)) {
-      return Optional.of("ClaimedTown");
-    }
-    return Optional.empty();
+  public Optional<TownClaim> getClaimAt(Location location) {
+    return claimed.test(location) ? Optional.of(new TownClaim()) : Optional.empty();
   }
 }

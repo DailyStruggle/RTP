@@ -9,7 +9,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
 import java.util.List;
@@ -111,7 +111,7 @@ public final class MapDispatch {
       try {
         lifecycle.onPlayerQuit(viewer);
       } catch (RuntimeException e) {
-        RTP.log(Level.WARNING,
+        RTPRuntime.log(Level.WARNING,
             "MapDispatch.firePlayerQuit: lifecycle " + lifecycle.getClass().getName()
                 + " threw for viewer " + viewer + ": " + e.getMessage(), e);
       }
@@ -129,7 +129,7 @@ public final class MapDispatch {
       try {
         lifecycle.onDisable();
       } catch (RuntimeException e) {
-        RTP.log(Level.WARNING,
+        RTPRuntime.log(Level.WARNING,
             "MapDispatch.fireDisable: lifecycle " + lifecycle.getClass().getName()
                 + " threw: " + e.getMessage(), e);
       }
@@ -171,13 +171,13 @@ public final class MapDispatch {
     Objects.requireNonNull(viewer, "viewer");
 
     MapBinding binding = BINDING.get();
-    RTP.log(Level.FINE,
+    RTPRuntime.log(Level.FINE,
         "[viz/bad-locations] MapDispatch.paint entry: kind=" + spec.kind()
             + " region=" + spec.regionName()
             + " viewer=" + viewer
             + " binding=" + (binding == null ? "null" : binding.getClass().getName()));
     if (binding instanceof NoopMapBinding) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " skipped: no concrete MapBinding installed (NoopMapBinding active).");
       sendMessage(viewer, CommandMessages.mapBindingMissing);
@@ -186,7 +186,7 @@ public final class MapDispatch {
 
     ChartSpecResolver resolver = ChartSpecResolvers.get(spec.kind());
     if (resolver == null) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " skipped: no ChartSpecResolver registered.");
       sendMessage(viewer, CommandMessages.mapResolverMissing);
@@ -195,11 +195,11 @@ public final class MapDispatch {
 
     ChartSpecResolver.Resolution resolution;
     try {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[viz/bad-locations] resolver.resolve invoking: resolver="
               + resolver.getClass().getName());
       resolution = resolver.resolve(spec);
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[viz/bad-locations] resolver.resolve OK: renderer="
               + (resolution == null ? "null"
                   : resolution.renderer().getClass().getName())
@@ -207,7 +207,7 @@ public final class MapDispatch {
                   ? "null"
                   : resolution.model().getClass().getName()));
     } catch (ChartSpecResolver.UnresolvableChartSpecException e) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " unresolvable: " + e.getMessage());
       sendMessage(viewer, CommandMessages.mapUnavailable);
@@ -216,7 +216,7 @@ public final class MapDispatch {
       // S-004: never swallow. Defensive translation of an unexpected
       // resolver fault to the same user-facing path so the viewer is not
       // left without feedback.
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " resolver threw: " + e.getMessage(), e);
       sendMessage(viewer, CommandMessages.mapUnavailable);
@@ -232,15 +232,15 @@ public final class MapDispatch {
         MapAllocationRequest.Locking.LOCKED);
     MapHandle handle;
     try {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[viz/bad-locations] binding.allocate invoking on "
               + binding.getClass().getName());
       handle = binding.allocate(request);
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[viz/bad-locations] binding.allocate OK: handle="
               + (handle == null ? "null" : handle.toString()));
     } catch (RuntimeException e) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " allocate failed: " + e.getMessage(), e);
       sendMessage(viewer, CommandMessages.mapBusy);
@@ -253,7 +253,7 @@ public final class MapDispatch {
       if (LIVE_REFRESH_KINDS.contains(spec.kind())) {
         // Live-refresh: re-invokes resolver per tick; faults handled inside LiveChartRenderer.
         final ChartSpecResolver resolverRef = resolver;
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[viz/live] binding.bindLive invoking for kind=" + spec.kind()
                 + " viewer=" + viewer);
         binding.bindLive(handle,
@@ -265,19 +265,19 @@ public final class MapDispatch {
                 return null; // skip this tick
               }
             });
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[viz/live] binding.bindLive OK for kind=" + spec.kind()
                 + " viewer=" + viewer);
       } else {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[viz/bad-locations] binding.renderEphemeral invoking for viewer="
                 + viewer);
         binding.renderEphemeral(handle, resolution.renderer(), resolution.model());
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[viz/bad-locations] binding.renderEphemeral OK for viewer=" + viewer);
       }
     } catch (RuntimeException e) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "ChartSpec " + spec.kind() + " for viewer " + viewer
               + " render failed: " + e.getMessage(), e);
       sendMessage(viewer, CommandMessages.mapUnavailable);
@@ -291,13 +291,13 @@ public final class MapDispatch {
     final MapHandle deliverHandle = handle;
     Runnable deliver = () -> {
       try {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[viz/bad-locations] binding.deliverTo invoking for viewer=" + viewer);
         deliverBinding.deliverTo(deliverHandle, viewer);
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[viz/bad-locations] binding.deliverTo OK for viewer=" + viewer);
       } catch (RuntimeException e) {
-        RTP.log(Level.WARNING,
+        RTPRuntime.log(Level.WARNING,
             "ChartSpec " + spec.kind() + " for viewer " + viewer
                 + " deliverTo failed: " + e.getMessage(), e);
         sendMessage(viewer, CommandMessages.mapUnavailable);
@@ -305,17 +305,17 @@ public final class MapDispatch {
     };
 
     RTPLocation viewerLocation = null;
-    if (RTP.serverAccessor != null) {
+    if (RTPRuntime.serverAccessor() != null) {
       try {
-        RTPPlayer p = RTP.serverAccessor.getPlayer(viewer);
+        RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(viewer);
         if (p != null) viewerLocation = p.getLocation();
       } catch (RuntimeException e) {
         // Resolver fault: fall through to inline delivery below.
         viewerLocation = null;
       }
     }
-    if (RTP.scheduler != null && viewerLocation != null) {
-      RTP.scheduler.runTask(viewerLocation, deliver);
+    if (RTPRuntime.scheduler() != null && viewerLocation != null) {
+      RTPRuntime.scheduler().runTask(viewerLocation, deliver);
     } else {
       // Test context / pre-init / unresolvable viewer location: run inline,
       // preserving the pre-hop behaviour on non-Folia and unit-test paths.
@@ -325,11 +325,11 @@ public final class MapDispatch {
   }
 
   private static void sendMessage(UUID viewer, Enum<?> key) {
-    if (RTP.serverAccessor == null) return; // test contexts; warning already logged
+    if (RTPRuntime.serverAccessor() == null) return; // test contexts; warning already logged
     try {
-      RTP.serverAccessor.sendMessage(viewer, key);
+      RTPRuntime.serverAccessor().sendMessage(viewer, key);
     } catch (RuntimeException e) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "MapDispatch failed to send " + key + " to " + viewer + ": " + e.getMessage());
     }
   }

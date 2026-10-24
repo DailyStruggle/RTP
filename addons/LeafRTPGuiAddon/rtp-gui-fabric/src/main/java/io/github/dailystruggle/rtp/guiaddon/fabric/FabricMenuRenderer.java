@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.guiaddon.fabric;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuLayout;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuModel;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuRenderer;
@@ -142,7 +143,7 @@ public final class FabricMenuRenderer implements MenuRenderer {
    * (the only source on the ServiceLoader / bundled-in-jar load path, where the mod
    * entry point never runs).
    *
-   * <p>We deliberately do NOT reflect over {@code RTP.serverAccessor.getServer()} here:
+   * <p>We deliberately do NOT reflect over {@code RTPRuntime.serverAccessor().getServer()} here:
    * {@code Class#getMethod} eagerly resolves every declared method signature of
    * {@code FabricServerAccessor}, and some are typed with the intermediary
    * {@code net.minecraft.class_3222} (ServerPlayer) which does not exist on the
@@ -183,7 +184,7 @@ public final class FabricMenuRenderer implements MenuRenderer {
     // processing completely before the new container screen is opened.
     RTP.log(java.util.logging.Level.FINE,
         "[RTP-GUI] Fabric renderer scheduling chest open for " + playerId);
-    RTP.scheduler.runTaskLater(() -> {
+    RTPRuntime.scheduler().runTaskLater(() -> {
       ServerPlayer player = resolvePlayer(playerId);
       if (player == null) {
         RTP.log(java.util.logging.Level.FINE,
@@ -208,8 +209,8 @@ public final class FabricMenuRenderer implements MenuRenderer {
                 + " threw" + (model.isRoot() ? "; falling back to a classic teleport" : ""), cannotOpen);
         if (model.isRoot()) {
           fallbackTeleport(playerId);
-        } else if (RTP.serverAccessor != null) {
-          RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Could not open menu.");
+        } else if (RTPRuntime.serverAccessor() != null) {
+          RTPRuntime.serverAccessor().sendMessage(playerId, "&c[RTP] Could not open menu.");
         }
       }
     }, 1L);
@@ -229,13 +230,13 @@ public final class FabricMenuRenderer implements MenuRenderer {
             if (error != null) {
               RTP.log(java.util.logging.Level.WARNING,
                   "[RTP-GUI] Fabric renderer: fallback teleport for " + playerId + " failed", error);
-              if (RTP.serverAccessor != null) {
-                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + error.getMessage());
+              if (RTPRuntime.serverAccessor() != null) {
+                RTPRuntime.serverAccessor().sendMessage(playerId, "&c[RTP] Teleport failed: " + error.getMessage());
               }
             } else if (result != null && !result.isSuccess()) {
               String msg = result.message() != null ? result.message() : (result.reason() != null ? result.reason().name() : "unknown");
-              if (RTP.serverAccessor != null) {
-                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + msg);
+              if (RTPRuntime.serverAccessor() != null) {
+                RTPRuntime.serverAccessor().sendMessage(playerId, "&c[RTP] Teleport failed: " + msg);
               }
             }
           });

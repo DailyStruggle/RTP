@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.hooks.PvPCombatAction;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -28,7 +28,7 @@ class PvPGateTest {
 
   @SuppressWarnings("unchecked")
   private ConfigParser<SafetyKeys> safety() {
-    return (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    return (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
   }
 
   /**
@@ -109,5 +109,13 @@ class PvPGateTest {
     setSafety(SafetyKeys.pvpCheckEnabled.name(), true);
     assertFalse(PvPGate.isInCombat(null));
     assertEquals(PvPCombatAction.ALLOW, PvPGate.evaluate(null));
+  }
+
+  @Test
+  @DisplayName("REQ-RTP-F-016: pvpCombatTagSeconds accepts explicit duration units")
+  void combatTagDurationAcceptsUnits() {
+    setSafety(SafetyKeys.pvpCombatTagSeconds.name(), "3h");
+
+    assertEquals(10_800_000L, PvPGate.combatTagMillis());
   }
 }

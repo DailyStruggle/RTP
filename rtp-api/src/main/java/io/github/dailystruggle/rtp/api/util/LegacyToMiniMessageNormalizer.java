@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  *
  * <p>Supports:
  * <ul>
- *   <li>Single-character codes ({@code &c}, {@code §c}, uppercase & lowercase)</li>
+ *   <li>Single-character codes ({@code &c}, {@code §c}, uppercase and lowercase)</li>
  *   <li>Bukkit hex sequences ({@code §x§r§r§g§g§b§b} / {@code &x&r&r&g&g&b&b})</li>
  *   <li>Direct hex forms ({@code #rrggbb}, {@code &#rrggbb}, {@code §#rrggbb})</li>
  * </ul>

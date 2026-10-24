@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 
@@ -66,7 +66,7 @@ public final class NetworkRegionCollisionWarner {
         for (Map.Entry<String, Set<String>> e : collisions.entrySet()) {
             // Sorted for stable log output and test golden files.
             String servers = new java.util.TreeSet<>(e.getValue()).toString();
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     String.format(Locale.ROOT,
                             "[RTP] region collision: region '%s' is advertised by %d backends %s. "
                                     + "policy=%s: serving locally first when this backend is one of them.",

@@ -6,10 +6,14 @@ import io.github.dailystruggle.effectsapi.fabric_unobf.FabricEffectRuntimeUnobf;
 import io.github.dailystruggle.effectsapi.fabric_unobf.FabricEffectsInitializer;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.effects.EffectDispatch;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import net.minecraft.server.MinecraftServer;
@@ -18,6 +22,7 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
 /**
@@ -63,6 +68,7 @@ public final class FabricEffectsHandlerUnobf {
      * lifecycle-hook lambdas are added once via the {@link AlreadyHooked} flag).
      */
     public static void setupEffects(MinecraftServer server) {
+        EffectDispatch.installWarnSink();
         RTP.log(Level.FINE, "[RTP][FX-trace] setupEffects ENTER server=" + (server == null ? "null" : server.getClass().getSimpleName()));
         if (server != null) {
             FabricEffectRuntimeUnobf.bindServer(server);
@@ -75,7 +81,7 @@ public final class FabricEffectsHandlerUnobf {
         }
         RTP.log(Level.FINE, "[RTP][FX-trace] setupEffects: attaching lifecycle hooks");
 
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
         FabricEffectRuntimeUnobf runtime = new FabricEffectRuntimeUnobf();
 
@@ -150,8 +156,8 @@ public final class FabricEffectsHandlerUnobf {
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
     private static void dispatchByUuid(String prefix, UUID uuid, FabricEffectRuntimeUnobf runtime) {
         try {
-            if (RTP.serverAccessor == null) return;
-            RTPPlayer rp = RTP.serverAccessor.getPlayer(uuid);
+            if (RTPRuntime.serverAccessor() == null) return;
+            RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(uuid);
             if (rp == null) return;
             dispatch(prefix, rp, runtime);
         } catch (Throwable t) {
@@ -261,10 +267,11 @@ public final class FabricEffectsHandlerUnobf {
 
             List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
             RTP.log(Level.FINE, "[RTP][FX-trace] built effects prefix=" + prefix + " count=" + effects.size());
-            for (Effect<?> effect : effects) {
+            AtomicInteger scheduled = new AtomicInteger();
+            EffectDispatch.forEachIsolated(prefix, effects, effect -> {
                 effect.setTarget(target);
                 if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
-                    RTP.deathEffectInFlight.add(handle.getUUID());
+                    DeathTeleports.effectInFlight().add(handle.getUUID());
                     if (pipelineTask != null) {
                         pipelineTask.deathEffectTriggered = true;
                     }
@@ -272,8 +279,9 @@ public final class FabricEffectsHandlerUnobf {
                 runtime.schedule(effect, 0);
                 RTP.log(Level.FINE, "[RTP][FX-trace] scheduled prefix=" + prefix
                         + " effectClass=" + effect.getClass().getSimpleName());
-            }
-            RTP.log(Level.FINE, "[RTP][FX-trace] dispatch DONE prefix=" + prefix + " scheduled=" + effects.size());
+                scheduled.incrementAndGet();
+            });
+            RTP.log(Level.FINE, "[RTP][FX-trace] dispatch DONE prefix=" + prefix + " scheduled=" + scheduled.get());
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP] Fabric effect dispatch failed for " + prefix + ": "

@@ -77,6 +77,12 @@ infoTopRejectionCause: "&7主要拒绝原因: #7E9CC8[genTopRejectionCause]&7 (#
 # 占位符: [genFailureBreakdown] - 以逗号分隔的 cause=N 列表，最忙的排在前面。
 infoFailureBreakdown: "&7按原因分类的拒绝: #7E9CC8[genFailureBreakdown]"
 
+# 自适应计算调节器：已配置与实际生效的预算及原因。
+infoGovernorAsync: "&7后台异步: #7E9CC8[govAsyncConfiguredMs]&7 毫秒 (生效 #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7后台同步: #7E9CC8[govSyncConfiguredMs]&7 毫秒 (生效 #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7热缓存上限: #7E9CC8[govHotCapConfigured]&7 (生效 #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7区块生成上限: #7E9CC8[govGenConfigured]&7 (生效 #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; 区域处理中 #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # 健康状态色带阈值。用于将彩色变体
 # 占位符（例如 [tps1mColoured]）标记为绿/黄/红。
 信息_TPS阈值_绿: 19.5
@@ -497,6 +503,7 @@ editorApplyFetching: "&7[P0] 正在获取配置数据..."
 editorApplyValidating: "&7[P0] 正在校验数据的完整性和语法..."
 editorApplySuccess: "&a[P0] 配置已应用并热重载！（已为修改过的文件创建 .bak 副本）"
 editorApplyFailed: "&c[P0] 无法应用数据：[reason]"
+editorApplyRejected: "&c[P0] 已拒绝应用：存在 [count] 个配置错误，未写入任何内容。第一个：[source] 中 [path] 处的 [code]。"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

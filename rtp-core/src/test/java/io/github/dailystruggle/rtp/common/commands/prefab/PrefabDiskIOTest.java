@@ -164,6 +164,18 @@ class PrefabDiskIOTest {
         assertEquals(50, reread.get("cacheCap"));
     }
 
+    @Test
+    void render_returnsPendingYamlWithoutWritingFile() throws IOException {
+        File perf = new File(pluginDir(), "performance.yml");
+        String original = "foo: original\n";
+        Files.writeString(perf.toPath(), original);
+
+        String candidate = PrefabDiskIO.render(pluginDir(), "performance", changes("foo", "updated"), null);
+
+        assertTrue(candidate.contains("updated"));
+        assertEquals(original, Files.readString(perf.toPath()));
+    }
+
     // --- writeWithBackup -----------------------------------------------------
 
     @Test

@@ -5,12 +5,14 @@ import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -62,7 +64,7 @@ class ReqRtpS005ArrivalChunkHoldTest {
         "arrival_hold_region", world, circle, new LinearAdjustor(new ArrayList<>()),
         false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
     region = new Region("arrival_hold_region", settings);
-    RTP.selectionAPI.permRegionLookup.put(region.name, region);
+    ActiveSelection.get().permRegionLookup.put(region.name, region);
 
     player = new MockRTPPlayer(UUID.randomUUID(), "ArrivalHoldPlayer", new RTPLocation(world, 0, 64, 0)) {
       @Override
@@ -80,9 +82,9 @@ class ReqRtpS005ArrivalChunkHoldTest {
   void tearDown() {
     TeleportPipelineTask.flushArrivalReservations();
     MemoryTracker.reset();
-    RTP.getInstance().latestTeleportData.clear();
-    RTP.getInstance().processingPlayers.clear();
-    RTP.scheduler = accessor.getMockScheduler();
+    TeleportSessions.current().latestTeleportData.clear();
+    TeleportSessions.current().processingPlayers.clear();
+    RTPRuntime.setScheduler(accessor.getMockScheduler());
     world.resetTicketCount();
   }
 
@@ -177,7 +179,7 @@ class ReqRtpS005ArrivalChunkHoldTest {
   @DisplayName("REQ-RTP-S-002: hold falls back to an immediate release without a scheduler")
   void holdWithoutSchedulerReleasesImmediately() {
     ChunkReservation held = reserve(1, 1);
-    RTP.scheduler = null;
+    RTPRuntime.setScheduler(null);
     TeleportPipelineTask.holdArrivalReservation(held, world, 1, 1);
 
     assertEquals(0, world.getActiveTicketCount());

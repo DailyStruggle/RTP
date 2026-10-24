@@ -70,5 +70,5 @@ Implement a lightweight, headless runtime harness that exercises the `ADR-087` a
 
 - [ADR-016: Anvil Read-Only Subsystem](ADR-016-anvil-subsystem.md)
 - [ADR-077: Multi-Format Region Support: Pluggable Region Readers (Linear via Addon)](ADR-077-multi-format-region-support.md)
-- [ADR-087: Adaptive Tick-Budget and Memory Backpressure for Folia](ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia.md)
+- [ADR-087: Adaptive Compute Governor](ADR-087-adaptive-compute-governor.md)
 - [ADR-088: Configurable Downsampling Stride Filter](ADR-088-configurable-downsampling-stride-filter.md)

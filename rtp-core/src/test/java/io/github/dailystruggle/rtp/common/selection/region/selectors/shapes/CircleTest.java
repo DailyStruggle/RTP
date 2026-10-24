@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.shapes;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import org.junit.jupiter.api.BeforeAll;
@@ -27,7 +27,7 @@ public class CircleTest {
     static void setupServer() {
         MockRTPServerAccessor accessor =
                 new MockRTPServerAccessor(new java.io.File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 

@@ -4,11 +4,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -28,11 +28,11 @@ public class DynamicWorldConfigTest {
     void setUp() {
         // "world" is registered by default in MockRTPServerAccessor
         accessor = RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
 
         // Initialize Configs
         configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         mockMulti = mock(MultiConfigParser.class);
         mockMulti.configParserFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
         configs.multiConfigParserMap.put(WorldKeys.class, mockMulti);

@@ -50,25 +50,30 @@ network:
 
     # Drainer pulse cadence in millis. Should track `heartbeat.intervalMs`
     # since BackendHeartbeat.networkKeptCount is the per-backend cap input.
+    # Supports duration units (e.g. 24h, 1d).
     drainIntervalMs: 1000
 
     # Backoff window after a total-failure pulse (every drained envelope
     # failed dispatch). The drainer refreshes every entry's TTL so the
     # reaper does not chew through valid entries during a network outage.
+    # Supports duration units (e.g. 24h, 1d).
     drainPauseMs: 2000
 
     # Redis-backed leader lease TTL. Lease is re-acquired on every pulse.
     # On `transport.type: in-memory` (or sql) the lease is always-leader,
     # which is safe only on single-proxy installs.
+    # Supports duration units (e.g. 24h, 1d).
     leaderLeaseHoldMs: 5000
 
     # Reaper pulse cadence in millis. Catches orphan entries from crashed
     # proxies; see ADR-015 "stale-entry concern" section.
+    # Supports duration units (e.g. 24h, 1d).
     reapIntervalMs: 10000
 
     # Maximum age before an entry is reaped on quit-event miss. Longer than
     # any reasonable network blip but short enough to free up the slot when
     # a proxy genuinely crashed mid-request.
+    # Supports duration units (e.g. 24h, 1d).
     reapMaxAgeMs: 60000
 transport:
   # Backing store for cross-process state.
@@ -148,7 +153,9 @@ heartbeat:
   # How often this proxy publishes its state row. 1000ms is the default
   # used by both proxy-side and backend-side publishers; peers must
   # observe rows within `staleAfterMs` to consider them live.
+  # Supports duration units (e.g. 24h, 1d).
   intervalMs: 1000
+  # Supports duration units (e.g. 24h, 1d).
   staleAfterMs: 5000
 
 # Proxy-cache availability store (DB-free tier). When a backend selects
@@ -202,6 +209,7 @@ heartbeat:
 # weight overrides; uncomment and adjust to bias the selector toward a
 # specific backend without re-running the curve math.
 loadBalancer:
+  # Supports duration units (e.g. 24h, 1d).
   staleAfterMs: 30000
   regionScarcityWeight: 0
   terms:

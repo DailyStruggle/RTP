@@ -25,6 +25,7 @@ class SetupCommandTest {
         Map<String, ?> children = setupCmd.getCommandLookup();
         assertNotNull(children);
         assertTrue(children.containsKey("WORLD"), "missing world");
+        assertTrue(children.containsKey("RADIUS"), "missing radius");
         assertTrue(children.containsKey("GAMEPLAY"), "missing gameplay");
         assertTrue(children.containsKey("PERF"), "missing perf");
         assertTrue(children.containsKey("NEXT"), "missing next");
@@ -44,6 +45,10 @@ class SetupCommandTest {
         // Verify choice parameters per stage
         var worldCmd = (io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand) children.get("WORLD");
         assertEquals(java.util.Set.of("single", "multi"), worldCmd.getParameterLookup().get("choice").values());
+        assertNotNull(worldCmd.getParameterLookup().get("radius"));
+
+        var radiusCmd = (io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand) children.get("RADIUS");
+        assertEquals(SetupRadiusCmd.PRESET_RADII, radiusCmd.getParameterLookup().get("radius").values());
 
         var gameplayCmd = (io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand) children.get("GAMEPLAY");
         assertEquals(java.util.Set.of("survival", "arena", "skyblock", "oneblock"), gameplayCmd.getParameterLookup().get("choice").values());
@@ -52,7 +57,8 @@ class SetupCommandTest {
         assertEquals(java.util.Set.of("high", "low", "folia"), perfCmd.getParameterLookup().get("choice").values());
 
         var toggleCmd = (io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand) children.get("TOGGLE");
-        assertEquals(java.util.Set.of("claimIntegrations", "cinematicEffects", "economyIntegration"), toggleCmd.getParameterLookup().get("key").values());
+        assertEquals(java.util.Set.of("openGuiOnRtp", "claimIntegrations", "cinematicEffects", "economyIntegration"),
+                toggleCmd.getParameterLookup().get("key").values());
     }
 
     @Test
@@ -256,7 +262,7 @@ class SetupCommandTest {
         org.mockito.Mockito.when(mockAccessor.getRTPWorld("world_nether")).thenReturn((io.github.dailystruggle.rtp.api.world.RTPWorld) nether);
         org.mockito.Mockito.when(mockAccessor.getRTPWorld("world_the_end")).thenReturn((io.github.dailystruggle.rtp.api.world.RTPWorld) end);
 
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = mockAccessor;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(mockAccessor);
 
         // Create default.yml with comments in definitions/regions/
         java.io.File defRegionDir = new java.io.File(tempDir, "definitions/regions");
@@ -289,8 +295,8 @@ class SetupCommandTest {
 
         assertTrue(endContent.contains("world: world_the_end") || endContent.contains("world: \"world_the_end\"") || endContent.contains("world: 'world_the_end'"),
                 "world_the_end.yml must contain world key, was: " + endContent);
-        assertTrue(endContent.contains("shape: '@config'") || endContent.contains("shape: \"@config\"") || endContent.contains("shape: @config"),
-                "world_the_end.yml must contain shape key, was: " + endContent);
+        assertTrue(endContent.contains("shape:") && endContent.contains("4096b"),
+                "world_the_end.yml must contain shape and radius, was: " + endContent);
         assertTrue(endContent.contains("vert:"), "world_the_end.yml must contain vert key, was: " + endContent);
         assertTrue(endContent.contains("requireSkyLight: false"), "world_the_end.yml vert must have requireSkyLight: false");
 
@@ -304,8 +310,8 @@ class SetupCommandTest {
         String netherContent = java.nio.file.Files.readString(netherFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
         assertTrue(netherContent.contains("world: world_nether") || netherContent.contains("world: \"world_nether\"") || netherContent.contains("world: 'world_nether'"),
                 "world_nether.yml must contain world key, was: " + netherContent);
-        assertTrue(netherContent.contains("shape: '@config'") || netherContent.contains("shape: \"@config\"") || netherContent.contains("shape: @config"),
-                "world_nether.yml must contain shape key, was: " + netherContent);
+        assertTrue(netherContent.contains("shape:") && netherContent.contains("4096b"),
+                "world_nether.yml must contain shape and radius, was: " + netherContent);
         assertTrue(netherContent.contains("vert:"), "world_nether.yml must contain vert key");
         assertTrue(netherContent.contains("requireSkyLight: false"), "world_nether.yml vert must have requireSkyLight: false");
     }
@@ -316,16 +322,38 @@ class SetupCommandTest {
         SetupBookMenuBuilder builder = new SetupBookMenuBuilder();
         SetupSession session = new SetupSession(UUID.randomUUID());
 
-        // 1. World page - single vs multi
+        // 1. World page - single vs multi, radius presets, and PromptAnvilInput
         session.setCurrentStage(SetupStage.WORLD);
         session.setWorldChoice("single");
+        session.setRadiusChoice("5km");
         var m1 = builder.build(session, Map.of());
         assertNotNull(m1);
         assertEquals("RTP Setup: World Topology", m1.title());
 
+        List<io.github.dailystruggle.rtp.api.menu.MenuFragment> worldFragments = m1.pages().get(0).lines().stream()
+                .flatMap(l -> l.fragments().stream())
+                .toList();
+        for (String preset : List.of("2.5km", "5km", "10km", "25km")) {
+            assertTrue(worldFragments.stream().anyMatch(f -> f.text().contains("[" + preset + "]")),
+                    "Missing radius preset button for " + preset);
+        }
+        var anvilFrag = worldFragments.stream()
+                .filter(f -> f.text().contains("[✎ Other...]"))
+                .findFirst()
+                .orElseThrow();
+        assertInstanceOf(io.github.dailystruggle.rtp.api.menu.MenuAction.PromptAnvilInput.class, anvilFrag.action());
+        var prompt = (io.github.dailystruggle.rtp.api.menu.MenuAction.PromptAnvilInput) anvilFrag.action();
+        assertArrayEquals(new String[]{"admin", "setup", "radius"}, prompt.parentPath());
+        assertEquals("radius", prompt.paramName());
+        assertEquals("5km", prompt.prefill());
+        assertEquals(io.github.dailystruggle.rtp.api.menu.MenuAction.Mode.RUN, prompt.mode());
+
         session.setWorldChoice("multi");
         var m1Multi = builder.build(session, Map.of());
         assertNotNull(m1Multi);
+        assertTrue(m1Multi.pages().get(0).lines().stream()
+                .flatMap(l -> l.fragments().stream())
+                .anyMatch(f -> f.text().contains("/rtp world=<name>") && f.text().contains("/rtp region=<name>")));
 
         // 2. Gameplay page - survival, arena, skyblock, oneblock
         session.setCurrentStage(SetupStage.GAMEPLAY);
@@ -345,18 +373,69 @@ class SetupCommandTest {
             assertEquals("RTP Setup: Performance", m.title());
         }
 
-        // 4. Addons page - toggles
+        // 4. Addons page - toggles including openGuiOnRtp
         session.setCurrentStage(SetupStage.ADDONS);
+        session.setToggle("openGuiOnRtp", true);
         session.setToggle("claimIntegrations", true);
         session.setToggle("cinematicEffects", true);
         var mAddons = builder.build(session, Map.of());
         assertNotNull(mAddons);
         assertEquals("RTP Setup: Addons & Effects", mAddons.title());
+        assertTrue(mAddons.pages().get(0).lines().stream()
+                .flatMap(l -> l.fragments().stream())
+                .anyMatch(f -> f.text().contains("Bare /rtp Opens GUI Menu")));
 
+        session.setToggle("openGuiOnRtp", false);
         session.setToggle("claimIntegrations", false);
         session.setToggle("cinematicEffects", false);
         var mAddons2 = builder.build(session, Map.of());
         assertNotNull(mAddons2);
+
+        // Verify book color contrast across all rendered models (never &e, &6, or &f on parchment)
+        for (var model : List.of(m1, m1Multi, mAddons, mAddons2)) {
+            for (var page : model.pages()) {
+                for (var line : page.lines()) {
+                    for (var frag : line.fragments()) {
+                        String text = frag.text();
+                        assertFalse(text.contains("&e") || text.contains("&6") || text.contains("&f"),
+                                "Book menu fragment must not use low-contrast parchment colors (&e/&6/&f): " + text);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Setup radius command and console formatter validate DistanceParser inputs and render hints")
+    void testRadiusCommandValidationAndConsoleFormatter() {
+        SetupSessionRegistry registry = new SetupSessionRegistry();
+        SetupBookMenuBuilder builder = new SetupBookMenuBuilder();
+        SetupCmd setupCmd = new SetupCmd(null, registry, builder, null);
+        UUID callerId = UUID.randomUUID();
+
+        var radiusCmd = setupCmd.getCommandLookup().get("RADIUS");
+        var worldCmd = setupCmd.getCommandLookup().get("WORLD");
+
+        for (String valid : List.of("2.5km", "5km", "10km", "25km", "4096b", "500c")) {
+            assertTrue(radiusCmd.onCommand(callerId, Map.of("radius", List.of(valid)), null));
+            assertEquals(valid, registry.get(callerId).orElseThrow().radiusChoice());
+        }
+
+        // Invalid syntax fails closed (S-004) without mutating session
+        assertFalse(radiusCmd.onCommand(callerId, Map.of("radius", List.of("invalid_dist")), null));
+        assertEquals("500c", registry.get(callerId).orElseThrow().radiusChoice());
+
+        assertFalse(worldCmd.onCommand(callerId, Map.of("radius", List.of("-10km")), null));
+        assertEquals("500c", registry.get(callerId).orElseThrow().radiusChoice());
+
+        assertTrue(worldCmd.onCommand(callerId, Map.of("choice", List.of("multi"), "radius", List.of("10km")), null));
+        SetupSession session = registry.get(callerId).orElseThrow();
+        assertEquals("multi", session.worldChoice());
+        assertEquals("10km", session.radiusChoice());
+
+        List<String> consoleLines = SetupConsoleFormatter.formatStatus(session, null);
+        assertTrue(consoleLines.stream().anyMatch(l -> l.contains("10km") && l.contains("radius=<distance>")));
+        assertTrue(consoleLines.stream().anyMatch(l -> l.contains("/rtp world=<name>") && l.contains("/rtp region=<name>")));
     }
 
     @Test

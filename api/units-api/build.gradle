@@ -1,0 +1,21 @@
+// units-api -- dependency-free temporal, spatial, and data-size parsers shared by
+// RTP core, platform-neutral APIs, and proxy configuration. The package names
+// are preserved from rtp-core so existing source imports remain stable after
+// extraction.
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}

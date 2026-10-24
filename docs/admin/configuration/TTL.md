@@ -44,7 +44,7 @@ Durations can be combined without punctuation (e.g. `1d12h`, `2h30m`, `1w2d`). I
 
 ```yaml
 # --- RTP Spatial Memory TTL Settings ---
-# Documentation: plugins/RTP/docs/admin/configuration/TTL.md
+# Documentation: docs/admin/configuration/TTL.md
 
 causes:
   # Natural terrain & geometry (permanent retention)

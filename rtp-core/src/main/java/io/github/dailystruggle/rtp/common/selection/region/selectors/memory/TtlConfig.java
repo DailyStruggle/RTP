@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.TtlKeys;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -19,13 +19,13 @@ public final class TtlConfig {
   private static final long INFINITE = -1L;
   private static final long DEFAULT_DYNAMIC_TTL_SECONDS = 14L * 86400L; // 14 days
 
-  private static final Map<LocationGenerator.FailTypes, Long> causeTtls =
-      new EnumMap<>(LocationGenerator.FailTypes.class);
+  private static final Map<FailTypes, Long> causeTtls =
+      new EnumMap<>(FailTypes.class);
   private static final Map<String, Long> verifierTtls = new ConcurrentHashMap<>();
-  private static final EnumSet<LocationGenerator.FailTypes> TRANSIENT = EnumSet.of(
-      LocationGenerator.FailTypes.timeout,
-      LocationGenerator.FailTypes.nullChunk,
-      LocationGenerator.FailTypes.ungenerated);
+  private static final EnumSet<FailTypes> TRANSIENT = EnumSet.of(
+      FailTypes.timeout,
+      FailTypes.nullChunk,
+      FailTypes.ungenerated);
 
   static {
     resetDefaults();
@@ -38,22 +38,24 @@ public final class TtlConfig {
     verifierTtls.clear();
 
     // Static tier: infinite (<= 0)
-    causeTtls.put(LocationGenerator.FailTypes.biome, INFINITE);
-    causeTtls.put(LocationGenerator.FailTypes.worldBorder, INFINITE);
-    causeTtls.put(LocationGenerator.FailTypes.vert, INFINITE);
-    causeTtls.put(LocationGenerator.FailTypes.safety, INFINITE);
-    causeTtls.put(LocationGenerator.FailTypes.prefilterBiome, INFINITE);
-    causeTtls.put(LocationGenerator.FailTypes.prefilterBlock, INFINITE);
-    causeTtls.put(LocationGenerator.FailTypes.prefilterRange, INFINITE);
-    causeTtls.put(LocationGenerator.FailTypes.misc, INFINITE);
+    causeTtls.put(FailTypes.biome, INFINITE);
+    causeTtls.put(FailTypes.worldBorder, INFINITE);
+    causeTtls.put(FailTypes.vert, INFINITE);
+    causeTtls.put(FailTypes.safety, INFINITE);
+    causeTtls.put(FailTypes.prefilterBiome, INFINITE);
+    causeTtls.put(FailTypes.prefilterBlock, INFINITE);
+    causeTtls.put(FailTypes.prefilterRange, INFINITE);
+    causeTtls.put(FailTypes.misc, INFINITE);
+    causeTtls.put(FailTypes.terrain, INFINITE);
+    causeTtls.put(FailTypes.prefilterTerrain, INFINITE);
 
     // Dynamic tier: finite default
-    causeTtls.put(LocationGenerator.FailTypes.uniquePlacement, 30L * 86400L); // 30 days
-    causeTtls.put(LocationGenerator.FailTypes.safetyExternal, DEFAULT_DYNAMIC_TTL_SECONDS); // 14 days
+    causeTtls.put(FailTypes.uniquePlacement, 30L * 86400L); // 30 days
+    causeTtls.put(FailTypes.safetyExternal, DEFAULT_DYNAMIC_TTL_SECONDS); // 14 days
 
     // Transient tier: never stored (see isTransient). The 0L here is NOT a TTL - a stored
     // ttl <= 0 means permanent - so callers must check isTransient before resolving.
-    for (LocationGenerator.FailTypes t : TRANSIENT) causeTtls.put(t, 0L);
+    for (FailTypes t : TRANSIENT) causeTtls.put(t, 0L);
   }
 
   /**
@@ -63,7 +65,7 @@ public final class TtlConfig {
    * @param cause rejection cause, may be {@code null}
    * @return {@code true} when marks with this cause must be discarded rather than stored
    */
-  public static boolean isTransient(LocationGenerator.FailTypes cause) {
+  public static boolean isTransient(FailTypes cause) {
     return cause != null && TRANSIENT.contains(cause);
   }
 
@@ -75,7 +77,7 @@ public final class TtlConfig {
    * @return retention duration in seconds; {@code <= 0} indicates infinite retention
    */
   public static long resolveTtlSeconds(
-      LocationGenerator.FailTypes cause, Class<?> verifierClass) {
+      FailTypes cause, Class<?> verifierClass) {
     if (verifierClass != null) {
       String simpleName = verifierClass.getSimpleName();
       Long override = verifierTtls.get(simpleName.toLowerCase(Locale.ROOT));
@@ -128,9 +130,9 @@ public final class TtlConfig {
       for (Map.Entry<?, ?> entry : causesMap.entrySet()) {
         String keyStr = String.valueOf(entry.getKey());
         try {
-          LocationGenerator.FailTypes cause = LocationGenerator.FailTypes.valueOf(keyStr);
+          FailTypes cause = FailTypes.valueOf(keyStr);
           if (isTransient(cause)) {
-            RTP.log(Level.WARNING, "[TtlConfig] ttl.yml causes." + keyStr
+            RTPRuntime.log(Level.WARNING, "[TtlConfig] ttl.yml causes." + keyStr
                 + " ignored: transient causes are never retained");
             continue;
           }
@@ -158,7 +160,7 @@ public final class TtlConfig {
     try {
       load(parser.getMap(TtlKeys.causes), parser.getMap(TtlKeys.verifiers));
     } catch (Exception e) {
-      RTP.log(Level.WARNING, "[TtlConfig] Error parsing ttl.yml: " + e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, "[TtlConfig] Error parsing ttl.yml: " + e.getMessage(), e);
     }
   }
 }

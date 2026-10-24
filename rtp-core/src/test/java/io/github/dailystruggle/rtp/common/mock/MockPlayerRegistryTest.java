@@ -80,4 +80,24 @@ class MockPlayerRegistryTest {
     assertSame(dest, resolved.getLocation());
     assertTrue(mock.isOnline());
   }
+
+  @Test
+  @DisplayName("ADR-121: RuntimeMockRTPPlayer records every setLocation and completes teleportFuture on the first")
+  void mockRecordsDestinations() throws Exception {
+    RuntimeMockRTPPlayer mock = newMock("Recorder");
+    assertEquals(0, mock.setLocationCount());
+    assertTrue(mock.destinations().isEmpty());
+    assertFalse(mock.teleportFuture().isDone());
+
+    RTPLocation first = new RTPLocation(new MockRTPWorld("world"), 10, 70, 20);
+    RTPLocation second = new RTPLocation(new MockRTPWorld("world"), 30, 71, 40);
+    mock.setLocation(first).get();
+    mock.setLocation(second).get();
+
+    assertEquals(2, mock.setLocationCount());
+    assertEquals(java.util.List.of(first, second), mock.destinations());
+    assertSame(first, mock.teleportFuture().getNow(null));
+    org.junit.jupiter.api.Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> mock.destinations().clear());
+  }
 }

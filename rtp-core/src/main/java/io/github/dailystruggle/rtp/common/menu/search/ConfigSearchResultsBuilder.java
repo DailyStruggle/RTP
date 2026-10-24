@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.menu.search;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -65,7 +65,7 @@ public final class ConfigSearchResultsBuilder {
         if (query == null) return List.of();
         String trimmed = query.trim();
         if (trimmed.length() < MIN_QUERY_LENGTH) return List.of();
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         if (configs == null) return List.of();
         return search(query, configs);
     }

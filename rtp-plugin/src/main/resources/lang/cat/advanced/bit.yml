@@ -1,0 +1,21 @@
+# --- Configuració de les proves integrades (BIT) ---
+# Documentació: docs/admin/configuration/BIT.md
+
+# Registra els errors estructurals de les accions com a avisos sense bloquejar-ne el registre.
+# Defineix-ho com a true per impedir el registre d'accions amb algun error efectiu.
+strictActions: false
+
+# Registra com a avisos les troballes de configuració que versions anteriors acceptaven, sense rebutjar /rtp reload.
+# Posa-ho a true per tractar-les com a errors; una recàrrega o Hot-Apply amb errors manté la configuració actual.
+strictConfig: false
+
+# Nombre mínim de mostres abans de classificar una porta com a sempre o mai superada.
+gateOutcomeSamples: 200
+
+# Nivells de severitat per a codis BIT registrats; tenen prioritat sobre strictActions.
+# Nivells admesos: ERROR, WARNING, INFO, DEBUG, TRACE i OFF. OFF silencia la troballa.
+# Els codis o nivells desconeguts s'ignoren i es registren al log.
+overrides:
+
+# NO TOQUIS EL NÚMERO DE VERSIÓ
+version: 1.0

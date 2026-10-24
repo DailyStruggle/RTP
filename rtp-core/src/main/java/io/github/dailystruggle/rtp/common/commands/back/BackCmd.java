@@ -10,6 +10,8 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -46,21 +48,21 @@ public class BackCmd extends BaseRTPCmdImpl {
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
     if (!(sender instanceof RTPPlayer player)) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.consoleCmdNotAllowed);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.consoleCmdNotAllowed);
       return true;
     }
 
     if (!sender.hasPermission("rtp.back") && !sender.hasPermission("rtp.*")) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noPerms);
       return true;
     }
 
     UUID uuid = player.uuid();
-    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
     if (data == null || data.originalCoords == null) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noBackLocation);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noBackLocation);
       return true;
     }
 
@@ -75,7 +77,7 @@ public class BackCmd extends BaseRTPCmdImpl {
         long dt = System.currentTimeMillis() - lastTpTime;
         if (dt < 0) dt = Long.MAX_VALUE + dt;
         if (dt < player.cooldown()) {
-          RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.cooldownMessage);
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.cooldownMessage);
           return true;
         }
       }
@@ -106,12 +108,12 @@ public class BackCmd extends BaseRTPCmdImpl {
         data.originWorldName = swapOrigin.worldName();
         data.originServerId = swapServerId;
         data.time = System.currentTimeMillis();
-        RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.backSuccess);
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.backSuccess);
       } else {
         if (result != null && result.message() != null && !result.message().isBlank()) {
-          RTP.serverAccessor.sendMessage(senderId, senderId, result.message());
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, result.message());
         } else {
-          RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.teleportCancel);
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.teleportCancel);
         }
       }
     });

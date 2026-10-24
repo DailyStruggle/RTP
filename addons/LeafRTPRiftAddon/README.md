@@ -77,8 +77,9 @@ is reverted with everything else when the warmup ends, so nothing stays obtainab
 ## Demo group shipped by default
 
 So the effect is demonstrable out of the box, the addon installs a ready-to-use
-`effects/rift.yml` group the first time it loads (it never overwrites an existing file, so
-operator edits and deletions stick):
+`definitions/effects/rift.yml` group whenever that file is missing at load. It never overwrites
+an existing file, so operator edits stick; a deleted file is installed again on the next start
+while the addon is present:
 
 ```yaml
 when: preload
@@ -87,8 +88,8 @@ effects:
 ```
 
 With `effectParsing: true` (the shipped default in `performance.yml`) every `/rtp` then plays
-the rift. Delete `plugins/RTP/addons/` and `plugins/RTP/effects/rift.yml`, or set
-`effects: []`, to turn it off.
+the rift. To turn it off, set `effects: []` in the file, or remove the addon jar from
+`plugins/RTP/addons/` and delete `plugins/RTP/definitions/effects/rift.yml`.
 
 ## How `RIFT` is used once registered
 

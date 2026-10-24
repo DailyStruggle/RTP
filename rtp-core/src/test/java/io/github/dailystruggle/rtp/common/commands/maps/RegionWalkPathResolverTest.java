@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.commands.maps;
 import io.github.dailystruggle.mapsapi.image.ImageMapCanvas;
 import io.github.dailystruggle.mapsapi.model.RegionWalkPath;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
@@ -53,8 +53,8 @@ class RegionWalkPathResolverTest {
     );
     testRegion = new Region("walk_region", settings);
 
-    if (RTP.selectionAPI != null) {
-      RTP.selectionAPI.permRegionLookup.put("walk_region", testRegion);
+    if (ActiveSelection.get() != null) {
+      ActiveSelection.get().permRegionLookup.put("walk_region", testRegion);
     }
   }
 

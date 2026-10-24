@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.bukkit.Chunk;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -25,8 +26,8 @@ public class OnChunkLoad implements Listener {
     public void onChunkLoad(ChunkLoadEvent event) {
         if (event == null) return;
         Chunk chunk = event.getChunk();
-        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID());
+        RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(chunk.getWorld().getUID());
         if (world == null) return;
-        RTP.selectionAPI.observeChunkLoad(world, chunk.getX(), chunk.getZ());
+        ActiveSelection.get().observeChunkLoad(world, chunk.getX(), chunk.getZ());
     }
 }

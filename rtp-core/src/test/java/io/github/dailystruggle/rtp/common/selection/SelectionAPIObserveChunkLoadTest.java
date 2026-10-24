@@ -1,11 +1,12 @@
 package io.github.dailystruggle.rtp.common.selection;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -41,7 +42,7 @@ class SelectionAPIObserveChunkLoadTest {
   @BeforeEach
   void setUp() {
     accessor = RTPTestSetup.install(tempDir.toFile());
-    RTP.selectionAPI = new SelectionAPI();
+    ActiveSelection.set(new SelectionAPI());
     world = new MockRTPWorld("default_world");
     accessor.addWorld(world);
     Square shape = new Square();
@@ -50,31 +51,31 @@ class SelectionAPIObserveChunkLoadTest {
         "default", world, shape, vert,
         false, false,
         10L, 1000L, 0L, 5, 0.0, 1L, "", false);
-    RTP.selectionAPI.permRegionLookup.put("default", new Region("default", settings));
+    ActiveSelection.get().permRegionLookup.put("default", new Region("default", settings));
   }
 
   @AfterEach
   void tearDown() {
-    if (RTP.selectionAPI != null) {
-      RTP.selectionAPI.permRegionLookup.clear();
-      RTP.selectionAPI.tempRegions.clear();
+    if (ActiveSelection.get() != null) {
+      ActiveSelection.get().permRegionLookup.clear();
+      ActiveSelection.get().tempRegions.clear();
     }
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
   }
 
   @SuppressWarnings("unchecked")
   private void setCheckOnChunkLoads(boolean value) {
     ConfigParser<PerformanceKeys> perf =
-        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     EnumMap<PerformanceKeys, Object> data = new EnumMap<>(PerformanceKeys.class);
     data.put(PerformanceKeys.checkOnChunkLoads, value);
     perf.setData(data);
   }
 
   private MemoryShape<?> shape() {
-    return (MemoryShape<?>) RTP.selectionAPI.getRegion("default").getShape();
+    return (MemoryShape<?>) ActiveSelection.get().getRegion("default").getShape();
   }
 
   @Test
@@ -85,7 +86,7 @@ class SelectionAPIObserveChunkLoadTest {
     shape.flushAndRebuild(shape.spatialResolution());
     assertEquals(0, shape.getEffectiveGoodCount(), "precondition: no biome recorded yet");
 
-    RTP.selectionAPI.observeChunkLoad(world, 10, 10);
+    ActiveSelection.get().observeChunkLoad(world, 10, 10);
 
     shape.flushAndRebuild(shape.spatialResolution());
     assertTrue(shape.getEffectiveGoodCount() > 0,
@@ -98,7 +99,7 @@ class SelectionAPIObserveChunkLoadTest {
     setCheckOnChunkLoads(false);
     MemoryShape<?> shape = shape();
 
-    RTP.selectionAPI.observeChunkLoad(world, 10, 10);
+    ActiveSelection.get().observeChunkLoad(world, 10, 10);
 
     shape.flushAndRebuild(shape.spatialResolution());
     assertEquals(0, shape.getEffectiveGoodCount(),
@@ -113,7 +114,7 @@ class SelectionAPIObserveChunkLoadTest {
     accessor.addWorld(other);
     MemoryShape<?> shape = shape();
 
-    RTP.selectionAPI.observeChunkLoad(other, 10, 10);
+    ActiveSelection.get().observeChunkLoad(other, 10, 10);
 
     shape.flushAndRebuild(shape.spatialResolution());
     assertEquals(0, shape.getEffectiveGoodCount(),

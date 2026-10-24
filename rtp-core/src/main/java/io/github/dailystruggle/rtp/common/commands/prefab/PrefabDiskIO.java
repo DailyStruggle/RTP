@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigBackups;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -50,10 +50,10 @@ public final class PrefabDiskIO {
                                                         String actionName,
                                                         String prefabId,
                                                         String userFacingFailure) {
-        File dir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
+        File dir = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPluginDirectory() : null;
         if (dir == null) {
             String pId = (prefabId == null) ? "" : prefabId;
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[prefab] " + actionName + " rejected NO_PLUGIN_DIR: caller=" + callerId
                             + (pId.isEmpty() ? "" : " prefab=" + pId));
             if (userFacingFailure != null && !userFacingFailure.isEmpty()) {
@@ -79,9 +79,9 @@ public final class PrefabDiskIO {
      * Tolerant of test scaffolds without a real sender.
      */
     public static void send(UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
+        if (callerId == null || RTPRuntime.serverAccessor() == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg);
         } catch (RuntimeException ignored) {
             // Tolerant of test scaffolds without a real sender.
         }
@@ -159,7 +159,7 @@ public final class PrefabDiskIO {
                         readLive(pluginDir, "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID));
             }
         } catch (RuntimeException re) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[prefab] apply: live snapshot failed for " + prefab.id()
                             + " - falling back to empty baseline: " + re.getMessage());
             baseline = new LinkedHashMap<>();
@@ -210,30 +210,47 @@ public final class PrefabDiskIO {
             }
         }
 
-        RtpYamlConfig cfg = null;
-        if (target.exists() && target.isFile()) {
-            cfg = new RtpYamlConfig(target);
-            cfg.loadWithComments();
-        } else if (templateFileId != null) {
-            // New file with a comment template: seed structure and comments
-            // from the template (e.g. regions/default.yml), then re-bind the
-            // config to the target path so the save lands on the new file.
-            File template = resolveFile(pluginDirectory, templateFileId);
-            if (template.exists() && template.isFile()) {
-                cfg = new RtpYamlConfig(template);
-                cfg.loadWithComments();
-                cfg.setConfigurationFile(target);
-            }
-        }
-        if (cfg == null) {
-            // New file: write a fresh empty config bound to the target path.
-            cfg = new RtpYamlConfig(target);
-        }
+        RtpYamlConfig cfg = configForWrite(pluginDirectory, fileId, templateFileId);
         for (PrefabApplier.Change c : changes) {
             cfg.set(c.keyPath(), c.newValue());
         }
         cfg.saveWithComments();
         return bakPath;
+    }
+
+    /** Render a pending file overlay as YAML without creating backups or writing to disk. */
+    public static String render(File pluginDirectory,
+                                String fileId,
+                                List<PrefabApplier.Change> changes,
+                                String templateFileId) throws IOException {
+        Objects.requireNonNull(changes, "changes");
+        RtpYamlConfig cfg = configForWrite(pluginDirectory, fileId, templateFileId);
+        for (PrefabApplier.Change change : changes) {
+            cfg.set(change.keyPath(), change.newValue());
+        }
+        return cfg.saveToString();
+    }
+
+    private static RtpYamlConfig configForWrite(File pluginDirectory, String fileId, String templateFileId)
+            throws IOException {
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        File target = resolveFile(pluginDirectory, fileId);
+        if (target.exists() && target.isFile()) {
+            RtpYamlConfig cfg = new RtpYamlConfig(target);
+            cfg.loadWithComments();
+            return cfg;
+        }
+        if (templateFileId != null) {
+            File template = resolveFile(pluginDirectory, templateFileId);
+            if (template.exists() && template.isFile()) {
+                RtpYamlConfig cfg = new RtpYamlConfig(template);
+                cfg.loadWithComments();
+                cfg.setConfigurationFile(target);
+                return cfg;
+            }
+        }
+        return new RtpYamlConfig(target);
     }
 
     /**
@@ -314,8 +331,8 @@ public final class PrefabDiskIO {
     @SuppressWarnings("unchecked")
     public static int resolveBakRetention() {
         try {
-            if (RTP.serverAccessor == null) return DEFAULT_BAK_RETENTION;
-            File pluginDir = RTP.serverAccessor.getPluginDirectory();
+            if (RTPRuntime.serverAccessor() == null) return DEFAULT_BAK_RETENTION;
+            File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
             if (pluginDir == null) return DEFAULT_BAK_RETENTION;
             Map<String, Object> perf = readLive(pluginDir, "advanced/performance");
             if (perf.isEmpty()) {

@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,12 +44,12 @@ class MultiConfigParserCoverageTest {
 
         RTPServerAccessor mockAccessor = mock(RTPServerAccessor.class);
         when(mockAccessor.getPluginDirectory()).thenReturn(pluginDir);
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     @Test
@@ -109,7 +109,7 @@ class MultiConfigParserCoverageTest {
         // 3. Lookup when world is present on serverAccessor -> constructs from default
         RTPWorld mockWorld = mock(RTPWorld.class);
         when(mockWorld.name()).thenReturn("known_world");
-        when(RTP.serverAccessor.getRTPWorld("KNOWN_WORLD")).thenReturn(mockWorld);
+        when(RTPRuntime.serverAccessor().getRTPWorld("KNOWN_WORLD")).thenReturn(mockWorld);
 
         ConfigParser<TestRegionKeys> worldParser = multiParser.getParser("known_world");
         assertNotNull(worldParser);

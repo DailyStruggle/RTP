@@ -5,6 +5,7 @@
 // Java 21 toolchain, JUnit 5, and Mockito are inherited from the root build.gradle subprojects block.
 
 dependencies {
+    api project(':bit-api')
     implementation 'org.jetbrains:annotations:24.1.0'
     // No runtime dependencies beyond the JDK: non-Anvil region formats (e.g. Linear) ship as
     // addons that register a RegionFileReader with RegionFormatRegistry (ADR-077).

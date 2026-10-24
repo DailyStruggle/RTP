@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.common.commands.admin;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
@@ -49,15 +51,15 @@ public class ClearQueueCmd extends PlayerTargetedClearCmd {
 
   @Override
   protected int clearAll() {
-    RTP rtp = RTP.getInstance();
-    if (rtp == null) return 0;
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return 0;
 
     // Snapshot every player currently represented in any queue structure so we
     // can report a count and cancel each in-flight attempt individually.
     java.util.Set<UUID> all = new java.util.LinkedHashSet<>();
-    all.addAll(rtp.queuedPlayers);
-    all.addAll(rtp.processingPlayers);
-    all.addAll(rtp.invulnerablePlayers.keySet());
+    all.addAll(TeleportSessions.current().queuedPlayers);
+    all.addAll(TeleportSessions.current().processingPlayers);
+    all.addAll(TeleportSessions.current().invulnerablePlayers.keySet());
     for (Region region : allRegions()) {
       RegionQueueManager qm = region.queueManager;
       if (qm == null) continue;
@@ -75,8 +77,8 @@ public class ClearQueueCmd extends PlayerTargetedClearCmd {
   @Override
   protected boolean clearOne(UUID uuid) {
     if (uuid == null) return false;
-    RTP rtp = RTP.getInstance();
-    if (rtp == null) return false;
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return false;
 
     boolean found = false;
 
@@ -103,20 +105,20 @@ public class ClearQueueCmd extends PlayerTargetedClearCmd {
     }
 
     // 2. Clear the global teleport-intent / mid-attempt markers.
-    if (rtp.queuedPlayers.remove(uuid)) found = true;
-    if (rtp.processingPlayers.remove(uuid)) found = true;
-    if (rtp.invulnerablePlayers.remove(uuid) != null) found = true;
+    if (TeleportSessions.current().queuedPlayers.remove(uuid)) found = true;
+    if (TeleportSessions.current().processingPlayers.remove(uuid)) found = true;
+    if (TeleportSessions.current().invulnerablePlayers.remove(uuid) != null) found = true;
 
     // 3. Cancel any in-flight teleport task through the normal cancel path so
     //    the failure is not silently swallowed (S-004) and reservations release.
-    TeleportData data = rtp.latestTeleportData.get(uuid);
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
     if (data != null && !data.completed && data.nextTask instanceof TeleportPipelineTask) {
       found = true;
       try {
         ((TeleportPipelineTask) data.nextTask).setCancelled(true);
-        RTP.scheduler.runTask(new RTPTeleportCancel(uuid));
+        RTPRuntime.scheduler().runTask(new RTPTeleportCancel(uuid));
       } catch (RuntimeException ex) {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[RTP] clear queue: failed to cancel in-flight teleport for " + uuid + ": " + ex.getMessage());
       }
@@ -128,9 +130,9 @@ public class ClearQueueCmd extends PlayerTargetedClearCmd {
   /** All live regions (permanent + per-world temp regions) currently loaded. */
   private static List<Region> allRegions() {
     List<Region> regions = new ArrayList<>();
-    if (RTP.selectionAPI != null) {
-      regions.addAll(RTP.selectionAPI.permRegionLookup.values());
-      regions.addAll(RTP.selectionAPI.tempRegions.values());
+    if (ActiveSelection.get() != null) {
+      regions.addAll(ActiveSelection.get().permRegionLookup.values());
+      regions.addAll(ActiveSelection.get().tempRegions.values());
     }
     return regions;
   }

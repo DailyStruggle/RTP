@@ -2,11 +2,16 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
+import io.github.dailystruggle.rtp.common.importer.ImportResult;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -48,8 +53,8 @@ class ConfigImportCmdExtendedTest {
   @Test
   void testImportNullDirectory() {
     ConfigImportCmd cmd = new ConfigImportCmd(null);
-    RTP.configs = null;
-    RTP.serverAccessor = null;
+    ActiveConfigs.set(null);
+    RTPRuntime.setServerAccessor(null);
     assertFalse(cmd.onCommand(UUID.randomUUID(), Collections.emptyMap(), null));
   }
 
@@ -79,6 +84,61 @@ class ConfigImportCmdExtendedTest {
         ConfigImportCmd.PARAM_PATH, List.of(tempDir.resolve("not_a_dir.txt").toString())
     );
     assertFalse(cmd.onCommand(UUID.randomUUID(), params, null));
+  }
+
+  @Test
+  void testImportRejectsBrokenConfigBeforeWritingDestination(@TempDir Path tempDir) throws IOException {
+    Path rtpDir = setupPluginDir(tempDir);
+    Path sourceDir = rtpDir.getParent().resolve("PbitRejectSource");
+    Files.createDirectories(sourceDir);
+    Files.writeString(sourceDir.resolve("config.yml"), "source: test\n");
+    List<Path> importerDestinations = new ArrayList<>();
+    Path destinationConfig = rtpDir.resolve("config.yml");
+    String originalConfig = Files.exists(destinationConfig) ? Files.readString(destinationConfig) : null;
+
+    ForeignConfigImporterRegistry.register(new ForeignConfigImporter() {
+      @Override
+      public String sourceName() {
+        return "pbit-rejection-test";
+      }
+
+      @Override
+      public boolean canImport(Path sourcePluginDir) {
+        return Files.isRegularFile(sourcePluginDir.resolve("config.yml"));
+      }
+
+      @Override
+      public ImportResult importConfiguration(Path sourcePluginDir, Path destinationDir, boolean overwrite) {
+        importerDestinations.add(destinationDir);
+        Path target = destinationDir.resolve("config.yml");
+        try {
+          Files.createDirectories(target.getParent());
+          Files.writeString(target, "broken: [yaml\n");
+          return ImportResult.success(sourceName(), List.of(target), List.of(), List.of("config.yml"));
+        } catch (IOException e) {
+          return ImportResult.failure(sourceName(), List.of(e.getMessage()), List.of());
+        }
+      }
+    });
+
+    ConfigImportCmd cmd = new ConfigImportCmd(null);
+    Map<String, List<String>> params = Map.of(
+        ConfigImportCmd.PARAM_SOURCE, List.of("pbit-rejection-test"),
+        ConfigImportCmd.PARAM_PATH, List.of(sourceDir.toString()),
+        ConfigImportCmd.PARAM_OVERWRITE, List.of("true"),
+        ConfigImportCmd.PARAM_PERMISSIONS, List.of("false")
+    );
+
+    assertTrue(cmd.onCommand(UUID.randomUUID(), params, null));
+    assertEquals(1, importerDestinations.size());
+    assertTrue(importerDestinations.get(0).startsWith(rtpDir.resolve("cache")),
+        "Import staging must stay under the RTP data directory cache");
+
+    if (originalConfig == null) {
+      assertFalse(Files.exists(destinationConfig), "Rejected importer output must not create config.yml");
+    } else {
+      assertEquals(originalConfig, Files.readString(destinationConfig), "Rejected importer output must not replace config.yml");
+    }
   }
 
   @Test

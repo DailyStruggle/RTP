@@ -2,7 +2,10 @@ package io.github.dailystruggle.rtp.bukkitplatform.network;
 
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.network.BackendStateSampler;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState;
 import org.bukkit.Bukkit;
@@ -21,7 +24,7 @@ import java.util.Set;
  * Bukkit/Paper/Folia implementation of {@link BackendStateSampler}.
  * Pulls TPS / MSPT / player count from the active
  * {@link io.github.dailystruggle.metrics.api.MetricsBinding} via
- * {@link RTP#metrics} and reads loaded worlds plus available regions from
+ * {@link CoreMetrics#instance()} and reads loaded worlds plus available regions from
  * the active {@link RTP} instance.
  *
  * <p>Pinned by rtp-proxy-ADR-011 section Backend Wiring. Lives in
@@ -42,7 +45,7 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
      * Lobby-mode flag. When {@code true}, heartbeats publish an
      * empty {@code regions} set and {@code acceptingRequests = false} so
      * peers never select this backend as a cross-server destination. The
-     * local {@code RTP.selectionAPI.permRegionLookup} contents are ignored
+     * local {@code ActiveSelection.get().permRegionLookup} contents are ignored
      * for advertisement purposes; the backend still serves local
      * {@code /rtp} calls when an operator-defined region exists, but the
      * network treats it as "dispatch-only".
@@ -80,7 +83,7 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
         long now = System.currentTimeMillis();
 
         // Metrics: best-effort. Before MetricsBindingDispatcher installs a real
-        // binding, RTP.metrics may report UNSAMPLED; we coerce to 0 / -1 so the
+        // binding, CoreMetrics.instance() may report UNSAMPLED; we coerce to 0 / -1 so the
         // schema's NOT NULL columns are still satisfied.
         double mspt;
         int playerCount;
@@ -88,7 +91,7 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
         long heapUsed;
         long heapMax;
         try {
-            MetricsSnapshot s = io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
+            MetricsSnapshot s = CoreMetrics.instance().snapshot();
             // MetricsSnapshot exposes public-final fields; UNSAMPLED == Double.NaN.
             mspt = s == null || Double.isNaN(s.mspt) ? 0.0 : s.mspt;
             playerCount = s == null ? 0 : s.playerCount;
@@ -119,7 +122,7 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
         try {
             RTP r = RTP.getInstance();
             if (r != null) {
-                queueDepth = r.processingPlayers.size();
+                queueDepth = TeleportSessions.current().processingPlayers.size();
             }
         } catch (Throwable ignored) {
             // Defensive.
@@ -165,7 +168,7 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
             try {
                 RTP r = RTP.getInstance();
                 if (r != null) {
-                    for (Region region : io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.values()) {
+                    for (Region region : ActiveSelection.get().permRegionLookup.values()) {
                         if (region == null || region.name == null) continue;
                         regions.add(region.name);
                         regionSet.add(region.name);

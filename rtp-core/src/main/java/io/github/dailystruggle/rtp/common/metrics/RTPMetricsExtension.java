@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
 import io.github.dailystruggle.metrics.api.RegionQueueRow;
+import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
+import io.github.dailystruggle.rtp.common.governor.GovernorSnapshot;
 import io.github.dailystruggle.rtp.common.selection.region.ImmediateGovernorRow;
 import io.github.dailystruggle.rtp.common.selection.region.LiveLoadGateRow;
 import io.github.dailystruggle.rtp.common.selection.region.ProbeGovernorRow;
@@ -32,6 +34,10 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
     public final Map<String, LiveLoadGateRow> liveLoadGates;
     /** ADR-114 on-demand chunk load governors keyed by region; empty until on-demand runs. */
     public final Map<String, ImmediateGovernorRow> immediateGovernors;
+    /** ADR-121 action-engine continuous counters captured with this metrics snapshot. */
+    public final ActionCbitCounters.Snapshot actionCbit;
+    /** ADR-087 adaptive compute governor telemetry snapshot captured with this metrics snapshot. */
+    public final GovernorSnapshot computeGovernor;
 
     /**
      * Backward-compatible constructor that leaves the ADR-053 audit counters at zero.
@@ -68,6 +74,8 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
         this.probeGovernors = immutableCopy(b.probeGovernors);
         this.liveLoadGates = immutableCopy(b.liveLoadGates);
         this.immediateGovernors = immutableCopy(b.immediateGovernors);
+        this.actionCbit = b.actionCbit == null ? ActionCbitCounters.Snapshot.EMPTY : b.actionCbit;
+        this.computeGovernor = b.computeGovernor == null ? GovernorSnapshot.EMPTY : b.computeGovernor;
     }
 
     /** Starts an extension with every counter at zero and every table empty. */
@@ -97,6 +105,8 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
         private Map<String, ProbeGovernorRow> probeGovernors;
         private Map<String, LiveLoadGateRow> liveLoadGates;
         private Map<String, ImmediateGovernorRow> immediateGovernors;
+        private ActionCbitCounters.Snapshot actionCbit = ActionCbitCounters.Snapshot.EMPTY;
+        private GovernorSnapshot computeGovernor = GovernorSnapshot.EMPTY;
 
         private Builder() {
         }
@@ -165,6 +175,16 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
             return this;
         }
 
+        public Builder actionCbit(ActionCbitCounters.Snapshot v) {
+            actionCbit = v;
+            return this;
+        }
+
+        public Builder computeGovernor(GovernorSnapshot v) {
+            computeGovernor = v;
+            return this;
+        }
+
         public RTPMetricsExtension build() {
             return new RTPMetricsExtension(this);
         }
@@ -187,6 +207,7 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
                 + ", probeGovernors=" + probeGovernors
                 + ", liveLoadGates=" + liveLoadGates
                 + ", immediateGovernors=" + immediateGovernors
+                + ", actionCbit=" + actionCbit
                 + '}';
     }
 }

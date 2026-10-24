@@ -4,12 +4,14 @@ import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.pvp.PvPGate;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -47,7 +49,7 @@ class TeleportPipelineTaskBranchTest {
         world = new TrackedMockWorld("branch_test_world");
         accessor.addWorld(world);
 
-        RTP.getInstance().databaseAccessor = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class));
 
         RegionSettings settings = new RegionSettings(
                 "branch_reg",
@@ -78,14 +80,14 @@ class TeleportPipelineTaskBranchTest {
         TeleportPipelineTask.cleanupPreActions.clear();
         TeleportPipelineTask.cleanupPostActions.clear();
 
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
-        RTP.deathEffectInFlight.clear();
-        RTP.pendingDeathTeleports.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
+        DeathTeleports.effectInFlight().clear();
+        DeathTeleports.pending().clear();
         PvPGate.nativeTracker().clearAll();
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
         if (safety != null) {
             safety.set(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.pvpCheckEnabled, false);
             safety.set(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.pvpOnCombat, "DENY");
@@ -107,8 +109,8 @@ class TeleportPipelineTaskBranchTest {
         data.nextTask = task;
         setField(task, "teleportData", data);
 
-        RTP.deathEffectInFlight.add(pid);
-        RTP.pendingDeathTeleports.put(pid, task);
+        DeathTeleports.effectInFlight().add(pid);
+        DeathTeleports.pending().put(pid, task);
 
         // Turn on lockAfterUses & postTeleportQueueing to exercise those branches
         long oldUses = TeleportPipelineTask.ConfigCache.lockAfterUses;
@@ -121,8 +123,8 @@ class TeleportPipelineTaskBranchTest {
             task.completeDeathTeleport(true);
 
             assertTrue(data.completed);
-            assertFalse(RTP.deathEffectInFlight.contains(pid));
-            assertFalse(RTP.pendingDeathTeleports.containsKey(pid));
+            assertFalse(DeathTeleports.effectInFlight().contains(pid));
+            assertFalse(DeathTeleports.pending().containsKey(pid));
             assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
         } finally {
             TeleportPipelineTask.ConfigCache.lockAfterUses = oldUses;
@@ -144,14 +146,14 @@ class TeleportPipelineTaskBranchTest {
         data.time = System.currentTimeMillis();
         setField(task, "teleportData", data);
 
-        RTP.deathEffectInFlight.add(pid);
-        RTP.pendingDeathTeleports.put(pid, task);
+        DeathTeleports.effectInFlight().add(pid);
+        DeathTeleports.pending().put(pid, task);
 
         task.completeDeathTeleport(false);
 
         assertFalse(data.completed);
-        assertFalse(RTP.deathEffectInFlight.contains(pid));
-        assertFalse(RTP.pendingDeathTeleports.containsKey(pid));
+        assertFalse(DeathTeleports.effectInFlight().contains(pid));
+        assertFalse(DeathTeleports.pending().containsKey(pid));
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
     }
 
@@ -168,11 +170,11 @@ class TeleportPipelineTaskBranchTest {
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis();
         setField(task, "teleportData", data);
-        RTP.getInstance().processingPlayers.add(pid);
+        TeleportSessions.current().processingPlayers.add(pid);
 
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
         assertNotNull(safety);
         safety.set(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.pvpCheckEnabled, true);
         safety.set(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.pvpOnCombat, "DENY");
@@ -186,7 +188,7 @@ class TeleportPipelineTaskBranchTest {
         runTeleport.invoke(task);
 
         assertFalse(data.completed);
-        assertFalse(RTP.getInstance().processingPlayers.contains(pid));
+        assertFalse(TeleportSessions.current().processingPlayers.contains(pid));
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
     }
 
@@ -279,7 +281,7 @@ class TeleportPipelineTaskBranchTest {
 
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> cfg =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
         if (cfg != null) {
             cfg.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.setRespawnOnTeleport, true);
         }

@@ -2,12 +2,16 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
@@ -84,13 +88,13 @@ class EditorSessionManagerBranchCoverageTest {
         File dir = tempDir.resolve("plugins/RTP").toFile();
         dir.mkdirs();
         RTPTestSetup.install(dir);
-        pluginDir = RTP.serverAccessor.getPluginDirectory().toPath();
+        pluginDir = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
         WorldBiomeStore.clearForTests();
     }
 
     @AfterEach
     void tearDown() {
-        if (RTP.selectionAPI != null) addedRegions.forEach(RTP.selectionAPI.permRegionLookup::remove);
+        if (ActiveSelection.get() != null) addedRegions.forEach(ActiveSelection.get().permRegionLookup::remove);
         Factory<Shape<?>> shapes = shapes();
         addedShapes.forEach(shapes::remove);
         WorldBiomeStore.clearForTests();
@@ -99,10 +103,10 @@ class EditorSessionManagerBranchCoverageTest {
 
     @SuppressWarnings("unchecked")
     private static Factory<Shape<?>> shapes() {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapes = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapes == null) {
             shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
+            FactoryRegistry.map().put(FactoryNames.shape, shapes);
         }
         return shapes;
     }
@@ -123,7 +127,7 @@ class EditorSessionManagerBranchCoverageTest {
 
     private Region register(String name, Shape<?> shape, MockRTPWorld world) {
         Region r = region(name, shape, world);
-        RTP.selectionAPI.permRegionLookup.put(name, r);
+        ActiveSelection.get().permRegionLookup.put(name, r);
         addedRegions.add(name);
         return r;
     }
@@ -463,20 +467,20 @@ class EditorSessionManagerBranchCoverageTest {
     @DisplayName("collectCurrentConfigs fails closed before init and returns empty without a plugin folder")
     void collectFailClosedAndMissingDir() {
         EditorSessionManager m = new EditorSessionManager();
-        Configs configs = RTP.configs;
-        RTP.configs = null;
+        Configs configs = ActiveConfigs.get();
+        ActiveConfigs.set(null);
         try {
             assertThrows(IllegalStateException.class, m::collectCurrentConfigs);
             assertThrows(IllegalStateException.class, m::createPayloadJson);
         } finally {
-            RTP.configs = configs;
+            ActiveConfigs.set(configs);
         }
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
-        RTP.serverAccessor = new MockRTPServerAccessor(tempDir.resolve("does-not-exist").toFile());
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
+        RTPRuntime.setServerAccessor(new MockRTPServerAccessor(tempDir.resolve("does-not-exist").toFile()));
         try {
             assertTrue(m.collectCurrentConfigs().isEmpty());
         } finally {
-            RTP.serverAccessor = accessor;
+            RTPRuntime.setServerAccessor(accessor);
         }
     }
 
@@ -503,15 +507,15 @@ class EditorSessionManagerBranchCoverageTest {
     @DisplayName("applyPayload fails closed before init (S-006)")
     void applyFailClosed() {
         EditorSessionManager m = new EditorSessionManager();
-        Configs configs = RTP.configs;
-        RTP.configs = null;
+        Configs configs = ActiveConfigs.get();
+        ActiveConfigs.set(null);
         try {
             CompletableFuture<Void> f = m.applyPayload("{}");
             assertTrue(f.isCompletedExceptionally());
             ExecutionException e = assertThrows(ExecutionException.class, f::get);
             assertInstanceOf(IllegalStateException.class, e.getCause());
         } finally {
-            RTP.configs = configs;
+            ActiveConfigs.set(configs);
         }
     }
 

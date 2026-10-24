@@ -15,10 +15,10 @@ import io.github.dailystruggle.rtp.api.schematic.PasteResult;
 import io.github.dailystruggle.rtp.api.schematic.SchematicPlacementPlanner;
 import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabSchematicInstaller;
 import io.github.dailystruggle.rtp.common.commands.prefab.Skyblock;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -57,12 +57,12 @@ class RegionSchematicServiceTest {
   @BeforeEach
   void setUp() throws Exception {
     pluginDir = Files.createTempDirectory("rtp-adr058").toFile();
-    RTP.serverAccessor = new MockRTPServerAccessor(pluginDir);
+    RTPRuntime.setServerAccessor(new MockRTPServerAccessor(pluginDir));
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = null;
+    RTPRuntime.setServerAccessor(null);
   }
 
   private void installFixture(String regionName) throws Exception {

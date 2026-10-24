@@ -1,5 +1,5 @@
 # --- RTP 공간 메모리 TTL 설정 ---
-# 문서: plugins/RTP/docs/admin/configuration/TTL.md
+# 문서: docs/admin/configuration/TTL.md
 
 # 공간 메모리에서 거부된 좌표 실행의 기본 보존 기간.
 # 지원 기간 형식: 예 14d, 12h, 30m, 3600s, 40t, 2500ms 또는 복합 형식 1d12h.

@@ -8,9 +8,11 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.api.server.ProgressBar;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
+import io.github.dailystruggle.rtp.common.mock.RuntimeMockRTPPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.permissions.PermissionAttachment;
@@ -57,22 +59,64 @@ class BukkitServerAccessorTest {
 
     @BeforeEach
     void setUp() {
+        MockPlayerRegistry.clear();
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin();
         accessor = new TestBukkitServerAccessor();
         accessor.start(plugin);
         RTPAPI.serverAccessor = accessor;
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
     }
 
     @AfterEach
     void tearDown() {
         RTPAPI.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
         if (accessor != null) {
             accessor.stop();
         }
         MockBukkit.unmock();
+        MockPlayerRegistry.clear();
+    }
+
+    @Test
+    @DisplayName("ADR-121: registered BIT mock resolves before native lookup and is absent from online lists")
+    void registeredMockResolvesBeforeNativeLookup() {
+        PlayerMock alice = server.addPlayer("Alice");
+        UUID mockId = UUID.randomUUID();
+        RuntimeMockRTPPlayer mock = new RuntimeMockRTPPlayer(mockId, "rtp-bit-0a1b2c3d", null);
+        MockPlayerRegistry.register(mock);
+
+        assertSame(mock, accessor.getPlayer(mockId));
+        assertSame(mock, accessor.getPlayer("RTP-BIT-0A1B2C3D"));
+        assertSame(mock, accessor.getSender(mockId));
+
+        Set<String> names = accessor.getOnlinePlayerNames();
+        assertFalse(names.contains("rtp-bit-0a1b2c3d"));
+        assertTrue(names.contains("Alice"));
+        assertTrue(accessor.getOnlinePlayers().stream().noneMatch(p -> mockId.equals(p.uuid())));
+        assertEquals(1, accessor.getOnlinePlayers().size());
+
+        // Native players still resolve natively while a mock is registered.
+        RTPPlayer nativeAlice = accessor.getPlayer(alice.getUniqueId());
+        assertNotNull(nativeAlice);
+        assertNotSame(mock, nativeAlice);
+    }
+
+    @Test
+    @DisplayName("ADR-121: after unregister, lookups fall back to native behaviour")
+    void unregisteredMockFallsBackToNative() {
+        UUID mockId = UUID.randomUUID();
+        RuntimeMockRTPPlayer mock = new RuntimeMockRTPPlayer(mockId, "rtp-bit-0a1b2c3d", null);
+        MockPlayerRegistry.register(mock);
+        MockPlayerRegistry.unregister(mockId);
+
+        assertNull(accessor.getPlayer(mockId));
+        assertNull(accessor.getPlayer("rtp-bit-0a1b2c3d"));
+        RTPCommandSender sender = accessor.getSender(mockId);
+        assertNotNull(sender);
+        assertNotSame(mock, sender);
+        assertFalse(sender instanceof RuntimeMockRTPPlayer);
     }
 
     @Test

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 
@@ -13,7 +13,7 @@ import java.util.logging.Level;
  * Backend heartbeat loop: periodically samples {@link BackendHeartbeat} state
  * and publishes it via {@link NetworkTransport#publishBackendHeartbeat}.
  *
- * <p>Uses {@link RTP#scheduler} async timers for Folia safety. Exceptions during
+ * <p>Uses {@link RTPRuntime#scheduler()} async timers for Folia safety. Exceptions during
  * sampling or publishing are logged and isolated so ticks continue.
  */
 public final class BackendStatePublisher {
@@ -36,7 +36,7 @@ public final class BackendStatePublisher {
 
     /**
      * Platform-scheduler task handle for the periodic tick.
-     * Stored so {@link #stop()} can cancel via {@code RTP.scheduler.cancelTask}.
+     * Stored so {@link #stop()} can cancel via {@code RTPRuntime.scheduler().cancelTask}.
      */
     private volatile Object task;
 
@@ -64,18 +64,18 @@ public final class BackendStatePublisher {
     /** Start the periodic tick. Idempotent. */
     public void start() {
         if (!started.compareAndSet(false, true)) return;
-        if (RTP.scheduler == null) {
+        if (RTPRuntime.scheduler() == null) {
             // No scheduler installed (e.g. early boot path on an adapter that
-            // wires the publisher before RTP.scheduler is assigned). Caller
+            // wires the publisher before RTPRuntime.scheduler() is assigned). Caller
             // can drive tick() manually; do not silently no-op forever.
-            RTP.log(java.util.logging.Level.WARNING,
+            RTPRuntime.log(java.util.logging.Level.WARNING,
                     "[RTP] BackendStatePublisher.start(): RTP.scheduler is null; "
                             + "periodic tick disabled for server=" + serverId);
             return;
         }
         // Convert intervalMs to server ticks (1 tick == 50 ms), clamped >= 1.
         long periodTicks = Math.max(1L, intervalMs / 50L);
-        this.task = RTP.scheduler.runTaskTimerAsynchronously(this::tick, periodTicks, periodTicks);
+        this.task = RTPRuntime.scheduler().runTaskTimerAsynchronously(this::tick, periodTicks, periodTicks);
     }
 
     /** Stop the periodic tick and release the scheduler handle. Idempotent. */
@@ -83,8 +83,8 @@ public final class BackendStatePublisher {
         if (!stopped.compareAndSet(false, true)) return;
         Object t = this.task;
         this.task = null;
-        if (t != null && RTP.scheduler != null) {
-            try { RTP.scheduler.cancelTask(t); }
+        if (t != null && RTPRuntime.scheduler() != null) {
+            try { RTPRuntime.scheduler().cancelTask(t); }
             catch (Throwable ignored) { /* best-effort */ }
         }
     }
@@ -106,13 +106,13 @@ public final class BackendStatePublisher {
             // a FINE line here (gated by advanced/logging.yml) confirming the
             // loop is alive and what it just published. Kept off INFO so it does
             // not spam at the heartbeat cadence.
-            RTP.log(Level.FINE, "[RTP] BackendStatePublisher published heartbeat #"
+            RTPRuntime.log(Level.FINE, "[RTP] BackendStatePublisher published heartbeat #"
                     + publishedCount.incrementAndGet() + " for server=" + serverId
                     + " (players=" + row.playerCount() + ", kept=" + row.keptCount()
                     + ", accepting=" + row.acceptingRequests() + ")");
         } catch (RuntimeException e) {
-            // RTP.log routes through the canonical accessor; safe to call here.
-            io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING,
+            // RTPRuntime.log routes through the canonical accessor; safe to call here.
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(java.util.logging.Level.WARNING,
                     "[RTP] BackendStatePublisher tick failed: " + e.getMessage(), e);
         }
     }

@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +18,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -25,6 +28,21 @@ import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
 
 public class BukkitRTPWorld extends RTPWorld<World> {
+  /** Server-wide count of live loads the chunk system is still working on (see GenerationBudget). */
+  private static final io.github.dailystruggle.rtp.common.tools.GenerationBudget GENERATION_BUDGET =
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.server();
+
+  static {
+    io.github.dailystruggle.rtp.common.tools.GenerationBudget.configureServerCap(() -> {
+      try {
+        return io.github.dailystruggle.rtp.common.tools.GenerationBudget.capFor(
+            org.bukkit.Bukkit.getBukkitVersion());
+      } catch (Throwable t) {
+        return io.github.dailystruggle.rtp.common.tools.GenerationBudget.VANILLA_CAP;
+      }
+    });
+  }
+
   private static final AtomicBoolean biomeException = new AtomicBoolean(false);
   private static Function<Location, String> getBiome =
       location -> {
@@ -36,6 +54,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           int z = location.getBlockZ();
           return world.getBiome(x, y, z).name();
         } catch (Throwable t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+              "World#getBiome", t.getClass().getSimpleName() + ": " + t.getMessage());
           return Biome.PLAINS.name();
         }
       };
@@ -192,7 +212,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-    return resolveChunkKey(cx, cz, true);
+    return resolveChunkKey(cx, cz, true,
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.currentReservation());
   }
 
   /**
@@ -201,10 +222,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    */
   @Override
   public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
-    return resolveChunkKey(cx, cz, false);
+    return resolveChunkKey(cx, cz, false, null);
   }
 
-  private CompletableFuture<Long> resolveChunkKey(int cx, int cz, boolean allowLive) {
+  private CompletableFuture<Long> resolveChunkKey(
+      int cx, int cz, boolean allowLive,
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
     // ADR-016 - Anvil read-only data source (no longer a gate).
@@ -239,9 +262,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       String dim = dimensionRegionSubpath(world);
       return anvilProbeSupport
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
-              s -> (RTP.serverAccessor != null)
-                  ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
-                  : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(s))
+              s -> (RTPRuntime.serverAccessor() != null)
+                  ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
+                  : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s))
           .thenCompose(result -> {
             io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
             if (view != null) {
@@ -256,12 +279,14 @@ public class BukkitRTPWorld extends RTPWorld<World> {
               return CompletableFuture.completedFuture(key);
             }
             // No view available (UNKNOWN) → live load is authoritative.
-            return allowLive ? loadChunkFuture(cx, cz, key) : CompletableFuture.completedFuture(null);
+            return allowLive
+                ? loadChunkFuture(cx, cz, key, generationSlot)
+                : CompletableFuture.completedFuture(null);
           });
     }
 
     if (!allowLive && !isResident(cx, cz)) return CompletableFuture.completedFuture(null);
-    return loadChunkFuture(cx, cz, key);
+    return loadChunkFuture(cx, cz, key, generationSlot);
   }
 
   private boolean isResident(int cx, int cz) {
@@ -281,7 +306,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    */
   public CompletableFuture<Long> loadLiveChunk(int cx, int cz) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
-    return loadChunkFuture(cx, cz, key);
+    return loadChunkFuture(cx, cz, key,
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.currentReservation());
   }
 
   /**
@@ -321,8 +347,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
-                s -> (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                s -> (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                     : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
       } catch (Throwable t) {
         RTP.log(java.util.logging.Level.FINE,
@@ -476,7 +502,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     }
     try {
       ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+          (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null) return true; // Config not available yet - default-on.
       Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
       boolean enabled;
@@ -568,8 +594,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @SuppressWarnings("unchecked")
   private static java.util.Set<String> currentUnsafeBlocks() {
     try {
-      if (RTP.configs == null) return java.util.Collections.emptySet();
-      Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (ActiveConfigs.get() == null) return java.util.Collections.emptySet();
+      Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
       if (raw instanceof java.util.Collection<?> c) {
         java.util.Set<String> out = new java.util.HashSet<>(c.size());
         for (Object o : c) if (o != null) out.add(o.toString());
@@ -590,7 +616,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * {@link World#getChunkAt(int, int)} fallback exists (S-005). Each edge is logged at
    * {@code WARNING}; the API-absent edge once per world (REQ-RTP-S-004).
    */
-  private CompletableFuture<Long> loadChunkFuture(int cx, int cz, long key) {
+  private CompletableFuture<Long> loadChunkFuture(
+      int cx, int cz, long key,
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
     // Count only actual live chunk-load attempts dispatched to the chunk system.
     // Probe-only paths (ADR-016 anvil pre-filter) and probe-cache hits MUST NOT bump
     // this counter - see the Javadoc on RTPWorld.totalChunkLoads. This avoids the
@@ -615,7 +643,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // fork implements true async generation (Paper/Folia). On vanilla Spigot the
     // scheduling still resolves on the main thread internally, but the caller is
     // not blocked - a strict improvement over the previous runTask+getChunkAt path.
-    return profileChunkLoad(requestChunkAsync(cx, cz, key), chunkLoadStartNanos, chunkGenerated);
+    // requestChunkAsync never returns null and releases generationSlot on every edge.
+    CompletableFuture<Long> load = requestChunkAsync(cx, cz, key, generationSlot);
+    return profileChunkLoad(load, chunkLoadStartNanos, chunkGenerated);
   }
 
   /**
@@ -623,12 +653,19 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * with {@code key} on success; every failure edge logs and completes with {@code null}.
    * Never completes exceptionally; never calls {@link World#getChunkAt(int, int)} (S-005).
    */
-  private CompletableFuture<Long> requestChunkAsync(int cx, int cz, long key) {
+  private CompletableFuture<Long> requestChunkAsync(
+      int cx, int cz, long key,
+      io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
     if (CHUNK_AT_ASYNC_FUTURE != null) {
+      // Counted until the server's future settles; Spigot's scheduler holds background fill
+      // back at the cap (GenerationBudget). Paper/Folia count too but never report saturation.
+      final Runnable releaseGeneration = GENERATION_BUDGET.begin(generationSlot);
       try {
         @SuppressWarnings("unchecked")
         CompletableFuture<org.bukkit.Chunk> asyncFuture =
             (CompletableFuture<org.bukkit.Chunk>) CHUNK_AT_ASYNC_FUTURE.invoke(world, cx, cz);
+        if (asyncFuture == null) releaseGeneration.run();
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.releaseOn(asyncFuture, releaseGeneration);
         if (asyncFuture != null) {
           CompletableFuture<Long> out = new CompletableFuture<>();
           asyncFuture.whenComplete((chunk, ex) -> {
@@ -656,6 +693,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
             "[RTP] Reflective async chunk API returned null for world=" + name + " chunk=("
                 + cx + "," + cz + ") - candidate rejected (no synchronous fallback, S-005)");
       } catch (Throwable t) {
+        releaseGeneration.run();
         // Test doubles (e.g. MockBukkit) or old forks may not honor the async API.
         RTP.log(java.util.logging.Level.WARNING,
             "[RTP] Reflective async chunk API failed for world=" + name + " chunk=(" + cx
@@ -663,10 +701,13 @@ public class BukkitRTPWorld extends RTPWorld<World> {
                 + " - candidate rejected (no synchronous fallback, S-005)");
       }
     } else if (asyncApiAbsentWarned.compareAndSet(false, true)) {
+      if (generationSlot != null) generationSlot.close();
       RTP.log(java.util.logging.Level.WARNING,
           "[RTP] World#getChunkAtAsync(int,int) CompletableFuture API is unavailable on this"
               + " server; unloaded chunks in world=" + name + " are rejected instead of loaded"
               + " synchronously (S-005). Pre-generate the world or use Paper/Folia.");
+    } else if (generationSlot != null) {
+      generationSlot.close();
     }
     return CompletableFuture.completedFuture(null);
   }
@@ -813,7 +854,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       }
     };
     io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
-        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+        RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getScheduler();
     if (scheduler != null) {
       scheduler.runTask(this, cx, cz, applyTicket);
     } else {
@@ -825,7 +866,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @Override
   public java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount() {
     java.util.concurrent.CompletableFuture<Integer> future = new java.util.concurrent.CompletableFuture<>();
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler().runTask(() -> {
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor().getScheduler().runTask(() -> {
       org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
       if (plugin == null) {
         future.complete(0);
@@ -877,9 +918,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     if (view != null) {
       int cx = (int) (key & 0xffffffffL);
       int cz = (int) (key >> 32);
-      java.util.Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+      java.util.Set<String> reconciled = (RTPRuntime.serverAccessor() != null)
+          ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
+          : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
       return new BukkitRTPChunk(view, cx, cz, id, reconciled);
     }
     return null;
@@ -888,11 +929,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @Override
   public RTPChunk<?> createChunk(Object preformedData, int cx, int cz, Set<String> reconciledUnsafe) {
     if (preformedData instanceof io.github.dailystruggle.rtp.anvil.AnvilChunkView view) {
-      java.util.Set<String> reconciled = (reconciledUnsafe != null)
-          ? reconciledUnsafe
-          : ((RTP.serverAccessor != null)
-              ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
-              : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks()));
+      java.util.Set<String> reconciled = reconciledUnsafe;
+      if (reconciled == null) {
+        reconciled = RTPRuntime.serverAccessor() != null
+            ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
+            : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+      }
       return new BukkitRTPChunk(view, cx, cz, id, reconciled);
     }
     throw new IllegalArgumentException("Unsupported preformed chunk data: " + (preformedData == null ? "null" : preformedData.getClass().getName()));
@@ -906,7 +948,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // Ticket only once resident; failures keep nothing and are logged (S-004). API-absent edge
     // is already logged once per world by requestChunkAsync.
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
-    requestChunkAsync(cx, cz, key).whenComplete((k, ex) -> {
+    requestChunkAsync(cx, cz, key, null).whenComplete((k, ex) -> {
       if (ex != null || k == null) {
         if (CHUNK_AT_ASYNC_FUTURE != null) {
           RTP.log(java.util.logging.Level.WARNING,
@@ -928,7 +970,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public void forgetChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {
+    RTPRuntime.scheduler().runTask(this, cx, cz, () -> {
       setForceLoaded(cx, cz, false);
       chunkCache.remove(((long) cx & 0xffffffffL | ((long) cz << 32)));
     });
@@ -1107,7 +1149,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   public void platform(RTPLocation location) {
     try {
       if (world == null) return;
-      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null) return;
       int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
       // Honour the documented "disable platforms" contract from safety.yml (platformRadius: -1).
@@ -1117,7 +1159,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
       // ADR-060: optional block-restoration timeout. -1 (default) keeps the platform permanent
       // and skips diff capture entirely (zero added cost).
-      int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
+      long restoreDurationSeconds = safety.getDuration(SafetyKeys.platformRestoreSeconds,
+          TemporalUnit.SECOND, TemporalUnit.SECOND, -1L);
+      int restoreSeconds = (int) Math.max(Integer.MIN_VALUE,
+          Math.min(Integer.MAX_VALUE, restoreDurationSeconds));
       Object rawMat = safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS");
       Material material = BukkitMaterialResolver.resolve(
           rawMat != null ? rawMat.toString() : "GLASS",
@@ -1196,9 +1241,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @Override
   public void save() {
     // World.save() is main-thread only on Spigot/Paper (AsyncCatcher will throw otherwise).
-    // ScanTask.wrapUpBatch invokes us from an async worker; RTP.scheduler.runTask
+    // ScanTask.wrapUpBatch invokes us from an async worker; RTPRuntime.scheduler().runTask
     // executes inline when already on the primary thread, otherwise schedules to it.
-    RTP.scheduler.runTask(() -> world.save());
+    RTPRuntime.scheduler().runTask(world::save);
   }
 
   @Override

@@ -32,7 +32,7 @@ import java.util.logging.Logger;
  * {@code ScheduledExecutorService} that calls {@link #runPulse()} on its
  * own cadence. Reasons:</p>
  * <ul>
- *   <li>Proxy JVMs cannot reach {@code RTP.scheduler} (it lives in the
+ *   <li>Proxy JVMs cannot reach {@code RTPRuntime.scheduler()} (it lives in the
  *       backend plugin), so a "scheduler" carve-out is legitimate per
  *       AGENTS.md "Scheduler Usage" section but kept at the adapter layer
  *       rather than common.</li>

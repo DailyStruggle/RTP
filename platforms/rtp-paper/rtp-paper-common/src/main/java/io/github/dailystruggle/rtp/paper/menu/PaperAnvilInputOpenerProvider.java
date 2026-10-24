@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.paper.menu;
 
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
+import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.menu.AnvilInputOpenerProvider;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;

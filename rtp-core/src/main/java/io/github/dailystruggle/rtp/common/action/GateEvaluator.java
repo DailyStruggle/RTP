@@ -1,8 +1,12 @@
 package io.github.dailystruggle.rtp.common.action;
 
+import io.github.dailystruggle.bit.Vocabulary;
+
 import io.github.dailystruggle.rtp.api.action.ActionGateContext;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +35,52 @@ import java.util.regex.Pattern;
  */
 public final class GateEvaluator {
 
+  private static final String OBJECTIVE_KEY = "objective";
+  private static final String PREDICATE_GATE = "predicate";
+  private static final String SCOREBOARD_GATE = "scoreboard";
+  private static final String SPATIAL_GATE = "spatial";
+  private static final String PLAYERS_GATE = "players";
+  private static final String EXECUTE_KEY = "execute";
+  private static final String REMAINING_KEY = "remaining";
+  private static final String WITHIN_BOUNDARY_KEY = "withinBoundary";
+  private static final String WORLD_KEY = "world";
+  private static final String PARTICIPANTS_GATE = "participants";
+  private static final String QUEUE_GATE = "queue";
+  private static final String COUNT_KEY = "count";
+  private static final String ELEVATION_DELTA_KEY = "elevationDelta";
+  private static final String DISTANCE_KEY = "distance";
+  private static final String ELAPSED_KEY = "elapsed";
+  private static final String COMMAND_GATE = "command";
+  private static final String TARGET_KEY = "target";
+  private static final String PARTICIPANT_COUNT_GATE = "participantcount";
+  private static final String PLAYER_COUNT_KEY = "playerCount";
+  private static final String SHAPE_KEY = "shape";
+  private static final String MATCHES_KEY = "matches";
+  private static final String RANGE_KEY = "range";
+  private static final String REGION_KEY = "region";
+
+  public static final Vocabulary GATE_TYPES = new Vocabulary("gate type", List.of(
+      SCOREBOARD_GATE, SPATIAL_GATE, "time", PREDICATE_GATE, PLAYERS_GATE,
+      PARTICIPANTS_GATE, QUEUE_GATE, PARTICIPANT_COUNT_GATE, COMMAND_GATE));
+  public static final Map<String, Set<String>> GATE_SUB_KEYS = Map.of(
+      SCOREBOARD_GATE, Set.of(OBJECTIVE_KEY, MATCHES_KEY, RANGE_KEY),
+      SPATIAL_GATE, Set.of(WITHIN_BOUNDARY_KEY, DISTANCE_KEY, TARGET_KEY, ELEVATION_DELTA_KEY,
+          SHAPE_KEY, REGION_KEY, PLAYER_COUNT_KEY, WORLD_KEY),
+      "time", Set.of(ELAPSED_KEY, REMAINING_KEY),
+      PREDICATE_GATE, Set.of(),
+      PLAYERS_GATE, Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY),
+      PARTICIPANTS_GATE, Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY),
+      QUEUE_GATE, Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY),
+      PARTICIPANT_COUNT_GATE, Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY),
+      COMMAND_GATE, Set.of(EXECUTE_KEY, "run"));
+  public static final Map<String, List<Set<String>>> GATE_REQUIRED_SUB_KEYS = Map.of(
+      SCOREBOARD_GATE, List.of(Set.of(OBJECTIVE_KEY), Set.of(MATCHES_KEY, RANGE_KEY)),
+      PLAYERS_GATE, List.of(Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY)),
+      PARTICIPANTS_GATE, List.of(Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY)),
+      QUEUE_GATE, List.of(Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY)),
+      PARTICIPANT_COUNT_GATE, List.of(Set.of(MATCHES_KEY, RANGE_KEY, COUNT_KEY)),
+      COMMAND_GATE, List.of(Set.of(EXECUTE_KEY, "run")));
+
   private static final Pattern COORD_SEPARATORS = Pattern.compile("[,\\s]+");
 
   private GateEvaluator() {}
@@ -42,27 +92,25 @@ public final class GateEvaluator {
   public static boolean requiresMultipleParticipants(List<Map<String, Object>> gates) {
     if (gates == null || gates.isEmpty()) return false;
     for (Map<String, Object> gateConfig : gates) {
-      if (gateConfig == null || gateConfig.isEmpty()) continue;
-      for (Map.Entry<String, Object> entry : gateConfig.entrySet()) {
-        String key = entry.getKey().toLowerCase();
-        if (key.equals("players") || key.equals("participants") || key.equals("queue") || key.equals("participantcount")) {
-          Object val = entry.getValue();
-          String matchExpr = null;
-          if (val instanceof Map<?, ?> m) {
-            Object matches = m.get("matches");
-            if (matches == null) matches = m.get("range");
-            if (matches == null) matches = m.get("count");
-            if (matches != null) matchExpr = matches.toString();
-          } else if (val != null) {
-            matchExpr = val.toString();
-          }
-          if (matchExpr != null && !matchExpr.isBlank() && !GateExpressionParser.matches(matchExpr, 1.0)) {
-            return true;
-          }
-        }
-      }
+      if (requiresMultipleParticipants(gateConfig)) return true;
     }
     return false;
+  }
+
+  private static boolean requiresMultipleParticipants(Map<String, Object> gateConfig) {
+    if (gateConfig == null || gateConfig.isEmpty()) return false;
+    for (Map.Entry<String, Object> entry : gateConfig.entrySet()) {
+      if (!isParticipantCountGate(entry.getKey().toLowerCase())) continue;
+      String expression = participantCountExpression(entry.getValue());
+      if (expression != null && !expression.isBlank()
+          && !GateExpressionParser.matches(expression, 1.0)) return true;
+    }
+    return false;
+  }
+
+  private static boolean isParticipantCountGate(String gateType) {
+    return gateType.equals(PLAYERS_GATE) || gateType.equals(PARTICIPANTS_GATE)
+        || gateType.equals(QUEUE_GATE) || gateType.equals(PARTICIPANT_COUNT_GATE);
   }
 
   /**
@@ -73,9 +121,22 @@ public final class GateEvaluator {
       ActionGateContext context,
       Map<String, Predicate<ActionGateContext>> externalPredicates,
       Map<String, Object> additionalTokens) {
+    return evaluateAll(gates, context, externalPredicates, additionalTokens, null);
+  }
+
+  static boolean evaluateAll(
+      List<Map<String, Object>> gates,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Map<String, Object> additionalTokens,
+      GateTrace trace) {
     if (context != null && context.context() != null) {
       for (Predicate<ActionGateContext> validator : context.context().gateValidators()) {
         if (validator != null && !validator.test(context)) {
+          if (trace != null) {
+            trace.onOutcome(Map.of("context", "validator"), false,
+                "A caller-supplied context validator rejected the action.");
+          }
           return false;
         }
       }
@@ -84,7 +145,7 @@ public final class GateEvaluator {
       return true;
     }
     for (Map<String, Object> gateConfig : gates) {
-      if (!evaluate(gateConfig, context, externalPredicates, additionalTokens)) {
+      if (!evaluate(gateConfig, context, externalPredicates, additionalTokens, trace)) {
         return false;
       }
     }
@@ -115,286 +176,363 @@ public final class GateEvaluator {
    * @param additionalTokens   context tokens for placeholder substitution
    * @return true if all defined conditions pass, false if any fails or an unknown gate is encountered
    */
-  @SuppressWarnings("unchecked")
-  public static boolean evaluate(
+  static boolean evaluate(
       Map<String, Object> gateConfig,
       ActionGateContext context,
       Map<String, Predicate<ActionGateContext>> externalPredicates,
       Map<String, Object> additionalTokens) {
-    if (context != null && context.context() != null) {
-      for (Predicate<ActionGateContext> validator : context.context().gateValidators()) {
-        if (validator != null && !validator.test(context)) {
-          return false;
-        }
-      }
-    }
+    return evaluate(gateConfig, context, externalPredicates, additionalTokens, null);
+  }
 
+  static boolean evaluate(
+      Map<String, Object> gateConfig,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Map<String, Object> additionalTokens,
+      GateTrace trace) {
+    if (!validatorsPass(context)) return completeGateEvaluation(gateConfig, context, false, trace);
     if (gateConfig == null || gateConfig.isEmpty()) {
-      return true;
+      return completeGateEvaluation(gateConfig, context, true, trace);
     }
-
     for (Map.Entry<String, Object> entry : gateConfig.entrySet()) {
-      String gateType = entry.getKey().toLowerCase();
-      Object val = entry.getValue();
-
-      switch (gateType) {
-        case "scoreboard" -> {
-          if (!(val instanceof Map<?, ?> map)) return false;
-          Object objName = map.get("objective");
-          Object matches = map.get("matches");
-          if (matches == null) matches = map.get("range");
-          if (objName == null || matches == null) return false;
-
-          // ADR-093 §4: Managed action scoreboard objectives
-          String objStr = objName.toString().trim();
-          double scoreValue = 0.0;
-          if ("rtp_violations".equalsIgnoreCase(objStr)) {
-            scoreValue = context.violations();
-          } else if ("rtp_in_bounds".equalsIgnoreCase(objStr)) {
-            scoreValue = context.inBounds() ? 1.0 : 0.0;
-          } else if ("rtp_time_left".equalsIgnoreCase(objStr)) {
-            scoreValue = context.remainingSeconds();
-          } else if ("rtp_dist_sq".equalsIgnoreCase(objStr)) {
-            scoreValue = context.distanceSqFromAnchor();
-          } else if ("rtp_session_id".equalsIgnoreCase(objStr)) {
-            if (context.sessionId() != null) {
-              int rawHash = context.sessionId().hashCode();
-              scoreValue = (rawHash == Integer.MIN_VALUE) ? Integer.MAX_VALUE : Math.abs(rawHash);
-            } else {
-              scoreValue = 0.0;
-            }
-          } else if ("rtp_alive".equalsIgnoreCase(objStr)) {
-            // Count alive session participants via server accessor if available
-            RTPServerAccessor accessor = RTP.serverAccessor;
-            if (accessor != null && io.github.dailystruggle.rtp.api.RTPAPI.actionService != null) {
-              scoreValue = io.github.dailystruggle.rtp.api.RTPAPI.actionService.getSession(context.sessionId())
-                  .map(s -> {
-                    int c = 0;
-                    for (UUID pid : s.participants()) {
-                      io.github.dailystruggle.rtp.api.entity.RTPPlayer p = accessor.getPlayer(pid);
-                      if (p != null && p.isOnline()) c++;
-                    }
-                    return (double) (c > 0 ? c : s.participants().size());
-                  }).orElse(1.0);
-            } else {
-              scoreValue = 1.0;
-            }
-          } else {
-            RTPServerAccessor accessor = RTP.serverAccessor;
-            UUID pid = context.participantId();
-            Integer realScore = (accessor != null && pid != null)
-                ? accessor.getScoreboardScore(pid, objStr)
-                : null;
-            if (realScore != null) {
-              scoreValue = realScore.doubleValue();
-            }
-          }
-          if (!GateExpressionParser.matches(matches.toString(), scoreValue)) {
-            return false;
-          }
-        }
-        case "spatial" -> {
-          if (!(val instanceof Map<?, ?> map)) return false;
-          if (map.containsKey("withinBoundary")) {
-            boolean req = Boolean.parseBoolean(map.get("withinBoundary").toString());
-            if (context.inBounds() != req) return false;
-          }
-          if (map.containsKey("distance")) {
-            double actualDist;
-            Object targetObj = map.get("target");
-            if (targetObj != null && !targetObj.toString().equalsIgnoreCase("anchor")) {
-              // Custom coordinate target: "x,y,z" or "x,z"
-              String[] parts = COORD_SEPARATORS.split(targetObj.toString());
-              if (parts.length >= 2 && context.currentX() != null && context.currentZ() != null) {
-                try {
-                  double tx = Double.parseDouble(parts[0]);
-                  double tz = Double.parseDouble(parts.length >= 3 ? parts[2] : parts[1]);
-                  double dx = context.currentX() - tx;
-                  double dz = context.currentZ() - tz;
-                  actualDist = Math.hypot(dx, dz);
-                } catch (NumberFormatException e) {
-                  return false;
-                }
-              } else {
-                return false;
-              }
-            } else {
-              actualDist = Math.sqrt(Math.max(0.0, context.distanceSqFromAnchor()));
-            }
-            if (!GateExpressionParser.matches(map.get("distance").toString(), actualDist)) {
-              return false;
-            }
-          }
-          if (map.containsKey("elevationDelta")) {
-            Double delta = context.elevationDelta();
-            if (delta == null) {
-              delta = 0.0; // current or anchor Y unknown
-            }
-            if (!GateExpressionParser.matches(map.get("elevationDelta").toString(), delta)) {
-              return false;
-            }
-          }
-          if (map.containsKey("shape") || map.containsKey("region") || map.containsKey("playerCount")) {
-            io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape = null;
-            if (map.containsKey("shape") && map.get("shape") instanceof Map<?, ?> smap) {
-              Map<String, Object> shapeData = new HashMap<>((Map<String, Object>) smap);
-              if (!shapeData.containsKey("centerRadius") && !shapeData.containsKey("centerradius")) {
-                shapeData.put("centerRadius", 0);
-              }
-              shape = io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader.deserializeShape(shapeData);
-            } else if (map.containsKey("region")) {
-              String rName = String.valueOf(map.get("region"));
-              io.github.dailystruggle.rtp.common.selection.region.Region r =
-                  (RTP.selectionAPI != null) ? RTP.selectionAPI.getRegion(rName) : null;
-              if (r != null) {
-                shape = r.getShape();
-              }
-            }
-            if (map.containsKey("shape") && shape == null) {
-              return false;
-            }
-            if (shape != null) {
-              // If context has current coords, check contains
-              if (context.currentX() != null && context.currentZ() != null) {
-                int chunkX = (int) Math.floor(context.currentX() / 16.0);
-                int chunkZ = (int) Math.floor(context.currentZ() / 16.0);
-                if (!shape.contains(chunkX, chunkZ)) {
-                  return false;
-                }
-              }
-              // If playerCount condition is present, count online players inside shape
-              if (map.containsKey("playerCount")) {
-                String reqCount = String.valueOf(map.get("playerCount"));
-                int matchingPlayers = 0;
-                String targetWorld = map.containsKey("world") ? String.valueOf(map.get("world")) : null;
-                RTPServerAccessor accessor = RTP.serverAccessor;
-                if (accessor != null) {
-                  for (io.github.dailystruggle.rtp.api.entity.RTPPlayer p : accessor.getOnlinePlayers()) {
-                    if (p != null) {
-                      io.github.dailystruggle.rtp.api.world.RTPLocation loc = p.getLocation();
-                      if (loc != null && loc.world() != null) {
-                        if (targetWorld != null && !loc.world().name().equalsIgnoreCase(targetWorld)) continue;
-                        int cx = (int) Math.floor(loc.x() / 16.0);
-                        int cz = (int) Math.floor(loc.z() / 16.0);
-                        if (shape.contains(cx, cz)) {
-                          matchingPlayers++;
-                        }
-                      }
-                    }
-                  }
-                }
-                if (!GateExpressionParser.matches(reqCount, matchingPlayers)) {
-                  return false;
-                }
-              }
-            } else if (map.containsKey("playerCount")) {
-              // No shape configured but playerCount specified
-              return false;
-            }
-          }
-        }
-        case "time" -> {
-          if (!(val instanceof Map<?, ?> map)) return false;
-          if (map.containsKey("elapsed")
-              && !GateExpressionParser.matches(map.get("elapsed").toString(), context.elapsedSeconds())) {
-            return false;
-          }
-          if (map.containsKey("remaining")
-              && !GateExpressionParser.matches(map.get("remaining").toString(), context.remainingSeconds())) {
-            return false;
-          }
-        }
-        case "predicate" -> {
-          String predName = val.toString().trim();
-          Predicate<ActionGateContext> predicate =
-              (externalPredicates == null) ? null : externalPredicates.get(predName);
-          if (predicate == null || !predicate.test(context)) {
-            return false;
-          }
-        }
-        case "players", "participants", "queue", "participantcount" -> {
-          String matchExpr = null;
-          if (val instanceof Map<?, ?> m) {
-            Object matches = m.get("matches");
-            if (matches == null) matches = m.get("range");
-            if (matches == null) matches = m.get("count");
-            if (matches != null) matchExpr = matches.toString();
-          } else if (val != null) {
-            matchExpr = val.toString();
-          }
-          if (matchExpr == null || matchExpr.isBlank()) return false;
-          int count = (context != null) ? context.participantCount() : 0;
-          if (!GateExpressionParser.matches(matchExpr, count)) {
-            return false;
-          }
-        }
-        case "command" -> {
-          List<String> rawCommands = new ArrayList<>();
-          if (val instanceof Map<?, ?> map) {
-            Object exec = map.get("execute");
-            if (exec == null) exec = map.get("run");
-            if (exec instanceof List<?> list) {
-              for (Object o : list) if (o != null) rawCommands.add(o.toString());
-            } else if (exec != null) {
-              rawCommands.add(exec.toString());
-            }
-          } else if (val instanceof List<?> list) {
-            for (Object o : list) if (o != null) rawCommands.add(o.toString());
-          } else if (val instanceof String s) {
-            rawCommands.add(s);
-          }
-          if (rawCommands.isEmpty()) return false;
-
-          RTPServerAccessor accessor = RTP.serverAccessor;
-          if (accessor == null) return false;
-
-          Map<String, Object> tokens = new HashMap<>();
-          if (additionalTokens != null && !additionalTokens.isEmpty()) {
-            tokens.putAll(additionalTokens);
-          }
-          tokens.put("session_id", context.sessionId().toString().substring(0, 8));
-          if (context.participantId() != null) {
-            tokens.put("player", context.participantId());
-            tokens.put("violator", context.participantId());
-          }
-
-          for (String cmdTemplate : rawCommands) {
-            if (cmdTemplate == null || cmdTemplate.isBlank()) continue;
-
-            // Check if command references a target token that is empty/unspecified
-            // e.g., name=[target_name_1] where target is empty -> wildcard match (skip command)
-            if (ActionPlaceholderSanitizer.hasMissingTarget(cmdTemplate, tokens)) {
-              continue; // Wildcard target passes this command check
-            }
-
-            String substituted = ActionPlaceholderSanitizer.substitute(cmdTemplate, tokens);
-            // Substitution can compose a target placeholder the pre-check could not see,
-            // e.g. "[target_[n]]" -> "[target_1]"; never dispatch it unresolved.
-            if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, "target")) {
-              continue; // Wildcard unmapped target passes this command check
-            }
-
-            // Reliability: evaluate 'execute if/unless entity @X[name=,tag=]' predicate
-            // checks natively via scoreboard tags. Bukkit's dispatchCommand return value
-            // does not reflect the predicate result for vanilla 'execute if', so trusting
-            // it silently passes/fails gates (and leaks "Test failed" chat feedback).
-            Optional<Boolean> nativeResult = evaluateEntityPredicate(substituted, accessor);
-            if (nativeResult.isPresent()) {
-              if (!nativeResult.get()) return false;
-              continue; // predicate satisfied; do not dispatch the vanilla command
-            }
-
-            boolean success = accessor.executeCommand(new UUID(0, 0), substituted);
-            if (!success) return false;
-          }
-        }
-        default -> {
-          // ADR-093: Unrecognized gate key fails closed (block skipped)
-          return false;
-        }
+      Object value = unwrapYamlValue(entry.getValue());
+      if (!evaluateGate(entry.getKey().toLowerCase(), value, context, externalPredicates, additionalTokens, trace)) {
+        return completeGateEvaluation(gateConfig, context, false, trace);
       }
+    }
+    return completeGateEvaluation(gateConfig, context, true, trace);
+  }
+
+  private static boolean validatorsPass(ActionGateContext context) {
+    if (context == null || context.context() == null) return true;
+    for (Predicate<ActionGateContext> validator : context.context().gateValidators()) {
+      if (validator != null && !validator.test(context)) return false;
     }
     return true;
+  }
+
+  private static boolean evaluateGate(
+      String gateType,
+      Object value,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Map<String, Object> additionalTokens,
+      GateTrace trace) {
+    return switch (gateType) {
+      case "scoreboard" -> evaluateScoreboardGate(value, context, trace);
+      case "spatial" -> evaluateSpatialGate(value, context, trace);
+      case "time" -> evaluateTimeGate(value, context);
+      case "predicate" -> evaluatePredicateGate(value, context, externalPredicates);
+      case "players", "participants", "queue", "participantcount" ->
+          evaluateParticipantCountGate(value, context);
+      case "command" -> evaluateCommandGate(value, context, additionalTokens, trace);
+      default -> false;
+    };
+  }
+
+  private static boolean evaluateScoreboardGate(Object value, ActionGateContext context, GateTrace trace) {
+    if (!(value instanceof Map<?, ?> map)) return false;
+    Object objective = map.get(OBJECTIVE_KEY);
+    Object matches = map.get(MATCHES_KEY);
+    if (matches == null) matches = map.get(RANGE_KEY);
+    if (objective == null || matches == null) return false;
+    double score = scoreboardValue(objective.toString().trim(), context, trace);
+    return GateExpressionParser.matches(matches.toString(), score);
+  }
+
+  private static double scoreboardValue(String objective, ActionGateContext context, GateTrace trace) {
+    return switch (objective.toLowerCase(java.util.Locale.ROOT)) {
+      case "rtp_violations" -> context.violations();
+      case "rtp_in_bounds" -> context.inBounds() ? 1.0 : 0.0;
+      case "rtp_time_left" -> (double) context.remainingSeconds();
+      case "rtp_dist_sq" -> context.distanceSqFromAnchor();
+      case "rtp_session_id" -> sessionIdScore(context);
+      case "rtp_alive" -> aliveScore(context, trace);
+      default -> externalScore(objective, context, trace);
+    };
+  }
+
+  private static double sessionIdScore(ActionGateContext context) {
+    if (context.sessionId() == null) return 0.0;
+    int hash = context.sessionId().hashCode();
+    if (hash == Integer.MIN_VALUE) return Integer.MAX_VALUE;
+    return Math.abs(hash);
+  }
+
+  private static double aliveScore(ActionGateContext context, GateTrace trace) {
+    if (context == null) return 0.0;
+    if (trace != null) return context.participantCount();
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    if (accessor == null || io.github.dailystruggle.rtp.api.RTPAPI.actionService == null) return 1.0;
+    return io.github.dailystruggle.rtp.api.RTPAPI.actionService.getSession(context.sessionId())
+        .map(session -> aliveParticipantCount(session.participants(), accessor))
+        .orElse(1.0);
+  }
+
+  private static double aliveParticipantCount(List<UUID> participants, RTPServerAccessor accessor) {
+    int onlineCount = 0;
+    for (UUID participantId : participants) {
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer player = accessor.getPlayer(participantId);
+      if (player != null && player.isOnline()) onlineCount++;
+    }
+    return onlineCount > 0 ? onlineCount : participants.size();
+  }
+
+  private static double externalScore(String objective, ActionGateContext context, GateTrace trace) {
+    RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
+    UUID participantId = context.participantId();
+    Integer score = accessor != null && participantId != null
+        ? accessor.getScoreboardScore(participantId, objective)
+        : null;
+    if (score != null) return score.doubleValue();
+    if (trace == null) ActionCbitCounters.recordMissingObjective(objective);
+    return 0.0;
+  }
+
+  private static boolean evaluateSpatialGate(Object value, ActionGateContext context, GateTrace trace) {
+    if (!(value instanceof Map<?, ?> map)) return false;
+    if (map.containsKey(WITHIN_BOUNDARY_KEY)) {
+      boolean required = Boolean.parseBoolean(map.get(WITHIN_BOUNDARY_KEY).toString());
+      if (context.inBounds() != required) return false;
+    }
+    if (map.containsKey(DISTANCE_KEY) && !matchesDistance(map, context)) return false;
+    if (map.containsKey(ELEVATION_DELTA_KEY) && !matchesElevationDelta(map, context)) return false;
+    return evaluateShapeConstraints(map, context, trace);
+  }
+
+  private static boolean matchesDistance(Map<?, ?> map, ActionGateContext context) {
+    Double distance = distanceFromTarget(map.get(TARGET_KEY), context);
+    return distance != null && GateExpressionParser.matches(map.get(DISTANCE_KEY).toString(), distance);
+  }
+
+  private static Double distanceFromTarget(Object target, ActionGateContext context) {
+    if (target == null || target.toString().equalsIgnoreCase("anchor")) {
+      return Math.sqrt(Math.max(0.0, context.distanceSqFromAnchor()));
+    }
+    String[] parts = COORD_SEPARATORS.split(target.toString());
+    if (parts.length < 2 || context.currentX() == null || context.currentZ() == null) return null;
+    try {
+      double targetX = Double.parseDouble(parts[0]);
+      double targetZ = Double.parseDouble(parts[parts.length >= 3 ? 2 : 1]);
+      double deltaX = context.currentX() - targetX;
+      double deltaZ = context.currentZ() - targetZ;
+      return Math.hypot(deltaX, deltaZ);
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private static boolean matchesElevationDelta(Map<?, ?> map, ActionGateContext context) {
+    Double delta = context.elevationDelta();
+    return GateExpressionParser.matches(
+        map.get(ELEVATION_DELTA_KEY).toString(), delta == null ? 0.0 : delta);
+  }
+
+  private static boolean evaluateShapeConstraints(
+      Map<?, ?> map, ActionGateContext context, GateTrace trace) {
+    if (!map.containsKey(SHAPE_KEY) && !map.containsKey(REGION_KEY)
+        && !map.containsKey(PLAYER_COUNT_KEY)) return true;
+    io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape = resolveShape(map);
+    if (map.containsKey(SHAPE_KEY) && shape == null) return false;
+    if (shape == null) return !map.containsKey(PLAYER_COUNT_KEY);
+    if (!shapeContainsCurrentPosition(shape, context)) return false;
+    return !map.containsKey(PLAYER_COUNT_KEY) || matchesPlayerCount(map, shape, context, trace);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> resolveShape(
+      Map<?, ?> map) {
+    if (map.containsKey(SHAPE_KEY) && map.get(SHAPE_KEY) instanceof Map<?, ?> shapeMap) {
+      Map<String, Object> shapeData = new HashMap<>((Map<String, Object>) shapeMap);
+      if (!shapeData.containsKey("centerRadius") && !shapeData.containsKey("centerradius")) {
+        shapeData.put("centerRadius", 0);
+      }
+      return io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader.deserializeShape(shapeData);
+    }
+    if (!map.containsKey(REGION_KEY)) return null;
+    String regionName = String.valueOf(map.get(REGION_KEY));
+    var selection = ActiveSelection.get();
+    io.github.dailystruggle.rtp.common.selection.region.Region region =
+        selection == null ? null : selection.getRegion(regionName);
+    return region == null ? null : region.getShape();
+  }
+
+  private static boolean shapeContainsCurrentPosition(
+      io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape,
+      ActionGateContext context) {
+    if (context.currentX() == null || context.currentZ() == null) return true;
+    int chunkX = (int) Math.floor(context.currentX() / 16.0);
+    int chunkZ = (int) Math.floor(context.currentZ() / 16.0);
+    return shape.contains(chunkX, chunkZ);
+  }
+
+  private static boolean matchesPlayerCount(
+      Map<?, ?> map,
+      io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape,
+      ActionGateContext context,
+      GateTrace trace) {
+    String requirement = String.valueOf(map.get(PLAYER_COUNT_KEY));
+    String targetWorld = map.containsKey(WORLD_KEY) ? String.valueOf(map.get(WORLD_KEY)) : null;
+    int count = countPlayersInShape(shape, context, trace, targetWorld);
+    return GateExpressionParser.matches(requirement, count);
+  }
+
+  private static int countPlayersInShape(
+      io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape,
+      ActionGateContext context,
+      GateTrace trace,
+      String targetWorld) {
+    if (trace != null) {
+      return targetWorld == null || targetWorld.equalsIgnoreCase("simulation")
+          ? context.participantCount()
+          : 0;
+    }
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    if (accessor == null) return 0;
+    int count = 0;
+    for (io.github.dailystruggle.rtp.api.entity.RTPPlayer player : accessor.getOnlinePlayers()) {
+      if (player != null) {
+        io.github.dailystruggle.rtp.api.world.RTPLocation location = player.getLocation();
+        if (location != null && location.world() != null
+            && (targetWorld == null || location.world().name().equalsIgnoreCase(targetWorld))) {
+          int chunkX = (int) Math.floor(location.x() / 16.0);
+          int chunkZ = (int) Math.floor(location.z() / 16.0);
+          if (shape.contains(chunkX, chunkZ)) count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  private static boolean evaluateTimeGate(Object value, ActionGateContext context) {
+    if (!(value instanceof Map<?, ?> map)) return false;
+    if (map.containsKey(ELAPSED_KEY)
+        && !GateExpressionParser.matches(map.get(ELAPSED_KEY).toString(), (double) context.elapsedSeconds())) return false;
+    return !map.containsKey(REMAINING_KEY)
+        || GateExpressionParser.matches(map.get(REMAINING_KEY).toString(), (double) context.remainingSeconds());
+  }
+
+  private static boolean evaluatePredicateGate(
+      Object value,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates) {
+    Predicate<ActionGateContext> predicate = externalPredicates == null
+        ? null
+        : externalPredicates.get(value.toString().trim());
+    return predicate != null && predicate.test(context);
+  }
+
+  private static boolean evaluateParticipantCountGate(Object value, ActionGateContext context) {
+    String expression = participantCountExpression(value);
+    if (expression == null || expression.isBlank()) return false;
+    int count = context == null ? 0 : context.participantCount();
+    return GateExpressionParser.matches(expression, count);
+  }
+
+  private static String participantCountExpression(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      Object expression = map.get(MATCHES_KEY);
+      if (expression == null) expression = map.get(RANGE_KEY);
+      if (expression == null) expression = map.get(COUNT_KEY);
+      return expression == null ? null : expression.toString();
+    }
+    return value == null ? null : value.toString();
+  }
+
+  private static boolean evaluateCommandGate(
+      Object value,
+      ActionGateContext context,
+      Map<String, Object> additionalTokens,
+      GateTrace trace) {
+    List<String> commands = commandTemplates(value);
+    if (commands.isEmpty()) return false;
+    RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
+    if (trace == null && accessor == null) return false;
+    Map<String, Object> tokens = new HashMap<>();
+    if (additionalTokens != null && !additionalTokens.isEmpty()) tokens.putAll(additionalTokens);
+    tokens.put("session_id", context.sessionId().toString().substring(0, 8));
+    if (context.participantId() != null) {
+      tokens.put("player", context.participantId());
+      tokens.put("violator", context.participantId());
+    }
+    for (String template : commands) {
+      if (shouldEvaluateCommand(template, tokens)
+          && !evaluateCommandTemplate(template, tokens, accessor, trace)) return false;
+    }
+    return true;
+  }
+
+  private static boolean shouldEvaluateCommand(String template, Map<String, Object> tokens) {
+    return template != null && !template.isBlank()
+        && !ActionPlaceholderSanitizer.hasMissingTarget(template, tokens);
+  }
+
+  private static List<String> commandTemplates(Object value) {
+    List<String> commands = new ArrayList<>();
+    if (value instanceof Map<?, ?> map) {
+      Object execute = map.get(EXECUTE_KEY);
+      if (execute == null) execute = map.get("run");
+      addCommandValues(commands, execute);
+    } else if (value instanceof List<?> list) {
+      addCommandValues(commands, list);
+    } else if (value instanceof String command) {
+      commands.add(command);
+    }
+    return commands;
+  }
+
+  private static void addCommandValues(List<String> commands, Object value) {
+    if (value instanceof List<?> list) {
+      for (Object command : list) {
+        if (command != null) commands.add(command.toString());
+      }
+    } else if (value != null) {
+      commands.add(value.toString());
+    }
+  }
+
+  private static boolean evaluateCommandTemplate(
+      String template, Map<String, Object> tokens, RTPServerAccessor accessor, GateTrace trace) {
+    String substituted = ActionPlaceholderSanitizer.substitute(template, tokens);
+    if (trace == null) ActionCbitCounters.recordUnresolvedPlaceholders(substituted);
+    if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, TARGET_KEY)) return true;
+    if (trace != null) return trace.simulateCommand(substituted);
+    return evaluateEntityPredicate(substituted, accessor)
+        .orElseGet(() -> accessor.executeCommand(new UUID(0, 0), substituted));
+  }
+
+  private static boolean completeGateEvaluation(
+      Map<String, Object> gateConfig, ActionGateContext context, boolean passed, GateTrace trace) {
+    if (trace == null) {
+      ActionCbitCounters.recordGateOutcome(gateConfig, context == null ? null : context.actionId(), passed);
+    }
+    if (trace != null && gateConfig != null && !gateConfig.isEmpty()) {
+      Object normalized = unwrapYamlValue(gateConfig);
+      Map<String, Object> tracedConfig = new HashMap<>();
+      if (normalized instanceof Map<?, ?> map) {
+        map.forEach((key, value) -> tracedConfig.put(String.valueOf(key), value));
+      }
+      String reason = passed
+          ? "All configured gate conditions matched."
+          : "Gate rejected the context for condition(s): " + tracedConfig;
+      trace.onOutcome(tracedConfig, passed, reason);
+    }
+    return passed;
+  }
+
+  private static Object unwrapYamlValue(Object value) {
+    if (value instanceof RtpYamlSection section) return unwrapYamlValue(section.getValues(false));
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> normalized = new HashMap<>();
+      map.forEach((key, child) -> normalized.put(String.valueOf(key), unwrapYamlValue(child)));
+      return normalized;
+    }
+    if (value instanceof List<?> values) {
+      List<Object> normalized = new ArrayList<>(values.size());
+      for (Object child : values) normalized.add(unwrapYamlValue(child));
+      return normalized;
+    }
+    return value;
   }
 
   private static final Pattern ENTITY_PREDICATE_PATTERN = Pattern.compile(

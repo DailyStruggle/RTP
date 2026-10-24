@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -8,6 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,7 +40,7 @@ public class ConfigsTest {
     @Test
     void testConfigsConstructorSetsRTPConfigs() {
         Configs configs = new Configs(tempDir.toFile());
-        assertSame(configs, RTP.configs, "Configs constructor should set RTP.configs to itself");
+        assertSame(configs, ActiveConfigs.get(), "Configs constructor should install itself in ActiveConfigs");
     }
 
     @Test
@@ -57,17 +57,17 @@ public class ConfigsTest {
         assertNotNull(configs.fileDatabase, "fileDatabase should be initialized by constructor");
     }
 
-    // --- double-init: second Configs replaces RTP.configs ---
+    // --- double-init: second Configs replaces ActiveConfigs.get() ---
 
     @Test
     void testDoubleInitReplacesRTPConfigs() {
         Configs first = new Configs(tempDir.toFile());
-        assertSame(first, RTP.configs);
+        assertSame(first, ActiveConfigs.get());
 
         Configs second = new Configs(tempDir.toFile());
-        assertSame(second, RTP.configs,
-                "Second Configs() call should replace RTP.configs with the new instance");
-        assertNotSame(first, RTP.configs);
+        assertSame(second, ActiveConfigs.get(),
+                "Second Configs() call should replace ActiveConfigs with the new instance");
+        assertNotSame(first, ActiveConfigs.get());
     }
 
     // --- putParser null guard ---
@@ -91,19 +91,34 @@ public class ConfigsTest {
     @Test
     void testGetParserAfterReloadConfigs() {
         // reloadConfigs() is called by RTPTestSetup.install(); parsers should be registered
-        FactoryValue<SafetyKeys> safetyParser = RTP.configs.getParser(SafetyKeys.class);
+        FactoryValue<SafetyKeys> safetyParser = ActiveConfigs.get().getParser(SafetyKeys.class);
         assertNotNull(safetyParser, "SafetyKeys parser should be registered after reloadConfigs()");
     }
 
     @Test
+    void initialLoadRecordsYamlFindingBeforeParserRecovery() throws IOException {
+        Configs configs = ActiveConfigs.get();
+        configs.configParserMap.clear();
+        configs.multiConfigParserMap.clear();
+        configs.fileDatabase.cachedLookup.get().clear();
+        configs.fileDatabase.cachedLookupLastModified.get().clear();
+        Files.writeString(tempDir.resolve("config.yml"), "radius: [1, 2\n");
+
+        configs.reloadConfigs();
+
+        assertTrue(configs.startupYamlFindings().stream().anyMatch(finding ->
+                finding.source().equals("config.yml") && finding.code().equals("RTP_YAML_UNPARSABLE")));
+    }
+
+    @Test
     void testGetParserLoggingKeys() {
-        FactoryValue<LoggingKeys> loggingParser = RTP.configs.getParser(LoggingKeys.class);
+        FactoryValue<LoggingKeys> loggingParser = ActiveConfigs.get().getParser(LoggingKeys.class);
         assertNotNull(loggingParser, "LoggingKeys parser should be registered after reloadConfigs()");
     }
 
     @Test
     void testGetParserPerformanceKeys() {
-        FactoryValue<PerformanceKeys> perfParser = RTP.configs.getParser(PerformanceKeys.class);
+        FactoryValue<PerformanceKeys> perfParser = ActiveConfigs.get().getParser(PerformanceKeys.class);
         assertNotNull(perfParser, "PerformanceKeys parser should be registered after reloadConfigs()");
     }
 
@@ -122,7 +137,7 @@ public class ConfigsTest {
         Configs configs = new Configs(tempDir.toFile());
 
         // Need LoggingKeys parser first (putParser logs via it)
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reloadConfigs();
 
         FactoryValue<SafetyKeys> retrieved = configs.getParser(SafetyKeys.class);
@@ -132,7 +147,7 @@ public class ConfigsTest {
     @Test
     void testPutAndGetMultiConfigParser() throws IOException {
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
@@ -148,10 +163,10 @@ public class ConfigsTest {
     @Test
     void testGetWorldParserForRegisteredWorld() throws IOException {
         // "world" is registered by default in MockRTPServerAccessor
-        assertInstanceOf(MockRTPServerAccessor.class, RTP.serverAccessor);
+        assertInstanceOf(MockRTPServerAccessor.class, RTPRuntime.serverAccessor());
 
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
@@ -165,7 +180,7 @@ public class ConfigsTest {
     @Test
     void testGetWorldParserForUnregisteredWorldReturnsNull() throws IOException {
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
@@ -184,7 +199,7 @@ public class ConfigsTest {
         Configs.onReload(() -> called[0] = true);
 
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reload();
 
         assertTrue(called[0], "onReload callback should be invoked during reload()");
@@ -195,7 +210,7 @@ public class ConfigsTest {
     @Test
     void testReloadReturnsTrue() {
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         assertTrue(configs.reload(), "reload() should return true on success");
     }
 
@@ -204,7 +219,7 @@ public class ConfigsTest {
     @Test
     void testGetWorldParserValueForUnregisteredWorldReturnsNull() throws IOException {
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
@@ -220,7 +235,7 @@ public class ConfigsTest {
     @Test
     void testGetWorldParserValueForRegisteredWorldReturnsNonNull() throws IOException {
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reloadConfigs();
 
         MultiConfigParser<WorldKeys> worldParser =
@@ -237,7 +252,7 @@ public class ConfigsTest {
     @Test
     void testReloadConfigsRegistersAllStandardParsers() throws IOException {
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         configs.reloadConfigs();
 
         assertNotNull(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class));
@@ -252,7 +267,7 @@ public class ConfigsTest {
     @Test
     void multiConfigWorldsReuseSharedLangMap_noStrayPerFileMapsInFolder() throws IOException {
         Configs configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         // Registers the worlds MultiConfigParser and adds a per-world parser for the
         // MockRTPServerAccessor-registered "world" via Factory.construct (the clone path).
         configs.reloadConfigs();

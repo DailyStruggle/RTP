@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -188,7 +188,7 @@ class ConsecutiveLandingSpacingSimTest {
       if (key < 0) continue;
       int[] c = s.locationToXZ(key);
       if (withTerrain && terrainBad(c[0], c[1])) {
-        s.addBadLocation(key, LocationGenerator.FailTypes.safety, 0L);
+        s.addBadLocation(key, FailTypes.safety, 0L);
         continue;
       }
       return key;
@@ -245,7 +245,7 @@ class ConsecutiveLandingSpacingSimTest {
           long k = backlog.poll();
           int[] p = c.locationToXZ(k);
           if (terrainBad(p[0], p[1])) {
-            c.addBadLocation(k, LocationGenerator.FailTypes.safety, 0L);
+            c.addBadLocation(k, FailTypes.safety, 0L);
             continue;
           }
           key = k;

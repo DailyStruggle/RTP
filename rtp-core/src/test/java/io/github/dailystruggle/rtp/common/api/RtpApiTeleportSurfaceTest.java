@@ -5,6 +5,9 @@ import io.github.dailystruggle.rtp.api.RTPResult;
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -186,7 +189,7 @@ class RtpApiTeleportSurfaceTest {
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
         UUID playerId = player.uuid();
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
 
         RtpTarget netTarget = RtpTarget.network("remoteServer", "default");
         CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, netTarget);
@@ -203,7 +206,7 @@ class RtpApiTeleportSurfaceTest {
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
         UUID playerId = player.uuid();
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
         player.setPermission("rtp.biome.plains", false);
         player.setPermission("rtp.biome.PLAINS", false);
         player.setPermission("rtp.biome.*", false);
@@ -212,7 +215,7 @@ class RtpApiTeleportSurfaceTest {
         RTPResult res = RTPAPI.teleport(playerId, biome).get();
         assertFalse(res.isSuccess());
         assertEquals(RTPResult.Reason.NO_PERMISSION, res.reason());
-        assertFalse(RTP.getInstance().processingPlayers.contains(playerId),
+        assertFalse(TeleportSessions.current().processingPlayers.contains(playerId),
                 "A refused request must not leave the player marked in-flight");
         assertEquals(io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION,
                 RTPAPI.getTargetStatus(playerId, biome).availability(),
@@ -226,23 +229,23 @@ class RtpApiTeleportSurfaceTest {
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
         UUID playerId = player.uuid();
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
         player.setPermission("rtp.servers.remoteServer", false);
         player.setPermission("rtp.servers.*", false);
 
         java.util.concurrent.atomic.AtomicBoolean routed = new java.util.concurrent.atomic.AtomicBoolean();
-        io.github.dailystruggle.rtp.api.network.NetworkCommandHook priorHook = RTP.networkCommandHook;
-        RTP.networkCommandHook = (pId, args) -> {
+        io.github.dailystruggle.rtp.api.network.NetworkCommandHook priorHook = NetworkHooks.commandHook();
+        NetworkHooks.setCommandHook((pId, args) -> {
             routed.set(true);
             return io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.crossServer(
                     UUID.randomUUID(), "default", "remoteServer");
-        };
+        });
         try {
             RTPResult res = RTPAPI.teleport(playerId, RtpTarget.network("remoteServer", "default")).get();
             assertEquals(RTPResult.Reason.NO_PERMISSION, res.reason());
             assertFalse(routed.get(), "A denied request must not be enrolled cross-server");
         } finally {
-            RTP.networkCommandHook = priorHook;
+            NetworkHooks.setCommandHook(priorHook);
         }
     }
 
@@ -253,7 +256,7 @@ class RtpApiTeleportSurfaceTest {
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
         UUID playerId = player.uuid();
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
 
         RtpTarget coordTarget = RtpTarget.coordinate(null, "world", 100, 64, 200);
         CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, coordTarget);
@@ -273,7 +276,7 @@ class RtpApiTeleportSurfaceTest {
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
         UUID playerId = player.uuid();
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
 
         RTP.reloading.set(true);
         try {
@@ -294,7 +297,7 @@ class RtpApiTeleportSurfaceTest {
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
         UUID playerId = player.uuid();
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
 
         RtpTarget coordTarget = RtpTarget.coordinate(null, "unloaded_world_xyz", 100, 64, 200);
         CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, coordTarget);
@@ -311,7 +314,7 @@ class RtpApiTeleportSurfaceTest {
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
         UUID playerId = player.uuid();
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
 
         RtpTarget actionTarget = RtpTarget.action("nav:biome_menu");
         CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, actionTarget);

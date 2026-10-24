@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.common.metrics.LandingHeatmap;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -259,14 +259,14 @@ class EditorLiveFeedAndLandSurveyTest {
         assertTrue(total > 0);
         assertTrue(hz.nextBatch(total).isEmpty(), "no hazards learned yet");
         long loc = sq.xzToLocation(5, 6);
-        sq.addBadLocation(loc, LocationGenerator.FailTypes.biome);
+        sq.addBadLocation(loc, FailTypes.biome);
         List<int[]> changed = hz.nextBatch(total);
         assertEquals(1, changed.size());
         int[] b = changed.get(0);
         int[] coords = sq.locationToXZ(loc);
         int[] cells = BiomeBinCodec.decode(hz.runs(b[0], b[1]));
         int d = BiomeBinCodec.xz2d(coords[0] & 31, coords[1] & 31);
-        assertEquals(LocationGenerator.FailTypes.biome.ordinal() + 1, cells[d]);
+        assertEquals(FailTypes.biome.ordinal() + 1, cells[d]);
         assertTrue(hz.nextBatch(total).isEmpty(), "unchanged bins are not reported again");
     }
 
@@ -431,7 +431,7 @@ class EditorLiveFeedAndLandSurveyTest {
         Path liveDir = tempDir.resolve("editor").resolve(EditorLiveFeed.LIVE_DIR);
         Map<String, MemoryShape<?>> shapes = new LinkedHashMap<>();
         Square first = square(20, 0, 0);
-        first.addBadLocation(first.xzToLocation(1, 1), LocationGenerator.FailTypes.biome);
+        first.addBadLocation(first.xzToLocation(1, 1), FailTypes.biome);
         shapes.put("alpha", first);
         EditorLiveFeed feed = new EditorLiveFeed(liveDir, List.of(), () -> new LinkedHashMap<>(shapes), null,
                 () -> "{}", 60_000L, System::currentTimeMillis);

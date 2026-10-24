@@ -77,6 +77,12 @@ infoTopRejectionCause: "&7주요 거부 원인: #7E9CC8[genTopRejectionCause]&7 
 # 자리표시자: [genFailureBreakdown] - 쉼표로 구분된 cause=N 목록 (빈도순).
 infoFailureBreakdown: "&7원인별 거부: #7E9CC8[genFailureBreakdown]"
 
+# 적응형 연산 거버너 설정 예산 대비 유효 예산 및 사유.
+infoGovernorAsync: "&7백그라운드 비동기: #7E9CC8[govAsyncConfiguredMs]&7 ms (유효 #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7백그라운드 동기: #7E9CC8[govSyncConfiguredMs]&7 ms (유효 #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7핫 캐시 한도: #7E9CC8[govHotCapConfigured]&7 (유효 #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7청크 생성 한도: #7E9CC8[govGenConfigured]&7 (유효 #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; 리전 진행 중 #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # 상태 색상 밴드 임계값. 색상이 적용된 변형 자리표시자
 # (예: [tps1mColoured]) 를 녹색/노란색/빨간색으로 표시하는 데 사용됩니다.
 infoThresholdTpsGreen: 19.5
@@ -497,5 +503,6 @@ editorApplyFetching: "&7[P0] 설정 페이로드를 가져오는 중..."
 editorApplyValidating: "&7[P0] 페이로드 무결성과 구문을 검증하는 중..."
 editorApplySuccess: "&a[P0] 설정을 적용하고 핫 리로드했습니다! (변경된 파일의 .bak 사본을 만들었습니다)"
 editorApplyFailed: "&c[P0] 페이로드를 적용하지 못했습니다: [reason]"
+editorApplyRejected: "&c[P0] 적용이 거부되었습니다: 설정 오류 [count]개로 아무것도 기록하지 않았습니다. 첫 오류: [source]의 [path]에서 [code]."
 
 version: 1.0

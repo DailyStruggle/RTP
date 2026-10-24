@@ -1,4 +1,4 @@
 package com.bekvon.bukkit.residence.protection;
 
-public class ClaimedResidence {
-}
+/** Test stand-in of the Residence {@code ClaimedResidence}; the checker only tests for presence. */
+public class ClaimedResidence {}

@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.commands.test.TestAccessorCmd;
-import io.github.dailystruggle.rtp.common.commands.test.TestEventsCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestWorldOpsCmd;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,8 +16,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>{@link AsyncReplyTestJob} - uses {@code SendMessage.addInterceptor} + {@code OnlinePlayerParameter}.</li>
  * </ul>
  *
- * <p>The {@code full}/{@code all} umbrella alias is also registered here, since
- * its target ({@link TestFullCmd}) only exists on Bukkit.
+ * <p>The {@code full} sweep is registered here because {@link TestFullCmd}
+ * only exists on Bukkit. The SAFE {@code all} command is platform-neutral.
  *
  * <p>Bukkit callers ({@code RTPCmdBukkit}) instantiate this class instead of
  * the parent {@link TestCmd}; Fabric callers ({@code RTPFabricMod}) instantiate
@@ -36,18 +35,10 @@ public class BukkitTestCmd extends TestCmd {
     addSubCommand(new TestStressCmd(this));
     addSubCommand(new TestChunkProbePerfCmd(this));
     addSubCommand(new AsyncReplyTestJob(this));
-    addSubCommand(new TestEventsCmd(this));
     addSubCommand(new TestWorldOpsCmd(this));
     addSubCommand(new TestAccessorCmd(this));
     addSubCommand(new TestHologramCmd(this));
 
-    // `full` is the umbrella entry point (see RUNTIME_TEST_SUITE_PLAN.md section 3.2).
-    // It is wired in last so `findChild` in TestFullCmd can resolve every
-    // sibling. `all` is registered as an alias by pointing the same instance
-    // at an additional key; TreeCommand uses upper-case keys (see
-    // TreeCommand#addSubCommand).
-    TestFullCmd fullCmd = new TestFullCmd(this);
-    addSubCommand(fullCmd);
-    commandLookup.put("ALL", fullCmd);
+    addSubCommand(new TestFullCmd(this));
   }
 }

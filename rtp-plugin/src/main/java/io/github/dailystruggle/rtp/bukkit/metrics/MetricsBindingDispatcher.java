@@ -3,11 +3,13 @@ package io.github.dailystruggle.rtp.bukkit.metrics;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.logging.Level;
 
 /**
  * Phase-M1 wiring (CHECKLIST-metrics-and-multiserver.md row B9): install the
- * platform-appropriate {@link MetricsBinding} into {@link RTP#metrics} at
+ * platform-appropriate {@link MetricsBinding} into {@link CoreMetrics#instance()} at
  * plugin enable, and tear it down at plugin disable.
  *
  * <p>Both bindings live in modules ({@code rtp-paper-common} and
@@ -26,7 +28,7 @@ import java.util.logging.Level;
  *       on {@code org.bukkit.Bukkit}), install {@code PaperMetricsBinding}.
  *       No per-tick sampler is needed; Paper publishes the values itself.</li>
  *   <li>Otherwise (raw Spigot 1.20.1+), install {@code BukkitTpsSampler}
- *       and schedule a 1-tick repeating task on {@link RTP#scheduler} that
+ *       and schedule a 1-tick repeating task on {@link RTPRuntime#scheduler()} that
  *       drives its {@code tick()} method.</li>
  * </ul>
  *
@@ -74,7 +76,7 @@ public final class MetricsBindingDispatcher {
     }
 
     /**
-     * Install the platform-appropriate binding into {@link RTP#metrics}.
+     * Install the platform-appropriate binding into {@link CoreMetrics#instance()}.
      * Safe to call repeatedly - only the first call has effect.
      */
     public static void install() {
@@ -108,7 +110,7 @@ public final class MetricsBindingDispatcher {
                         // binding, so per-region samples are preserved.
                         RTP.log(Level.FINE, LOG_TAG
                                 + " installed FoliaMetricsBinding (threaded-regions detected)");
-                        RTP.metrics.setBinding(wrapWithSparkIfPresent(folia));
+                        CoreMetrics.instance().setBinding(wrapWithSparkIfPresent(folia));
                         installed = true;
                         return;
                     }
@@ -122,7 +124,7 @@ public final class MetricsBindingDispatcher {
                         // Per-field merge: prefer spark's TPS/MSPT over the native
                         // Paper values when spark is present (Folia is handled above
                         // and intentionally stays on its native per-region binding).
-                        RTP.metrics.setBinding(wrapWithSparkIfPresent(paper));
+                        CoreMetrics.instance().setBinding(wrapWithSparkIfPresent(paper));
                         installed = true;
                         return;
                     }
@@ -133,13 +135,13 @@ public final class MetricsBindingDispatcher {
                     // Merge spark TPS/MSPT over the raw-Spigot sampler when present;
                     // the sampler is still driven below so its values back the
                     // merge's fallback and supply playerCount / softCap.
-                    RTP.metrics.setBinding(wrapWithSparkIfPresent((MetricsBinding) sampler));
+                    CoreMetrics.instance().setBinding(wrapWithSparkIfPresent((MetricsBinding) sampler));
                     // Drive sampler.tick() once per server tick. The sampler is
                     // documented as single-tick-thread-only, which matches
-                    // RTP.scheduler.runTaskTimer (global region scheduler on Folia,
+                    // RTPRuntime.scheduler().runTaskTimer (global region scheduler on Folia,
                     // main thread on Spigot/Paper).
                     java.lang.reflect.Method tick = samplerClass.getMethod("tick");
-                    spigotSamplerTaskHandle = RTP.scheduler.runTaskTimer(() -> {
+                    spigotSamplerTaskHandle = RTPRuntime.scheduler().runTaskTimer(() -> {
                         try {
                             tick.invoke(sampler);
                         } catch (Throwable t) {
@@ -184,7 +186,7 @@ public final class MetricsBindingDispatcher {
                 }
             }
             try {
-                RTP.metrics.setBinding(null);
+                CoreMetrics.instance().setBinding(null);
             } catch (Throwable t) {
                 RTP.log(Level.FINER,
                         LOG_TAG + " setBinding(null) failed (ignored): "

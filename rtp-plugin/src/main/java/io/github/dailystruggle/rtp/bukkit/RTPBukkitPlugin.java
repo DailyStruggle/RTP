@@ -2,6 +2,13 @@ package io.github.dailystruggle.rtp.bukkit;
 
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
+import io.github.dailystruggle.rtp.common.bit.RtpBitStartup;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
+import io.github.dailystruggle.rtp.bukkit.commands.test.BukkitBitCodeOwners;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.events.*;
@@ -13,10 +20,13 @@ import io.github.dailystruggle.rtp.bukkit.utils.JarUtils;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -48,7 +58,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
    * @return region object
    */
   public static Region getRegion(Player player) {
-    return RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
+    return ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(player.getUniqueId()));
   }
 
   public boolean isPaper() {
@@ -86,7 +96,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   /** whenever bukkit feels like enabling this plugin */
   @Override
   public void onEnable() {
-    // Wire RTP.serverAccessor and RTP.scheduler FIRST (silently) so every subsequent
+    // Wire RTPRuntime.serverAccessor() and RTPRuntime.scheduler() FIRST (silently) so every subsequent
     // RTP.log(...) routes through the canonical accessor instead of the JUL bootstrap
     // fallback. Reflection itself cannot log via RTP.log because the accessor isn't ready.
     if (instance == null) {
@@ -99,7 +109,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     }
 
     // Install the Bukkit implementations of the /rtp test ... umbrella SPI onto RTP.
-    // Doing this once RTP.serverAccessor + RTP.scheduler are wired guarantees both
+    // Doing this once RTPRuntime.serverAccessor() + RTPRuntime.scheduler() are wired guarantees both
     // adapter dependencies are usable. Idempotent: the field is volatile and may be
     // overwritten on a hot reload.
     RTP.testUmbrellaContext =
@@ -110,7 +120,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats (id=30865)");
     // Shared bStats entry point (bstats-api client + RTP chart catalogue). All chart
-    // lambdas read RTP.metrics.snapshot() and bucketise to keep submissions
+    // lambdas read CoreMetrics.instance().snapshot() and bucketise to keep submissions
     // privacy-safe and low-cardinality.
     io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
         new io.github.dailystruggle.rtp.bukkit.metrics.BukkitBStatsHost(this),
@@ -124,7 +134,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     if (RTP.getInstance() == null) {
       RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable accessor/scheduler wired; starting accessor");
       RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable RTP.serverAccessor.start(plugin)");
-      RTP.serverAccessor.start(this);
+      RTPRuntime.serverAccessor().start(this);
       RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable constructing new RTP() -- wires API instance");
       RTP rtp = new RTP(); // constructor updates API instance
 
@@ -138,8 +148,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       try {
         java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
             getDataFolder(), RTPBukkitPlugin.class);
-        RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
-        if (RTP.lobbyMode) {
+        NetworkHooks.setLobbyMode(NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml));
+        if (NetworkHooks.lobbyMode()) {
           RTP.log(java.util.logging.Level.INFO,
               "[RTP] onEnable routing.lobbyMode=true -- local region processing"
                   + " (ScanTask pre-fill, DB hydrate, Region.execute pulse) will be"
@@ -147,7 +157,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         }
       } catch (Throwable t) {
         // Never block plugin enable on this read.
-        RTP.lobbyMode = false;
+        NetworkHooks.setLobbyMode(false);
         RTP.log(java.util.logging.Level.FINE,
             "[RTP] onEnable lobbyMode early-read failed; defaulting to false: "
                 + t.getMessage());
@@ -155,6 +165,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
       try {
         RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable BukkitDatabaseHandler.setupDatabase");
+        RtpBitCodes.addOwners(BukkitBitCodeOwners.OWNERS);
         BukkitDatabaseHandler.setupDatabase(rtp);
         RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable database setup complete");
         // Boot backend-side network mode AFTER the DB is up
@@ -181,20 +192,20 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ChunkyBorderChecker.loadChunky");
     ChunkyBorderChecker.loadChunky();
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable startupTasks drain #1 size="
-        + RTP.getInstance().startupTasks.size());
-    RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+        + MiscTasks.startup().size());
+    MiscTasks.startup().execute(Long.MAX_VALUE);
 
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable binding /rtp and /wild executors and tab-completers");
     // ADR-024: shared helper -- identical command-binding logic between full and lite.
     BootstrapSupport.registerRtpAndWildCommands(this);
 
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable scheduling deferred startupTasks drain (tick+1)");
-    RTP.scheduler.runTaskLater(
+    RTPRuntime.scheduler().runTaskLater(
         () -> {
           RTP.log(java.util.logging.Level.FINER, "[RTP] deferred startupTasks drain firing size="
-              + RTP.getInstance().startupTasks.size());
-          while (RTP.getInstance().startupTasks.size() > 0) {
-            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+              + MiscTasks.startup().size());
+          while (MiscTasks.startup().size() > 0) {
+            MiscTasks.startup().execute(Long.MAX_VALUE);
           }
         },
         1);
@@ -207,8 +218,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     setupBukkitEvents();
     // Install the platform-appropriate MapBinding via the accessor layer
     // (ADR-047 / REQ-RTP-MAP-006) so MapDispatch can satisfy chart requests.
-    if (RTP.serverAccessor != null) {
-      RTP.serverAccessor.setupMapBinding();
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPRuntime.serverAccessor().setupMapBinding();
     }
     // Install the Bukkit-family BiomeColorSource so the biomes visualisation
     // can ask the server for each biome's native cartography colour (rather
@@ -236,19 +247,19 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnWorldLoadUnload
         .rebindFallbackRegionsForAllLoadedWorlds();
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable scheduling deferred setupIntegrations (tick+1)");
-    RTP.scheduler.runTaskLater(() -> {
+    RTPRuntime.scheduler().runTaskLater(() -> {
       RTP.log(java.util.logging.Level.FINER, "[RTP] deferred setupIntegrations firing");
       setupIntegrations();
     }, 1);
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
-    RTP.scheduler.runTaskLater(() -> {
+    RTPRuntime.scheduler().runTaskLater(() -> {
       RTP.log(java.util.logging.Level.FINER, "[RTP] deferred BukkitEffectsHandler.setupEffects firing");
       BukkitEffectsHandler.setupEffects(this);
     }, 1);
 
     if (!isFolia()) {
       RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable starting non-Folia ChunkUnloadProcessor timer");
-      RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
+      RTPRuntime.scheduler().runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
     } else {
       RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable Folia detected -- skipping ChunkUnloadProcessor");
     }
@@ -261,7 +272,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     //  - Folia: an ASYNC timer pulse (runTaskTimerAsynchronously) only enumerates
     //    the online players and hands them to BiomeActivityTracker.sample, which
     //    dispatches each per-player biome read onto that player's OWNING region
-    //    thread via RTP.scheduler.runTaskForPlayer. No world/entity state is
+    //    thread via RTPRuntime.scheduler().runTaskForPlayer. No world/entity state is
     //    touched on the async pulse thread itself.
     //
     //  - Non-Folia: a MAIN-thread timer pulse (runTaskTimer) does the data
@@ -273,14 +284,14 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       final long biomeSamplePeriodTicks = 600L; // ~30s at 20 TPS
       RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable starting biome occupancy sampler timer");
       if (isFolia()) {
-        RTP.scheduler.runTaskTimerAsynchronously(
+        RTPRuntime.scheduler().runTaskTimerAsynchronously(
             () -> {
               try {
                 java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> players =
                     new java.util.ArrayList<>();
                 for (Player p : Bukkit.getOnlinePlayers()) {
                   io.github.dailystruggle.rtp.api.entity.RTPPlayer rp =
-                      RTP.serverAccessor.getPlayer(p.getUniqueId());
+                      RTPRuntime.serverAccessor().getPlayer(p.getUniqueId());
                   if (rp != null) players.add(rp);
                 }
                 if (!players.isEmpty()) RTP.biomeActivity.sample(players);
@@ -292,7 +303,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             biomeSamplePeriodTicks,
             biomeSamplePeriodTicks);
       } else {
-        RTP.scheduler.runTaskTimer(
+        RTPRuntime.scheduler().runTaskTimer(
             () -> {
               try {
                 // Main thread owns every world: read each online player's biome
@@ -300,7 +311,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                 java.util.List<String> biomes = new java.util.ArrayList<>();
                 for (Player p : Bukkit.getOnlinePlayers()) {
                   io.github.dailystruggle.rtp.api.entity.RTPPlayer rp =
-                      RTP.serverAccessor.getPlayer(p.getUniqueId());
+                      RTPRuntime.serverAccessor().getPlayer(p.getUniqueId());
                   if (rp == null || !rp.isOnline()) continue;
                   io.github.dailystruggle.rtp.api.world.RTPLocation loc = rp.getLocation();
                   if (loc == null || loc.world() == null) continue;
@@ -309,7 +320,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                 }
                 // Hand the accumulation off the main thread.
                 if (!biomes.isEmpty()) {
-                  RTP.scheduler.runTaskAsynchronously(
+                  RTPRuntime.scheduler().runTaskAsynchronously(
                       () -> biomes.forEach(RTP.biomeActivity::record));
                 }
               } catch (Throwable t) {
@@ -327,9 +338,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable startupTasks drain #2 size="
-        + RTP.getInstance().startupTasks.size());
-    while (RTP.getInstance().startupTasks.size() > 0) {
-      RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+        + MiscTasks.startup().size());
+    while (MiscTasks.startup().size() > 0) {
+      MiscTasks.startup().execute(Long.MAX_VALUE);
     }
 
     if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -348,6 +359,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // dispatch the startup burst. Decoupled from Region.execute() per ADR-023.
     initLoginReserveCache();
 
+    RtpBitStartup.schedule();
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable EXIT -- plugin enabled");
   }
 
@@ -361,7 +373,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   private void initLoginReserveCache() {
     try {
       ConfigParser<PerformanceKeys> perf =
-          (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+          (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
       if (perf == null) return;
       Object enabledObj = perf.getConfigValue(PerformanceKeys.loginCacheEnabled, false);
       boolean enabled = (enabledObj instanceof Boolean)
@@ -373,7 +385,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       // Read soft cap from the metrics snapshot when a binding is installed; fall
       // back to Bukkit.getMaxPlayers() only on the NOOP path (snapshot.softCap=0).
       io.github.dailystruggle.metrics.api.MetricsSnapshot bootSnap =
-          RTP.metrics.snapshot();
+          CoreMetrics.instance().snapshot();
       int snapshotCap = bootSnap.softCap;
       int cap = (configuredCap > 0)
           ? (int) Math.min(configuredCap, Integer.MAX_VALUE)
@@ -386,7 +398,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         return;
       }
       String defaultWorldName = Bukkit.getWorlds().get(0).getName();
-      Region region = RTP.selectionAPI.permRegionLookup.values().stream()
+      Region region = ActiveSelection.get().permRegionLookup.values().stream()
           .filter(r -> r.getWorld() != null && defaultWorldName.equals(r.getWorld().name()))
           .findFirst()
           .orElse(null);
@@ -408,7 +420,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       // which is also the value Bukkit returns at this lifecycle point, so the two
       // paths are semantically aligned).
       io.github.dailystruggle.metrics.api.MetricsSnapshot burstSnap =
-          RTP.metrics.snapshot();
+          CoreMetrics.instance().snapshot();
       int online = (burstSnap.playerCount > 0)
           ? burstSnap.playerCount
           : Bukkit.getOnlinePlayers().size();
@@ -468,7 +480,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     try {
       RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable ScanTask.kill + clear scan progress bars");
-      io.github.dailystruggle.rtp.common.tasks.ScanTask.kill();
+      io.github.dailystruggle.rtp.common.tasks.scan.ScanTask.kill();
       io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars.clear();
     } catch (NoClassDefFoundError ignored) {
     }
@@ -505,14 +517,14 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     }
 
     try {
-      if (RTP.getInstance() != null && RTP.getInstance().databaseAccessor != null) {
+      if (RTP.getInstance() != null && ActiveDatabase.accessor() != null) {
         RTP.log(java.util.logging.Level.FINE,
             "[RTP] onDisable writing referenceData sentinel + processQueries(MAX) final drain");
         Map<String, Object> referenceData = new HashMap<>();
         referenceData.put("time", System.currentTimeMillis());
         referenceData.put("UUID", new UUID(0, 0).toString());
-        RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
-        RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+        ActiveDatabase.accessor().setValue("referenceData", referenceData);
+        ActiveDatabase.accessor().processQueries(Long.MAX_VALUE);
         RTP.log(java.util.logging.Level.FINER,
             "[RTP] onDisable referenceData sentinel persisted");
       } else {
@@ -522,10 +534,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     } catch (NoClassDefFoundError ignored) {
     }
 
-    if (RTP.serverAccessor != null) {
+    if (RTPRuntime.serverAccessor() != null) {
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] onDisable releaseAllChunkTickets (S-002 guarantee)");
-      RTP.serverAccessor.releaseAllChunkTickets();
+      RTPRuntime.serverAccessor().releaseAllChunkTickets();
     } else {
       RTP.log(java.util.logging.Level.FINER,
           "[RTP] onDisable releaseAllChunkTickets skipped (serverAccessor null)");
@@ -561,7 +573,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   private void setupBukkitEvents() {
     RTP.log(java.util.logging.Level.FINE, "[RTP] setupBukkitEvents ENTER");
     ConfigParser<PerformanceKeys> performance =
-        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
 
     boolean onEventParsing;
     Object o = performance.getConfigValue(PerformanceKeys.onEventParsing, false);
@@ -631,11 +643,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
   public void setupIntegrations() {
     RTP.log(java.util.logging.Level.FINE, "[RTP] setupIntegrations ENTER");
-    if (RTP.economy == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
+    if (RTPRuntime.economy() == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
       VaultChecker.setupEconomy();
       VaultChecker.setupPermissions();
-      // ADR-026: bind through the public RTPHooks facade rather than poking RTP.economy
-      // directly. The facade also writes RTP.economy for read-path compatibility; see
+      // ADR-026: bind through the public RTPHooks facade rather than poking RTPRuntime.economy()
+      // directly. The facade also writes RTPRuntime.economy() for read-path compatibility; see
       // docs/dev/EXTERNAL_HOOKS.md.
       if (VaultChecker.getEconomy() != null) {
         io.github.dailystruggle.rtp.api.RTPAPI.hooks().economy().bind(new VaultChecker());

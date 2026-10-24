@@ -8,8 +8,15 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -63,10 +70,23 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       RTPWorld<?> rtpWorld = getRTPWorld(s);
       if (!(rtpWorld instanceof BukkitRTPWorld)) return null;
       World world = ((BukkitRTPWorld) rtpWorld).world();
-      org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
+      org.bukkit.WorldBorder worldBorder;
+      try {
+        worldBorder = world.getWorldBorder();
+      } catch (Throwable t) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, t.getClass().getSimpleName() + ": " + t.getMessage());
+        log(Level.WARNING, "[RTP] Failed to resolve native WorldBorder for world " + s + ": " + t.getMessage(), t);
+        return null;
+      }
+      if (worldBorder == null) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, "world.getWorldBorder() returned null");
+        return null;
+      }
       return new WorldBorder(
           () -> {
-            Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+            Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
             if (shape instanceof Square square) {
               square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
               square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
@@ -92,7 +112,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         s -> {
           World world = Bukkit.getWorld(s);
           if (world == null) return null;
-          Region region = RTP.selectionAPI.getRegion(Objects.requireNonNull(getRTPWorld(world.getUID())));
+          Region region = ActiveSelection.get().getRegion(Objects.requireNonNull(getRTPWorld(world.getUID())));
           if (region == null) throw new IllegalStateException();
           Object o = region.getData(RegionKeys.shape);
           if (!(o instanceof Shape<?>)) throw new IllegalStateException();
@@ -156,10 +176,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public @NotNull io.github.dailystruggle.rtp.api.server.PlatformFamily getPlatformFamily() {
+  public @NotNull io.github.dailystruggle.server.api.PlatformFamily getPlatformFamily() {
     // Bukkit/Spigot and every Bukkit-derived fork (Paper, Folia, Purpur, ...) share the
     // org.bukkit API surface, so they all classify as the BUKKIT family.
-    return io.github.dailystruggle.rtp.api.server.PlatformFamily.BUKKIT;
+    return io.github.dailystruggle.server.api.PlatformFamily.BUKKIT;
   }
 
   private boolean isPaper() {
@@ -270,6 +290,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable RTPPlayer getPlayer(UUID uuid) {
+    // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return null;
     return wrapPlayer(player);
@@ -277,6 +300,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable RTPPlayer getPlayer(String name) {
+    RTPPlayer mock = MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(name);
     if (player == null) return null;
     return wrapPlayer(player);
@@ -290,6 +315,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public @NotNull RTPCommandSender getSender(UUID uuid) {
     if (uuid.equals(RTPAPI.serverId)) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) {
       OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
@@ -330,8 +357,16 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public Optional<Boolean> hasScoreboardObjective(String objective) {
+    if (objective == null || objective.isBlank()) return Optional.empty();
+    org.bukkit.scoreboard.ScoreboardManager manager = Bukkit.getScoreboardManager();
+    if (manager == null) return Optional.empty();
+    return Optional.of(manager.getMainScoreboard().getObjective(objective) != null);
+  }
+
+  @Override
   public void sendMessage(UUID target, Enum<?> msgType, String tag) {
-    Object cv = RTP.configs.getConfigValue(msgType, "");
+    Object cv = ActiveConfigs.get().getConfigValue(msgType, "");
     String message = cv == null ? "" : cv.toString();
     RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage(UUID, Enum) target=" + target
             + " msgType=" + msgType
@@ -343,7 +378,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
-    Object cv = RTP.configs.getConfigValue(msgType, "");
+    Object cv = ActiveConfigs.get().getConfigValue(msgType, "");
     String message = cv == null ? "" : cv.toString();
     sendMessage(target1, target2, message, tag);
   }
@@ -460,6 +495,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public @NotNull Set<String> getOnlinePlayerNames() {
     Set<String> names = new HashSet<>();
     for (Player player : Bukkit.getOnlinePlayers()) {
+      if (MockPlayerRegistry.isMock(player.getUniqueId())) continue;
       names.add(player.getName());
     }
     return names;
@@ -531,6 +567,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         try {
           values = tag.getValues();
         } catch (Throwable t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+              key.getNamespace() + ":" + key.getKey(),
+              t.getClass().getSimpleName() + ": " + t.getMessage());
           log(Level.WARNING,
               "[RTP] tag.getValues() threw for key="
                   + key.getNamespace() + ":" + key.getKey()
@@ -553,12 +592,16 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       // NoSuchMethodError / NoClassDefFoundError on forks where the Tag API
       // signature differs, and those would otherwise silently escape our handler
       // with no operator-visible log line.
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", e.getClass().getSimpleName() + ": " + e.getMessage());
       log(Level.WARNING,
           "[RTP] Failed to snapshot block tag registry: "
               + e.getClass().getName() + ": " + e.getMessage(), e);
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", "empty-tag-snapshot(iterated=" + totalTags + ",empty=" + totalEmpty + ")");
       log(Level.WARNING,
           "[RTP] Bukkit block-tag registry yielded no usable tags (iterated="
               + totalTags + ", empty=" + totalEmpty
@@ -605,14 +648,14 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     // ADR-049: install the platform backend-heartbeat sampler factory so the
     // platform-neutral NetworkModeBootstrap (rtp-core) can build a sampler
     // without importing this Bukkit-family class. Idempotent across reloads.
-    RTP.backendStateSamplerFactory = lobbyMode ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode);
+    NetworkHooks.setBackendStateSamplerFactory(
+        io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler::new);
     // rtp-proxy-ADR-016: install the tier-1 (DB-free) plugin-message bridge
     // factory so NetworkModeBootstrap can open the plugin-message / auto
     // transports without importing this Bukkit-family class. Idempotent across
     // reloads; a fresh bridge per call re-registers the channel cleanly.
-    RTP.networkBridgeFactory = () ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitNetworkBridge(bukkitPlugin);
+    NetworkHooks.setBridgeFactory(() ->
+        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitNetworkBridge(bukkitPlugin));
   }
 
   @Override
@@ -655,7 +698,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() {
-    return io.github.dailystruggle.rtp.common.RTP.scheduler;
+    return io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
   }
 
   @Override
@@ -666,7 +709,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     // shipped on Bukkit since pre-Metrics days.
     try {
       io.github.dailystruggle.metrics.api.MetricsSnapshot s =
-          io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
+          CoreMetrics.instance().snapshot();
       double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
       if (!Double.isNaN(v)) return v;
     } catch (Throwable ignored) {
@@ -896,7 +939,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (players.isEmpty()) return Collections.emptyList();
       java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> list = new java.util.ArrayList<>(players.size());
       for (Player p : players) {
-        if (p == null) continue;
+        if (p == null || MockPlayerRegistry.isMock(p.getUniqueId())) continue;
         io.github.dailystruggle.rtp.api.entity.RTPPlayer rp = getPlayer(p.getUniqueId());
         if (rp != null) list.add(rp);
       }
@@ -1412,8 +1455,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
             }
           };
 
-      if (io.github.dailystruggle.rtp.common.RTP.scheduler != null) {
-        io.github.dailystruggle.rtp.common.RTP.scheduler.runTaskForPlayer(rtpPlayer, damageTask, 0L);
+      if (io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler() != null) {
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler().runTaskForPlayer(rtpPlayer, damageTask, 0L);
       } else {
         damageTask.run();
       }
@@ -1468,7 +1511,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     } catch (Exception ignored) {
       // Material lookup threw; fall back to normalizer
     }
-    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+    return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
 
   // ---------------------------------------------------------------------------

@@ -2,13 +2,13 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuRendererProvider;
-import io.github.dailystruggle.rtp.api.server.PlatformFamily;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.server.api.PlatformFamily;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -57,13 +57,15 @@ public final class MenuBindingSupport {
         // See discoverRenderer: a platform opener may link a runtime type absent
         // on this server (LinkageError / NoClassDefFoundError), which is not a
         // RuntimeException. Catch both so discovery degrades gracefully.
-        RTP.log(
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAnvilInputDegraded(
+            provider.getClass().getName(), ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        RTPRuntime.log(
             Level.WARNING,
             "failed to instantiate menu anvil-input opener: " + ex,
             ex);
       }
     }
-    RTP.log(Level.INFO, "menu anvil-input unavailable on this platform");
+    RTPRuntime.log(Level.INFO, "menu anvil-input unavailable on this platform");
     return null;
   }
 
@@ -77,7 +79,7 @@ public final class MenuBindingSupport {
     try {
       @SuppressWarnings("unchecked")
       ConfigParser<ConfigKeys> menuConfig =
-          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+          (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       if (menuConfig != null) {
         Object menuBlock = menuConfig.getConfigValue(ConfigKeys.menu, null);
         if (menuBlock instanceof Map<?, ?> map) {
@@ -110,25 +112,7 @@ public final class MenuBindingSupport {
    * {@link java.util.ServiceConfigurationError} to safely skip mismatched platform classes in universal jars.
    */
   private static <T> List<T> loadProvidersSafely(ServiceLoader<T> loader, String what) {
-    List<T> providers = new ArrayList<>();
-    Iterator<T> it = loader.iterator();
-    while (true) {
-      T provider;
-      try {
-        if (!it.hasNext()) break;
-        provider = it.next();
-      } catch (java.util.ServiceConfigurationError | LinkageError err) {
-        // Unloadable on this platform (wrong-family provider in a universal
-        // jar). The lazy iterator has already advanced past the bad entry, so
-        // continue to surface any remaining valid providers.
-        RTP.log(
-            Level.FINE,
-            "skipping unloadable " + what + ": " + err);
-        continue;
-      }
-      providers.add(provider);
-    }
-    return providers;
+    return io.github.dailystruggle.menu.api.MenuBindingSupport.loadProvidersSafely(loader, what);
   }
 
   /**
@@ -138,8 +122,8 @@ public final class MenuBindingSupport {
    */
   private static @Nullable PlatformFamily currentPlatformFamily() {
     try {
-      if (RTP.serverAccessor == null) return null;
-      return RTP.serverAccessor.getPlatformFamily();
+      if (RTPRuntime.serverAccessor() == null) return null;
+      return RTPRuntime.serverAccessor().getPlatformFamily();
     } catch (RuntimeException ignored) {
       return null;
     }
@@ -152,8 +136,7 @@ public final class MenuBindingSupport {
    */
   static boolean matchesPlatform(
       @Nullable PlatformFamily providerFamily, @Nullable PlatformFamily running) {
-    if (providerFamily == null) return true;
-    if (running == null || running == PlatformFamily.UNKNOWN) return true;
-    return providerFamily == running;
+    return io.github.dailystruggle.menu.api.MenuBindingSupport.matchesPlatform(
+        providerFamily, running);
   }
 }

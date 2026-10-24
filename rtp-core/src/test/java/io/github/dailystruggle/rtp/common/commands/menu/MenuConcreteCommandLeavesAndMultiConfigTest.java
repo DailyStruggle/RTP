@@ -7,12 +7,13 @@ import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.DefaultMultiConfigRemovalGuards;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -97,9 +98,9 @@ final class MenuConcreteCommandLeavesAndMultiConfigTest {
 
     @AfterEach
     void tearDown() {
-        if (RTP.configs != null && RTP.configs.multiConfigParserMap != null) {
+        if (ActiveConfigs.get() != null && ActiveConfigs.get().multiConfigParserMap != null) {
             MultiConfigParser<?> regionsParser = null;
-            for (MultiConfigParser<?> p : RTP.configs.multiConfigParserMap.values()) {
+            for (MultiConfigParser<?> p : ActiveConfigs.get().multiConfigParserMap.values()) {
                 if (p != null && "regions".equalsIgnoreCase(p.name)) {
                     regionsParser = p;
                     break;
@@ -110,9 +111,9 @@ final class MenuConcreteCommandLeavesAndMultiConfigTest {
                 regionsParser.removeParser("custom_region_1");
             }
         }
-        RTP.configs = null;
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        ActiveConfigs.set(null);
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
     }
 
@@ -205,7 +206,7 @@ final class MenuConcreteCommandLeavesAndMultiConfigTest {
 
         // Seed 'default' parser into the regions MultiConfigParser so construct(name) has a template
         MultiConfigParser<?> regionsParser = null;
-        for (MultiConfigParser<?> p : RTP.configs.multiConfigParserMap.values()) {
+        for (MultiConfigParser<?> p : ActiveConfigs.get().multiConfigParserMap.values()) {
             if (p != null && "regions".equalsIgnoreCase(p.name)) {
                 regionsParser = p;
                 break;

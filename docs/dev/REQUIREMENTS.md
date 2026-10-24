@@ -45,6 +45,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **REQ-RTP-F-003 — Statistical Distributions:** The system shall allow server administrators to configure the mathematical distribution of teleport locations (e.g., Flat, Normal, Exponential).
 - **REQ-RTP-F-004 — Region Management:** The system shall allow the server to be divided into multiple teleport regions, each with independent configurations, rules, and permissions.
 - **REQ-RTP-F-012 — Administrative World-Scan Lifecycle:** The system shall expose a world-scan lifecycle (`start`, `pause`, `resume`, `reset`, `cancel`) that allows operators to pre-populate a region's spatial memory without teleporting players.
+- **REQ-RTP-F-015 — Landing-Spot Slope Limit:** The system shall allow a region's vertical adjustor to set a maximum landing-spot slope, expressed as the largest floor-height difference in blocks over a configurable horizontal radius, and shall reject candidate locations that exceed it. The slope test shall follow the floor layer of the candidate rather than the world surface, shall read only block data already resident or probed for the candidate's chunk (REQ-RTP-S-005), and shall give the same verdict on the live and region-file probe paths. When no maximum slope is configured, location selection and region cache identity shall be unchanged (ADR-119).
 
 ### 1.2 Computational Safety and Performance
 - **REQ-RTP-F-005 — Bounded Selection Complexity:** Location selection tasks shall operate within deterministic time complexity bounds (e.g., O(log(n))), ensuring predictable computational overhead during background generation.
@@ -62,6 +63,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 ### 1.5 Configuration
 - **REQ-RTP-F-013 — Configurable User Messages:** The system shall allow all user-facing messages to be configurable via the `messages.yml` configuration file.
 - **REQ-RTP-F-014 — Foreign Configuration & Permission Import:** The system shall provide an explicit, non-destructive migration mechanism (`/rtp config import <plugin>`) capable of translating third-party random teleport configurations (BetterRTP, JustRTP, EzRTP, JakesRTP) and permissions into native RTP configuration trees and permissions without modifying or clobbering existing customized configs without confirmation (ADR-066).
+- **REQ-RTP-F-016 — Human-Readable Config Durations:** Runtime-read duration settings shall accept explicit duration units supported by the shared parser. Bare numbers shall retain each setting's documented unit, and invalid values shall be surfaced by the owning configuration reader and handled using its documented fallback or validation contract.
 
 ### 1.6 Network / Proxy Support
 
@@ -99,7 +101,7 @@ These requirements establish the overarching contract for operating RTP across m
 
 ### 1.7 Maps / Runtime Cartography
 
-These requirements establish the overarching contract for the runtime cartography chart-generation surface (in-world 2D imagery delivered through the native Minecraft cartography map). Module shape, palette policy, binding lifecycle, and renderer catalogue are design-level concerns and shall be specified in [ADR-046](../adr/ADR-046-maps-api-module.md), in `maps-api/docs/adr/`, and in [`docs/dev/scratch/CHECKLIST-maps-api.md`](scratch/CHECKLIST-maps-api.md) until that checklist is retired.
+These requirements establish the overarching contract for the runtime cartography chart-generation surface (in-world 2D imagery delivered through the native Minecraft cartography map). Module shape, palette policy, binding lifecycle, and renderer catalogue are design-level concerns and shall be specified in [ADR-046](../adr/ADR-046-maps-api-module.md), [ADR-047](../adr/ADR-047-declarative-chart-composition-bridge.md), and [maps-api-ADR-001](../../api/maps-api/docs/adr/maps-api-ADR-001-bootstrap.md).
 
 - **REQ-RTP-MAP-001 — Require-by-Contract Map Binding:** A `MapBinding` implementation shall throw `IllegalStateException` when invoked before RTP core is loaded. The exception message shall identify the missing initialization step so addons can self-diagnose without inspecting RTP internals. This requirement extends REQ-RTP-S-006 to the map-binding surface.
 
@@ -127,6 +129,14 @@ These requirements establish the overarching contract for the runtime cartograph
 
 - **REQ-RTP-OBS-006 - Queue-Growth Audit:** The system shall provide an operator-configurable threshold on the depth of the public teleport wait queue above which queue backpressure is audited. When the audit is enabled and the observed queue depth reaches or exceeds the threshold, the system shall emit a log entry at WARN level or higher and shall increment a cumulative queue-growth counter exposed through the metrics snapshot. The audit shall be edge-triggered so that a single sustained period of elevated queue depth produces a bounded number of log entries rather than one entry per evaluation. The threshold shall be configurable through the configuration mechanism, and a non-positive threshold shall disable the audit. This audit shall not be conflated with the teleport-failure accounting of REQ-RTP-S-004.
 
+### 1.9 Operability
+
+These requirements bound what an operator must do to run the system and what the system must tell the operator. Terms: *operator* and *operator surface* are defined in [GLOSSARY.md](GLOSSARY.md).
+
+- **REQ-RTP-OPS-001 - Working Defaults:** With the shipped configuration and no edits, the system shall teleport players to safe locations on every platform and version that [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) classifies as Tested. Required operator setup shall be limited to installing the distribution artifact and the platform prerequisites listed in [`QUICK_START.md`](../admin/QUICK_START.md). A feature that cannot work without further operator setup shall be disabled by default and shall document that setup with the feature, as network mode does (REQ-RTP-NET-001).
+
+- **REQ-RTP-OPS-002 - Explained Backpressure:** When one of the following reduces or pauses RTP's background work, the system shall report the cause, and the configured value it was compared against where there is one, on at least one operator surface: the tick-health gate (`minTPS`, `maxMSPT`, stalled tick), the heap gate (`maxHeapPercent`), the per-region circuit breaker, and any mechanism that lowers a `performance.yml` value below its configured setting in response to server load. A sustained condition shall produce a bounded number of log entries, not one per evaluation. Refusals of player requests are covered by REQ-RTP-S-004.
+
 ## 2. Non-Functional Requirements
 
 ### 2.1 Fault Tolerance
@@ -141,7 +151,7 @@ These requirements establish the overarching contract for the runtime cartograph
 ## 3. Prohibition Requirements
 
 These requirements describe prohibited behaviours. Each maps to one or more hazards in
-[`HAZARDS.md`](../admin/HAZARDS.md).
+[`HAZARDS.md`](HAZARDS.md).
 
 - **REQ-RTP-S-001 — No Lethal Teleport Destination:** The system shall not teleport a player to
   a location where the landing block or surrounding blocks are lava, fire, magma, void air, or
@@ -157,7 +167,11 @@ These requirements describe prohibited behaviours. Each maps to one or more haza
 
 - **REQ-RTP-S-004 — No Silent Failure:** The system shall not silently discard a teleport
   request. Every failure (empty queue, invalid region, permission denied, safety rejection) shall
-  produce a player-visible message and a log entry at WARN level or higher.
+  produce a player-visible message and a log entry at WARN level or higher. Every other outcome
+  a player can observe (teleport completed, teleport delayed, waiting in the queue, refused by
+  cooldown, cost or usage limit) shall produce a player-visible message; these outcomes do not
+  require a log entry. A message the operator has configured blank satisfies the player-visible
+  part; the WARN log entry for a failure still applies.
   - *Compliance Note:* Malformed command inputs are intentionally tested by `rtp test commands-live`
     to ensure they produce these required warnings. Expect `Level.WARNING` logs during test execution.
 
@@ -171,5 +185,5 @@ These requirements describe prohibited behaviours. Each maps to one or more haza
   instead.
 
 ## 4. System Requirements
-- **REQ-RTP-SYS-001 — Runtime Environment:** The system shall run on Java 17 or higher, together with the Java runtime that the host Minecraft version itself requires (Java 17 for 1.18-1.20.4, Java 21 for 1.20.5-1.21.x, Java 25 for 26.x). The shared platform-neutral modules (`rtp-api`, `rtp-core`, `anvil-api`, `yaml-api`, `commands-api`, `effects-api`, `metrics-api`, `bstats-api`, `maps-api`, `rtp-proxy-common`), the pre-1.20.5 platform carriers with their common modules, and the `rtp-plugin` entry points shall compile to Java 17 bytecode (classfile 61) per [ADR-113](../adr/ADR-113-java-17-baseline-and-26x-support-boundary.md).
+- **REQ-RTP-SYS-001 — Runtime Environment:** The system shall run on Java 17 or higher, together with the Java runtime that the host Minecraft version itself requires (Java 17 for 1.18-1.20.4, Java 21 for 1.20.5-1.21.x, Java 25 for 26.x). The shared platform-neutral modules (`rtp-api`, `rtp-core`, `anvil-api`, `bit-api`, `bstats-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `server-api`, `tags-api`, `units-api`, `yaml-api`, `rtp-proxy-common`), the pre-1.20.5 platform carriers with their common modules, and the `rtp-plugin` entry points shall compile to Java 17 bytecode (classfile 61) per [ADR-113](../adr/ADR-113-java-17-baseline-and-26x-support-boundary.md).
 - **REQ-RTP-SYS-002 — Server Software:** The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia), with Fabric, and with NeoForge. All platforms are delivered through dedicated native platform adapters; rationale and decisions are recorded in [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) and [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md).

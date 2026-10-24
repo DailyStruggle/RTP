@@ -1,4 +1,4 @@
-# RTP Network Mode (multi-server / proxy). Documentation: plugins/RTP/docs/admin/proxies/CONFIGURATION.md
+# RTP Network Mode (multi-server / proxy). Documentation: docs/admin/proxies/CONFIGURATION.md
 
 # Off by default. Set network.enabled true to use it.
 network:
@@ -53,11 +53,13 @@ transport:
 # How servers tell each other they're alive.
 heartbeat:
   # How often to report this server (ms).
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 1000
   intervalMs: 1000
 
   # How long a server is trusted after its last report (ms). Keep above intervalMs.
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
@@ -92,16 +94,19 @@ queue:
   maxDepth: 50
 
   # How often to send updates (ms).
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
 
   # How often to refresh each player's progress (ms).
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
 
-  # Auto-clean old entries after this long (ms). 0 = off.
+  # Cancel non-terminal entries whose last status update is this old (ms). 0 = off.
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 0
   entryTtlMs: 0
@@ -124,11 +129,13 @@ queue:
 # Held spots for traveling players.
 reservation:
   # How often to clean up expired holds (ms).
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
 
   # How long a held spot lasts before it's freed (ms).
+  # Supports duration units (e.g. 24h, 1d).
   # @type: integer
   # @default: 60000
   ttlMs: 60000
@@ -160,7 +167,7 @@ regionCollision:
 #    # @type: boolean
 #    # @default: true
 #    allow-when-unavailable: true
-# Picks the best server for a plain /rtp. Lowest score wins. Documentation: plugins/RTP/docs/admin/proxies/CONFIGURATION.md
+# Picks the best server for a plain /rtp. Lowest score wins. Documentation: docs/admin/proxies/CONFIGURATION.md
 loadBalancer:
   # Weight of the built-in scarcity term. 0 = the `region` term handles it.
   # @type: number
@@ -314,6 +321,7 @@ editor:
   # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
   trust:
     # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # Supports duration units (e.g. 24h, 1d).
     # @type: integer
     # @default: 0
     maxAgeDays: 0

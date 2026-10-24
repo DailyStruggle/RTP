@@ -5,11 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -34,7 +34,7 @@ public class VersionCmdTest {
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new SelectionAPI();
+        ActiveSelection.set(new SelectionAPI());
         versionCmd = new VersionCmd(null);
     }
 

@@ -77,6 +77,12 @@ infoTopRejectionCause: "&7Voornaamste afwijzingsoorzaak: #7E9CC8[genTopRejection
 # Plaatshouder: [genFailureBreakdown] - door komma's gescheiden lijst van oorzaak=N, drukste eerst.
 infoFailureBreakdown: "&7Afwijzingen per oorzaak: #7E9CC8[genFailureBreakdown]"
 
+# Adaptieve compute-governor: geconfigureerde vs. effectieve budgetten en reden.
+infoGovernorAsync: "&7Achtergrond-async: #7E9CC8[govAsyncConfiguredMs]&7 ms (effectief #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Achtergrond-sync: #7E9CC8[govSyncConfiguredMs]&7 ms (effectief #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Hot-cachelimiet: #7E9CC8[govHotCapConfigured]&7 (effectief #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Generatie: #7E9CC8[govGenConfigured]&7 (effectief #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; regionaal actief #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Drempelwaarden voor statuskleuren. Gebruikt om de gekleurde varianten
 # van plaatshouders (bijv. [tps1mColoured]) groen/geel/rood te kleuren.
 infoThresholdTpsGreen: 19.5
@@ -510,5 +516,6 @@ editorApplyFetching: "&7[P0] Configuratiepayload wordt opgehaald..."
 editorApplyValidating: "&7[P0] Integriteit en syntaxis van de payload worden gecontroleerd..."
 editorApplySuccess: "&a[P0] Configuratie toegepast en live herladen! (.bak-kopieën gemaakt van gewijzigde bestanden)"
 editorApplyFailed: "&c[P0] De payload kon niet worden toegepast: [reason]"
+editorApplyRejected: "&c[P0] Toepassen geweigerd: [count] configuratiefout(en); er is niets geschreven. Eerste: [code] in [source] bij [path]."
 
 version: 1.0

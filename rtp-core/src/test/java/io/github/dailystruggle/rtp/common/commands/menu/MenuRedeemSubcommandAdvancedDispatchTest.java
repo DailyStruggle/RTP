@@ -12,9 +12,11 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -264,7 +266,7 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
 
         // Seed 'default' parser into the regions MultiConfigParser so construct(name) has a template
         MultiConfigParser<?> regionsParser = null;
-        for (MultiConfigParser<?> p : RTP.configs.multiConfigParserMap.values()) {
+        for (MultiConfigParser<?> p : ActiveConfigs.get().multiConfigParserMap.values()) {
             if (p != null && "regions".equalsIgnoreCase(p.name)) {
                 regionsParser = p;
                 break;
@@ -299,7 +301,7 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
         assertFalse(regionsParser.listParsers().contains("custom_region"));
 
         // Close any open streams/parsers on the temp files so file deletion can happen cleanly
-        RTP.configs = null;
+        ActiveConfigs.set(null);
     }
 
     @Test
@@ -310,7 +312,7 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
         UUID viewer = UUID.randomUUID();
 
         MultiConfigParser<?> regionsParser = null;
-        for (MultiConfigParser<?> p : RTP.configs.multiConfigParserMap.values()) {
+        for (MultiConfigParser<?> p : ActiveConfigs.get().multiConfigParserMap.values()) {
             if (p != null && "regions".equalsIgnoreCase(p.name)) {
                 regionsParser = p;
                 break;
@@ -342,7 +344,7 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
         assertTrue(full.dispatchMultiConfigMutate(viewer,
                 new MenuAction.MultiConfigMutate("regions", "viewonly_keep", MenuAction.MultiConfigMutate.Op.REMOVE),
                 m -> {}));
-        RTP.configs = null;
+        ActiveConfigs.set(null);
     }
 
     // ------------------------------------------------------------------------
@@ -488,18 +490,18 @@ public class MenuRedeemSubcommandAdvancedDispatchTest {
 
     @Test
     void miscAsyncTasksPrecedent_executesSeedMirrorTree() {
-        // Precedent for tasking: drain RTP.getInstance().miscAsyncTasks
+        // Precedent for tasking: drain MiscTasks.async()
         MenuRedeemSubcommand wired = wired(allow());
         // Verify before drain that mirror command lookup may not have children yet
         // Drain miscAsyncTasks pipe to execute delayed RTPRunnable(seedMirrorTree, 10)
         for (int i = 0; i < 15; i++) {
-            RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE);
+            MiscTasks.async().execute(Long.MAX_VALUE);
         }
         // Sibling commands should now be mirrored under wired
         assertNotNull(wired.getCommandLookup());
         // Second call is idempotent
         for (int i = 0; i < 5; i++) {
-            RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE);
+            MiscTasks.async().execute(Long.MAX_VALUE);
         }
     }
 

@@ -1,11 +1,13 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,12 +78,12 @@ public class ReqRtpAdr065WorldRegionTeleportTrapTest {
         // Drive the queue path with a null sender so the rtp.unqueued shortcut
         // (MockRTPCommandSender.hasPermission always returns true) is bypassed;
         // the only reason to take the fast path here must be the not-pumped check.
-        RTP.serverAccessor.getLocationGenerator()
+        RTPRuntime.serverAccessor().getLocationGenerator()
                 .getLocation(synthetic, null, player, null);
 
         assertFalse(synthetic.queueManager.playerQueue.contains(playerId),
                 "un-pumped world-override region must not enqueue the player (teleport trap)");
-        assertFalse(RTP.getInstance().queuedPlayers.contains(playerId),
+        assertFalse(TeleportSessions.current().queuedPlayers.contains(playerId),
                 "un-pumped world-override region must not mark the player as queued (teleport trap)");
     }
 
@@ -95,7 +97,7 @@ public class ReqRtpAdr065WorldRegionTeleportTrapTest {
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void pumpedRegion_stillEnqueuesPlayer() {
         Region pumped = buildRegion("pumped_region");
-        RTP.selectionAPI.permRegionLookup.put(pumped.name, pumped);
+        ActiveSelection.get().permRegionLookup.put(pumped.name, pumped);
 
         UUID playerId = UUID.randomUUID();
         MockRTPPlayer player =
@@ -103,7 +105,7 @@ public class ReqRtpAdr065WorldRegionTeleportTrapTest {
                         new RTPLocation(world, 0, 64, 0));
         accessor.addPlayer(player);
 
-        RTP.serverAccessor.getLocationGenerator()
+        RTPRuntime.serverAccessor().getLocationGenerator()
                 .getLocation(pumped, null, player, null);
 
         assertTrue(pumped.queueManager.playerQueue.contains(playerId),

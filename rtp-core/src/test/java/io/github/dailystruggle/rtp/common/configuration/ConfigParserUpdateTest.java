@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,10 +29,10 @@ class ConfigParserUpdateTest {
         pluginDir = tempDir.resolve("RTP").toFile();
         pluginDir.mkdirs();
 
-        // Mock RTP.serverAccessor for ConfigParser.saveResource
+        // Mock RTPRuntime.serverAccessor() for ConfigParser.saveResource
         RTPServerAccessor mockAccessor = mock(RTPServerAccessor.class);
         when(mockAccessor.getPluginDirectory()).thenReturn(pluginDir);
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
 
         db = new YamlFileDatabase(pluginDir);
         db.connect();

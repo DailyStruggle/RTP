@@ -1,0 +1,1560 @@
+package io.github.dailystruggle.rtp.common.placeholders;
+
+import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionContext;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.tasks.ScanProgressView;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
+import io.github.dailystruggle.rtp.common.tools.ColourBands;
+import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
+import io.github.dailystruggle.rtp.common.tools.ParseString;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+
+public class PlaceholderProvider {
+    private PlaceholderProvider() {}
+    public static final Map<String, Function<UUID, String>> placeholders = new ConcurrentHashMap<>();
+
+    /**
+     * Per-thread cache for {@link MetricsSnapshot} so message-formatting passes
+     * observe a consistent atomic snapshot across all placeholder resolutions.
+     */
+    private static final ThreadLocal<MetricsSnapshot> METRICS_SNAPSHOT_CACHE = new ThreadLocal<>();
+
+    /** Install a snapshot for the current thread; pair with {@link #popSnapshot()}. */
+    public static void pushSnapshot(MetricsSnapshot snap) {
+        METRICS_SNAPSHOT_CACHE.set(snap);
+    }
+
+    /** Clear any snapshot installed for the current thread. */
+    public static void popSnapshot() {
+        METRICS_SNAPSHOT_CACHE.remove();
+    }
+
+    /**
+     * Return the snapshot in scope for the current thread, or a fresh
+     * {@code CoreMetrics.instance().snapshot()} if none. Never returns {@code null}.
+     */
+    public static MetricsSnapshot currentSnapshot() {
+        MetricsSnapshot snap = METRICS_SNAPSHOT_CACHE.get();
+        if (snap != null) return snap;
+        return CoreMetrics.instance().snapshot();
+    }
+
+    /**
+     * {@code true} when the active binding has sampled a live server TPS (i.e. the
+     * snapshot's {@code tps1m} is not the {@link MetricsSnapshot#UNSAMPLED} sentinel).
+     * Used by {@code /rtp info} to suppress the {@code n/a} TPS row when no live
+     * metrics binding is installed.
+     */
+    public static boolean hasLiveTps() {
+        return !Double.isNaN(currentSnapshot().tps1m);
+    }
+
+    /**
+     * {@code true} when the active binding has sampled a live server MSPT. Used by
+     * {@code /rtp info} to suppress the {@code n/a} MSPT rows when no live metrics
+     * binding is installed.
+     */
+    public static boolean hasLiveMspt() {
+        return !Double.isNaN(currentSnapshot().mspt);
+    }
+
+    /**
+     * {@code true} when a database round-trip latency has been recorded (the RTP
+     * extension reports a non-negative value). Used by {@code /rtp info} to suppress
+     * the {@code n/a} database-latency row before any query has run.
+     */
+    public static boolean hasDatabaseLatency() {
+        return currentRtpExt().databaseLatencyMs >= 0;
+    }
+
+    /**
+     * Number of pipeline-latency samples currently in the ring (0 when no teleport
+     * has completed yet). Used by {@code /rtp info} to suppress the {@code n/a}
+     * average-latency and percentile rows before any sample exists.
+     */
+    public static int pipelineSampleCount() {
+        return currentPercentiles().sampleCount;
+    }
+
+    /**
+     * Return the RTP-specific extension on the current snapshot, or a zeroed
+     * fallback if absent (e.g. NOOP binding). Never returns {@code null}.
+     */
+    private static RTPMetricsExtension currentRtpExt() {
+        RTPMetricsExtension ext = currentSnapshot().extension(RTPMetricsExtension.class);
+        return (ext != null) ? ext : new RTPMetricsExtension(0, 0, 0, 0, Double.NaN, -1);
+    }
+
+    /**
+     * Point-in-time pipeline-latency percentiles (ADR-053 section 1). Reads the
+     * {@code CoreMetrics}-owned {@link io.github.dailystruggle.rtp.common.metrics.PipelineHistogram};
+     * if the read throws, returns an all-{@code NaN} (zero-sample) snapshot. Never returns
+     * {@code null}.
+     */
+    private static io.github.dailystruggle.rtp.common.metrics.PipelineHistogram.Percentiles currentPercentiles() {
+        try {
+            return CoreMetrics.instance().pipelineHistogram().percentiles();
+        } catch (Throwable ignored) {
+            // fall through to the empty readout
+        }
+        return new io.github.dailystruggle.rtp.common.metrics.PipelineHistogram.Percentiles(
+                Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN,
+                Double.NaN, Double.NaN, 0);
+    }
+
+    /** Renders a percentile value in ms (2 dp), or {@code "n/a"} when unsampled. */
+    private static String formatPercentile(double v) {
+        return (Double.isNaN(v) || Double.isInfinite(v)) ? "n/a" : String.format("%.2f", v);
+    }
+
+    /**
+     * Run {@code body} with one freshly-captured snapshot installed for the current thread.
+     * Snapshot is captured by {@code CoreMetrics.instance().snapshot()} exactly once at entry and
+     * is cleared on exit (even on exception).
+     */
+    public static void withSnapshot(Runnable body) {
+        MetricsSnapshot prior = METRICS_SNAPSHOT_CACHE.get();
+        METRICS_SNAPSHOT_CACHE.set(CoreMetrics.instance().snapshot());
+        try {
+            body.run();
+        } finally {
+            if (prior == null) METRICS_SNAPSHOT_CACHE.remove();
+            else METRICS_SNAPSHOT_CACHE.set(prior);
+        }
+    }
+
+    static {
+        placeholders.put(
+                "delay",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    if (RTPRuntime.serverAccessor() == null) return "0";
+                    RTPCommandSender commandSender = RTPRuntime.serverAccessor().getSender(uuid);
+                    Number n = ConfigParser.parseSecondsDurationMillis(
+                            ActiveConfigs.get().getConfigValue(ConfigKeys.teleportDelay, 0), 0L) / 1000L;
+                    int n2 = ParsePermissions.getInt(commandSender, "rtp.delay.");
+                    if (n2 >= 0) n = n2;
+                    if (n.longValue() == 0) return "0";
+
+                    long time = n.longValue();
+                    long days = TimeUnit.SECONDS.toDays(time);
+                    long hours = TimeUnit.SECONDS.toHours(time) % 24;
+                    long minutes = TimeUnit.SECONDS.toMinutes(time) % 60;
+                    long seconds = time % 60;
+
+                    String replacement = "";
+                    if (days > 0)
+                        replacement += days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
+                    if (hours > 0)
+                        replacement +=
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                    if (minutes > 0)
+                        replacement +=
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                    if (seconds > 0)
+                        replacement += seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
+                    return replacement;
+                });
+        placeholders.put(
+                "cooldown",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "A";
+                    if (RTPRuntime.serverAccessor() == null) return "B";
+                    RTPCommandSender commandSender = RTPRuntime.serverAccessor().getSender(uuid);
+                    Number n = ConfigParser.parseSecondsDurationMillis(
+                            ActiveConfigs.get().getConfigValue(ConfigKeys.teleportCooldown, 0), 0L) / 1000L;
+                    int n2 = ParsePermissions.getInt(commandSender, "rtp.cooldown.");
+                    if (n2 >= 0) n = n2;
+
+                    long time = n.longValue();
+                    if (time <= 0) time = 0;
+                    long days = TimeUnit.SECONDS.toDays(time);
+                    long hours = TimeUnit.SECONDS.toHours(time) % 24;
+                    long minutes = TimeUnit.SECONDS.toMinutes(time) % 60;
+                    long seconds = time % 60;
+
+                    String replacement = "";
+                    if (days > 0)
+                        replacement += days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
+                    if (hours > 0)
+                        replacement +=
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                    if (minutes > 0)
+                        replacement +=
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                    if (seconds > 0)
+                        replacement += seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
+                    return replacement;
+                });
+        placeholders.put(
+                "remainingCooldown",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "A";
+                    if (RTPRuntime.serverAccessor() == null) return "B";
+
+                    long start = System.currentTimeMillis();
+
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
+                    if (sender != null) {
+                        long lastTime = RTP.getEffectiveLastTeleportTime(uuid);
+                        if (lastTime <= 0L) lastTime = start;
+
+                        long n = sender.cooldown();
+
+                        long currTime = (start - lastTime);
+                        long remainingTime = currTime < 0L ? 0L : n - currTime;
+                        if (remainingTime < 0) remainingTime = 0;
+
+                        long days = TimeUnit.MILLISECONDS.toDays(remainingTime);
+                        long hours = TimeUnit.MILLISECONDS.toHours(remainingTime) % 24;
+                        long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingTime) % 60;
+                        long seconds = TimeUnit.MILLISECONDS.toSeconds(remainingTime) % 60;
+                        long millis = remainingTime % 1000;
+                        if (millis > 500 && seconds > 0) {
+                            seconds++;
+                            millis = 0;
+                        }
+
+                        String replacement = "";
+                        if (days > 0)
+                            replacement +=
+                                    days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
+                        if (hours > 0)
+                            replacement +=
+                                    hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                        if (minutes > 0)
+                            replacement +=
+                                    minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                        if (seconds > 0) {
+
+                            replacement +=
+                                    seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
+                        }
+                        if (seconds < 2) {
+                            replacement += millis + ActiveConfigs.get().getConfigValue(PlayerMessages.millis, "").toString();
+                        }
+                        return replacement;
+                    }
+                    return "C";
+                });
+        placeholders.put(
+                "remainingLockTime",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
+                    if (cfg == null) return "";
+                    long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+                    long resetMillis =
+                            ConfigParser.parseSecondsDurationMillis(
+                                    cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
+                    long remainingTime = ActiveDatabase.teleportLimitStore().millisUntilReset(
+                            uuid, cap, resetMillis, System.currentTimeMillis());
+                    if (remainingTime <= 0) return "";
+
+                    long days = TimeUnit.MILLISECONDS.toDays(remainingTime);
+                    long hours = TimeUnit.MILLISECONDS.toHours(remainingTime) % 24;
+                    long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingTime) % 60;
+                    long seconds = TimeUnit.MILLISECONDS.toSeconds(remainingTime) % 60;
+
+                    String replacement = "";
+                    if (days > 0)
+                        replacement +=
+                                days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
+                    if (hours > 0)
+                        replacement +=
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                    if (minutes > 0)
+                        replacement +=
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                    if (seconds > 0)
+                        replacement +=
+                                seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
+                    // Sub-second remainder: show at least "1s" so the clock is never blank
+                    // while the player is still locked.
+                    if (replacement.isEmpty())
+                        replacement = "1" + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
+                    return replacement.trim();
+                });
+        placeholders.put(
+                "remaining_lock_time",
+                placeholders.get("remainingLockTime"));
+        placeholders.put(
+                "lockUses",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
+                    if (cfg == null) return "0";
+                    long resetMillis =
+                            ConfigParser.parseSecondsDurationMillis(
+                                    cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
+                    long uses = ActiveDatabase.teleportLimitStore().uses(
+                            uuid, resetMillis, System.currentTimeMillis());
+                    return String.valueOf(uses);
+                });
+        placeholders.put(
+                "lock_uses",
+                placeholders.get("lockUses"));
+        placeholders.put(
+                "remainingLockUses",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
+                    if (cfg == null) return "0";
+                    long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+                    if (cap <= 0) return "0";
+                    long resetMillis =
+                            ConfigParser.parseSecondsDurationMillis(
+                                    cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
+                    long uses = ActiveDatabase.teleportLimitStore().uses(
+                            uuid, resetMillis, System.currentTimeMillis());
+                    long remaining = cap - uses;
+                    return String.valueOf(Math.max(0L, remaining));
+                });
+        placeholders.put(
+                "remaining_lock_uses",
+                placeholders.get("remainingLockUses"));
+        placeholders.put(
+                "lockLimit",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    ConfigParser<ConfigKeys> cfg =
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
+                    if (cfg == null) return "0";
+                    long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
+                    return String.valueOf(Math.max(0L, cap));
+                });
+        placeholders.put(
+                "lock_limit",
+                placeholders.get("lockLimit"));
+        placeholders.put(
+                "lockAfterUses",
+                placeholders.get("lockLimit"));
+        placeholders.put(
+                "lock_after_uses",
+                placeholders.get("lockLimit"));
+        placeholders.put(
+                "queueLocation",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+                    return String.valueOf(teleportData.queueLocation);
+                });
+        placeholders.put(
+                "tickets",
+                uuid ->{
+                    long res = 0;
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
+                        res += world.activeChunkTickets.get();
+                    }
+                    return String.valueOf(res);
+                });
+
+        placeholders.put(
+                "plugin_forced",
+                uuid -> {
+                    long res = 0;
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
+                        res += world.numForceLoaded();
+                    }
+                    return String.valueOf(res);
+                });
+
+        placeholders.put(
+                "server_forced",
+                uuid -> {
+                    long res = 0;
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
+                        res += world.getServerForceLoadedCount().join();
+                    }
+                    return String.valueOf(res);
+                });
+
+        placeholders.put(
+                "teleports",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    return String.valueOf(TeleportSessions.current().latestTeleportData.values().stream().filter(teleportData -> !teleportData.completed).count());
+                });
+
+        placeholders.put(
+                "loads",
+                uuid -> {
+                    long totalLoads = 0;
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
+                        totalLoads += world.totalChunkLoads.get();
+                    }
+                    return String.valueOf(totalLoads);
+                });
+
+        placeholders.put(
+                "loadsByOrigin",
+                uuid -> {
+                    // Aggregate per-origin chunk-load counts across all worlds. Each
+                    // origin tag is registered by RTPWorld.recordChunkLoadOrigin at
+                    // every getOrLoadChunk(cx,cz,origin) call site (QueueTask.*,
+                    // PregenTask.*, ScanTask.fullLoad, Region.coldPromote, etc.).
+                    // Formatted as a comma-separated "tag=N" list, sorted by count
+                    // descending so the noisiest origin sits first. Empty when no
+                    // origin has been recorded yet (e.g. fresh server, no loads).
+                    java.util.Map<String, Long> totals = new java.util.HashMap<>();
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
+                        world.chunkLoadsByOrigin.forEach((tag, ctr) ->
+                                totals.merge(tag, ctr.get(), Long::sum));
+                    }
+                    if (totals.isEmpty()) return "";
+                    return totals.entrySet().stream()
+                            .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                            .map(e -> e.getKey() + "=" + e.getValue())
+                            .collect(java.util.stream.Collectors.joining(", "));
+                });
+
+        placeholders.put(
+                "leakRate",
+                uuid -> {
+                    // Leak rate: fraction of cumulative issued tickets flagged as orphaned by GC sweep.
+                    // Uses lifetimeTicketsIssued as denominator to account for all ticket acquisitions.
+                    long lifetimeOrphaned = 0;
+                    long ticketsIssued = 0;
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
+                        lifetimeOrphaned += world.lifetimeOrphanedTicketsScanned.get();
+                        ticketsIssued += world.lifetimeTicketsIssued.get();
+                    }
+                    double leakRate = (ticketsIssued > 0) ? ((double) lifetimeOrphaned / ticketsIssued) * 100.0 : 0.0;
+                    return String.format("%.4f%%", leakRate);
+                });
+
+        // --- Metrics SPI placeholders ---
+        // All read a single MetricsSnapshot via currentSnapshot().
+        placeholders.put(
+                "queueDepth",
+                uuid -> String.valueOf(currentRtpExt().queueDepth));
+        placeholders.put(
+                "pendingTeleports",
+                uuid -> String.valueOf(currentRtpExt().pendingTeleports));
+        placeholders.put(
+                "avgPipelineMs",
+                uuid -> {
+                    double v = currentRtpExt().avgPipelineMs;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        // ADR-053 section 1 / REQ-RTP-OBS-004: pipeline-latency percentiles, computed on demand by
+        // sorting a point-in-time copy of the bounded histogram ring. Read directly off the
+        // CoreMetrics-owned PipelineHistogram (not the snapshot extension) since percentiles are
+        // a read-path over the same data; render "n/a" until the first sample lands.
+        placeholders.put("pipelineMsP50", uuid -> formatPercentile(currentPercentiles().p50));
+        placeholders.put("pipelineMsP75", uuid -> formatPercentile(currentPercentiles().p75));
+        placeholders.put("pipelineMsP90", uuid -> formatPercentile(currentPercentiles().p90));
+        placeholders.put("pipelineMsP95", uuid -> formatPercentile(currentPercentiles().p95));
+        placeholders.put("pipelineMsP99", uuid -> formatPercentile(currentPercentiles().p99));
+        placeholders.put("pipelineSampleCount",
+                uuid -> String.valueOf(currentPercentiles().sampleCount));
+        // ADR-053 section 2a / REQ-RTP-OBS-005: slow-teleport audit (immediate/unqueued only).
+        placeholders.put("slowPipelineCount",
+                uuid -> String.valueOf(currentRtpExt().slowPipelineCount));
+        placeholders.put("slowPipelineThresholdMs",
+                uuid -> {
+                    long t = currentRtpExt().slowPipelineThresholdMs;
+                    return (t <= 0L) ? "disabled" : String.valueOf(t);
+                });
+        // ADR-053 section 2b / REQ-RTP-OBS-006: queue-growth audit.
+        placeholders.put("queueGrowthWarnCount",
+                uuid -> String.valueOf(currentRtpExt().queueGrowthWarnCount));
+        placeholders.put("queueGrowthWarnThreshold",
+                uuid -> {
+                    int t = currentRtpExt().queueGrowthWarnThreshold;
+                    return (t <= 0) ? "disabled" : String.valueOf(t);
+                });
+        placeholders.put(
+                "heapUsedMb",
+                uuid -> String.valueOf(currentSnapshot().heapUsedMb()));
+        placeholders.put(
+                "heapMaxMb",
+                uuid -> {
+                    long mb = currentSnapshot().heapMaxMb();
+                    return (mb < 0) ? "unbounded" : String.valueOf(mb);
+                });
+        placeholders.put(
+                "memoryEntries",
+                uuid -> String.valueOf(currentRtpExt().memoryTrackerEntries));
+        placeholders.put(
+                "chunkLoadBacklog",
+                uuid -> String.valueOf(currentRtpExt().chunkLoadBacklog));
+        // Additional Metrics SPI placeholders - TPS / MSPT / capacity /
+        // database latency / tick budget. Each renders the documented sentinel (NaN
+        // tps/mspt, -1 db latency, 0 softCap) as "n/a" / "unbounded" so locales can
+        // surface "metrics unavailable" deterministically when the NOOP binding is live.
+        placeholders.put(
+                "tps1m",
+                uuid -> {
+                    double v = currentSnapshot().tps1m;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "tps5m",
+                uuid -> {
+                    double v = currentSnapshot().tps5m;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "tps15m",
+                uuid -> {
+                    double v = currentSnapshot().tps15m;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "mspt",
+                uuid -> {
+                    double v = currentSnapshot().mspt;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "tickBudgetUtilisation",
+                uuid -> {
+                    double v = currentSnapshot().tickBudgetUtilisation;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.1f%%", v * 100.0);
+                });
+        placeholders.put(
+                "softCap",
+                uuid -> {
+                    int v = currentSnapshot().softCap;
+                    return (v <= 0) ? "unbounded" : String.valueOf(v);
+                });
+        placeholders.put(
+                "playerCount",
+                uuid -> String.valueOf(currentSnapshot().playerCount));
+        placeholders.put(
+                "databaseLatencyMs",
+                uuid -> {
+                    int v = currentRtpExt().databaseLatencyMs;
+                    return (v < 0) ? "n/a" : String.valueOf(v);
+                });
+        // Generation-outcome placeholders (ADR-052). Read directly off the process-global
+        // RtpOutcomeStats.GLOBAL accumulator (the same read-directly pattern the ADR-053
+        // percentiles use for the CoreMetrics histogram) rather than threading through the
+        // MetricsSnapshot extension: these counters are wait-free and process-global, so a
+        // direct read needs no snapshot round-trip. They surface the operator-facing
+        // success/failure rate and per-cause rejection breakdown (the analogue of a
+        // competitor's "/rtp unsafe-stats") in /rtp info.
+        placeholders.put(
+                "genSuccessRate",
+                uuid -> {
+                    double r = io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.successRate();
+                    return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", r * 100.0);
+                });
+        placeholders.put(
+                "genFailureRate",
+                uuid -> {
+                    double r = io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.successRate();
+                    return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", (1.0 - r) * 100.0);
+                });
+        placeholders.put(
+                "genOutcomeTotal",
+                uuid -> {
+                    io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats stats =
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL;
+                    return String.valueOf(stats.successCount() + stats.totalFailures());
+                });
+        placeholders.put(
+                "genFailureBreakdown",
+                uuid -> {
+                    Map<io.github.dailystruggle.rtp.common.selection.model.FailTypes, Long>
+                            breakdown =
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                    // Comma-separated "cause=N" list, omitting zero buckets, busiest first.
+                    String out = breakdown.entrySet().stream()
+                            .filter(e -> e.getValue() > 0L)
+                            .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                            .map(e -> e.getKey().name() + "=" + e.getValue())
+                            .collect(java.util.stream.Collectors.joining(", "));
+                    return out.isEmpty() ? "none" : out;
+                });
+        placeholders.put(
+                "genTopRejectionCause",
+                uuid -> {
+                    Map<io.github.dailystruggle.rtp.common.selection.model.FailTypes, Long>
+                            breakdown =
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                    return breakdown.entrySet().stream()
+                            .filter(e -> e.getValue() > 0L)
+                            .max(java.util.Map.Entry.comparingByValue())
+                            .map(e -> e.getKey().name())
+                            .orElse("none");
+                });
+        placeholders.put(
+                "genTopRejectionShare",
+                uuid -> {
+                    Map<io.github.dailystruggle.rtp.common.selection.model.FailTypes, Long>
+                            breakdown =
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                    long total = 0L;
+                    long top = 0L;
+                    for (long v : breakdown.values()) {
+                        total += v;
+                        if (v > top) top = v;
+                    }
+                    if (total == 0L) return "n/a";
+                    return String.format("%.1f%%", ((double) top / total) * 100.0);
+                });
+        // Coloured-wrapper variants of numeric health-pipeline placeholders.
+        placeholders.put(
+                "tps1mColoured",
+                uuid -> {
+                    double v = currentSnapshot().tps1m;
+                    return ColourBands.forTps(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "tps5mColoured",
+                uuid -> {
+                    double v = currentSnapshot().tps5m;
+                    return ColourBands.forTps(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "tps15mColoured",
+                uuid -> {
+                    double v = currentSnapshot().tps15m;
+                    return ColourBands.forTps(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "msptColoured",
+                uuid -> {
+                    double v = currentSnapshot().mspt;
+                    return ColourBands.forMspt(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "tickBudgetUtilisationColoured",
+                uuid -> {
+                    double v = currentSnapshot().tickBudgetUtilisation;
+                    return ColourBands.forTickBudgetUtilisation(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.1f%%", v * 100.0))
+                            + "&r";
+                });
+        placeholders.put(
+                "avgPipelineMsColoured",
+                uuid -> {
+                    double v = currentRtpExt().avgPipelineMs;
+                    // avgPipelineMs is on the same lower-is-better axis as server MSPT, so
+                    // reuse the MSPT bands. A high average pipeline latency is the operator
+                    // signal that the teleport pipeline is starved or stalling.
+                    return ColourBands.forMspt(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+
+        placeholders.put(
+                "attempts",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "A";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "B";
+                    return String.valueOf(teleportData.attempts);
+                });
+        placeholders.put(
+                "processingTime",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+
+                    long time = (teleportData != null) ? teleportData.processingTime : 0L;
+
+                    long days = TimeUnit.MILLISECONDS.toDays(time);
+                    long hours = TimeUnit.MILLISECONDS.toHours(time) % 24;
+                    long minutes = TimeUnit.MILLISECONDS.toMinutes(time) % 60;
+                    long seconds = TimeUnit.MILLISECONDS.toSeconds(time) % 60;
+                    long millis = time % 1000;
+                    if (millis > 500 && seconds > 0) {
+                        seconds++;
+                        millis = 0;
+                    }
+
+                    String replacement = "";
+                    if (days > 0)
+                        replacement += days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
+                    if (hours > 0)
+                        replacement +=
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                    if (minutes > 0)
+                        replacement +=
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                    if (seconds > 0)
+                        replacement += seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
+                    if (seconds < 2) {
+                        replacement += millis + ActiveConfigs.get().getConfigValue(PlayerMessages.millis, "").toString();
+                    }
+                    return replacement;
+                });
+        placeholders.put(
+                "distance",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0.0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0.0";
+                    return String.format(java.util.Locale.US, "%.1f", teleportData.distance);
+                });
+        placeholders.put(
+                "distance_blocks",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+                    return String.valueOf(Math.round(teleportData.distance));
+                });
+        placeholders.put(
+                "distance_center",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0.0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0.0";
+                    return String.format(java.util.Locale.US, "%.1f", teleportData.distanceFromCenter);
+                });
+        placeholders.put(
+                "distance_center_blocks",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+                    return String.valueOf(Math.round(teleportData.distanceFromCenter));
+                });
+        placeholders.put(
+                "spot",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+
+                    long spot = teleportData.queueLocation;
+                    return String.valueOf(spot);
+                });
+        placeholders.put(
+                "player",
+                uuid -> {
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
+                    if (sender == null) {
+                        return "";
+                    }
+                    return sender.name();
+                });
+        placeholders.put(
+                "player_name",
+                uuid -> {
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
+                    if (sender == null) {
+                        return "";
+                    }
+                    return sender.name();
+                });
+        placeholders.put(
+                "player_status",
+                uuid -> {
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
+                    if (sender == null) {
+                        return "";
+                    }
+
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
+
+                    if (data == null) {
+                        long lastTime = RTP.getEffectiveLastTeleportTime(uuid);
+                        long elapsed = System.currentTimeMillis() - lastTime;
+                        if (lastTime > 0L && elapsed >= 0L && elapsed < sender.cooldown()) {
+                            return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
+                        }
+                        return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
+                    }
+                    if (data.completed) {
+                        long lastTime = RTP.getEffectiveLastTeleportTime(uuid);
+                        long dt = System.currentTimeMillis() - lastTime;
+                        if (lastTime > 0L && dt >= 0L && dt < sender.cooldown()) {
+                            return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
+                        }
+
+                        return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
+                    }
+
+                    RTPRunnable nextTask = data.nextTask;
+                    if (nextTask instanceof TrackableTask task) {
+                        switch (task.phaseName()) {
+                            case "TELEPORT":
+                                return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_TELEPORTING, "").toString();
+                            case "LOAD":
+                                return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_LOADING, "").toString();
+                            case "SETUP":
+                                return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_SETUP, "").toString();
+                            default:
+                                break;
+                        }
+                    }
+                    return "";
+                });
+
+        placeholders.put(
+                "total_queue_length",
+                uuid -> {
+                    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
+                    if (player == null) {
+                        return "";
+                    }
+
+                    Region region =
+                            ActiveSelection.get().getRegion(player);
+                    if (region == null) return "0";
+                    return String.valueOf(region.queueManager.getTotalQueueLength(uuid));
+                });
+
+        placeholders.put(
+                "public_queue_length",
+                uuid -> {
+                    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
+                    if (player == null) {
+                        return "";
+                    }
+
+                    Region region =
+                            ActiveSelection.get().getRegion(player);
+                    if (region == null) return "0";
+                    return String.valueOf(region.queueManager.getPublicQueueLength());
+                });
+
+        placeholders.put(
+                "personal_queue_length",
+                uuid -> {
+                    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
+                    if (player == null) {
+                        return "";
+                    }
+
+                    Region region =
+                            ActiveSelection.get().getRegion(player);
+                    if (region == null) return "0";
+                    return String.valueOf(region.queueManager.getPersonalQueueLength(uuid));
+                });
+
+        placeholders.put(
+                "teleport_world",
+                uuid -> {
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (data == null || data.selectedCoords == null) return "";
+                    return data.selectedCoords.worldName();
+                });
+
+        placeholders.put(
+                "teleport_x",
+                uuid -> {
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (data == null || data.selectedCoords == null) return "";
+                    return String.valueOf(data.selectedCoords.x());
+                });
+
+        placeholders.put(
+                "teleport_y",
+                uuid -> {
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (data == null || data.selectedCoords == null) return "";
+                    return String.valueOf(data.selectedCoords.y());
+                });
+
+        placeholders.put(
+                "teleport_z",
+                uuid -> {
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (data == null || data.selectedCoords == null) return "";
+                    return String.valueOf(data.selectedCoords.z());
+                });
+
+        placeholders.put(
+                "teleport_biome",
+                uuid -> {
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
+                    if (data == null || data.selectedCoords == null) return "";
+                    RTPWorld<?> world =
+                            RTPRuntime.serverAccessor().getRTPWorld(data.selectedCoords.worldName());
+                    if (world == null) return "";
+                    // ADR-016 section 13.1 follow-up (2026-04-20): route the biome read
+                    // through the resolved chunk so anvil-cached data is used
+                    // transparently and an ungenerated chunk is probed/loaded on
+                    // demand rather than falling to the seed-synth getter.
+                    int cx = data.selectedCoords.x() >> 4;
+                    int cz = data.selectedCoords.z() >> 4;
+                    try {
+                        io.github.dailystruggle.rtp.api.world.RTPChunk<?> chunk =
+                                world.getOrLoadChunk(cx, cz, "PlaceholderProvider.teleportBiome").get(5, TimeUnit.SECONDS);
+                        if (chunk != null) {
+                            return chunk.getBiome(
+                                    data.selectedCoords.x(),
+                                    data.selectedCoords.y(),
+                                    data.selectedCoords.z());
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        // Fall through to world-level getter on timeout/error.
+                    } catch (Exception ignored) {
+                        // Fall through to world-level getter on timeout/error.
+                    }
+                    return world.getBiome(
+                            data.selectedCoords.x(), data.selectedCoords.y(), data.selectedCoords.z());
+                });
+        placeholders.put(
+                "scan_chunks",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    Region region = RegionContext.region().get();
+                    if (region != null) {
+                        ScanProgressView task = ScanTasks.current().get(region.name);
+                        return (task != null) ? String.valueOf(task.absolutePos()) : "0";
+                    }
+                    long total = 0;
+                    for (ScanProgressView task : ScanTasks.current().values()) {
+                        if (task != null) total += task.absolutePos();
+                    }
+                    return String.valueOf(total);
+                });
+        placeholders.put(
+                "scan_totalChunks",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    Region region = RegionContext.region().get();
+                    if (region != null) {
+                        ScanProgressView task = ScanTasks.current().get(region.name);
+                        return (task != null) ? String.valueOf(task.absoluteTotal()) : "0";
+                    }
+                    long total = 0;
+                    for (ScanProgressView task : ScanTasks.current().values()) {
+                        if (task != null) total += task.absoluteTotal();
+                    }
+                    return String.valueOf(total);
+                });
+        placeholders.put(
+                "scan_cps",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0";
+                    Region region = RegionContext.region().get();
+                    if (region != null) {
+                        ScanProgressView task = ScanTasks.current().get(region.name);
+                        return (task != null) ? String.valueOf(task.cps()) : "0";
+                    }
+                    long total = 0;
+                    for (ScanProgressView task : ScanTasks.current().values()) {
+                        if (task != null) total += task.cps();
+                    }
+                    return String.valueOf(total);
+                });
+        placeholders.put(
+                "scan_regions",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "";
+                    Region region = RegionContext.region().get();
+                    if (region != null) return region.name;
+                    return String.join(", ", ScanTasks.current().keySet());
+                });
+        placeholders.put(
+                "scan_landPercentage",
+                uuid -> {
+                    if (TeleportSessions.current() == null) return "0.00";
+                    // Read ScanProgressView's good/(good+bad) tally; MemoryShape bad counts include
+                    // gap-bridged runs and outer-ring preimages, so a shape-derived ratio
+                    // drifts or clamps to 0 mid-scan.
+                    Region r = RegionContext.region().get();
+                    double pct;
+                    if (r != null) {
+                        ScanProgressView task = ScanTasks.current().get(r.name);
+                        pct = (task != null) ? task.landPercentage() : 0.0;
+                    } else {
+                        pct = averageLandPercentage(ScanTasks.current().values());
+                    }
+                    return String.format(java.util.Locale.ROOT, "%.2f", pct);
+                });
+        placeholders.put(
+                "scan_eta",
+                uuid -> {
+                    try {
+                        if (TeleportSessions.current() == null) return "0s";
+                        Region region = RegionContext.region().get();
+                        if (region != null) {
+                            ScanProgressView task = ScanTasks.current().get(region.name);
+                            long eta = (task != null) ? task.etaSeconds() : 0L;
+                            return formatEta(eta);
+                        }
+
+                        long maxEta = 0;
+                        for (ScanProgressView task : ScanTasks.current().values()) {
+                            if (task != null && task.etaSeconds() > maxEta) maxEta = task.etaSeconds();
+                        }
+
+                        return formatEta(maxEta);
+                    } catch (Exception e) {
+                        RTPRuntime.log(java.util.logging.Level.WARNING, "Placeholder resolution failed for scan_eta", e);
+                        return "0s";
+                    }
+                });
+
+        placeholders.put("world", uuid -> {
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return world.name();
+            Region region = RegionContext.region().get();
+            if (region != null) return region.getWorld().name();
+            RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
+            if (sender != null) {
+                RTPWorld senderWorld = RTPRuntime.serverAccessor().getRTPWorld(sender.uuid()); // This is wrong, sender uuid is player uuid.
+                // Wait, RTPWorld getRTPWorld(UUID) might be world UID or player UID depending on implementation.
+                // Usually it's world UID.
+                // Let's use a better way if possible.
+            }
+            return "";
+        });
+
+        placeholders.put("name", uuid -> {
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return world.name();
+            Region region = RegionContext.region().get();
+            if (region != null) return region.getWorld().name();
+            return "";
+        });
+
+        placeholders.put("region", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return region.name;
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return ActiveSelection.get().getRegion(world).name;
+            return "";
+        });
+
+        // Cosmetic, operator-configured display name for the region (the optional
+        // `displayName` config key), falling back to the region's identity name
+        // when unset. Available in any region-context message (e.g. regionInfo) as
+        // [displayName]; identity-bearing [region] is unchanged.
+        placeholders.put("displayName", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return region.displayName();
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return ActiveSelection.get().getRegion(world).displayName();
+            return "";
+        });
+
+        placeholders.put("requirePermission", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) {
+                boolean req = false;
+                EnumMap<RegionKeys, Object> data = region.getData();
+                Object o = data.getOrDefault(RegionKeys.requirePermission, false);
+                if (o instanceof Boolean) req = (Boolean) o;
+                else if (o instanceof String) {
+                    req = Boolean.parseBoolean((String) o);
+                    data.put(RegionKeys.requirePermission, req);
+                }
+                return String.valueOf(req);
+            }
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) {
+                MultiConfigParser<WorldKeys> worlds =
+                        (MultiConfigParser<WorldKeys>) ActiveConfigs.get().getParser(WorldKeys.class);
+                ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
+                return ActiveConfigs.get().getConfigValue(WorldKeys.requirePermission, false).toString();
+            }
+            return "false";
+        });
+
+        placeholders.put("override", uuid -> {
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) {
+                MultiConfigParser<WorldKeys> worlds =
+                        (MultiConfigParser<WorldKeys>) ActiveConfigs.get().getParser(WorldKeys.class);
+                ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
+                String override = ActiveConfigs.get().getConfigValue(WorldKeys.override, "[0]").toString();
+                if (override.startsWith("[") && override.endsWith("]")) {
+                    try {
+                        int num = Integer.parseInt(override.substring(1, override.length() - 1));
+                        List<RTPWorld<?>> rtpWorlds = RTPRuntime.serverAccessor().getRTPWorlds();
+                        if (num >= 0 && num < rtpWorlds.size()) {
+                            return rtpWorlds.get(num).name();
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                return override;
+            }
+            return "0";
+        });
+
+        placeholders.put("pluginForced", uuid -> {
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return String.valueOf(world.numForceLoaded());
+            return "0";
+        });
+
+        placeholders.put("serverForced", uuid -> {
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return String.valueOf(world.getServerForceLoadedCount().join());
+            return "0";
+        });
+
+        placeholders.put("shape", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return region.getShape().name;
+            return "none";
+        });
+
+        placeholders.put("cacheCap", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return String.valueOf(region.getSettings().cacheCap());
+            return "0";
+        });
+
+        placeholders.put("cached", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return String.valueOf(region.queueManager.getPublicQueueLength());
+            return "0";
+        });
+
+        placeholders.put("keptCache", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return String.valueOf(region.queueManager.keptLocations.size());
+            return "0";
+        });
+
+        // Cold - pre-verified locations whose chunks have been released ("unkept").
+        placeholders.put("unkeptCache", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return String.valueOf(region.queueManager.unkeptLocations.size());
+            return "0";
+        });
+
+        // Backlog - optional verified-pile size from the backlog buffer (ADR-028).
+        // Reports the number of Anvil-pre-filter VALIDATED entries currently
+        // waiting to be promoted into cold (the "success" pile), not the raw
+        // buffer occupancy. INVALIDATED entries are ejected eagerly in
+        // Region.processBacklog (step 2b) and UNVERIFIED entries are still
+        // in flight, so neither contributes to this number. Resolves to 0
+        // when the backlog is disabled (backlogCacheCap == 0, lite default;
+        // backlogLocations is null).
+        placeholders.put("backlogCache", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null && region.queueManager.backlogLocations != null) {
+                return String.valueOf(region.queueManager.backlogLocations.validatedSize());
+            }
+            return "0";
+        });
+
+        // Backlog capacity (ADR-028). Mirrors %rtp_cacheCap%; 0 indicates the backlog is disabled.
+        placeholders.put("backlogCacheCap", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return String.valueOf(region.getSettings().backlogCacheCap());
+            return "0";
+        });
+
+        placeholders.put("locationQueue", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return String.valueOf(region.queueManager.keptLocations.size());
+            return "0";
+        });
+
+        placeholders.put("inFlightCalculations", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) return String.valueOf(region.inFlightCalculations.get());
+            return "0";
+        });
+
+        placeholders.put("worldBorderOverride", uuid -> {
+            Region region = RegionContext.region().get();
+            if (region != null) {
+                boolean wbo = false;
+                EnumMap<RegionKeys, Object> data = region.getData();
+                Object o = data.getOrDefault(RegionKeys.worldBorderOverride, false);
+                if (o instanceof Boolean) wbo = (Boolean) o;
+                else if (o instanceof String) {
+                    wbo = Boolean.parseBoolean((String) o);
+                    data.put(RegionKeys.worldBorderOverride, wbo);
+                }
+                return String.valueOf(wbo);
+            }
+            return "false";
+        });
+
+        // --- Persistent learned-state ([mem*]) placeholders -----------------
+        // Read-only roll-up of a region's MemoryShape learned state (the same
+        // data exportDebugJson persists). Surfaced by /rtp info region:<name>.
+        // Resolve to "N/A" when the region's selector is not a MemoryShape or
+        // has not been scanned yet. No chunk I/O, no scan is triggered.
+        placeholders.put("memCoveragePct", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
+            return s == null ? "N/A" : formatPercent(s.coveragePercent());
+        });
+
+        placeholders.put("memBadPct", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
+            return s == null ? "N/A" : formatPercent(s.badPercent());
+        });
+
+        placeholders.put("memBadCount", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
+            return s == null ? "N/A" : String.valueOf(s.badCount());
+        });
+
+        placeholders.put("memTopCause", uuid -> {
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
+            return s == null ? "N/A" : s.topCause();
+        });
+
+        placeholders.put(
+                "memTopCausePct",
+                uuid -> {
+                    MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
+                    return s == null ? "N/A" : formatPercent(s.topCausePercent());
+                });
+
+        // --- Adaptive Compute Governor placeholders (ADR-087 Section 6.2, ADR-124 Section 7) ---
+        placeholders.put(
+                "govAsyncConfiguredMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredAsyncBudgetMs()));
+        placeholders.put(
+                "govAsyncEffectiveMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectiveAsyncBudgetMs()));
+        placeholders.put(
+                "govAsyncReason",
+                uuid -> currentRtpExt().computeGovernor.asyncReason().displayName());
+        placeholders.put(
+                "govSyncConfiguredMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredSyncBudgetMs()));
+        placeholders.put(
+                "govSyncEffectiveMs",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectiveSyncBudgetMs()));
+        placeholders.put(
+                "govSyncReason",
+                uuid -> currentRtpExt().computeGovernor.syncReason().displayName());
+        placeholders.put(
+                "govPeriodConfigured",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredPeriodTicks()));
+        placeholders.put(
+                "govPeriodEffective",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectivePeriodTicks()));
+        placeholders.put(
+                "govPeriodReason",
+                uuid -> currentRtpExt().computeGovernor.periodReason().displayName());
+        placeholders.put(
+                "govPromotionsConfigured",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredPromotionsPerTurn()));
+        placeholders.put(
+                "govPromotionsEffective",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectivePromotionsPerTurn()));
+        placeholders.put(
+                "govPromotionsReason",
+                uuid -> currentRtpExt().computeGovernor.promotionsReason().displayName());
+        placeholders.put(
+                "govGenConfigured",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.configuredGenerationCap()));
+        placeholders.put(
+                "govGenEffective",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.effectiveGenerationCap()));
+        placeholders.put(
+                "govGenReason",
+                uuid -> currentRtpExt().computeGovernor.generationReason().displayName());
+        placeholders.put(
+                "govRegionalInflight",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.regionalInflightCount()));
+        placeholders.put(
+                "govRegionalInflightCap",
+                uuid -> String.valueOf(currentRtpExt().computeGovernor.regionalInflightCeiling()));
+        placeholders.put(
+                "govHotCapConfigured",
+                uuid -> String.valueOf(resolveGovHotCapConfigured()));
+        placeholders.put(
+                "govHotCapEffective",
+                uuid -> String.valueOf(resolveGovHotCapEffective()));
+        placeholders.put(
+                "govHotCapReason",
+                uuid -> resolveGovHotCapReason().displayName());
+        placeholders.put(
+                "govUnitsPerTurn",
+                uuid -> String.valueOf(resolveGovUnitsPerTurn()));
+        placeholders.put(
+                "govConstrainedEvalShare",
+                uuid -> String.format(java.util.Locale.ROOT, "%.1f%%",
+                        currentRtpExt().computeGovernor.constrainedEvaluationShare() * 100.0));
+        placeholders.put(
+                "govMaxConsumerSkew",
+                uuid -> String.format(java.util.Locale.ROOT, "%.2fx",
+                        currentRtpExt().computeGovernor.maxConsumerSkewRatio()));
+    }
+
+    private static int resolveGovHotCapConfigured() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Integer cfg = gov.regionConfiguredHotCaps().get(region.name);
+            return (cfg != null) ? cfg : region.getSettings().activeChunkCap();
+        }
+        if (!gov.regionConfiguredHotCaps().isEmpty()) {
+            return gov.regionConfiguredHotCaps().values().iterator().next();
+        }
+        if (ActiveSelection.get() != null && !ActiveSelection.get().permRegionLookup.isEmpty()) {
+            Region first = ActiveSelection.get().permRegionLookup.values().iterator().next();
+            if (first != null && first.getSettings() != null) {
+                return first.getSettings().activeChunkCap();
+            }
+        }
+        return 10;
+    }
+
+    private static int resolveGovHotCapEffective() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Integer eff = gov.regionHotCaps().get(region.name);
+            return (eff != null) ? eff : region.getSettings().activeChunkCap();
+        }
+        if (!gov.regionHotCaps().isEmpty()) {
+            return gov.regionHotCaps().values().iterator().next();
+        }
+        return resolveGovHotCapConfigured();
+    }
+
+    private static io.github.dailystruggle.rtp.common.governor.GovernorReason resolveGovHotCapReason() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            io.github.dailystruggle.rtp.common.governor.GovernorReason r = gov.regionHotCapReasons().get(region.name);
+            return (r != null) ? r : io.github.dailystruggle.rtp.common.governor.GovernorReason.CONFIGURED;
+        }
+        for (io.github.dailystruggle.rtp.common.governor.GovernorReason r : gov.regionHotCapReasons().values()) {
+            if (r != null && r != io.github.dailystruggle.rtp.common.governor.GovernorReason.CONFIGURED) {
+                return r;
+            }
+        }
+        return io.github.dailystruggle.rtp.common.governor.GovernorReason.CONFIGURED;
+    }
+
+    private static int resolveGovUnitsPerTurn() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Integer u = gov.regionUnitsPerTurn().get(region.name);
+            return (u != null) ? u : 0;
+        }
+        if (!gov.regionUnitsPerTurn().isEmpty()) {
+            return gov.regionUnitsPerTurn().values().iterator().next();
+        }
+        return 0;
+    }
+
+    /**
+     * Returns the learned-state summary for {@code region}'s shape, or
+     * {@code null} when the region is {@code null} or its selector is not a
+     * {@link MemoryShape} (e.g. a non-memory shape build, or before any scan).
+     */
+    private static MemoryShape.LearnedStateSummary memSummary(Region region) {
+        if (region == null) return null;
+        if (region.getShape() instanceof MemoryShape<?> shape) {
+            return shape.learnedStateSummary();
+        }
+        return null;
+    }
+
+    /**
+     * Format seconds into a human-readable ETA string using configured time unit labels.
+     *
+     * @param totalSeconds duration in seconds
+     * @return formatted duration string (e.g. "2h 19m 28s")
+     */
+    public static String formatEta(long totalSeconds) {
+        if (totalSeconds < 0) totalSeconds = 0;
+        if (ActiveConfigs.get() == null) return totalSeconds + "s";
+
+        long days = TimeUnit.SECONDS.toDays(totalSeconds);
+        long hours = TimeUnit.SECONDS.toHours(totalSeconds) % 24;
+        long minutes = TimeUnit.SECONDS.toMinutes(totalSeconds) % 60;
+        long seconds = totalSeconds % 60;
+
+        StringBuilder sb = new StringBuilder();
+        if (days > 0) {
+            sb.append(days).append(ActiveConfigs.get().getConfigValue(PlayerMessages.days, "d")).append(" ");
+        }
+        if (hours > 0) {
+            sb.append(hours).append(ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "h")).append(" ");
+        }
+        if (minutes > 0) {
+            sb.append(minutes).append(ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "m")).append(" ");
+        }
+        if (seconds > 0 || sb.isEmpty()) {
+            sb.append(seconds).append(ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "s"));
+        }
+
+        return sb.toString().trim();
+    }
+
+    /** Two-decimal percent with a trailing {@code %}; {@code "N/A"} when not sampled. */
+    public static String formatPercent(double v) {
+        if (Double.isNaN(v) || Double.isInfinite(v)) return "N/A";
+        return String.format(java.util.Locale.ROOT, "%.2f%%", v);
+    }
+
+    /**
+     * Mean of {@link ScanProgressView#landPercentage} across {@code tasks}; {@code 0.0} when empty.
+     * Unweighted: each task's figure is already a per-region good/(good+bad) ratio.
+     */
+    public static double averageLandPercentage(java.util.Collection<? extends ScanProgressView> tasks) {
+        if (tasks == null || tasks.isEmpty()) return 0.0;
+        double sum = 0.0;
+        int n = 0;
+        for (ScanProgressView task : tasks) {
+            if (task == null) continue;
+            sum += task.landPercentage();
+            n++;
+        }
+        return n == 0 ? 0.0 : sum / n;
+    }
+
+    public static String fillPlaceholders(String text, UUID uuid) {
+        Set<String> keywords =
+                ParseString.keywords(
+                        text,
+                        placeholders.keySet(),
+                        new HashSet<>(Arrays.asList('[', '%', '<')),
+                        new HashSet<>(Arrays.asList(']', '%', '>')));
+
+        for (String s : keywords) {
+            Function<UUID, String> function = placeholders.get(s);
+            if (function == null) continue;
+            String value = function.apply(uuid);
+            text = replaceDelimited(text, '[', s, ']', value);
+            text = replaceDelimited(text, '%', s, '%', value);
+            text = replaceDelimited(text, '<', s, '>', value);
+        }
+        return text;
+    }
+
+    /**
+     * Replaces every {@code open + key + close} (key matched case-insensitively, literally)
+     * with {@code value}, left to right, non-overlapping. Keys come from the addon-writable
+     * {@link #placeholders} map, so they must never be interpreted as regex syntax.
+     */
+    static String replaceDelimited(String text, char open, String key, char close, String value) {
+        int keyLen = key.length();
+        int tokenLen = keyLen + 2;
+        int from = text.indexOf(open);
+        if (from < 0) return text;
+        StringBuilder sb = null;
+        int copied = 0;
+        int last = text.length() - tokenLen;
+        for (int i = from; i >= 0 && i <= last; ) {
+            if (text.charAt(i + tokenLen - 1) == close && text.regionMatches(true, i + 1, key, 0, keyLen)) {
+                if (sb == null) sb = new StringBuilder(text.length() + Math.max(0, value.length() - tokenLen));
+                sb.append(text, copied, i).append(value);
+                copied = i + tokenLen;
+                i = text.indexOf(open, copied);
+            } else {
+                i = text.indexOf(open, i + 1);
+            }
+        }
+        if (sb == null) return text;
+        return sb.append(text, copied, text.length()).toString();
+    }
+
+    public static String fillNumericPlaceholders(String text) {
+        if (ActiveConfigs.get() == null) return text;
+        List<?>[] list = new List<?>[1];
+        IntFunction<String> lookup = index -> {
+            if (list[0] == null) {
+                Object o = ActiveConfigs.get().getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
+                list[0] = o instanceof List<?> pList ? pList : Collections.emptyList();
+            }
+            return list[0].size() > index ? String.valueOf(list[0].get(index)) : "[invalid]";
+        };
+        // [p0], [p1]...
+        text = fillNumericPlaceholders(text, '[', ']', lookup);
+        // %p0%, %p1%...
+        text = fillNumericPlaceholders(text, '%', '%', lookup);
+        return text;
+    }
+
+    /**
+     * Single left-to-right pass over {@code open [Pp] digits close} tokens. Replacement text is
+     * not rescanned, and same-syntax tokens are stripped from it so a configured value cannot
+     * re-introduce a placeholder. Tokens with an empty or unparseable index are kept verbatim.
+     */
+    private static String fillNumericPlaceholders(String text, char open, char close, IntFunction<String> lookup) {
+        return scanNumericTokens(text, open, close, index -> {
+            if (index < 0) return null;
+            return scanNumericTokens(lookup.apply(index), open, close, ignored -> "");
+        });
+    }
+
+    /**
+     * Visits each {@code open [Pp] [0-9]* close} token; {@code replacer} receives the parsed index
+     * ({@code -1} when empty or overflowing) and returns the substitute, or {@code null} to keep it.
+     */
+    private static String scanNumericTokens(String text, char open, char close, IntFunction<String> replacer) {
+        int i = text.indexOf(open);
+        if (i < 0) return text;
+        StringBuilder sb = null;
+        int copied = 0;
+        int n = text.length();
+        while (i >= 0 && i + 2 < n) {
+            char p = text.charAt(i + 1);
+            if (p != 'p' && p != 'P') {
+                i = text.indexOf(open, i + 1);
+                continue;
+            }
+            int j = i + 2;
+            while (j < n && text.charAt(j) >= '0' && text.charAt(j) <= '9') j++;
+            if (j >= n || text.charAt(j) != close) {
+                i = text.indexOf(open, i + 1);
+                continue;
+            }
+            int index = -1;
+            if (j > i + 2) {
+                try {
+                    index = Integer.parseInt(text, i + 2, j, 10);
+                } catch (NumberFormatException ignored) {
+                    // overflow: keep the -1 sentinel
+                }
+            }
+            String replacement = replacer.apply(index);
+            if (replacement != null) {
+                if (sb == null) sb = new StringBuilder(n);
+                sb.append(text, copied, i).append(replacement);
+                copied = j + 1;
+            }
+            i = text.indexOf(open, j + 1);
+        }
+        if (sb == null) return text;
+        return sb.append(text, copied, n).toString();
+    }
+}

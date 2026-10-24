@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.network;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfig;
 import io.github.dailystruggle.rtp.proxy.common.selector.RegionAwareSelector;
 import io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion;
@@ -7,7 +8,6 @@ import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.RtpRequest;
 import io.github.dailystruggle.rtp.proxy.common.spi.TriggerType;
-import io.github.dailystruggle.rtp.common.RTP;
 
 import java.util.HashSet;
 import java.util.logging.Level;
@@ -277,7 +277,7 @@ public final class PeerRegionRegistry {
                 if (r != null && !r.isEmpty()) out.add(peer + ":" + r);
             }
         }
-        RTP.log(Level.FINE, "[RTP] peerEntries: snapshot="
+        RTPRuntime.log(Level.FINE, "[RTP] peerEntries: snapshot="
                 + (snap == null ? "null" : snap.all().size() + " backend(s)")
                 + ", heartbeatServers=" + heartbeatServers
                 + ", topologyPeers=" + topology

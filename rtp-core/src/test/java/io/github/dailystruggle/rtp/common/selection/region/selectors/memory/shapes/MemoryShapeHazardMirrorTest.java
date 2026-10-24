@@ -3,11 +3,11 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
@@ -26,7 +26,7 @@ public class MemoryShapeHazardMirrorTest {
   static void beforeAll() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new File("target/test-data-hazard-mirror"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 
@@ -125,16 +125,16 @@ public class MemoryShapeHazardMirrorTest {
     assertEquals(0L, shape.getEffectiveBadCount());
 
     // 2. Mix of addBadLocation with causes & TTLs
-    shape.addBadLocation(100L, LocationGenerator.FailTypes.biome, 0L);
-    shape.addBadLocation(101L, LocationGenerator.FailTypes.biome, 0L);
-    shape.addBadLocation(102L, LocationGenerator.FailTypes.biome, 0L);
+    shape.addBadLocation(100L, FailTypes.biome, 0L);
+    shape.addBadLocation(101L, FailTypes.biome, 0L);
+    shape.addBadLocation(102L, FailTypes.biome, 0L);
     // Gap that will be coalesced/bridged with spatialResolution=2 (gap is (104 - (102+1)) = 1 <= 2)
-    shape.addBadLocation(104L, LocationGenerator.FailTypes.biome, 0L);
+    shape.addBadLocation(104L, FailTypes.biome, 0L);
 
     // Dynamic runs
-    shape.addBadLocation(500L, LocationGenerator.FailTypes.safetyExternal, 1000L);
-    shape.addBadLocation(501L, LocationGenerator.FailTypes.safetyExternal, 1000L);
-    shape.addBadLocation(503L, LocationGenerator.FailTypes.safetyExternal, 1000L);
+    shape.addBadLocation(500L, FailTypes.safetyExternal, 1000L);
+    shape.addBadLocation(501L, FailTypes.safetyExternal, 1000L);
+    shape.addBadLocation(503L, FailTypes.safetyExternal, 1000L);
 
     // Isolated runs
     shape.addBadLocation(2000L);
@@ -174,12 +174,12 @@ public class MemoryShapeHazardMirrorTest {
       // Run 1: key 10000, len 10, expired but within probation window
       buf.putLong(10000L);
       buf.putLong(10L);
-      buf.put((byte) LocationGenerator.FailTypes.safetyExternal.ordinal());
+      buf.put((byte) FailTypes.safetyExternal.ordinal());
       buf.putLong(now - 10L);
       // Run 2: key 20000, len 10, active
       buf.putLong(20000L);
       buf.putLong(10L);
-      buf.put((byte) LocationGenerator.FailTypes.safetyExternal.ordinal());
+      buf.put((byte) FailTypes.safetyExternal.ordinal());
       buf.putLong(now + 1000L);
       buf.putInt(0); // union: 0 biome names
       buf.putInt(0); // union: 0 biome runs

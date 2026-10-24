@@ -2,10 +2,11 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.NoiseWorldMask;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.CandidateValidator;
 import io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
@@ -13,6 +14,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.region.SubspaceShape;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -368,7 +370,7 @@ class SubspaceNoiseTerrainDiagnosticTest {
   @DisplayName("Phase 4b: S-004 fail-closed reporting on claim-encapsulated zones in GroupPlacementDispatcher")
   void testS004FailClosedOnClaimEncapsulatedZone() throws Exception {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-        (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+        (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
     RTPWorld<?> world = accessor.getRTPWorld("world");
 
     UUID p1Uuid = UUID.randomUUID();
@@ -388,7 +390,7 @@ class SubspaceNoiseTerrainDiagnosticTest {
     org.mockito.Mockito.when(mockRegion.getLocation(org.mockito.ArgumentMatchers.anySet())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(genResult));
     org.mockito.Mockito.when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1L));
 
-    RTP.selectionAPI.permRegionLookup.put("claim_encapsulated_region", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("claim_encapsulated_region", mockRegion);
 
     // Global verifier simulates claim covering the entire area: returns false for any coordinate
     io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> false);
@@ -411,7 +413,7 @@ class SubspaceNoiseTerrainDiagnosticTest {
       org.mockito.Mockito.verify(anchorTicket).close();
     } finally {
       io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-      RTP.selectionAPI.permRegionLookup.remove("claim_encapsulated_region");
+      ActiveSelection.get().permRegionLookup.remove("claim_encapsulated_region");
     }
   }
 }

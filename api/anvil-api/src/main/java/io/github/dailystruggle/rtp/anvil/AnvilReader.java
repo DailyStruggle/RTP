@@ -437,6 +437,64 @@ public final class AnvilReader implements RegionFileReader {
                 minY, maxY);
     }
 
+    /**
+     * Lean probe for the ADR-120 terrain square: block states of the sections overlapping
+     * {@code [minY, maxY]} only; biomes and heightmaps are skipped ({@link ColumnProbe#biomeAt}
+     * answers null, {@code heightmapTopY} is absent). Block answers inside the window equal
+     * {@link #readColumnProbe}'s.
+     *
+     * @return the probe, or {@code null} if the chunk is absent, incomplete or has no block section
+     */
+    public static ColumnProbe readTerrainProbe(byte[] regionBytes, int regionLength, int cx, int cz, int minY,
+                                               int maxY) throws IOException {
+        if (minY > maxY) {
+            throw new IllegalArgumentException("minY=" + minY + " must be <= maxY=" + maxY);
+        }
+        RawChunk raw = readRawChunk(regionBytes, regionLength, cx, cz);
+        if (raw == null) return null;
+        return terrainProbeFrom(Nbt.readRootCompoundSelective(raw.nbtBytes, AnvilReader::terrainProbeDecision),
+                minY, maxY);
+    }
+
+    /** {@link #readTerrainProbe} for absolute chunk (chunkX, chunkZ) over its own sector run. */
+    public static ColumnProbe readTerrainProbeFromSectors(byte[] sectorBytes, int length, int chunkX, int chunkZ,
+                                                          int minY, int maxY) throws IOException {
+        if (minY > maxY) {
+            throw new IllegalArgumentException("minY=" + minY + " must be <= maxY=" + maxY);
+        }
+        if (sectorBytes == null) {
+            throw new CorruptRegionEntryException("Null sector buffer for chunk (" + chunkX + "," + chunkZ + ")");
+        }
+        RawChunk raw = decodeSectorPayload(sectorBytes, length, 0, length, chunkX & 31, chunkZ & 31);
+        LinkedHashMap<String, Object> root = Nbt.readRootCompoundSelective(raw.nbtBytes, AnvilReader::terrainProbeDecision);
+        verifyPosition(root, chunkX, chunkZ);
+        return terrainProbeFrom(root, minY, maxY);
+    }
+
+    private static ColumnProbe terrainProbeFrom(LinkedHashMap<String, Object> root, int minY, int maxY) {
+        if (isIncompleteChunk(root)) return null;
+        Nbt.NbtList sections = getSections(root);
+        if (sections == null || sections.items.isEmpty()) return null;
+        int syMin = Math.floorDiv(minY, 16), syMax = Math.floorDiv(maxY, 16);
+        List<PaletteSection> out = new ArrayList<>(syMax - syMin + 1);
+        for (Object rawSection : sections.items) {
+            PaletteSection ps = sectionFromCompound(rawSection);
+            if (ps != null && ps.sectionY() >= syMin && ps.sectionY() <= syMax) out.add(ps);
+        }
+        if (out.isEmpty()) return null;
+        return new ColumnProbe(minY, maxY, Integer.MIN_VALUE, Collections.unmodifiableList(out),
+                Collections.emptyList());
+    }
+
+    /** As {@link #columnProbeDecision} without heightmaps and biomes. */
+    static Nbt.SelectiveFilter.Decision terrainProbeDecision(List<String> path, String name, byte type) {
+        if (path.isEmpty() && "Heightmaps".equals(name)) return Nbt.SelectiveFilter.Decision.SKIP;
+        if (path.size() == 2 && "sections".equals(path.get(0)) && "biomes".equals(name)) {
+            return Nbt.SelectiveFilter.Decision.SKIP;
+        }
+        return columnProbeDecision(path, name, type);
+    }
+
     private static ColumnProbe columnProbeFrom(LinkedHashMap<String, Object> root, int minY, int maxY)
             throws IOException {
         // Proto-chunks read as air; only a native load finishes them. UNKNOWN, not SCAN_MISS.

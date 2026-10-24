@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.sql.*;
 import java.util.*;
@@ -12,7 +12,7 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
     try {
       Class.forName("org.h2.Driver");
     } catch (ClassNotFoundException e) {
-      RTP.log(Level.WARNING, "H2 JDBC driver not on classpath: " + e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, "H2 JDBC driver not on classpath: " + e.getMessage(), e);
     }
   }
 
@@ -20,7 +20,7 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
   private Connection connection;
 
   public H2DatabaseAccessor() {
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     File databaseDir = new File(pluginDir, "database");
     if (!databaseDir.exists()) {
       databaseDir.mkdirs();
@@ -66,7 +66,7 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
         statement.execute(schema);
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -96,7 +96,7 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
         connection.close();
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -134,7 +134,7 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
       }
       statement.executeUpdate();
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "Failed to write to H2 table " + tableName, e);
+      RTPRuntime.log(Level.WARNING, "Failed to write to H2 table " + tableName, e);
     }
   }
 }

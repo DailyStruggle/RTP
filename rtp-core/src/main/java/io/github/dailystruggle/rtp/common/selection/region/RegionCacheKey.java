@@ -1,11 +1,12 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 
 import java.nio.charset.StandardCharsets;
@@ -94,11 +95,11 @@ public final class RegionCacheKey {
    * Serializes active safety config keys into the canonical hash buffer.
    */
   private static void appendSafetySnapshot(StringBuilder sb) {
-    if (RTP.configs == null) return;
+    if (ActiveConfigs.get() == null) return;
     for (Enum<?> key : SAFETY_HASH_KEYS) {
       Object value;
       try {
-        value = RTP.configs.getConfigValue(key, null);
+        value = ActiveConfigs.get().getConfigValue(key, null);
       } catch (RuntimeException e) {
         return;
       }
@@ -143,6 +144,12 @@ public final class RegionCacheKey {
           value = e.getValue();
           break;
         }
+      }
+      if ("vert".equals(prefix) && "maxHillAngle".equals(k)) {
+        // ADR-120: "off" hashes like an absent key; "30" and 30.0 alike.
+        double deg = AbstractVerticalAdjustor.hillAngleOf(value);
+        if (deg < 0) continue;
+        value = deg;
       }
       sb.append(prefix).append('.')
           .append(k.toLowerCase())

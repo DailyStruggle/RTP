@@ -1,10 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
 
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CoordinateRunEncoder;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -149,7 +149,7 @@ class CoordinateRunEncoderTest {
         sumsField.setAccessible(true);
         sumsField.set(square, sums);
         byte[] causes = new byte[keys.length];
-        java.util.Arrays.fill(causes, (byte) LocationGenerator.FailTypes.safety.ordinal());
+        java.util.Arrays.fill(causes, (byte) FailTypes.safety.ordinal());
         java.lang.reflect.Field snapField = MemoryShape.class.getDeclaredField("badLocationsSnapshot");
         snapField.setAccessible(true);
         long[] expiries = new long[keys.length];

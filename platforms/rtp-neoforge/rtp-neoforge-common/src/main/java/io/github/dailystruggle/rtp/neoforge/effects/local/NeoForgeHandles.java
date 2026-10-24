@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.neoforge.effects.local;
 
+import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
 import io.github.dailystruggle.effectsapi.common.spi.HandleProvider;
 import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
@@ -282,10 +283,72 @@ public final class NeoForgeHandles implements HandleProvider {
             // No-op fallback on common carrier; version adapters provide concrete firework spawn
         }
 
+        /**
+         * Lifts the player and starts a glide that {@link GlideKeepAlive} holds until landing
+         * (vanilla drops the flag next tick without an elytra). {@code allowFireworks},
+         * {@code placeOnShutdown} and {@code platformMaterial} have no NeoForge implementation.
+         */
         @Override
         public void startGlide(int relativeLift, int maxY, int landingTimeoutTicks,
                                boolean allowFireworks, boolean placeOnShutdown, String platformMaterial) {
-            // No-op fallback on common carrier; version adapters provide concrete glide mechanics
+            onServer("GLIDE", () -> {
+                ServerLevel level = NeoForgeRTPPlayer.resolveServerLevel(player);
+                if (level == null) {
+                    RTP.log(Level.WARNING, "[RTP][NeoForge] GLIDE dropped for " + player.getUUID() + " (no level)");
+                    return;
+                }
+                double toY = Math.min(player.getY() + relativeLift, maxY);
+                if (!NeoForgeRTPPlayer.performTeleport(player, level, player.getX(), toY, player.getZ(),
+                        player.getYRot(), player.getXRot())) {
+                    RTP.log(Level.WARNING, "[RTP][NeoForge] GLIDE lift failed for " + player.getUUID());
+                    return;
+                }
+                player.startFallFlying();
+                GlideKeepAlive.track(new NeoForgeGlider(player), landingTimeoutTicks);
+            });
+        }
+
+        /** Drops the inventory at the player (as on Fabric); {@code dropLocation} is not used. */
+        @Override
+        public void dropInventory(@Nullable LocationHandle dropLocation) {
+            onServer("DROP_INVENTORY", () -> player.getInventory().dropAll());
+        }
+
+        /** Vanilla death formula {@code min(level * 7, 100)}, then clears level and points. */
+        @Override
+        public void dropExperience(@Nullable LocationHandle dropLocation) {
+            onServer("DROP_EXP", () -> {
+                int points = Math.min(player.experienceLevel * 7, 100);
+                ServerLevel level = NeoForgeRTPPlayer.resolveServerLevel(player);
+                if (points > 0 && level != null) {
+                    Vec3 pos = dropLocation != null
+                            ? new Vec3(dropLocation.doubleX(), dropLocation.doubleY(), dropLocation.doubleZ())
+                            : new Vec3(player.getX(), player.getY(), player.getZ());
+                    net.minecraft.world.entity.ExperienceOrb.award(level, pos, points);
+                }
+                player.experienceLevel = 0;
+                player.experienceProgress = 0.0f;
+                player.totalExperience = 0;
+            });
+        }
+
+        /** Runs {@code action} on the server thread (inline when no server is bound); failures are logged. */
+        private void onServer(@NotNull String effect, @NotNull Runnable action) {
+            Runnable task = () -> {
+                try {
+                    action.run();
+                } catch (RuntimeException | LinkageError t) {
+                    RTP.log(Level.WARNING, "[RTP][NeoForge] " + effect + " effect failed for " + player.getUUID(), t);
+                }
+            };
+            // The running server is borrowed, never owned here.
+            //noinspection resource
+            MinecraftServer server = serverOf(player);
+            if (server != null) {
+                server.execute(task);
+            } else {
+                task.run();
+            }
         }
 
         @Override

@@ -2,13 +2,15 @@ package io.github.dailystruggle.rtp.actionaddon;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -34,7 +36,7 @@ class RTPActionAddonConfigTest {
   @Test
   void testAddonRegistersActionMultiConfigParserAndDefaultFallback() {
     Configs configs = new Configs(tempDir.toFile());
-    RTP.configs = configs;
+    ActiveConfigs.set(configs);
     configs.reloadConfigs();
 
     // Verify core reloadConfigs does NOT register ActionKeys
@@ -79,7 +81,7 @@ class RTPActionAddonConfigTest {
   @Test
   void testAddonIngestsImportedZoneActionsWithMultipleTriggers() throws IOException {
     Configs configs = new Configs(tempDir.toFile());
-    RTP.configs = configs;
+    ActiveConfigs.set(configs);
     configs.reloadConfigs();
 
     // Prepare an imported zone action file with multiple physical triggers
@@ -131,16 +133,16 @@ class RTPActionAddonConfigTest {
     File zoneFile = new File(actionsDir, "zone_double_portal.yml");
     java.nio.file.Files.writeString(zoneFile.toPath(), zoneActionYaml);
 
-    // Clean any prior triggers in RTP.triggerManager
-    RTP.triggerManager.clear();
+    // Clean any prior triggers in PhysicalTriggerManager.instance()
+    PhysicalTriggerManager.instance().clear();
 
     // Load addon
     RTPActionAddon addon = new RTPActionAddon();
     addon.onLoad();
 
     // Verify action definition is ingested into ActionManager
-    assertNotNull(RTP.actionManager, "ActionManager must be initialized");
-    var optDef = RTP.actionManager.getAction("zone_double_portal");
+    assertNotNull(ActionServices.actionManager(), "ActionManager must be initialized");
+    var optDef = ActionServices.actionManager().getAction("zone_double_portal");
     assertTrue(optDef.isPresent(), "zone_double_portal action should be loaded by RTPActionAddon");
 
     var def = optDef.get();
@@ -154,8 +156,8 @@ class RTPActionAddonConfigTest {
     // Verify both physical triggers are parsed in the action definition
     assertEquals(2, def.triggers().size(), "Both triggers should be parsed in ActionDefinition");
 
-    // Verify both triggers are ingested and registered in RTP.triggerManager
-    var triggerA = RTP.triggerManager.getTrigger("portal_alpha");
+    // Verify both triggers are ingested and registered in PhysicalTriggerManager.instance()
+    var triggerA = PhysicalTriggerManager.instance().getTrigger("portal_alpha");
     assertNotNull(triggerA, "portal_alpha must be registered in PhysicalTriggerManager");
     assertEquals(io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.PORTAL, triggerA.type());
     assertEquals("world", triggerA.worldName());
@@ -165,7 +167,7 @@ class RTPActionAddonConfigTest {
     assertEquals(10L, triggerA.batchIntervalSeconds());
     assertEquals("zone_double_portal", triggerA.actionId());
 
-    var triggerB = RTP.triggerManager.getTrigger("portal_beta");
+    var triggerB = PhysicalTriggerManager.instance().getTrigger("portal_beta");
     assertNotNull(triggerB, "portal_beta must be registered in PhysicalTriggerManager");
     assertEquals(io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.STEP_IN, triggerB.type());
     assertEquals("world_nether", triggerB.worldName());
@@ -176,6 +178,6 @@ class RTPActionAddonConfigTest {
     assertEquals("zone_double_portal", triggerB.actionId());
 
     addon.onUnload();
-    RTP.triggerManager.clear();
+    PhysicalTriggerManager.instance().clear();
   }
 }

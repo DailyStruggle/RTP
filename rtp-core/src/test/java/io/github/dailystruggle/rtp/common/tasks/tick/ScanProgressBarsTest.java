@@ -1,16 +1,19 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link ScanProgressBars} - the platform-neutral driver that
- * aggregates {@link RTP#scanTasks} metrics and pushes / clears on-screen
+ * aggregates {@link ScanTasks#current()} metrics and pushes / clears on-screen
  * progress bars via the server accessor.
  */
 class ScanProgressBarsTest {
@@ -39,7 +42,7 @@ class ScanProgressBarsTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
 
         MockRTPWorld world = new MockRTPWorld("scanbar_world");
         Square square = new Square();
@@ -50,19 +53,19 @@ class ScanProgressBarsTest {
                 "scanbar_region", world, square, vert,
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         region = new Region("scanbar_region", settings);
-        RTP.selectionAPI.permRegionLookup.put("scanbar_region", region);
+        ActiveSelection.get().permRegionLookup.put("scanbar_region", region);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().scanTasks.clear();
-        RTP.selectionAPI.permRegionLookup.clear();
+        ScanTasks.current().clear();
+        ActiveSelection.get().permRegionLookup.clear();
     }
 
     @SuppressWarnings("unchecked")
     private void setBossBarTemplate(String template) {
         ConfigParser<CommandMessages> lang =
-                (ConfigParser<CommandMessages>) RTP.configs.getParser(CommandMessages.class);
+                (ConfigParser<CommandMessages>) ActiveConfigs.get().getParser(CommandMessages.class);
         lang.setData(Map.of("scanBossBar", template));
     }
 
@@ -70,7 +73,7 @@ class ScanProgressBarsTest {
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void update_withEmptyTemplate_doesNotThrow() {
         setBossBarTemplate("");
-        RTP.getInstance().scanTasks.put("scanbar_region", new ScanTask(region, 0L));
+        ScanTasks.current().put("scanbar_region", new ScanTask(region, 0L));
         assertDoesNotThrow(ScanProgressBars::update);
     }
 
@@ -78,7 +81,7 @@ class ScanProgressBarsTest {
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void update_withNoScanTasks_doesNotThrow() {
         setBossBarTemplate("[scan_regions] [scan_landPercentage]%");
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
         assertDoesNotThrow(ScanProgressBars::update);
     }
 
@@ -93,7 +96,7 @@ class ScanProgressBarsTest {
         task.latestAbsoluteTotal = 200L;
         task.latestCps = 10L;
         task.latestEtaSeconds = 90L;
-        RTP.getInstance().scanTasks.put("scanbar_region", task);
+        ScanTasks.current().put("scanbar_region", task);
 
         assertDoesNotThrow(ScanProgressBars::update);
     }
@@ -105,7 +108,7 @@ class ScanProgressBarsTest {
         ScanTask task = new ScanTask(region, 0L);
         task.latestAbsolutePos = 0L;
         task.latestAbsoluteTotal = 0L; // guards the divide-by-zero branch
-        RTP.getInstance().scanTasks.put("scanbar_region", task);
+        ScanTasks.current().put("scanbar_region", task);
         assertDoesNotThrow(ScanProgressBars::update);
     }
 
@@ -118,21 +121,21 @@ class ScanProgressBarsTest {
         task.latestAbsolutePos = 50L;
         task.latestAbsoluteTotal = 200L;
         task.latestLandPercentage = 87.5;
-        RTP.getInstance().scanTasks.put("scanbar_region", task);
+        ScanTasks.current().put("scanbar_region", task);
 
         java.util.concurrent.atomic.AtomicReference<Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar>> captured =
                 new java.util.concurrent.atomic.AtomicReference<>();
-        io.github.dailystruggle.rtp.api.server.RTPServerAccessor original = RTP.serverAccessor;
-        RTP.serverAccessor = new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir) {
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor original = RTPRuntime.serverAccessor();
+        RTPRuntime.setServerAccessor(new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir) {
             @Override
             public void updateProgressBars(Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar> bars) {
                 captured.set(bars);
             }
-        };
+        });
         try {
             ScanProgressBars.update();
         } finally {
-            RTP.serverAccessor = original;
+            RTPRuntime.setServerAccessor(original);
         }
 
         assertNotNull(captured.get(), "update() must push bars while a scan is active");

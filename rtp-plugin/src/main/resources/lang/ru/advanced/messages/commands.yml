@@ -80,6 +80,12 @@ infoTopRejectionCause: "&7Основная причина отказа: #7E9CC8[
 # Плейсхолдер: [genFailureBreakdown] - разделённый запятыми список причина=N, от наиболее частых к редким.
 infoFailureBreakdown: "&7Отказы по причинам: #7E9CC8[genFailureBreakdown]"
 
+# Адаптивный регулятор нагрузки: настроенные и фактические лимиты и причина.
+infoGovernorAsync: "&7Фоновый async: #7E9CC8[govAsyncConfiguredMs]&7 мс (факт. #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Фоновый sync: #7E9CC8[govSyncConfiguredMs]&7 мс (факт. #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Горячий лимит: #7E9CC8[govHotCapConfigured]&7 (факт. #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Генерация: #7E9CC8[govGenConfigured]&7 (факт. #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; в полёте по регионам #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Пороговые значения цветовых диапазонов состояния. Используются для окрашивания цветных вариантов
 # плейсхолдеров (например, [tps1mColoured]) в зелёный/жёлтый/красный.
 infoThresholdTpsGreen: 19.5
@@ -511,5 +517,6 @@ editorApplyFetching: "&7[P0] Получение данных конфигура�
 editorApplyValidating: "&7[P0] Проверка целостности и синтаксиса данных..."
 editorApplySuccess: "&a[P0] Конфигурация применена и перезагружена на лету! (созданы копии .bak изменённых файлов)"
 editorApplyFailed: "&c[P0] Не удалось применить данные: [reason]"
+editorApplyRejected: "&c[P0] Применение отклонено: ошибок конфигурации: [count]; ничего не записано. Первая: [code] в [source], путь [path]."
 
 version: 1.0

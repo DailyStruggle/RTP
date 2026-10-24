@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import com.google.gson.JsonObject;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.ChannelPageStub;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
@@ -9,13 +8,15 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopback
 import io.github.dailystruggle.rtp.common.commands.editor.channel.InMemoryTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -157,7 +158,7 @@ class EditorChannelWiringTest {
         square.set(GenericMemoryShapeParams.centerRadius, 0L);
         square.set(GenericMemoryShapeParams.centerX, 0L);
         square.set(GenericMemoryShapeParams.centerZ, 0L);
-        square.addBadLocation(square.xzToLocation(1, 1), LocationGenerator.FailTypes.biome);
+        square.addBadLocation(square.xzToLocation(1, 1), FailTypes.biome);
         square.flushAndRebuild(1L);
         Map<String, MemoryShape<?>> shapes = new LinkedHashMap<>(Map.of("alpha", square));
         EditorLiveFeed live = new EditorLiveFeed(tempDir.resolve("live"), false, List.of(),
@@ -173,7 +174,7 @@ class EditorChannelWiringTest {
         assertEquals(channel.pluginFingerprint(), reset.get("from").getAsString(), "from stays the sender header");
         assertFalse(reset.has("to"), "a broadcast has no recipient header");
 
-        square.addBadLocation(square.xzToLocation(-10, 7), LocationGenerator.FailTypes.biome);
+        square.addBadLocation(square.xzToLocation(-10, 7), FailTypes.biome);
         square.flushAndRebuild(2L);
         assertTrue(live.tick(), "stopped: " + live.stopReason());
         JsonObject delta = page.last("hazard-delta");
@@ -291,10 +292,10 @@ class EditorChannelWiringTest {
     @DisplayName("Every registered shape's helper ships in curveCode with a sample curve block at its defaults")
     @SuppressWarnings("unchecked")
     void registeredHelpersShipWithSample() {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapes = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapes == null) {
             shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
+            FactoryRegistry.map().put(FactoryNames.shape, shapes);
         }
         shapes.add("SAMPLE_CIRCLE_TEST", new Circle("SAMPLE_CIRCLE_TEST"));
         try {

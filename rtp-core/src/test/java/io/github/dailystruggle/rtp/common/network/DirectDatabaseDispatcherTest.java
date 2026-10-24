@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
@@ -41,12 +41,12 @@ class DirectDatabaseDispatcherTest {
 
         when(mockPlayer.isOnline()).thenReturn(true);
         when(mockAccessor.getPlayer(playerId)).thenReturn(mockPlayer);
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     @Test

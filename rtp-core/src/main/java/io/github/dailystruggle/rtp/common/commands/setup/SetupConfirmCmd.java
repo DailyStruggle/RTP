@@ -2,16 +2,21 @@ package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabDiskIO;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,7 +66,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
         }
 
         SetupSession session = opt.get();
-        File baseDir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
+        File baseDir = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPluginDirectory() : null;
         if (baseDir == null) {
             SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Cannot resolve plugin directory for writing configs.");
             return false;
@@ -90,6 +95,26 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
             String defaultRegionFileId = "definitions/regions/" + io.github.dailystruggle.rtp.common.commands.prefab.MultiWorldExpander.DEFAULT_REGION_ID;
 
             try {
+                Map<String, String> candidateOverlays = new LinkedHashMap<>();
+                for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
+                    String fileId = entry.getKey();
+                    if (result.newTrees().get(fileId) == null) continue;
+                    String templateFileId = (fileId.startsWith("definitions/regions/")
+                            && !fileId.equals(defaultRegionFileId)) ? defaultRegionFileId : null;
+                    String path = baseDir.toPath().toAbsolutePath().normalize()
+                            .relativize(PrefabDiskIO.resolveFile(baseDir, fileId).toPath().toAbsolutePath().normalize())
+                            .toString().replace(File.separatorChar, '/');
+                    candidateOverlays.put(path, PrefabDiskIO.render(
+                            baseDir, fileId, entry.getValue(), templateFileId));
+                }
+                ConfigCandidateGate.Result gate = ConfigCandidateGate.evaluate(baseDir.toPath(), candidateOverlays);
+                if (gate.rejected()) {
+                    ReloadSupport.sendReloadRejected(callerId, gate);
+                    SetupHandlerSupport.sendMessage(callerId,
+                            "&c[RTP Setup] No setup files were written because the candidate config was rejected.");
+                    return;
+                }
+
                 for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
                     String fileId = entry.getKey();
                     Map<String, Object> newTree = result.newTrees().get(fileId);
@@ -112,7 +137,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                     }
                 }
 
-                RTP.log(Level.INFO, "[setup] Applied setup wizard recipe for caller=" + callerId
+                RTPRuntime.log(Level.INFO, "[setup] Applied setup wizard recipe for caller=" + callerId
                         + ", writtenFiles=" + writtenFiles.size() + ", backups=" + backups.size());
                 SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Successfully applied setup recipe!");
                 SetupHandlerSupport.sendMessage(callerId, "&7Written: &f" + String.join(", ", writtenFiles));
@@ -126,10 +151,10 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                             : null;
                     if (reload != null) {
                         reloaded = reload.onCommand(callerId, java.util.Collections.emptyMap(), null);
-                    } else if (RTP.configs != null) {
+                    } else if (ActiveConfigs.get() != null) {
                         RTP.reloading.set(true);
                         try {
-                            reloaded = RTP.configs.reload();
+                            reloaded = ActiveConfigs.get().reload();
                         } finally {
                             RTP.reloading.set(false);
                         }
@@ -148,13 +173,13 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                     SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Run &f/rtp reload&7 to pick up changes.");
                 }
             } catch (IOException | RuntimeException e) {
-                RTP.log(Level.WARNING, "[setup] Failed to write setup recipe to disk: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[setup] Failed to write setup recipe to disk: " + e.getMessage(), e);
                 SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Error writing setup configuration to disk: " + e.getMessage());
             }
         };
 
-        if (RTP.scheduler != null) {
-            RTP.scheduler.runTaskAsynchronously(applyTask);
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(applyTask);
         } else {
             applyTask.run();
         }

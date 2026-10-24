@@ -3,10 +3,10 @@ package io.github.dailystruggle.rtp.common.event;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +33,7 @@ class PlayerMoveSamplerTest {
     @BeforeEach
     void setUp() {
         accessor = new MockRTPServerAccessor(tempDir);
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
     }
 
     @AfterEach
@@ -46,7 +46,7 @@ class PlayerMoveSamplerTest {
             }
         }
         handles.clear();
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     private MockRTPPlayer watchedPlayerAt(List<PlayerMoveEvent> sink, int x, int y, int z) {

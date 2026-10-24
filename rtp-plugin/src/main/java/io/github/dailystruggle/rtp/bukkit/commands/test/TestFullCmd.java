@@ -2,12 +2,17 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
@@ -22,10 +27,10 @@ import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaSender;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +39,7 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test full} (alias: {@code rtp test all}) &mdash; runs every
+ * {@code rtp test full} &mdash; runs every
  * currently-shipped {@code rtp test *} subcommand in sequence with
  * conservative defaults, emitting a consolidated start/end log line.
  *
@@ -43,10 +48,11 @@ import org.jetbrains.annotations.Nullable;
  * {@link #runStep(UUID, int, FullAudit)} in the same
  * change. Today the shipped set is {@link TestSchedulerCmd} and
  * {@link TestStressCmd}; {@link TestCancelCmd} is deliberately excluded
- * (invoking cancel inside the sweep would abort the sweep itself), and
+ * (invoking cancel inside the sweep would abort the sweep itself),
  * {@link TestReloadSafetyCmd} is excluded because it requires
  * {@code rtp.test.admin} and intentionally courts failures that would
- * swamp a default operator run.
+ * swamp a default operator run, and {@code action} is excluded because it
+ * requires an explicitly selected action definition.
  *
  * <p>Permission is {@code rtp.test.full} rather than {@code rtp.test} so
  * operators can grant per-subcommand access without granting the aggregate
@@ -67,10 +73,11 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    * invokes. Mirrors the sequence dispatched by {@link #runStep(UUID, int, FullAudit)}.
    * Exposed package-private so unit tests can assert parity with
    * {@link TestCmd}'s registration set without having to initialise
-   * {@link RTP#serverAccessor}.
+   * {@link RTPRuntime#serverAccessor()}.
    *
-   * <p>Deliberately excluded: {@code cancel} (would abort the sweep itself)
-   * and {@code reload-safety} (admin-only, intentionally noisy).
+   * <p>Deliberately excluded: {@code cancel} (would abort the sweep itself),
+   * {@code reload-safety} (admin-only, intentionally noisy), and {@code action}
+   * (requires a selected action id and is exercised by its dedicated simulation tests).
    */
   static final List<String> SHIPPED_SUBCOMMAND_NAMES =
       Collections.unmodifiableList(
@@ -109,7 +116,16 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               // it. Runs on-demand only so the default sweep stays read-only.
               "config-set",
               "full",
+              // The SAFE BIT runner is a separate group command; the legacy full sweep also covers
+              // subcommands that do not yet publish BIT components.
               "all",
+              "status",
+              // Requires an explicitly selected action id; its isolated simulation has dedicated tests.
+              "action",
+              // A player-targeted teleport changes the caller's location and is not a group check.
+              "teleport",
+              // Heavy mock sampling performs real location selection and chunk I/O; run only when named.
+              "teleport-heatmap",
               // Visual diagnostic: spawns holograms in player world context.
               "hologram",
               // Player-context diagnostic: needs the caller's live world + origin
@@ -133,7 +149,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
   @Override
   public String description() {
-    return "runs every currently-shipped rtp test subcommand in sequence (alias: all)";
+    return "runs every currently-shipped rtp test subcommand in sequence";
   }
 
   private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -181,12 +197,12 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
     String header = "[RTP test/full] begin (shipped subcommands only)";
     if (!callerId.equals(RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, header);
+      RTPRuntime.serverAccessor().sendMessage(callerId, header);
     }
     RTP.log(Level.INFO, header);
 
     try {
-      RTP.scheduler.runTaskAsynchronously(() -> runStep(callerId, 0, audit));
+      RTPRuntime.scheduler().runTaskAsynchronously(() -> runStep(callerId, 0, audit));
     } catch (Throwable t) {
       // Async scheduler unavailable (e.g. headless tests). Run the chain
       // inline so we don't silently no-op (S-004). In headless contexts
@@ -234,7 +250,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       if (skipReason != null) {
         String msg = "[RTP test/full] " + subName + " skipped: " + skipReason;
         if (!callerId.equals(RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         }
         RTP.log(Level.INFO, msg);
         scheduleNext(callerId, index + 1, audit);
@@ -246,12 +262,13 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       String notice = noticeFor(subName);
       if (notice != null && !notice.isEmpty()) {
         if (!callerId.equals(RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, notice);
+          RTPRuntime.serverAccessor().sendMessage(callerId, notice);
         }
         RTP.log(Level.INFO, notice);
       }
 
       final int warnBefore = audit.warnCount.get();
+      final long stepStartedAtMillis = System.currentTimeMillis();
       final java.util.concurrent.atomic.AtomicBoolean successFired =
           new java.util.concurrent.atomic.AtomicBoolean(false);
       final java.util.concurrent.atomic.AtomicBoolean failFired =
@@ -314,6 +331,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
         // ActiveTestJobs listeners, not just the synchronous dispatch.
         int delta = Math.max(0, audit.warnCount.get() - warnBefore);
         audit.stepWarnDeltas.put(subName, delta);
+        audit.stepVerdicts.put(subName, stepPassed(subName, stepStartedAtMillis, delta));
         scheduleNext(callerId, index + 1, audit);
       });
     } catch (Throwable t) {
@@ -338,7 +356,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    */
   private void scheduleNext(UUID callerId, int nextIndex, FullAudit audit) {
     try {
-      RTP.scheduler.runTaskAsynchronously(() -> runStep(callerId, nextIndex, audit));
+      RTPRuntime.scheduler().runTaskAsynchronously(() -> runStep(callerId, nextIndex, audit));
     } catch (Throwable t) {
       runStep(callerId, nextIndex, audit);
     }
@@ -356,7 +374,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     if (sub == null) {
       String msg = "[RTP test/full] " + subName + " subcommand not registered; skipping";
       if (!callerId.equals(RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return;
@@ -405,7 +423,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
           Object wd = watchdogHolder[0];
           if (wd != null) {
             try {
-              RTP.scheduler.cancelTask(wd);
+              RTPRuntime.scheduler().cancelTask(wd);
             } catch (Throwable ignored) {
               // best-effort: a stale cancel can't double-advance because
               // of the `advanced` guard.
@@ -438,7 +456,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             Object self = selfHolder[0];
             if (self != null) {
               try {
-                RTP.scheduler.cancelTask(self);
+                RTPRuntime.scheduler().cancelTask(self);
               } catch (Throwable ignored) {
                 // best-effort
               }
@@ -458,7 +476,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             onAdvance.run();
           };
       Object task =
-          RTP.scheduler.runTaskTimerAsynchronously(
+          RTPRuntime.scheduler().runTaskTimerAsynchronously(
               watchdogBody, DRAIN_TIMEOUT_TICKS, DRAIN_TIMEOUT_TICKS);
       selfHolder[0] = task;
       watchdogHolder[0] = task;
@@ -496,22 +514,22 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       boolean leak = (activeTickets != 0 || activeTasks != 0);
       if (leak) {
         audit.stepWarnDeltas.put("memory-leak", (int) Math.max(1, activeTickets + activeTasks));
+        audit.stepVerdicts.put("memory-leak", false);
         RTP.log(
             Level.WARNING,
             "[RTP test/full] post-sweep assertion FAILED: MemoryTracker leak detected (activeTickets="
                 + activeTickets + ", activeTasks=" + activeTasks + ")");
       }
 
-      // Build the per-step success-rate summary from the deltas captured
-      // in runStep. Each entry was the delta in audit.warnCount across
-      // one subcommand's dispatch + drain window; 0 delta == pass.
+      // Preserve the warning count in each row while using a recent component result
+      // as the verdict when the subcommand publishes one.
       int total = audit.stepWarnDeltas.size();
       int passed = 0;
       StringBuilder rows = new StringBuilder(total * 64);
       List<String> failed = new ArrayList<>();
       for (Map.Entry<String, Integer> e : audit.stepWarnDeltas.entrySet()) {
         int d = e.getValue();
-        boolean ok = d == 0;
+        boolean ok = audit.stepVerdicts.getOrDefault(e.getKey(), d == 0);
         if (ok) passed++;
         else failed.add(e.getKey());
         rows.append("[RTP test/full]   ")
@@ -531,7 +549,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
       // Snapshot server metrics once for inclusion in the diagnostic dump.
       // Read-only and cheap per Metrics SPI contract.
-      MetricsSnapshot snap = RTP.metrics.snapshot();
+      MetricsSnapshot snap = CoreMetrics.instance().snapshot();
       String metricsLine = "[RTP test/full] metrics: " + snap;
 
       String footer = "[RTP test/full] end (total-audited-warnings=" + audit.warnCount + ")";
@@ -552,18 +570,37 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       for (String line : lines) {
         if (line.isEmpty()) continue;
         if (!callerId.equals(RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, line);
+          RTPRuntime.serverAccessor().sendMessage(callerId, line);
         }
         RTP.log(Level.INFO, line);
       }
       if (!callerId.equals(RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, resultLine);
+        RTPRuntime.serverAccessor().sendMessage(callerId, resultLine);
       }
       sender().log(resultLine);
     } finally {
       SendMessage.removeInterceptor((java.util.function.BiConsumer<Level, String>) audit);
       isProcessing.set(false);
     }
+  }
+
+  static boolean stepPassed(String subName, long startedAtMillis, int warnDelta) {
+    boolean observed = false;
+    for (String componentId : componentIdsForStep(subName)) {
+      BitResult result = RtpBit.RUNNER.last(componentId);
+      if (result != null && result.completedAtMillis() >= startedAtMillis) {
+        observed = true;
+        if (result.report().health() == BitHealth.FAILED) return false;
+      }
+    }
+    return observed || warnDelta == 0;
+  }
+
+  static List<String> componentIdsForStep(String subName) {
+    if ("stress".equals(subName) || "async-reply".equals(subName)) {
+      return Arrays.asList(subName, subName + "-player");
+    }
+    return Collections.singletonList(subName);
   }
 
   /**
@@ -621,28 +658,21 @@ public class TestFullCmd extends BaseRTPCmdImpl {
   /**
    * Returns a non-null skip reason if {@code subName} should not be dispatched
    * for {@code callerId} on the current platform, or {@code null} to proceed.
-   * Encapsulates the small handful of context-dependent gates the sweep used
-   * to inline (Folia-only subcommands, console callers that lack a region or
-   * player, etc.).
+   * Encapsulates the platform-dependent gates the sweep applies to probes.
    */
   private String shouldSkip(String subName, UUID callerId) {
-    boolean isConsole = callerId.equals(RTPAPI.serverId);
     switch (subName) {
       case "folia-ownership":
-        return (RTP.serverAccessor != null && RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia"))
+        return (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia"))
             ? null
             : "only meaningful on Folia";
       case "economy-isolation":
-        if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-            || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC
-            || RTP.economy == null)) {
+        if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+            || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.server.api.PlatformFamily.FABRIC
+            || RTPRuntime.economy() == null)) {
           return "Vault is Bukkit-only";
         }
         return null;
-      case "queue-starvation":
-        return isConsole ? "console caller has no resolvable region" : null;
-      case "async-reply":
-        return isConsole ? "console caller has no resolvable player" : null;
       default:
         return null;
     }
@@ -673,8 +703,10 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             new ArrayList<>(Collections.singletonList(String.valueOf(FULL_ITERATIONS))));
         break;
       case "async-reply":
-        args.put(
-            "player", new ArrayList<>(Collections.singletonList(resolveName(callerId))));
+        if (!callerId.equals(RTPAPI.serverId)) {
+          args.put(
+              "player", new ArrayList<>(Collections.singletonList(resolveName(callerId))));
+        }
         break;
       case "stress":
         if (!callerId.equals(RTPAPI.serverId)) {
@@ -711,7 +743,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
   private String resolveName(UUID callerId) {
     if (callerId == null) return "CONSOLE";
     try {
-      var player = RTP.serverAccessor.getPlayer(callerId);
+      var player = RTPRuntime.serverAccessor().getPlayer(callerId);
       if (player != null) return player.name();
     } catch (Throwable ignored) {
       // fall through
@@ -801,6 +833,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
      * fail; the summary's denominator reflects what actually ran).
      */
     final Map<String, Integer> stepWarnDeltas = new LinkedHashMap<>();
+    final Map<String, Boolean> stepVerdicts = new LinkedHashMap<>();
 
     long elapsedMillis() {
       return Math.max(0L, (System.nanoTime() - startTimeNanos) / 1_000_000L);

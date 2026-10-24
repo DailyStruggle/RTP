@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.claimaddon;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -17,7 +17,7 @@ public final class ClaimLocationResolver {
   /**
    * Safely converts {@link RTPCoords} to Bukkit {@link Location}.
    *
-   * <p>Prefers resolving through {@link RTP#serverAccessor} to avoid direct Bukkit static coupling.
+   * <p>Prefers resolving through {@link RTPRuntime#serverAccessor()} to avoid direct Bukkit static coupling.
    * If uninitialized or unresolvable, falls back to {@link Bukkit#getServer()} guarded against null.
    *
    * @param coords the coordinates to convert
@@ -26,10 +26,10 @@ public final class ClaimLocationResolver {
   public static Location toLocation(RTPCoords coords) {
     if (coords == null || coords.worldName() == null) return null;
 
-    // 1. Resolve via RTP.serverAccessor without directly calling Bukkit.getWorld()
+    // 1. Resolve via RTPRuntime.serverAccessor() without directly calling Bukkit.getWorld()
     try {
-      if (RTP.serverAccessor != null) {
-        RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+      if (RTPRuntime.serverAccessor() != null) {
+        RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
         if (rtpWorld != null && rtpWorld.world() instanceof World bw) {
           return new Location(bw, coords.x(), coords.y(), coords.z());
         }

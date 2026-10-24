@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.common.permission;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
 import io.github.dailystruggle.rtp.common.importer.UniversalConfigImporter;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
 import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 import org.jetbrains.annotations.NotNull;
@@ -67,10 +68,10 @@ public final class PermissionSourceResolver {
     @Nullable
     public static Path resolvePluginsDir() {
         File pluginDir = null;
-        if (RTP.configs != null && RTP.configs.pluginDirectory != null) {
-            pluginDir = RTP.configs.pluginDirectory;
-        } else if (RTP.serverAccessor != null) {
-            pluginDir = RTP.serverAccessor.getPluginDirectory();
+        if (ActiveConfigs.get() != null && ActiveConfigs.get().pluginDirectory != null) {
+            pluginDir = ActiveConfigs.get().pluginDirectory;
+        } else if (RTPRuntime.serverAccessor() != null) {
+            pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         }
         if (pluginDir == null) return null;
         File parent = pluginDir.getAbsoluteFile().getParentFile();

@@ -6,18 +6,23 @@ import io.github.dailystruggle.rtp.api.schematic.*;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.*;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.pvp.PvPGate;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -89,14 +94,14 @@ public class TeleportPipelineTaskMutationTest {
         RTPTestSetup.install(tempDir);
         clearAllHooks();
         world = new PlatformTrackingMockWorld("mutation_world");
-        accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.addWorld(world);
         RTPRunnable.scheduler = accessor.getMockScheduler();
         TeleportPipelineTask.ConfigCache.reload();
         GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
-        RTP.getInstance().invulnerablePlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
+        TeleportSessions.current().invulnerablePlayers.clear();
         PvPGate.nativeTracker().clearAll();
     }
 
@@ -104,9 +109,9 @@ public class TeleportPipelineTaskMutationTest {
     void tearDown() {
         clearAllHooks();
         GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
-        RTP.getInstance().invulnerablePlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
+        TeleportSessions.current().invulnerablePlayers.clear();
         PvPGate.nativeTracker().clearAll();
         RTPRunnable.scheduler = accessor.getMockScheduler();
         TeleportPipelineTask.ConfigCache.reload();
@@ -130,7 +135,7 @@ public class TeleportPipelineTaskMutationTest {
         RegionSettings settings = new RegionSettings(
                 name, world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         Region reg = new Region(name, settings);
-        RTP.selectionAPI.permRegionLookup.put(reg.name, reg);
+        ActiveSelection.get().permRegionLookup.put(reg.name, reg);
         return reg;
     }
 
@@ -190,7 +195,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, -1);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, -1);
         RTPCoords coords = new RTPCoords(world.name(), 10, 64, 10);
         boolean result = (boolean) m.invoke(null, world, coords);
         assertFalse(result, "Negative platformRadius should disable platform check immediately");
@@ -212,7 +217,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
         world.nullChunkKeyPredicate = k -> true;
         RTPCoords coords = new RTPCoords(world.name(), 16000, 64, 16000);
         boolean result = (boolean) m.invoke(null, world, coords);
@@ -225,8 +230,8 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
-        RTP.configs.getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, List.of("LAVA", "FIRE"));
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
+        ActiveConfigs.get().getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, List.of("LAVA", "FIRE"));
 
         // Put cached chunk at cx=0, cz=0
         world.getChunkAt(0, 0).join();
@@ -407,14 +412,14 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
         task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
 
-        RTP.getInstance().processingPlayers.add(player.uuid());
+        TeleportSessions.current().processingPlayers.add(player.uuid());
 
         // Configure PvP Gate in safety.yml
         Map<String, Object> map = new HashMap<>();
         map.put(SafetyKeys.pvpSource.name(), "NATIVE");
         map.put(SafetyKeys.pvpCheckEnabled.name(), true);
         map.put(SafetyKeys.pvpOnCombat.name(), "CANCEL");
-        RTP.configs.getParser(SafetyKeys.class).setData(map);
+        ActiveConfigs.get().getParser(SafetyKeys.class).setData(map);
 
         PvPGate.nativeTracker().stamp(player.uuid(), System.currentTimeMillis());
 
@@ -422,7 +427,7 @@ public class TeleportPipelineTaskMutationTest {
 
         // Player should receive pvpInCombat message, processingPlayers removed, transitioned to CLEANUP
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
-        assertFalse(RTP.getInstance().processingPlayers.contains(player.uuid()));
+        assertFalse(TeleportSessions.current().processingPlayers.contains(player.uuid()));
     }
 
     @Test
@@ -441,7 +446,7 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
         task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         // Clear pvp gate
         PvPGate.nativeTracker().clearAll();
@@ -496,7 +501,7 @@ public class TeleportPipelineTaskMutationTest {
         fPaster.setAccessible(true);
         fPaster.set(task, mockPaster);
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         task.run();
         // Tick scheduler so the scheduled destination region task runs
@@ -534,13 +539,13 @@ public class TeleportPipelineTaskMutationTest {
         Field fPaster = TeleportPipelineTask.class.getDeclaredField("schematicPaster");
         fPaster.setAccessible(true);
         fPaster.set(task, paster);
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis();
         data.sender = player;
         data.targetRegion = reg;
         data.selectedCoords = coords;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
         fData.set(task, data);
@@ -587,7 +592,7 @@ public class TeleportPipelineTaskMutationTest {
         LoadedSchematic schem = new TestSchematic(3, 3, 3, 0, 0);
         TeleportPipelineTask task = schematicTeleportTask(player, createTestRegion("schem_fail_reg"),
                 recordingPaster(schem, () -> { throw new LinkageError("paste exploded"); }), schem);
-        RTP.getInstance().processingPlayers.add(player.uuid());
+        TeleportSessions.current().processingPlayers.add(player.uuid());
         String savedUnsafe = TeleportPipelineTask.ConfigCache.unsafe;
         TeleportPipelineTask.ConfigCache.unsafe = "UNSAFE_FOOTING";
         try {
@@ -596,7 +601,7 @@ public class TeleportPipelineTaskMutationTest {
 
             assertFalse(events.contains("teleport"), "no teleport without footing (S-001)");
             assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
-            assertFalse(RTP.getInstance().processingPlayers.contains(player.uuid()),
+            assertFalse(TeleportSessions.current().processingPlayers.contains(player.uuid()),
                     "the busy lock must be released so the next /rtp is accepted");
             assertTrue(player.sentMessages.stream().anyMatch(m -> m.contains("UNSAFE_FOOTING")),
                     "the abort must be reported to the player (S-004)");
@@ -625,16 +630,16 @@ public class TeleportPipelineTaskMutationTest {
         task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
 
         // Turn on all relevant flags
-        RTP.configs.getParser(ConfigKeys.class).set(ConfigKeys.setRespawnOnTeleport, true);
+        ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.setRespawnOnTeleport, true);
         TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
         TeleportPipelineTask.ConfigCache.lockAfterUses = 5;
         TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000;
         TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
         TeleportPipelineTask.ConfigCache.teleportMessage = "You arrived safely!";
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         // Pre-populate latestTeleportData and assign to task field
         TeleportData data = new TeleportData();
@@ -642,7 +647,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.targetRegion = reg;
         data.selectedCoords = coords;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -664,21 +669,21 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(coords.x(), respawn.x());
 
         // 2. Verify lockAfter recorded in store
-        assertTrue(RTP.getInstance().teleportLimitStore.uses(player.uuid(), 60000, System.currentTimeMillis()) > 0
-                        || RTP.getInstance().teleportLimitStore.isLocked(player.uuid(), 5, 60000, System.currentTimeMillis()),
+        assertTrue(ActiveDatabase.teleportLimitStore().uses(player.uuid(), 60000, System.currentTimeMillis()) > 0
+                        || ActiveDatabase.teleportLimitStore().isLocked(player.uuid(), 5, 60000, System.currentTimeMillis()),
                 "lockAfterUses should record success in store");
 
         // 3. Verify postTeleportQueueing added a task to region's cachePipeline
         assertTrue(reg.cachePipeline.size() > 0, "postTeleportQueueing should add RegionCacheTask to cachePipeline");
 
         // 4. Verify invulnerability was applied
-        assertTrue(RTP.getInstance().invulnerablePlayers.containsKey(player.uuid()));
+        assertTrue(TeleportSessions.current().invulnerablePlayers.containsKey(player.uuid()));
 
         // Tick scheduler past 5 * 20 ticks = 100 ticks to verify invulnerability expiration task runs
         for (int i = 0; i < 110; i++) {
             accessor.getMockScheduler().tick(1);
         }
-        assertFalse(RTP.getInstance().invulnerablePlayers.containsKey(player.uuid()),
+        assertFalse(TeleportSessions.current().invulnerablePlayers.containsKey(player.uuid()),
                 "Invulnerability should expire after duration ticks");
 
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
@@ -703,8 +708,8 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask.ConfigCache.unsafe = "Destination was unsafe!";
         TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 0L);
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 0L);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         // Configure player to fail setLocation
         player.setFailSetLocation(true);
@@ -714,7 +719,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -754,7 +759,7 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
         task.setPhase(TeleportPipelineTask.Phase.LOAD);
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         task.run();
         // Because delay is 0 and chunkSet is already done, transitions to TELEPORT or CLEANUP
@@ -811,7 +816,7 @@ public class TeleportPipelineTaskMutationTest {
         data.targetRegion = reg;
         data.nextTask = task;
         data.completed = false; // not completed yet
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         AtomicBoolean onCompleteFired = new AtomicBoolean(false);
         data.onComplete = d -> onCompleteFired.set(true);
@@ -828,7 +833,7 @@ public class TeleportPipelineTaskMutationTest {
         assertTrue(onCompleteFired.get(), "teleportData.fireOnComplete() must be invoked");
 
         // 2. data was removed from latestTeleportData because !data.completed
-        assertNull(RTP.getInstance().latestTeleportData.get(player.uuid()),
+        assertNull(TeleportSessions.current().latestTeleportData.get(player.uuid()),
                 "Incomplete teleport data must be removed from latestTeleportData on cleanup");
 
         // 3. inFlightCalculations decremented
@@ -851,7 +856,7 @@ public class TeleportPipelineTaskMutationTest {
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis();
         data.completed = true; // completed!
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -862,7 +867,7 @@ public class TeleportPipelineTaskMutationTest {
         task.run();
 
         // Should NOT remove because data.completed is true
-        assertSame(data, RTP.getInstance().latestTeleportData.get(player.uuid()),
+        assertSame(data, TeleportSessions.current().latestTeleportData.get(player.uuid()),
                 "Completed teleport data should be retained in latestTeleportData");
     }
 
@@ -924,7 +929,7 @@ public class TeleportPipelineTaskMutationTest {
         data.time = System.currentTimeMillis();
         data.sender = player;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -993,7 +998,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = sender;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -1067,7 +1072,7 @@ public class TeleportPipelineTaskMutationTest {
         fSchemLoad.setAccessible(true);
         fSchemLoad.set(task, CompletableFuture.completedFuture(null));
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         task.run();
         accessor.getMockScheduler().tick(1);
@@ -1113,7 +1118,7 @@ public class TeleportPipelineTaskMutationTest {
         // Register claim verifier that rejects cell (50, 70, 50)
         GlobalRegionVerifiers.addGlobalRegionVerifier(c -> !(c.x() == 50 && c.z() == 50));
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         world.resetPlatformCalled();
         task.run();
@@ -1157,7 +1162,7 @@ public class TeleportPipelineTaskMutationTest {
         fPaster.setAccessible(true);
         fPaster.set(task, mockPaster);
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         world.resetPlatformCalled();
         task.run();
@@ -1201,7 +1206,7 @@ public class TeleportPipelineTaskMutationTest {
         fPaster.setAccessible(true);
         fPaster.set(task, mockPaster);
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         task.run();
         accessor.getMockScheduler().tick(1);
@@ -1239,7 +1244,7 @@ public class TeleportPipelineTaskMutationTest {
         Region reg = createTestRegion("silent_halt_reg");
         reg.inFlightCalculations.set(5);
         SettablePlayer player = createPlayer("SilentHaltP");
-        RTP.getInstance().processingPlayers.add(player.uuid());
+        TeleportSessions.current().processingPlayers.add(player.uuid());
 
         GenerationContext ctx = new GenerationContext(player, player, null);
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg);
@@ -1277,7 +1282,7 @@ public class TeleportPipelineTaskMutationTest {
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis();
         data.sender = player;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         GenerationContext ctx = new GenerationContext(player, player, null);
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg);
@@ -1320,7 +1325,7 @@ public class TeleportPipelineTaskMutationTest {
         data.time = System.currentTimeMillis();
         data.sender = player;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -1382,7 +1387,7 @@ public class TeleportPipelineTaskMutationTest {
         data.time = System.currentTimeMillis();
         data.sender = player;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -1407,7 +1412,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 1);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 1);
         world.getChunkAt(0, 0).join();
 
         RTPCoords centerCoords = new RTPCoords(world.name(), 5, 64, 5);
@@ -1424,7 +1429,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
         world.getChunkAt(0, 0).join();
 
         // Landing at y=32 has belowY=31 which is solid ground in MockRTPChunk (!isAir(31))
@@ -1439,7 +1444,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
 
         // World that asserts exactly the chunk key requested in getCachedChunk
         AtomicBoolean chunkKeyVerified = new AtomicBoolean(false);
@@ -1482,7 +1487,7 @@ public class TeleportPipelineTaskMutationTest {
         data.time = System.currentTimeMillis();
         data.sender = player;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -1521,7 +1526,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -1554,7 +1559,7 @@ public class TeleportPipelineTaskMutationTest {
 
         task.run();
 
-        TeleportData data = RTP.getInstance().latestTeleportData.get(player.uuid());
+        TeleportData data = TeleportSessions.current().latestTeleportData.get(player.uuid());
         assertNotNull(data, "runLoad must populate latestTeleportData if absent");
         assertEquals(coords, data.selectedCoords);
         assertEquals(reg, data.targetRegion);
@@ -1606,7 +1611,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         task.run();
 
@@ -1662,11 +1667,11 @@ public class TeleportPipelineTaskMutationTest {
         map.put(SafetyKeys.pvpSource.name(), "NATIVE");
         map.put(SafetyKeys.pvpCheckEnabled.name(), true);
         map.put(SafetyKeys.pvpOnCombat.name(), "ALLOW");
-        RTP.configs.getParser(SafetyKeys.class).setData(map);
+        ActiveConfigs.get().getParser(SafetyKeys.class).setData(map);
 
         PvPGate.nativeTracker().stamp(player.uuid(), System.currentTimeMillis());
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         task.run();
         accessor.getMockScheduler().tick(1);
@@ -1701,7 +1706,7 @@ public class TeleportPipelineTaskMutationTest {
         fSchemLoad.setAccessible(true);
         fSchemLoad.set(task, pending);
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         task.run();
         accessor.getMockScheduler().tick(1);
@@ -1710,12 +1715,12 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
     }
     @Test
-    @DisplayName("ConfigCache reload accurately applies delay ticks and viewDistance restore intervals")
+    @DisplayName("REQ-RTP-F-016: ConfigCache reload applies duration and tick intervals")
     void configCache_reload_detailed_values() {
-        RTP.configs.getParser(PerformanceKeys.class).set(PerformanceKeys.viewDistanceRestoreInterval, 42L);
-        RTP.configs.getParser(PerformanceKeys.class).set(PerformanceKeys.viewDistanceTeleport, 3);
-        RTP.configs.getParser(ConfigKeys.class).set(ConfigKeys.lockAfterUses, 7);
-        RTP.configs.getParser(ConfigKeys.class).set(ConfigKeys.lockAfterResetSeconds, 15);
+        ActiveConfigs.get().getParser(PerformanceKeys.class).set(PerformanceKeys.viewDistanceRestoreInterval, 42L);
+        ActiveConfigs.get().getParser(PerformanceKeys.class).set(PerformanceKeys.viewDistanceTeleport, 3);
+        ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.lockAfterUses, 7);
+        ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.lockAfterResetSeconds, 15);
 
         TeleportPipelineTask.ConfigCache.reload();
 
@@ -1723,6 +1728,19 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(3, TeleportPipelineTask.ConfigCache.viewDistanceTeleport);
         assertEquals(7, TeleportPipelineTask.ConfigCache.lockAfterUses);
         assertEquals(15000L, TeleportPipelineTask.ConfigCache.lockAfterResetMillis);
+
+        ActiveConfigs.get().getParser(PerformanceKeys.class).set(
+                PerformanceKeys.viewDistanceRestoreInterval, "5s");
+        TeleportPipelineTask.ConfigCache.reload();
+        assertEquals(100L, TeleportPipelineTask.ConfigCache.viewDistanceRestoreInterval);
+
+        ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.lockAfterResetSeconds, "3h");
+        TeleportPipelineTask.ConfigCache.reload();
+        assertEquals(10_800_000L, TeleportPipelineTask.ConfigCache.lockAfterResetMillis);
+
+        ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.lockAfterResetSeconds, 60);
+        TeleportPipelineTask.ConfigCache.reload();
+        assertEquals(60_000L, TeleportPipelineTask.ConfigCache.lockAfterResetMillis);
     }
 
     // -------------------------------------------------------------------------
@@ -1755,7 +1773,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = sender;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -1802,7 +1820,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = sender;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
@@ -1929,7 +1947,7 @@ public class TeleportPipelineTaskMutationTest {
         // RTPCmd stores a TeleportData carrying only the sender before submitting the pipeline.
         TeleportData data = new TeleportData();
         data.sender = player;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         new TeleportPipelineTask(new GenerationContext(player, player, null), reg).run();
 
@@ -1982,7 +2000,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -1990,7 +2008,7 @@ public class TeleportPipelineTaskMutationTest {
             fData.set(task, data);
         } catch (Exception ignored) {}
 
-        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
 
         task.run();
         accessor.getMockScheduler().tick(1);
@@ -2049,14 +2067,14 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask.ConfigCache.lockAfterUses = 0;
         TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = false;
         TeleportPipelineTask.ConfigCache.postTeleportQueueing = false;
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 0L);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 0L);
 
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis();
         data.sender = player;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -2065,13 +2083,13 @@ public class TeleportPipelineTaskMutationTest {
         } catch (Exception ignored) {}
 
         DatabaseAccessor mockDb = Mockito.mock(DatabaseAccessor.class);
-        RTP.getInstance().databaseAccessor = mockDb;
+        ActiveDatabase.setAccessor(mockDb);
 
         task.run();
         accessor.getMockScheduler().tick(1);
         accessor.getMockScheduler().tick(1);
 
-        assertFalse(RTP.getInstance().invulnerablePlayers.containsKey(player.uuid()),
+        assertFalse(TeleportSessions.current().invulnerablePlayers.containsKey(player.uuid()),
                 "duration == 0 should remove invulnerability immediately");
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
         assertTrue(data.processingTime >= 0, "processingTime must be calculated as currentTime - startTime");
@@ -2103,7 +2121,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.selectedCoords = coords;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -2112,7 +2130,7 @@ public class TeleportPipelineTaskMutationTest {
         } catch (Exception ignored) {}
 
         DatabaseAccessor mockDb = Mockito.mock(DatabaseAccessor.class);
-        RTP.getInstance().databaseAccessor = mockDb;
+        ActiveDatabase.setAccessor(mockDb);
 
         task.run();
 
@@ -2148,7 +2166,7 @@ public class TeleportPipelineTaskMutationTest {
         data.delay = player.delay();
         data.targetRegion = reg;
         data.selectedCoords = coords;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -2176,7 +2194,7 @@ public class TeleportPipelineTaskMutationTest {
         data.time = System.currentTimeMillis();
         data.sender = player;
         data.targetRegion = reg;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         try {
             Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
@@ -2203,7 +2221,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
 
         // Populate chunks around (0, 0)
         world.getChunkAt(0, 0).join();
@@ -2239,7 +2257,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
 
         io.github.dailystruggle.rtp.common.mock.MockRTPChunk testChunk = new io.github.dailystruggle.rtp.common.mock.MockRTPChunk(0, 0, world) {
             @Override
@@ -2320,7 +2338,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
 
         // Case 1: Landing block is unsafe (e.g. lava/fire)
         io.github.dailystruggle.rtp.common.mock.MockRTPChunk chunkUnsafe = new io.github.dailystruggle.rtp.common.mock.MockRTPChunk(0, 0, world) {
@@ -2387,8 +2405,8 @@ public class TeleportPipelineTaskMutationTest {
         assertFalse((boolean) m.invoke(null, w4, new RTPCoords(w4.name(), 5, 50, 5)));
 
         // Case 5: safety != null with unsafeBlocks containing a custom material that makes landing block unsafe
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
-        RTP.configs.getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, List.of("CUSTOM_HAZARD"));
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
+        ActiveConfigs.get().getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, List.of("CUSTOM_HAZARD"));
         io.github.dailystruggle.rtp.common.mock.MockRTPChunk chunkCustomHazard = new io.github.dailystruggle.rtp.common.mock.MockRTPChunk(0, 0, world) {
             @Override
             public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
@@ -2438,7 +2456,7 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 0);
 
         io.github.dailystruggle.rtp.common.mock.MockRTPChunk chunk = new io.github.dailystruggle.rtp.common.mock.MockRTPChunk(0, 0, world) {
             @Override
@@ -2505,13 +2523,13 @@ public class TeleportPipelineTaskMutationTest {
         // Put a different TeleportData in latestTeleportData
         TeleportData otherData = new TeleportData();
         otherData.completed = false;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), otherData);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), otherData);
 
         Method cleanup = TeleportPipelineTask.class.getDeclaredMethod("runCleanup");
         cleanup.setAccessible(true);
         cleanup.invoke(task);
 
-        assertSame(otherData, RTP.getInstance().latestTeleportData.get(player.uuid()),
+        assertSame(otherData, TeleportSessions.current().latestTeleportData.get(player.uuid()),
                 "latestTeleportData should not remove unmatched TeleportData");
     }
 
@@ -2526,7 +2544,7 @@ public class TeleportPipelineTaskMutationTest {
         TeleportData data = new TeleportData();
         data.sender = player;
         data.nextTask = task;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -2548,8 +2566,8 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
-        RTP.configs.getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, Arrays.asList("LAVA", "FIRE"));
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
+        ActiveConfigs.get().getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, Arrays.asList("LAVA", "FIRE"));
 
         io.github.dailystruggle.rtp.common.mock.MockRTPChunk chunkUnsafe = new io.github.dailystruggle.rtp.common.mock.MockRTPChunk(0, 0, world) {
             @Override
@@ -2629,12 +2647,12 @@ public class TeleportPipelineTaskMutationTest {
                 "Safe solid ground should not require platform");
 
         // Test radius < 0 (operator disabled platforms)
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, -1);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, -1);
         assertFalse((boolean) m.invoke(null, wUnsafe, new RTPCoords(wUnsafe.name(), 5, 50, 5)),
                 "platformRadius < 0 must always return false");
 
         // Reset radius
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 2);
     }
 
     @Test
@@ -2648,7 +2666,7 @@ public class TeleportPipelineTaskMutationTest {
         task.setPhase(TeleportPipelineTask.Phase.CLEANUP);
 
         long beforeCount = 0L;
-        if (RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm) {
+        if (CoreMetrics.instance() instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm) {
             beforeCount = cm.slowPipelineCount();
         }
 
@@ -2665,7 +2683,7 @@ public class TeleportPipelineTaskMutationTest {
         cleanup.setAccessible(true);
         cleanup.invoke(task);
 
-        if (RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm) {
+        if (CoreMetrics.instance() instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm) {
             assertEquals(beforeCount + 1L, cm.slowPipelineCount(), "slowPipelineCount should increment by 1");
         }
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
@@ -2682,7 +2700,7 @@ public class TeleportPipelineTaskMutationTest {
         TeleportData data = new TeleportData();
         data.sender = player;
         data.nextTask = task;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -2758,8 +2776,8 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.nextTask = task;
         data.time = System.currentTimeMillis();
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
-        RTP.getInstance().processingPlayers.add(player.uuid());
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().processingPlayers.add(player.uuid());
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -2849,7 +2867,7 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.nextTask = task;
         data.time = System.currentTimeMillis(); // elapsed ~ 0 ms, remaining ~ 200 ms -> 4 ticks
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -2933,8 +2951,8 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.nextTask = task;
         data.time = System.currentTimeMillis();
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
-        RTP.getInstance().processingPlayers.add(player.uuid());
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().processingPlayers.add(player.uuid());
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -3082,7 +3100,7 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg);
 
         // Player is NOT in processingPlayers
-        RTP.getInstance().processingPlayers.remove(player.uuid());
+        TeleportSessions.current().processingPlayers.remove(player.uuid());
 
         Method m = TeleportPipelineTask.class.getDeclaredMethod("processGenerationResult", GenerationResult.class);
         m.setAccessible(true);
@@ -3139,7 +3157,7 @@ public class TeleportPipelineTaskMutationTest {
         data.nextTask = task;
         // Set time such that elapsed = 40ms, remaining = 60ms -> ticks = 60/50 = 1 tick.
         data.time = System.currentTimeMillis() - 40L;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -3163,8 +3181,8 @@ public class TeleportPipelineTaskMutationTest {
         Method m = TeleportPipelineTask.class.getDeclaredMethod("shouldBuildPlatform", RTPWorld.class, RTPCoords.class);
         m.setAccessible(true);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 3);
-        RTP.configs.getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, List.of("MINECRAFT:LAVA", "MINECRAFT:FIRE"));
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.platformRadius, 3);
+        ActiveConfigs.get().getParser(BlocksKeys.class).set(BlocksKeys.unsafeBlocks, List.of("MINECRAFT:LAVA", "MINECRAFT:FIRE"));
 
         final AtomicBoolean unsafeChecked = new AtomicBoolean(false);
         io.github.dailystruggle.rtp.common.mock.MockRTPChunk chunk = new io.github.dailystruggle.rtp.common.mock.MockRTPChunk(0, 0, world) {
@@ -3204,7 +3222,7 @@ public class TeleportPipelineTaskMutationTest {
         // 0 ms elapsed -> remaining = 2000 ms -> toTicks = 2000 / 50 = 40.
         // If mutated to 2000 * 50 = 100000 ticks.
         data.time = System.currentTimeMillis();
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -3215,15 +3233,15 @@ public class TeleportPipelineTaskMutationTest {
         chunkSetField.setAccessible(true);
         chunkSetField.set(task, set);
 
-        // Spy scheduler calls via RTP.scheduler directly
+        // Spy scheduler calls via RTPRuntime.scheduler() directly
         final java.util.concurrent.atomic.AtomicLong scheduledTicks = new java.util.concurrent.atomic.AtomicLong(-1);
-        RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+        RTPRuntime.setScheduler(new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
             @Override
             public void runTaskForPlayer(io.github.dailystruggle.rtp.api.entity.RTPPlayer p, RTPRunnable runnable, long delayTicks) {
                 scheduledTicks.set(delayTicks);
                 super.runTaskForPlayer(p, runnable, delayTicks);
             }
-        };
+        });
 
         task.setPhase(TeleportPipelineTask.Phase.LOAD);
         task.run();
@@ -3256,16 +3274,16 @@ public class TeleportPipelineTaskMutationTest {
         data.sender = player;
         data.nextTask = task;
         data.time = System.currentTimeMillis();
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
         tpDataField.set(task, data);
 
         final java.util.concurrent.atomic.AtomicLong scheduledTicks = new java.util.concurrent.atomic.AtomicLong(-1);
         final AtomicBoolean ranImmediately = new AtomicBoolean(false);
-        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTP.scheduler;
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTPRuntime.scheduler();
         try {
-            RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+            RTPRuntime.setScheduler(new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
                 @Override
                 public void runTaskForPlayer(io.github.dailystruggle.rtp.api.entity.RTPPlayer p, RTPRunnable runnable, long delayTicks) {
                     if (runnable == task) scheduledTicks.set(delayTicks);
@@ -3275,12 +3293,12 @@ public class TeleportPipelineTaskMutationTest {
                 public void runTask(Runnable runnable) {
                     if (runnable == task) ranImmediately.set(true);
                 }
-            };
+            });
 
             task.setPhase(TeleportPipelineTask.Phase.LOAD);
             task.run();
         } finally {
-            RTP.scheduler = original;
+            RTPRuntime.setScheduler(original);
         }
 
         assertFalse(ranImmediately.get(), "A 3 s delay must not dispatch the teleport at once");
@@ -3306,9 +3324,9 @@ public class TeleportPipelineTaskMutationTest {
 
         final AtomicBoolean asyncScheduled = new AtomicBoolean(false);
         final AtomicBoolean syncScheduled = new AtomicBoolean(false);
-        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler originalScheduler = RTP.scheduler;
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler originalScheduler = RTPRuntime.scheduler();
         try {
-            RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+            RTPRuntime.setScheduler(new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
                 @Override
                 public io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask runTaskAsynchronously(Runnable runnable) {
                     asyncScheduled.set(true);
@@ -3319,7 +3337,7 @@ public class TeleportPipelineTaskMutationTest {
                 public void runTask(RTPWorld<?> world, int chunkX, int chunkZ, Runnable runnable) {
                     syncScheduled.set(true);
                 }
-            };
+            });
 
             CompletableFuture<Long> chunkFuture = new CompletableFuture<>();
             CompletableFuture<Boolean> setDoneFuture = new CompletableFuture<>();
@@ -3348,7 +3366,7 @@ public class TeleportPipelineTaskMutationTest {
                 assertFalse(asyncScheduled.get(), "Async scheduler must not be called when chunkSet is complete");
             }
         } finally {
-            RTP.scheduler = originalScheduler;
+            RTPRuntime.setScheduler(originalScheduler);
         }
     }
 
@@ -3380,12 +3398,12 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords);
 
         final AtomicBoolean syncScheduled = new AtomicBoolean(false);
-        RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+        RTPRuntime.setScheduler(new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
             @Override
             public void runTask(Runnable runnable) {
                 syncScheduled.set(true);
             }
-        };
+        });
 
         Field csField = TeleportPipelineTask.class.getDeclaredField("chunkSet");
         csField.setAccessible(true);
@@ -3400,7 +3418,7 @@ public class TeleportPipelineTaskMutationTest {
         data.targetRegion = reg;
         data.selectedCoords = coords;
         data.nextTask = task;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
         Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         tpDataField.setAccessible(true);
@@ -3455,14 +3473,14 @@ public class TeleportPipelineTaskMutationTest {
         data2.completed = false;
         tpDataField.set(task2, data2);
 
-        RTP.configs.getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
         TeleportPipelineTask.ConfigCache.lockAfterUses = 5L;
         TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000L;
         TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
         try {
             task2.completeDeathTeleport(true);
             assertTrue(data2.completed);
-            assertTrue(RTP.getInstance().invulnerablePlayers.containsKey(player.uuid()));
+            assertTrue(TeleportSessions.current().invulnerablePlayers.containsKey(player.uuid()));
         } finally {
             TeleportPipelineTask.ConfigCache.lockAfterUses = 0L;
             TeleportPipelineTask.ConfigCache.postTeleportQueueing = false;
@@ -3500,12 +3518,12 @@ public class TeleportPipelineTaskMutationTest {
     @DisplayName("ConfigCache reload handles null cfg and non-null values")
     void configCache_reload_branches() {
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cfgParser =
-            RTP.configs.configParserMap.remove(ConfigKeys.class);
+            ActiveConfigs.get().configParserMap.remove(ConfigKeys.class);
         try {
             assertDoesNotThrow(TeleportPipelineTask.ConfigCache::reload);
         } finally {
             if (cfgParser != null) {
-                RTP.configs.configParserMap.put(ConfigKeys.class, cfgParser);
+                ActiveConfigs.get().configParserMap.put(ConfigKeys.class, cfgParser);
             }
             TeleportPipelineTask.ConfigCache.reload();
         }

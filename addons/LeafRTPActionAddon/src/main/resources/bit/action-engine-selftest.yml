@@ -1,0 +1,44 @@
+cases:
+  bundled-start:
+    players: 2
+    script: []
+    expected:
+      - say bundled 00000000
+    definition:
+      placement: false
+      confinement:
+        boundary: NONE
+        duration: 30s
+      lifecycle:
+        onStart:
+          - gate:
+              players: ">= 2"
+            run:
+              - CONSOLE: "say bundled [session_id]"
+  violation-count:
+    players: 2
+    script:
+      - violate
+      - violate
+    expected:
+      - say first-violation
+      - say second-violation
+    definition:
+      placement: false
+      confinement:
+        boundary: NONE
+        duration: 30s
+      lifecycle:
+        onBoundaryViolation:
+          - gate:
+              scoreboard:
+                objective: rtp_violations
+                matches: "< 2"
+            run:
+              - CONSOLE: "say first-violation"
+          - gate:
+              scoreboard:
+                objective: rtp_violations
+                matches: ">= 2"
+            run:
+              - CONSOLE: "say second-violation"

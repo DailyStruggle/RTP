@@ -1,6 +1,6 @@
 # ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
 
-**Status:** Proposed - superseded as a decision by [ADR-084](ADR-084-layered-spiral-hilbert-rle-index.md); retained as an alternative considered
+**Status:** Superseded by [ADR-084](ADR-084-layered-spiral-hilbert-rle-index.md), then declined by [ADR-085](ADR-085-spiral-addressed-hilbert-key-space.md) - alternative considered
 **Date:** 2026-09-05
 
 > **Supersession note.** The measurements in sections 8a and 8b falsified this record's own Context premise (run count against compact-feature area fits `area^0.500`, i.e. perimeter-order) and showed the descriptor's compile cost growing as `radius^1.857`. [ADR-084](ADR-084-layered-spiral-hilbert-rle-index.md) decides a layered spiral-plus-Hilbert-RLE index instead, and explicitly rejects three positions taken below: the area-growth premise, `supportsExpand() = false`, and `PI_MIN` subsampling. Sections 8a and 8b remain the evidence of record.

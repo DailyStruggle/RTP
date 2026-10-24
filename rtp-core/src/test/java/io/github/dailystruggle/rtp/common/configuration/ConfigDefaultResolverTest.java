@@ -28,7 +28,7 @@ class ConfigDefaultResolverTest {
     void setUp() {
         rtpMockedStatic = mockStatic(RTP.class);
         mockConfigs = mock(Configs.class);
-        RTP.configs = mockConfigs;
+        ActiveConfigs.set(mockConfigs);
     }
 
     @AfterEach

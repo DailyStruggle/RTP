@@ -3,10 +3,12 @@ package io.github.dailystruggle.rtp.common.economy;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.mock.SyntheticSideEffects;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.UUID;
 
@@ -62,18 +64,20 @@ public final class EconomyGate {
       PriceKey which,
       boolean hasParams,
       boolean hasBiome) {
-    RTPEconomy economy = RTP.economy;
+    RTPEconomy economy = RTPRuntime.economy();
     if (economy == null) return new Charge(Result.ALLOWED, 0.0);
     if (payerId == null || payerId.equals(CommandsAPI.serverId)) {
       return new Charge(Result.ALLOWED, 0.0);
     }
+    // ADR-121 section 11: a BIT mock has no real account; never query or debit it.
+    if (SyntheticSideEffects.isSynthetic(payerId)) return new Charge(Result.ALLOWED, 0.0);
     if (freeSubject != null && freeSubject.hasPermission("rtp.free")) {
       return new Charge(Result.ALLOWED, 0.0);
     }
 
     @SuppressWarnings("unchecked")
     ConfigParser<EconomyKeys> eco =
-        (ConfigParser<EconomyKeys>) RTP.configs.getParser(EconomyKeys.class);
+        (ConfigParser<EconomyKeys>) ActiveConfigs.get().getParser(EconomyKeys.class);
     if (eco == null) return new Charge(Result.ALLOWED, 0.0);
 
     EconomyKeys baseKey = (which == PriceKey.OTHER) ? EconomyKeys.priceOther : EconomyKeys.price;
@@ -93,7 +97,7 @@ public final class EconomyGate {
     EconomyHop.run(
         () -> {
           if (!economyRef.take(payer, takeCost)) {
-            RTP.log(
+            RTPRuntime.log(
                 java.util.logging.Level.WARNING,
                 "[RTP] economy.take returned false for " + payer
                     + " cost=" + takeCost + " (balance check passed earlier)");

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPChunk;
@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,8 +64,8 @@ class RegionPromotionChecksTest {
         };
     }
 
-    private LocationGenerator.FailTypes check(MockRTPChunk c) throws Exception {
-        CompletableFuture<LocationGenerator.FailTypes> f = region.promotionChecks(landing, c);
+    private FailTypes check(MockRTPChunk c) throws Exception {
+        CompletableFuture<FailTypes> f = region.promotionChecks(landing, c);
         assertTrue(f.isDone(), "single-chunk checks with sync verifiers complete inline");
         return f.get();
     }
@@ -77,23 +78,23 @@ class RegionPromotionChecksTest {
     @Test
     @SuppressWarnings("unchecked")
     void blacklistedBiomeIsDropped() throws Exception {
-        ConfigParser<BiomesKeys> biomes = (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
+        ConfigParser<BiomesKeys> biomes = (ConfigParser<BiomesKeys>) ActiveConfigs.get().getParser(BiomesKeys.class);
         biomes.set(BiomesKeys.biomeWhitelist, false);
         biomes.set(BiomesKeys.biomes, List.of("DESERT"));
 
-        assertEquals(LocationGenerator.FailTypes.biome, check(chunk("DESERT", true)));
+        assertEquals(FailTypes.biome, check(chunk("DESERT", true)));
         assertNull(check(chunk("PLAINS", true)));
     }
 
     @Test
     void unsafeColumnIsDropped() throws Exception {
-        assertEquals(LocationGenerator.FailTypes.safety, check(chunk("PLAINS", false)));
+        assertEquals(FailTypes.safety, check(chunk("PLAINS", false)));
     }
 
     @Test
     void claimedLocationIsDropped() throws Exception {
         try (AutoCloseable claim = GlobalRegionVerifiers.addGlobalRegionVerifier(c -> false)) {
-            assertEquals(LocationGenerator.FailTypes.safetyExternal, check(chunk("PLAINS", true)));
+            assertEquals(FailTypes.safetyExternal, check(chunk("PLAINS", true)));
         }
         assertNull(check(chunk("PLAINS", true)));
     }

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.folia.mock.MockAsyncScheduler;
 import io.github.dailystruggle.rtp.folia.mock.MockGlobalRegionScheduler;
 import io.github.dailystruggle.rtp.folia.mock.MockRegionScheduler;
@@ -62,10 +63,12 @@ class FoliaRTPWorldChunkTicketTest {
     FoliaSchedulerImpl scheduler = new FoliaSchedulerImpl(
         plugin, regionScheduler, asyncScheduler, globalScheduler, 8, 200L);
 
-    previousAccessor = RTP.serverAccessor;
+    previousAccessor = RTPRuntime.serverAccessor();
     RTPServerAccessor accessor = Mockito.mock(RTPServerAccessor.class);
     when(accessor.getScheduler()).thenReturn(scheduler);
-    RTP.serverAccessor = accessor;
+    // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+    RTP.ensureInitialized();
+    RTPRuntime.setServerAccessor(accessor);
 
     bukkitWorld = Mockito.mock(World.class);
     preload = new CompletableFuture<>();
@@ -75,7 +78,7 @@ class FoliaRTPWorldChunkTicketTest {
 
   @AfterEach
   void tearDown() throws Exception {
-    RTP.serverAccessor = previousAccessor;
+    RTPRuntime.setServerAccessor(previousAccessor);
     java.lang.reflect.Field serverField = org.bukkit.Bukkit.class.getDeclaredField("server");
     serverField.setAccessible(true);
     serverField.set(null, previousServer);
@@ -180,7 +183,7 @@ class FoliaRTPWorldChunkTicketTest {
   @DisplayName("ADR-112: chunk-load continuations run on the async scheduler, not the region thread that loaded")
   void chunkFutureContinuationsLeaveTheRegionThread() {
     when(org.bukkit.Bukkit.getServer().getAsyncScheduler()).thenReturn(asyncScheduler);
-    when(RTP.serverAccessor.getPlugin()).thenReturn(plugin);
+    when(RTPRuntime.serverAccessor().getPlugin()).thenReturn(plugin);
     java.util.concurrent.atomic.AtomicReference<String> ranOn = new java.util.concurrent.atomic.AtomicReference<>();
 
     rtpWorld.getChunkAtAsync(3, 4).thenAccept(set -> ranOn.set(Thread.currentThread().getName()));
@@ -195,7 +198,7 @@ class FoliaRTPWorldChunkTicketTest {
   @Test
   @DisplayName("ADR-112: with the plugin gone the chunk future completes inline instead of stranding dependents")
   void chunkFutureCompletesInlineWithoutPlugin() {
-    when(RTP.serverAccessor.getPlugin()).thenReturn(null);
+    when(RTPRuntime.serverAccessor().getPlugin()).thenReturn(null);
     java.util.concurrent.atomic.AtomicBoolean ran = new java.util.concurrent.atomic.AtomicBoolean();
 
     rtpWorld.getChunkAtAsync(3, 4).thenAccept(set -> ran.set(true));

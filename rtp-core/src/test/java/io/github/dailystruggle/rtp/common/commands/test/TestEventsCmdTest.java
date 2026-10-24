@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.RTPCommandEvents;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -64,12 +64,12 @@ class TestEventsCmdTest {
   void nullScheduler_reportsCoreNotLoaded() {
     MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "p", null);
     accessor.addPlayer(player);
-    RTP.scheduler = null;
+    RTPRuntime.setScheduler(null);
     try {
       boolean ret = new TestEventsCmd(null).onCommand(player.uuid(), noArgs(), null);
       assertFalse(ret);
     } finally {
-      RTP.scheduler = accessor.getMockScheduler();
+      RTPRuntime.setScheduler(accessor.getMockScheduler());
     }
     assertTrue(
         player.sentMessages.stream().anyMatch(m -> m.contains("core not yet loaded")),

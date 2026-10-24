@@ -185,8 +185,15 @@ final class Lz4BlockDecoder {
             if (offset >= matchLen) {
                 System.arraycopy(dst, mp, dst, dp, matchLen);
             } else {
-                // Overlapping copy replicates the trailing pattern byte by byte.
-                for (int i = 0; i < matchLen; i++) dst[dp + i] = dst[mp + i];
+                // Overlapping copy: the first offset bytes are one period of the pattern; doubling
+                // copies of whole periods (done stays a multiple of offset) replicate it.
+                System.arraycopy(dst, mp, dst, dp, offset);
+                int done = offset;
+                while (done < matchLen) {
+                    int n = Math.min(done, matchLen - done);
+                    System.arraycopy(dst, dp, dst, dp + done, n);
+                    done += n;
+                }
             }
             dp += matchLen;
         }

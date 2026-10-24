@@ -3,9 +3,11 @@ package io.github.dailystruggle.rtp.common.pvp;
 import io.github.dailystruggle.rtp.api.hooks.PvPCombatAction;
 import io.github.dailystruggle.rtp.api.hooks.PvPCombatStateRegistry;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -63,7 +65,7 @@ public final class PvPGate {
         return provider.isInCombat(player);
       } catch (Throwable t) {
         // Never let a buggy integration block teleports; audit and treat as clear (REQ-RTP-S-004).
-        RTP.log(Level.WARNING,
+        RTPRuntime.log(Level.WARNING,
             "[RTP] PvP combat-state provider threw; treating player as not-in-combat", t);
         return false;
       }
@@ -129,10 +131,11 @@ public final class PvPGate {
   /** @return the configured native combat-tag window, in millis (clamped to {@code >= 0}). */
   public static long combatTagMillis() {
     ConfigParser<SafetyKeys> safety = safety();
-    long seconds = (safety == null)
-        ? 15L
-        : safety.getNumber(SafetyKeys.pvpCombatTagSeconds, 15L).longValue();
-    return Math.max(0L, seconds) * 1000L;
+    long millis = (safety == null)
+        ? 15_000L
+        : safety.getDuration(SafetyKeys.pvpCombatTagSeconds,
+            TemporalUnit.SECOND, TemporalUnit.MILLISECOND, 15_000L);
+    return Math.max(0L, millis);
   }
 
   // --- helpers -------------------------------------------------------------
@@ -148,7 +151,7 @@ public final class PvPGate {
   @SuppressWarnings("unchecked")
   private static ConfigParser<SafetyKeys> safety() {
     try {
-      return (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      return (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
     } catch (RuntimeException ex) {
       return null;
     }

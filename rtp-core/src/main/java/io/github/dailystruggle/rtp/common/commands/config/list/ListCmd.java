@@ -3,9 +3,11 @@ package io.github.dailystruggle.rtp.common.commands.config.list;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +38,7 @@ public class ListCmd extends BaseRTPCmdImpl {
     this.file = file;
     this.key = key;
 
-    RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 20));
+    MiscTasks.async().add(new RTPRunnable(this::addCommands, 20));
   }
 
   @Override
@@ -60,11 +62,11 @@ public class ListCmd extends BaseRTPCmdImpl {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
     addCommands();
 
-    String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
+    String updateMsg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", name);
-    RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updateMsg);
+    RTPRuntime.serverAccessor().sendMessage(CommandsAPI.serverId, callerId, updateMsg);
 
-    RTP.scheduler.runTaskAsynchronously(() -> {
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
       List<String> stringList = file.getStringList(key);
 
       List<String> add = parameterValues.get("add");
@@ -81,13 +83,13 @@ public class ListCmd extends BaseRTPCmdImpl {
       try {
         file.save();
       } catch (IOException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
         return;
       }
 
-      String updatedMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updated, ""));
+      String updatedMsg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", name);
-      RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updatedMsg);
+      RTPRuntime.serverAccessor().sendMessage(CommandsAPI.serverId, callerId, updatedMsg);
     });
 
     return true;

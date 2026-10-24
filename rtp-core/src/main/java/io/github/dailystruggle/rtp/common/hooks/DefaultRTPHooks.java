@@ -16,8 +16,8 @@ import io.github.dailystruggle.rtp.api.hooks.RootActionRegistry;
 import io.github.dailystruggle.rtp.api.hooks.WorldBorderProviderRegistry;
 import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.EditorExtensions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,13 +68,13 @@ public final class DefaultRTPHooks implements RTPHooks {
       if (provider == null) {
         throw new IllegalArgumentException("[RTP API] economy provider must not be null");
       }
-      RTP.economy = provider;
+      RTPRuntime.setEconomy(provider);
     }
     @Override public RTPEconomy current() {
-      return RTP.economy;
+      return RTPRuntime.economy();
     }
     @Override public void clear() {
-      RTP.economy = null;
+      RTPRuntime.setEconomy(null);
     }
   };
 
@@ -201,7 +201,7 @@ public final class DefaultRTPHooks implements RTPHooks {
             return boundary;
           }
         } catch (Throwable t) {
-          RTP.log(Level.WARNING, "[RTP API] ClaimBoundaryProvider " + p.namespace() + " threw while resolving boundary for player " + playerId, t);
+          RTPRuntime.log(Level.WARNING, "[RTP API] ClaimBoundaryProvider " + p.namespace() + " threw while resolving boundary for player " + playerId, t);
         }
       }
       return Optional.empty();
@@ -223,7 +223,7 @@ public final class DefaultRTPHooks implements RTPHooks {
             return boundary;
           }
         } catch (Throwable t) {
-          RTP.log(Level.WARNING, "[RTP API] ClaimBoundaryProvider " + p.namespace() + " threw while resolving boundary at " + worldName + " (" + x + "," + z + ")", t);
+          RTPRuntime.log(Level.WARNING, "[RTP API] ClaimBoundaryProvider " + p.namespace() + " threw while resolving boundary at " + worldName + " (" + x + "," + z + ")", t);
         }
       }
       return Optional.empty();

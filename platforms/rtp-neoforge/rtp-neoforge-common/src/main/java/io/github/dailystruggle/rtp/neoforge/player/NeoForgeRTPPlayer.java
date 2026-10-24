@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.SenderTimings;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.menu.NeoForgeBookSpec;
 import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeLegacyText;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
@@ -104,7 +106,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
      * (maps-api parity). Mirrors {@link #openBookMenu}: the maps path flows
      * player-first, so the raw {@link ServerPlayer} handle never leaves this
      * class. Resolves the active {@link NeoForgeVersionAdapter}, hops to the
-     * server tick thread via {@code RTP.scheduler} (map saved-data allocation,
+     * server tick thread via {@code RTPRuntime.scheduler()} (map saved-data allocation,
      * packet dispatch, and inventory mutation all require server-thread
      * affinity), then delegates to the carrier's NM-free seam with the live
      * handle.
@@ -114,7 +116,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         if (!isOnline() || chartKey == null || argb == null) return false;
         NeoForgeVersionAdapter adapter = NeoForgeVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return false;
-        RTP.scheduler.runTask(() -> {
+        RTPRuntime.scheduler().runTask(() -> {
             ServerPlayer p = handleRef.get();
             if (p == null) return; // viewer went offline before the hop
             adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
@@ -259,12 +261,12 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public long cooldown() {
-        return 0L;
+        return SenderTimings.cooldownMillis(this);
     }
 
     @Override
     public long delay() {
-        return 0L;
+        return SenderTimings.delayMillis(this);
     }
 
     @Override
@@ -450,9 +452,11 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
     /**
      * Teleport implementation that survives mapping drift across the 1.21.x
      * carrier line. Attempts the reflective 6-arg {@code teleportTo} first, then
-     * a same-dimension packet teleport, then a position-set fallback.
+     * a same-dimension packet teleport, then a position-set fallback. Server thread only.
+     *
+     * @return {@code true} when the player was moved to {@code target}
      */
-    private static boolean performTeleport(ServerPlayer cur, ServerLevel target,
+    public static boolean performTeleport(ServerPlayer cur, ServerLevel target,
                                            double x, double y, double z,
                                            float yaw, float pitch) {
         try {
@@ -610,9 +614,9 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         if (p == null) return null;
         ServerLevel level = resolveServerLevel(p);
         if (level == null) return null;
-        RTPWorld<?> rtpWorld = RTP.serverAccessor == null
+        RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor() == null
                 ? null
-                : RTP.serverAccessor.getRTPWorld(
+                : RTPRuntime.serverAccessor().getRTPWorld(
                         io.github.dailystruggle.rtp.neoforge.world.NeoForgeRTPWorld
                                 .resolveDimensionName(level, false));
         if (rtpWorld == null) return null;

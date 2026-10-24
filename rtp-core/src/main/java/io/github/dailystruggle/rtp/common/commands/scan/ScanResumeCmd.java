@@ -2,9 +2,11 @@ package io.github.dailystruggle.rtp.common.commands.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +38,7 @@ public class ScanResumeCmd extends ScanSubCmd {
 
     List<Region> regions = getRegions(callerId, parameterValues.get("region"));
     for (Region region : regions) {
-      ScanTask scanTask = RTP.getInstance().scanTasks.get(region.name);
+      ScanTask scanTask = ScanTasks.current().get(region.name);
       if (scanTask == null) {
         Map<String, List<String>> singleRegion = new HashMap<>(parameterValues);
         singleRegion.put("region", Collections.singletonList(region.name));
@@ -46,15 +48,15 @@ public class ScanResumeCmd extends ScanSubCmd {
 
       scanTask.resetStatusWindow();
       scanTask.pause.set(false);
-      RTP.scheduler.runTaskAsynchronously(scanTask);
+      RTPRuntime.scheduler().runTaskAsynchronously(scanTask);
 
-      if (RTP.configs == null) continue;
-      String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanResume, ""));
+      if (ActiveConfigs.get() == null) continue;
+      String msg = String.valueOf(ActiveConfigs.get().getConfigValue(CommandMessages.scanResume, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[scan_regions]", region.name);
       msg = msg.replace("[scan_region]", region.name);
       msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
+      RTPRuntime.serverAccessor().announce(msg, "rtp.scan", "SCAN");
     }
     return true;
   }

@@ -19,6 +19,7 @@ import itertools
 import json
 import math
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -28,16 +29,17 @@ import time
 import types
 import unittest
 import unittest.mock
+import zipfile
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPTS))
 import bench_fuzz as bf  # noqa: E402
+import bench_fuzz_server as bfs  # noqa: E402
 
 CFG = {"min_bots": 2, "max_bots": 8, "min_s": 20, "max_s": 60, "novelty": 0.25, "rtp_args": []}
-LEAK_HEADER = ("epoch_ms,label,online,joins_total,quits_total,distinct_uuids,craftplayer_live,serverplayer_live,"
-               "game_listener_live,retained_player_objects,heap_used_after_gc_mb,old_gen_after_gc_mb,"
-               "histogram_ms,histogram_file")
+LEAK_HEADER = ("epoch_ms,label,online,joins_total,quits_total,distinct_uuids,heap_used_after_gc_mb,"
+               "old_gen_after_gc_mb,histogram_ms,histogram_file")
 
 
 def dumps(x) -> str:
@@ -247,15 +249,15 @@ class CorpusTest(unittest.TestCase):
 
     def test_count_changes_kept_by_direction_and_magnitude(self):
         c = bf.Corpus()
-        self.assertTrue(c.consider(0, [], [], {"retained_player_objects": 1})["kept"])
-        self.assertFalse(c.consider(1, [], [], {"retained_player_objects": 1})["kept"])
-        self.assertTrue(c.consider(2, [], [], {"retained_player_objects": 3})["kept"])
-        self.assertTrue(c.consider(3, [], [], {"retained_player_objects": -1})["kept"])
+        self.assertTrue(c.consider(0, [], [], {"threads_live": 1})["kept"])
+        self.assertFalse(c.consider(1, [], [], {"threads_live": 1})["kept"])
+        self.assertTrue(c.consider(2, [], [], {"threads_live": 3})["kept"])
+        self.assertTrue(c.consider(3, [], [], {"threads_live": -1})["kept"])
         self.assertTrue(c.consider(4, [], [], {"plugin.betterrtp.live_instances": 12})["kept"])
         # noise-like or harness-owned values do not count
         self.assertFalse(c.consider(5, [], [], {"heap_used_after_gc_mb": 50.0, "cls:java.lang.String": 900,
                                                 "plugin.stresstestrtp.live_instances": 99,
-                                                "retained_player_objects": 0})["kept"])
+                                                "threads_live": 0})["kept"])
 
     def test_cap_drops_oldest(self):
         c = bf.Corpus(cap=2)
@@ -266,13 +268,15 @@ class CorpusTest(unittest.TestCase):
 
 class DeltaTest(unittest.TestCase):
     def test_count_deltas(self):
-        before = {"_epoch": 1, "retained_player_objects": 2.0, "heap_used_after_gc_mb": 100.0, "fd_open": -1.0,
+        before = {"_epoch": 1, "threads_daemon": 2.0, "heap_used_after_gc_mb": 100.0, "fd_open": -1.0,
                   "teleports_total": 5.0, "threads_live": 40.0, "checkpoint_quick": 1.0,
                   "plugin.x.live_instances": 10.0, "plugin.x.owned_classes": 7.0}
         after = dict(before, _epoch=2, heap_used_after_gc_mb=101.25, fd_open=30.0, teleports_total=9.0,
                      threads_live=41.0, **{"plugin.x.live_instances": 13.0, "plugin.x.owned_classes": 9.0})
-        self.assertEqual(bf.count_deltas(before, after), {"retained_player_objects": 0, "heap_used_after_gc_mb": 1.25,
+        # an unchanged count is sparse; the heap is always reported
+        self.assertEqual(bf.count_deltas(before, after), {"heap_used_after_gc_mb": 1.25,
                                                           "threads_live": 1, "plugin.x.live_instances": 3})
+        self.assertEqual(bf.count_deltas(before, dict(before, _epoch=2)), {"heap_used_after_gc_mb": 0})
 
     def test_class_deltas_top_by_magnitude(self):
         h0 = {"A": (10, 100), "B": (5, 50), "C": (1, 10)}
@@ -311,11 +315,12 @@ class CsvTailTest(unittest.TestCase):
     def test_reader_merges_rows_and_times_out(self):
         r = bf.RunsReader(self.dir)
         with open(os.path.join(self.dir, "leak.csv"), "w", encoding="utf-8") as fh:
-            fh.write(LEAK_HEADER + "\n5,L1,0,1,1,1,0,0,0,3,100.5,80,10,h.txt\n")
+            fh.write(LEAK_HEADER + "\n5,L1,0,1,3,1,100.5,80,10,h.txt\n")
         with open(os.path.join(self.dir, "leak-metrics.csv"), "w", encoding="utf-8") as fh:
             fh.write("epoch_ms,label,metric,value\n5,L1,threads_live,40\n5,L2,threads_live,1\n")
         d = r.fetch("L1", 2, poll_s=0.01)
-        self.assertEqual(d["retained_player_objects"], 3.0)
+        self.assertEqual(d["quits_total"], 3.0)
+        self.assertEqual(d["heap_used_after_gc_mb"], 100.5)
         self.assertEqual(d["threads_live"], 40.0)
         self.assertEqual(d["_histo"], "h.txt")
         t0 = time.time()
@@ -489,14 +494,21 @@ class StopRampTest(unittest.TestCase):
         self.assertTrue(d.ramp_active)
 
 
+LEAKY = "com.example.Leaky"
+LEAK_CLS = bf.CLS + LEAKY
+
+
 class FakeServer:
     """RCON + runs files: a quick checkpoint writes the leak.csv row, metrics
-    rows and histogram at once. Each quit after an rtp retains one player."""
+    rows and histogram at once. Each quit after an rtp retains one LEAKY
+    instance in the histogram; every ended session counts in quits_total."""
 
     def __init__(self, runs_dir):
         self.runs = runs_dir
         self.completed = 0
         self.retained = 0
+        self.quits = 0
+        self.fds = 0  # file handles a fake plugin keeps open (fd_open = 100 + fds)
         self.last = "none"
         self.fail_labels: set[str] = set()
         self.no_histo_labels: set[str] = set()
@@ -505,7 +517,7 @@ class FakeServer:
         self.cmds: list[str] = []
         os.makedirs(runs_dir, exist_ok=True)
         with open(os.path.join(runs_dir, "leak.csv"), "w", encoding="utf-8") as fh:
-            fh.write(LEAK_HEADER + "\n1,soak-c00,32,0,0,0,0,0,0,0,1,1,1,old.txt\n")
+            fh.write(LEAK_HEADER + "\n1,soak-c00,32,0,0,0,1,1,1,old.txt\n")
         with open(os.path.join(runs_dir, "leak-metrics.csv"), "w", encoding="utf-8") as fh:
             fh.write("epoch_ms,label,metric,value\n")
 
@@ -538,18 +550,18 @@ class FakeServer:
         else:
             self.write_histo(histo)
         with open(os.path.join(self.runs, "leak.csv"), "a", encoding="utf-8") as fh:
-            fh.write(f"{int(time.time() * 1000)},{label},0,0,0,0,{self.retained},{self.retained},0,"
-                     f"{self.retained},{500 + self.retained},400,30,{histo}\n")
+            fh.write(f"{int(time.time() * 1000)},{label},0,0,{self.quits},0,{500 + self.retained},400,30,"
+                     f"{histo}\n")
         with open(os.path.join(self.runs, "leak-metrics.csv"), "a", encoding="utf-8") as fh:
-            for k, v in (("checkpoint_quick", 1), ("threads_live", 40), ("plugin.target.listeners", 3)):
+            for k, v in (("checkpoint_quick", 1), ("threads_live", 40), ("fd_open", 100 + self.fds),
+                         ("plugin.target.listeners", 3)):
                 fh.write(f"1,{label},{k},{v}\n")
 
     def write_histo(self, histo):
         with open(os.path.join(self.runs, histo), "w", encoding="utf-8") as fh:
             fh.write(" num     #instances         #bytes  class name (module)\n")
             fh.write(f"   1:          {100 + self.retained}       {8000 + self.retained}  java.lang.String\n")
-            fh.write(f"   2:          {self.retained}       {self.retained * 64}  "
-                     "net.minecraft.server.level.ServerPlayer\n")
+            fh.write(f"   2:          {self.retained}       {self.retained * 64}  {LEAKY}\n")
 
 
 class FakeSwarm:
@@ -559,7 +571,9 @@ class FakeSwarm:
         self.restarts = 0
         self.fail_next = False
         self.after = None  # hook(req) run once the episode's events are produced
-        self.leak_quit = True  # quit right after rtp retains a player
+        self.leak_quit = True  # quit right after rtp retains one LEAKY instance
+        self.spawn_sequence = []  # optional per-episode spawn outcome
+        self.no_spawn_error = "No data available for version 26.2"
 
     def run_episode(self, req, timeout_s):
         self.requests.append((req, timeout_s))
@@ -569,8 +583,13 @@ class FakeSwarm:
             self.fail_next = False
             raise bf.SwarmError("no done")
         events = []
+        spawned = self.spawn_sequence.pop(0) if self.spawn_sequence else True
         for b in req["bots"]:
-            last = None
+            if not spawned:
+                events.append({"ev": "bot_error", "id": req["id"], "bot": b["name"],
+                               "text": self.no_spawn_error})
+                continue
+            last, online = None, True
             t = bf.SPAWN_EST_MS
             events.append({"ev": "spawn", "id": req["id"], "bot": b["name"], "t": t})
             for i, x in enumerate(b["program"]):
@@ -581,8 +600,14 @@ class FakeSwarm:
                                    "text": f"Teleporting {b['name']} in {i + 2}s"})
                 if x["a"] == "quit" and last == "rtp" and self.leak_quit:
                     self.server.retained += 1
+                if x["a"] in ("quit", "rejoin") and online:
+                    self.server.quits += 1
+                if x["a"] in ("quit", "rejoin"):
+                    online = x["a"] == "rejoin"
                 if x["a"] != "wait":
                     last = x["a"]
+            if online:
+                self.server.quits += 1  # the swarm disconnects every bot at the end
         done = {"ev": "done", "id": req["id"], "ms": req["max_ms"], "reason": "complete",
                 "bots": [{"name": b["name"], "last": b["name"]} for b in req["bots"]]}
         return events, done
@@ -622,6 +647,102 @@ class LoopFixture:
 
 
 class EpisodeLoopTest(LoopFixture, unittest.TestCase):
+    def test_empty_spawn_episode_is_excluded_and_not_counted_as_executed(self):
+        self.a.episodes = 2
+        self.swarm.spawn_sequence = [False, True]
+        self.tr.run_seed(1)
+        recs = self.records()
+
+        self.assertEqual(recs[0]["excluded"], "no bot spawned")
+        self.assertNotIn("ms", recs[0])
+        self.assertEqual(recs[0]["bot_errors"], [self.swarm.no_spawn_error])
+        self.assertIsNone(recs[0]["deltas"])
+        self.assertEqual(self.tr.coverage["executed"], 1)
+        self.assertEqual(len(self.swarm.requests), 2)
+        labels = [c.split()[2] for c in self.server.cmds if c.startswith("rtpstress leakcheck ")]
+        self.assertFalse(any("-e0" in label for label in labels))
+        self.assertTrue(any("-e1" in label for label in labels))
+
+    def test_empty_spawn_limit_counts_consecutive_episodes_and_resets_after_spawn(self):
+        self.a.episodes = 4
+        self.a.max_empty = 2
+        self.swarm.spawn_sequence = [False, True, False, False]
+
+        with self.assertRaisesRegex(bf.NoSpawnError, "2 consecutive episodes"):
+            self.tr.run_seed(1)
+
+        recs = self.records()
+        self.assertEqual([r.get("excluded") for r in recs],
+                         ["no bot spawned", None, "no bot spawned", "no bot spawned"])
+        self.assertEqual(self.tr.coverage["executed"], 1)
+        self.assertEqual(len(self.swarm.requests), 4)
+
+    def test_warm_up_is_unscored_and_runs_before_the_baseline(self):
+        self.a.warmup = 2
+        run_dir = os.path.join(self.dir, "run")
+        os.makedirs(run_dir)
+        self.a.settle_s = 0
+
+        with unittest.mock.patch.object(bf.lc, "prepare_target", return_value=True), \
+                unittest.mock.patch.object(bf.time, "sleep"):
+            bf.run_target(self.a, self.server, self.swarm, "direct", [1], run_dir,
+                          "20261010-200000", unittest.mock.Mock())
+
+        self.assertEqual(len(self.swarm.requests), self.a.episodes + 2)
+        self.assertIn("warm0", self.swarm.requests[0][0]["id"])
+        self.assertIn("warm1", self.swarm.requests[1][0]["id"])
+        first_baseline = next(i for i, cmd in enumerate(self.server.cmds)
+                              if cmd.startswith("rtpstress leakcheck "))
+        self.assertLess(self.server.cmds.index("list"), first_baseline)
+        trace = os.path.join(run_dir, "direct", "episodes.jsonl")
+        self.assertEqual(len(bf.read_trace(trace)), self.a.episodes)
+        self.assertFalse(any("warm" in str(r) for r in bf.read_trace(trace)))
+
+    def test_warm_up_with_no_spawn_fails_before_a_baseline(self):
+        self.a.warmup = 1
+        self.swarm.spawn_sequence = [False]
+
+        with self.assertRaisesRegex(bf.NoSpawnError, "No data available for version 26.2"):
+            self.tr.warm_up(1)
+
+        self.assertEqual(len(self.swarm.requests), 1)
+        self.assertFalse(any(c.startswith("rtpstress leakcheck ") for c in self.server.cmds))
+
+    def test_warm_up_swarm_failure_restarts_the_swarm_and_continues(self):
+        self.a.warmup = 2
+        self.swarm.fail_next = True
+
+        self.tr.warm_up(1)
+
+        self.assertEqual(self.swarm.restarts, 1)
+        self.assertEqual(len(self.swarm.requests), 2)
+        self.assertIsNone(self.tr.prev)
+
+    def test_warm_up_swarm_restart_failure_aborts_cleanly(self):
+        self.a.warmup = 1
+        self.swarm.fail_next = True
+
+        def broken_restart():
+            raise bf.SwarmError("port gone")
+        self.swarm.restart = broken_restart
+
+        with self.assertRaisesRegex(bf.NoSpawnError, "swarm restart failed"):
+            self.tr.warm_up(1)
+
+    def test_repetition_with_no_spawn_is_not_checkpointed(self):
+        self.a.episodes = 1
+        self.a.reps = 2
+        self.swarm.spawn_sequence = [True, False]
+
+        self.tr.run_seed(1)
+
+        rec = self.records()[0]
+        self.assertEqual(rec["reps_error"], "no bot spawned")
+        self.assertEqual(rec["reps_bot_errors"], [self.swarm.no_spawn_error])
+        self.assertEqual(rec["reps"], 1)
+        self.assertFalse(any("-e0k1" in label for label in
+                             [c.split()[2] for c in self.server.cmds if c.startswith("rtpstress leakcheck ")]))
+
     def test_loop_writes_traces_with_exact_deltas(self):
         self.tr.run_seed(1)
         recs = self.records()
@@ -633,13 +754,15 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
             self.assertNotIn("excluded", r)
             self.assertEqual(r["cmd"], "betterrtp:rtp")
             self.assertTrue(r["label"].startswith("fz20261010-200000-betterrtp-s1-e"))
-            self.assertIn("retained_player_objects", r["deltas"])
             self.assertIn("heap_used_after_gc_mb", r["deltas"])
             self.assertNotIn("threads_live", r["deltas"])  # unchanged, not kept
-            self.assertEqual(r["deltas"].get("cls:net.minecraft.server.level.ServerPlayer", 0),
-                             r["deltas"]["retained_player_objects"])
+            # The heap grows with the leaked instances the histogram counts.
+            self.assertEqual(r["deltas"].get(LEAK_CLS, 0), r["deltas"]["heap_used_after_gc_mb"])
+            self.assertGreaterEqual(r["departures"], len(r["bots"]))  # every bot leaves by the end
             self.assertTrue(all(len(p) == 2 for p in r["states"]))
-        self.assertEqual(sum(r["deltas"]["retained_player_objects"] for r in recs), self.server.retained)
+        self.assertEqual(sum(r["deltas"].get(LEAK_CLS, 0) for r in recs), self.server.retained)
+        self.assertGreater(self.server.retained, 0)
+        self.assertEqual(sum(r["departures"] for r in recs), self.server.quits)
         self.assertTrue(recs[0]["kept"])  # first replies are always new
         # Episode requests are the planned programs, bound for the swarm's deadline.
         req, timeout = self.swarm.requests[0]
@@ -721,7 +844,8 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         recs = self.records()
         self.assertTrue(recs[1]["no_histogram"])
         self.assertFalse(any(k.startswith("cls:") for k in recs[1]["deltas"]))
-        self.assertIn("retained_player_objects", recs[1]["deltas"])  # exact counts still measured
+        self.assertIn("heap_used_after_gc_mb", recs[1]["deltas"])  # exact counts still measured
+        self.assertIsNotNone(recs[1]["departures"])
         # The next episode compares against an empty histogram: flagged too, then back to normal.
         self.assertTrue(recs[2]["no_histogram"])
         self.assertNotIn("no_histogram", recs[3])
@@ -754,7 +878,7 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         self.assertNotEqual(lines[0]["sampled_from"]["mean"], lines[0]["next"]["mean"])  # moved
         self.assertEqual(lines[1]["sampled_from"], lines[0]["next"])
         fit = bf.load_json(self.tr.fit_path)
-        self.assertIn("retained_player_objects", fit["fit"])
+        self.assertIn(LEAK_CLS, fit["fit"])  # screened from the histogram, never named
         # Same seed, same server behaviour: the optimiser's trajectory is reproducible.
         other = bf.TargetRun(self.a, self.server, self.swarm, bf.RunsReader(self.runs), "betterrtp",
                              "20261010-200000", os.path.join(self.dir, "out2"))
@@ -763,16 +887,19 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         self.assertEqual([dumps(r["params"]) for r in recs], [dumps(r["params"]) for r in recs2])
 
     def test_control_fit_is_loaded_by_later_targets(self):
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.5,
-                                               "noise": 2.0, "ci": {}, "n": 9},
+        control = {"threads_live": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.5,
+                                    "noise": 2.0, "ci": {}, "n": 9},
                    "plugin.x.listeners": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.0,
-                                          "noise": 1.0, "ci": {}, "n": 9}}
+                                          "noise": 1.0, "ci": {}, "n": 9},
+                   # a key from an older control fit that no longer qualifies is dropped
+                   "retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.0,
+                                               "noise": 1.0, "ci": {}, "n": 9}}
         bf.save_json(os.path.join(self.dir, bf.CONTROL_FILE), control)
         tdir = os.path.join(self.dir, "betterrtp")
         os.makedirs(tdir)
         tr = bf.TargetRun(self.a, self.server, self.swarm, bf.RunsReader(self.runs), "betterrtp",
                           "20261010-200000", tdir)
-        self.assertEqual(tr.score_counts, ["plugin.x.listeners", "retained_player_objects"])
+        self.assertEqual(tr.score_counts, ["plugin.x.listeners", "threads_live"])
         ctl = bf.TargetRun(self.a, self.server, self.swarm, bf.RunsReader(self.runs), "direct",
                            "20261010-200000", os.path.join(self.dir, "direct"))
         self.assertIsNone(ctl.control)  # the control never subtracts itself
@@ -784,8 +911,8 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
                                                {"a": "rtp"}, {"a": "wait", "ms": 5}, {"a": "quit"}]},
                 {"name": "fzS_1", "program": [{"a": "wait", "ms": 5}, {"a": "die"}]}]
         rec = self.tr.execute(1, 0, {"origin": "cem", "parent": None, "params": None, "bots": bots}, None)
-        self.assertEqual(rec["deltas"]["retained_player_objects"], 1)
-        out = self.tr.shrink(1, rec, "retained_player_objects")
+        self.assertEqual(rec["deltas"][LEAK_CLS], 1)
+        out = self.tr.shrink(1, rec, LEAK_CLS)
         self.assertTrue(out["reproduced"])
         self.assertEqual(out["sequence"], [["rtp", "quit"]])  # the fake leaks on quit right after rtp
         self.assertEqual((out["hits"], out["n"]), (3, 3))
@@ -797,10 +924,10 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         self.assertFalse(names & {"fzS_0", "fzS_1"})
 
     def test_ambient_drift_alone_does_not_reproduce(self):
-        # Every checkpoint drifts retained by +1 with no leak; the control's
+        # Every checkpoint drifts the leaky class by +1 with no leak; the control's
         # intercept explains it, so a replay needs more than the drift.
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 1.0,
-                                               "noise": 1.0, "ci": {}, "n": 9}}
+        control = {LEAK_CLS: {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 1.0,
+                              "noise": 1.0, "ci": {}, "n": 9}}
         self.tr.control = control
         self.assertTrue(self.tr.baseline(1, "base"))
         orig = self.server.write
@@ -810,9 +937,10 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
             orig(label)
         self.server.write = drift
         bots = [{"name": "fzD_0", "program": [{"a": "wait", "ms": 5}]}]
-        hits, n, ok = self.tr.reproduce(1, "d0", bots, "retained_player_objects", 1.0, 3, 2)
+        hits, n, ok = self.tr.reproduce(1, "d0", bots, LEAK_CLS, 1.0, 3, 2)
         self.assertFalse(ok)
         self.assertEqual(hits, 0)
+        self.assertGreater(n, 0)  # the replays were measured, not skipped
 
     def test_replay_reuses_programs_under_new_names(self):
         self.tr.run_seed(1)
@@ -879,7 +1007,7 @@ class FeatureTest(unittest.TestCase):
 
 class RidgeTest(unittest.TestCase):
     def planted(self, coef, n=120, noise=0.6):
-        """Episodes whose retained delta is coef * quit_lt250 + integer noise."""
+        """Episodes whose count delta is coef * quit_lt250 + integer noise."""
         rng = __import__("random").Random(7)
         recs = []
         for ep in range(n):
@@ -887,12 +1015,12 @@ class RidgeTest(unittest.TestCase):
             feats = {k: 0 for k in bf.FEATURES}
             feats.update(rtp=rtp, quit=q250 + qlate, quit_lt250=q250, quit_later=qlate)
             d = coef * q250 + round(rng.gauss(0, noise))
-            recs.append({"ep": ep, "features": feats, "deltas": {"retained_player_objects": d}, "ms": 40000})
+            recs.append({"ep": ep, "features": feats, "deltas": {"threads_live": d}, "ms": 40000})
         return recs
 
     def test_recovers_planted_coefficient(self):
-        fit = bf.fit_counts(self.planted(1.0), ["retained_player_objects"])
-        c = fit["retained_player_objects"]
+        fit = bf.fit_counts(self.planted(1.0), ["threads_live"])
+        c = fit["threads_live"]
         self.assertAlmostEqual(c["coef"]["quit_lt250"], 1.0, delta=0.2)
         self.assertTrue(bf.excludes_zero(c["ci"]["quit_lt250"]))
         for other in ("rtp", "quit_later", "move", "die"):
@@ -900,10 +1028,10 @@ class RidgeTest(unittest.TestCase):
             self.assertFalse(bf.excludes_zero(c["ci"][other]), other)
 
     def test_flag_needs_control_to_be_clean(self):
-        target = bf.fit_counts(self.planted(1.0), ["retained_player_objects"])
+        target = bf.fit_counts(self.planted(1.0), ["threads_live"])
         # A control that also leaks on quit_lt250 masks the flag; a clean one does not.
-        leaky = bf.fit_counts(self.planted(1.0), ["retained_player_objects"])
-        clean = bf.fit_counts(self.planted(0.0), ["retained_player_objects"])
+        leaky = bf.fit_counts(self.planted(1.0), ["threads_live"])
+        clean = bf.fit_counts(self.planted(0.0), ["threads_live"])
         self.assertTrue(any(f["feature"] == "quit_lt250" for f in bf.flag_features(target, clean)))
         self.assertFalse(any(f["feature"] == "quit_lt250" for f in bf.flag_features(target, leaky)))
         self.assertFalse(bf.flag_features(target, target))
@@ -911,17 +1039,17 @@ class RidgeTest(unittest.TestCase):
 
 class ScoreTest(unittest.TestCase):
     def test_net_leak_subtracts_control_and_is_per_minute(self):
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
-                                               "noise": 2.0, "ci": {}}}
-        control["retained_player_objects"]["coef"]["quit_lt250"] = 1.0
+        control = {"threads_live": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
+                                    "noise": 2.0, "ci": {}}}
+        control["threads_live"]["coef"]["quit_lt250"] = 1.0
         feats = {k: 0 for k in bf.FEATURES}
         feats["quit_lt250"] = 3
         # control predicts 2 + 1*3 = 5; delta 11 -> net 6 over noise 2 = 3, in 30 s -> *2 per min
-        rec = {"features": feats, "deltas": {"retained_player_objects": 11}, "ms": 30000}
-        self.assertAlmostEqual(bf.score_episode(rec, ["retained_player_objects"], control), 6.0, places=4)
+        rec = {"features": feats, "deltas": {"threads_live": 11}, "ms": 30000}
+        self.assertAlmostEqual(bf.score_episode(rec, ["threads_live"], control), 6.0, places=4)
         # Matching the control exactly scores ~0.
-        rec0 = {"features": feats, "deltas": {"retained_player_objects": 5}, "ms": 30000}
-        self.assertAlmostEqual(bf.score_episode(rec0, ["retained_player_objects"], control), 0.0, places=4)
+        rec0 = {"features": feats, "deltas": {"threads_live": 5}, "ms": 30000}
+        self.assertAlmostEqual(bf.score_episode(rec0, ["threads_live"], control), 0.0, places=4)
         self.assertIsNone(bf.score_episode({"excluded": "x", "deltas": None, "ms": 1}, ["x"], None))
 
     def test_unexplained_find(self):
@@ -987,7 +1115,7 @@ class ScoreTest(unittest.TestCase):
 
     def test_attribution_metrics_excluded_from_surprises(self):
         rec = {"features": {k: 0 for k in bf.FEATURES},
-               "deltas": {"plugin.rtp.live_instances": 100, "retained_player_objects": 0}, "ms": 40000}
+               "deltas": {"plugin.rtp.live_instances": 100, "threads_live": 0}, "ms": 40000}
         fit = {"plugin.rtp.live_instances": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.0, "noise": 1.0, "ci": {}}}
         found = bf.surprises(rec, ["plugin.rtp.live_instances"], None, fit, z=3.0)
         self.assertNotIn("plugin.rtp.live_instances", found)
@@ -1012,7 +1140,7 @@ class ClassScreenTest(unittest.TestCase):
             q250, qlate, rtp = rng.randint(0, 4), rng.randint(0, 4), rng.randint(1, 5)
             feats = {k: 0 for k in bf.FEATURES}
             feats.update(rtp=rtp, quit=q250 + qlate, quit_lt250=q250, quit_later=qlate)
-            d = {"retained_player_objects": 0}
+            d = {"threads_live": 0}
             for name, m, s in cls:
                 v = round(rng.gauss(m, s))
                 if v:
@@ -1050,8 +1178,8 @@ class ClassScreenTest(unittest.TestCase):
         rec = max(target, key=lambda r: r["features"]["quit_lt250"])
         ref["cls:plug.P"] = dict(ref["cls:plug.P"], noise=max(ref["cls:plug.P"]["noise"], screen[0]["noise"]))
         z = bf.bonferroni_z(seen)
-        base = bf.score_episode(rec, ["retained_player_objects"], ref, z)
-        with_cls = bf.score_episode(rec, ["retained_player_objects", "cls:plug.P"], ref, z)
+        base = bf.score_episode(rec, ["threads_live"], ref, z)
+        with_cls = bf.score_episode(rec, ["threads_live", "cls:plug.P"], ref, z)
         self.assertGreater(with_cls, base)
         self.assertLessEqual(with_cls - base, bf.CLASS_TERM_CAP * 60000 / rec["ms"] + 1e-9)
 
@@ -1091,7 +1219,7 @@ class ClassScreenTest(unittest.TestCase):
         self.assertIsNone(side)
         self.assertEqual(bf.class_stats(recs)["n"], 9)
         self.assertEqual(bf.fit_counts(recs, ["cls:plug.P"])["cls:plug.P"]["n"], 9)
-        self.assertEqual(bf.fit_counts(recs, ["retained_player_objects"])["retained_player_objects"]["n"], 10)
+        self.assertEqual(bf.fit_counts(recs, ["threads_live"])["threads_live"]["n"], 10)
 
     def test_target_run_rescreens_against_control_episodes_on_disk(self):
         run_dir = tempfile.mkdtemp()
@@ -1123,6 +1251,94 @@ class ClassScreenTest(unittest.TestCase):
     def test_bonferroni_is_stricter_with_more_classes(self):
         self.assertAlmostEqual(bf.bonferroni_z(1), 1.96, delta=0.01)
         self.assertGreater(bf.bonferroni_z(10000 * len(bf.FIT_FEATURES)), 5.0)
+
+
+class DepartureScreenTest(unittest.TestCase):
+    """Growth per departed session: a class something keeps per ended session
+    is found by its slope against the quit counter, whatever its name."""
+
+    def episodes(self, seed, n=12, leaky=0.0, shared=2.0):
+        """Histogram episodes with 1..10 departures each: x.Leaky grows `leaky`
+        per departure, x.Shared `shared` per departure, n.Noise is departure-free."""
+        rng = __import__("random").Random(seed)
+        recs = []
+        for ep in range(n):
+            q = rng.randint(1, 10)
+            d = {}
+            for name, v in (("x.Leaky", leaky * q + rng.gauss(0, 0.5)), ("x.Shared", shared * q + rng.gauss(0, 0.5)),
+                            ("n.Noise", rng.gauss(0, 2))):
+                if round(v):
+                    d[bf.CLS + name] = round(v)
+            recs.append({"seed": seed, "ep": ep, "rung": 0, "features": {k: 0 for k in bf.FEATURES},
+                         "deltas": d, "departures": q, "ms": 40000})
+        return recs
+
+    def test_departures_from_the_quit_counter(self):
+        self.assertEqual(bf.departures({"quits_total": 3.0}, {"quits_total": 7.0}), 4)
+        self.assertEqual(bf.departures({"quits_total": 7.0}, {"quits_total": 7.0}), 0)
+        self.assertIsNone(bf.departures({"quits_total": -1.0}, {"quits_total": 7.0}))  # -1 = not measured
+        self.assertIsNone(bf.departures({"quits_total": 3.0}, {"quits_total": -1.0}))
+        self.assertIsNone(bf.departures({}, {"quits_total": 7.0}))
+        self.assertIsNone(bf.departures({"quits_total": 3.0}, {}))
+        self.assertIsNone(bf.departures({"quits_total": 10.0}, {"quits_total": 2.0}))  # counter reset
+
+    def test_class_growing_per_departure_beyond_the_control_is_flagged(self):
+        target, control = self.episodes(2, leaky=3.0), self.episodes(1)
+        out = bf.screen_departures(target, control, 64)
+        names = [s["cls"] for s in out]
+        self.assertEqual(names, ["x.Leaky"])  # x.Shared grows as much in the control; n.Noise never
+        self.assertAlmostEqual(out[0]["per_departure"], 3.0, delta=0.2)
+        self.assertAlmostEqual(out[0]["control_per_departure"], 0.0, delta=0.2)
+        self.assertGreater(out[0]["z"], bf.bonferroni_z(3))
+        # Without the control's slope, the shared growth is indistinguishable from a leak.
+        self.assertIn("x.Shared", [s["cls"] for s in bf.screen_departures(target, None, 64)])
+
+    def test_noise_alone_flags_nothing(self):
+        self.assertEqual(bf.screen_departures(self.episodes(2), self.episodes(1), 64), [])
+
+    def test_too_few_departure_episodes_screen_nothing(self):
+        target, control = self.episodes(2, n=3, leaky=3.0), self.episodes(1)
+        self.assertEqual(bf.screen_departures(target, control, 64), [])
+        self.assertTrue(bf.screen_departures(self.episodes(2, n=4, leaky=3.0), control, 64))
+        # Episodes nobody left do not count towards min_n.
+        idle = [dict(r, departures=0) for r in self.episodes(2, leaky=3.0)]
+        self.assertEqual(bf.screen_departures(idle, control, 64), [])
+
+    def test_scorable_drops_retired_counts_and_keeps_resources(self):
+        self.assertFalse(bf.scorable("retained_player_objects"))
+        self.assertFalse(bf.scorable("slope.retained_player_objects"))
+        self.assertTrue(bf.scorable("threads_live"))
+        self.assertTrue(bf.scorable("slope.histogram_live_mb"))
+        self.assertFalse(bf.scorable(bf.CLS + "x.Leaky"))  # classes come from the screens
+
+    def test_target_run_scores_a_class_only_the_departure_screen_finds(self):
+        # Per episode the class grows by 10 in both runs, so the cumulative screen
+        # sees nothing; the control keeps 2 per departed session, the target 10.
+        def recs(seed, q):
+            return [{"seed": seed, "ep": ep, "rung": 0, "features": {k: 0 for k in bf.FEATURES},
+                     "deltas": {bf.CLS + "x.PerSession": 10}, "departures": q, "ms": 40000} for ep in range(8)]
+        run_dir = tempfile.mkdtemp()
+        try:
+            cdir = os.path.join(run_dir, bf.DIRECT)
+            os.makedirs(cdir)
+            control = recs(1, 5)
+            stub = types.SimpleNamespace(trace=os.path.join(cdir, "episodes.jsonl"), tdir=cdir)
+            for r in control:
+                bf.TargetRun.write(stub, r)
+            bf.save_json(os.path.join(run_dir, bf.CONTROL_CLASSES_FILE), bf.class_stats(control))
+            tdir = os.path.join(run_dir, "betterrtp")
+            os.makedirs(tdir)
+            a = bf.build_parser().parse_args(["--server-dir", run_dir])
+            tr = bf.TargetRun(a, None, None, None, "betterrtp", "20261010-200000", tdir)
+            tr.rescreen(recs(2, 1))
+            self.assertNotIn("x.PerSession", [s["cls"] for s in tr.screen])
+            self.assertEqual([s["cls"] for s in tr.departure_screen], ["x.PerSession"])
+            self.assertAlmostEqual(tr.departure_screen[0]["per_departure"], 10.0)
+            self.assertAlmostEqual(tr.departure_screen[0]["control_per_departure"], 2.0)
+            self.assertIn(bf.CLS + "x.PerSession", tr.score_counts)
+            self.assertEqual(tr.class_ref[bf.CLS + "x.PerSession"]["n"], len(control))  # fitted on the control
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
 
 
 class SearchLoopTest(unittest.TestCase):
@@ -1170,7 +1386,7 @@ class SearchLoopTest(unittest.TestCase):
             if req["id"].endswith("-e4"):
                 target["progs"] = progs
             if target.get("progs") == progs:
-                self.server.retained += 5
+                self.server.fds += 5
         self.swarm.after = rare
         recs = self.tr.run_seed(1)
         replays = [r for r in recs if r["origin"] == "replay"]
@@ -1179,10 +1395,8 @@ class SearchLoopTest(unittest.TestCase):
         self.assertEqual(len(planned), 24)
         self.assertEqual(len(replays), 3)
         self.assertEqual(len(recs), 27)  # replays do not consume the planned episode budget
-        # The fake moves every player count together; the largest net names the candidate.
-        players = {"retained_player_objects", "serverplayer_live", "craftplayer_live"}
         self.assertEqual([(c["ep"], c["k"], c["n"]) for c in self.tr.candidates], [(4, 3, 3)])
-        self.assertIn(self.tr.candidates[0]["count"], players)
+        self.assertEqual(self.tr.candidates[0]["count"], "fd_open")
         lines = self.opt()
         self.assertEqual(lines[0]["state"], "searching")
         flip = next(x for x in lines if x["state"] == "exploiting")
@@ -1202,7 +1416,7 @@ class SearchLoopTest(unittest.TestCase):
             if req["id"].endswith("-e4"):
                 target["progs"] = progs
             if target.get("progs") == progs:
-                self.server.retained += 5
+                self.server.fds += 5
         self.swarm.after = rare
         self.a.replay_budget = 0  # no replays allowed by budget
         recs = self.tr.run_seed(1)
@@ -1213,7 +1427,7 @@ class SearchLoopTest(unittest.TestCase):
     def test_one_off_spike_is_replayed_but_does_not_flip(self):
         def spike(req):
             if req["id"].endswith("-e4"):
-                self.server.retained += 5
+                self.server.fds += 5
         self.swarm.after = spike
         self.tr.run_seed(1)
         side = bf.read_trace(os.path.join(self.tdir, "surprises.jsonl"))
@@ -1223,12 +1437,12 @@ class SearchLoopTest(unittest.TestCase):
         self.assertFalse(self.tr.candidates)
 
     def test_candidates_are_shrunk_first(self):
-        self.tr.candidates.append({"seed": 1, "ep": 9, "count": "retained_player_objects",
+        self.tr.candidates.append({"seed": 1, "ep": 9, "count": "fd_open",
                                    "rec": {"ep": 9, "bots": [], "features": {}, "deltas": {}}})
         called = []
         self.tr.shrink = lambda seed, rec, count: called.append((rec["ep"], count)) or {}
         self.tr.shrink_top(1, [], 2)
-        self.assertEqual(called, [(9, "retained_player_objects")])
+        self.assertEqual(called, [(9, "fd_open")])
 
 
 class SearchStateTest(unittest.TestCase):
@@ -1260,14 +1474,14 @@ class SearchStateTest(unittest.TestCase):
 
     def test_surprise_detection(self):
         feats = {k: 0 for k in bf.FEATURES}
-        ref = {"retained_player_objects": {"coef": {}, "intercept": 0.0, "noise": 0.5, "sd": 0.0, "ci": {}}}
-        rec = {"features": feats, "deltas": {"retained_player_objects": 1}, "ms": 1}
+        ref = {"threads_live": {"coef": {}, "intercept": 0.0, "noise": 0.5, "sd": 0.0, "ci": {}}}
+        rec = {"features": feats, "deltas": {"threads_live": 1}, "ms": 1}
         # A count the control never moved: a single object is surprising.
-        self.assertEqual(bf.surprises(rec, ["retained_player_objects"], ref, {}, 4.0), {"retained_player_objects": 1.0})
-        noisy = {"retained_player_objects": dict(ref["retained_player_objects"], sd=2.0)}
-        self.assertEqual(bf.surprises(rec, ["retained_player_objects"], noisy, {}, 4.0), {})
-        down = dict(rec, deltas={"retained_player_objects": -9})
-        self.assertEqual(bf.surprises(down, ["retained_player_objects"], noisy, {}, 4.0), {})
+        self.assertEqual(bf.surprises(rec, ["threads_live"], ref, {}, 4.0), {"threads_live": 1.0})
+        noisy = {"threads_live": dict(ref["threads_live"], sd=2.0)}
+        self.assertEqual(bf.surprises(rec, ["threads_live"], noisy, {}, 4.0), {})
+        down = dict(rec, deltas={"threads_live": -9})
+        self.assertEqual(bf.surprises(down, ["threads_live"], noisy, {}, 4.0), {})
 
 
 class LadderRulesTest(unittest.TestCase):
@@ -1349,7 +1563,7 @@ class LadderLoopTest(unittest.TestCase):
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def cand(self, name, program):
-        return {"cand": name, "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+        return {"cand": name, "seed": 1, "ep": 0, "count": LEAK_CLS, "source": "flag",
                 "shrunk": False, "bots": [{"name": "x", "program": program}] * 2, "net0": 2.0, "bots0": 2}
 
     def test_climb_confirms_the_leak_and_drops_the_rest(self):
@@ -1366,7 +1580,7 @@ class LadderLoopTest(unittest.TestCase):
         self.assertEqual(dropped, {"noise": (0, "micro-only"), "micro4": (1, "micro-only")})
         top = [r for r in ladder if "confirm" in r]
         self.assertEqual([r["cand"] for r in top], ["leak"])
-        self.assertEqual(top[0]["nets"], [8.0, 8.0, 8.0])  # 8 bots, one retained player each
+        self.assertEqual(top[0]["nets"], [8.0, 8.0, 8.0])  # 8 bots, one leaked instance each
         self.assertTrue(top[0]["confirm"]["fail"])
         self.assertTrue(top[0]["dumps"]["final"].endswith(".hprof"))
         self.assertIn("heap_owner.py", top[0]["owner"]["command"])  # no --mat: the command to run
@@ -1533,12 +1747,12 @@ class ShrinkTest(unittest.TestCase):
 
     def test_required_effect_is_half_net_and_at_least_one(self):
         feats = {k: 0 for k in bf.FEATURES}
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
-                                               "noise": 1.0, "ci": {}}}
-        rec = {"features": feats, "deltas": {"retained_player_objects": 12}}  # net 10 over control intercept 2
-        self.assertEqual(bf.required_effect(rec, "retained_player_objects", control), 5.0)
-        small = {"features": feats, "deltas": {"retained_player_objects": 3}}
-        self.assertEqual(bf.required_effect(small, "retained_player_objects", control), 1.0)
+        control = {"threads_live": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
+                                    "noise": 1.0, "ci": {}}}
+        rec = {"features": feats, "deltas": {"threads_live": 12}}  # net 10 over control intercept 2
+        self.assertEqual(bf.required_effect(rec, "threads_live", control), 5.0)
+        small = {"features": feats, "deltas": {"threads_live": 3}}
+        self.assertEqual(bf.required_effect(small, "threads_live", control), 1.0)
 
 
 class DdminTest(unittest.TestCase):
@@ -1596,6 +1810,339 @@ class SwarmControlTest(unittest.TestCase):
             sw.close()
         self.assertIsNotNone(proc.poll())
 
+    def test_discover_op_validation_and_unreachable_server_completion(self):
+        sw = bf.Swarm([NODE, bf.SWARM_JS, "--fuzz-control", "0", "--host", "127.0.0.1", "--port", "1",
+                       "--join-delay-ms", "0", "--fuzz-spawn-timeout-ms", "2000"])
+        sw.start()
+        try:
+            events, done = sw.run_episode({"op": "discover", "id": "d-1", "tier": "default", "bot": "fzd_def"}, 30)
+            self.assertEqual(done["id"], "d-1")
+            self.assertEqual(done["tier"], "default")
+            self.assertEqual(done["reason"], "no_commands")
+            cmd_events = [e for e in events if e.get("ev") == "commands"]
+            self.assertEqual(len(cmd_events), 1)
+            self.assertEqual(cmd_events[0]["tier"], "default")
+            self.assertFalse(cmd_events[0]["captured"])
+            self.assertEqual(cmd_events[0]["rootIndex"], 0)
+            self.assertEqual(cmd_events[0]["nodes"], [])
+            with self.assertRaisesRegex(bf.SwarmError, "failed to capture command graph"):
+                sw.discover("d-unreach", tier="default", bot="fzd_def2", max_ms=1500, timeout_s=15)
+            with self.assertRaises(bf.SwarmError):
+                sw.run_episode({"op": "discover", "id": "d-2", "tier": "default", "bot": "bad name"}, 10)
+        finally:
+            sw.close()
+
+    def test_discover_happy_path_and_default_episode_no_telemetry_leak(self):
+        server_js = r"""
+const path = require('path');
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const mc = require(path.join(nm, 'minecraft-protocol'));
+const mcData = require(path.join(nm, 'minecraft-data'))('1.20.1');
+const srv = mc.createServer({ 'online-mode': false, host: '127.0.0.1', port: 0, version: '1.20.1' });
+srv.on('login', (client) => {
+  client.write('login', {
+    ...mcData.loginPacket,
+    entityId: 1,
+    isHardcore: false,
+    gameMode: 0,
+    previousGameMode: -1,
+    hashedSeed: [0, 0],
+    maxPlayers: 20,
+    viewDistance: 2,
+    simulationDistance: 2,
+    reducedDebugInfo: false,
+    enableRespawnScreen: true,
+    isDebug: false,
+    isFlat: true
+  });
+  const sendCmds = () => {
+    try {
+      client.write('declare_commands', {
+        rootIndex: 0,
+        nodes: [
+          {
+            flags: { command_node_type: 0, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+            children: [1, 2]
+          },
+          {
+            flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+            children: [],
+            extraNodeData: { name: 'rtp' }
+          },
+          {
+            flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+            children: [],
+            redirectNode: 1,
+            extraNodeData: { name: 'betterrtp:rtp' }
+          }
+        ]
+      });
+    } catch (e) { /* client disconnected */ }
+  };
+  if (client.username === 'fzd_late') {
+    setTimeout(sendCmds, 1200);
+  } else {
+    sendCmds();
+  }
+  client.write('position', { x: 0, y: 64, z: 0, yaw: 0, pitch: 0, flags: 0, teleportId: 1 });
+  client.write('update_time', { age: [0, 100], time: [0, 100] });
+});
+srv.on('listening', () => {
+  console.log(JSON.stringify({ port: srv.socketServer.address().port }));
+});
+"""
+        srv_proc = subprocess.Popen([NODE, "-e", server_js, bf.SWARM_JS],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            line = srv_proc.stdout.readline()
+            self.assertTrue(line, "fake server did not report listening port")
+            port = json.loads(line)["port"]
+            sw = bf.Swarm([NODE, bf.SWARM_JS, "--fuzz-control", "0", "--host", "127.0.0.1", "--port", str(port),
+                           "--version", "1.20.1", "--join-delay-ms", "0", "--fuzz-spawn-timeout-ms", "1500"])
+            sw.start()
+            try:
+                # 1. Immediate declare_commands (arrives before spawn): finishes right away with reason='complete'.
+                cmd_fast_ev, done_fast = sw.discover("d-fast", tier="default", bot="fzd_fast", max_ms=5000, timeout_s=15)
+                self.assertEqual(done_fast["reason"], "complete")
+                self.assertEqual(done_fast["tier"], "default")
+                self.assertTrue(cmd_fast_ev["captured"])
+                self.assertEqual([n["name"] for n in cmd_fast_ev["nodes"]], ["", "rtp", "betterrtp:rtp"])
+                self.assertEqual(cmd_fast_ev["nodes"][2]["redirect"], 1)
+
+                # 2. Delayed declare_commands (>1s after login): waits up to max_ms and completes with reason='complete'.
+                cmd_late_ev, done_late = sw.discover("d-late", tier="op", bot="fzd_late", max_ms=5000, timeout_s=15)
+                self.assertEqual(done_late["reason"], "complete")
+                self.assertEqual(done_late["tier"], "op")
+                self.assertTrue(cmd_late_ev["captured"])
+                self.assertEqual(len(cmd_late_ev["nodes"]), 3)
+
+                merged_tree = bfs.merge_command_trees({"default": cmd_fast_ev, "op": cmd_late_ev})
+                self.assertEqual(merged_tree.nodes["rtp"].aliases, ["rtp", "betterrtp:rtp"])
+                self.assertEqual(merged_tree.nodes["rtp"].min_tier, "default")
+
+                # 3. Default ADR-111 episode (no telemetry opt-in) emits zero commands, tick_gap, or window events.
+                ep_req = bf.episode_request(
+                    "ep-def", "rtp", [{"name": "fzE_0", "program": [{"a": "wait", "ms": 20}, {"a": "quit"}]}], 4000
+                )
+                ev_ep, done_ep = sw.run_episode(ep_req, 15)
+                self.assertEqual(done_ep["id"], "ep-def")
+                leaked_evs = [e["ev"] for e in ev_ep if e.get("ev") in ("commands", "tick_gap", "window")]
+                self.assertEqual(leaked_evs, [])
+            finally:
+                sw.close()
+        finally:
+            srv_proc.terminate()
+            try:
+                srv_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                srv_proc.kill()
+            if srv_proc.stdout:
+                srv_proc.stdout.close()
+            if srv_proc.stderr:
+                srv_proc.stderr.close()
+
+    def test_passive_protocol_event_parsing(self):
+        script = r"""
+const EventEmitter = require('events');
+const path = require('path');
+const sw = require(process.argv[1]);
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const { createSerializer, createDeserializer } = require(path.join(nm, 'minecraft-protocol/src/transforms/serializer'));
+
+function roundTrip(version, name, params) {
+  const ser = createSerializer({ state: 'play', isServer: true, version });
+  const des = createDeserializer({ state: 'play', isServer: false, version });
+  const buf = ser.createPacketBuffer({ name, params });
+  return des.parsePacketBuffer(buf).data.params;
+}
+
+const rawCmdParams = {
+  rootIndex: 0,
+  nodes: [
+    {
+      flags: { command_node_type: 0, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [1, 4]
+    },
+    {
+      flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [2, 3],
+      extraNodeData: { name: 'rtp' }
+    },
+    {
+      flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 1 },
+      children: [],
+      extraNodeData: {
+        name: 'radius',
+        parser: 'brigadier:integer',
+        properties: { flags: { min_present: 1, max_present: 1 }, min: 1, max: 256 },
+        suggestionType: 'minecraft:ask_server'
+      }
+    },
+    {
+      flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [5],
+      extraNodeData: {
+        name: 'seed',
+        parser: 'brigadier:long',
+        properties: {
+          flags: { min_present: 1, max_present: 1 },
+          min: -5000000000n,
+          max: 9007199254740993n
+        }
+      }
+    },
+    {
+      flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+      children: [],
+      redirectNode: 1,
+      extraNodeData: { name: 'betterrtp:rtp' }
+    },
+    {
+      flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [],
+      extraNodeData: {
+        name: 'target',
+        parser: 'minecraft:entity',
+        properties: { unused: 0, onlyAllowPlayers: 1, onlyAllowEntities: 1 }
+      }
+    }
+  ]
+};
+
+const pkt120 = roundTrip('1.20.1', 'declare_commands', rawCmdParams);
+const pkt121 = roundTrip('1.21.4', 'declare_commands', rawCmdParams);
+const graph120 = sw.serializeCommandPacket(pkt120);
+const graph121 = sw.serializeCommandPacket(pkt121);
+
+// Verify generic 2-int arrays are NOT coerced into 64-bit integers.
+const pairKept = sw.jsonSafeValue([1, 2]);
+
+// Real open_window packets (no slotCount in protocol):
+const win120 = sw.parseWindowPacket('fzP_0', roundTrip('1.20.1', 'open_window', {
+  windowId: 2,
+  inventoryType: 2, // minecraft:generic_9x3 -> 27 slots
+  windowTitle: JSON.stringify({ text: 'RTP Menu 1.20' })
+}), '1.20.1');
+const win121 = sw.parseWindowPacket('fzP_0', roundTrip('1.21.4', 'open_window', {
+  windowId: 3,
+  inventoryType: 5, // minecraft:generic_9x6 -> 54 slots
+  windowTitle: { type: 'compound', value: { text: { type: 'string', value: 'RTP Menu 1.21' } } }
+}), '1.21.4');
+const winUnknown = sw.parseWindowPacket('fzP_0', {
+  windowId: 4,
+  inventoryType: 999,
+  windowTitle: JSON.stringify({ text: 'Custom Unknown' })
+}, '1.20.1');
+
+// Default episode (telemetry: false) must emit no commands, tick_gap, or window events.
+const defaultEmitted = [];
+const epDefault = { telemetry: false, emit: (obj) => defaultEmitted.push(obj) };
+const clientDefault = new EventEmitter();
+const connDefault = { username: 'fzDef_0', spawned: true };
+sw.attachProtocolTelemetry(epDefault, connDefault, { _client: clientDefault, version: '1.20.1' });
+clientDefault.emit('declare_commands', pkt120);
+clientDefault.emit('keep_alive', { keepAliveId: 1n });
+clientDefault.emit('update_time', { age: 100n, time: 100n });
+clientDefault.emit('update_time', { age: 120n, time: 120n });
+clientDefault.emit('open_window', { windowId: 1, inventoryType: 2, windowTitle: '{"text":"No"}' });
+
+// Opt-in telemetry episode (telemetry: true) emits tick_gap and window, and discover callback receives graph.
+const emitted = [];
+const ep = { telemetry: true, emit: (obj) => emitted.push(obj) };
+const client = new EventEmitter();
+const bot = { _client: client, version: '1.21.4' };
+const conn = { username: 'fzP_0', spawned: false };
+let discovered = null;
+sw.attachProtocolTelemetry(ep, conn, bot, (g) => { discovered = g; });
+
+client.emit('declare_commands', pkt121);
+// Before spawn, update_time only records the timestamp without emitting tick_gap.
+client.emit('update_time', { age: 100n, time: 100n });
+conn.spawned = true;
+const t0 = Date.now();
+conn.lastKeepAliveAt = t0 - 150;
+client.emit('keep_alive', { keepAliveId: 1n });
+conn.lastUpdateTimeAt = Date.now() - 1050;
+client.emit('update_time', { age: 120n, time: 120n });
+client.emit('open_window', roundTrip('1.21.4', 'open_window', {
+  windowId: 2,
+  inventoryType: 2,
+  windowTitle: { type: 'compound', value: { text: { type: 'string', value: 'RTP Menu' } } }
+}));
+
+// Verify parseEpisode telemetry validation and action boundaries.
+const epParsedDefault = sw.parseEpisode({ id: 1, cmd: 'rtp', bots: [{ name: 'b0', program: ['quit'] }] });
+const epParsedTel = sw.parseEpisode({ id: 2, cmd: 'rtp', telemetry: true, bots: [{ name: 'b0', program: ['quit'] }] });
+let badActionRejected = false;
+try { sw.parseAction({ a: 'window_click', slot: 0 }, 'step0'); } catch (e) { badActionRejected = true; }
+
+console.log(JSON.stringify({
+  graph120,
+  graph121,
+  pairKept,
+  win120,
+  win121,
+  winUnknown,
+  defaultEmitted,
+  discovered: !!discovered,
+  emitted,
+  epTelemetryDefault: epParsedDefault.telemetry,
+  epTelemetryOptIn: epParsedTel.telemetry,
+  badActionRejected
+}));
+"""
+        proc = subprocess.run([NODE, "-e", script, bf.SWARM_JS], check=True, capture_output=True, text=True, timeout=30)
+        out = json.loads(proc.stdout.strip())
+        self.assertTrue(out["discovered"])
+        self.assertTrue(out["badActionRejected"])
+        self.assertFalse(out["epTelemetryDefault"])
+        self.assertTrue(out["epTelemetryOptIn"])
+        self.assertEqual(out["pairKept"], [1, 2])
+        self.assertEqual(out["defaultEmitted"], [])
+        for graph in (out["graph120"], out["graph121"]):
+            self.assertEqual(graph["rootIndex"], 0)
+            self.assertEqual(len(graph["nodes"]), 6)
+            n0, n1, n2, n3, n4, n5 = graph["nodes"]
+            self.assertEqual((n0["kind"], n0["children"], n0["executable"]), ("root", [1, 4], False))
+            self.assertEqual((n1["kind"], n1["name"], n1["children"], n1["executable"]), ("literal", "rtp", [2, 3], True))
+            self.assertEqual((n2["kind"], n2["name"], n2["parser"], n2["executable"], n2["suggestions"]),
+                             ("argument", "radius", "brigadier:integer", True, "minecraft:ask_server"))
+            self.assertEqual(n2["properties"]["min"], 1)
+            self.assertEqual(n2["properties"]["max"], 256)
+            self.assertEqual((n3["kind"], n3["name"], n3["parser"]), ("argument", "seed", "brigadier:long"))
+            self.assertEqual(n3["properties"]["min"], -5000000000)
+            self.assertEqual(n3["properties"]["max"], "9007199254740993")
+            self.assertEqual((n4["kind"], n4["name"], n4["redirect"]), ("literal", "betterrtp:rtp", 1))
+            self.assertEqual((n5["kind"], n5["name"], n5["parser"]), ("argument", "target", "minecraft:entity"))
+            self.assertEqual(n5["properties"]["onlyAllowPlayers"], 1)
+            self.assertEqual(n5["properties"]["onlyAllowEntities"], 1)
+        self.assertEqual(out["win120"], {
+            "ev": "window", "bot": "fzP_0", "window_id": 2, "window_type": 2, "slots": 27, "title": "RTP Menu 1.20"
+        })
+        self.assertEqual(out["win121"], {
+            "ev": "window", "bot": "fzP_0", "window_id": 3, "window_type": 5, "slots": 54, "title": "RTP Menu 1.21"
+        })
+        self.assertEqual(out["winUnknown"], {
+            "ev": "window", "bot": "fzP_0", "window_id": 4, "window_type": 999, "slots": None, "title": "Custom Unknown"
+        })
+        emitted = out["emitted"]
+        tick_gaps = [e for e in emitted if e["ev"] == "tick_gap"]
+        self.assertEqual(len(tick_gaps), 1)
+        self.assertEqual(tick_gaps[0]["bot"], "fzP_0")
+        self.assertGreaterEqual(tick_gaps[0]["ms"], 1000)
+        self.assertGreater(tick_gaps[0]["at"], 1700000000000)
+        self.assertGreaterEqual(tick_gaps[0]["keepalive_ms"], 100)
+        windows = [e for e in emitted if e["ev"] == "window"]
+        self.assertEqual(len(windows), 1)
+        self.assertEqual(windows[0], {
+            "ev": "window",
+            "bot": "fzP_0",
+            "window_id": 2,
+            "window_type": 2,
+            "slots": 27,
+            "title": "RTP Menu"
+        })
+
 
 class RepetitionTest(LoopFixture, unittest.TestCase):
     """--reps: growth per repetition separates a leak from a cache that fills once."""
@@ -1612,10 +2159,14 @@ class RepetitionTest(LoopFixture, unittest.TestCase):
         return self.tr.execute(1, 0, plan, None)
 
     def test_leak_keeps_its_slope(self):
+        def leak_fd(req):
+            self.server.fds += 1
+        self.swarm.after = leak_fd
         rec = self.run_plan([{"a": "rtp"}, {"a": "quit"}])
         self.assertEqual(3, rec["reps"])
         self.assertEqual(3, len(rec["series"]))
-        self.assertEqual(1.0, rec["deltas"]["slope.retained_player_objects"])
+        self.assertEqual(1.0, rec["deltas"]["slope.fd_open"])
+        self.assertEqual(1.0, rec["deltas"]["slope.heap_used_after_gc_mb"])  # one leaked instance per rep
         self.assertEqual(0.0, rec["deltas"]["slope.threads_live"])
         self.assertEqual(3, self.server.retained)  # every repetition leaked
         labels = [c.split()[2] for c in self.server.cmds if c.endswith(" quick")]
@@ -1624,7 +2175,7 @@ class RepetitionTest(LoopFixture, unittest.TestCase):
         names = [b["name"] for req, _ in self.swarm.requests for b in req["bots"]]
         self.assertEqual(3, len(set(names)))
         # The next episode starts from the last repetition's checkpoint.
-        self.assertEqual(3, self.tr.prev["retained_player_objects"])
+        self.assertEqual(103, self.tr.prev["fd_open"])
 
     def test_cache_that_fills_once_has_no_slope(self):
         self.swarm.leak_quit = False
@@ -1633,12 +2184,12 @@ class RepetitionTest(LoopFixture, unittest.TestCase):
         def fill_once(req):
             calls.append(req["id"])
             if len(calls) == 1:
-                self.server.retained += 5
+                self.server.fds += 5
 
         self.swarm.after = fill_once
         rec = self.run_plan([{"a": "rtp"}, {"a": "quit"}])
-        self.assertEqual(5, rec["deltas"]["retained_player_objects"])  # first run: looks like a leak
-        self.assertEqual(0.0, rec["deltas"]["slope.retained_player_objects"])  # repetitions: flat
+        self.assertEqual(5, rec["deltas"]["fd_open"])  # first run: looks like a leak
+        self.assertEqual(0.0, rec["deltas"]["slope.fd_open"])  # repetitions: flat
 
     def test_console_actions_run_every_repetition_and_count_as_feature_and_state(self):
         rec = self.run_plan([{"a": "rtp"}], console=[{"at_ms": 0, "cmd": "betterrtp reload"}])
@@ -2160,7 +2711,8 @@ class FaultModeTest(LoopFixture, unittest.TestCase):
         self.assertEqual(sum(1 for c in self.server.cmds if c == f"rtpstress leakcheck {base} quick"), 1)
         self.assertEqual(sum(1 for c in self.server.cmds if c == "rtpstress leakcheck fz20261010-200000-betterrtp-s1-ep0 quick"), 1)  # the checkpointed run
         self.assertIsNotNone(rerun[0]["deltas"])
-        self.assertIn("retained_player_objects", rerun[0]["deltas"])
+        self.assertIn("heap_used_after_gc_mb", rerun[0]["deltas"])
+        self.assertGreater(rerun[0]["departures"], 0)
         self.assertNotIn("kept", rerun[0])  # re-runs are never offered to the corpus
         mine = [x for x in self.ladder_rows() if x.get("origin") == "leakrerun"]
         self.assertEqual(len(mine), 1)
@@ -2173,10 +2725,11 @@ class FaultModeTest(LoopFixture, unittest.TestCase):
         tr.run_seed(1)
         with open(os.path.join(self.tdir, "fit.json"), encoding="utf-8") as fh:
             fit = json.load(fh)["fit"]
-        self.assertEqual(fit["retained_player_objects"]["n"], 4)  # the 4 re-runs; fault episodes have no deltas
+        self.assertEqual(fit["threads_live"]["n"], 4)  # the 4 re-runs; fault episodes have no deltas
+        self.assertEqual(fit[LEAK_CLS]["n"], 4)  # the leaking class was screened from them
 
     def test_rung_on_a_faults_mode_candidate_takes_checkpointed_runs_and_a_confirm(self):
-        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": LEAK_CLS, "source": "flag",
              "shrunk": False, "bots": bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, self.tr.cfg), "console": None,
              "net0": 1.0, "bots0": 2, "params": None}
         res = self.tr.run_rung(c, 0, 2, 2, True)
@@ -2210,7 +2763,7 @@ class FaultModeTest(LoopFixture, unittest.TestCase):
                 self.server.online = ["fzlinger_0"]
 
         self.swarm.after = leave_player
-        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": LEAK_CLS, "source": "flag",
              "shrunk": False, "bots": bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, self.tr.cfg), "console": None,
              "net0": 1.0, "bots0": 2, "params": None}
         rung = self.tr.run_rung(c, 0, 2, 1, False)
@@ -2418,6 +2971,2434 @@ class FindingLoopTest(LoopFixture, unittest.TestCase):
         with self.assertRaises(SystemExit) as cm:
             bf.main(["--server-dir", self.dir, "--finding-n", "2", "--finding-k", "3"])
         self.assertEqual(2, cm.exception.code)
+
+
+class CommandTreeAndDenylistTest(unittest.TestCase):
+    """Tests for ADR-125 passive command tree merging, structural alias folding,
+    redirect cycle protection, minimum-visible-tier metadata, Denylist filtering,
+    and commands.json serialization."""
+
+    def test_merge_tiers_alias_folding_and_min_tier_metadata(self):
+        default_pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2, 4]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": [3]},
+                {"index": 2, "kind": "literal", "name": "betterrtp:rtp", "executable": False, "redirect": 1, "children": []},
+                {
+                    "index": 3,
+                    "kind": "argument",
+                    "name": "world",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 4, "kind": "literal", "name": "spawn", "executable": True, "children": []},
+            ],
+        }
+        op_pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2, 5, 7]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": [3, 6]},
+                {"index": 2, "kind": "literal", "name": "betterrtp:rtp", "executable": False, "redirect": 1, "children": []},
+                {
+                    "index": 3,
+                    "kind": "argument",
+                    "name": "world",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 5, "kind": "literal", "name": "spawn", "executable": True, "children": []},
+                {"index": 6, "kind": "literal", "name": "reload", "executable": True, "children": []},
+                {"index": 7, "kind": "literal", "name": "adminonly", "executable": True, "children": []},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = os.path.join(tmpdir, "commands.json")
+            tree = bfs.merge_command_trees({"default": default_pkt, "op": op_pkt}, out_path=out_file)
+
+            self.assertEqual(tree.tiers, ["default", "op"])
+            self.assertIn("rtp", tree.root_children)
+            self.assertNotIn("betterrtp:rtp", tree.root_children)
+            self.assertEqual(tree.alias_map["rtp"], "rtp")
+            self.assertEqual(tree.alias_map["betterrtp:rtp"], "rtp")
+
+            rtp_node = tree.nodes["rtp"]
+            self.assertEqual(rtp_node.aliases, ["rtp", "betterrtp:rtp"])
+            self.assertEqual(rtp_node.tiers, ["default", "op"])
+            self.assertEqual(rtp_node.min_tier, "default")
+            self.assertTrue(rtp_node.executable)
+            self.assertFalse(rtp_node.denied)
+
+            world_node = tree.nodes["rtp <world>"]
+            self.assertEqual(world_node.tiers, ["default", "op"])
+            self.assertEqual(world_node.min_tier, "default")
+            self.assertEqual(world_node.aliases, ["rtp <world>", "betterrtp:rtp <world>"])
+
+            reload_node = tree.nodes["rtp reload"]
+            self.assertEqual(reload_node.tiers, ["op"])
+            self.assertEqual(reload_node.min_tier, "op")
+            self.assertEqual(reload_node.aliases, ["rtp reload", "betterrtp:rtp reload"])
+
+            admin_node = tree.nodes["adminonly"]
+            self.assertEqual(admin_node.tiers, ["op"])
+            self.assertEqual(admin_node.min_tier, "op")
+
+            # Verify commands.json round-trip
+            reloaded = bfs.CommandTree.read_json(out_file)
+            self.assertEqual(reloaded.to_dict(), tree.to_dict())
+            default_allowed = [n.node_id for n in reloaded.allowed_executable_nodes(["default"])]
+            self.assertEqual(default_allowed, ["rtp", "rtp <world>", "spawn"])
+            all_allowed = [n.node_id for n in reloaded.allowed_executable_nodes(["default", "op"])]
+            self.assertEqual(all_allowed, ["adminonly", "rtp", "rtp <world>", "rtp reload", "spawn"])
+
+    def test_max_nodes_truncates_without_dangling_references_and_roundtrips(self):
+        packet = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 4]},
+                {"index": 1, "kind": "literal", "name": "alpha", "children": [2, 3]},
+                {"index": 2, "kind": "literal", "name": "first", "executable": True, "children": []},
+                {"index": 3, "kind": "literal", "name": "second", "executable": True, "children": []},
+                {"index": 4, "kind": "literal", "name": "beta", "executable": True, "children": []},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = os.path.join(tmpdir, "commands.json")
+            tree = bfs.merge_command_trees({"default": packet}, out_path=out_file, max_nodes=2)
+
+            self.assertEqual(len(tree.nodes), 2)
+            self.assertEqual(tree.root_children, ["alpha"])
+            self.assertEqual(tree.nodes["alpha"].children, ["alpha first"])
+            self.assertTrue(all(root in tree.nodes for root in tree.root_children))
+            self.assertTrue(all(child in tree.nodes for node in tree.nodes.values() for child in node.children))
+            self.assertTrue(tree.truncated)
+
+            reloaded = bfs.CommandTree.read_json(out_file)
+            self.assertEqual(reloaded.to_dict(), tree.to_dict())
+            self.assertTrue(reloaded.truncated)
+
+    def test_cross_tier_alias_subtree_inequality_does_not_fold(self):
+        # Case 1: Within the same tier, `pluginx:tp` and `tp` have different subtrees -> must stay separate.
+        pkt_same_tier = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2]},
+                {"index": 1, "kind": "literal", "name": "tp", "executable": False, "children": [3]},
+                {"index": 2, "kind": "literal", "name": "pluginx:tp", "executable": True, "children": [4]},
+                {
+                    "index": 3,
+                    "kind": "argument",
+                    "name": "target",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": True},
+                    "executable": True,
+                    "children": [],
+                },
+                {
+                    "index": 4,
+                    "kind": "literal",
+                    "name": "home",
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        tree1 = bfs.merge_command_trees({"default": pkt_same_tier})
+        self.assertIn("tp", tree1.nodes)
+        self.assertIn("pluginx:tp", tree1.nodes)
+        self.assertEqual(tree1.nodes["tp"].aliases, ["tp"])
+        self.assertEqual(tree1.nodes["pluginx:tp"].aliases, ["pluginx:tp"])
+
+        # Case 2: `msg` is in default tier only, `adminmod:msg` is in op tier only (never paired in the same tier).
+        # Even if both happen to be bare literals, cross-tier distinct commands without same-tier pairing must not fold.
+        default_only_bare = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "msg", "executable": True, "children": []},
+            ],
+        }
+        op_only_ns = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "adminmod:msg", "executable": True, "children": []},
+            ],
+        }
+        tree2 = bfs.merge_command_trees({"default": default_only_bare, "op": op_only_ns})
+        self.assertIn("msg", tree2.nodes)
+        self.assertIn("adminmod:msg", tree2.nodes)
+        self.assertEqual(tree2.nodes["msg"].min_tier, "default")
+        self.assertEqual(tree2.nodes["adminmod:msg"].min_tier, "op")
+
+        # Case 3: Same command in both tiers, but op tier has an argument with a different parser under the same name.
+        def_arg = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": " warp", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "dest",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        op_arg = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "warp", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "dest",
+                    "parser": "brigadier:integer",
+                    "properties": {"min": 1, "max": 10},
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        tree3 = bfs.merge_command_trees({"default": def_arg, "op": op_arg})
+        self.assertIn("warp <dest>", tree3.nodes)
+        self.assertIn("warp <dest:integer>", tree3.nodes)
+        self.assertEqual(tree3.nodes["warp <dest>"].min_tier, "default")
+        self.assertEqual(tree3.nodes["warp <dest:integer>"].min_tier, "op")
+
+        # Case 4: `default` has equal `rtp` and `x:rtp`, but `op` has ONLY `x:rtp` with an extra child `nuke`.
+        # Folding must be rejected so `rtp` never inherits the undeclared `rtp nuke` subcommand.
+        def_pair = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                {"index": 2, "kind": "literal", "name": "x:rtp", "executable": True, "children": []},
+            ],
+        }
+        op_ns_conflict = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "x:rtp", "executable": True, "children": [2]},
+                {"index": 2, "kind": "literal", "name": "nuke", "executable": True, "children": []},
+            ],
+        }
+        tree4 = bfs.merge_command_trees({"default": def_pair, "op": op_ns_conflict})
+        self.assertIn("rtp", tree4.nodes)
+        self.assertIn("x:rtp", tree4.nodes)
+        self.assertIn("x:rtp nuke", tree4.nodes)
+        self.assertNotIn("rtp nuke", tree4.nodes)
+        self.assertEqual(tree4.nodes["rtp"].tiers, ["default"])
+        self.assertEqual(tree4.nodes["x:rtp"].tiers, ["default", "op"])
+
+        # Case 5: `a:rtp` redirects to `rtp` AND also declares its own child `stop`.
+        # Redirect with own children is not a pure alias and must not fold into `rtp`.
+        redir_with_own_children = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                {"index": 2, "kind": "literal", "name": "a:rtp", "executable": False, "redirect": 1, "children": [3]},
+                {"index": 3, "kind": "literal", "name": "stop", "executable": True, "children": []},
+            ],
+        }
+        tree5 = bfs.merge_command_trees({"default": redir_with_own_children})
+        self.assertIn("rtp", tree5.nodes)
+        self.assertIn("a:rtp", tree5.nodes)
+        self.assertNotIn("rtp stop", tree5.nodes)
+        self.assertEqual(tree5.nodes["rtp"].aliases, ["rtp"])
+
+    def test_redirect_cycle_protection_and_unsafe_redirects(self):
+        # Includes:
+        # - `execute -> run -> root (0)` cycle
+        # - mutual redirect cycle `loop_a <-> loop_b`
+        # - self-redirect `self_loop -> self_loop`
+        # - child cycle via `children` array (`child_cycle -> sub -> child_cycle`)
+        cyclic_pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 3, 4, 5, 6]},
+                {"index": 1, "kind": "literal", "name": "execute", "executable": False, "children": [2]},
+                {"index": 2, "kind": "literal", "name": "run", "executable": False, "redirect": 0, "children": []},
+                {"index": 3, "kind": "literal", "name": "loop_a", "executable": False, "redirect": 4, "children": []},
+                {"index": 4, "kind": "literal", "name": "loop_b", "executable": True, "redirect": 3, "children": []},
+                {"index": 5, "kind": "literal", "name": "self_loop", "executable": False, "redirect": 5, "children": []},
+                {"index": 6, "kind": "literal", "name": "child_cycle", "executable": True, "children": [7]},
+                {"index": 7, "kind": "literal", "name": "sub", "executable": True, "children": [6]},
+            ],
+        }
+        tree = bfs.merge_command_trees({"op": cyclic_pkt})
+        self.assertIn("execute", tree.nodes)
+        self.assertIn("execute run", tree.nodes)
+        self.assertTrue(tree.nodes["execute run"].cycle_cut)
+        self.assertTrue(tree.nodes["execute"].denied)
+        self.assertTrue(tree.nodes["execute run"].denied)
+
+        self.assertIn("loop_a", tree.nodes)
+        self.assertTrue(tree.nodes["loop_a"].cycle_cut)
+        # `loop_a` is not executable on its own and its redirect `loop_b -> loop_a` is a cycle,
+        # so it must not inherit executable=True from a cyclic redirect chain.
+        self.assertFalse(tree.nodes["loop_a"].executable)
+
+        self.assertIn("self_loop", tree.nodes)
+        self.assertTrue(tree.nodes["self_loop"].cycle_cut)
+        self.assertFalse(tree.nodes["self_loop"].executable)
+
+        self.assertIn("child_cycle sub", tree.nodes)
+        self.assertTrue(tree.nodes["child_cycle sub"].cycle_cut)
+
+    def test_denylist_default_rules_and_operator_extensions(self):
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {
+                    "index": 0,
+                    "kind": "root",
+                    "name": "",
+                    "children": [1, 2, 3, 4, 5, 8, 15, 17, 19],
+                },
+                {"index": 1, "kind": "literal", "name": "stop", "executable": True, "children": []},
+                {"index": 2, "kind": "literal", "name": "minecraft:stop", "executable": False, "redirect": 1, "children": []},
+                {"index": 3, "kind": "literal", "name": "ban", "executable": True, "children": []},
+                {"index": 4, "kind": "literal", "name": "ban-ip", "executable": True, "children": []},
+                {"index": 5, "kind": "literal", "name": "reload", "executable": True, "children": [6, 7]},
+                {"index": 6, "kind": "literal", "name": "confirm", "executable": True, "children": []},
+                {"index": 7, "kind": "literal", "name": "status", "executable": True, "children": []},
+                {"index": 8, "kind": "literal", "name": "tick", "executable": False, "children": [9, 10, 11, 12, 13, 14]},
+                {"index": 9, "kind": "literal", "name": "query", "executable": True, "children": []},
+                {"index": 10, "kind": "literal", "name": "freeze", "executable": True, "children": []},
+                {"index": 11, "kind": "literal", "name": "unfreeze", "executable": True, "children": []},
+                {"index": 12, "kind": "literal", "name": "rate", "executable": True, "children": []},
+                {"index": 13, "kind": "literal", "name": "sprint", "executable": True, "children": []},
+                {"index": 14, "kind": "literal", "name": "step", "executable": True, "children": []},
+                {"index": 15, "kind": "literal", "name": "kill", "executable": True, "children": [16]},
+                {
+                    "index": 16,
+                    "kind": "argument",
+                    "name": "targets",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": False},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 17, "kind": "literal", "name": "customadmin", "executable": True, "children": [18]},
+                {"index": 18, "kind": "literal", "name": "wipe", "executable": True, "children": []},
+                {"index": 19, "kind": "literal", "name": "minecraft:pardon-ip", "executable": True, "children": []},
+            ],
+        }
+        deny = bfs.Denylist(extra_entries=["customadmin wipe"])
+        tree = bfs.merge_command_trees({"op": pkt}, denylist=deny)
+
+        # `minecraft:stop` folds into `stop` and is denied by `stop`
+        self.assertEqual(tree.nodes["stop"].aliases, ["stop", "minecraft:stop"])
+        self.assertTrue(tree.nodes["stop"].denied)
+        self.assertEqual(tree.nodes["stop"].denied_by, "stop")
+
+        # Glob `ban*` and `pardon*` (even when namespaced without bare counterpart)
+        self.assertTrue(tree.nodes["ban"].denied)
+        self.assertEqual(tree.nodes["ban"].denied_by, "ban*")
+        self.assertTrue(tree.nodes["ban-ip"].denied)
+        self.assertTrue(tree.nodes["minecraft:pardon-ip"].denied)
+        self.assertEqual(tree.nodes["minecraft:pardon-ip"].denied_by, "pardon*")
+
+        # `reload confirm` is denied, but bare `reload` and `reload status` remain allowed
+        self.assertFalse(tree.nodes["reload"].denied)
+        self.assertFalse(tree.nodes["reload status"].denied)
+        self.assertTrue(tree.nodes["reload confirm"].denied)
+        self.assertEqual(tree.nodes["reload confirm"].denied_by, "reload confirm")
+
+        # `tick` state-changing subcommands denied; `tick query` allowed
+        self.assertFalse(tree.nodes["tick query"].denied)
+        for sub in ("freeze", "unfreeze", "rate", "sprint", "step"):
+            self.assertTrue(tree.nodes[f"tick {sub}"].denied, f"tick {sub} should be denied")
+            self.assertEqual(tree.nodes[f"tick {sub}"].denied_by, f"tick {sub}")
+
+        # `kill <entity>` denies `kill <targets>` (entity parser) while bare `kill` remains allowed
+        self.assertFalse(tree.nodes["kill"].denied)
+        self.assertTrue(tree.nodes["kill <targets>"].denied)
+        self.assertEqual(tree.nodes["kill <targets>"].denied_by, "kill <entity>")
+
+        # Operator `--deny` entry `customadmin wipe` denies `customadmin wipe`, leaving `customadmin` allowed
+        self.assertFalse(tree.nodes["customadmin"].denied)
+        self.assertTrue(tree.nodes["customadmin wipe"].denied)
+        self.assertEqual(tree.nodes["customadmin wipe"].denied_by, "customadmin wipe")
+
+        # Raw command-line checks (used for passive filtering / replay safety)
+        self.assertTrue(deny.is_denied_command_line("/minecraft:stop", tree))
+        self.assertTrue(deny.is_denied_command_line("kill @a", tree))
+        self.assertFalse(deny.is_denied_command_line("kill", tree))
+        self.assertTrue(deny.is_denied_command_line("reload confirm", tree))
+        self.assertFalse(deny.is_denied_command_line("reload", tree))
+        self.assertTrue(deny.is_denied_command_line("tick freeze", tree))
+        self.assertFalse(deny.is_denied_command_line("tick query", tree))
+
+    def test_redirect_to_denied_command_propagates_denial_and_command_line_matching(self):
+        # 1. `tp -> teleport` with `--deny teleport`
+        # 2. non-namespaced alias `slay -> kill` (built-in `kill <entity>`)
+        # 3. non-namespaced alias `boot -> kick` and multi-hop `punt -> boot -> kick` (built-in `kick`)
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 3, 4, 6, 7, 9]},
+                {"index": 1, "kind": "literal", "name": "teleport", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "t",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": True},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 3, "kind": "literal", "name": "tp", "executable": False, "redirect": 1, "children": []},
+                {"index": 4, "kind": "literal", "name": "kill", "executable": True, "children": [5]},
+                {
+                    "index": 5,
+                    "kind": "argument",
+                    "name": "targets",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": False},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 6, "kind": "literal", "name": "slay", "executable": False, "redirect": 4, "children": []},
+                {"index": 7, "kind": "literal", "name": "kick", "executable": False, "children": [8]},
+                {
+                    "index": 8,
+                    "kind": "argument",
+                    "name": "player",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": True},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 9, "kind": "literal", "name": "boot", "executable": False, "redirect": 7, "children": []},
+                {"index": 10, "kind": "literal", "name": "punt", "executable": False, "redirect": 9, "children": []},
+            ],
+        }
+        pkt["nodes"][0]["children"].append(10)
+        deny = bfs.Denylist(extra_entries=["teleport"])
+        tree = bfs.merge_command_trees({"op": pkt}, denylist=deny)
+
+        # `teleport` and redirecting `tp` + `tp <t>` are all denied by `teleport`
+        self.assertTrue(tree.nodes["teleport"].denied)
+        self.assertTrue(tree.nodes["teleport <t>"].denied)
+        self.assertTrue(tree.nodes["tp"].denied)
+        self.assertEqual(tree.nodes["tp"].denied_by, "teleport")
+        self.assertTrue(tree.nodes["tp <t>"].denied)
+        self.assertEqual(tree.nodes["tp <t>"].denied_by, "teleport")
+        self.assertTrue(deny.is_denied_command_line("tp @s", tree))
+        self.assertTrue(deny.is_denied_command_line("/tp", tree))
+
+        # `slay -> kill`: bare `slay` is allowed (like bare `kill`), while `slay <targets>` is denied by `kill <entity>`
+        self.assertFalse(tree.nodes["slay"].denied)
+        self.assertTrue(tree.nodes["slay <targets>"].denied)
+        self.assertEqual(tree.nodes["slay <targets>"].denied_by, "kill <entity>")
+        self.assertTrue(deny.is_denied_command_line("slay @a", tree))
+        self.assertFalse(deny.is_denied_command_line("slay", tree))
+
+        # `boot -> kick` and `punt -> boot -> kick`: denied by built-in `kick`
+        for nid in ("kick", "kick <player>", "boot", "boot <player>", "punt", "punt <player>"):
+            self.assertTrue(tree.nodes[nid].denied, f"{nid} should be denied via redirect to kick")
+            self.assertEqual(tree.nodes[nid].denied_by, "kick")
+        self.assertTrue(deny.is_denied_command_line("boot player1", tree))
+        self.assertTrue(deny.is_denied_command_line("punt player1", tree))
+
+    def test_json_roundtrip_preserves_steps_and_apply_denylist_recomputes_flags(self):
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 3, 4]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "world",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 3, "kind": "literal", "name": "teleport", "executable": True, "children": []},
+                {"index": 4, "kind": "literal", "name": "tp", "executable": False, "redirect": 3, "children": []},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = os.path.join(tmpdir, "commands.json")
+            tree = bfs.merge_command_trees({"default": pkt}, out_path=out_file)
+            self.assertFalse(tree.nodes["rtp <world>"].denied)
+            self.assertFalse(tree.nodes["teleport"].denied)
+            self.assertFalse(tree.nodes["tp"].denied)
+
+            # Reload from commands.json: dataclass equality (including _steps and _root_id) holds
+            reloaded = bfs.CommandTree.read_json(out_file)
+            self.assertEqual(reloaded, tree)
+            self.assertEqual(reloaded.nodes["rtp <world>"]._steps, (("argument", "world", "brigadier:string"),))
+            self.assertEqual(reloaded.nodes["rtp <world>"]._root_id, "rtp")
+
+            # Re-apply a stricter denylist on the reloaded tree
+            new_deny = bfs.Denylist(extra_entries=["rtp <string>", "teleport"])
+            reloaded.apply_denylist(new_deny)
+            self.assertFalse(reloaded.nodes["rtp"].denied)
+            self.assertTrue(reloaded.nodes["rtp <world>"].denied)
+            self.assertEqual(reloaded.nodes["rtp <world>"].denied_by, "rtp <string>")
+            self.assertTrue(reloaded.nodes["teleport"].denied)
+            self.assertTrue(reloaded.nodes["tp"].denied)
+            self.assertEqual(reloaded.nodes["tp"].denied_by, "teleport")
+
+            # Also verify reconstruction when `steps` and `root_id` are absent from serialized dict
+            raw_dict = tree.to_dict()
+            for n_entry in raw_dict["nodes"]:
+                n_entry.pop("steps", None)
+                n_entry.pop("root_id", None)
+            reconstructed = bfs.CommandTree.from_dict(raw_dict)
+            reconstructed.apply_denylist(new_deny)
+            self.assertTrue(reconstructed.nodes["rtp <world>"].denied)
+            self.assertTrue(reconstructed.nodes["tp"].denied)
+
+    def test_swarm_discover_raises_on_missing_or_uncaptured_or_timeout_graph(self):
+        sw = bf.Swarm(["node"])
+        # 1. Missing `commands` event
+        with unittest.mock.patch.object(
+            sw, "run_episode", return_value=([], {"ev": "done", "id": "d1", "reason": "complete"})
+        ):
+            with self.assertRaisesRegex(bf.SwarmError, "missing commands event"):
+                sw.discover("d1", tier="default")
+
+        # 2. `captured: False` with `reason: 'no_commands'`
+        with unittest.mock.patch.object(
+            sw,
+            "run_episode",
+            return_value=(
+                [
+                    {"ev": "bot_error", "text": "no spawn within 2000 ms"},
+                    {"ev": "commands", "id": "d2", "tier": "default", "rootIndex": 0, "nodes": [], "captured": False},
+                ],
+                {"ev": "done", "id": "d2", "reason": "no_commands"},
+            ),
+        ):
+            with self.assertRaisesRegex(bf.SwarmError, "failed to capture command graph.*no_commands"):
+                sw.discover("d2", tier="default")
+
+        # 3. `captured: True` but `reason: 'timeout'`
+        with unittest.mock.patch.object(
+            sw,
+            "run_episode",
+            return_value=(
+                [{"ev": "commands", "id": "d3", "tier": "op", "rootIndex": 0, "nodes": [], "captured": True}],
+                {"ev": "done", "id": "d3", "reason": "timeout"},
+            ),
+        ):
+            with self.assertRaisesRegex(bf.SwarmError, "reason='timeout'"):
+                sw.discover("d3", tier="op")
+
+    def test_dag_command_graph_resolves_without_exponential_blowup(self):
+        # Width-3, depth-16 diamond DAG (shared child indices at each level)
+        nodes = [{"index": 0, "kind": "root", "name": "", "children": [1, 2, 3]}]
+        idx = 1
+        for depth in range(16):
+            next_base = idx + 3
+            children = [next_base, next_base + 1, next_base + 2] if depth < 15 else []
+            for w in range(3):
+                nodes.append(
+                    {
+                        "index": idx + w,
+                        "kind": "literal",
+                        "name": f"l{depth}_{w}",
+                        "executable": depth == 15,
+                        "children": list(children),
+                    }
+                )
+            idx += 3
+        pkt = {"rootIndex": 0, "nodes": nodes}
+        t0 = time.monotonic()
+        roots = bfs._resolve_raw_tier_graph(pkt)
+        elapsed = time.monotonic() - t0
+        self.assertEqual(sorted(roots.keys()), ["l0_0", "l0_1", "l0_2"])
+        self.assertLess(elapsed, 1.0)
+
+
+class JcmdAndStallOracleTest(unittest.TestCase):
+    """ADR-125 section 2.4 & 2.6: JcmdObserver PID/container selection, exclusion windows, and StallOracle."""
+
+    SAMPLE_HISTO = (
+        " num     #instances         #bytes  class name (module)\n"
+        "-------------------------------------------------------\n"
+        "   1:         12000        1500000  [B (java.base@21.0.2)\n"
+        "   2:           450          36000  jdk.internal.vm.FillerObject (java.base@21.0.2)\n"
+        "   3:           300          24000  jdk.internal.vm.FillerElement (java.base@21.0.2)\n"
+        "   4:            42           3360  com.example.alpha.SessionState\n"
+        "   5:            10            800  [Lcom.example.alpha.SessionState;\n"
+        "Total         12802        1564160\n"
+    )
+
+    SAMPLE_THREAD_DUMP = (
+        "2026-10-24 01:00:00\n"
+        "Full thread dump OpenJDK 64-Bit Server VM (21.0.2+13-LTS mixed mode):\n"
+        "\n"
+        '"Netty Epoll Server IO #0" #25 daemon prio=5 os_prio=0 tid=0x00007f01 nid=0x101 runnable\n'
+        "   java.lang.Thread.State: RUNNABLE\n"
+        "\tat io.netty.channel.epoll.Native.epollWait(Native Method)\n"
+        "\n"
+        '"Server thread" #30 prio=5 os_prio=0 tid=0x00007f02 nid=0x102 runnable\n'
+        "   java.lang.Thread.State: RUNNABLE\n"
+        "\tat java.base@21.0.2/java.lang.Thread.onSpinWait(Thread.java:310)\n"
+        "\tat com.example.alpha.ScanTask.runBusyScan(ScanTask.java:88)\n"
+        "\tat net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1020)\n"
+        "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:910)\n"
+        "\tat net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:700)\n"
+    )
+
+    def test_jcmd_observer_pid_file_and_histogram_parsing_and_window_recording(self):
+        clock_vals = [1000, 1400, 3000, 3120]
+        calls = []
+
+        def fake_clock():
+            return clock_vals.pop(0) if clock_vals else 5000
+
+        def fake_runner(cmd, timeout_s):
+            calls.append((cmd, timeout_s))
+            if cmd[-1] == "GC.class_histogram":
+                return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+            if cmd[-1] == "Thread.print":
+                return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_THREAD_DUMP, stderr="")
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="unexpected")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pid_path = os.path.join(tmpdir, "server.pid")
+            with open(pid_path, "w", encoding="utf-8") as fh:
+                fh.write(f"{os.getpid()}\n")
+
+            obs = bfs.JcmdObserver(
+                pid_file=pid_path,
+                post_grace_ms=200,
+                runner=fake_runner,
+                clock_ms=fake_clock,
+            )
+            self.assertEqual(obs.resolve_pid(), os.getpid())
+
+            histo = obs.class_histogram()
+            # FillerObject and FillerElement are filtered; raw array `[Lcom.example.alpha.SessionState;` stays distinct
+            self.assertNotIn("jdk.internal.vm.FillerObject", histo)
+            self.assertNotIn("jdk.internal.vm.FillerElement", histo)
+            self.assertEqual(histo["com.example.alpha.SessionState"], (42, 3360))
+            self.assertEqual(histo["[Lcom.example.alpha.SessionState;"], (10, 800))
+            self.assertEqual(histo["[B"], (12000, 1500000))
+
+            dump = obs.thread_print()
+            self.assertIn("com.example.alpha.ScanTask.runBusyScan", dump)
+
+            # Exclusion windows recorded for both GC.class_histogram and Thread.print (+200ms post_grace_ms)
+            self.assertEqual(len(obs.exclusion_windows), 2)
+            self.assertEqual(obs.exclusion_windows[0], bfs.ExclusionWindow(1000, 1600, "GC.class_histogram"))
+            self.assertEqual(obs.exclusion_windows[1], bfs.ExclusionWindow(3000, 3320, "Thread.print"))
+            self.assertTrue(obs.overlaps_exclusion(1500, 1550))
+            self.assertFalse(obs.overlaps_exclusion(2000, 2500))
+
+            # Stale --pid-file pointing to a process whose cwd does not match server_dir is rejected
+            stale_obs = bfs.JcmdObserver(
+                pid_file=pid_path,
+                server_dir="/srv/bench/expected-server",
+                pid_cwd=lambda p: "/tmp/unrelated-cwd",
+                runner=fake_runner,
+            )
+            with self.assertRaisesRegex(bfs.JcmdError, "does not match server_dir.*stale"):
+                stale_obs.resolve_pid()
+
+    def test_jcmd_observer_jcmd_list_matching_and_container_wrapping(self):
+        jcmd_list_out = (
+            "1011 jdk.jcmd/sun.tools.jcmd.JCmd -l\n"
+            "2048 /opt/other/app.jar\n"
+            "4096 /srv/bench/paper-server/paper.jar nogui\n"
+        )
+        recorded_cmds = []
+
+        def fake_runner(cmd, timeout_s):
+            recorded_cmds.append(cmd)
+            if cmd == ["jcmd", "-l"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout=jcmd_list_out, stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+
+        obs = bfs.JcmdObserver(
+            server_dir="/srv/bench/paper-server",
+            check_local_pid=False,
+            pid_cwd=lambda p: None,
+            runner=fake_runner,
+        )
+        self.assertEqual(obs.resolve_pid(), 4096)
+        counts = obs.class_counts()
+        self.assertEqual(counts["com.example.alpha.SessionState"], 42)
+        self.assertEqual(counts["[Lcom.example.alpha.SessionState;"], 10)
+        self.assertEqual(recorded_cmds[-1], ["jcmd", "4096", "GC.class_histogram"])
+
+        # Basename-only collision test: server_dir='/srv/bench/paper' must NEVER match unrelated
+        # `5000 /home/u/tools/paper-utils.jar`, and matches `4096 server.jar nogui` only when cwd matches.
+        collision_list = (
+            "4096 server.jar nogui\n"
+            "5000 /home/u/tools/paper-utils.jar\n"
+        )
+        obs_no_cwd = bfs.JcmdObserver(
+            server_dir="/srv/bench/paper",
+            check_local_pid=False,
+            pid_cwd=lambda p: "/home/u/tools" if p == 5000 else None,
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=collision_list, stderr=""),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "found no JVM matching"):
+            obs_no_cwd.resolve_pid()
+
+        obs_with_cwd = bfs.JcmdObserver(
+            server_dir="/srv/bench/paper",
+            check_local_pid=False,
+            pid_cwd=lambda p: "/srv/bench/paper" if p == 4096 else "/home/u/tools",
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=collision_list, stderr=""),
+        )
+        self.assertEqual(obs_with_cwd.resolve_pid(), 4096)
+
+        # Container mode resolves child JVM PID via `docker exec <container> jcmd -l` (e.g. itzg/minecraft-server)
+        container_cmds = []
+
+        def container_runner(cmd, timeout_s):
+            container_cmds.append(cmd)
+            if cmd[-2:] == ["jcmd", "-l"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="110 jdk.jcmd/sun.tools.jcmd.JCmd -l\n47 paper.jar nogui\n", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+
+        c_obs = bfs.JcmdObserver(container="mc-fabric-1", container_user="1000", runner=container_runner)
+        c_obs.class_histogram()
+        self.assertEqual(
+            container_cmds,
+            [
+                ["docker", "exec", "-u", "1000", "mc-fabric-1", "jcmd", "-l"],
+                ["docker", "exec", "-u", "1000", "mc-fabric-1", "jcmd", "47", "GC.class_histogram"],
+            ],
+        )
+
+        # Container mode with host `server_dir` and `jar_pattern` both set ignores the host path
+        # inside the container namespace and matches the in-container JVM by `jar_pattern`.
+        multi_container_jcmd = (
+            "110 jdk.jcmd/sun.tools.jcmd.JCmd -l\n"
+            "7 /data/paper-1.21.jar nogui\n"
+            "19 /opt/metrics/agent.jar\n"
+        )
+        c_both = bfs.JcmdObserver(
+            container="mc-paper",
+            server_dir="/home/u/RTP/devstack/data/paper",
+            jar_pattern="paper",
+            runner=lambda cmd, t: subprocess.CompletedProcess(
+                cmd, 0, stdout=multi_container_jcmd if cmd[-2:] == ["jcmd", "-l"] else self.SAMPLE_HISTO, stderr=""
+            ),
+        )
+        self.assertEqual(c_both.resolve_pid(), 7)
+
+        # Container mode falls back to PID 1 when `jcmd -l` lists no candidate rows
+        fallback_cmds = []
+        c_fallback = bfs.JcmdObserver(
+            container="mc-minimal",
+            runner=lambda cmd, t: (
+                fallback_cmds.append(cmd) or subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+            ),
+        )
+        c_fallback.class_histogram()
+        self.assertEqual(
+            fallback_cmds,
+            [
+                ["docker", "exec", "mc-minimal", "jcmd", "-l"],
+                ["docker", "exec", "mc-minimal", "jcmd", "1", "GC.class_histogram"],
+            ],
+        )
+
+        # Invalid container name starting with `-` is rejected immediately
+        with self.assertRaisesRegex(bfs.JcmdError, "invalid container name"):
+            bfs.JcmdObserver(container="--privileged")
+
+    def test_jcmd_observer_actionable_errors_and_read_only_enforcement(self):
+        # 1. Missing binary raises JcmdError with hint
+        def missing_bin_runner(cmd, timeout_s):
+            raise FileNotFoundError("jcmd")
+
+        obs_missing = bfs.JcmdObserver(pid=1234, check_local_pid=False, runner=missing_bin_runner)
+        with self.assertRaisesRegex(bfs.JcmdError, "not found.*Hint"):
+            obs_missing.class_histogram()
+        # Even when jcmd fails, the exclusion window is recorded
+        self.assertEqual(len(obs_missing.exclusion_windows), 1)
+
+        # 2. Empty or unparseable histogram raises JcmdError (never returns `{}`)
+        obs_empty = bfs.JcmdObserver(
+            pid=1234,
+            check_local_pid=False,
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout="1234:\nCommand executed successfully\n", stderr=""),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "no readable class rows"):
+            obs_empty.class_histogram()
+
+        # 3. Permission / wrong user attach failure raises JcmdError with user hint
+        obs_perm = bfs.JcmdObserver(
+            pid=1234,
+            check_local_pid=False,
+            runner=lambda cmd, t: subprocess.CompletedProcess(
+                cmd, 1, stdout="", stderr="com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file"
+            ),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "Unable to open socket file.*Hint"):
+            obs_perm.thread_print()
+
+        # 4. Ambiguous `jcmd -l` raises JcmdError listing visible JVMs
+        ambig_out = "2001 /srv/a/paper.jar\n2002 /srv/b/paper.jar\n"
+        obs_ambig = bfs.JcmdObserver(
+            jar_pattern="paper.jar",
+            check_local_pid=False,
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=ambig_out, stderr=""),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "matched multiple JVMs.*--pid-file"):
+            obs_ambig.resolve_pid()
+
+        # 5. Disallowed jcmd operation is rejected
+        with self.assertRaisesRegex(bfs.JcmdError, "disallowed jcmd operation"):
+            obs_empty._build_command("VM.system_properties")
+
+        # 6. Local PID ownership check surfaces PermissionError and ProcessLookupError with hints
+        with unittest.mock.patch("os.kill", side_effect=PermissionError("Operation not permitted")):
+            obs_wrong_user = bfs.JcmdObserver(pid=9999, check_local_pid=True)
+            with self.assertRaisesRegex(bfs.JcmdError, "permission denied signalling JVM PID 9999.*same OS user"):
+                obs_wrong_user.resolve_pid()
+
+        with unittest.mock.patch("os.kill", side_effect=ProcessLookupError("No such process")):
+            obs_dead = bfs.JcmdObserver(pid=9998, check_local_pid=True)
+            with self.assertRaisesRegex(bfs.JcmdError, "JVM process PID 9998.*is not running"):
+                obs_dead.resolve_pid()
+
+    def test_stall_oracle_excludes_observer_windows_and_detects_acute_and_sustained_stalls(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plugins_dir = os.path.join(tmpdir, "plugins")
+            os.makedirs(plugins_dir)
+            jar_path = os.path.join(plugins_dir, "AlphaPlugin.jar")
+            with zipfile.ZipFile(jar_path, "w") as zf:
+                zf.writestr("plugin.yml", "name: AlphaPlugin\nmain: com.example.alpha.AlphaMain\n")
+                zf.writestr("com/example/alpha/ScanTask.class", b"\xca\xfe\xba\xbe")
+
+            jar_index = bfs.JarIndex(plugins_dir)
+            profile = bfs.get_platform_profile("paper")
+
+            # Baseline tick gaps: steady ~1000ms per 20 ticks
+            baseline_gaps = [
+                {"ms": 995.0, "end_ms": 1000 * i} if i % 2 == 0 else {"ms": 1005.0, "end_ms": 1000 * i}
+                for i in range(1, 25)
+            ]
+
+            clock_vals = [10000, 10500]
+            obs = bfs.JcmdObserver(
+                pid=1234,
+                check_local_pid=False,
+                post_grace_ms=200,
+                clock_ms=lambda: clock_vals.pop(0) if clock_vals else 20000,
+                runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr=""),
+            )
+            # Trigger a GC.class_histogram that records exclusion window [10000, 10700]
+            obs.class_histogram()
+
+            oracle = bfs.StallOracle(
+                baseline_gaps=baseline_gaps,
+                stall_ms=2000.0,
+                profile=profile,
+                jar_index=jar_index,
+                observer=obs,
+            )
+
+            # Case 1: Real bench-swarm.js `tick_gap` event shape (`at` epoch ms) overlapping [10000, 10700]
+            # and an untimed gap (when exclusion windows exist) both fail closed into `excluded` -> no stall
+            gc_overlapping_gaps = [
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1000.0, "at": 9000, "keepalive_ms": 980, "t": 500},
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 3500.0, "at": 11000, "keepalive_ms": 1000, "t": 2500},  # [7500, 11000] overlaps [10000, 10700]
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 4000.0},  # untimed gap rejected when exclusion windows exist
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1002.0, "at": 14002, "keepalive_ms": 990, "t": 5502},
+            ]
+            res_gc = oracle.evaluate_episode(gc_overlapping_gaps, follow_up="quit_lt1s")
+            self.assertFalse(res_gc["stalled"])
+            self.assertEqual(res_gc["summary"]["excluded_count"], 2)
+            self.assertEqual(res_gc["summary"]["unverifiable_count"], 1)
+            self.assertEqual(res_gc["summary"]["count"], 2)
+
+            # Case 2: Acute single-gap stall (3300ms > ~1005 + 2000ms) outside observer windows, attributed via Thread.print
+            acute_gaps = [
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1000.0, "at": 20000, "t": 1000},
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 3300.0, "at": 23300, "t": 4300},
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1000.0, "at": 24300, "t": 5300},
+            ]
+            res_acute = oracle.evaluate_episode(
+                acute_gaps,
+                follow_up="quit_lt1s",
+                thread_dumps=[self.SAMPLE_THREAD_DUMP],
+            )
+            self.assertTrue(res_acute["stalled"])
+            self.assertTrue(res_acute["acute"])
+            self.assertFalse(res_acute["sustained"])
+            self.assertEqual(res_acute["kind"], "acute")
+            self.assertEqual(res_acute["culprit_frame"], "com.example.alpha.ScanTask.runBusyScan")
+            self.assertEqual(res_acute["first_suspect"], "AlphaPlugin.jar")
+            self.assertEqual(res_acute["attribution_status"], "unconfirmed")
+
+            # Verify "Server thread" takes priority over an earlier "main" thread, and Kotlin mangled frame names parse cleanly
+            main_before_server_dump = (
+                '"main" #1 prio=5 runnable\n'
+                "\tat java.base/java.lang.Object.wait(Native Method)\n"
+                "\n"
+                '"Server thread" #30 prio=5 runnable\n'
+                "\tat knot//com.example.alpha.ScanTask.runBusyScan-7a8b9c$lambda$2(ScanTask.kt:88)\n"
+            )
+            parsed_kt = bfs.parse_main_thread_frame(main_before_server_dump, profile=profile, jar_index=jar_index)
+            self.assertEqual(parsed_kt["thread_name"], "Server thread")
+            self.assertEqual(parsed_kt["culprit_frame"], "com.example.alpha.ScanTask.runBusyScan-7a8b9c$lambda$2")
+            self.assertEqual(parsed_kt["first_suspect"], "AlphaPlugin.jar")
+
+            # Case 3: Sustained tick inflation during `repeat` (e.g. 1150ms per 20 ticks over 8 intervals:
+            # never crosses 3005ms acute threshold, but inflates mean by ~150ms and p95 by ~155ms)
+            sustained_gaps = [{"ms": 1150.0, "end_ms": 30000 + i * 1150} for i in range(1, 9)]
+            res_sustained = oracle.evaluate_episode(
+                sustained_gaps,
+                follow_up="repeat",
+                thread_dumps=[self.SAMPLE_THREAD_DUMP],
+            )
+            self.assertTrue(res_sustained["stalled"])
+            self.assertFalse(res_sustained["acute"])
+            self.assertTrue(res_sustained["sustained"])
+            self.assertEqual(res_sustained["kind"], "sustained")
+            self.assertEqual(res_sustained["first_suspect"], "AlphaPlugin.jar")
+
+            # Case 4: Stall with only JDK/Minecraft server frames stays attributed to `server`
+            vanilla_only_dump = (
+                '"Server thread" #30 prio=5 runnable\n'
+                "\tat java.base/java.util.HashMap.getNode(HashMap.java:560)\n"
+                "\tat net.minecraft.server.level.ServerChunkCache.tick(ServerChunkCache.java:400)\n"
+                "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:910)\n"
+            )
+            res_server = oracle.evaluate_episode(
+                acute_gaps,
+                follow_up="quit_lt1s",
+                thread_dumps=[vanilla_only_dump],
+            )
+            self.assertTrue(res_server["stalled"])
+            self.assertIsNone(res_server["culprit_frame"])
+            self.assertEqual(res_server["first_suspect"], "server")
+
+
+class JarIndexAndLeakScreenTest(unittest.TestCase):
+    """ADR-125 section 2.4 & 2.6: JarIndex class/dependency scanning and Bonferroni leak screen."""
+
+    def test_jar_index_class_ownership_and_dependency_closure_across_paper_fabric_neoforge(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 1. Paper plugins directory: CoreLib -> MidPlugin -> LeafPlugin, plus SharedLib in two jars
+            plugins_dir = os.path.join(tmpdir, "plugins")
+            os.makedirs(plugins_dir)
+
+            with zipfile.ZipFile(os.path.join(plugins_dir, "CoreLib-1.0.jar"), "w") as zf:
+                zf.writestr("plugin.yml", "name: CoreLib\nprovides: [CoreAPI]\n")
+                zf.writestr("com/example/core/CoreService.class", b"\xca\xfe")
+                zf.writestr("META-INF/versions/21/com/example/core/MultiReleaseHelper.class", b"\xca\xfe")
+                zf.writestr("META-INF/versions/21/module-info.class", b"\xca\xfe")
+                zf.writestr("com/example/shared/ShadedUtil.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(plugins_dir, "MidPlugin-2.0.jar"), "w") as zf:
+                zf.writestr(
+                    "paper-plugin.yml",
+                    "name: MidPlugin\n"
+                    "dependencies:\n"
+                    "  server:\n"
+                    "    CoreAPI:\n"
+                    "      required: true\n"
+                    "    OptionalHook:\n"
+                    "      required: false\n",
+                )
+                zf.writestr("com/example/mid/MidManager.class", b"\xca\xfe")
+                zf.writestr("com/example/shared/ShadedUtil.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(plugins_dir, "LeafPlugin-3.0.jar"), "w") as zf:
+                # Same-indent YAML list items (`depend:\n- MidPlugin`) are very common in Bukkit plugin.yml
+                zf.writestr(
+                    "plugin.yml",
+                    "name: LeafPlugin\n"
+                    "depend:\n"
+                    "- MidPlugin\n"
+                    "softdepend:\n"
+                    "- SomeSoftPlugin\n",
+                )
+                zf.writestr("com/example/leaf/LeafSession.class", b"\xca\xfe")
+
+            p_idx = bfs.JarIndex(plugins_dir)
+            self.assertEqual(p_idx.owner_of_class("com.example.core.CoreService"), "CoreLib-1.0.jar")
+            self.assertEqual(p_idx.owner_of_class("[Lcom.example.core.CoreService;"), "CoreLib-1.0.jar")
+            self.assertEqual(p_idx.owner_of_class("com.example.core.MultiReleaseHelper"), "CoreLib-1.0.jar")
+            # Inner / lambda class resolves via outer host class
+            self.assertEqual(
+                p_idx.owner_of_class("com.example.leaf.LeafSession$PendingTask$$Lambda$42/0x000001"),
+                "LeafPlugin-3.0.jar",
+            )
+            # Class shipped by multiple jars is marked `ambiguous` (never arbitrarily blamed on one jar)
+            self.assertEqual(p_idx.owner_of_class("com.example.shared.ShadedUtil"), "ambiguous")
+            self.assertEqual(
+                p_idx.jars_for_class("com.example.shared.ShadedUtil"),
+                ["CoreLib-1.0.jar", "MidPlugin-2.0.jar"],
+            )
+            # Unknown / JDK / vanilla server class defaults to `server`
+            self.assertEqual(p_idx.owner_of_class("net.minecraft.advancements.AdvancementProgress"), "server")
+            # Transitive hard dependency closure: LeafPlugin -> MidPlugin -> CoreLib (via `provides: [CoreAPI]`)
+            self.assertEqual(
+                p_idx.close_deps(["LeafPlugin-3.0.jar"]),
+                ["CoreLib-1.0.jar", "LeafPlugin-3.0.jar", "MidPlugin-2.0.jar"],
+            )
+
+            # 2. Fabric mods directory (including nested `META-INF/jars/*.jar` Jar-in-Jar)
+            fabric_dir = os.path.join(tmpdir, "fabric_mods")
+            os.makedirs(fabric_dir)
+            nested_fabric_buf = io.BytesIO()
+            with zipfile.ZipFile(nested_fabric_buf, "w") as nzf:
+                nzf.writestr(
+                    "fabric.mod.json",
+                    json.dumps(
+                        {
+                            "schemaVersion": 1,
+                            "id": "bundled-sublib",
+                            "provides": ["bundled-subapi"],
+                        }
+                    ),
+                )
+                nzf.writestr("net/example/bundled/BundledHelper.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(fabric_dir, "base-lib.jar"), "w") as zf:
+                zf.writestr(
+                    "fabric.mod.json",
+                    json.dumps(
+                        {
+                            "schemaVersion": 1,
+                            "id": "baselib",
+                            "provides": ["baselib-api"],
+                            "depends": {"fabricloader": ">=0.15.0", "minecraft": "~1.21"},
+                            "jars": [{"file": "META-INF/jars/bundled-sublib-1.0.jar"}],
+                        }
+                    ),
+                )
+                zf.writestr("net/example/baselib/BaseMod.class", b"\xca\xfe")
+                zf.writestr("META-INF/jars/bundled-sublib-1.0.jar", nested_fabric_buf.getvalue())
+
+            with zipfile.ZipFile(os.path.join(fabric_dir, "addon-mod.jar"), "w") as zf:
+                zf.writestr(
+                    "fabric.mod.json",
+                    json.dumps(
+                        {
+                            "schemaVersion": 1,
+                            "id": "addonmod",
+                            "depends": {"fabricloader": ">=0.15.0", "bundled-subapi": "*"},
+                            "recommends": {"optionalmod": "*"},
+                        }
+                    ),
+                )
+                zf.writestr("net/example/addon/AddonMod.class", b"\xca\xfe")
+
+            f_idx = bfs.JarIndex(fabric_dir)
+            self.assertEqual(f_idx.owner_of_class("net.example.addon.AddonMod"), "addon-mod.jar")
+            # Nested jar class is credited to the outer `base-lib.jar`
+            self.assertEqual(f_idx.owner_of_class("net.example.bundled.BundledHelper"), "base-lib.jar")
+            # Dependency on `bundled-subapi` (provided by nested jar inside `base-lib.jar`) resolves to `base-lib.jar`
+            self.assertEqual(f_idx.close_deps(["addon-mod.jar"]), ["addon-mod.jar", "base-lib.jar"])
+
+            # 3. NeoForge mods directory (`META-INF/neoforge.mods.toml` + `META-INF/jarjar/*.jar`)
+            neo_dir = os.path.join(tmpdir, "neo_mods")
+            os.makedirs(neo_dir)
+            nested_neo_buf = io.BytesIO()
+            with zipfile.ZipFile(nested_neo_buf, "w") as nzf:
+                nzf.writestr(
+                    "META-INF/neoforge.mods.toml",
+                    'modLoader="javafml"\n'
+                    "[[mods]]\n"
+                    'modId="neoshaded"\n',
+                )
+                nzf.writestr("net/example/neoshaded/ShadedCodec.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(neo_dir, "neocore.jar"), "w") as zf:
+                zf.writestr(
+                    "META-INF/neoforge.mods.toml",
+                    'modLoader="javafml"\n'
+                    "[[mods]]\n"
+                    'modId="neocore"\n',
+                )
+                zf.writestr("META-INF/jarjar/neoshaded-1.0.jar", nested_neo_buf.getvalue())
+            with zipfile.ZipFile(os.path.join(neo_dir, "neoaddon.jar"), "w") as zf:
+                zf.writestr(
+                    "META-INF/neoforge.mods.toml",
+                    'modLoader="javafml"\n'
+                    "[[mods]]\n"
+                    'modId="neoaddon"\n'
+                    "[[dependencies.neoaddon]]\n"
+                    'modId="neoforge"\n'
+                    'type="required"\n'
+                    "[[dependencies.neoaddon]]\n"
+                    'modId="neoshaded"\n'
+                    'type="required"\n'
+                    "[[dependencies.neoaddon]]\n"
+                    'modId="optmod"\n'
+                    'type="optional"\n',
+                )
+            n_idx = bfs.JarIndex(neo_dir)
+            self.assertEqual(n_idx.owner_of_class("net.example.neoshaded.ShadedCodec"), "neocore.jar")
+            self.assertEqual(n_idx.close_deps(["neoaddon.jar"]), ["neoaddon.jar", "neocore.jar"])
+
+    def test_bonferroni_server_leak_screen_and_passive_histogram_summary(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plugins_dir = os.path.join(tmpdir, "plugins")
+            os.makedirs(plugins_dir)
+            with zipfile.ZipFile(os.path.join(plugins_dir, "QueuePlugin.jar"), "w") as zf:
+                zf.writestr("plugin.yml", "name: QueuePlugin\n")
+                zf.writestr("com/example/queue/RetainedSession.class", b"\xca\xfe")
+                zf.writestr("com/example/queue/AmbientDriftCache.class", b"\xca\xfe")
+
+            jar_index = bfs.JarIndex(plugins_dir)
+
+            # Vanilla baseline records: `net.minecraft.world.ChunkHolder` grows by ~50 per episode in vanilla,
+            # so exploration growth of ~50 must be subtracted and NOT flagged.
+            baseline_records = []
+            for ep in range(8):
+                baseline_records.append(
+                    {
+                        "ep": ep,
+                        "node": "help",
+                        "follow_up": "repeat",
+                        "departures": 1,
+                        "deltas": {
+                            "cls:net.minecraft.world.ChunkHolder": 50.0 + (1.0 if ep % 2 == 0 else -1.0),
+                            "cls:java.util.HashMap$Node": 2.0 if ep % 2 == 0 else -2.0,
+                        },
+                    }
+                )
+
+            # Exploration records across 48 episodes:
+            # - 12 episodes run `queue` with `quit_lt1s` -> leaks +200 `com.example.queue.RetainedSession` each
+            # - 36 episodes run `help` with `repeat` -> 0 `RetainedSession` growth
+            # - `com.example.queue.AmbientDriftCache` (plugin class absent from baseline) grows by ~20 in EVERY episode
+            # - `net.minecraft.world.ChunkHolder` grows by ~50 in all episodes (same as baseline)
+            # - 15 noisy background classes fluctuate around 0
+            records = []
+            noise_rng = random.Random(3)
+            for ep in range(48):
+                is_leak_arm = ep % 4 == 0
+                deltas = {
+                    "cls:net.minecraft.world.ChunkHolder": 50.0 + (1.0 if ep % 3 == 0 else -1.0),
+                    "cls:com.example.queue.AmbientDriftCache": 20.0 + noise_rng.uniform(-0.5, 0.5),
+                    "cls:com.example.queue.RetainedSession": 200.0 if is_leak_arm else 0.0,
+                }
+                for n_idx in range(15):
+                    deltas[f"cls:com.example.noise.NoiseClass{n_idx}"] = noise_rng.gauss(0.0, 1.0)
+                records.append(
+                    {
+                        "ep": ep,
+                        "node": "queue" if is_leak_arm else "help",
+                        "follow_up": "quit_lt1s" if is_leak_arm else "repeat",
+                        "departures": 1 if is_leak_arm else 0,
+                        "deltas": deltas,
+                    }
+                )
+
+            screen = bfs.screen_server_leaks(
+                records=records,
+                baseline_records=baseline_records,
+                jar_index=jar_index,
+                profile=bfs.get_platform_profile("paper"),
+            )
+            self.assertEqual(screen["usable_episodes"], 48)
+            self.assertGreater(screen["total_tests"], 30)
+            self.assertGreater(screen["bonferroni_z"], 3.0)
+
+            flagged = screen["correlations"]
+            self.assertTrue(flagged, "expected RetainedSession correlation above Bonferroni threshold")
+            top = flagged[0]
+            self.assertEqual(top["cls"], "com.example.queue.RetainedSession")
+            self.assertEqual(top["feature"], "arm:queue:quit_lt1s")
+            self.assertAlmostEqual(top["slope"], 200.0, places=2)
+            self.assertEqual(top["first_suspect"], "QueuePlugin.jar")
+            # Passive correlation never claims confirmed exploit attribution
+            self.assertEqual(top["attribution_status"], "unconfirmed_passive_correlation")
+
+            # 6 leak episodes out of 12 is only 1-in-924 by chance, above the Bonferroni level for this many
+            # (class, feature) cells: the screen must report insufficient evidence, not a leak.
+            small = bfs.screen_server_leaks(records=records[:12], baseline_records=baseline_records)
+            self.assertEqual(small["correlations"], [])
+
+            # Negative assertions:
+            # 1. Vanilla baseline class `ChunkHolder` is subtracted and never flagged
+            # 2. Plugin ambient-drift class `AmbientDriftCache` (growing in every episode) is absorbed by intercept and not flagged
+            # 3. Noise classes are never flagged
+            # 4. `RetainedSession` is NEVER flagged on `node:help` or `arm:help:repeat`
+            flagged_classes = {c["cls"] for c in flagged}
+            self.assertEqual(flagged_classes, {"com.example.queue.RetainedSession"})
+            flagged_features = {c["feature"] for c in flagged}
+            self.assertNotIn("node:help", flagged_features)
+            self.assertNotIn("arm:help:repeat", flagged_features)
+
+            # 200-episode ambient-drift probe over 5 nodes: a plugin class growing ~20 in every episode
+            # must have all 10 node/arm features absorbed by the intercept (0 features flagged).
+            ambient_records = []
+            for ep in range(200):
+                node_idx = ep % 5
+                ambient_records.append(
+                    {
+                        "ep": ep,
+                        "node": f"cmd{node_idx}",
+                        "follow_up": "repeat",
+                        "departures": 0,
+                        "deltas": {
+                            "cls:com.example.queue.AmbientDriftCache": 20.0 + (0.5 if ep % 2 == 0 else -0.5),
+                        },
+                    }
+                )
+            ambient_screen = bfs.screen_server_leaks(
+                records=ambient_records,
+                baseline_records=[],
+                jar_index=jar_index,
+                profile=bfs.get_platform_profile("paper"),
+            )
+            self.assertEqual(ambient_screen["correlations"], [])
+
+            # Correlated multi-arm episode probe: when `queue` and `help` run together in 6 episodes (+200),
+            # `help` runs alone in 6 episodes (0), and `list` runs alone in 6 episodes (0),
+            # joint ridge fitting blames `queue` and does NOT flag `help` or `list`.
+            corr_records = []
+            for ep in range(18):
+                if ep < 6:
+                    arms = [{"node": "queue", "follow_up": "quit_lt1s"}, {"node": "help", "follow_up": "repeat"}]
+                    leak_val = 200.0
+                elif ep < 12:
+                    arms = [{"node": "help", "follow_up": "repeat"}]
+                    leak_val = 0.0
+                else:
+                    arms = [{"node": "list", "follow_up": "repeat"}]
+                    leak_val = 0.0
+                corr_records.append(
+                    {
+                        "ep": ep,
+                        "arms": arms,
+                        "departures": 1 if ep < 6 else 0,
+                        "deltas": {"cls:com.example.queue.RetainedSession": leak_val},
+                    }
+                )
+            corr_screen = bfs.screen_server_leaks(
+                records=corr_records,
+                baseline_records=[],
+                jar_index=jar_index,
+                profile=bfs.get_platform_profile("paper"),
+            )
+            corr_feats = {c["feature"] for c in corr_screen["correlations"]}
+            self.assertIn("arm:queue:quit_lt1s", corr_feats)
+            self.assertIn("node:queue", corr_feats)
+            self.assertNotIn("arm:help:repeat", corr_feats)
+            self.assertNotIn("node:help", corr_feats)
+            self.assertNotIn("arm:list:repeat", corr_feats)
+            self.assertNotIn("node:list", corr_feats)
+
+            # Passive snapshot summary test
+            snapshots = [
+                {
+                    "epoch_ms": 0,
+                    "histogram": {
+                        "com.example.queue.RetainedSession": (10, 800),
+                        "jdk.internal.vm.FillerObject": (100, 8000),
+                    },
+                },
+                {
+                    "epoch_ms": 1800_000,  # 0.5 hours later
+                    "histogram": {
+                        "com.example.queue.RetainedSession": (210, 16800),
+                        "jdk.internal.vm.FillerObject": (500, 40000),
+                    },
+                },
+            ]
+            snap_summary = bfs.summarize_histogram_snapshots(snapshots, jar_index=jar_index)
+            self.assertEqual(snap_summary["snapshot_count"], 2)
+            self.assertEqual(len(snap_summary["top_growing_classes"]), 1)
+            row = snap_summary["top_growing_classes"][0]
+            self.assertEqual(row["cls"], "com.example.queue.RetainedSession")
+            self.assertEqual(row["delta_instances"], 200)
+            self.assertEqual(row["instances_per_hour"], 400.0)
+            self.assertEqual(row["first_suspect"], "QueuePlugin.jar")
+            self.assertEqual(row["attribution_status"], "unconfirmed_passive_correlation")
+
+    def test_sparse_bursty_and_heavy_tail_null_vs_repeated_planted_leak(self):
+        follow_ups = ["quit_lt1s", "quit_delay", "rejoin", "repeat", "concurrent", "window_click"]
+
+        # 1. Sparse arms (200 episodes over 15 nodes x 6 follow-ups = 90 arms) with 15 bursty classes
+        #    (2% per-episode chance of a +500 one-off burst, no real leak) across 3 seeds -> 0 false positives.
+        for seed in (1, 2, 3):
+            rng = random.Random(seed)
+            burst_records = []
+            for ep in range(200):
+                node = f"n{rng.randrange(15)}"
+                fu = follow_ups[rng.randrange(len(follow_ups))]
+                deltas = {f"cls:com.example.burst.C{c}": (500.0 if rng.random() < 0.02 else 0.0) for c in range(15)}
+                burst_records.append(
+                    {
+                        "ep": ep,
+                        "node": node,
+                        "follow_up": fu,
+                        "departures": 1 if "quit" in fu else 0,
+                        "deltas": deltas,
+                    }
+                )
+            burst_screen = bfs.screen_server_leaks(burst_records)
+            self.assertEqual(burst_screen["correlations"], [], f"unexpected false positive on burst seed {seed}")
+
+        # 2. Heavy-tail exponential noise (mean 20, sd 20) over 200 episodes and 90 arms -> 0 false positives.
+        for seed in (101, 102):
+            rng = random.Random(seed)
+            exp_records = []
+            for ep in range(200):
+                node = f"n{rng.randrange(15)}"
+                fu = follow_ups[rng.randrange(len(follow_ups))]
+                deltas = {f"cls:com.example.exp.C{c}": rng.expovariate(1.0 / 20.0) for c in range(15)}
+                exp_records.append(
+                    {
+                        "ep": ep,
+                        "node": node,
+                        "follow_up": fu,
+                        "departures": 1 if "quit" in fu else 0,
+                        "deltas": deltas,
+                    }
+                )
+            exp_screen = bfs.screen_server_leaks(exp_records)
+            self.assertEqual(exp_screen["correlations"], [], f"unexpected false positive on exp seed {seed}")
+
+        # 3. Same sparse bursty 200-episode environment WITH a genuine repeated planted leak on `n0` x `quit_lt1s`
+        #    (active in 5 episodes, leaking +200 each time): only `RetainedSession` is flagged, 0 bursty classes.
+        rng = random.Random(7)
+        mixed_records = []
+        for ep in range(200):
+            if ep in (10, 40, 80, 120, 160):
+                node, fu = "n0", "quit_lt1s"
+            else:
+                node = f"n{1 + rng.randrange(14)}"
+                fu = follow_ups[rng.randrange(len(follow_ups))]
+            deltas = {f"cls:com.example.burst.C{c}": (500.0 if rng.random() < 0.02 else 0.0) for c in range(15)}
+            deltas["cls:com.example.queue.RetainedSession"] = 200.0 if (node == "n0" and fu == "quit_lt1s") else 0.0
+            mixed_records.append(
+                {
+                    "ep": ep,
+                    "node": node,
+                    "follow_up": fu,
+                    "departures": 1 if "quit" in fu else 0,
+                    "deltas": deltas,
+                }
+            )
+        mixed_screen = bfs.screen_server_leaks(mixed_records)
+        flagged_cls = {c["cls"] for c in mixed_screen["correlations"]}
+        self.assertEqual(flagged_cls, {"com.example.queue.RetainedSession"})
+        self.assertEqual(mixed_screen["correlations"][0]["feature"], "arm:n0:quit_lt1s")
+        self.assertAlmostEqual(mixed_screen["correlations"][0]["slope"], 200.0, places=1)
+
+    @staticmethod
+    def _synthetic_leak_records(seed, noise, arms_per_episode, planted=None, n_episodes=200, n_classes=15):
+        """Episodes over 15 nodes x 6 follow-ups; `planted` leaks on 7 episodes of one extra arm."""
+        follow_ups = ["quit_lt1s", "quit_delay", "rejoin", "repeat", "concurrent", "window_click"]
+        rng = random.Random(seed)
+        leak_eps = set(rng.sample(range(n_episodes), 7)) if planted else set()
+        records = []
+        for ep in range(n_episodes):
+            arms = [
+                {"node": f"n{rng.randrange(15)}", "follow_up": rng.choice(follow_ups)}
+                for _ in range(arms_per_episode)
+            ]
+            if ep in leak_eps:
+                arms[0] = {"node": "leaky", "follow_up": "quit_lt1s"}
+            deltas = {}
+            for c in range(n_classes):
+                if noise == "gauss":
+                    deltas[f"cls:com.example.bg.C{c}"] = rng.gauss(20.0, 10.0)
+                else:
+                    deltas[f"cls:com.example.bg.C{c}"] = float(rng.choice([0, 0, 0, 100]))
+            deltas["cls:com.example.queue.RetainedSession"] = rng.gauss(0.0, 20.0) + (planted if ep in leak_eps else 0.0)
+            records.append(
+                {
+                    "ep": ep,
+                    "arms": arms,
+                    "departures": sum(1 for a in arms if "quit" in a["follow_up"]),
+                    "deltas": deltas,
+                }
+            )
+        return records
+
+    def test_leak_screen_empirical_familywise_rate_and_planted_sensitivity(self):
+        # Exact hypergeometric top-rank test, Bonferroni over classes x features x thresholds:
+        # nominal familywise false-positive rate is 2.5% per run; assert a loose 5% empirically on 100 null
+        # seeds for continuous and quantised-bimodal deltas, with 1 and 3 arms per episode.
+        for noise in ("gauss", "bimodal"):
+            for arms_per_episode in (1, 3):
+                false_runs = sum(
+                    1
+                    for seed in range(100)
+                    if bfs.screen_server_leaks(self._synthetic_leak_records(seed, noise, arms_per_episode))[
+                        "correlations"
+                    ]
+                )
+                self.assertLessEqual(
+                    false_runs, 5, f"{noise}/{arms_per_episode} arms: {false_runs}/100 runs with a false positive"
+                )
+
+        # A +80 per-activation leak over 7 active episodes (noise sd 20) is found in nearly every run, on the
+        # right class and arm; weak signals (+40) are allowed to stay "insufficient evidence".
+        hits = 0
+        for seed in range(10):
+            screen = bfs.screen_server_leaks(self._synthetic_leak_records(1000 + seed, "gauss", 3, planted=80.0))
+            found = [
+                c
+                for c in screen["correlations"]
+                if c["cls"] == "com.example.queue.RetainedSession" and c["feature"] == "arm:leaky:quit_lt1s"
+            ]
+            self.assertTrue(all(c["cls"] == "com.example.queue.RetainedSession" for c in screen["correlations"]))
+            hits += 1 if found else 0
+        self.assertGreaterEqual(hits, 9)
+
+    def test_leak_screen_few_active_episodes_with_discrete_deltas_is_insufficient_evidence(self):
+        # 4 of 4 active episodes landing in a 25% "high" mode is 0.4% likely by chance: far above the Bonferroni
+        # level, so it must not be reported even though every active episode is high.
+        rng = random.Random(9)
+        records = []
+        active = set(rng.sample(range(200), 4))
+        for ep in range(200):
+            high = ep in active or rng.random() < 0.25
+            records.append(
+                {
+                    "ep": ep,
+                    "arms": [{"node": "rare" if ep in active else f"n{ep % 10}", "follow_up": "quit_lt1s"}],
+                    "departures": 1,
+                    "deltas": {"cls:com.example.bg.Batch": 100.0 if high else 0.0},
+                }
+            )
+        for c in range(14):
+            for rec in records:
+                rec["deltas"][f"cls:com.example.bg.Other{c}"] = float(rng.choice([0, 0, 0, 100]))
+        self.assertEqual(bfs.screen_server_leaks(records)["correlations"], [])
+
+    def test_leak_screen_runtime_bounded_at_thousands_of_classes(self):
+        follow_ups = ["quit_lt1s", "quit_delay", "rejoin", "repeat", "concurrent", "window_click"]
+        rng = random.Random(5)
+        records = []
+        for ep in range(300):
+            records.append(
+                {
+                    "ep": ep,
+                    "arms": [
+                        {"node": f"n{rng.randrange(60)}", "follow_up": rng.choice(follow_ups)} for _ in range(3)
+                    ],
+                    "departures": 1,
+                    "deltas": {f"cls:com.example.big.C{c}": rng.expovariate(1.0 / 20.0) for c in range(2000)},
+                }
+            )
+        t0 = time.monotonic()
+        screen = bfs.screen_server_leaks(records)
+        self.assertLess(time.monotonic() - t0, 20.0)
+        self.assertEqual(screen["correlations"], [])
+        self.assertGreater(screen["total_tests"], 100000)
+
+
+class ServerModePassiveAuditTest(unittest.TestCase):
+    """ADR-125 `--mode server` passive local audit validation, read-only discovery,
+    optional local JcmdObserver snapshot, offline JarIndex inventory, and report/verdict output."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.out_dir = tempfile.mkdtemp()
+        self.plugins_dir = os.path.join(self.dir, "plugins")
+        os.makedirs(self.plugins_dir, exist_ok=True)
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nrcon.port=25575\nrcon.password=secret\nonline-mode=false\n")
+        with open(os.path.join(self.dir, "bench-loop.sh"), "w", encoding="utf-8") as fh:
+            fh.write("#!/bin/sh\nwhile true; do ./start.sh; sleep 2; done\n")
+        self._write_jar(
+            os.path.join(self.plugins_dir, "ViaVersion-5.0.0.jar"),
+            plugin_yml="name: ViaVersion\nversion: 5.0.0\n",
+            classes=["com/viaversion/viaversion/ViaManagerImpl.class"],
+        )
+        self._write_jar(
+            os.path.join(self.plugins_dir, "ExamplePlugin-1.0.jar"),
+            plugin_yml="name: ExamplePlugin\nversion: 1.0\ndepend:\n- ViaVersion\n",
+            classes=[
+                "com/example/plugin/ExamplePlugin.class",
+                "com/example/plugin/SessionCache.class",
+            ],
+        )
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+        shutil.rmtree(self.out_dir, ignore_errors=True)
+
+    @staticmethod
+    def _write_jar(path: str, plugin_yml: str, classes: list[str]) -> None:
+        with zipfile.ZipFile(path, "w") as zf:
+            zf.writestr("plugin.yml", plugin_yml)
+            for cls_entry in classes:
+                zf.writestr(cls_entry, b"\xca\xfe\xba\xbe")
+
+    # Serverbound 1.20.1 packets a passive discovery session may send: handshake, client settings/brand,
+    # movement acknowledgements and keep-alives. Any other name (chat, commands, tab-complete, clicks) is active.
+    PASSIVE_SERVERBOUND = frozenset({
+        "login_start", "encryption_begin", "settings", "custom_payload", "teleport_confirm",
+        "position", "position_look", "look", "flying", "keep_alive", "message_acknowledgement",
+    })
+
+    @staticmethod
+    def _read_protocol_events(events_log: str) -> list[dict]:
+        time.sleep(0.3)
+        if not os.path.exists(events_log):
+            return []
+        with open(events_log, "r", encoding="utf-8") as fh:
+            return [json.loads(ln) for ln in fh if ln.strip()]
+
+    def _assert_passive_session(self, events_log: str, start: int, label: str) -> int:
+        new = self._read_protocol_events(events_log)[start:]
+        logins = [e for e in new if e["ev"] == "login"]
+        packets = {e["packet"] for e in new if e["ev"] == "packet"}
+        self.assertEqual(len(logins), 1, f"{label}: expected exactly one login")
+        self.assertEqual(sorted(packets - self.PASSIVE_SERVERBOUND), [], f"{label}: active serverbound packets")
+        return start + len(new)
+
+    def _assert_cli_rejected(self, extra_argv: list[str], expected_substr: str) -> None:
+        err = io.StringIO()
+        argv = ["--mode", "server", "--server-dir", self.dir, "--out-dir", self.out_dir] + extra_argv
+        with (
+            unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("RCON touched")),
+            unittest.mock.patch.object(bf, "PermissionGrant", side_effect=AssertionError("LP touched")),
+            unittest.mock.patch.object(bf, "Swarm", side_effect=AssertionError("Swarm touched")),
+            contextlib.redirect_stderr(err),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            bf.main(argv)
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn(expected_substr, err.getvalue())
+
+    def test_validates_explicit_profile_local_host_and_disposable_server_dir(self):
+        # Missing explicit --profile
+        self._assert_cli_rejected([], "requires an explicit --profile")
+
+        # Unknown --profile
+        self._assert_cli_rejected(["--profile", "spigot"], "invalid --profile")
+
+        # Profile jar directory mismatch (fabric needs mods/, only plugins/ exists)
+        self._assert_cli_rejected(["--profile", "fabric"], "requires jar directory")
+
+        # Non-local --host / --mc-host
+        self._assert_cli_rejected(["--profile", "paper", "--host", "10.0.0.5"], "local loopback --host")
+        self._assert_cli_rejected(["--profile", "paper", "--mc-host", "192.168.1.20"], "local loopback --mc-host")
+
+        # Non-disposable directory (remove bench-loop.sh marker)
+        os.remove(os.path.join(self.dir, "bench-loop.sh"))
+        self._assert_cli_rejected(["--profile", "paper"], "disposable bench copy")
+
+        # Restore marker via spigot.yml no-restart-script, but set online-mode=true
+        with open(os.path.join(self.dir, "spigot.yml"), "w", encoding="utf-8") as fh:
+            fh.write("settings:\n  restart-script: ./no-restart-script.sh\n")
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nonline-mode=true\n")
+        self._assert_cli_rejected(["--profile", "paper"], "online-mode=true")
+
+        # Missing online-mode key in server.properties (Minecraft defaults to online-mode=true) must also be rejected
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nrcon.port=25575\n")
+        self._assert_cli_rejected(["--profile", "paper"], "explicit online-mode=false")
+
+        # Restore online-mode=false and check that passing both --pid and --pid-file is rejected
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nrcon.port=25575\nonline-mode=false\n")
+        pid_file = os.path.join(self.dir, "server.pid")
+        with open(pid_file, "w", encoding="utf-8") as fh:
+            fh.write(f"{os.getpid()}\n")
+        self._assert_cli_rejected(
+            ["--profile", "paper", "--pid", str(os.getpid()), "--pid-file", pid_file],
+            "rejects passing both --pid and --pid-file",
+        )
+
+    def test_mc_port_must_match_server_port_and_pid_reverified_before_jcmd(self):
+        # Explicit --mc-port must equal the validated server-port; omitted uses the configured port.
+        self.assertEqual(bfs.resolve_server_port({"server-port": "25570"}, None), 25570)
+        self.assertEqual(bfs.resolve_server_port({"server-port": "25570"}, 25570), 25570)
+        with self.assertRaisesRegex(ValueError, "does not match server.properties server-port=25565"):
+            bfs.resolve_server_port({"server-port": "25565"}, 25566)
+        self._assert_cli_rejected(["--profile", "paper", "--mc-port", "25566"], "invalid --mc-port")
+
+        # PID ownership is re-verified before every jcmd call, so a recycled PID is never attached.
+        cwd = {"value": self.dir}
+        calls: list[list[str]] = []
+
+        def runner(cmd, timeout_s):
+            calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        obs = bfs.JcmdObserver(
+            pid=4242,
+            server_dir=self.dir,
+            runner=runner,
+            pid_cwd=lambda pid: cwd["value"],
+            pid_cmdline=lambda pid: None,
+        )
+        with unittest.mock.patch("os.kill", return_value=None):
+            self.assertEqual(obs._build_command("Thread.print")[1], "4242")
+            cwd["value"] = "/tmp/recycled-other-server"
+            with self.assertRaisesRegex(bfs.JcmdError, "does not match server_dir"):
+                obs._run_jcmd_op("GC.class_histogram")
+        self.assertEqual(calls, [])
+
+    @unittest.skipUnless(os.name == "posix", "local jcmd PID verification requires POSIX")
+    def test_jcmd_observer_rejects_stale_hint(self):
+        calls: list[list[str]] = []
+
+        def runner(cmd, timeout_s):
+            calls.append(cmd)
+            if cmd == ["jcmd", "-l"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout=f"4242 {self.dir}/paper.jar\n", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout='"Server"\nThread.run', stderr="")
+
+        obs = bfs.JcmdObserver(
+            server_dir=self.dir,
+            runner=runner,
+            pid_cwd=lambda pid: None,
+            pid_cmdline=lambda pid: None,
+        )
+        with unittest.mock.patch("os.kill", return_value=None):
+            with self.assertRaisesRegex(bfs.JcmdError, "cannot be positively verified"):
+                obs.thread_print()
+
+        self.assertEqual(calls, [["jcmd", "-l"]])
+
+    def test_requires_default_tier_only_and_rejects_prohibited_flags(self):
+        # Non-default tiers rejected
+        for bad_tier in ("op", "default,op", "op,default", "admin"):
+            self._assert_cli_rejected(["--profile", "paper", "--tiers", bad_tier], "requires --tiers default only")
+
+        # Target-specific flags rejected (even when matching default value)
+        for flag_args in (
+            ["--cmd", "rtp=rtp"],
+            ["--names", bf.bo.DEFAULT_NAMES],
+            ["--jars", bf.bo.DEFAULT_JARS],
+            ["--plugin-packages", "com.example=Example"],
+            ["--targets", "direct,rtp"],
+            ["--rtp-args", "world"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects target-specific flag")
+
+        # Unsafe / op / mutation / container flags rejected
+        for flag_args in (
+            ["--grant", "*"],
+            ["--lp-group", "default"],
+            ["--console", "rtp=rtp reload"],
+            ["--allow-online"],
+            ["--container", "mc-bench"],
+            ["--mat", "/opt/mat/ParseHeapDump.sh"],
+            ["--no-restart"],
+            ["--no-isolate"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects unsafe/op flag")
+
+        # Replay flags rejected
+        for flag_args in (
+            ["--replay", "trace.jsonl", "--ep", "0"],
+            ["--ep", "1"],
+            ["--replay-seed", "1"],
+            ["--replay-n", "3"],
+            ["--replay-budget", "10"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects replay flag")
+
+        # Budget / active / stall-probe flags rejected
+        for flag_args in (
+            ["--episodes", "10"],
+            ["--seeds", "1,2"],
+            ["--reps", "2"],
+            ["--rungs", "4x1"],
+            ["--warmup", "0"],
+            ["--shrink", "1"],
+            ["--finding-n", "2"],
+            ["--surprise-n", "2"],
+            ["--coverage"],
+            ["--stall-ms", "2000"],
+            ["--default-budget-share", "0.75"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects budget/active flag")
+
+        # Abbreviated prohibited flags rejected via explicit-vs-default attribute comparison
+        for flag_args, expected_cat in (
+            (["--no-rest"], "rejects unsafe/op flag --no-restart"),
+            (["--allow-on"], "rejects unsafe/op flag --allow-online"),
+            (["--cont", "mc-bench"], "rejects unsafe/op flag --container"),
+            (["--default-budget", "0.75"], "rejects budget/active flag --default-budget-share"),
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, expected_cat)
+
+        # Ambiguous prefix abbreviations rejected by argparse
+        self._assert_cli_rejected(["--profile", "paper", "--repl", "trace.jsonl"], "ambiguous option")
+        self._assert_cli_rejected(["--profile", "paper", "--episo", "10"], "ambiguous option")
+        self._assert_cli_rejected(["--profile", "paper", "--stall", "1500"], "ambiguous option")
+
+        # Server-only flags rejected in ADR-111 target modes
+        err = io.StringIO()
+        with (
+            unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("server touched")),
+            contextlib.redirect_stderr(err),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            bf.main(["--server-dir", self.dir, "--mode", "leak", "--profile", "paper", "--out-dir", self.out_dir])
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("--profile is only valid with --mode server", err.getvalue())
+
+    def test_passive_audit_captures_commands_once_and_writes_passive_only_verdict_and_report(self):
+        discover_calls: list[dict] = []
+        created_swarms: list[Any] = []
+
+        class FakePassiveSwarm:
+            def __init__(self, argv, log_path):
+                self.argv = argv
+                self.log_path = log_path
+                self.started = False
+                self.closed = False
+                created_swarms.append(self)
+
+            def start(self):
+                self.started = True
+
+            def close(self):
+                self.closed = True
+
+            def discover(self, did, tier="default", bot=None, max_ms=15000, timeout_s=None):
+                discover_calls.append({"did": did, "tier": tier, "bot": bot, "max_ms": max_ms})
+                pkt = {
+                    "ev": "commands",
+                    "id": did,
+                    "tier": tier,
+                    "captured": True,
+                    "truncated": False,
+                    "rootIndex": 0,
+                    "nodes": [
+                        {"index": 0, "kind": "root", "name": "", "children": [1, 2, 3, 4]},
+                        {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                        {"index": 2, "kind": "literal", "name": "betterrtp:rtp", "executable": False, "redirect": 1, "children": []},
+                        {"index": 3, "kind": "literal", "name": "stop", "executable": True, "children": []},
+                        {"index": 4, "kind": "literal", "name": "customdanger", "executable": True, "children": []},
+                    ],
+                }
+                return pkt, {"ev": "done", "id": did, "reason": "complete"}
+
+        with (
+            unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("RCON must not be touched")),
+            unittest.mock.patch.object(bf, "PermissionGrant", side_effect=AssertionError("LP must not be touched")),
+            unittest.mock.patch.object(bf, "Swarm", side_effect=FakePassiveSwarm),
+        ):
+            rc = bf.main([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--tiers", "default",
+                "--deny", "customdanger",
+                "--out-dir", self.out_dir,
+            ])
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(discover_calls), 1)
+        self.assertEqual(discover_calls[0]["tier"], "default")
+        self.assertEqual(len(created_swarms), 1)
+        self.assertTrue(created_swarms[0].started)
+        self.assertTrue(created_swarms[0].closed)
+
+        # Verify no jars were renamed to .off
+        plugin_files = sorted(os.listdir(self.plugins_dir))
+        self.assertEqual(plugin_files, ["ExamplePlugin-1.0.jar", "ViaVersion-5.0.0.jar"])
+
+        runs_root = os.path.join(self.out_dir, "runs")
+        run_dirs = [os.path.join(runs_root, d) for d in os.listdir(runs_root)]
+        self.assertEqual(len(run_dirs), 1)
+        run_dir = run_dirs[0]
+
+        commands_file = os.path.join(run_dir, "commands.json")
+        verdict_file = os.path.join(run_dir, "verdict.json")
+        report_file = os.path.join(run_dir, "report.txt")
+        self.assertTrue(os.path.isfile(commands_file))
+        self.assertTrue(os.path.isfile(verdict_file))
+        self.assertTrue(os.path.isfile(report_file))
+
+        tree = bfs.CommandTree.read_json(commands_file)
+        self.assertEqual(tree.tiers, ["default"])
+        self.assertEqual([n.node_id for n in tree.allowed_executable_nodes(["default"])], ["rtp"])
+        self.assertTrue(tree.nodes["stop"].denied)
+        self.assertTrue(tree.nodes["customdanger"].denied)
+        self.assertEqual(tree.nodes["customdanger"].denied_by, "customdanger")
+
+        with open(verdict_file, "r", encoding="utf-8") as fh:
+            verdict = json.load(fh)
+        self.assertEqual(verdict["mode"], "server")
+        self.assertEqual(verdict["status"], "passive_only")
+        self.assertEqual(verdict["verdict"], "PASSIVE_ONLY")
+        self.assertEqual(verdict["profile"], "paper")
+        self.assertEqual(verdict["tiers"], ["default"])
+        self.assertEqual(verdict["baseline"]["available"], False)
+        self.assertEqual(verdict["baseline"]["status"], "unavailable")
+        self.assertEqual(verdict["confirmed_culprits"], [])
+        self.assertEqual(verdict["blamed_jars"], [])
+        self.assertEqual(verdict["findings"], [])
+        self.assertEqual(verdict["jcmd_snapshot"]["requested"], False)
+        self.assertEqual(verdict["jcmd_snapshot"]["status"], "not_requested")
+        self.assertEqual(verdict["jars"]["installed_jars"], ["ExamplePlugin-1.0.jar", "ViaVersion-5.0.0.jar"])
+        self.assertEqual(verdict["jars"]["prerequisite_jars"], ["ViaVersion-5.0.0.jar"])
+        self.assertEqual(verdict["jars"]["candidate_jars"], ["ExamplePlugin-1.0.jar"])
+        self.assertNotIn("replay_cmd", json.dumps(verdict))
+        self.assertNotIn("operator_mitigation", json.dumps(verdict))
+        self.assertNotIn("author_reproducer", json.dumps(verdict))
+
+        with open(report_file, "r", encoding="utf-8") as fh:
+            report_text = fh.read()
+        self.assertIn("status: passive_only", report_text)
+        self.assertIn("status: unavailable (available=False)", report_text)
+        self.assertIn("confirmed_culprits: none (0)", report_text)
+        self.assertNotIn("--replay", report_text)
+
+    def test_passive_audit_optional_local_jcmd_snapshot_and_truncation_warning(self):
+        pid_file = os.path.join(self.dir, "server.pid")
+        with open(pid_file, "w", encoding="utf-8") as fh:
+            fh.write(f"{os.getpid()}\n")
+
+        histo_out = (
+            " num     #instances         #bytes  class name (module)\n"
+            "-------------------------------------------------------\n"
+            "   1:           250          40000  com.example.plugin.SessionCache\n"
+            "   2:           100           8000  java.lang.String (java.base@21.0.2)\n"
+            "Total           350          48000\n"
+        )
+        tdump_out = (
+            '2026-10-24 03:00:00\n'
+            'Full thread dump OpenJDK 64-Bit Server VM:\n\n'
+            '"Server thread" #25 prio=5 os_prio=0 tid=0x01 nid=0x02 runnable\n'
+            '   java.lang.Thread.State: RUNNABLE\n'
+            '\tat com.example.plugin.ExamplePlugin.onTick(ExamplePlugin.java:42)\n'
+            '\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n'
+        )
+
+        def fake_runner(cmd, timeout_s):
+            op = cmd[-1]
+            if op == "GC.class_histogram":
+                return subprocess.CompletedProcess(cmd, 0, stdout=histo_out, stderr="")
+            if op == "Thread.print":
+                return subprocess.CompletedProcess(cmd, 0, stdout=tdump_out, stderr="")
+            raise AssertionError(f"unexpected jcmd call: {cmd}")
+
+        obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            runner=fake_runner,
+            pid_cwd=lambda p: os.path.realpath(self.dir) if p == os.getpid() else None,
+        )
+
+        class TruncatedSwarm:
+            def discover(self, did, tier="default", bot=None, max_ms=15000, timeout_s=None):
+                pkt = {
+                    "ev": "commands",
+                    "id": did,
+                    "tier": tier,
+                    "captured": True,
+                    "truncated": True,
+                    "rootIndex": 0,
+                    "nodes": [
+                        {"index": 0, "kind": "root", "name": "", "children": [1]},
+                        {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                    ],
+                }
+                return pkt, {"ev": "done", "id": did, "reason": "complete"}
+
+        args = bf.build_parser().parse_args([
+            "--mode", "server",
+            "--server-dir", self.dir,
+            "--profile", "paper",
+            "--pid-file", pid_file,
+            "--out-dir", self.out_dir,
+        ])
+        run_dir = os.path.join(self.out_dir, "audit-snap")
+        runner = bfs.ServerRun(args, run_dir, swarm=TruncatedSwarm(), observer=obs)
+        verdict = runner.run()
+
+        self.assertEqual(verdict["status"], "passive_only")
+        self.assertEqual(verdict["confirmed_culprits"], [])
+        self.assertEqual(verdict["blamed_jars"], [])
+        self.assertEqual(verdict["findings"], [])
+        self.assertTrue(verdict["commands"]["truncated"])
+        self.assertTrue(any("truncated" in w.lower() for w in verdict["warnings"]))
+
+        snap = verdict["jcmd_snapshot"]
+        self.assertTrue(snap["requested"])
+        self.assertEqual(snap["status"], "collected")
+        self.assertEqual(snap["pid"], os.getpid())
+        self.assertEqual(snap["attribution_status"], "passive_snapshot_only")
+        self.assertEqual(len(snap["exclusion_windows"]), 2)
+        self.assertEqual(snap["top_classes"][0]["class_name"], "com.example.plugin.SessionCache")
+        self.assertEqual(snap["top_classes"][0]["jar_owner"], "ExamplePlugin-1.0.jar")
+        self.assertEqual(snap["main_thread"]["first_suspect"], "ExamplePlugin-1.0.jar")
+
+        with open(os.path.join(run_dir, "report.txt"), "r", encoding="utf-8") as fh:
+            report_text = fh.read()
+        self.assertIn("non-causal", report_text)
+        self.assertIn("truncated", report_text.lower())
+
+        # Unowned / non-existent PID in --pid-file fails closed before starting Swarm
+        stale_pid_file = os.path.join(self.dir, "stale.pid")
+        with open(stale_pid_file, "w", encoding="utf-8") as fh:
+            fh.write("99999999\n")
+        err = io.StringIO()
+        with (
+            unittest.mock.patch.object(bf, "Swarm", side_effect=AssertionError("Swarm must not start on bad PID")),
+            contextlib.redirect_stderr(err),
+        ):
+            rc = bf.main([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--pid-file", stale_pid_file,
+                "--out-dir", self.out_dir,
+            ])
+        self.assertEqual(rc, 2)
+        self.assertIn("99999999", err.getvalue())
+
+        # Failed discover fails closed without writing a false verdict.json and always closes owned Swarm
+        failed_swarms: list[Any] = []
+
+        class FailingSwarm:
+            def __init__(self, argv, log_path):
+                self.started = False
+                self.closed = False
+                failed_swarms.append(self)
+
+            def start(self):
+                self.started = True
+
+            def close(self):
+                self.closed = True
+
+            def discover(self, did, tier="default", bot=None, max_ms=15000, timeout_s=None):
+                raise bf.SwarmError("discover timed out before declare_commands")
+
+        fail_out = os.path.join(self.out_dir, "fail-discover")
+        err2 = io.StringIO()
+        with (
+            unittest.mock.patch.object(bf, "Swarm", side_effect=FailingSwarm),
+            contextlib.redirect_stderr(err2),
+        ):
+            rc2 = bf.main([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--out-dir", fail_out,
+            ])
+        self.assertEqual(rc2, 2)
+        self.assertIn("discover timed out", err2.getvalue())
+        self.assertEqual(len(failed_swarms), 1)
+        self.assertTrue(failed_swarms[0].started)
+        self.assertTrue(failed_swarms[0].closed)
+
+        # Injected observer with container set or check_local_pid=False is rejected before discovery
+        container_obs = bfs.JcmdObserver(container="mc-container", runner=fake_runner)
+        with self.assertRaisesRegex(bfs.JcmdError, "container JcmdObserver.*not permitted"):
+            bfs.ServerRun(
+                args,
+                os.path.join(self.out_dir, "audit-container-obs"),
+                swarm=TruncatedSwarm(),
+                observer=container_obs,
+            ).run()
+
+        unchecked_obs = bfs.JcmdObserver(pid=os.getpid(), check_local_pid=False, runner=fake_runner)
+        with self.assertRaisesRegex(bfs.JcmdError, "check_local_pid=False is not permitted"):
+            bfs.ServerRun(
+                args,
+                os.path.join(self.out_dir, "audit-unchecked-obs"),
+                swarm=TruncatedSwarm(),
+                observer=unchecked_obs,
+            ).run()
+
+        # Unknown cwd (e.g. non-Linux without /proc) and unreadable/non-matching cmdline fails closed before discovery
+        unverified_obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            runner=fake_runner,
+            pid_cwd=lambda p: None,
+            pid_cmdline=lambda p: None,
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "cannot be positively verified"):
+            bfs.ServerRun(
+                args,
+                os.path.join(self.out_dir, "audit-unverified-pid"),
+                swarm=TruncatedSwarm(),
+                observer=unverified_obs,
+            ).run()
+
+        # Windows / non-POSIX host never calls os.kill(pid, 0) (which sends CTRL_C_EVENT on Windows) and fails closed
+        win_obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            runner=fake_runner,
+            pid_cwd=lambda p: os.path.realpath(self.dir),
+        )
+        with (
+            unittest.mock.patch.object(bfs.os, "name", "nt"),
+            unittest.mock.patch.object(bfs.os, "kill", side_effect=AssertionError("os.kill must never run on Windows")),
+        ):
+            with self.assertRaisesRegex(bfs.JcmdError, "unsupported on non-POSIX host"):
+                bfs.ServerRun(
+                    args,
+                    os.path.join(self.out_dir, "audit-win-pid"),
+                    swarm=TruncatedSwarm(),
+                    observer=win_obs,
+                ).run()
+
+    def test_tick_gap_timestamp_exclusion_with_actual_swarm_event_shape(self):
+        # Verify JcmdObserver exclusion windows and filter_tick_gaps / summarize_tick_gaps / StallOracle
+        # using the exact event payload emitted by bench-swarm.js:
+        #   {ev: 'tick_gap', bot, ms, at, keepalive_ms, id, t}
+        pid_file = os.path.join(self.dir, "server.pid")
+        with open(pid_file, "w", encoding="utf-8") as fh:
+            fh.write(f"{os.getpid()}\n")
+
+        histo_out = (
+            " num     #instances         #bytes  class name (module)\n"
+            "-------------------------------------------------------\n"
+            "   1:           120          19200  com.example.plugin.SessionCache\n"
+            "Total           120          19200\n"
+        )
+        tdump_out = (
+            "2026-10-24 03:00:00\n"
+            "Full thread dump OpenJDK 64-Bit Server VM:\n\n"
+            '"Server thread" #25 prio=5 os_prio=0 tid=0x01 nid=0x02 runnable\n'
+            "   java.lang.Thread.State: RUNNABLE\n"
+            "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n"
+        )
+        # GC.class_histogram runs across [50000, 50600] (+200ms grace -> [50000, 50800]);
+        # Thread.print runs across [55000, 55100] (+200ms grace -> [55000, 55300]).
+        clock_ticks = [50000, 50600, 55000, 55100]
+
+        def fake_runner(cmd, timeout_s):
+            if cmd[-1] == "GC.class_histogram":
+                return subprocess.CompletedProcess(cmd, 0, stdout=histo_out, stderr="")
+            if cmd[-1] == "Thread.print":
+                return subprocess.CompletedProcess(cmd, 0, stdout=tdump_out, stderr="")
+            raise AssertionError(f"unexpected jcmd call: {cmd}")
+
+        obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            post_grace_ms=200,
+            clock_ms=lambda: clock_ticks.pop(0) if clock_ticks else 60000,
+            runner=fake_runner,
+            pid_cwd=lambda p: os.path.realpath(self.dir) if p == os.getpid() else None,
+        )
+        obs.class_histogram()
+        obs.thread_print()
+        serialized_windows = [w.to_dict() for w in obs.exclusion_windows]
+        self.assertEqual(
+            serialized_windows,
+            [
+                {"start_ms": 50000, "end_ms": 50800, "kind": "GC.class_histogram"},
+                {"start_ms": 55000, "end_ms": 55300, "kind": "Thread.print"},
+            ],
+        )
+
+        # Actual bench-swarm.js tick_gap events include `id` and episode-relative `t` alongside epoch `at`.
+        raw_tick_gaps = [
+            # 1. Strictly before GC window: [48000, 49000] -> kept
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1000, "at": 49000, "keepalive_ms": None, "id": "ep-1", "t": 1000},
+            # 2. Overlaps GC window interior: [49000, 52200] overlaps [50000, 50800] -> excluded (observer_window)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 3200, "at": 52200, "keepalive_ms": 1010, "id": "ep-1", "t": 4200},
+            # 3. Touches GC window upper boundary: [50800, 51800] touches 50800 -> excluded (observer_window)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1000, "at": 51800, "keepalive_ms": 1000, "id": "ep-1", "t": 5200},
+            # 4. Strictly between GC and Thread.print windows: [52000, 53000] -> kept
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1000, "at": 53000, "keepalive_ms": 995, "id": "ep-1", "t": 6400},
+            # 5. Touches Thread.print lower boundary: [52500, 55000] touches 55000 -> excluded (observer_window)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 2500, "at": 55000, "keepalive_ms": 1005, "id": "ep-1", "t": 8400},
+            # 6. Episode-relative `t` only (missing `at`): must NOT treat `t` as epoch timestamp -> excluded (unverifiable_timestamp)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 3400, "keepalive_ms": 1000, "id": "ep-1", "t": 53500},
+            # 7. Strictly after Thread.print window: [56000, 57010] -> kept
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1010, "at": 57010, "keepalive_ms": 1020, "id": "ep-1", "t": 10410},
+        ]
+
+        kept, excluded = bfs.filter_tick_gaps(raw_tick_gaps, serialized_windows)
+        self.assertEqual([g["at"] for g in kept], [49000, 53000, 57010])
+        self.assertEqual(
+            [(g.get("at"), g.get("excluded_reason")) for g in excluded],
+            [
+                (52200, "observer_window"),
+                (51800, "observer_window"),
+                (55000, "observer_window"),
+                (None, "unverifiable_timestamp"),
+            ],
+        )
+
+        summary = bfs.summarize_tick_gaps(raw_tick_gaps, serialized_windows)
+        self.assertEqual(summary["count"], 3)
+        self.assertEqual(summary["excluded_count"], 4)
+        self.assertEqual(summary["unverifiable_count"], 1)
+        self.assertEqual(summary["max_ms"], 1010.0)
+        self.assertEqual(summary["max_keepalive_ms"], 1020.0)
+
+        baseline_gaps = [{"ms": 1000.0, "at": 1000 * i} for i in range(1, 25)]
+        oracle = bfs.StallOracle(baseline_gaps=baseline_gaps, stall_ms=2000.0, observer=obs)
+        eval_res = oracle.evaluate_episode(raw_tick_gaps, follow_up="quit_lt1s")
+        self.assertFalse(eval_res["stalled"])
+        self.assertEqual(eval_res["summary"]["count"], 3)
+        self.assertEqual(eval_res["summary"]["excluded_count"], 4)
+
+    @unittest.skipUnless(NODE and MINEFLAYER, "node or devstack/clients/node_modules missing")
+    def test_passive_audit_cli_against_local_fake_protocol_server_and_failure_cleanup(self):
+        events_log = os.path.join(self.out_dir, "protocol_events.jsonl")
+        drop_flag = os.path.join(self.out_dir, "drop_without_commands.flag")
+        server_js = r"""
+const fs = require('fs');
+const path = require('path');
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const mc = require(path.join(nm, 'minecraft-protocol'));
+const mcData = require(path.join(nm, 'minecraft-data'))('1.20.1');
+const eventsLog = process.argv[2];
+const dropFlag = process.argv[3];
+
+function recordEvent(obj) {
+  fs.appendFileSync(eventsLog, JSON.stringify(obj) + '\n');
+}
+
+const srv = mc.createServer({ 'online-mode': false, host: '127.0.0.1', port: 0, version: '1.20.1' });
+srv.on('login', (client) => {
+  recordEvent({ ev: 'login', username: client.username });
+  client.on('packet', (data, meta) => {
+    recordEvent({ ev: 'packet', packet: meta.name, username: client.username });
+  });
+  client.write('login', {
+    ...mcData.loginPacket,
+    entityId: 1,
+    isHardcore: false,
+    gameMode: 0,
+    previousGameMode: -1,
+    hashedSeed: [0, 0],
+    maxPlayers: 20,
+    viewDistance: 2,
+    simulationDistance: 2,
+    reducedDebugInfo: false,
+    enableRespawnScreen: true,
+    isDebug: false,
+    isFlat: true
+  });
+  if (fs.existsSync(dropFlag)) {
+    setTimeout(() => { try { client.end('dropped before declare_commands'); } catch (e) {} }, 40);
+    return;
+  }
+  client.write('declare_commands', {
+    rootIndex: 0,
+    nodes: [
+      {
+        flags: { command_node_type: 0, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [1, 3, 4, 5, 6, 8, 11]
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [2],
+        extraNodeData: { name: 'rtp' }
+      },
+      {
+        flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 1 },
+        children: [],
+        extraNodeData: {
+          name: 'radius',
+          parser: 'brigadier:integer',
+          properties: { flags: { min_present: 1, max_present: 1 }, min: 1, max: 256 },
+          suggestionType: 'minecraft:ask_server'
+        }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+        children: [],
+        redirectNode: 1,
+        extraNodeData: { name: 'betterrtp:rtp' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'stop' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+        children: [],
+        redirectNode: 4,
+        extraNodeData: { name: 'minecraft:stop' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [7],
+        extraNodeData: { name: 'kill' }
+      },
+      {
+        flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: {
+          name: 'target',
+          parser: 'minecraft:entity',
+          properties: { unused: 0, onlyAllowPlayers: 0, onlyAllowEntities: 0 }
+        }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [9, 10],
+        extraNodeData: { name: 'tick' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'query' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'freeze' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'customdanger' }
+      }
+    ]
+  });
+  client.write('position', { x: 0, y: 64, z: 0, yaw: 0, pitch: 0, flags: 0, teleportId: 1 });
+  client.write('update_time', { age: [0, 100], time: [0, 100] });
+});
+srv.on('listening', () => {
+  console.log(JSON.stringify({ port: srv.socketServer.address().port }));
+});
+"""
+        t0 = time.monotonic()
+        srv_proc = subprocess.Popen(
+            [NODE, "-e", server_js, bf.SWARM_JS, events_log, drop_flag],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            line = srv_proc.stdout.readline()
+            self.assertTrue(line, "fake protocol server did not report listening port")
+            port = int(json.loads(line)["port"])
+            with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+                fh.write(f"server-port={port}\nrcon.port=25575\nrcon.password=secret\nonline-mode=false\n")
+
+            spawned_swarms: list[Any] = []
+            real_swarm_cls = bf.Swarm
+
+            class TrackingSwarm(real_swarm_cls):
+                def __init__(self, *a, **kw):
+                    super().__init__(*a, **kw)
+                    self.started_proc = None
+                    spawned_swarms.append(self)
+
+                def start(self):
+                    super().start()
+                    self.started_proc = self.proc
+
+            def guarded() -> contextlib.ExitStack:
+                stack = contextlib.ExitStack()
+                stack.enter_context(unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("RCON must not be touched")))
+                stack.enter_context(unittest.mock.patch.object(bf, "PermissionGrant", side_effect=AssertionError("LP must not be touched")))
+                stack.enter_context(unittest.mock.patch.object(bf.bo, "rcon", side_effect=AssertionError("rcon must not be called")))
+                stack.enter_context(unittest.mock.patch.object(bf, "Swarm", side_effect=TrackingSwarm))
+                return stack
+
+            live_out = os.path.join(self.out_dir, "live-passive")
+            with guarded():
+                rc = bf.main([
+                    "--mode", "server",
+                    "--server-dir", self.dir,
+                    "--profile", "paper",
+                    "--tiers", "default",
+                    "--deny", "customdanger",
+                    "--mc-port", str(port),
+                    "--mc-version", "1.20.1",
+                    "--join-delay-ms", "0",
+                    "--episode-max-s", "4",
+                    "--out-dir", live_out,
+                ])
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(len(spawned_swarms), 1)
+            self.assertIsNotNone(spawned_swarms[0].started_proc)
+            self.assertIsNone(spawned_swarms[0].proc)
+            self.assertIsNotNone(
+                spawned_swarms[0].started_proc.poll(), "bench-swarm.js child process must terminate cleanly"
+            )
+
+            cursor = self._assert_passive_session(events_log, 0, "discover run")
+
+            # Verify no jars were renamed or modified
+            self.assertEqual(sorted(os.listdir(self.plugins_dir)), ["ExamplePlugin-1.0.jar", "ViaVersion-5.0.0.jar"])
+
+            runs_root = os.path.join(live_out, "runs")
+            run_dirs = [os.path.join(runs_root, d) for d in os.listdir(runs_root)]
+            self.assertEqual(len(run_dirs), 1)
+            run_dir = run_dirs[0]
+
+            tree = bfs.CommandTree.read_json(os.path.join(run_dir, "commands.json"))
+            self.assertEqual(tree.tiers, ["default"])
+            self.assertFalse(tree.truncated)
+            self.assertEqual(tree.nodes["rtp"].aliases, ["rtp", "betterrtp:rtp"])
+            self.assertFalse(tree.nodes["rtp"].denied)
+            self.assertEqual(tree.nodes["rtp <radius>"].parser, "brigadier:integer")
+            self.assertEqual(tree.nodes["rtp <radius>"].properties["min"], 1)
+            self.assertEqual(tree.nodes["rtp <radius>"].properties["max"], 256)
+            self.assertFalse(tree.nodes["rtp <radius>"].denied)
+            self.assertFalse(tree.nodes["kill"].denied)
+            self.assertTrue(tree.nodes["kill <target>"].denied)
+            self.assertEqual(tree.nodes["kill <target>"].denied_by, "kill <entity>")
+            self.assertFalse(tree.nodes["tick query"].denied)
+            self.assertTrue(tree.nodes["tick freeze"].denied)
+            self.assertEqual(tree.nodes["tick freeze"].denied_by, "tick freeze")
+            self.assertTrue(tree.nodes["stop"].denied)
+            self.assertEqual(tree.nodes["stop"].denied_by, "stop")
+            self.assertIn("minecraft:stop", tree.nodes["stop"].aliases)
+            self.assertTrue(tree.nodes["customdanger"].denied)
+            self.assertEqual(tree.nodes["customdanger"].denied_by, "customdanger")
+            self.assertEqual(
+                sorted(n.node_id for n in tree.allowed_executable_nodes(["default"])),
+                ["kill", "rtp", "rtp <radius>", "tick query"],
+            )
+
+            with open(os.path.join(run_dir, "verdict.json"), "r", encoding="utf-8") as fh:
+                verdict = json.load(fh)
+            self.assertEqual(verdict["status"], "passive_only")
+            self.assertEqual(verdict["verdict"], "PASSIVE_ONLY")
+            self.assertFalse(verdict["baseline"]["available"])
+            self.assertEqual(verdict["confirmed_culprits"], [])
+            self.assertEqual(verdict["blamed_jars"], [])
+            self.assertEqual(verdict["findings"], [])
+            self.assertNotIn("replay_cmd", json.dumps(verdict))
+            self.assertNotIn("operator_mitigation", json.dumps(verdict))
+            self.assertNotIn("author_reproducer", json.dumps(verdict))
+
+            with open(os.path.join(run_dir, "report.txt"), "r", encoding="utf-8") as fh:
+                report_text = fh.read()
+            self.assertIn("status: passive_only", report_text)
+            self.assertIn("confirmed_culprits: none (0)", report_text)
+            self.assertNotIn("--replay", report_text)
+
+            # Failure cleanup 1: protocol server drops connection before declare_commands -> Swarm closed, no verdict
+            with open(drop_flag, "w", encoding="utf-8") as fh:
+                fh.write("drop\n")
+            drop_out = os.path.join(self.out_dir, "drop-passive")
+            err_drop = io.StringIO()
+            with guarded(), contextlib.redirect_stderr(err_drop):
+                rc_drop = bf.main([
+                    "--mode", "server",
+                    "--server-dir", self.dir,
+                    "--profile", "paper",
+                    "--tiers", "default",
+                    "--mc-port", str(port),
+                    "--mc-version", "1.20.1",
+                    "--join-delay-ms", "0",
+                    "--episode-max-s", "2",
+                    "--out-dir", drop_out,
+                ])
+            self.assertEqual(rc_drop, 2)
+            self.assertIn("failed to capture command graph", err_drop.getvalue())
+            cursor = self._assert_passive_session(events_log, cursor, "drop run")
+            self.assertEqual(len(spawned_swarms), 2)
+            self.assertIsNotNone(spawned_swarms[1].started_proc)
+            self.assertIsNone(spawned_swarms[1].proc)
+            self.assertIsNotNone(
+                spawned_swarms[1].started_proc.poll(), "bench-swarm.js must be cleaned up on discover failure"
+            )
+            for root_dir, _, files in os.walk(drop_out):
+                self.assertNotIn("verdict.json", files)
+                self.assertNotIn("report.txt", files)
+
+            # Failure cleanup 2: discover succeeds against protocol server, then post-discovery jcmd fails ->
+            # Swarm closed, no verdict.json or report.txt written
+            os.remove(drop_flag)
+            pid_file = os.path.join(self.dir, "server.pid")
+            with open(pid_file, "w", encoding="utf-8") as fh:
+                fh.write(f"{os.getpid()}\n")
+            jcmd_fail_dir = os.path.join(self.out_dir, "jcmd-fail-passive")
+            failing_obs = bfs.JcmdObserver(
+                pid_file=pid_file,
+                server_dir=self.dir,
+                pid_cwd=lambda p: os.path.realpath(self.dir) if p == os.getpid() else None,
+                runner=lambda cmd, t: subprocess.CompletedProcess(
+                    cmd, 1, stdout="", stderr="AttachNotSupportedException: target JVM refused attach"
+                ),
+            )
+            args_jcmd_fail = bf.build_parser().parse_args([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--tiers", "default",
+                "--mc-port", str(port),
+                "--mc-version", "1.20.1",
+                "--join-delay-ms", "0",
+                "--episode-max-s", "4",
+                "--pid-file", pid_file,
+                "--out-dir", jcmd_fail_dir,
+            ])
+            with guarded():
+                with self.assertRaisesRegex(bfs.JcmdError, "AttachNotSupportedException"):
+                    bfs.ServerRun(args_jcmd_fail, jcmd_fail_dir, observer=failing_obs).run()
+            self.assertTrue(
+                os.path.exists(os.path.join(jcmd_fail_dir, "commands.json")),
+                "discovery must write commands.json before the jcmd attach fails",
+            )
+            cursor = self._assert_passive_session(events_log, cursor, "jcmd-fail run")
+            self.assertEqual(len(spawned_swarms), 3)
+            self.assertIsNotNone(spawned_swarms[2].started_proc)
+            self.assertIsNone(spawned_swarms[2].proc)
+            self.assertIsNotNone(
+                spawned_swarms[2].started_proc.poll(), "bench-swarm.js must be closed before jcmd failure exits"
+            )
+            self.assertFalse(os.path.exists(os.path.join(jcmd_fail_dir, "verdict.json")))
+            self.assertFalse(os.path.exists(os.path.join(jcmd_fail_dir, "report.txt")))
+
+            # Positive control: a raw client sending active 1.20.1 chat packets must be recorded and flagged.
+            probe_js = r"""
+const path = require('path');
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const mc = require(path.join(nm, 'minecraft-protocol'));
+const client = mc.createClient({ host: '127.0.0.1', port: Number(process.argv[2]), username: 'probe_active', version: '1.20.1', 'online-mode': false });
+client.on('error', () => process.exit(1));
+client.on('login', () => {
+  client.write('chat_message', { message: 'probe', timestamp: 0n, salt: 0n, signature: undefined, offset: 0, acknowledged: Buffer.alloc(3) });
+  client.write('chat_command', { command: 'rtp', timestamp: 0n, salt: 0n, argumentSignatures: [], messageCount: 0, acknowledged: Buffer.alloc(3) });
+  setTimeout(() => { client.end(); process.exit(0); }, 300);
+});
+setTimeout(() => process.exit(1), 15000);
+"""
+            probe = subprocess.run(
+                [NODE, "-e", probe_js, bf.SWARM_JS, str(port)],
+                capture_output=True, text=True, timeout=20,
+            )
+            self.assertEqual(probe.returncode, 0, probe.stderr)
+            probe_events = self._read_protocol_events(events_log)[cursor:]
+            probe_packets = {e["packet"] for e in probe_events if e["ev"] == "packet"}
+            self.assertIn("chat_message", probe_packets)
+            self.assertIn("chat_command", probe_packets)
+            self.assertTrue(probe_packets - self.PASSIVE_SERVERBOUND, "allowlist must flag active packets")
+            with self.assertRaises(AssertionError):
+                self._assert_passive_session(events_log, cursor, "active control probe session")
+            self.assertLess(time.monotonic() - t0, 20.0)
+        finally:
+            srv_proc.terminate()
+            try:
+                srv_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                srv_proc.kill()
+            if srv_proc.stdout:
+                srv_proc.stdout.close()
+            if srv_proc.stderr:
+                srv_proc.stderr.close()
 
 
 if __name__ == "__main__":

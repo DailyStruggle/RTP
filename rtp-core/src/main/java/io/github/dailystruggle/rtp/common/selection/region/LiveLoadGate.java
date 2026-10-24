@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
@@ -69,7 +71,7 @@ public final class LiveLoadGate {
     }
 
     /** Drops all gates. For tests only. */
-    static void resetAll() {
+    public static void resetAll() {
         REGISTRY.clear();
     }
 
@@ -97,11 +99,24 @@ public final class LiveLoadGate {
     }
 
     /**
-     * Claims a pin slot when {@code keptSize + pinsInFlight < keptCap}. The caller must
+     * Resolves the effective pin-slot ceiling for this region from {@link ComputeBudget#hotCap(String, int)}
+     * when {@code autoTune} is active, falling back to {@code configuredCap} (ADR-087 Section 4.3 item 6 & 7.3, ADR-110).
+     */
+    public int effectiveHotCap(int configuredCap) {
+        ComputeBudget budget = ComputeGovernor.currentBudget();
+        if (budget != null && budget.isActuating()) {
+            return budget.hotCap(region, configuredCap);
+        }
+        return Math.max(0, configuredCap);
+    }
+
+    /**
+     * Claims a pin slot when {@code keptSize + pinsInFlight < effectiveHotCap(keptCap)}. The caller must
      * {@link #releasePin()} exactly once when its attempt ends (handed off or rejected).
      */
     public boolean tryAcquirePin(Supplier<Integer> keptSize, int keptCap) {
-        if (keptCap <= 0) return false;
+        int effectiveCap = effectiveHotCap(keptCap);
+        if (effectiveCap <= 0) return false;
         while (true) {
             int cur = pinsInFlight.get();
             int kept;
@@ -111,7 +126,7 @@ public final class LiveLoadGate {
             } catch (Throwable t) {
                 return false;
             }
-            if (kept + cur >= keptCap) return false;
+            if (kept + cur >= effectiveCap) return false;
             if (pinsInFlight.compareAndSet(cur, cur + 1)) return true;
         }
     }
@@ -203,6 +218,6 @@ public final class LiveLoadGate {
     }
 
     private void logSummary(String tag) {
-        RTP.log(Level.INFO, summaryLine(tag));
+        RTPRuntime.log(Level.INFO, summaryLine(tag));
     }
 }

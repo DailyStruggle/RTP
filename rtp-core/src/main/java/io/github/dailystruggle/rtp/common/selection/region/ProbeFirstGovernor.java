@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
-
+import io.github.dailystruggle.rtp.common.predict.ComparativeCostGovernor;
+import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
+import io.github.dailystruggle.rtp.common.predict.EwmaLinearFit;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -9,7 +11,6 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
@@ -106,116 +107,36 @@ public final class ProbeFirstGovernor {
         REGISTRY.clear();
     }
 
-    /** EWMA mean/variance; the first samples use 1/n so early estimates are unbiased. */
-    static final class Ewma {
-        long n;
-        double mean = Double.NaN;
-        double variance;
-
-        void add(double x) {
-            n++;
-            if (n == 1) {
-                mean = x;
-                variance = 0.0;
-                return;
-            }
-            double a = Math.max(1.0 / n, ALPHA);
-            double d = x - mean;
-            double inc = a * d;
-            mean += inc;
-            variance = (1.0 - a) * (variance + d * inc);
-        }
-
-        double neff() {
-            return Math.min(n, WINDOW);
-        }
-    }
-
-    /** EWMA least-squares fit of per-chunk probe cost {@code y} on {@code x = 1/g}: {@code y = perChunk + open * x}. */
-    static final class Fit {
-        long n;
-        double mx = Double.NaN;
-        double my = Double.NaN;
-        double vxx;
-        double vyy;
-        double cxy;
-
-        void add(double x, double y) {
-            n++;
-            if (n == 1) {
-                mx = x;
-                my = y;
-                vxx = vyy = cxy = 0.0;
-                return;
-            }
-            double a = Math.max(1.0 / n, ALPHA);
-            double dx = x - mx;
-            double dy = y - my;
-            mx += a * dx;
-            my += a * dy;
-            vxx = (1.0 - a) * (vxx + a * dx * dx);
-            vyy = (1.0 - a) * (vyy + a * dy * dy);
-            cxy = (1.0 - a) * (cxy + a * dx * dy);
-        }
-
-        /** Open term is identifiable only once group sizes vary. */
-        boolean identified() {
-            return n >= MIN_SAMPLES && vxx > MIN_X_VAR;
-        }
-
-        /** Open cost per {@code 1/g}; never negative (an open cannot save time). */
-        double slope() {
-            return identified() ? Math.max(0.0, cxy / vxx) : 0.0;
-        }
-
-        double at(double x) {
-            return Math.max(0.0, my + slope() * (x - mx));
-        }
-
-        /** Squared standard error of {@link #at}: residual variance, widened by extrapolation distance. */
-        double se2At(double x) {
-            double neff = Math.min(n, WINDOW);
-            if (!identified()) return vyy / neff;
-            double b = slope();
-            double resid = Math.max(0.0, vyy - 2.0 * b * cxy + b * b * vxx);
-            double dx = x - mx;
-            return resid / neff * (1.0 + dx * dx / vxx);
-        }
-    }
-
     /** Immutable decision state exposed to selection threads without synchronization. */
     record DecisionState(Mode mode, double z, double exploreShare) {
         static final DecisionState INITIAL = new DecisionState(Mode.PROBE, Double.NaN, MAX_EXPLORE);
-    }
-
-    /** Immutable trial state for SKIP-mode trial probe bursts within one region file bin. */
-    record TrialState(double credit, long bin, int left, long until) {
-        static final TrialState INITIAL = new TrialState(0.0, NO_BIN, 0, 0);
     }
 
     private final String region;
     private final Path path;
     private final LongSupplier clock;
     private final ReentrantLock updateLock = new ReentrantLock();
-    private final Ewma probe = new Ewma();
-    private final Fit probeFit = new Fit();
+    private final EwmaEstimator probe = EwmaEstimator.ofWindow(WINDOW);
+    private final EwmaLinearFit probeFit = EwmaLinearFit.ofCoalescedCost(WINDOW, MIN_SAMPLES, MIN_X_VAR);
     /** {@code 1/g} of probes recorded while probing is the default; frozen in SKIP. */
-    private final Ewma defaultInvG = new Ewma();
-    private final Ewma reject = new Ewma();
-    private final Ewma loadAfterProbe = new Ewma();
-    private final Ewma loadDirect = new Ewma();
+    private final EwmaEstimator defaultInvG = EwmaEstimator.ofWindow(WINDOW);
+    private final EwmaEstimator reject = EwmaEstimator.ofWindow(WINDOW);
+    private final EwmaEstimator loadAfterProbe = EwmaEstimator.ofWindow(WINDOW);
+    private final EwmaEstimator loadDirect = EwmaEstimator.ofWindow(WINDOW);
+    private final ComparativeCostGovernor<Mode> comparativeGovernor =
+            ComparativeCostGovernor.ofVarianceHysteresis(new ComparativeCostGovernor.HysteresisConfig<>(
+                    Mode.PROBE, Mode.SKIP, Z_SWITCH, SUSTAIN, WINDOW, MIN_EXPLORE, MAX_EXPLORE));
+    private final ComparativeCostGovernor.CoalescedTrialAccrual trialAccrual =
+            new ComparativeCostGovernor.CoalescedTrialAccrual(NO_BIN, TRIAL_RUN, TRIAL_WINDOW);
     private final AtomicLong skipCount = new AtomicLong();
     private final AtomicLong skipMeanBits = new AtomicLong(Double.doubleToRawLongBits(Double.NaN));
     private final AtomicLong decisions = new AtomicLong();
     private final AtomicLong probeSamples = new AtomicLong();
     private final AtomicLong directSamples = new AtomicLong();
-    private final AtomicReference<TrialState> trialState = new AtomicReference<>(TrialState.INITIAL);
     private volatile DecisionState decisionState = DecisionState.INITIAL;
     private Mode mode = Mode.PROBE;
     private long flips;
     private long lastSummary;
-    private long sinceFlip;
-    private int beyond;
     private double costProbe = Double.NaN;
     private double costDirect = Double.NaN;
     private double z = Double.NaN;
@@ -240,16 +161,16 @@ public final class ProbeFirstGovernor {
             return true;
         }
         if (directSamples.get() < MIN_SAMPLES) {
-            boolean skipNow = every(d, MAX_EXPLORE);
+            boolean skipNow = ComparativeCostGovernor.shouldExploreDeterministic(d, MAX_EXPLORE);
             recordSkip(skipNow);
             return !skipNow;
         }
         DecisionState state = this.decisionState;
         boolean skipNow;
         if (state.mode() == Mode.PROBE) {
-            skipNow = every(d, state.exploreShare());
+            skipNow = ComparativeCostGovernor.shouldExploreDeterministic(d, state.exploreShare());
         } else {
-            skipNow = !trialProbe(bin, state.exploreShare(), d);
+            skipNow = !trialAccrual.shouldTrial(bin, state.exploreShare(), d);
         }
         recordSkip(skipNow);
         return !skipNow;
@@ -275,43 +196,6 @@ public final class ProbeFirstGovernor {
         return Double.longBitsToDouble(skipMeanBits.get());
     }
 
-    /**
-     * SKIP-mode trial. The explore share accrues as credit; a trial spends one credit per probe on
-     * up to {@link #TRIAL_RUN} candidates of one bin within {@link #TRIAL_WINDOW} decisions, so trial
-     * probes can share a drain as default probes would while the long-run probe share stays the same.
-     */
-    private boolean trialProbe(long bin, double share, long currentDecisions) {
-        while (true) {
-            TrialState cur = trialState.get();
-            double credit = Math.min(cur.credit() + share, 1.0);
-            int left = cur.left();
-            long trialBin = cur.bin();
-            long until = cur.until();
-
-            if (left > 0 && currentDecisions > until) {
-                left = 0;
-            }
-            boolean probeNow;
-            if (left > 0 && bin != NO_BIN && bin == trialBin) {
-                left--;
-                credit -= 1.0;
-                probeNow = true;
-            } else if (credit >= 1.0) {
-                credit -= 1.0;
-                trialBin = bin;
-                left = (bin == NO_BIN) ? 0 : TRIAL_RUN - 1;
-                until = currentDecisions + TRIAL_WINDOW;
-                probeNow = true;
-            } else {
-                probeNow = false;
-            }
-            TrialState next = new TrialState(credit, trialBin, left, until);
-            if (trialState.compareAndSet(cur, next)) {
-                return probeNow;
-            }
-        }
-    }
-
     /** One finished, uncoalesced probe: wall time from dispatch to verdict, and whether it rejected. */
     public void recordProbe(long nanos, boolean rejected) {
         recordProbe(nanos, 1, rejected);
@@ -327,16 +211,16 @@ public final class ProbeFirstGovernor {
         String log;
         updateLock.lock();
         try {
-            probe.add(nanos);
-            probeSamples.set(probe.n);
-            probeFit.add(invG, nanos);
-            if (decisionState.mode() == Mode.PROBE) defaultInvG.add(invG);
-            reject.add(rejected ? 1.0 : 0.0);
+            probe.recordSample(nanos);
+            probeSamples.set(probe.sampleCount());
+            probeFit.record(invG, nanos);
+            if (decisionState.mode() == Mode.PROBE) defaultInvG.recordSample(invG);
+            reject.recordSample(rejected ? 1.0 : 0.0);
             log = evaluate();
         } finally {
             updateLock.unlock();
         }
-        if (log != null) RTP.log(Level.INFO, log);
+        if (log != null) RTPRuntime.log(Level.INFO, log);
     }
 
     /** One finished full load: wall time from request to chunk; {@code afterProbe} = a probe ran first. */
@@ -345,15 +229,15 @@ public final class ProbeFirstGovernor {
         String log;
         updateLock.lock();
         try {
-            (afterProbe ? loadAfterProbe : loadDirect).add(nanos);
+            (afterProbe ? loadAfterProbe : loadDirect).recordSample(nanos);
             if (!afterProbe) {
-                directSamples.set(loadDirect.n);
+                directSamples.set(loadDirect.sampleCount());
             }
             log = evaluate();
         } finally {
             updateLock.unlock();
         }
-        if (log != null) RTP.log(Level.INFO, log);
+        if (log != null) RTPRuntime.log(Level.INFO, log);
     }
 
     public Mode mode() {
@@ -365,27 +249,28 @@ public final class ProbeFirstGovernor {
         try {
             DecisionState state = this.decisionState;
             return new ProbeGovernorRow(region, path.label, state.mode().name(), !warm(),
-                    reject.mean, ms(probeAtDefault()), ms(loadAfterProbe.mean), ms(loadDirect.mean),
-                    ms(costProbe), ms(costDirect), state.z(), skipMean(), flips, probe.n, loadDirect.n);
+                    reject.mean(), ms(probeAtDefault()), ms(loadAfterProbe.mean()), ms(loadDirect.mean()),
+                    ms(costProbe), ms(costDirect), state.z(), skipMean(), flips,
+                    probe.sampleCount(), loadDirect.sampleCount());
         } finally {
             updateLock.unlock();
         }
     }
 
     private boolean warm() {
-        return probe.n >= MIN_SAMPLES && loadDirect.n >= MIN_SAMPLES;
+        return probe.sampleCount() >= MIN_SAMPLES && loadDirect.sampleCount() >= MIN_SAMPLES;
     }
 
     /** {@code 1/g} at which the probe arm is judged: the default-probing group size once seen. */
     private double invGAtDefault() {
-        return (defaultInvG.n > 0) ? defaultInvG.mean : probeFit.mx;
+        return (defaultInvG.sampleCount() > 0) ? defaultInvG.mean() : probeFit.meanX();
     }
 
     /** Fitted per-chunk probe cost at the default-probing group size. */
     double probeAtDefault() {
         updateLock.lock();
         try {
-            return (probeFit.n == 0) ? Double.NaN : probeFit.at(invGAtDefault());
+            return (probeFit.sampleCount() == 0) ? Double.NaN : probeFit.predict(invGAtDefault());
         } finally {
             updateLock.unlock();
         }
@@ -404,55 +289,34 @@ public final class ProbeFirstGovernor {
 
     /** Losing-arm share: ~1/(1+|z|), within [MIN_EXPLORE, MAX_EXPLORE]. */
     static double computeExploreShare(double zScore) {
-        double az = Double.isNaN(zScore) ? 0.0 : Math.abs(zScore);
-        return Math.max(MIN_EXPLORE, Math.min(MAX_EXPLORE, 1.0 / (1.0 + az)));
-    }
-
-    /** Deterministic stride: true on every round(1/share)-th decision. */
-    private static boolean every(long d, double share) {
-        long stride = Math.max(1L, Math.round(1.0 / share));
-        return d % stride == 0L;
+        return ComparativeCostGovernor.computeExploreShare(zScore, MIN_EXPLORE, MAX_EXPLORE);
     }
 
     /** Recompute costs; flip on a significant gap. Returns a log line to emit, or null. */
     private String evaluate() {
         if (!warm()) return summaryIfDue();
-        double p = clamp01(reject.mean);
+        double p = clamp01(reject.mean());
         // Rare after-probe loads (p near 1) give a noisy mean; borrow the direct arm until sampled.
-        Ewma tf = (loadAfterProbe.n >= 8) ? loadAfterProbe : loadDirect;
+        EwmaEstimator tf = (loadAfterProbe.sampleCount() >= 8) ? loadAfterProbe : loadDirect;
         double x = invGAtDefault();
-        costProbe = probeFit.at(x) + (1.0 - p) * tf.mean;
-        costDirect = loadDirect.mean;
-        double se2 = probeFit.se2At(x)
-                + (1.0 - p) * (1.0 - p) * tf.variance / tf.neff()
-                + tf.mean * tf.mean * p * (1.0 - p) / reject.neff()
-                + loadDirect.variance / loadDirect.neff();
-        double gap = costProbe - costDirect;
-        if (se2 > 0.0) {
-            z = gap / Math.sqrt(se2);
-        } else if (gap > 0.0) {
-            z = Double.POSITIVE_INFINITY;
-        } else if (gap < 0.0) {
-            z = Double.NEGATIVE_INFINITY;
-        } else {
-            z = 0.0;
-        }
-        sinceFlip++;
-        boolean losing = (mode == Mode.PROBE) ? z > Z_SWITCH : z < -Z_SWITCH;
-        beyond = losing ? beyond + 1 : 0;
-        if (beyond >= SUSTAIN && (flips == 0 || sinceFlip >= WINDOW)) {
-            Mode prev = mode;
-            Mode next = (mode == Mode.PROBE) ? Mode.SKIP : Mode.PROBE;
-            mode = next;
-            flips++;
-            sinceFlip = 0;
-            beyond = 0;
-            trialState.set(TrialState.INITIAL);
+        costProbe = probeFit.predict(x) + (1.0 - p) * tf.mean();
+        costDirect = loadDirect.mean();
+        double se2 = probeFit.standardErrorSquaredAt(x)
+                + (1.0 - p) * (1.0 - p) * tf.standardErrorSquared()
+                + tf.mean() * tf.mean() * p * (1.0 - p) / reject.effectiveSampleCount()
+                + loadDirect.standardErrorSquared();
+        ComparativeCostGovernor.VarianceDecision<Mode> decision =
+                comparativeGovernor.evaluateVarianceGated(costProbe, costDirect, se2);
+        z = decision.zScore();
+        mode = decision.mode();
+        flips = decision.flips();
+        this.decisionState = new DecisionState(decision.mode(), decision.zScore(), decision.exploreShare());
+        if (decision.flipped()) {
+            trialAccrual.reset();
             lastSummary = clock.getAsLong();
-            this.decisionState = new DecisionState(next, z, computeExploreShare(z));
-            return "[RTP][probe-gov] " + region + "/" + path.label + " flip " + prev + "->" + next + " " + describe();
+            return "[RTP][probe-gov] " + region + "/" + path.label + " flip "
+                    + decision.previousMode() + "->" + decision.mode() + " " + describe();
         }
-        this.decisionState = new DecisionState(mode, z, computeExploreShare(z));
         return summaryIfDue();
     }
 
@@ -467,9 +331,10 @@ public final class ProbeFirstGovernor {
         return String.format(Locale.ROOT,
                 "mode=%s%s p=%.3f Tp=%.3fms (raw=%.3fms g=%.1f open=%.3fms) Tf|probe=%.3fms Tf|direct=%.3fms"
                         + " cost probe=%.3fms direct=%.3fms z=%.2f skip=%.3f n(probe/direct)=%d/%d flips=%d",
-                mode, warm() ? "" : "(warmup)", reject.mean, ms(probeAtDefault()), ms(probe.mean),
-                groupSizeAtDefault(), ms(probeFit.slope()), ms(loadAfterProbe.mean),
-                ms(loadDirect.mean), ms(costProbe), ms(costDirect), z, skipMean(), probe.n, loadDirect.n, flips);
+                mode, warm() ? "" : "(warmup)", reject.mean(), ms(probeAtDefault()), ms(probe.mean()),
+                groupSizeAtDefault(), ms(probeFit.slope()), ms(loadAfterProbe.mean()),
+                ms(loadDirect.mean()), ms(costProbe), ms(costDirect), z, skipMean(),
+                probe.sampleCount(), loadDirect.sampleCount(), flips);
     }
 
     private static double ms(double nanos) {

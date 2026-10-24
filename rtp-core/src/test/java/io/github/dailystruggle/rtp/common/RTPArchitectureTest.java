@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -73,6 +74,8 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("TestSchedulerCmd")
                     .and().haveSimpleNameNotContaining("TestChunkTicketCmd")
                     .and().haveSimpleNameNotContaining("TestEventsCmd")
+                    // Bounded per-mock await on the async worker that runs the BIT check (ADR-121).
+                    .and().haveSimpleNameNotContaining("TestTeleportCmd")
                     .and().haveSimpleNameNotContaining("NetworkModeBootstrap")
                     .and().haveSimpleNameNotContaining("NetworkStateBinding")
                     .should().callMethodWhere(
@@ -127,7 +130,7 @@ public class RTPArchitectureTest {
                     // (it creates no threads and owns no platform API), but a platform-neutral
                     // delegating decorator that times the RTP-submitted tasks it forwards to the
                     // real platform scheduler. It must live in core because it is installed
-                    // around RTP.scheduler in the core RTP() constructor; the thread-isolation
+                    // around RTPRuntime.scheduler() in the core RTP() constructor; the thread-isolation
                     // intent of this rule is not weakened because all threading still belongs to
                     // the wrapped platform scheduler.
                     .and().doNotHaveFullyQualifiedName(
@@ -236,7 +239,7 @@ public class RTPArchitectureTest {
     /**
      * Rule 8 - Logging Discipline (No printStackTrace).
      *
-     * <p>Stack traces must be routed through {@code RTP.log(Level.WARNING, ...)}
+     * <p>Stack traces must be routed through {@code RTPRuntime.log(Level.WARNING, ...)}
      * and never dumped via {@link Throwable#printStackTrace()}.
      */
     @ArchTest
@@ -253,7 +256,7 @@ public class RTPArchitectureTest {
     /**
      * Rule 9 - Console and Platform Logger Isolation (No System.out / Bukkit.getLogger).
      *
-     * <p>Logging must go through {@code RTP.log()} / {@code RTPServerAccessor.log()}.
+     * <p>Logging must go through {@code RTPRuntime.log()} / {@code RTPServerAccessor.log()}.
      * Direct stdout/stderr console writes and direct {@code Bukkit.getLogger()} calls are prohibited.
      */
     @ArchTest
@@ -322,4 +325,172 @@ public class RTPArchitectureTest {
                     .matching("io.github.dailystruggle.rtp.common.commands.(*)..")
                     .should().beFreeOfCycles()
                     .because("ADR-115 Seam 2: Command feature sub-packages must not have cyclic dependencies.");
+
+    /**
+     * Rule 13 - Configuration Does Not Drive Tasks or Regions (ADR-115, RTP-68).
+     *
+     * <p>{@code configuration} loads parsers only. Task shutdown, teleport cancellation,
+     * tick-budget refresh and region rebuild on reload run in
+     * {@code lifecycle.ConfigReloadCoordinator}, reached through {@code ConfigReloadLifecycle}.
+     */
+    @ArchTest
+    static final ArchRule configuration_must_not_depend_on_tasks_or_regions =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.configuration..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.tasks..",
+                            "io.github.dailystruggle.rtp.common.selection.region",
+                            "io.github.dailystruggle.rtp.common.lifecycle.."
+                    )
+                    .because("ADR-115: configuration is a lower tier than tasks and regions; reload "
+                            + "orchestration belongs to the Tier 4 ConfigReloadCoordinator.");
+
+    /**
+     * Rule 14 - Lifecycle Is Tier 4 (ADR-115).
+     *
+     * <p>Only the composition root ({@code common.RTP}) installs the reload coordinator.
+     */
+    @ArchTest
+    static final ArchRule only_composition_root_depends_on_lifecycle =
+            noClasses()
+                    .that().resideInAPackage(CORE_PACKAGE)
+                    .and().resideOutsideOfPackages(
+                            "io.github.dailystruggle.rtp.common",
+                            "io.github.dailystruggle.rtp.common.lifecycle..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.lifecycle..")
+                    .because("ADR-115 Invariant 2: no lower-tier package depends on Tier 4.");
+
+    /**
+     * Rule 15 - Regions Do Not Create Pipeline Tasks (ADR-115, RTP-68).
+     *
+     * <p>{@code selection.region} starts scans and teleports through the
+     * {@code RegionTaskDispatcher} it owns; the Tier 4 {@code lifecycle.RegionTaskCoordinator}
+     * creates the {@code ScanTask} and {@code TeleportPipelineTask} instances.
+     */
+    @ArchTest
+    static final ArchRule regions_must_not_depend_on_scan_or_teleport_tasks =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.region..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.tasks.scan..",
+                            "io.github.dailystruggle.rtp.common.tasks.teleport.."
+                    )
+                    .because("ADR-115 seam 3: scan and teleport tasks import Region, so Region "
+                            + "dispatches them through RegionTaskDispatcher.");
+
+    /**
+     * Rule 16 - Base Task Types Stay Below Regions (ADR-115, RTP-68).
+     *
+     * <p>{@code common.tasks} holds only the base types regions use ({@code RTPTaskPipe},
+     * {@code CompletionPaced}, {@code RTPRunnable}); tasks that read regions live in
+     * {@code tasks.scan} and {@code tasks.teleport}.
+     */
+    @ArchTest
+    static final ArchRule base_tasks_must_not_depend_on_selection =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.tasks")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection..")
+                    .because("ADR-115 seam 3: selection.region depends on common.tasks, so the "
+                            + "base task package must not depend back on it.");
+
+    /**
+     * Rule 17 - Spatial Memory Stays Below Regions (ADR-115, RTP-67).
+     *
+     * <p>{@code Region} owns its {@code MemoryShape}, so shapes, TTL policy and residency must
+     * not reach back into the classes of {@code selection.region}. Shared value types they need
+     * ({@code FailTypes}, {@code BiomeNames}) live in {@code selection.model}; {@code SubspaceShape}
+     * wraps a {@code Region} and so lives in {@code selection.region}.
+     */
+    @ArchTest
+    static final ArchRule spatial_memory_must_not_depend_on_region_classes =
+            noClasses()
+                    .that().resideInAPackage(
+                            "io.github.dailystruggle.rtp.common.selection.region.selectors.memory..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region")
+                    .because("ADR-115: selection.region depends on spatial memory, so memory "
+                            + "must not depend back on it.");
+
+    /**
+     * Rule 18 - Selection Model Is Tier 1 (ADR-115, RTP-67).
+     *
+     * <p>{@code selection.model} holds value types shared by shapes, regions and diagnostics, and
+     * depends on no other {@code rtp-core} package.
+     */
+    @ArchTest
+    static final ArchRule selection_model_must_not_depend_on_core =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.model..")
+                    .should().dependOnClassesThat(
+                            JavaClass.Predicates.resideInAPackage(CORE_PACKAGE).and(
+                                    JavaClass.Predicates.resideOutsideOfPackage(
+                                            "io.github.dailystruggle.rtp.common.selection.model..")))
+                    .because("ADR-115 Tier 1: shared selection value types have no core dependencies.");
+
+    /**
+     * Rule 19 - Tools Stay Below Regions (ADR-115, RTP-67).
+     *
+     * <p>Regions use the trackers, health gates and diagnostics in {@code tools}. The
+     * {@code MemoryTracker} census reads regions through {@code tools.TicketCensusRegion} views,
+     * and {@code PlaceholderProvider}, which renders region stats, lives in {@code placeholders}.
+     */
+    @ArchTest
+    static final ArchRule tools_must_not_depend_on_region_classes =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.tools..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region")
+                    .because("ADR-115: selection.region depends on tools, so tools must not "
+                            + "depend back on it.");
+
+    /**
+     * Rule 20 - Runtime Holder Is Tier 1 (ADR-115 seam 4).
+     *
+     * <p>{@code common.runtime} holds the platform accessor, scheduler, economy and the bootstrap
+     * log buffer that every core package reads, typed only by {@code rtp-api}. A core dependency
+     * here would close a cycle with each package that logs.
+     */
+    @ArchTest
+    static final ArchRule runtime_holder_must_not_depend_on_core =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.runtime..")
+                    .should().dependOnClassesThat(
+                            JavaClass.Predicates.resideInAPackage(CORE_PACKAGE).and(
+                                    JavaClass.Predicates.resideOutsideOfPackage(
+                                            "io.github.dailystruggle.rtp.common.runtime..")))
+                    .because("ADR-115 seam 4: the runtime holder is Tier 1; the composition root "
+                            + "injects config-dependent behaviour such as the log buffer gate.");
+
+    /**
+     * Rule 21 - Governor Package Must Not Create Threads or Acquire Locks (ADR-087 Invariant I8).
+     */
+    @ArchTest
+    static final ArchRule governor_package_must_not_create_threads_or_use_locks =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.governor..")
+                    .should().dependOnClassesThat().areAssignableTo(Thread.class)
+                    .orShould().dependOnClassesThat().areAssignableTo(java.util.concurrent.ExecutorService.class)
+                    .orShould().dependOnClassesThat().haveFullyQualifiedName("java.util.concurrent.Executors")
+                    .orShould().dependOnClassesThat().resideInAPackage("java.util.concurrent.locks..")
+                    .because("ADR-087 Invariant I8: ComputeGovernor and ComputeBudget must not create threads or acquire locks on actuation paths.");
+
+    /**
+     * Rule 22 - Governor Package Is Tier 2 Below Selection, Tasks, and Tools (ADR-115, ADR-087).
+     */
+    @ArchTest
+    static final ArchRule governor_package_must_not_depend_on_selection_tasks_or_tools =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.governor..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.selection..",
+                            "io.github.dailystruggle.rtp.common.tasks..",
+                            "io.github.dailystruggle.rtp.common.tools..",
+                            "io.github.dailystruggle.rtp.common.configuration.."
+                    )
+                    .because("ADR-115: common.governor is consumed by selection, tasks, and tools, so it must not depend back on them.");
 }

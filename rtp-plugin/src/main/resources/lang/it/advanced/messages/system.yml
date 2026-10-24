@@ -17,6 +17,8 @@ nuovoMondo: "&b[P0] rilevato un nuovo mondo '[world]'"
 # segnaposto: [filename] - nome del file
 ricaricamento: "&b[P0] caricamento di [filename]..."
 ricaricato: "&b[P0] [filename] caricato con successo."
+reloadFailed: "&c[P0] Impossibile ricaricare la configurazione. Controlla il log del server."
+reloadRejected: "&c[P0] Ricaricamento rifiutato: [count] errore/i di configurazione; la configurazione attiva viene mantenuta. Primo: [code] in [source] a [path]. Dettagli: /rtp test subsystem=config"
 aggiornamento: "&a[P0] aggiornamento di [filename]..."
 aggiornato: "&a[P0] [filename] aggiornato con successo."
 

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.folia.tasks;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPCancellable;
 import io.github.dailystruggle.rtp.common.tasks.RTPDelayable;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
@@ -41,15 +42,22 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
 
     @Override
     public boolean execute(long availableTime) {
+        return execute(availableTime, new java.util.concurrent.atomic.AtomicBoolean(false));
+    }
+
+    @Override
+    public boolean execute(long availableTime, java.util.concurrent.atomic.AtomicBoolean sharedRanAny) {
         if (stop) return true;
         if (runnables.isEmpty()) return true;
         if (availableTime <= 0) return false;
+        java.util.concurrent.atomic.AtomicBoolean ranTracker =
+            (sharedRanAny != null) ? sharedRanAny : new java.util.concurrent.atomic.AtomicBoolean(false);
         long start = System.nanoTime();
         List<Runnable> delayed = new ArrayList<>();
         int budget = 0;
         try {
-            // Clock checked only after the first task: a 1 ns budget still guarantees progress.
-            while (budget < maxTasksPerTick && (budget == 0 || System.nanoTime() - start < availableTime)) {
+            // Clock checked only after the first task in the shared scope: a 1 ns budget still guarantees progress.
+            while (budget < maxTasksPerTick && (!ranTracker.get() || System.nanoTime() - start < availableTime)) {
                 if (stop) return true;
                 Runnable runnable = runnables.poll();
                 if (runnable == null) break;
@@ -59,6 +67,7 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
                     continue;
                 }
                 budget++;
+                ranTracker.set(true);
                 RTPLocation location = runnable instanceof RTPRunnable rtpRunnable ? rtpRunnable.getLocation() : null;
                 if (location == null) {
                     runIsolated(runnable);
@@ -91,8 +100,8 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
 
     private static void dispatchToRegion(RTPLocation location, Runnable runnable) {
         try {
-            RTPScheduler scheduler = RTP.serverAccessor != null ? RTP.serverAccessor.getScheduler() : null;
-            if (scheduler == null) scheduler = RTP.scheduler;
+            RTPScheduler scheduler = RTPRuntime.serverAccessor() != null ? RTPRuntime.serverAccessor().getScheduler() : null;
+            if (scheduler == null) scheduler = RTPRuntime.scheduler();
             if (scheduler == null) {
                 throw new IllegalStateException("no scheduler installed for region-bound task");
             }

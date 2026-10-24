@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ class TPSTest {
     void setUp() {
         rtpMockedStatic = mockStatic(RTP.class);
         mockAccessor = mock(RTPServerAccessor.class);
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
     }
 
     @AfterEach

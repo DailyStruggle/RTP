@@ -4,12 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.IndexConfigPlanner.Config;
 import io.github.dailystruggle.rtp.common.benchmark.IndexConfigPlanner.Plan;
 import io.github.dailystruggle.rtp.common.benchmark.IndexConfigPlanner.Situation;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,7 +66,7 @@ public class HeuristicPlannerBenchmarkTest {
 
   @BeforeAll
   public static void setup() {
-    RTP.serverAccessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
+    RTPRuntime.setServerAccessor(new MockRTPServerAccessor(new java.io.File("target/test-data")));
     if (!WorldOccupancyMask.available()) return;
     Path dir = WorldOccupancyMask.resolveDirectory();
     WorldOccupancyMask source = WorldOccupancyMask.load(dir);

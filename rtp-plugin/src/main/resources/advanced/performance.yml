@@ -1,7 +1,13 @@
 # --- RTP Performance Settings ---
-# Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
+# Documentation: docs/admin/configuration/PERFORMANCE.md
 
 # --- Server health ---
+# Adapts background compute, promotion rate, hot-cache size, and generation concurrency to server headroom and demand.
+# Configured values below act as ceilings while active. Set false to run at fixed configured values.
+# @type: boolean
+# @default: true
+autoTune: true
+
 # Pause background cache filling when TPS drops below this. On Folia the
 # slowest region counts. Waiting players are still served. 0 = off.
 # @type: number
@@ -30,6 +36,7 @@ maxHeapPercent: 85.0
 maxAttempts: 32
 
 # Ticks between refills of the same region. Regions take turns.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -37,6 +44,7 @@ maxAttempts: 32
 period: 20
 
 # Max ms per tick for main-thread work. Capped at 25.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -44,6 +52,7 @@ period: 20
 syncAllottedTime: 5
 
 # Max ms per pulse for background work. Capped at 25.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -68,6 +77,7 @@ viewDistanceTeleport: 0
 # Ticks to ease view distance back to normal after arrival. 0 = off.
 # NOTE: Temporarily forced to 0. The gradual restore causes client-side
 # flashing / re-rendering on arrival. Leave at 0 until further notice.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -129,6 +139,7 @@ biomeRecallForced: false
 
 # --- Auditing counters ---
 # Warn when a teleport takes longer than this (ms). 0 or less = off.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

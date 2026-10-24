@@ -1,9 +1,12 @@
 package io.github.dailystruggle.rtp.fabric.database;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.DatabaseKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.DatabaseAccessorFactory;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.File;
@@ -46,7 +49,7 @@ public final class FabricDatabaseHandler {
     }
 
     /**
-     * Initialise {@code rtp.databaseAccessor} from the configured database type.
+     * Initialise {@code ActiveDatabase.accessor()} from the configured database type.
      * Mirrors {@code BukkitDatabaseHandler#setupDatabase(RTP)} for Fabric.
      *
      * @param rtp the loaded RTP core instance
@@ -67,12 +70,12 @@ public final class FabricDatabaseHandler {
             throw new FileSystemException("unable to make directories: " + databaseDirectory.getAbsolutePath());
         }
 
-        RTP.configs.reloadConfigs();
+        ActiveConfigs.get().reloadConfigs();
 
         // ADR-071: database settings now live in database.yml (split out of config.yml).
         ConfigParser<DatabaseKeys> databaseParser =
-                (ConfigParser<DatabaseKeys>) RTP.configs.getParser(DatabaseKeys.class);
-        Map<String, Object> databaseMap = RTP.configs.getDatabaseConfig();
+                (ConfigParser<DatabaseKeys>) ActiveConfigs.get().getParser(DatabaseKeys.class);
+        Map<String, Object> databaseMap = ActiveConfigs.get().getDatabaseConfig();
 
         // Mirror BukkitDatabaseHandler defaults so the requested → H2 → flat-file fallback
         // chain in DatabaseAccessorFactory is preserved verbatim across platforms.
@@ -136,7 +139,7 @@ public final class FabricDatabaseHandler {
         // missing JDBC driver (we cannot shade every backend) does not crash startup.
         DatabaseAccessorFactory.Result dbResult = DatabaseAccessorFactory.create(
                 type, databaseDirectory, host, port, name, username, password);
-        rtp.databaseAccessor = dbResult.accessor;
+        ActiveDatabase.setAccessor(dbResult.accessor);
         String effectiveType = dbResult.effectiveType;
 
         RTP.handleMigration(previousType, effectiveType);
@@ -146,11 +149,11 @@ public final class FabricDatabaseHandler {
             RTP.log(Level.WARNING, "FabricDatabaseHandler: failed to write .db_state", e);
         }
 
-        RTP.configs.reloadRegions();
-        RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
+        ActiveConfigs.get().reloadRegions();
+        RTPRuntime.scheduler().runTaskLater(() -> ActiveDatabase.accessor().startup(), 1);
         // ADR-060: start the emergency-platform restore reaper once the DB is up so any
         // persisted restore jobs resume across the restart.
-        RTP.scheduler.runTaskLater(
+        RTPRuntime.scheduler().runTaskLater(
                 io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager::startGlobal, 2);
     }
 }

@@ -2,11 +2,13 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,12 +41,12 @@ class ConfigurationHelpersCoverageTest {
 
         RTPServerAccessor mockAccessor = mock(RTPServerAccessor.class);
         when(mockAccessor.getPluginDirectory()).thenReturn(pluginDir);
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     @Test
@@ -112,8 +114,8 @@ class ConfigurationHelpersCoverageTest {
         // Resolving unknown reference returns fallback
         assertEquals("fallback", ConfigDefaultResolver.resolve("@unknown_source", "key", "fallback"));
 
-        // Resolving when RTP.configs is null returns fallback
-        RTP.configs = null;
+        // Resolving when ActiveConfigs.get() is null returns fallback
+        ActiveConfigs.set(null);
         assertEquals("fallback", ConfigDefaultResolver.resolve("@config", "key", "fallback"));
         assertEquals("fallback", ConfigDefaultResolver.resolve("@economy", "key", "fallback"));
         assertEquals("fallback", ConfigDefaultResolver.resolve("@safety", "key", "fallback"));
@@ -155,8 +157,8 @@ class ConfigurationHelpersCoverageTest {
         assertNotNull(invalidCmd);
         assertEquals(PlayerMessages.invalidCommand, invalidCmd);
 
-        // valueByName when RTP.configs is null returns def
-        RTP.configs = null;
+        // valueByName when ActiveConfigs.get() is null returns def
+        ActiveConfigs.set(null);
         assertEquals("default_msg", Messages.valueByName("invalidCommand", "default_msg"));
         assertEquals("default_msg", Messages.valueByName("invalid_key_xyz", "default_msg"));
     }
@@ -183,8 +185,8 @@ class ConfigurationHelpersCoverageTest {
         Factory<DummyShape> shapeFactory = new Factory<>();
         DummyShape dummy = new DummyShape("circle.yml");
         shapeFactory.add("circle.yml", dummy);
-        RTP.factoryMap.put(RTP.factoryNames.shape, (Factory) shapeFactory);
-        RTP.factoryMap.put(RTP.factoryNames.vert, new Factory<>());
+        FactoryRegistry.map().put(FactoryNames.shape, (Factory) shapeFactory);
+        FactoryRegistry.map().put(FactoryNames.vert, new Factory<>());
 
         // write with null
         SelectorCatalogWriter.write(null);
@@ -229,7 +231,7 @@ class ConfigurationHelpersCoverageTest {
         // When tag snapshot has minecraft:leaves -> expands to materials
         Map<String, Set<String>> snapshot = new HashMap<>();
         snapshot.put("minecraft:leaves", Set.of("minecraft:oak_leaves", "minecraft:birch_leaves"));
-        when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot);
+        when(RTPRuntime.serverAccessor().blockTagSnapshot()).thenReturn(snapshot);
 
         SafetyTokenExpander.expandAndApply(safetyParser);
 
@@ -280,7 +282,7 @@ class ConfigurationHelpersCoverageTest {
         Map<String, Set<String>> snapshot = new HashMap<>();
         snapshot.put("minecraft:leaves", Set.of("minecraft:oak_leaves", "minecraft:birch_leaves"));
         snapshot.put("minecraft:slabs", Set.of("minecraft:oak_slab", "minecraft:birch_slab", "minecraft:stone_slab"));
-        when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot);
+        when(RTPRuntime.serverAccessor().blockTagSnapshot()).thenReturn(snapshot);
 
         SafetyTokenExpander.expandAndApply(safetyParser);
 

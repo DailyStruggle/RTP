@@ -3,19 +3,20 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,18 +43,18 @@ class TeleportPipelineTaskDistanceTest {
     void setUp() {
         RTPTestSetup.install(tempDir);
         world = new TrackedMockWorld("test_world");
-        accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.addWorld(world);
         RTPRunnable.scheduler = accessor.getMockScheduler();
         TeleportPipelineTask.ConfigCache.reload();
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     @Test
@@ -114,7 +115,7 @@ class TeleportPipelineTaskDistanceTest {
         TeleportData data = new TeleportData();
         data.distance = task.getDistance();
         data.distanceFromCenter = task.getDistanceFromCenter();
-        RTP.getInstance().latestTeleportData.put(playerId, data);
+        TeleportSessions.current().latestTeleportData.put(playerId, data);
 
         // Verify PlaceholderProvider replacement as well
         String globalTemplate = "Global: <distance> blocks, %distance% / [distance] | <distance_blocks>";

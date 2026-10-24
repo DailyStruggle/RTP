@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class ReqRtpAdr043PersonalQueueSeparationTest {
         mockRegion = buildMockRegion();
         // RegionQueueManager construction may inherit state from previous
         // tests via the shared RTP singleton - be defensive.
-        RTP.getInstance().queuedPlayers.clear();
+        TeleportSessions.current().queuedPlayers.clear();
     }
 
     @Test
@@ -50,7 +50,7 @@ class ReqRtpAdr043PersonalQueueSeparationTest {
                 "openPersonalQueue must create the personal bucket");
         assertFalse(qm.playerQueue.contains(uuid),
                 "openPersonalQueue must NOT enroll the uuid on the teleport waitlist (ADR-043)");
-        assertFalse(RTP.getInstance().queuedPlayers.contains(uuid),
+        assertFalse(TeleportSessions.current().queuedPlayers.contains(uuid),
                 "openPersonalQueue must NOT set the global awaiting-teleport flag (ADR-043)");
     }
 
@@ -82,7 +82,7 @@ class ReqRtpAdr043PersonalQueueSeparationTest {
 
         assertTrue(qm.playerQueue.contains(uuid),
                 "requestTeleport must enroll the uuid on the teleport waitlist");
-        assertTrue(RTP.getInstance().queuedPlayers.contains(uuid),
+        assertTrue(TeleportSessions.current().queuedPlayers.contains(uuid),
                 "requestTeleport must set the global awaiting-teleport flag");
         assertFalse(qm.perPlayerLocationQueue.containsKey(uuid),
                 "requestTeleport must NOT create a personal bucket (ADR-043)");
@@ -130,7 +130,7 @@ class ReqRtpAdr043PersonalQueueSeparationTest {
 
         assertTrue(qm.playerQueue.contains(uuid),
                 "closePersonalQueue must not touch the teleport waitlist — that is RTPTeleportCancel's job");
-        assertTrue(RTP.getInstance().queuedPlayers.contains(uuid),
+        assertTrue(TeleportSessions.current().queuedPlayers.contains(uuid),
                 "closePersonalQueue must not clear the global awaiting-teleport flag");
     }
 

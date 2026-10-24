@@ -18,10 +18,10 @@ import java.util.regex.Pattern;
  */
 public final class GateExpressionParser {
 
+  /** Possessive blank run: operand starts at the first non-blank, no backtracking (input is trimmed). */
   private static final Pattern OP_PATTERN =
-      Pattern.compile("^(<=|>=|<|>|==|=)\\s*(.+)$");
-  private static final Pattern RANGE_PATTERN =
-      Pattern.compile("^(.+?)\\s*\\.\\.\\s*(.+)$");
+      Pattern.compile("(<=|>=|<|>|==|=)\\s*+(.+)");
+  private static final String RANGE_SEPARATOR = "..";
 
   private GateExpressionParser() {}
 
@@ -36,11 +36,11 @@ public final class GateExpressionParser {
     if (expr == null || expr.isBlank()) return false;
     String trimmed = expr.trim();
 
-    // Range pattern: "min..max"
-    Matcher rangeMatcher = RANGE_PATTERN.matcher(trimmed);
-    if (rangeMatcher.matches()) {
-      double min = parseValue(rangeMatcher.group(1));
-      double max = parseValue(rangeMatcher.group(2));
+    // Range "min..max": split at the first ".." after a non-empty min (linear scan, no regex backtracking).
+    int sep = trimmed.indexOf(RANGE_SEPARATOR, 1);
+    if (sep > 0 && sep + RANGE_SEPARATOR.length() < trimmed.length()) {
+      double min = parseValue(trimmed.substring(0, sep));
+      double max = parseValue(trimmed.substring(sep + RANGE_SEPARATOR.length()));
       return actualValue >= min && actualValue <= max;
     }
 
@@ -63,7 +63,28 @@ public final class GateExpressionParser {
     return val != null && Math.abs(actualValue - val) < 1e-6;
   }
 
-  /** {@code text} is a regex group bounded by non-whitespace, so never null or blank. */
+  /** Returns whether {@code expr} has a complete expression accepted by the gate parser. */
+  public static boolean isValid(String expr) {
+    if (expr == null || expr.isBlank()) return false;
+    String trimmed = expr.trim();
+
+    int sep = trimmed.indexOf(RANGE_SEPARATOR, 1);
+    if (sep > 0 && sep + RANGE_SEPARATOR.length() < trimmed.length()) {
+      return isNumber(trimmed.substring(0, sep))
+          && isNumber(trimmed.substring(sep + RANGE_SEPARATOR.length()));
+    }
+
+    Matcher opMatcher = OP_PATTERN.matcher(trimmed);
+    if (opMatcher.matches()) return isNumber(opMatcher.group(2));
+    return isNumber(trimmed);
+  }
+
+  private static boolean isNumber(String text) {
+    Double value = parseNumber(text.trim());
+    return value != null && Double.isFinite(value);
+  }
+
+  /** {@code text} is a slice of the trimmed expression ending or starting at its non-blank edge, so never blank. */
   private static double parseValue(String text) {
     Double val = parseNumber(text.trim());
     return val != null ? val : 0.0;

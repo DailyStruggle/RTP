@@ -9,10 +9,11 @@ import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import java.util.*;
@@ -38,18 +39,18 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
       Set<String> unsafeBlocks, Set<String> airBlocks, int platformDepth) {}
 
   /**
-   * Reads safety configuration from {@link RTP#configs} and block-tag registry snapshot.
+   * Reads safety configuration from {@link ActiveConfigs#get()} and block-tag registry snapshot.
    * Normalises tokens on the fly and resolves {@code #namespace:tag} members.
    */
   @SuppressWarnings("unchecked")
   private static SafetySnapshot readSafetySnapshot() {
     ConfigParser<SafetyKeys> safety =
-        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
 
     Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
-    if (RTP.serverAccessor != null) {
+    if (RTPRuntime.serverAccessor() != null) {
       try {
-        Map<String, Set<String>> snap = RTP.serverAccessor.blockTagSnapshot();
+        Map<String, Set<String>> snap = RTPRuntime.serverAccessor().blockTagSnapshot();
         if (snap != null) tagSnapshot = snap;
       } catch (Throwable ignored) {
         // Best-effort - fall through with the empty snapshot.
@@ -61,9 +62,9 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     int depth = 1;
     if (safety != null) {
       expandTokens(
-          RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>()), tagSnapshot, unsafe);
+          ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>()), tagSnapshot, unsafe);
       expandTokens(
-          RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>()), tagSnapshot, air);
+          ActiveConfigs.get().getConfigValue(BlocksKeys.airBlocks, new ArrayList<>()), tagSnapshot, air);
       // Ground-sweep depth - reuses SafetyKeys.safetyRadius so it stays
       // distinct from SafetyKeys.platformDepth (which exclusively sizes the
       // platform-creation tool in BukkitRTPWorld.platform / FoliaRTPWorld.platform).
@@ -168,6 +169,16 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
         "rtp.params", "initial amount to jump", (sender, s) -> true, 1, 16, 32));
     subParameters.put("requireskylight", new BooleanParameter(
         "rtp.params", "require sky light for placement", (sender, s) -> true));
+    // ADR-119 slope keys: tab completion only, no defaults entry (cache key unchanged when unset).
+    subParameters.put("maxslope", new IntegerParameter(
+        "rtp.params", "largest floor-height step allowed around the landing spot, -1 off",
+        (sender, s) -> true, -1, 0, 1, 2, 3));
+    subParameters.put("sloperadius", new IntegerParameter(
+        "rtp.params", "horizontal distance of the slope samples", (sender, s) -> true, 1, 2, 3, 4, 8));
+    // ADR-120: same cache-key rule as the slope keys.
+    subParameters.put("maxhillangle", new IntegerParameter(
+        "rtp.params", "steepest hill in degrees a landing may sit on, -1 off",
+        (sender, s) -> true, -1, 20, 25, 30, 35));
   }
 
   public JumpAdjustor(List<Predicate<RTPCoords>> verifiers) {
@@ -216,6 +227,7 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     SafetySnapshot snap = readSafetySnapshot();
     Set<String> unsafeBlocks = snap.unsafeBlocks();
     int platformDepth = snap.platformDepth();
+    SlopeCheck slope = slopeCheck(chunk);
 
     // Narrowing mutates the bounds; each test column starts from the configured window.
     final int baseMinY = minY;
@@ -268,7 +280,8 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
             && skylight > 7
             && chunk.isSafe(x, i + 1, z, unsafeBlocks)
             && chunk.isSafe(x, i, z, unsafeBlocks)
-            && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
+            && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)
+            && (slope == null || slope.test(x, i, z))) {
           output.setWorldName(chunk.getWorld().name());
           output.setXZ(globalX, globalZ);
           output.setY(i);
@@ -307,6 +320,7 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     SafetySnapshot snap = readSafetySnapshot();
     Set<String> unsafeBlocks = snap.unsafeBlocks();
     int platformDepth = snap.platformDepth();
+    SlopeCheck slope = slopeCheck(chunk);
 
     int x = localX & 15;
     int z = localZ & 15;
@@ -324,7 +338,8 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
           && skylight > 7
           && chunk.isSafe(x, i + 1, z, unsafeBlocks)
           && chunk.isSafe(x, i, z, unsafeBlocks)
-          && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
+          && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)
+          && (slope == null || slope.test(x, i, z))) {
         return new MutableRTPCoords(chunk.getWorld().name(), globalX, i, globalZ).toImmutable();
       }
     }
@@ -364,6 +379,7 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     if (probe.minY() > minY - 1 || probe.maxY() < maxY) return AdjustResult.WINDOW_REJECT;
 
     SafetySnapshot snap = readSafetySnapshot();
+    SlopeCheck slope = slopeCheck(probe);
 
     // Multi-column probe sweep mirroring live adjust(RTPChunk,...) testCoords (5 sub-columns).
     // Sky-light gating derives open-sky from computeColumnSkyFloor block-data scan.
@@ -375,10 +391,12 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
           ? computeColumnSkyFloor(probe, lx, lz)
           : Integer.MIN_VALUE;
       for (int y = minY; y < maxY; y++) {
-        if (!acceptProbeY(probe, lx, lz, y, requireSkyLight, columnSkyFloor, snap)) continue;
-        int globalX = (probe.chunkX() << 4) + lx;
-        int globalZ = (probe.chunkZ() << 4) + lz;
-        return AdjustResult.ok(new MutableRTPCoords(worldName, globalX, y, globalZ).toImmutable());
+        if (acceptProbeY(probe, lx, lz, y, requireSkyLight, columnSkyFloor, snap)
+            && (slope == null || slope.test(lx, y, lz))) {
+          int globalX = (probe.chunkX() << 4) + lx;
+          int globalZ = (probe.chunkZ() << 4) + lz;
+          return AdjustResult.ok(new MutableRTPCoords(worldName, globalX, y, globalZ).toImmutable());
+        }
       }
     }
     return AdjustResult.SCAN_MISS_REJECT;

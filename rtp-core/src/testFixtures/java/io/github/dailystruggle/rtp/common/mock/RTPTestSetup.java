@@ -2,8 +2,13 @@ package io.github.dailystruggle.rtp.common.mock;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import java.io.File;
 import java.lang.reflect.Field;
 
@@ -32,10 +37,10 @@ public final class RTPTestSetup {
         RTPAPI.serverAccessor = null;
 
         // Wire RTP static fields
-        RTP.serverAccessor = accessor;
-        RTP.scheduler = accessor.getMockScheduler();
-        if (RTP.selectionAPI == null) {
-            RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        RTPRuntime.setServerAccessor(accessor);
+        RTPRuntime.setScheduler(accessor.getMockScheduler());
+        if (ActiveSelection.get() == null) {
+            ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
         }
 
         // Ensure RTP.getInstance() returns a valid instance
@@ -50,12 +55,13 @@ public final class RTPTestSetup {
         // left by shutdown-path tests.
         io.github.dailystruggle.rtp.common.RTP rtpInstance = RTP.getInstance();
         if (rtpInstance != null) {
-            rtpInstance.databaseAccessor = null;
-            rtpInstance.cancelTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
-            rtpInstance.miscSyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
-            rtpInstance.miscAsyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
-            rtpInstance.startupTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
-            if (rtpInstance.cancelTasks instanceof io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe timeBoundCancel) {
+            ActiveDatabase.setAccessor(null);
+            MiscTasks.setCancel((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
+            MiscTasks.setSync((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
+            MiscTasks.setBackgroundSync((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
+            MiscTasks.setAsync((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
+            MiscTasks.setStartup((io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe());
+            if (MiscTasks.cancel() instanceof io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe timeBoundCancel) {
                 timeBoundCancel.setAvailableTime(Long.MAX_VALUE);
             }
         }
@@ -70,8 +76,8 @@ public final class RTPTestSetup {
         // core parsers (SafetyKeys, PerformanceKeys, LoggingKeys, etc.).  Without this,
         // LocationGenerator.getLocation() and RegionCacheTask NPE because the parsers are
         // only registered by Configs.reloadConfigs(), never by the RTP constructor itself.
-        RTP.configs = new Configs(pluginDir);
-        RTP.configs.reloadConfigs();
+        ActiveConfigs.set(new Configs(pluginDir));
+        ActiveConfigs.get().reloadConfigs();
 
         return accessor;
     }
@@ -81,21 +87,21 @@ public final class RTPTestSetup {
      * This ensures no open file handles linger on Windows preventing {@code @TempDir} deletion.
      */
     public static void cleanUp() {
-        if (RTP.configs != null) {
-            if (RTP.configs.fileDatabase != null) {
-                RTP.configs.fileDatabase.processQueries(Long.MAX_VALUE);
-                RTP.configs.fileDatabase.disconnect(java.util.Collections.emptyMap());
+        if (ActiveConfigs.get() != null) {
+            if (ActiveConfigs.get().fileDatabase != null) {
+                ActiveConfigs.get().fileDatabase.processQueries(Long.MAX_VALUE);
+                ActiveConfigs.get().fileDatabase.disconnect(java.util.Collections.emptyMap());
             }
-            if (RTP.configs.configParserMap != null) {
-                for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cp : RTP.configs.configParserMap.values()) {
-                    if (cp != null && cp.fileDatabase != null && cp.fileDatabase != RTP.configs.fileDatabase) {
+            if (ActiveConfigs.get().configParserMap != null) {
+                for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cp : ActiveConfigs.get().configParserMap.values()) {
+                    if (cp != null && cp.fileDatabase != null && cp.fileDatabase != ActiveConfigs.get().fileDatabase) {
                         cp.fileDatabase.processQueries(Long.MAX_VALUE);
                         cp.fileDatabase.disconnect(java.util.Collections.emptyMap());
                     }
                 }
             }
-            if (RTP.configs.multiConfigParserMap != null) {
-                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp : RTP.configs.multiConfigParserMap.values()) {
+            if (ActiveConfigs.get().multiConfigParserMap != null) {
+                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp : ActiveConfigs.get().multiConfigParserMap.values()) {
                     if (mcp != null) {
                         if (mcp.fileDatabase != null) {
                             mcp.fileDatabase.processQueries(Long.MAX_VALUE);
@@ -114,11 +120,11 @@ public final class RTPTestSetup {
             }
         }
         if (RTP.getInstance() != null) {
-            RTP.getInstance().databaseAccessor = null;
+            ActiveDatabase.setAccessor(null);
         }
-        RTP.configs = null;
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        ActiveConfigs.set(null);
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         RTPAPI.serverAccessor = null;
     }
 

@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.reload;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,10 +65,10 @@ public class SubReloadCmdTest {
 
     @Test
     void subReload_withConfigParser_delegatesToSubReloadSingle() {
-        // subReloadSingle requires RTP.configs to have a Enum<?> parser.
+        // subReloadSingle requires ActiveConfigs.get() to have a Enum<?> parser.
         // RTPTestSetup.install() registers all core parsers including MessagesKeys,
         // so this should succeed and return true.
-        FactoryValue<?> parser = RTP.configs.getParser(
+        FactoryValue<?> parser = ActiveConfigs.get().getParser(
                 io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         assumeNotNull(parser);
         boolean result = cmd.subReload(UUID.randomUUID(), parser);
@@ -93,6 +93,6 @@ public class SubReloadCmdTest {
 
     private static void assumeNotNull(Object obj) {
         org.junit.jupiter.api.Assumptions.assumeTrue(obj != null,
-                "Skipping test: required object is null (RTP.configs not fully initialised)");
+                "Skipping test: required object is null (ActiveConfigs not fully initialised)");
     }
 }

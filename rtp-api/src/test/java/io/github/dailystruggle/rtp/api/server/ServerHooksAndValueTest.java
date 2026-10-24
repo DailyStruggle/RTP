@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api.server;
 
+import io.github.dailystruggle.server.api.PlatformFamily;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;

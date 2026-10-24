@@ -39,9 +39,11 @@ name: Release LeafRTP to BuiltByBit (BBCode sites)
 #   Or:
 #     BBB_CLIENT_ID        -- BuiltByBit OAuth2 Client ID
 #     BBB_CLIENT_SECRET    -- BuiltByBit OAuth2 Client Secret
-#   Optional:
-#     SIGNING_KEY          -- (Optional) ASCII-armored PGP private key for signing deliverables.
-#     SIGNING_PASSWORD     -- (Optional) Passphrase for SIGNING_KEY.
+#   And:
+#     SIGNING_KEY          -- ASCII-armored PGP private key for signing deliverables.
+#     SIGNING_PASSWORD     -- Passphrase for SIGNING_KEY.
+#   The job fails before building if a required secret is missing, and before
+#   uploading if the Pro jar has no `.asc` signature.
 
 on:
   pull_request:
@@ -72,9 +74,25 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
+
+      - name: Validate required release secrets
+        env:
+          BBB_API_TOKEN: ${{ secrets.BBB_API_TOKEN }}
+          BBB_CLIENT_ID: ${{ secrets.BBB_CLIENT_ID }}
+          BBB_CLIENT_SECRET: ${{ secrets.BBB_CLIENT_SECRET }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          if [ -z "$BBB_API_TOKEN" ] && { [ -z "$BBB_CLIENT_ID" ] || [ -z "$BBB_CLIENT_SECRET" ]; }; then
+            echo "::error::Neither BBB_API_TOKEN nor (BBB_CLIENT_ID + BBB_CLIENT_SECRET) configured in repository secrets."
+            exit 1
+          fi
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::error::Missing required secret SIGNING_KEY; the Pro jar would ship unsigned."
+            exit 1
+          fi
 
       # Owns the Git release tag when Pro is published on PR merge.
       # If the tag already exists (e.g. from manual workflow_dispatch), it is preserved.
@@ -112,7 +130,7 @@ jobs:
           echo "Prepared release version: ${VERSION} with tag: ${TAG}"
 
       - name: Set up JDK 21 and 25
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           java-version: |
             21
@@ -141,6 +159,11 @@ jobs:
           if [ -z "$PRO_JAR" ] || [ ! -f "$PRO_JAR" ]; then
             echo "::error::Could not locate the LeafRTP-Pro jar under rtp-plugin/build/libs/"
             ls -la rtp-plugin/build/libs/ || true
+            exit 1
+          fi
+
+          if [ ! -f "${PRO_JAR}.asc" ]; then
+            echo "::error::Missing PGP signature ${PRO_JAR}.asc. Release cannot proceed unsigned."
             exit 1
           fi
 
@@ -275,7 +298,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+          # Look up refs/tags/ only: a branch with the tag's name (e.g. v3.3.0)
+          # must not count as an existing tag.
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null \
+            || [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
             echo "Tag ${TAG} already exists locally or remotely. Skipping tag creation."
           else
             echo "Creating and pushing tag ${TAG}..."
@@ -290,7 +316,7 @@ jobs:
       # no duplicate GitHub Release).
 
       - name: Generate SLSA Build Provenance (Pro jar)
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           # Only the Pro jar is published from this workflow (to BuiltByBit).
           # The Lite jar is attested by release.yml where it is published.
@@ -298,7 +324,7 @@ jobs:
             ${{ steps.artifacts.outputs.pro_jar }}
 
       - name: Archive Pro Release Deliverables
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: leaf-rtp-pro-deliverables
           path: |

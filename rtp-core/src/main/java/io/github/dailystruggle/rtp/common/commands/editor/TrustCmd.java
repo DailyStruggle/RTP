@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -80,7 +80,7 @@ public class TrustCmd extends BaseRTPCmdImpl {
             return true;
         }
         if (rateLimited(callerId, clock.getAsLong())) {
-            RTP.log(Level.WARNING, "[editor] trust command refused for " + callerId + ": " + MAX_FAILURES
+            RTPRuntime.log(Level.WARNING, "[editor] trust command refused for " + callerId + ": " + MAX_FAILURES
                     + " wrong codes in the last minute");
             EditorChannelWiring.tell(callerId, EditorChannelWiring.message("editorTrustRateLimited",
                     "[P0] Too many wrong editor trust codes. Wait a minute, then try again."));
@@ -90,7 +90,7 @@ public class TrustCmd extends BaseRTPCmdImpl {
         // The trusted-editors file write stays off the main thread
         EditorSecurity.supplyAsync(() -> EditorChannel.trustAny(code)).whenComplete((result, t) -> {
             if (t != null) {
-                RTP.log(Level.WARNING, "[editor] trust command failed: " + t.getMessage(), t);
+                RTPRuntime.log(Level.WARNING, "[editor] trust command failed: " + t.getMessage(), t);
                 result = EditorChannel.TrustResult.UNKNOWN;
             }
             CommandMessages key;
@@ -115,7 +115,7 @@ public class TrustCmd extends BaseRTPCmdImpl {
             }
             if (result == EditorChannel.TrustResult.UNKNOWN || result == EditorChannel.TrustResult.EXPIRED) {
                 recordFailure(callerId, clock.getAsLong());
-                RTP.log(Level.INFO, "[editor] trust code refused (" + result + ")");
+                RTPRuntime.log(Level.INFO, "[editor] trust code refused (" + result + ")");
             }
             EditorChannelWiring.tell(callerId, EditorChannelWiring.message(key, fallback).replace("[nonce]", code));
         });

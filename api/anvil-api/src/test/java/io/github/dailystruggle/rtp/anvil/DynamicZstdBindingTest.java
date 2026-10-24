@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.anvil;
 
-import io.github.dailystruggle.rtp.anvil.bit.BitHealth;
-import io.github.dailystruggle.rtp.anvil.bit.PbitResult;
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.PbitResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +21,7 @@ class DynamicZstdBindingTest {
     @DisplayName("PBIT canary succeeds when host zstd is on classpath")
     void pbitCanarySucceedsWithHostZstd() {
         assertTrue(DynamicZstdBinding.isAvailable(), "Host Zstd should be available on test classpath");
+        assertFalse(DynamicZstdBinding.hostEngineMissing());
         assertEquals(BitHealth.HEALTHY, DynamicZstdBinding.health());
         assertEquals(BitHealth.HEALTHY, DynamicZstdBinding.INSTANCE.getHealthStatus());
 

@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.config;
 
+import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import io.github.dailystruggle.rtp.proxy.common.RTPProxyAccessor;
 import io.github.dailystruggle.rtp.proxy.common.Role;
 import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
@@ -218,8 +220,8 @@ public final class NetworkConfig {
         b.role = declared;
 
         b.transportType         = asString(transport, "type", "in-memory");
-        b.heartbeatIntervalMs   = asLong(heartbeat, "intervalMs", 1000L);
-        b.heartbeatStaleAfterMs = asLong(heartbeat, "staleAfterMs", 5000L);
+        b.heartbeatIntervalMs   = asDurationMs(heartbeat, "intervalMs", 1000L);
+        b.heartbeatStaleAfterMs = asDurationMs(heartbeat, "staleAfterMs", 5000L);
 
         Map<String, Object> redis = asMap(transport, "redis");
         parseRedis(redis, b, env);
@@ -228,7 +230,7 @@ public final class NetworkConfig {
         // non-positive values clamp to the default so a misconfigured zero/
         // negative knob cannot silently disable reaping.
         Map<String, Object> reservation = asMap(root, "reservation");
-        long reapMs = asLong(reservation, "reapIntervalMs", 30_000L);
+        long reapMs = asDurationMs(reservation, "reapIntervalMs", 30_000L);
         b.reservationReapIntervalMs = reapMs > 0 ? reapMs : 30_000L;
 
         // ADR-015 / REQ-RTP-NET-015: shared cross-proxy waitlist knobs.
@@ -238,15 +240,15 @@ public final class NetworkConfig {
         b.waitlistEnabled = asBool(waitlist, "enabled", true);
         int maxSize = asInt(waitlist, "maxSize", 1024);
         b.waitlistMaxSize = maxSize > 0 ? maxSize : 1024;
-        long drainMs = asLong(waitlist, "drainIntervalMs", 1000L);
+        long drainMs = asDurationMs(waitlist, "drainIntervalMs", 1000L);
         b.waitlistDrainIntervalMs = drainMs > 0 ? drainMs : 1000L;
-        long pauseMs = asLong(waitlist, "drainPauseMs", 2000L);
+        long pauseMs = asDurationMs(waitlist, "drainPauseMs", 2000L);
         b.waitlistDrainPauseMs = pauseMs >= 0 ? pauseMs : 2000L;
-        long leaseMs = asLong(waitlist, "leaderLeaseHoldMs", 5000L);
+        long leaseMs = asDurationMs(waitlist, "leaderLeaseHoldMs", 5000L);
         b.waitlistLeaderLeaseHoldMs = leaseMs > 0 ? leaseMs : 5000L;
-        long reapEveryMs = asLong(waitlist, "reapIntervalMs", 10_000L);
+        long reapEveryMs = asDurationMs(waitlist, "reapIntervalMs", 10_000L);
         b.waitlistReapIntervalMs = reapEveryMs > 0 ? reapEveryMs : 10_000L;
-        long reapMaxMs = asLong(waitlist, "reapMaxAgeMs", 60_000L);
+        long reapMaxMs = asDurationMs(waitlist, "reapMaxAgeMs", 60_000L);
         b.waitlistReapMaxAgeMs = reapMaxMs > 0 ? reapMaxMs : 60_000L;
 
         // Fail-fast: redis transport requires a host.
@@ -388,6 +390,18 @@ public final class NetworkConfig {
         if (v == null) return def;
         try { return Long.parseLong(String.valueOf(v)); }
         catch (NumberFormatException e) { throw new NetworkConfigException(key + ": expected long, got '" + v + "'"); }
+    }
+
+    private static long asDurationMs(Map<String, Object> m, String key, long def) {
+        Object v = m.get(key);
+        if (v == null) return def;
+        DurationParser.ParsedDuration parsed =
+                DurationParser.parse(String.valueOf(v), TemporalUnit.MILLISECOND);
+        double millis = parsed == null ? Double.NaN : parsed.toMillis();
+        if (!Double.isFinite(millis) || millis < -0x1.0p63 || millis >= 0x1.0p63) {
+            throw new NetworkConfigException(key + ": expected duration, got '" + v + "'");
+        }
+        return Math.round(millis);
     }
 
     /**

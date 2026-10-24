@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.fabric.tools;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -153,7 +154,7 @@ public final class FabricBrigadierSourceBridge {
     /**
      * Permission predicate. Mirrors {@code RTPFabricMod}'s prior contract:
      * non-player sources bypass; players consult
-     * {@code RTP.serverAccessor.getSender(uuid).hasPermission(perm)};
+     * {@code RTPRuntime.serverAccessor().getSender(uuid).hasPermission(perm)};
      * unknown sender entries fail closed.
      */
     public static boolean checkPermission(Object src, String permission) {
@@ -162,7 +163,7 @@ public final class FabricBrigadierSourceBridge {
         if (RTPAPI.serverId.equals(uuid)) return true;
         try {
             io.github.dailystruggle.rtp.api.entity.RTPCommandSender sender =
-                    RTP.serverAccessor.getSender(uuid);
+                    RTPRuntime.serverAccessor().getSender(uuid);
             if (sender == null) return false;
             return sender.hasPermission(permission);
         } catch (Throwable t) {

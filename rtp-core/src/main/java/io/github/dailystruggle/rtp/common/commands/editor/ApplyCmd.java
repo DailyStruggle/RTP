@@ -2,8 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -76,7 +78,7 @@ public class ApplyCmd extends BaseRTPCmdImpl {
         }
 
         // S-006: Pre-init fail-closed guard
-        if (RTP.serverAccessor == null || RTP.configs == null) {
+        if (RTPRuntime.serverAccessor() == null || ActiveConfigs.get() == null) {
             sendMessage(callerId, "RTP: Core is not initialized yet. Please wait.");
             return true;
         }
@@ -120,12 +122,12 @@ public class ApplyCmd extends BaseRTPCmdImpl {
             // Also keeps the offline drop lookup below a single file name inside editor/
             return CompletableFuture.failedFuture(new IllegalArgumentException("Malformed session token"));
         }
-        RTP.log(Level.FINE, "[editor] applying session " + shown);
+        RTPRuntime.log(Level.FINE, "[editor] applying session " + shown);
         // 1. Check local in-memory ephemeral active sessions first
         String localPayload = EditorSessionManager.getInstance().getSession(finalToken);
         final boolean fromSession = localPayload != null;
 
-        // 2. Offline file drop, then the byte store; S-005: the drop's disk I/O runs on RTP.scheduler's async pool
+        // 2. Offline file drop, then the byte store; S-005: the drop's disk I/O runs on RTPRuntime.scheduler()'s async pool
         CompletableFuture<Fetched> payloadFuture = fromSession
                 ? CompletableFuture.completedFuture(new Fetched(localPayload, false))
                 : EditorSecurity.supplyAsync(() -> readOfflineDrop(callerId, finalToken, shown))
@@ -148,12 +150,18 @@ public class ApplyCmd extends BaseRTPCmdImpl {
             // S-004: Zero silent swallows on invalid token or apply failure; the token is not echoed
             Throwable cause = EditorChannelWiring.cause(throwable);
             if (cause instanceof EditorSessionManager.MissingDigestException) {
-                RTP.log(Level.WARNING, "[editor] apply of session " + shown + " refused: " + cause.getMessage());
+                RTPRuntime.log(Level.WARNING, "[editor] apply of session " + shown + " refused: " + cause.getMessage());
                 sendMessage(callerId, EditorChannelWiring.message("editorApplyDigestMissing",
                         "[P0] The editor payload has no sha256 checksum, so it was not applied. Commit again from an up-to-date editor page."));
                 return null;
             }
-            RTP.log(Level.WARNING, "[editor] apply of session " + shown + " failed: " + cause.getMessage(), cause);
+            if (cause instanceof ConfigCandidateGate.RejectedException) {
+                // ADR-121 section 7: findings were logged by the gate; nothing was written
+                RTPRuntime.log(Level.WARNING, "[editor] apply of session " + shown + " rejected by config PBIT");
+                sendMessage(callerId, cause.getMessage());
+                return null;
+            }
+            RTPRuntime.log(Level.WARNING, "[editor] apply of session " + shown + " failed: " + cause.getMessage(), cause);
             sendMessage(callerId, EditorChannelWiring.message("editorApplyFailed",
                     "[P0] Failed to apply payload: [reason]")
                     .replace("[reason]", String.valueOf(cause.getMessage())));
@@ -171,9 +179,9 @@ public class ApplyCmd extends BaseRTPCmdImpl {
      */
     @Nullable
     private static String readOfflineDrop(@Nullable UUID callerId, String token, String shown) {
-        if (RTP.serverAccessor == null) return null;
+        if (RTPRuntime.serverAccessor() == null) return null;
         try {
-            File pluginDir = RTP.serverAccessor.getPluginDirectory();
+            File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
             if (pluginDir == null) return null;
             Path editorDir = pluginDir.toPath().resolve("editor");
             Path tokenFile = editorDir.resolve(token.endsWith(".json") ? token : token + ".json");
@@ -188,7 +196,7 @@ public class ApplyCmd extends BaseRTPCmdImpl {
             return Files.readString(tokenFile, StandardCharsets.UTF_8);
         } catch (IOException | RuntimeException e) {
             // S-004: an unreadable drop file falls through to the byte store, but is reported
-            RTP.log(Level.WARNING, "[editor] offline apply file for session " + shown + " unreadable: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] offline apply file for session " + shown + " unreadable: " + e.getMessage(), e);
             sendMessage(callerId, EditorChannelWiring.message("editorApplyFileUnreadable",
                     "[P0] The offline apply file could not be read ([reason]); trying the byte store.")
                     .replace("[reason]", String.valueOf(e.getMessage())));
@@ -197,9 +205,9 @@ public class ApplyCmd extends BaseRTPCmdImpl {
     }
 
     private static void sendMessage(@Nullable UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
+        if (callerId == null || RTPRuntime.serverAccessor() == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg);
         } catch (Exception ignored) {
         }
     }

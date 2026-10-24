@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +19,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -40,6 +43,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           int z = location.getBlockZ();
           return world.getBiome(x, y, z).name();
         } catch (Throwable t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+              "World#getBiome", t.getClass().getSimpleName() + ": " + t.getMessage());
           return Biome.PLAINS.name();
         }
       };
@@ -212,9 +217,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       String dim = dimensionRegionSubpath(world);
       return anvilProbeSupport
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
-              s -> (RTP.serverAccessor != null)
-                  ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
-                  : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(s))
+              s -> (RTPRuntime.serverAccessor() != null)
+                  ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
+                  : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s))
           .thenCompose(result -> {
             io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
             if (view != null) {
@@ -281,8 +286,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
-                s -> (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                s -> (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                     : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
       } catch (Throwable t) {
         RTP.log(java.util.logging.Level.FINE,
@@ -474,7 +479,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * the async scheduler rejects, so dependents are never stranded.
    */
   static final java.util.concurrent.Executor OFF_REGION = task -> {
-    Object handle = RTP.serverAccessor != null ? RTP.serverAccessor.getPlugin() : null;
+    Object handle = RTPRuntime.serverAccessor() != null ? RTPRuntime.serverAccessor().getPlugin() : null;
     if (handle instanceof org.bukkit.plugin.Plugin plugin && plugin.isEnabled()) {
       try {
         org.bukkit.Bukkit.getAsyncScheduler().runNow(plugin, st -> task.run());
@@ -527,7 +532,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     try {
       @SuppressWarnings("unchecked")
       ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+          (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null) return true;
       Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
       boolean enabled;
@@ -604,8 +609,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @SuppressWarnings("unchecked")
   private static java.util.Set<String> currentUnsafeBlocks() {
     try {
-      if (RTP.configs == null) return java.util.Collections.emptySet();
-      Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (ActiveConfigs.get() == null) return java.util.Collections.emptySet();
+      Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
       if (raw instanceof java.util.Collection<?> c) {
         java.util.Set<String> out = new java.util.HashSet<>(c.size());
         for (Object o : c) if (o != null) out.add(o.toString());
@@ -754,7 +759,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       org.bukkit.plugin.Plugin plugin, int cx, int cz, boolean forceLoad, Object deferredToken) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
     io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
-        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+        RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getScheduler();
     if (scheduler == null || !plugin.isEnabled()) {
       // Shutdown: the scheduler would drop the task and the future would never complete.
       if (deferredToken != null) deferredTicketAdds.remove(key, deferredToken);
@@ -810,9 +815,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     if (view != null) {
       int cx = (int) (key & 0xffffffffL);
       int cz = (int) (key >> 32);
-      java.util.Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+      java.util.Set<String> reconciled = (RTPRuntime.serverAccessor() != null)
+          ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
+          : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
       return new FoliaRTPChunk(view, cx, cz, id, reconciled);
     }
     return null;
@@ -821,11 +826,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   public RTPChunk<?> createChunk(Object preformedData, int cx, int cz, Set<String> reconciledUnsafe) {
     if (preformedData instanceof io.github.dailystruggle.rtp.anvil.AnvilChunkView view) {
-      java.util.Set<String> reconciled = (reconciledUnsafe != null)
-          ? reconciledUnsafe
-          : ((RTP.serverAccessor != null)
-              ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
-              : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks()));
+      java.util.Set<String> reconciled = reconciledUnsafe;
+      if (reconciled == null) {
+        reconciled = RTPRuntime.serverAccessor() != null
+            ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
+            : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+      }
       return new FoliaRTPChunk(view, cx, cz, id, reconciled);
     }
     throw new IllegalArgumentException("Unsupported preformed chunk data: " + (preformedData == null ? "null" : preformedData.getClass().getName()));
@@ -869,7 +875,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public void forgetChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {
+    RTPRuntime.scheduler().runTask(this, cx, cz, () -> {
       setForceLoaded(cx, cz, false);
       chunkCache.remove(((long) cx & 0xffffffffL | ((long) cz << 32)));
     });
@@ -1042,7 +1048,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     // entity-region thread). Bounce the work to the destination region(s) via the
     // RegionScheduler. See REQ-RTP-S-005 / Folia threading rules in `Project Guidelines`.
     try {
-      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null || world == null) return;
       int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
       // Honour the documented "disable platforms" contract from safety.yml (platformRadius: -1).
@@ -1051,7 +1057,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       int airHeight = safety.getNumber(SafetyKeys.platformAirHeight, 0).intValue();
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
       // ADR-060: optional block-restoration timeout (-1 disables, skips capture).
-      final int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
+      long restoreDurationSeconds = safety.getDuration(SafetyKeys.platformRestoreSeconds,
+          TemporalUnit.SECOND, TemporalUnit.SECOND, -1L);
+      final int restoreSeconds = (int) Math.max(Integer.MIN_VALUE,
+          Math.min(Integer.MAX_VALUE, restoreDurationSeconds));
       Object rawMat = safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS");
       final Material materialFinal = BukkitMaterialResolver.resolve(
           rawMat != null ? rawMat.toString() : "GLASS",
@@ -1083,7 +1092,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           final int chunkMaxX = Math.min(lx + radiusFinal, (cx << 4) + 15);
           final int chunkMinZ = Math.max(lz - radiusFinal, cz << 4);
           final int chunkMaxZ = Math.min(lz + radiusFinal, (cz << 4) + 15);
-          RTP.scheduler.runTask(this, chunkX, chunkZ, () -> {
+          RTPRuntime.scheduler().runTask(this, chunkX, chunkZ, () -> {
             java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> diff =
                 restoreSeconds >= 0 ? new java.util.ArrayList<>() : null;
             for (int x = chunkMinX; x <= chunkMaxX; x++) {

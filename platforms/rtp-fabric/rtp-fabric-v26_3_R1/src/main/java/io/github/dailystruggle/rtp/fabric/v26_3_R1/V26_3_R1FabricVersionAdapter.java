@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.fabric.v26_3_R1;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.unobf.effects.FabricEffectsHandlerUnobf;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle;
@@ -118,12 +119,12 @@ public final class V26_3_R1FabricVersionAdapter implements FabricVersionAdapter 
             return server.submit(() -> tryAddTempLoadTicket(sl, ticketPos))
                     .thenComposeAsync(added -> invokeGetChunkFuture(sl, cx, cz).whenComplete((handle, ex) -> {
                         if (Boolean.TRUE.equals(added)) scheduleTempLoadTicketRemoval(sl, ticketPos);
-                    }), r -> RTP.scheduler.runTaskAsynchronously(r));
+                    }), r -> RTPRuntime.scheduler().runTaskAsynchronously(r));
         }
         final boolean ticketAdded = tryAddTempLoadTicket(sl, ticketPos);
         if (server != null) {
             CompletableFuture<RTPChunkHandle> out = new CompletableFuture<>();
-            RTP.scheduler.runTaskAsynchronously(() ->
+            RTPRuntime.scheduler().runTaskAsynchronously(() ->
                     invokeGetChunkFuture(sl, cx, cz).whenComplete((handle, ex) -> {
                         if (ticketAdded) scheduleTempLoadTicketRemoval(sl, ticketPos);
                         if (ex != null) out.completeExceptionally(ex);
@@ -316,8 +317,8 @@ public final class V26_3_R1FabricVersionAdapter implements FabricVersionAdapter 
                 () -> {
                     io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape =
                             (io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>)
-                                    io.github.dailystruggle.rtp.common.RTP.factoryMap
-                                            .get(io.github.dailystruggle.rtp.common.RTP.factoryNames.shape)
+                                    io.github.dailystruggle.rtp.common.factory.FactoryRegistry
+                                            .get(io.github.dailystruggle.rtp.common.factory.FactoryNames.shape)
                                             .get("SQUARE");
                     if (shape instanceof io.github.dailystruggle.rtp.common.selection
                             .region.selectors.memory.shapes.Square square) {

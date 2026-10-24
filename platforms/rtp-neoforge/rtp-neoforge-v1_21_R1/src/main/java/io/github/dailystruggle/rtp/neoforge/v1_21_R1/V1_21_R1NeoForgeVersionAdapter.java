@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.neoforge.v1_21_R1;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Holder;
@@ -197,7 +198,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         final ChunkPos cp = new ChunkPos(cx, cz);
         boolean ticketAdded = false;
         try {
-            addRtpTicket(cache, cp);
+            addRtpTicket(cache, level, cp, true);
             ticketAdded = true;
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
@@ -222,7 +223,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         // applied separately after cold->hot promotion, so S-002 is unaffected.
         if (server.isSameThread()) {
             CompletableFuture<ChunkAccess> out = new CompletableFuture<>();
-            RTP.scheduler.runTaskAsynchronously(() ->
+            RTPRuntime.scheduler().runTaskAsynchronously(() ->
                     invokeGetChunkFuture(level, cx, cz, cp, addedTicket).whenComplete((ca, ex) -> {
                         if (ex != null) out.completeExceptionally(ex);
                         else out.complete(ca);
@@ -270,7 +271,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
      */
     private static void scheduleTicketRemoval(ServerLevel level, ChunkPos cp) {
         MinecraftServer server = level.getServer();
-        Runnable remove = () -> tryRemoveLoadTicket(level.getChunkSource(), cp);
+        Runnable remove = () -> tryRemoveLoadTicket(level, cp);
         if (!server.isSameThread()) {
             server.execute(remove);
         } else {
@@ -278,9 +279,9 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
     }
 
-    private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
+    private static void tryRemoveLoadTicket(ServerLevel level, ChunkPos cp) {
         try {
-            removeRtpTicket(cache, cp);
+            removeRtpTicket(level.getChunkSource(), level, cp, true);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][NeoForge 1.21.1] temp load-ticket release failed for chunk=("
@@ -315,11 +316,9 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     // -------------------------------------------------------------------------
     // Non-persistent chunk tickets - see NeoForgeVersionAdapter Javadoc and
     // rtp-fabric-ADR-006 / -016 (ported). create(name, comparator, timeout=0)
-    // yields a non-persistent, non-expiring type; distance 1 -> effective level
-    // 33-1=32 (FULL/BORDER, below ENTITY_TICKING): the chunk stays pinned and
-    // block-readable for RTPChunk#isSafe but does not entity-tick, so a
-    // player-less kept chunk costs ~0 MSPT; the player's own arrival ticket
-    // promotes it to ENTITY_TICKING on teleport without a regen. Supersedes
+    // yields a non-persistent, non-expiring type. Distance 0 holds one FULL,
+    // non-ticking chunk; distance 1 is reserved for active hill checks that read
+    // the resident 3x3. Supersedes
     // ADR-006's ENTITY_TICKING end-state for the kept cache (rtp-fabric-ADR-016).
     // -------------------------------------------------------------------------
 
@@ -344,7 +343,11 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     private static volatile Method SCC_REMOVE_TICKET_RADIUS;
     private static volatile Object MODERN_TICKET_TYPE;
 
-    private static final int RTP_TICKET_DISTANCE = 1;
+    private record RtpTicketKey(ServerLevel level, long chunkPosition, boolean temporary) {}
+
+    private static final java.util.concurrent.ConcurrentHashMap<RtpTicketKey,
+            java.util.concurrent.ConcurrentLinkedQueue<Integer>> RTP_TICKET_DISTANCES =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     private static TicketType<ChunkPos> ticketType() {
         TicketType<ChunkPos> t = RTP_TICKET_TYPE;
@@ -619,25 +622,48 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     }
 
     /** Add the RTP load ticket for {@code cp}, dispatching on the resolved strategy. */
-    private static void addRtpTicket(ServerChunkCache cache, ChunkPos cp) throws ReflectiveOperationException {
+    private static void addRtpTicket(
+            ServerChunkCache cache, ServerLevel level, ChunkPos cp, boolean temporary)
+            throws ReflectiveOperationException {
         ensureTicketStrategy(cache);
+        int ticketDistance = io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance();
         if (TICKET_MODE == TICKET_MODE_MODERN) {
-            SCC_ADD_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+            SCC_ADD_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, ticketDistance);
         } else {
             Object dm = distanceManager(cache);
-            ADD_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
+            ADD_TICKET_METHOD.invoke(dm, ticketType(), cp, ticketDistance, cp);
         }
+        ticketDistances(level, cp, temporary).offer(ticketDistance);
     }
 
     /** Remove the RTP load ticket for {@code cp}, dispatching on the resolved strategy. */
-    private static void removeRtpTicket(ServerChunkCache cache, ChunkPos cp) throws ReflectiveOperationException {
+    private static void removeRtpTicket(
+            ServerChunkCache cache, ServerLevel level, ChunkPos cp, boolean temporary)
+            throws ReflectiveOperationException {
         ensureTicketStrategy(cache);
+        RtpTicketKey key = new RtpTicketKey(level, cp.toLong(), temporary);
+        java.util.concurrent.ConcurrentLinkedQueue<Integer> distances = RTP_TICKET_DISTANCES.get(key);
+        Integer appliedDistance = distances == null ? null : distances.peek();
+        int ticketDistance = appliedDistance == null
+                ? io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance()
+                : appliedDistance;
         if (TICKET_MODE == TICKET_MODE_MODERN) {
-            SCC_REMOVE_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, RTP_TICKET_DISTANCE);
+            SCC_REMOVE_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, ticketDistance);
         } else {
             Object dm = distanceManager(cache);
-            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
+            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), cp, ticketDistance, cp);
         }
+        if (appliedDistance != null) {
+            distances.poll();
+            if (distances.isEmpty()) RTP_TICKET_DISTANCES.remove(key, distances);
+        }
+    }
+
+    private static java.util.concurrent.ConcurrentLinkedQueue<Integer> ticketDistances(
+            ServerLevel level, ChunkPos cp, boolean temporary) {
+        return RTP_TICKET_DISTANCES.computeIfAbsent(
+                new RtpTicketKey(level, cp.toLong(), temporary),
+                key -> new java.util.concurrent.ConcurrentLinkedQueue<>());
     }
 
     private static Object distanceManager(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -650,7 +676,9 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             GET_DISTANCE_MANAGER_METHOD = m;
             return m.invoke(cache);
         }
-        return GET_DISTANCE_MANAGER_FIELD.get(cache);
+        f = GET_DISTANCE_MANAGER_FIELD;
+        if (f == null) throw new NoSuchFieldException("ServerChunkCache distance manager field was not found");
+        return f.get(cache);
     }
 
     @Override
@@ -660,7 +688,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
         try {
             ServerChunkCache cache = level.getChunkSource();
-            addRtpTicket(cache, new ChunkPos(cx, cz));
+            addRtpTicket(cache, level, new ChunkPos(cx, cz), false);
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
@@ -677,7 +705,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
         try {
             ServerChunkCache cache = level.getChunkSource();
-            removeRtpTicket(cache, new ChunkPos(cx, cz));
+            removeRtpTicket(cache, level, new ChunkPos(cx, cz), false);
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
@@ -885,7 +913,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         // NeoForgeRTPPlayer resolved and owns, so all server/level state is
         // reached through the player handle (sp.level()) rather than a standalone
         // MinecraftServer. The caller (NeoForgeRTPPlayer#renderMapChart) has
-        // already hopped to the server tick thread via RTP.scheduler, so map
+        // already hopped to the server tick thread via RTPRuntime.scheduler(), so map
         // allocation, colour writes, packet dispatch, and inventory mutation are
         // all server-thread-safe here.
         if (!(serverPlayer instanceof ServerPlayer sp)

@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuActionToCommand;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeBookOpener;
 
 import java.util.ArrayList;
@@ -94,7 +95,7 @@ public final class NeoForgeBookMenuRenderer implements MenuRenderer {
      */
     private static NeoForgeBookOpener resolveOpener(UUID playerId) {
         try {
-            RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
+            RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(playerId);
             if (player instanceof NeoForgeBookOpener opener) {
                 return opener;
             }
@@ -138,7 +139,7 @@ public final class NeoForgeBookMenuRenderer implements MenuRenderer {
         if (raw == null || raw.isEmpty()) return raw;
         try {
             UUID uuid = (playerId == null) ? RTPAPI.serverId : playerId;
-            return RTP.serverAccessor.format(uuid, raw);
+            return RTPRuntime.serverAccessor().format(uuid, raw);
         } catch (Throwable t) {
             // Test / pre-boot contexts without a wired accessor: pass the raw
             // string through so colour codes still render downstream.

@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -29,7 +29,7 @@ public class MemoryShapeOutOfDomainMarkTest {
 
     static {
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
@@ -49,7 +49,7 @@ public class MemoryShapeOutOfDomainMarkTest {
         for (int x = cx - half; x < cx + half; x++) {
             for (int z = -half; z < half; z++) {
                 shape.addBadLocation(
-                        shape.xzToLocation((long) x, (long) z), LocationGenerator.FailTypes.safety);
+                        shape.xzToLocation((long) x, (long) z), FailTypes.safety);
             }
         }
         shape.flushAndRebuild(0L);

@@ -1,0 +1,1995 @@
+package io.github.dailystruggle.rtp.common.tasks.scan;
+
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
+import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
+import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
+import io.github.dailystruggle.rtp.common.selection.region.MaterialNames;
+import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.ScanProgressView;
+import java.io.File;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+
+/** Task for pre-scanning a region with valid teleport locations */
+public class ScanTask extends RTPRunnable implements ScanProgressView {
+  /** Spark-profiler frame tag (diagram 05). See {@link RTPRunnable#sparkFrameName()}. */
+  @Override
+  protected String sparkFrameName() { return "rtp_scan_crawler"; }
+
+  @Override
+  public long absolutePos() {
+    return latestAbsolutePos;
+  }
+
+  @Override
+  public long absoluteTotal() {
+    return latestAbsoluteTotal;
+  }
+
+  @Override
+  public long cps() {
+    return latestCps;
+  }
+
+  @Override
+  public double landPercentage() {
+    return latestLandPercentage;
+  }
+
+  @Override
+  public long etaSeconds() {
+    return latestEtaSeconds;
+  }
+
+  /** Number of locations to process in each step */
+  public final AtomicLong scanIncrement = new AtomicLong(0L);
+  private final AtomicLong cps = new AtomicLong(128);
+  private static final BigInteger increment_big = BigInteger.ONE;
+
+  // Instance trackers to natively isolate data per ScanTask
+  public long latestAbsolutePos = 0;
+  public long latestAbsoluteTotal = 0;
+  public long latestCps = 0;
+  public long latestEtaSeconds = 0;
+
+  public final Region region;
+  private final AtomicLong scanIter;
+  private final CompletableFuture<Boolean> done = new CompletableFuture<>();
+  public long currentOffset = 0L;
+
+  /**
+   * Scan phase constants:
+   *   0 = PRESCAN (anvil probe sweep; fast pre-filtering).
+   *   1 = FULLSCAN (full chunk-load sweep over non-bad positions).
+   *   2 = GENSCAN (generation pre-pass).
+   */
+  public static final int PHASE_PRESCAN = 0;
+  public static final int PHASE_FULLSCAN = 1;
+  public static final int PHASE_GENSCAN = 2;
+  final AtomicInteger scanPhase = new AtomicInteger(PHASE_PRESCAN);
+
+  /** Whether the task is currently paused */
+  public AtomicBoolean pause = new AtomicBoolean(false);
+
+  private static final int MAX_PENDING_CHUNKS = 50;
+  private final Semaphore inFlightGate = new Semaphore(MAX_PENDING_CHUNKS);
+
+  // Upper bound (ms) on how long a cancel/pause drain will block the caller
+  // (typically the command / main thread) waiting for in-flight chunk futures
+  // to settle. A hung or timing-out chunk load must never freeze the server, so
+  // the drain is bounded: once the cancelled/pause flag is set, late callbacks
+  // are already guarded (they check isCancelled()/pause and complete false
+  // without mutating shape state), so proceeding after the timeout is safe.
+  private static final long DRAIN_TIMEOUT_MS = 5_000L;
+
+  // Region name -> latest async cancel/pause teardown; read by ScanStartCmd to refuse a restart mid-teardown.
+  private static final java.util.concurrent.ConcurrentHashMap<String, CompletableFuture<Void>> PENDING_TEARDOWNS =
+          new java.util.concurrent.ConcurrentHashMap<>();
+
+  // In-flight chunk-load futures dispatched by runFullLoadPath. Tracked so a
+  // cancel/pause can actively cancel them instead of waiting out the per-future
+  // 30s orTimeout one by one - cancelling completes our future chain promptly,
+  // releases the inFlightGate, and stops the timeout-exception log spam.
+  private final Set<CompletableFuture<?>> inFlightChunkFutures = ConcurrentHashMap.newKeySet();
+
+  /*
+   * Concurrency gauge for the scan driver. Incremented at dispatch,
+   * decremented on future completion. `peakInFlight` tracks the max observed in a batch; both are
+   * logged + reset in wrapUpBatch. If peak stays well below MAX_PENDING_CHUNKS, the driver is the bottleneck,
+   * not the I/O pool.
+   */
+  private final AtomicInteger inFlight = new AtomicInteger(0);
+  private final AtomicInteger peakInFlight = new AtomicInteger(0);
+
+  /*
+   * Cumulative GC time (ms) observed at the start of the previous gauge
+   * log. Delta = current - last, reported as gcDeltaMs in the log line. If this climbs with
+   * scan progress it confirms the 4MB-per-region byte[] churn is pressuring the collector.
+   */
+  private long lastGcTotalMs = -1L;
+
+  /*
+   * Stage-2 (full chunk load + safety scan) cost. Count and total wall-clock
+   * nanos accumulated per gauge window. Reported as fullLoads / fullLoadAvgMs. If fullLoadAvgMs
+   * grows with scan progress while probe I/O (avgColdMissMs) stays flat, the degradation is in
+   * stage-2 (loaded-chunk path), not the probe prefilter.
+   */
+  private final java.util.concurrent.atomic.AtomicLong fullLoadCount = new java.util.concurrent.atomic.AtomicLong(0L);
+  private final java.util.concurrent.atomic.AtomicLong fullLoadNanos = new java.util.concurrent.atomic.AtomicLong(0L);
+
+  /*
+   * Per-outcome counters for the probe-first fast path. Diagnostic only; emitted on the
+   * concurrency gauge log. Tells us which branch of evaluateScanProbe / tryProbeFirstScan is
+   * consuming each candidate. These counters split the full-load bucket so the dominant
+   * routing cause can be identified.
+   */
+  private final AtomicLong probeOutcomeProbeNull = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeAdjustNull = new AtomicLong(0L);
+  /*
+   * Sub-attribution of probeOutcomeAdjustNull. The single adjustNull
+   * counter is ambiguous across platforms (Paper-vs-Folia asymmetry cannot
+   * be diagnosed without a debugger). These four buckets are mutually
+   * exclusive and sum to adjustNull. Reasons map to VerticalAdjustor.
+   * ProbeRejectReason: LIGHT_GATE / WINDOW / SCAN_MISS / THREW.
+   */
+  private final AtomicLong probeOutcomeAdjustNullLight = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeAdjustNullWindow = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeAdjustNullScan = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeAdjustNullThrew = new AtomicLong(0L);
+  /*
+   * Counts SCAN_MISS verdicts short-circuited to addBadLocation without full chunk load.
+   * Subset of probeOutcomeAdjustNullScan.
+   */
+  private final AtomicLong probeOutcomeAdjustNullScanShortCircuit = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeBiomeReject = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeBlockReject = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeCacheMissAccept = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeCacheHitLoad = new AtomicLong(0L);
+
+  /*
+   * GENSCAN attribution: per-batch counts of isChunkGenerated verdicts.
+   * Tracks generated, ungenerated, and threw states for disk presence.
+   */
+  private final AtomicLong genscanGenerated = new AtomicLong(0L);
+  private final AtomicLong genscanUngenerated = new AtomicLong(0L);
+  private final AtomicLong genscanThrew = new AtomicLong(0L);
+
+  /*
+   * Cumulative count of ungenerated chunks observed during GENSCAN.
+   * If > 0, triggers fallback to FULLSCAN when ungenerated chunks are present.
+   */
+  private final AtomicLong genscanUngeneratedTotal = new AtomicLong(0L);
+
+  /*
+   * Rejection sub-attribution counters for runFullLoadPath.
+   * Splits failure causes: timeout/null, biomes, vert adjustment, overflow, safety, or exceptions.
+   */
+  private final AtomicLong fullLoadOutcomeAccept = new AtomicLong(0L);
+  private final AtomicLong fullLoadOutcomeTimeoutOrNull = new AtomicLong(0L);
+  private final AtomicLong fullLoadOutcomeMidBiome = new AtomicLong(0L);
+  private final AtomicLong fullLoadOutcomeVertAdjust = new AtomicLong(0L);
+  private final AtomicLong fullLoadOutcomePhysBiome = new AtomicLong(0L);
+  private final AtomicLong fullLoadOutcomeYOverflow = new AtomicLong(0L);
+  private final AtomicLong fullLoadOutcomeSafetyScan = new AtomicLong(0L);
+  private final AtomicLong fullLoadOutcomeCrashed = new AtomicLong(0L);
+
+  // Land-percentage accounting: tracks accept/reject verdicts during PRESCAN
+  // and FULLSCAN to yield an honest accept/(accept+reject) ratio for display.
+  // Not derived from MemoryShape.getEffectiveBadCount() because the shape's
+  // totalBadCount includes gap-bridged runs and outer-ring preimages that can
+  // exceed finalPos1 and clamp land% to 0.00%.
+  private final AtomicLong scanGoodCount = new AtomicLong(0L);
+  private final AtomicLong scanBadCount = new AtomicLong(0L);
+  public volatile double latestLandPercentage;
+
+  // Tracks whether the "prescan starting" announcement has been emitted for
+  // this task instance. Symmetric with the existing "prescan complete; starting
+  // full-load verification pass" log emitted at the PRESCAN -> FULLSCAN flip:
+  // without it, users who run /rtp scan see no indication that the cheap probe
+  // sweep (PRESCAN) is the active phase, and mistake long initial runtimes for
+  // a stalled fullscan. Logged once per run() entry when phase==PRESCAN.
+  private final AtomicBoolean prescanAnnounced = new AtomicBoolean(false);
+
+  private long lastSaveTime = 0;
+
+  // Status-window origin for the reported cps/ETA: wall time and spiral position. A single
+  // batch is ~1 region file, so its rate swings 20x between a cold and a warm .mca read.
+  private volatile long statusWindowStartMs = -1L;
+  private volatile long statusWindowStartPos = 0L;
+
+  public long getStatusWindowStartMs() {
+    return statusWindowStartMs;
+  }
+
+  public void resetStatusWindow() {
+    statusWindowStartMs = -1L;
+  }
+
+  private BigInteger cps_all = BigInteger.ZERO;
+  private BigInteger cps_divisor = BigInteger.ZERO;
+
+  {
+    RTP.futures.add(done);
+  }
+
+  /**
+   * Constructor for ScanTask
+   *
+   * @param region the region to scan
+   * @param start the starting location index
+   */
+  public ScanTask(Region region, long start) {
+    this.region = region;
+    this.scanIter = new AtomicLong(start);
+    long[] progress = loadProgress(region.name, region.cacheKey());
+    if (progress != null) {
+      if (progress.length > 3) this.currentOffset = progress[3];
+      // Persisted phase byte only stores PRESCAN(0)/FULLSCAN(1); a resumed
+      // scan skips the transient GENSCAN pre-phase. See PHASE_GENSCAN docs.
+      if (progress.length > 4) this.scanPhase.set((int) progress[4]);
+    }
+    scanGoodCount.set(0L);
+    scanBadCount.set(0L);
+    latestLandPercentage = 0.0;
+
+    if (scanIncrement.get() <= 0) {
+      long cpu = Runtime.getRuntime().availableProcessors();
+      scanIncrement.set(cpu * 1000 / 32);
+    } else {
+      // try for 5 seconds between messages
+      scanIncrement.set(cps.get() * 5);
+    }
+
+    // Clear the shape only when starting from scratch (start==0 AND PRESCAN).
+    // When resuming mid-FULLSCAN with scanIter persisted as 0 (fresh Pass 2),
+    // the Pass 1 bad-location bitmap must be preserved so Pass 2 can skip
+    // positions already marked bad.
+    if (start == 0 && (scanPhase.get() == PHASE_PRESCAN || scanPhase.get() == PHASE_GENSCAN)
+        && region.shape instanceof MemoryShape<?> memoryShape) {
+      memoryShape.clear();
+    }
+  }
+
+  /**
+   * Performance-tracking constructor for {@link ScanTask}.
+   */
+  public ScanTask(Region region, long start, BigInteger cps_all, BigInteger divisor, long scanIncrementVal, long cpsVal) {
+    this.region = region;
+    this.scanIter = new AtomicLong(start);
+    this.cps_all = cps_all;
+    this.cps_divisor = divisor;
+    this.cps.set(cpsVal);
+    long[] progress = loadProgress(region.name, region.cacheKey());
+    if (progress != null) {
+      // Persisted phase byte only stores PRESCAN(0)/FULLSCAN(1); a resumed
+      // scan skips the transient GENSCAN pre-phase. See PHASE_GENSCAN docs.
+      if (progress.length > 4) this.scanPhase.set((int) progress[4]);
+      if (progress.length > 3) this.currentOffset = progress[3];
+    }
+    scanGoodCount.set(0L);
+    scanBadCount.set(0L);
+    latestLandPercentage = 0.0;
+
+    if (scanIncrementVal <= 0) {
+      long cpu = Runtime.getRuntime().availableProcessors();
+      scanIncrement.set(cpu * 10000 / 64);
+    } else {
+      scanIncrement.set(scanIncrementVal);
+    }
+  }
+
+  private static String phaseLabel(int phase) {
+    if (phase == PHASE_GENSCAN) return "genscan";
+    if (phase == PHASE_FULLSCAN) return "fullscan";
+    return "prescan";
+  }
+
+  /** Stop all running scan tasks */
+  public static void kill() {
+    ScanTasks.current().forEach((s, scanTask) -> scanTask.setCancelled(true));
+    ScanTasks.current().clear();
+  }
+
+  @Override
+  public void run() {
+    io.github.dailystruggle.rtp.common.tools.CfDiag.scanRunBatch.increment();
+    io.github.dailystruggle.rtp.common.tools.CfDiag.ensureStarted();
+    if (trackingId != null) {
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
+    }
+
+    if (!isRunning.compareAndSet(false, true)) {
+      RTPRuntime.log(Level.FINER, "[ScanTask] run() reentry skipped (already running) region=" + region.name);
+      return;
+    }
+
+    RTPRuntime.log(Level.FINE, "[ScanTask] batch entry region=" + region.name
+            + " phase=" + phaseLabel(scanPhase.get())
+            + " scanIter=" + scanIter.get()
+            + " scanIncrement=" + scanIncrement.get()
+            + " currentOffset=" + currentOffset);
+
+    // Announce the active scan phase at the beginning so users are not
+    // confused by the three-pass design (GENSCAN -> PRESCAN -> FULLSCAN).
+    // Phase transitions already log in wrapUpBatch; this covers the initial
+    // entry into a phase (fresh start, resume after pause, or resume after
+    // restart with a persisted phase).
+    if (prescanAnnounced.compareAndSet(false, true)) {
+      RTPRuntime.log(Level.INFO, "[RTP] starting scan (hybrid MCA off-tick / full-load generation) for region=" + region.name);
+    }
+
+    if (pause.get() || isCancelled() || scanIncrement.get() <= 0) {
+      RTPRuntime.log(Level.FINE, "[ScanTask] batch short-circuit region=" + region.name
+              + " pause=" + pause.get() + " cancelled=" + isCancelled()
+              + " scanIncrement=" + scanIncrement.get());
+      if (pause.get() || isCancelled()) {
+        if (region.getShape() instanceof MemoryShape<?> ms) {
+          ms.flushAndRebuild(ms.spatialResolution());
+          ms.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+        }
+        save();
+        if (isCancelled()) {
+          ScanTasks.current().remove(region.name, this);
+          done.complete(true);
+        }
+      }
+      isRunning.set(false);
+      return;
+    }
+
+    long timingStart = System.currentTimeMillis();
+
+    MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+    VerticalAdjustor<?> vert = region.getVert();
+    if (vert == null) {
+      RTPRuntime.log(Level.WARNING, "null vert");
+      isRunning.set(false);
+      return;
+    }
+
+    ConfigParser<PerformanceKeys> performance =
+            (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
+    ConfigParser<SafetyKeys> safety =
+            (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
+    ConfigParser<BlocksKeys> blocks =
+            (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
+    ConfigParser<BiomesKeys> biomesParser =
+            (ConfigParser<BiomesKeys>) ActiveConfigs.get().getParser(BiomesKeys.class);
+
+    Object o = biomesParser.getConfigValue(BiomesKeys.biomeWhitelist, false);
+    boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
+
+    o = biomesParser.getConfigValue(BiomesKeys.biomes, new ArrayList<String>());
+    if (!(o instanceof List<?>)) {
+      RTPRuntime.log(Level.WARNING, "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName(),
+              new IllegalArgumentException("expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName()));
+      biomesParser.set(BiomesKeys.biomes, new ArrayList<String>());
+    }
+
+    List<?> objList = (o instanceof List) ? ((List<?>) o) : new ArrayList<String>();
+    Set<String> biomeSet = objList.stream().map(o2 -> o2.toString().toUpperCase()).collect(Collectors.toSet());
+    Set<String> defaultBiomes;
+
+    if (whitelist) {
+      defaultBiomes = biomeSet;
+    } else {
+      Set<String> biomes = RTPRuntime.serverAccessor().getBiomes(region.getWorld());
+      Set<String> set = new HashSet<>();
+      for (String s : biomes) {
+        String su = s.toUpperCase();
+        if (!BiomeNames.matches(biomeSet, su)) {
+          set.add(su);
+        }
+      }
+      defaultBiomes = set;
+    }
+
+    o = blocks.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
+    Set<String> unsafeBlocks =
+            (o instanceof Collection)
+                    ? ((Collection<?>) o).stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet())
+                    : new HashSet<>();
+
+    int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
+    boolean biomeRecall = Boolean.parseBoolean(performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
+
+    RTPWorld world = region.getWorld();
+    WorldBorder border = (WorldBorder) RTPRuntime.serverAccessor().getWorldBorder(world.name());
+
+    long range = shape.getRange();
+    long pos;
+    long limit = scanIncrement.get();
+    long currentStart = scanIter.get();
+    long limitEnd = Math.min(range, currentStart + limit);
+    MutableRTPCoords cursor = new MutableRTPCoords(0, 0);
+    cursor.setWorldName(region.getWorld().name());
+
+    long activeChecks = 0;
+
+    // 1. Initialize the sliding window gate (field, shared with setCancelled for drain-on-shutdown)
+
+    // Group candidate positions by region file (rx, rz) into bins.
+    // Dispatched bin-by-bin to maximize anvil cache locality.
+    java.util.LinkedHashMap<Long, long[]> binHeaders = new java.util.LinkedHashMap<>();
+    java.util.HashMap<Long, long[]> binPositions = new java.util.HashMap<>();
+    java.util.HashMap<Long, int[]> binCx = new java.util.HashMap<>();
+    java.util.HashMap<Long, int[]> binCz = new java.util.HashMap<>();
+    // binHeaders value: {count, capacity} tracking per-bin fill; initial capacity 64, grows 2x.
+
+    pos = currentStart;
+    while (pos < limitEnd) {
+      if (pause.get() || isCancelled()) {
+        break;
+      }
+      if (shape.isKnownBad(pos) && shape.biomeAt(pos) != null) {
+        pos++;
+        continue;
+      }
+      shape.locationToXZ(pos, cursor);
+      // Circumscribing key spaces (dual-layer circle: square rings) hold keys outside the shape.
+      // Skip them unrecorded: marking them bad would feed expand's learned bad area and grow the
+      // effective radius for land that was never selectable.
+      if (!shape.contains(cursor.x, cursor.z)) {
+        pos++;
+        continue;
+      }
+      long key = (((long) (cursor.x >> 5)) << 32) | ((cursor.z >> 5) & 0xFFFFFFFFL);
+      long[] header = binHeaders.get(key);
+      long[] positions;
+      int[] cxArr;
+      int[] czArr;
+      if (header == null) {
+        header = new long[]{0L, 64L};
+        binHeaders.put(key, header);
+        positions = new long[64];
+        cxArr = new int[64];
+        czArr = new int[64];
+        binPositions.put(key, positions);
+        binCx.put(key, cxArr);
+        binCz.put(key, czArr);
+      } else {
+        positions = binPositions.get(key);
+        cxArr = binCx.get(key);
+        czArr = binCz.get(key);
+        if (header[0] >= header[1]) {
+          int newCap = (int) (header[1] * 2L);
+          long[] np = new long[newCap];
+          int[] ncx = new int[newCap];
+          int[] ncz = new int[newCap];
+          System.arraycopy(positions, 0, np, 0, (int) header[0]);
+          System.arraycopy(cxArr, 0, ncx, 0, (int) header[0]);
+          System.arraycopy(czArr, 0, ncz, 0, (int) header[0]);
+          positions = np;
+          cxArr = ncx;
+          czArr = ncz;
+          binPositions.put(key, positions);
+          binCx.put(key, cxArr);
+          binCz.put(key, czArr);
+          header[1] = newCap;
+        }
+      }
+      int count = (int) header[0];
+      positions[count] = pos;
+      cxArr[count] = cursor.x;
+      czArr[count] = cursor.z;
+      header[0] = count + 1L;
+      pos++;
+    }
+
+    // Dispatch bin-by-bin: one full region file's worth of candidates completes before the next
+    // bin starts. Within-bin in-flight probes all share the same .mca -> cache hit rate ~1.0.
+    RTPRuntime.log(Level.FINER, "[ScanTask] dispatching bins region=" + region.name
+            + " bins=" + binHeaders.size() + " cap=" + MAX_PENDING_CHUNKS);
+    outer:
+    for (java.util.Map.Entry<Long, long[]> binEntry : binHeaders.entrySet()) {
+      if (pause.get() || isCancelled()) {
+        RTPRuntime.log(Level.FINE, "[ScanTask] dispatch loop interrupted region=" + region.name
+                + " pause=" + pause.get() + " cancelled=" + isCancelled());
+        break;
+      }
+      long key = binEntry.getKey();
+      int binCount = (int) binEntry.getValue()[0];
+      RTPRuntime.log(Level.FINER, "[ScanTask] bin start region=" + region.name
+              + " binKey=" + key + " binCount=" + binCount);
+      long[] positions = binPositions.get(key);
+      int[] cxArr = binCx.get(key);
+      int[] czArr = binCz.get(key);
+
+      for (int bi = 0; bi < binCount; bi++) {
+        if (pause.get() || isCancelled()) {
+          break outer;
+        }
+        final long currentPos = positions[bi];
+        if (shape.isKnownBad(currentPos)) {
+          scanBadCount.incrementAndGet();
+          continue;
+        }
+        int centerBlockX = (cxArr[bi] << 4) + 8;
+        int centerBlockZ = (czArr[bi] << 4) + 8;
+
+        // 2. Throttle the loop natively.
+        try {
+          inFlightGate.acquire();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break outer;
+        }
+
+        activeChecks++;
+
+        try {
+          int now = inFlight.incrementAndGet();
+          peakInFlight.accumulateAndGet(now, Math::max);
+          CompletableFuture<Boolean> posFuture = testPos(region, currentPos, centerBlockX, centerBlockZ, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border);
+
+          // 3. Release the permit on asynchronous completion
+          posFuture.whenComplete((res, err) -> {
+            inFlight.decrementAndGet();
+            inFlightGate.release();
+            if (err == null && res != null) {
+              if (res) scanGoodCount.incrementAndGet();
+              else scanBadCount.incrementAndGet();
+            }
+          });
+        } catch (Exception e) {
+          // Failsafe: Release the permit instantly if a synchronous error occurs
+          inFlight.decrementAndGet();
+          inFlightGate.release();
+          // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
+          // deterministic, so re-rolling onto the same chunk produces the same placement and
+          // the same failure. Mark the twin spiral index too.
+          shape.addBadChunk(currentPos);
+          scanBadCount.incrementAndGet();
+          RTPRuntime.log(Level.WARNING, "Synchronous calculation failure at " + currentPos, e);
+        }
+      }
+
+      // No per-bin drain. An earlier design drained here (acquire(50)/release(50))
+      // to let AnvilRegionByteCache settle on one region file at a time. Read coalescing made
+      // cross-bin cache interference cheap (~49x dedup on concurrent misses), so the barrier
+      // was costing pipeline bubbles without earning correctness. Removing this drain lets
+      // the driver keep dispatching across bin boundaries and holds peakInFlight at cap.
+    }
+
+    final long finalPos1 = pos;
+    final long finalActiveChecks = activeChecks;
+
+    // 4. Drain the gate to wait for the final trailing chunks of the iteration to complete
+    RTPRuntime.log(Level.FINER, "[ScanTask] drain begin region=" + region.name
+            + " activeChecks=" + activeChecks + " inFlight=" + inFlight.get());
+    long drainStart = System.nanoTime();
+    try {
+      inFlightGate.acquire(MAX_PENDING_CHUNKS);
+      inFlightGate.release(MAX_PENDING_CHUNKS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    RTPRuntime.log(Level.FINER, "[ScanTask] drain end region=" + region.name
+            + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
+
+    // 5. Execute synchronously on the async thread, avoiding detached callback contexts
+    wrapUpBatch(finalPos1, finalActiveChecks, timingStart, range, shape, limitEnd);
+  }
+
+  private void wrapUpBatch(long finalPos1, long activeChecks, long timingStart, long range, MemoryShape<?> shape, long limitEnd) {
+    if (activeChecks > 0) {
+      long dtMillis = System.currentTimeMillis() - timingStart;
+      if (dtMillis <= 0) dtMillis = 1;
+      long cps_local = (activeChecks * 1000L) / dtMillis;
+      cps_all = cps_all.add(new BigInteger(String.valueOf(cps_local)));
+      cps_divisor = cps_divisor.add(increment_big);
+      cps.set((cps.get() * 7 / 8) + cps_local / 8);
+
+      if (statusWindowStartMs < 0 || finalPos1 < statusWindowStartPos) {
+        statusWindowStartMs = timingStart;
+        statusWindowStartPos = scanIter.get();
+      }
+      long windowMs = Math.max(1L, System.currentTimeMillis() - statusWindowStartMs);
+      long windowCps = Math.max(0L, finalPos1 - statusWindowStartPos) * 1000L / windowMs;
+
+      long etaSeconds = getEtaSeconds(range, finalPos1, shape, windowCps);
+
+      // --- LAND PERCENTAGE CALCULATION ---
+      // Derived from scanGoodCount / (scanGoodCount + scanBadCount) accumulated
+      // during the scan. MemoryShape.getEffectiveBadCount() is not used
+      // directly as a numerator or subtractor against finalPos1 because totalBadCount
+      // includes gap-bridged runs and outer-ring preimages that can exceed finalPos1.
+      double landPercentage;
+      long good = scanGoodCount.get();
+      long bad = scanBadCount.get();
+      double totalEvaluated = (double) good + bad;
+      landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
+      this.latestLandPercentage = landPercentage;
+      // ------------------------------------
+
+      this.latestAbsolutePos = finalPos1;
+      this.latestAbsoluteTotal = range;
+      this.latestCps = windowCps;
+      this.latestEtaSeconds = etaSeconds;
+
+      long now = System.currentTimeMillis();
+      if (now - lastSaveTime > 5000 || finalPos1 >= range || pause.get() || isCancelled()) {
+        shape.flushAndRebuild(shape.spatialResolution());
+
+        good = scanGoodCount.get();
+        bad = scanBadCount.get();
+        totalEvaluated = (double) good + bad;
+        landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
+        this.latestLandPercentage = landPercentage;
+
+        RTPRuntime.log(Level.FINE, "[ScanTask] checkpoint region=" + region.name
+                + " pos=" + finalPos1 + "/" + range
+                + " cps=" + cps_local + " etaSec=" + etaSeconds
+                + " land%=" + String.format("%.2f", landPercentage));
+        lastSaveTime = now;
+        statusWindowStartMs = now;
+        statusWindowStartPos = finalPos1;
+
+        // Concurrency gauge: observed peak in-flight probes this window vs the
+        // MAX_PENDING_CHUNKS cap. peak well below cap => driver-loop serialization (root-cause fix is driver
+        // prefetch or region-file batching, not adapter-side tuning).
+        int peak = peakInFlight.getAndSet(inFlight.get());
+        String cacheSuffix = readAnvilCacheStatsAndReset();
+        String gcSuffix = readGcDeltaMs();
+        String fullLoadSuffix = readFullLoadStatsAndReset();
+        String probeOutcomeSuffix = readProbeOutcomeStatsAndReset();
+        String phaseLabelStr = phaseLabel(scanPhase.get());
+        // Per-batch diagnostic split logged at Level.FINE to aid troubleshooting without INFO spam.
+        RTPRuntime.log(Level.FINE, "[TRACE] ScanTask diag region=" + region.name
+            + " phase=" + phaseLabelStr
+            + " cps=" + cps_local + " activeChecks=" + activeChecks + " peakInFlight=" + peak
+            + " currentInFlight=" + inFlight.get() + " cap=" + MAX_PENDING_CHUNKS
+            + cacheSuffix + gcSuffix + fullLoadSuffix + probeOutcomeSuffix);
+
+        String msg = ActiveConfigs.get().getConfigValue(CommandMessages.scanStatus, "").toString();
+
+        if (msg != null && !msg.isEmpty()) {
+          msg = msg.replace("[scan_regions]", region.name);
+          msg = msg.replace("[scan_region]", region.name);
+          msg = msg.replace("[region]", region.name);
+          msg = msg.replace("[scan_chunks]", String.valueOf(this.latestAbsolutePos));
+          msg = msg.replace("[scan_totalChunks]", String.valueOf(this.latestAbsoluteTotal));
+          msg = msg.replace("[scan_cps]", String.valueOf(windowCps));
+          msg = msg.replace("[scan_landPercentage]", String.format(java.util.Locale.ROOT, "%.2f", landPercentage));
+          msg = msg.replace("[scan_eta]", io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider.formatEta(etaSeconds));
+          RTPRuntime.serverAccessor().announce(msg, "rtp.scan", "");
+        }
+
+        save();
+        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+        // Persist generator-loaded chunks. On Spigot the platform RTPWorld
+        // delegates to org.bukkit.World#save() because Bukkit's autosave
+        // does not reliably flush chunks produced by external generators
+        // (see docs/dev/LESSONS_LEARNED.md → "Pre-Generation & Shutdown").
+        // On Paper / Folia / Fabric this is a no-op - those platforms'
+        // chunk systems persist via their own paths.
+        try {
+          region.getWorld().save();
+        } catch (Throwable t) {
+          RTPRuntime.log(Level.WARNING,
+              "[ScanTask] world.save() failed for region=" + region.name
+                  + " world=" + region.getWorld().name(), t);
+        }
+      }
+    }
+
+    scanIter.set(finalPos1);
+
+    if (finalPos1 >= range) {
+      RTPRuntime.log(Level.INFO, "[RTP] scan complete for region=" + region.name);
+
+      RTPRuntime.log(Level.FINE, "[ScanTask] scan complete region=" + region.name
+              + " finalPos=" + finalPos1 + " range=" + range);
+      shape.flushAndRebuild(shape.spatialResolution());
+      shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+      save(); // Ensure final pass is securely flushed before deletion
+      ScanTasks.current().remove(region.name, this);
+      delete();
+      // Mark the region as sufficiently pre-generated. This unlocks the
+      // backlog cache pulse (Region.processBacklog), which is gated on
+      // scanCompleted to avoid driving live-load chunk traffic while the
+      // pre-generation crawler is still consuming tick-thread budget.
+      region.scanCompleted = true;
+      // Scan-time page cache, coalescing and learned rejects no longer describe the fill/consume
+      // paths; let the probe-first governors re-learn (ADR-109).
+      io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.reset(region.name);
+      done.complete(true);
+      super.setCancelled(true);
+      isRunning.set(false);
+    } else if (!isCancelled() && !pause.get()) {
+      if (ScanTasks.current().get(region.name) == this) {
+        RTPRuntime.log(Level.FINER, "[ScanTask] yielding to scheduler for next batch region=" + region.name
+                + " nextScanIter=" + finalPos1);
+        shape.flushAndRebuild(shape.spatialResolution());
+        isRunning.set(false);
+        // Yield to the main thread between batches to allow pending chunk tickets to drain.
+        // If main thread is backlogged, a delayed async fallback ensures progress continues.
+        final ScanTask self = this;
+        final java.util.concurrent.atomic.AtomicBoolean dispatched =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        final Runnable dispatch = () -> {
+          if (dispatched.compareAndSet(false, true)) {
+            RTPRuntime.scheduler().runTaskAsynchronously(self);
+          }
+        };
+        RTPRuntime.scheduler().runTask(dispatch);
+        // Fallback fires via the platform async scheduler (Bukkit/Folia/
+        // Paper/Fabric) so the next batch starts even when the main thread
+        // is jammed. The fallback is a self-cancelling repeating-async
+        // task: cancel itself immediately after the first invocation so
+        // it only ever fires once. ~2s delay (40 ticks @ 20 TPS) matches
+        // the chunk-ticket budget used elsewhere in the pipeline.
+        final java.util.concurrent.atomic.AtomicReference<Object> fallbackHandle =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Object handle = RTPRuntime.scheduler().runTaskTimerAsynchronously(() -> {
+          try {
+            dispatch.run();
+          } finally {
+            Object h = fallbackHandle.get();
+            if (h != null) {
+              try {
+                RTPRuntime.scheduler().cancelTask(h);
+              } catch (Throwable ignored) {
+                // Platform scheduler may reject double-cancel; benign.
+              }
+            }
+          }
+        }, 40L, 40L);
+        fallbackHandle.set(handle);
+      } else {
+        RTPRuntime.log(Level.FINE, "[ScanTask] task supplanted; halting reschedule region=" + region.name);
+        isRunning.set(false);
+      }
+    } else {
+      isRunning.set(false);
+      if (isCancelled()) {
+        RTPRuntime.log(Level.FINE, "[ScanTask] batch end (cancelled) region=" + region.name);
+        ScanTasks.current().remove(region.name, this);
+        done.complete(true);
+      } else {
+        RTPRuntime.log(Level.FINE, "[ScanTask] batch end (paused) region=" + region.name);
+      }
+    }
+  }
+
+  // Reflectively read AnvilRegionByteCache.stats() + resetStats() so rtp-core doesn't
+  // need a compile-time dep on rtp-anvil for a diagnostic. Returns "" when rtp-anvil isn't on
+  // the classpath (Fabric builds, unit tests) or when no probes have run yet.
+  private static volatile java.lang.reflect.Method cacheStatsMethod;
+  private static volatile java.lang.reflect.Method cacheResetMethod;
+  private static volatile boolean cacheReflectResolved;
+
+  private static String readAnvilCacheStatsAndReset() {
+    try {
+      if (!cacheReflectResolved) {
+        synchronized (ScanTask.class) {
+          if (!cacheReflectResolved) {
+            try {
+              Class<?> c = Class.forName("io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache");
+              cacheStatsMethod = c.getMethod("stats");
+              cacheResetMethod = c.getMethod("resetStats");
+            } catch (Throwable ignored) {
+              // rtp-anvil not on classpath; leave methods null.
+            }
+            cacheReflectResolved = true;
+          }
+        }
+      }
+      if (cacheStatsMethod == null) return "";
+      Object stats = cacheStatsMethod.invoke(null);
+      long hits = (long) stats.getClass().getMethod("hits").invoke(stats);
+      long misses = (long) stats.getClass().getMethod("misses").invoke(stats);
+      long stale = (long) stats.getClass().getMethod("stale").invoke(stats);
+      long coalesced = 0L;
+      try {
+        coalesced = (long) stats.getClass().getMethod("coalesced").invoke(stats);
+      } catch (NoSuchMethodException ignored) {
+        // older rtp-anvil without the coalesced counter
+      }
+      // avgColdMissMs - average Files.readAllBytes wall time on misses. If this
+      // climbs from ~1ms (warm) to >20ms (cold disk) the scan frontier is paying real I/O
+      // and OS page-cache pressure is the primary bottleneck.
+      double avgColdMissMs = 0.0;
+      try {
+        avgColdMissMs = (double) stats.getClass().getMethod("avgColdMissMs").invoke(stats);
+      } catch (NoSuchMethodException ignored) {
+        // older rtp-anvil without cold-read timing
+      }
+      // statSkips - warm hits served without an mtime stat syscall. Near-parity with
+      // anvilCacheHits means the revalidation window is absorbing the per-probe stat cost.
+      long statSkips = 0L;
+      try {
+        statSkips = (long) stats.getClass().getMethod("statSkips").invoke(stats);
+      } catch (NoSuchMethodException ignored) {
+        // older rtp-anvil without the stat-skip counter
+      }
+      long total = hits + misses + coalesced;
+      if (total == 0) return " anvilCache=idle";
+      double rate = (double) (hits + coalesced) / (double) total;
+      if (cacheResetMethod != null) cacheResetMethod.invoke(null);
+      return " anvilCacheHits=" + hits + " anvilCacheMisses=" + misses + " anvilCacheStale=" + stale
+          + " anvilCacheCoalesced=" + coalesced
+          + " anvilCacheHitRate=" + String.format(java.util.Locale.ROOT, "%.3f", rate)
+          + " anvilCacheStatSkips=" + statSkips
+          + " avgColdMissMs=" + String.format(java.util.Locale.ROOT, "%.2f", avgColdMissMs);
+    } catch (Throwable t) {
+      return "";
+    }
+  }
+
+  /**
+   * Cumulative GC-time delta since the previous gauge log. Reported as
+   * {@code gcDeltaMs=…} on the concurrency gauge line. If this grows from ~50ms/window
+   * (warm) to ~500ms/window (degraded) the 4MB-per-region byte[] churn is pressuring the
+   * collector - fix direction is to avoid per-file allocation (mmap / FileChannel).
+   *
+   * <p>Returns {@code ""} if the management bean isn't available (headless environments).</p>
+   */
+  private String readGcDeltaMs() {
+    try {
+      long total = 0L;
+      for (java.lang.management.GarbageCollectorMXBean b :
+              java.lang.management.ManagementFactory.getGarbageCollectorMXBeans()) {
+        long t = b.getCollectionTime();
+        if (t > 0) total += t;
+      }
+      long delta = (lastGcTotalMs < 0) ? 0L : Math.max(0L, total - lastGcTotalMs);
+      lastGcTotalMs = total;
+      return " gcDeltaMs=" + delta;
+    } catch (Throwable ignored) {
+      return "";
+    }
+  }
+
+  /**
+   * Stage-2 (full chunk load + safety scan) count and per-invocation
+   * average wall-clock cost since the previous gauge log. Reported as
+   * {@code fullLoads=N fullLoadAvgMs=X.XX}. If {@code fullLoadAvgMs} grows with scan
+   * progress while {@code avgColdMissMs} stays flat, the degradation is in the loaded-chunk
+   * path (more chunks passing the probe → more stage-2 work), not the probe prefilter.
+   */
+  private String readFullLoadStatsAndReset() {
+    long count = fullLoadCount.getAndSet(0L);
+    long nanos = fullLoadNanos.getAndSet(0L);
+    double avgMs = count == 0 ? 0.0 : (nanos / 1_000_000.0) / count;
+    return " fullLoads=" + count
+            + " fullLoadAvgMs=" + String.format(java.util.Locale.ROOT, "%.2f", avgMs);
+  }
+
+  /**
+   * Diagnostic summary of probe-first fast path outcomes since last gauge log.
+   */
+  private String readProbeOutcomeStatsAndReset() {
+    long pn = probeOutcomeProbeNull.getAndSet(0L);
+    long an = probeOutcomeAdjustNull.getAndSet(0L);
+    // Sub-attribution. Buckets are mutually exclusive and sum to {@code an}.
+    long anL = probeOutcomeAdjustNullLight.getAndSet(0L);
+    long anW = probeOutcomeAdjustNullWindow.getAndSet(0L);
+    long anS = probeOutcomeAdjustNullScan.getAndSet(0L);
+    long anT = probeOutcomeAdjustNullThrew.getAndSet(0L);
+    long anSC = probeOutcomeAdjustNullScanShortCircuit.getAndSet(0L);
+    long br = probeOutcomeBiomeReject.getAndSet(0L);
+    long kr = probeOutcomeBlockReject.getAndSet(0L);
+    long cma = probeOutcomeCacheMissAccept.getAndSet(0L);
+    long chl = probeOutcomeCacheHitLoad.getAndSet(0L);
+    long gg = genscanGenerated.getAndSet(0L);
+    long gu = genscanUngenerated.getAndSet(0L);
+    long gt = genscanThrew.getAndSet(0L);
+    long flA = fullLoadOutcomeAccept.getAndSet(0L);
+    long flT = fullLoadOutcomeTimeoutOrNull.getAndSet(0L);
+    long flMB = fullLoadOutcomeMidBiome.getAndSet(0L);
+    long flVA = fullLoadOutcomeVertAdjust.getAndSet(0L);
+    long flPB = fullLoadOutcomePhysBiome.getAndSet(0L);
+    long flYO = fullLoadOutcomeYOverflow.getAndSet(0L);
+    long flSS = fullLoadOutcomeSafetyScan.getAndSet(0L);
+    long flX = fullLoadOutcomeCrashed.getAndSet(0L);
+    return " probeNull=" + pn
+            + " adjustNull=" + an
+            + "(light=" + anL + " window=" + anW + " scan=" + anS
+            + " scanShortCircuit=" + anSC + " threw=" + anT + ")"
+            + " biomeReject=" + br + " blockReject=" + kr
+            + " cacheMissAccept=" + cma + " cacheHitLoad=" + chl
+            + " genscanGenerated=" + gg
+            + " genscanUngenerated=" + gu
+            + " genscanThrew=" + gt
+            + " fullLoadOutcome=accept=" + flA
+            + " timeoutOrNull=" + flT
+            + " midBiome=" + flMB
+            + " vertAdjust=" + flVA
+            + " physBiome=" + flPB
+            + " yOverflow=" + flYO
+            + " safetyScan=" + flSS
+            + " crashed=" + flX;
+  }
+
+  public long getEtaSeconds(long range, long finalPos1, MemoryShape<?> shape, long cpsLocal) {
+    long totalRemainingPoints = Math.max(0L, range - finalPos1);
+    long effectiveBad = shape.getEffectiveBadCount();
+    long totalEvaluated = shape.getEffectiveGoodCount() + effectiveBad;
+    double badDensity = (double) effectiveBad / (double) Math.max(1, totalEvaluated);
+    long estimatedActivePointsRemaining = (long) (totalRemainingPoints * (1.0 - badDensity));
+
+    // ETA is biased pessimistically toward recent throughput so a performance
+    // dip immediately raises the displayed ETA instead of being diluted by
+    // historically-fast batches. We take the minimum of:
+    //   - the cumulative average cps across the whole scan,
+    //   - the EWMA-smoothed cps (recent-weighted),
+    //   - the just-finished batch's cps.
+    // This guarantees ETA never under-predicts when throughput drops; it will
+    // recover (shrink) once recent batches catch up to the cumulative average.
+    long cumulativeAvg = cps_divisor.signum() > 0 ? cps_all.divide(cps_divisor).longValue() : 0L;
+    long ewma = cps.get();
+    // Every candidate is >= 1, so the minimum is a safe non-zero divisor.
+    long minCps = Math.max(1L, cpsLocal);
+    if (cumulativeAvg > 0) minCps = Math.min(minCps, cumulativeAvg);
+    if (ewma > 0) minCps = Math.min(minCps, ewma);
+    return estimatedActivePointsRemaining / minCps;
+  }
+
+  public void save() {
+    if (isCancelled()) {
+      RTPRuntime.log(Level.FINER, "[ScanTask] save() skipped (cancelled); deleting progress file region=" + region.name);
+      delete();
+      return;
+    }
+    RTPRuntime.log(Level.FINER, "[ScanTask] save() region=" + region.name
+            + " scanIter=" + scanIter.get()
+            + " currentOffset=" + currentOffset
+            + " phase=" + scanPhase.get());
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+    File dir = new File(pluginDir, "database" + File.separator + "regionData");
+    if (!dir.isDirectory() && !dir.mkdirs()) {
+      RTPRuntime.log(Level.WARNING, "[ScanTask] save() could not create " + dir + "; progress not saved for region=" + region.name);
+      return;
+    }
+    File file = new File(dir, region.name + "_" + region.cacheKey() + ".scan");
+
+    try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+      // Layout: scanIter(8) | spatialResolution(8) | currentOffset(8) | isFine(1) | scanPhase(1) = 26 bytes.
+      ByteBuffer buf = ByteBuffer.allocate(26).order(ByteOrder.BIG_ENDIAN);
+      buf.putLong(scanIter.get());
+      Shape<?> shape = region.getShape();
+      if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution());}
+      buf.putLong(currentOffset);
+      buf.put((byte) 0);
+      // GENSCAN is transient - collapse to PRESCAN on disk so a resumed scan
+      // does not re-run the chunk-generation pre-pass (chunks generated in
+      // the previous run are still generated). See PHASE_GENSCAN docs.
+      int persistedPhase = scanPhase.get();
+      if (persistedPhase == PHASE_GENSCAN) persistedPhase = PHASE_PRESCAN;
+      buf.put((byte) (persistedPhase & 0xFF));
+      out.write(buf.array());
+    } catch (java.io.IOException e) {
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+  public static long[] loadProgress(String regionName, String cacheKey) {
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+    File file =
+        new File(
+            pluginDir,
+            "database" + File.separator + "regionData" + File.separator
+                + regionName + "_" + cacheKey + ".scan");
+    if (!file.exists()) return null;
+
+    try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
+      byte[] bytes = new byte[26];
+      int read = in.read(bytes);
+      if (read >= 16) {
+        ByteBuffer buf = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+        long iter = buf.getLong();
+        long stride = buf.getLong();
+        long offset = 0;
+        long isFine = 0;
+        long phase = 0;
+        if (read >= 24) {
+          offset = buf.getLong();
+          if (read >= 25) {
+            isFine = bytes[24] & 0xFF;
+          }
+          if (read >= 26) {
+            phase = bytes[25] & 0xFF;
+          }
+        } else if (read == 17) {
+          isFine = bytes[16] & 0xFF;
+        } else if (stride == 1) {
+          isFine = 1;
+        }
+        return new long[] {iter, stride, isFine, offset, phase, 0L};
+      }
+    } catch (java.io.IOException e) {
+      // ignore
+    }
+    return null;
+  }
+
+  public void delete() {
+    delete(region.name);
+  }
+
+  /**
+   * Delete every {@code <regionName>_*.scan} progress file in the regionData directory.
+   *
+   * <p>Used by reset/start commands which do not know which cache-key suffix the previous
+   * run used (it may pre-date the current config). Sweeping by name prefix avoids leaving
+   * orphan progress files behind.
+   */
+  public static void delete(String regionName) {
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+    File dir = new File(pluginDir, "database" + File.separator + "regionData");
+    if (!dir.isDirectory()) return;
+    String prefix = regionName + "_";
+    String suffix = ".scan";
+    String bare = regionName + suffix;
+    File[] candidates =
+        dir.listFiles((d, n) -> n.endsWith(suffix) && (n.startsWith(prefix) || n.equals(bare)));
+    if (candidates == null) return;
+    for (File f : candidates) {
+      try {
+        java.nio.file.Files.deleteIfExists(f.toPath());
+      } catch (Exception e) {
+        if (f.exists()) {
+          RTPRuntime.log(Level.FINE, "[ScanTask] Could not delete scan progress file: " + f.getName(), e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Tests whether candidate location {@code pos} within {@code region} is valid for teleportation.
+   *
+   * @return future completing with true if valid
+   */
+  public CompletableFuture<Boolean> testPos(
+          Region region,
+          final long pos,
+          final int blockX,
+          final int blockZ,
+          int safetyRadius,
+          Set<String> unsafeBlocks,
+          Set<String> defaultBiomes,
+          boolean biomeRecall,
+          WorldBorder border) {
+    io.github.dailystruggle.rtp.common.tools.CfDiag.scanTestPos.increment();
+
+    try {
+      safetyRadius = Math.min(safetyRadius, 7);
+
+      int cx = blockX >> 4;
+      int cz = blockZ >> 4;
+      MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+      if (shape == null) return CompletableFuture.completedFuture(false);
+
+      VerticalAdjustor<?> vert = region.getVert();
+      if (vert == null) return CompletableFuture.completedFuture(false);
+
+      RTPWorld<?> world = region.getWorld();
+
+      if(shape.isKnownBad(pos)) {
+        if (shape.biomeAt(pos) != null) {
+          return CompletableFuture.completedFuture(false);
+        }
+        // Known bad, but biome was not yet recorded. Resolve probe off-tick so map has no holes.
+        CompletableFuture<Boolean> res = new CompletableFuture<>();
+        int midY = (vert.maxY() + vert.minY()) / 2;
+        CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        try {
+          fut = world.probeChunkColumn(cx, cz, vert.minY() - 1, vert.maxY());
+        } catch (Throwable t) {
+          fut = null;
+        }
+        if (fut == null) {
+          res.complete(false);
+          return res;
+        }
+        fut.whenComplete((probe, ex) -> {
+          if (probe != null && ex == null) {
+            String b = resolveProbeBiome(probe, midY);
+            if (b != null) {
+              recordBiomeForChunk(shape, pos, cx, cz, b);
+            }
+          } else {
+            final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+            RTPChunk<?> cached = world.getCachedChunk(chunkKey);
+            if (cached != null) {
+              try {
+                String b = cached.getBiome(blockX, midY, blockZ);
+                if (b != null) {
+                  recordBiomeForChunk(shape, pos, cx, cz, b);
+                }
+              } catch (Exception ignored) {
+                // Best-effort biome resolution from cached chunk
+              }
+            }
+          }
+          res.complete(false);
+        });
+        return res;
+      }
+
+      // Fast mathematical rejection ONLY for World Border.
+      // Mathematical biome check is completely removed to force chunk generation.
+      // Null-guard: an absent border (e.g. platform adapter returned null for
+      // this world) means "no border in effect" - accept the candidate here
+      // and let downstream shape/region constraints bound the selection.
+      if (border != null && !border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
+        RTPRuntime.log(Level.FINER, "[ScanTask] border-reject region=" + region.name
+                + " pos=" + pos + " block=(" + blockX + "," + blockZ + ")");
+        // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
+        // deterministic, so re-rolling onto the same chunk yields the same picked column,
+        // which the border will reject again. Mark the twin spiral index too.
+        CompletableFuture<Boolean> res = new CompletableFuture<>();
+        int midY = (vert.maxY() + vert.minY()) / 2;
+        CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        try {
+          fut = world.probeChunkColumn(cx, cz, vert.minY() - 1, vert.maxY());
+        } catch (Throwable t) {
+          fut = null;
+        }
+        if (fut == null) {
+          shape.addBadChunk(pos);
+          res.complete(false);
+          return res;
+        }
+        fut.whenComplete((probe, ex) -> {
+          if (probe != null && ex == null) {
+            String b = resolveProbeBiome(probe, midY);
+            if (b != null) {
+              recordBiomeForChunk(shape, pos, cx, cz, b);
+            }
+          } else {
+            final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+            RTPChunk<?> cached = world.getCachedChunk(chunkKey);
+            if (cached != null) {
+              try {
+                String b = cached.getBiome(blockX, midY, blockZ);
+                if (b != null) {
+                  recordBiomeForChunk(shape, pos, cx, cz, b);
+                }
+              } catch (Exception ignored) {
+                // Best-effort biome resolution from cached chunk
+              }
+            }
+          }
+          shape.addBadChunk(pos);
+          res.complete(false);
+        });
+        return res;
+      }
+
+      if (isCancelled() || pause.get()) {
+        return CompletableFuture.completedFuture(false);
+      }
+
+      CompletableFuture<Boolean> res = new CompletableFuture<>();
+      int finalSafetyRadius = safetyRadius;
+      final int midY = (vert.maxY() + vert.minY()) / 2;
+
+      // Chunk-by-chunk decision:
+      // 1. Check if chunk is generated on disk.
+      // 2. If generated, attempt off-tick region-file column probe first.
+      // 3. If ungenerated or probe UNKNOWN / unreadable, route to full-load path.
+      boolean generated;
+      try {
+        generated = world.isChunkGenerated(cx, cz);
+        if (generated) {
+          genscanGenerated.incrementAndGet();
+        } else {
+          genscanUngenerated.incrementAndGet();
+          genscanUngeneratedTotal.incrementAndGet();
+        }
+      } catch (Throwable t) {
+        RTPRuntime.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
+                + " chunk=(" + cx + "," + cz + "): " + t);
+        generated = true;
+        genscanThrew.incrementAndGet();
+      }
+
+      if (!generated) {
+        // Chunk is ungenerated: trigger generation and validation via full load path
+        runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
+                finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
+        return res;
+      }
+
+      // Chunk is generated: attempt off-tick MCA probe first.
+      if (tryProbeFirstScan(region, world, vert, shape, pos, blockX, blockZ,
+              finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res)) {
+        return res;
+      }
+
+      // Probe returned UNKNOWN or unsupported: fall through to authoritative full load.
+      runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
+              finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
+      return res;
+    } catch (Throwable t) {
+      RTPRuntime.log(Level.SEVERE, "[ScanTask] Synchronous abort at testPos for location " + pos, t);
+      return CompletableFuture.completedFuture(false);
+    }
+  }
+
+  /**
+   * Probe-first fast path attempting validation before full chunk load.
+   *
+   * @return true if verdict was committed; false on UNKNOWN to fall back to full load
+   */
+  private boolean tryProbeFirstScan(
+          Region region,
+          RTPWorld<?> world,
+          VerticalAdjustor<?> vert,
+          MemoryShape<?> shape,
+          long pos,
+          int blockX,
+          int blockZ,
+          int configuredSafetyRadius,
+          Set<String> unsafeBlocks,
+          Set<String> defaultBiomes,
+          boolean biomeRecall,
+          CompletableFuture<Boolean> res) {
+    int cx = blockX >> 4;
+    int cz = blockZ >> 4;
+    int minY = vert.minY();
+    int maxY = vert.maxY();
+    if (minY >= maxY) return false;
+
+    CompletableFuture<ChunkColumnProbe> fut;
+    try {
+      // Widen the probe window by one block below minY so that
+      // LinearAdjustor/JumpAdjustor.adjustFromProbe (which consults the block
+      // at y-1 for standing-surface safety) doesn't trivially reject with
+      // probe.minY() > minY - 1. Without this the fast path would be inert on
+      // every candidate and every probe-accept would degrade to a full load.
+      fut = world.probeChunkColumn(cx, cz, minY - 1, maxY);
+    } catch (Throwable t) {
+      RTPRuntime.log(Level.FINE,
+              "[ScanTask] probeChunkColumn threw for world=" + world.name()
+                      + " chunk=(" + cx + "," + cz + "): " + t);
+      probeOutcomeProbeNull.incrementAndGet();
+      return false;
+    }
+    if (fut == null) { probeOutcomeProbeNull.incrementAndGet(); return false; }
+
+    // Fast path: future already complete (default no-op adapter). Handle inline
+    // to avoid scheduler dispatch on platforms that don't override probeChunkColumn.
+    if (fut.isDone() && !fut.isCompletedExceptionally()) {
+      ChunkColumnProbe probe;
+      try {
+        probe = fut.getNow(null);
+      } catch (Throwable ignored) {
+        return false;
+      }
+      if (probe == null) { probeOutcomeProbeNull.incrementAndGet(); return false; }
+      return evaluateScanProbe(region, world, vert, shape, pos, blockX, blockZ,
+              configuredSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall,
+              probe, res);
+    }
+
+    // Async completion - schedule evaluation, return true so the caller does
+    // not also run the legacy path. On UNKNOWN we continue to the legacy path
+    // from within the callback.
+    fut.whenComplete((probe, ex) -> {
+      if (ex != null) {
+        RTPRuntime.log(Level.FINE,
+                "[ScanTask] probeChunkColumn failed for world=" + world.name()
+                        + " chunk=(" + cx + "," + cz + "): "
+                        + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        probeOutcomeProbeNull.incrementAndGet();
+        runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ,
+                (maxY + minY) / 2, configuredSafetyRadius, unsafeBlocks,
+                defaultBiomes, biomeRecall, res);
+        return;
+      }
+      if (probe == null) {
+        probeOutcomeProbeNull.incrementAndGet();
+        runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ,
+                (maxY + minY) / 2, configuredSafetyRadius, unsafeBlocks,
+                defaultBiomes, biomeRecall, res);
+        return;
+      }
+      if (evaluateScanProbe(region, world, vert, shape, pos, blockX, blockZ,
+              configuredSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall,
+              probe, res)) {
+        return;
+      }
+      // UNKNOWN from adjustFromProbe - fall through to full load.
+      runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ,
+              (maxY + minY) / 2, configuredSafetyRadius, unsafeBlocks,
+              defaultBiomes, biomeRecall, res);
+    });
+    return true;
+  }
+
+  /**
+   * Evaluate a probe for ScanTask. Returns {@code true} iff a verdict was
+   * committed to {@code res}; {@code false} on UNKNOWN (caller falls through
+   * to full load path).
+   */
+  private boolean evaluateScanProbe(
+          Region region,
+          RTPWorld<?> world,
+          VerticalAdjustor<?> vert,
+          MemoryShape<?> shape,
+          long pos,
+          int blockX,
+          int blockZ,
+          int configuredSafetyRadius,
+          Set<String> unsafeBlocks,
+          Set<String> defaultBiomes,
+          boolean biomeRecall,
+          ChunkColumnProbe probe,
+          CompletableFuture<Boolean> res) {
+    RTPCoords picked;
+    try {
+      VerticalAdjustor.AdjustResult ar = vert.adjustFromProbeWithReason(probe, world.name());
+      picked = ar.picked();
+      if (picked == null) {
+        probeOutcomeAdjustNull.incrementAndGet();
+        switch (ar.reason()) {
+          case LIGHT_GATE -> {
+            probeOutcomeAdjustNullLight.incrementAndGet();
+            return false; // UNKNOWN: probe couldn't decide light, defer to full load.
+          }
+          case WINDOW -> {
+            probeOutcomeAdjustNullWindow.incrementAndGet();
+            return false; // UNKNOWN: probe window incomplete, defer to full load.
+          }
+          case THREW -> {
+            probeOutcomeAdjustNullThrew.incrementAndGet();
+            return false; // UNKNOWN: adjustor threw, defer to full load.
+          }
+          case SCAN_MISS, NONE -> {
+            // Authoritative bad: multi-column probe sweep found no acceptable Y.
+            // Short-circuit to avoid redundant chunk load.
+            probeOutcomeAdjustNullScan.incrementAndGet();
+            probeOutcomeAdjustNullScanShortCircuit.incrementAndGet();
+            // Always record the biome for this position even though no
+            // acceptable Y was found. Biome is a per-chunk property in the
+            // anvil probe, so a mid-window read is representative; keyed by
+            // location, so the record stays idempotent.
+            try {
+              int midProbeY = (vert.maxY() + vert.minY()) / 2;
+              String scanMissBiome = resolveProbeBiome(probe, midProbeY);
+              if (scanMissBiome != null) {
+                recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, scanMissBiome);
+              }
+            } catch (Throwable ignored) {
+              // Biome read is best-effort; a failure must not change the verdict.
+            }
+            // addBadChunk: chunk-uniform - SCAN_MISS means the multi-column probe sweep
+            // iterated every testCoords column in this chunk and found no acceptable Y on
+            // any of them; the twin spiral index targets a column already covered by the
+            // sweep, so it is guaranteed to also reject.
+            shape.addBadChunk(pos);
+            res.complete(false);
+            return true;
+          }
+        }
+        return false;
+      }
+    } catch (Throwable t) {
+      // Adjustor threw - UNKNOWN, fall through. Attribute to THREW sub-bucket.
+      probeOutcomeAdjustNull.incrementAndGet();
+      probeOutcomeAdjustNullThrew.incrementAndGet();
+      return false;
+    }
+    int py = picked.y();
+
+    int cx = blockX >> 4;
+    int cz = blockZ >> 4;
+
+    // Center-column biome check. The biome of every readable point is recorded
+    // below (accept or reject) so the shape always carries biome data.
+    String probeBiome = resolveProbeBiome(probe, py, (vert.maxY() + vert.minY()) / 2);
+    if (probeBiome != null) {
+      String ub = probeBiome.toUpperCase();
+      // Fill in biome data for every point whose biome we can read, regardless
+      // of whether the point is ultimately accepted or rejected. The biome map
+      // is keyed by location, so re-recording an already-known position is
+      // idempotent ("if it doesn't already").
+      recordBiomeForChunk(shape, pos, cx, cz, ub);
+      if (!BiomeNames.matches(defaultBiomes, ub)) {
+        probeOutcomeBiomeReject.incrementAndGet();
+        // addBadChunk: chunk-uniform - biome is a per-chunk property in the anvil probe;
+        // the twin spiral index decodes to the same chunk and is guaranteed to fail.
+        shape.addBadChunk(pos);
+        res.complete(false);
+        return true;
+      }
+    }
+
+    // Center-column unsafe-block check at picked Y.
+    String probeBlock = probe.blockAt(py);
+    if (probeBlock != null && MaterialNames.matches(unsafeBlocks, probeBlock.toUpperCase())) {
+      probeOutcomeBlockReject.incrementAndGet();
+      if (probeBiome == null) {
+        String fallbackBiome = resolveProbeBiome(probe, (vert.maxY() + vert.minY()) / 2);
+        if (fallbackBiome != null) {
+          recordBiomeForChunk(shape, pos, cx, cz, fallbackBiome.toUpperCase());
+        }
+      }
+      // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
+      // deterministic, so the twin spiral index resolves to the same picked column and the
+      // same unsafe block.
+      shape.addBadChunk(pos);
+      res.complete(false);
+      return true;
+    }
+
+    // Probe accepted at center column. Now gate on cache residency.
+    final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+    RTPChunk<?> cached = world.getCachedChunk(chunkKey);
+
+    // Pass 1 / PRESCAN: trust probe-accept for BOTH cache-miss and cache-hit.
+    // Authoritative (2r+1)^3 verification is deferred to Pass 2 / FULLSCAN,
+    // which re-sweeps every position that Pass 1 did not mark bad. This keeps
+    // Pass 1 a pure anvil-probe sweep (no chunk loads on accept, no region-
+    // thread dispatch), while Pass 2 runs the classic authoritative scan.
+    if (cached == null) {
+      probeOutcomeCacheMissAccept.incrementAndGet();
+    } else {
+      probeOutcomeCacheHitLoad.incrementAndGet();
+    }
+    res.complete(true);
+    return true;
+  }
+
+  /**
+   * Legacy full-load path, invoked when the probe is unavailable (UNKNOWN) or fails.
+   *
+   * <p>Times each invocation from entry to {@code res} completion and accumulates into
+   * {@link #fullLoadCount}/{@link #fullLoadNanos}. Diagnostic only; emitted by
+   * {@link #readFullLoadStatsAndReset()}.</p>
+   */
+  private void runFullLoadPath(
+          Region region,
+          RTPWorld<?> world,
+          VerticalAdjustor<?> vert,
+          MemoryShape<?> shape,
+          long pos,
+          int blockX,
+          int blockZ,
+          int midY,
+          int finalSafetyRadius,
+          Set<String> unsafeBlocks,
+          Set<String> defaultBiomes,
+          boolean biomeRecall,
+          CompletableFuture<Boolean> res) {
+      io.github.dailystruggle.rtp.common.tools.CfDiag.scanRunFullLoad.increment();
+      final long fullLoadStartNanos = System.nanoTime();
+      res.whenComplete((r, e) -> {
+        fullLoadCount.incrementAndGet();
+        fullLoadNanos.addAndGet(System.nanoTime() - fullLoadStartNanos);
+      });
+      int cx = blockX >> 4;
+      int cz = blockZ >> 4;
+
+      // Probe-first resolution: anvil cache if available, else live load.
+      // The mid-Y biome pre-filter is now performed on the resolved chunk so
+      // ungenerated-chunk cases transparently load on demand and cached
+      // anvil/live data is used when available (ADR-016 section 13.1 follow-up,
+      // 2026-04-20).
+      final CompletableFuture<RTPChunk<?>> chunkFuture =
+              world.getOrLoadChunk(cx, cz)
+                      .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS);
+      // Track so a cancel/pause can abort this load instead of waiting out the
+      // 30s timeout; cancellation completes the chain promptly and releases the
+      // inFlightGate (see drainInFlight).
+      inFlightChunkFutures.add(chunkFuture);
+      chunkFuture
+              .whenComplete((resolvedChunk, throwable) -> {
+                inFlightChunkFutures.remove(chunkFuture);
+                try {
+                  if (throwable != null || resolvedChunk == null || isCancelled() || pause.get()) {
+                    // Suppress the warning once cancelled/paused: a cancel
+                    // actively aborts in-flight loads, so the resulting
+                    // CancellationException/TimeoutException is expected and
+                    // logging it would spam the console during shutdown of a scan.
+                    // A CancellationException is always benign (it can only come
+                    // from us aborting the load), so suppress it unconditionally.
+                    boolean stopping = isCancelled() || pause.get()
+                            || unwrap(throwable) instanceof CancellationException;
+                    if (throwable != null) {
+                      if (!stopping) {
+                        RTPRuntime.log(Level.WARNING, "[ScanTask] Chunk generation exception at " + pos, throwable);
+                      }
+                      fullLoadOutcomeTimeoutOrNull.incrementAndGet();
+                    } else if (resolvedChunk == null) {
+                      if (!stopping) {
+                        RTPRuntime.log(Level.WARNING, "[ScanTask] INSTANT BYPASS: Chunk manager returned a null chunk for " + pos);
+                      }
+                      fullLoadOutcomeTimeoutOrNull.incrementAndGet();
+                    } else {
+                        if (!stopping) {
+                          RTPRuntime.log(Level.WARNING, "[ScanTask] undetermined failure at " + pos);
+                          fullLoadOutcomeTimeoutOrNull.incrementAndGet();
+                        }
+                    }
+                      res.complete(false);
+                    return;
+                  }
+
+                  // Mid-Y biome pre-filter on the resolved chunk - safe to run
+                  // inline only for self-contained (anvil-backed) chunks. For
+                  // live-backed chunks the biome read routes through
+                  // CraftBlock#getBiome which enforces TickThread and would
+                  // throw on the async scheduler thread we're currently on;
+                  // in that case we defer the biome check to the region-thread
+                  // runTask body below (the post-load biome guard already
+                  // rejects out-of-biome candidates there).
+                  if (resolvedChunk.isSelfContained()) {
+                    String midBiome = resolvedChunk.getBiome(blockX, midY, blockZ).toUpperCase();
+                    // Fill in biome data for every point whose biome we can
+                    // read, regardless of accept/reject. Keyed by location, so
+                    // re-recording is idempotent ("if it doesn't already").
+                    recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, midBiome);
+                    if (!BiomeNames.matches(defaultBiomes, midBiome)) {
+                      // addBadChunk: chunk-uniform - mid-Y biome read from the resolved
+                      // (anvil-backed self-contained) chunk; biome is per-chunk so the twin
+                      // spiral index in the same chunk is guaranteed to fail.
+                      shape.addBadChunk(pos);
+                      fullLoadOutcomeMidBiome.incrementAndGet();
+                      res.complete(false);
+                      return;
+                    }
+                  }
+
+                  RTPLocation targetLoc = new RTPLocation(world, blockX, 0, blockZ);
+                  RTPRuntime.serverAccessor().getScheduler().runTask(targetLoc, () -> {
+                    try {
+                      MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
+                      localCursor.setWorldName(world.name());
+
+                      // Always record the biome for this position, even when a
+                      // later check (vert.adjust, safety scan, etc.) rejects it.
+                      // For self-contained chunks the mid-Y biome was already
+                      // recorded above; for live-backed chunks the biome read has
+                      // to happen on this region thread, so do it here before any
+                      // reject path can short-circuit. Keyed by location, so
+                      // re-recording the picked-Y biome below stays idempotent.
+                      if (!resolvedChunk.isSelfContained()) {
+                        try {
+                          String midBiomeLive = resolvedChunk.getBiome(blockX, midY, blockZ);
+                          if (midBiomeLive != null) {
+                            recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, midBiomeLive.toUpperCase());
+                          }
+                        } catch (Throwable ignored) {
+                          // Biome read is best-effort; a failure here must not
+                          // abort the authoritative scan below.
+                        }
+                      }
+
+                      if (!vert.adjust(resolvedChunk, localCursor)) {
+                        // addBadChunk: chunk-uniform - within a chunk the per-column
+                        // selection order is deterministic, so the twin spiral index picks
+                        // the same column and vert.adjust fails identically.
+                        shape.addBadChunk(pos);
+                        fullLoadOutcomeVertAdjust.incrementAndGet();
+                        res.complete(false);
+                        return;
+                      }
+
+                      // PHYSICAL BIOME CHECK: ask the resolved chunk for its own biome
+                      // (ADR-016 section 13.1 follow-up, 2026-04-20). This bypasses
+                      // `anvilProbeSupport.takeCached` so an evicted cache entry cannot
+                      // cause a fallthrough to the seed-synth getter on a loaded chunk.
+                      String actualBiome = resolvedChunk.getBiome(localCursor.x, localCursor.y, localCursor.z);
+                      // Fill in biome data for every point whose biome we can
+                      // read, regardless of accept/reject. Keyed by location,
+                      // so re-recording is idempotent ("if it doesn't already").
+                      recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, actualBiome.toUpperCase());
+
+                      if (!BiomeNames.matches(defaultBiomes, actualBiome.toUpperCase())) {
+                        // addBadChunk: chunk-uniform - authoritative biome read from the
+                        // loaded chunk; biome is per-chunk so the twin spiral index in the
+                        // same chunk is guaranteed to fail.
+                        shape.addBadChunk(pos);
+                        fullLoadOutcomePhysBiome.incrementAndGet();
+                        res.complete(false);
+                        return;
+                      }
+
+                      boolean pass = localCursor.y < vert.maxY();
+                      if (!pass) {
+                        // addBadChunk: chunk-uniform - within a chunk the per-column
+                        // selection order is deterministic, so the twin spiral index picks
+                        // the same column and the same picked Y > maxY.
+                        shape.addBadChunk(pos);
+                        fullLoadOutcomeYOverflow.incrementAndGet();
+                        res.complete(false);
+                        return;
+                      }
+
+                      int localX = localCursor.x & 15;
+                      int localZ = localCursor.z & 15;
+
+                      int minX = Math.max(0, localX - finalSafetyRadius);
+                      int maxX = Math.min(15, localX + finalSafetyRadius);
+                      int minZ = Math.max(0, localZ - finalSafetyRadius);
+                      int maxZ = Math.min(15, localZ + finalSafetyRadius);
+
+                      for (int xx = minX; xx <= maxX && pass; xx++) {
+                        for (int zz = minZ; zz <= maxZ && pass; zz++) {
+                          for (int y = localCursor.y - finalSafetyRadius; y <= localCursor.y + finalSafetyRadius && pass; y++) {
+                            if (!resolvedChunk.isSafe(xx, y, zz, unsafeBlocks)) {
+                              pass = false;
+                            }
+                          }
+                        }
+                      }
+
+                      if (isCancelled() || pause.get()) {
+                        res.complete(false);
+                        return;
+                      }
+
+                      // Claim verifiers may complete on another thread: continue from their
+                      // future instead of join()ing, which blocked this tick thread (S-005).
+                      java.util.function.BiConsumer<Boolean, GlobalRegionVerifiers.VerifierCheckResult> finish =
+                          (ok, verResult) -> { try {
+                      if (ok) {
+                        fullLoadOutcomeAccept.incrementAndGet();
+                        res.complete(true);
+                      } else {
+                        boolean claimEncapsulated = false;
+                        if (verResult != null && !verResult.passed()) {
+                          try {
+                            io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry claimRegistry =
+                                io.github.dailystruggle.rtp.api.RTPAPI.hooks().claimBoundaries();
+                            if (claimRegistry != null) {
+                              Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> claimOpt =
+                                  claimRegistry.resolveAt(world.name(), localCursor.x, localCursor.z);
+                              if (claimOpt.isEmpty()) {
+                                claimOpt = claimRegistry.resolveAt(world.name(), blockX, blockZ);
+                              }
+                              if (claimOpt.isPresent()) {
+                                io.github.dailystruggle.rtp.api.claim.ClaimBoundary boundary = claimOpt.get();
+                                int bMinX = boundary.minX();
+                                int bMinZ = boundary.minZ();
+                                int bMaxX = boundary.maxX();
+                                int bMaxZ = boundary.maxZ();
+
+                                int newlyMarked = 0;
+                                for (int bx = bMinX; bx <= bMaxX; bx++) {
+                                  for (int bz = bMinZ; bz <= bMaxZ; bz++) {
+                                    long loc = shape.xzToLocation(bx, bz);
+                                    if (loc >= 0 && loc < shape.getEffectiveRange() && !shape.isKnownBad(loc)) {
+                                      shape.addBadLocation(loc, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safetyExternal);
+                                      newlyMarked++;
+                                    }
+                                  }
+                                }
+
+                                long pointsApprox = (newlyMarked > 0)
+                                    ? newlyMarked
+                                    : Math.max(1L, (long) (bMaxX - bMinX + 1) * (bMaxZ - bMinZ + 1));
+                                scanBadCount.addAndGet(pointsApprox);
+
+                                RTPRuntime.log(Level.FINE, "[ScanTask] Encapsulated claim boundary '" + boundary.id()
+                                    + "' [" + bMinX + "," + bMinZ + " -> " + bMaxX + "," + bMaxZ
+                                    + "] in region '" + region.name + "'");
+                                claimEncapsulated = true;
+                              }
+                            }
+                          } catch (Throwable t) {
+                            RTPRuntime.log(Level.WARNING, "[ScanTask] Error encapsulating claim boundary at " + localCursor, t);
+                          }
+                        }
+
+                        if (!claimEncapsulated) {
+                          // addBadChunk: chunk-uniform - within a chunk the per-column
+                          // selection order is deterministic, so the twin spiral index picks
+                          // the same column and the same (2r+1)^3 safety scan rejects again.
+                          shape.addBadChunk(pos);
+                        }
+                        fullLoadOutcomeSafetyScan.incrementAndGet();
+                        res.complete(false);
+                      }
+                      } catch (Throwable t) {
+                        RTPRuntime.log(Level.SEVERE, "[ScanTask] Verifier verdict crashed at location " + pos, t);
+                        shape.addBadChunk(pos);
+                        fullLoadOutcomeCrashed.incrementAndGet();
+                        res.complete(false);
+                      } };
+
+                      if (!pass) {
+                        finish.accept(false, null);
+                        return;
+                      }
+                      CompletableFuture<GlobalRegionVerifiers.VerifierCheckResult> verdict =
+                          GlobalRegionVerifiers.checkGlobalRegionVerifiersDetailed(localCursor.toImmutable());
+                      if (verdict == null) {
+                        finish.accept(false, null);
+                        return;
+                      }
+                      verdict.whenComplete((vr, ex) -> {
+                        if (ex != null) {
+                          RTPRuntime.log(Level.SEVERE, "[ScanTask] Claim verifier failed at location " + pos, ex);
+                          shape.addBadChunk(pos);
+                          fullLoadOutcomeCrashed.incrementAndGet();
+                          res.complete(false);
+                          return;
+                        }
+                        finish.accept(vr != null && vr.passed(), vr);
+                      });
+                    } catch (Throwable t) {
+                      RTPRuntime.log(Level.SEVERE, "[ScanTask] Validation crashed on Region Thread at location " + pos, t);
+                      // addBadChunk: chunk-uniform - within a chunk the per-column
+                      // selection order is deterministic, so re-rolling the same chunk
+                      // would crash the same way.
+                      shape.addBadChunk(pos);
+                      fullLoadOutcomeCrashed.incrementAndGet();
+                      res.complete(false);
+                    }
+                  });
+                } catch (Throwable t) {
+                  RTPRuntime.log(Level.SEVERE, "[ScanTask] Async callback crashed at location " + pos, t);
+                  // addBadChunk: chunk-uniform - within a chunk the per-column selection
+                  // order is deterministic, so re-rolling the same chunk would crash the
+                  // async callback identically.
+                  shape.addBadChunk(pos);
+                  fullLoadOutcomeCrashed.incrementAndGet();
+                  res.complete(false);
+                }
+              });
+  }
+
+  /**
+   * Records a discovered biome for a chunk across all locations representing that chunk in
+   * {@code shape}: the tested {@code pos}, the canonical representative {@link MemoryShape#xzToLocation},
+   * and all preimages in {@link MemoryShape#chunkToLocations}.
+   *
+   * <p>This prevents skipped twin locations or bad-chunk marks from leaving unmapped holes (gray dots)
+   * on the biome map when {@link MemoryShape#biomeAt(int, int)} is queried.</p>
+   */
+  public static void recordBiomeForChunk(MemoryShape<?> shape, long pos, int cx, int cz, String biome) {
+    if (shape == null || biome == null || biome.isEmpty()) return;
+    String ub = biome.toUpperCase();
+    long range = shape.getRange();
+    if (pos >= 0 && pos < range) {
+      shape.addBiomeLocation(pos, 1, ub);
+    }
+    long rep = shape.xzToLocation(cx, cz);
+    if (rep >= 0 && rep < range && rep != pos) {
+      shape.addBiomeLocation(rep, 1, ub);
+    }
+    long[] preimages = shape.chunkToLocations(cx, cz);
+    if (preimages != null) {
+      for (long p : preimages) {
+        if (p >= 0 && p < range && p != pos && p != rep) {
+          shape.addBiomeLocation(p, 1, ub);
+        }
+      }
+    }
+  }
+
+  /**
+   * Resiliently extracts a biome identifier from a {@link ChunkColumnProbe}, testing preferred
+   * heights first, then the window midpoint, and finally stepping across all vertical sections.
+   */
+  private static String resolveProbeBiome(io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe, int... preferredYs) {
+    if (probe == null) return null;
+    if (preferredYs != null) {
+      for (int y : preferredYs) {
+        try {
+          String b = probe.biomeAt(y);
+          if (b != null && !b.isEmpty()) return b;
+        } catch (Exception ignored) {
+          // Probe may not have data at this specific Y level
+        }
+      }
+    }
+    int minY = probe.minY();
+    int maxY = probe.maxY();
+    int midY = (minY + maxY) / 2;
+    try {
+      String b = probe.biomeAt(midY);
+      if (b != null && !b.isEmpty()) return b;
+    } catch (Exception ignored) {
+      // Probe may not have data at midY
+    }
+    for (int y = minY + 8; y <= maxY; y += 16) {
+      try {
+        String b = probe.biomeAt(y);
+        if (b != null && !b.isEmpty()) return b;
+      } catch (Exception ignored) {
+        // Probe may not have data at section Y
+      }
+    }
+    return null;
+  }
+
+  /** Unwraps {@link CompletionException}/{@link java.util.concurrent.ExecutionException} layers to the root cause. */
+  private static Throwable unwrap(Throwable t) {
+    while ((t instanceof CompletionException || t instanceof java.util.concurrent.ExecutionException)
+            && t.getCause() != null && t.getCause() != t) {
+      t = t.getCause();
+    }
+    return t;
+  }
+
+  /**
+   * Bounded drain of in-flight chunk-load futures. Waits up to {@code timeoutMs}
+   * for outstanding chunk callbacks to settle without blocking indefinitely.
+   */
+  private void drainInFlight(String reason, long timeoutMs) {
+    // Actively abort outstanding chunk loads so the gate frees up promptly.
+    for (CompletableFuture<?> f : inFlightChunkFutures) {
+      try {
+        f.cancel(true);
+      } catch (Throwable ignored) { }
+    }
+    long drainStart = System.nanoTime();
+    boolean drained = false;
+    try {
+      drained = inFlightGate.tryAcquire(MAX_PENDING_CHUNKS, timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException ignored) {
+      Thread.currentThread().interrupt();
+    } finally {
+      if (drained) inFlightGate.release(MAX_PENDING_CHUNKS);
+    }
+    long drainMs = (System.nanoTime() - drainStart) / 1_000_000L;
+    if (drained) {
+      RTPRuntime.log(Level.FINER, "[ScanTask] " + reason + " drain complete region=" + region.name
+              + " drainMs=" + drainMs);
+    } else {
+      RTPRuntime.log(Level.FINE, "[ScanTask] " + reason + " drain timed out region=" + region.name
+              + " after " + drainMs + "ms inFlight=" + inFlight.get()
+              + " - proceeding (cancelled/pause flag guards late callbacks)");
+    }
+  }
+
+  /**
+   * Pauses the scan. The flag is set and in-flight loads are cancelled on the caller;
+   * the drain, shape rebuild and saves run on the async lane via {@link #teardownAsync}.
+   */
+  @SuppressWarnings("java:S1845") // Method pause() operates on AtomicBoolean pause flag
+  public void pause() {
+    pause(null);
+  }
+
+  /**
+   * Pause variant that reports the teardown outcome to {@code onDone} on the main lane.
+   *
+   * @param onDone receives null on success, or the teardown failure (S-004); may be null
+   */
+  public void pause(java.util.function.Consumer<Throwable> onDone) {
+    RTPRuntime.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
+            + " inFlight=" + inFlight.get());
+    pause.set(true);
+    statusWindowStartMs = -1L;
+    cancelInFlightChunkFutures();
+    teardownAsync("pause", true, onDone);
+  }
+
+  /**
+   * Cancels the scan. The flag is set and in-flight loads are cancelled on the caller;
+   * the drain, shape rebuild and saves run on the async lane via {@link #teardownAsync}.
+   */
+  @Override
+  public void setCancelled(boolean cancelled) {
+    setCancelled(cancelled, null);
+  }
+
+  /**
+   * Cancel variant that reports the teardown outcome to {@code onDone} on the main lane.
+   *
+   * @param cancelled the cancel flag
+   * @param onDone receives null on success, or the teardown failure (S-004); may be null
+   */
+  public void setCancelled(boolean cancelled, java.util.function.Consumer<Throwable> onDone) {
+    if (cancelled) {
+      RTPRuntime.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
+              + " inFlight=" + inFlight.get());
+      // Mark cancelled BEFORE draining: prevents late callback exception spam during cancel.
+      super.setCancelled(true);
+      try {
+        done.cancel(true);
+      } catch (CancellationException | CompletionException ignored) { }
+      cancelInFlightChunkFutures();
+      teardownAsync("cancel", false, onDone);
+      return;
+    }
+    super.setCancelled(false);
+  }
+
+  private void cancelInFlightChunkFutures() {
+    for (CompletableFuture<?> f : inFlightChunkFutures) {
+      try {
+        f.cancel(true);
+      } catch (Throwable ignored) { }
+    }
+  }
+
+  /**
+   * Off-caller teardown: bounded drain, shape rebuild, saves, scan-map removal.
+   * Completion or failure is reported to {@code onDone} on the main lane (S-004).
+   * A later start waits on {@link #teardownDone} so it never rebuilds over a stale frontier.
+   */
+  private void teardownAsync(String reason, boolean pauseSave, java.util.function.Consumer<Throwable> onDone) {
+    CompletableFuture<Void> gate = new CompletableFuture<>();
+    teardownDone = gate;
+    PENDING_TEARDOWNS.put(region.name, gate);
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+      try {
+        drainInFlight(reason, DRAIN_TIMEOUT_MS);
+        MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+        if (shape != null) {
+          shape.flushAndRebuild(shape.spatialResolution());
+          if (pauseSave) {
+            shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+          } else {
+            shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+          }
+        }
+        save();
+        if (!pauseSave) {
+          delete(region.name);
+          ScanTasks.current().remove(region.name, this);
+        }
+        gate.complete(null);
+        reportTeardown(onDone, null);
+      } catch (Throwable t) {
+        RTPRuntime.log(Level.WARNING, "[ScanTask] " + reason + " teardown failed region=" + region.name, t);
+        gate.completeExceptionally(t);
+        reportTeardown(onDone, t);
+      } finally {
+        PENDING_TEARDOWNS.remove(region.name, gate);
+      }
+    });
+  }
+
+  private static void reportTeardown(java.util.function.Consumer<Throwable> onDone, Throwable failure) {
+    if (onDone == null) return;
+    RTPRuntime.scheduler().runTask(() -> onDone.accept(failure));
+  }
+
+  /** Completes when the most recent teardown has finished; used to order a restart after it. */
+  private volatile CompletableFuture<Void> teardownDone = CompletableFuture.completedFuture(null);
+
+  /** @return future that completes after the last cancel/pause teardown has run. */
+  public CompletableFuture<Void> teardownFuture() {
+    return teardownDone;
+  }
+
+  /** @return true while a cancel/pause teardown for {@code regionName} has not finished. */
+  public static boolean isTeardownPending(String regionName) {
+    CompletableFuture<Void> pending = PENDING_TEARDOWNS.get(regionName);
+    return pending != null && !pending.isDone();
+  }
+
+  public static void setPendingTeardownForTesting(String regionName, CompletableFuture<Void> gate) {
+    if (gate == null) {
+      PENDING_TEARDOWNS.remove(regionName);
+    } else {
+      PENDING_TEARDOWNS.put(regionName, gate);
+    }
+  }
+}

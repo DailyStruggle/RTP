@@ -9,12 +9,16 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +38,7 @@ public class InfoCmdTest {
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new SelectionAPI();
+        ActiveSelection.set(new SelectionAPI());
         infoCmd = new InfoCmd(null);
     }
 
@@ -162,7 +166,7 @@ public class InfoCmdTest {
                 return super.getSender(uuid);
             }
         };
-        RTP.serverAccessor = customAccessor;
+        RTPRuntime.setServerAccessor(customAccessor);
 
         assertDoesNotThrow(() -> infoCmd.onCommand(senderId, new HashMap<>(), null));
     }
@@ -204,7 +208,7 @@ public class InfoCmdTest {
      * {@link MetricsSnapshot} round-trip (i.e. one call into the installed
      * {@link io.github.dailystruggle.metrics.api.MetricsBinding}), regardless
      * of how many metrics-backed placeholders the rendered messages contain.
-     * Anchored in {@link io.github.dailystruggle.rtp.common.tools.PlaceholderProvider#withSnapshot}.
+     * Anchored in {@link io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider#withSnapshot}.
      */
     @Test
     void onCommand_snapshotsMetricsExactlyOncePerInvocation() {
@@ -224,7 +228,7 @@ public class InfoCmdTest {
                     @Override public int chunkLoadBacklog() { return 0; }
                     @Override public int databaseLatencyMs() { return -1; }
                 };
-        RTP.metrics.setBinding(counting);
+        CoreMetrics.instance().setBinding(counting);
         try {
             boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
             assertTrue(result);
@@ -235,7 +239,7 @@ public class InfoCmdTest {
                             + "invocation; placeholders read the cached snapshot "
                             + "via PlaceholderProvider.currentSnapshot().");
         } finally {
-            RTP.metrics.setBinding(null);
+            CoreMetrics.instance().setBinding(null);
         }
     }
 
@@ -275,14 +279,14 @@ public class InfoCmdTest {
                     @Override public int databaseLatencyMs() { return -1; }
                     @Override public java.util.List<io.github.dailystruggle.metrics.api.FoliaRegionSample> foliaRegions() { return regions; }
                 };
-        RTP.metrics.setBinding(folia);
+        CoreMetrics.instance().setBinding(folia);
         @SuppressWarnings("unchecked")
         // Inject explicit templates - the test ConfigParser stub returns the
         // enum name as default text, which would not exercise the row-token
         // substitution. Setting the values directly is the minimal surface
         // for verifying the rendering path.
         ConfigParser<CommandMessages> lang =
-                (ConfigParser<CommandMessages>) RTP.configs.getParser(CommandMessages.class);
+                (ConfigParser<CommandMessages>) ActiveConfigs.get().getParser(CommandMessages.class);
         Object prevHeader = lang.getConfigValue(CommandMessages.infoFoliaRegionsHeader, null);
         Object prevRow = lang.getConfigValue(CommandMessages.infoFoliaRegion, null);
         lang.setData(java.util.Map.of(
@@ -309,7 +313,7 @@ public class InfoCmdTest {
                                     && s.contains("players=1") && s.contains("queue=0")),
                     "Expected region-1 row with substituted tokens, got: " + sent);
         } finally {
-            RTP.metrics.setBinding(null);
+            CoreMetrics.instance().setBinding(null);
             lang.setData(java.util.Map.of(
                     "infoFoliaRegionsHeader", prevHeader == null ? "" : prevHeader,
                     "infoFoliaRegion", prevRow == null ? "" : prevRow));
@@ -339,7 +343,7 @@ public class InfoCmdTest {
                     @Override public int databaseLatencyMs() { return -1; }
                     // foliaRegions() inherits the empty-list default
                 };
-        RTP.metrics.setBinding(singleRegion);
+        CoreMetrics.instance().setBinding(singleRegion);
         try {
             boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
             assertTrue(result);
@@ -349,7 +353,7 @@ public class InfoCmdTest {
                     sent.stream().noneMatch(s -> s.contains("Folia Regions")),
                     "infoFoliaRegionsHeader must be suppressed when foliaRegions() is empty, got: " + sent);
         } finally {
-            RTP.metrics.setBinding(null);
+            CoreMetrics.instance().setBinding(null);
         }
     }
 
@@ -396,5 +400,68 @@ public class InfoCmdTest {
         assertTrue(
                 player.sentMessages.stream().anyMatch(s -> s.contains("DRM:")),
                 "Expected DRM line in /rtp info output for admin/support, got: " + player.sentMessages);
+    }
+
+    @Test
+    void onCommand_rendersGovernorBudgetsAndReasons() {
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "gov-player", null);
+        accessor.addPlayer(player);
+
+        io.github.dailystruggle.rtp.common.governor.ComputeGovernor gov =
+                io.github.dailystruggle.rtp.common.governor.ComputeGovernor.active();
+        gov.reset();
+        try {
+            long ms = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1);
+            long sec = java.util.concurrent.TimeUnit.SECONDS.toNanos(1);
+            gov.setUnitCostsForTesting(5 * ms, ms, ms);
+            io.github.dailystruggle.rtp.common.governor.ComputeSignals signals =
+                    io.github.dailystruggle.rtp.common.governor.ComputeSignals.builder()
+                            .autoTune(true)
+                            .configuredAsyncNanos(25 * ms)
+                            .configuredSyncNanos(5 * ms)
+                            .configuredGenerationCap(2)
+                            .maxMspt(50.0)
+                            .mspt(io.github.dailystruggle.rtp.common.governor.ComputeSignals.SampledSignal.fresh(36.0, sec))
+                            .chunkLoadLatencyMs(io.github.dailystruggle.rtp.common.governor.ComputeSignals.SampledSignal.fresh(50.0, sec))
+                            .minWindowedChunkLoadLatencyMs(10.0)
+                            .generationInFlight(1)
+                            .region(new io.github.dailystruggle.rtp.common.governor.ComputeSignals.RegionDemand(
+                                    "default", 50L, 1.0, 5, 10, 0, false))
+                            .build();
+            gov.evaluate(signals, sec);
+
+            @SuppressWarnings("unchecked")
+            ConfigParser<CommandMessages> lang =
+                    (ConfigParser<CommandMessages>) ActiveConfigs.get().getParser(CommandMessages.class);
+            lang.setData(java.util.Map.of(
+                    "infoGovernorAsync",
+                    "Background async: [govAsyncConfiguredMs] ms (effective [govAsyncEffectiveMs], [govAsyncReason])",
+                    "infoGovernorSync",
+                    "Background sync: [govSyncConfiguredMs] ms (effective [govSyncEffectiveMs], [govSyncReason])",
+                    "infoGovernorHotCap",
+                    "Hot cap: [govHotCapConfigured] (effective [govHotCapEffective], [govHotCapReason])",
+                    "infoGovernorGeneration",
+                    "Generation: [govGenConfigured] (effective [govGenEffective], [govGenReason]; regional in-flight [govRegionalInflight]/[govRegionalInflightCap])"
+            ));
+
+            List<String> sent = new ArrayList<>();
+            RTP.messageTap.set(sent::add);
+            try {
+                boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
+                assertTrue(result);
+            } finally {
+                RTP.messageTap.remove();
+            }
+
+            assertTrue(
+                    sent.stream().anyMatch(s -> s.contains("Background async: 25 ms") && s.contains("cpu headroom")),
+                    "Expected governor async line with cpu headroom reason, got: " + sent);
+            assertTrue(
+                    sent.stream().anyMatch(s -> s.contains("Generation: 2 (effective 1, chunk latency; regional in-flight 1/2)")),
+                    "Expected governor generation line with chunk latency and regional in-flight, got: " + sent);
+        } finally {
+            gov.reset();
+        }
     }
 }

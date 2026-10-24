@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileSystems;
@@ -89,9 +89,9 @@ public final class EditorKeys {
                 PublicKey pu = kf.generatePublic(new X509EncodedKeySpec(Files.readAllBytes(pub)));
                 EditorKeys keys = new EditorKeys(new KeyPair(pu, pk));
                 if (keys.matches()) return keys;
-                RTP.log(Level.WARNING, "[editor] channel key pair in " + dir + " does not match; replacing it");
+                RTPRuntime.log(Level.WARNING, "[editor] channel key pair in " + dir + " does not match; replacing it");
             } catch (GeneralSecurityException | IOException | RuntimeException e) {
-                RTP.log(Level.WARNING, "[editor] channel key pair in " + dir + " is unreadable; replacing it: "
+                RTPRuntime.log(Level.WARNING, "[editor] channel key pair in " + dir + " is unreadable; replacing it: "
                         + e.getMessage(), e);
             }
         }
@@ -99,7 +99,7 @@ public final class EditorKeys {
         Files.createDirectories(dir);
         writePrivate(priv, keys.privateKey.getEncoded());
         writePrivate(pub, keys.publicKey.getEncoded());
-        RTP.log(Level.INFO, "[editor] generated editor channel key " + keys.fingerprint.substring(0, 16) + " in " + dir);
+        RTPRuntime.log(Level.INFO, "[editor] generated editor channel key " + keys.fingerprint.substring(0, 16) + " in " + dir);
         return keys;
     }
 
@@ -148,7 +148,7 @@ public final class EditorKeys {
             acl.setAcl(List.of(owner));
             return true;
         }
-        RTP.log(Level.WARNING, "[editor] " + file + ": the file system supports neither POSIX permissions nor ACLs;"
+        RTPRuntime.log(Level.WARNING, "[editor] " + file + ": the file system supports neither POSIX permissions nor ACLs;"
                 + " it is readable by other local accounts");
         return false;
     }

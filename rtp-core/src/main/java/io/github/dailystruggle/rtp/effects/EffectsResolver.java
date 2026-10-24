@@ -2,10 +2,11 @@ package io.github.dailystruggle.rtp.effects;
 
 import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -23,7 +24,7 @@ import java.util.logging.Level;
 /**
  * Resolves the per-player effect-token list for a pipeline stage from {@code effects/} config files.
  *
- * <p>Queries {@link RTP#configs} dynamically so reloads take effect immediately (effects-api-ADR-005).
+ * <p>Queries {@link ActiveConfigs#get()} dynamically so reloads take effect immediately (effects-api-ADR-005).
  * Produces synthetic permission-style strings matching {@code <prefix>.<EFFECT>.<args>}.
  */
 public final class EffectsResolver {
@@ -44,13 +45,13 @@ public final class EffectsResolver {
     Objects.requireNonNull(player, "player");
     Objects.requireNonNull(prefix, "prefix");
 
-    if (RTP.configs == null) return Collections.emptyList();
+    if (ActiveConfigs.get() == null) return Collections.emptyList();
     MultiConfigParser<EffectsGroupKeys> mcp;
     try {
       mcp = (MultiConfigParser<EffectsGroupKeys>)
-          RTP.configs.multiConfigParserMap.get(EffectsGroupKeys.class);
+          ActiveConfigs.get().multiConfigParserMap.get(EffectsGroupKeys.class);
     } catch (ClassCastException cce) {
-      RTP.log(Level.WARNING, "[effects] effects/ parser type mismatch", cce);
+      RTPRuntime.log(Level.WARNING, "[effects] effects/ parser type mismatch", cce);
       return Collections.emptyList();
     }
     if (mcp == null) return Collections.emptyList();
@@ -111,13 +112,13 @@ public final class EffectsResolver {
       LinkedHashSet<String> out) {
     String key = groupName.toLowerCase(Locale.ROOT);
     if (!visiting.add(key)) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[effects] inherit: cycle detected at group '" + groupName + "'; truncating");
       return;
     }
     ConfigParser<EffectsGroupKeys> cp = groupsByName.get(key);
     if (cp == null) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[effects] inherit: references undefined group '" + groupName + "'");
       visiting.remove(key);
       return;

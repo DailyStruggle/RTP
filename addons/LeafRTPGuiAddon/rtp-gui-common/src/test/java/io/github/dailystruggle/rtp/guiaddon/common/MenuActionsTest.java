@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,8 +34,8 @@ public class MenuActionsTest {
 
     @BeforeEach
     void setUp() {
-        originalServerAccessor = RTP.serverAccessor;
-        originalScheduler = RTP.scheduler;
+        originalServerAccessor = RTPRuntime.serverAccessor();
+        originalScheduler = RTPRuntime.scheduler();
         originalApiServerAccessor = RTPAPI.serverAccessor;
 
         dispatchedCommands.clear();
@@ -92,15 +93,17 @@ public class MenuActionsTest {
                     return null;
                 });
 
-        RTP.serverAccessor = mockAccessor;
-        RTP.scheduler = mockScheduler;
+        // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+        RTP.ensureInitialized();
+        RTPRuntime.setServerAccessor(mockAccessor);
+        RTPRuntime.setScheduler(mockScheduler);
         RTPAPI.serverAccessor = mockAccessor;
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = originalServerAccessor;
-        RTP.scheduler = originalScheduler;
+        RTPRuntime.setServerAccessor(originalServerAccessor);
+        RTPRuntime.setScheduler(originalScheduler);
         RTPAPI.serverAccessor = originalApiServerAccessor;
         GuiRenderers.clear();
     }

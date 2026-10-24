@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,13 +38,13 @@ class SafetyTokenExpanderTest {
   @BeforeEach
   void setUp() {
     pluginDir = tempDir.toFile();
-    originalAccessor = RTP.serverAccessor;
-    RTP.serverAccessor = mock(RTPServerAccessor.class);
+    originalAccessor = RTPRuntime.serverAccessor();
+    RTPRuntime.setServerAccessor(mock(RTPServerAccessor.class));
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = originalAccessor;
+    RTPRuntime.setServerAccessor(originalAccessor);
   }
 
   @Test
@@ -76,7 +76,7 @@ class SafetyTokenExpanderTest {
     Map<String, Set<String>> snapshot = new HashMap<>();
     snapshot.put("minecraft:leaves", Set.of("minecraft:oak_leaves", "minecraft:azalea_leaves", "minecraft:flowering_azalea_leaves"));
     snapshot.put("minecraft:slabs", Set.of("minecraft:oak_slab", "minecraft:birch_slab", "minecraft:stone_slab"));
-    when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot);
+    when(RTPRuntime.serverAccessor().blockTagSnapshot()).thenReturn(snapshot);
 
     SafetyTokenExpander.expandAndApply(safetyParser);
 

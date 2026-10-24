@@ -1,0 +1,21 @@
+# --- Configuration des tests intégrés (BIT) ---
+# Documentation : docs/admin/configuration/BIT.md
+
+# Consigne les constats structurels des actions comme avertissements sans bloquer leur enregistrement.
+# Définir sur true empêche l'enregistrement d'une action comportant une erreur effective.
+strictActions: false
+
+# Consigne comme avertissements les constats de configuration acceptés par les versions précédentes, sans refuser /rtp reload.
+# Définir sur true pour les traiter comme des erreurs ; un rechargement ou Hot-Apply en erreur conserve la configuration active.
+strictConfig: false
+
+# Nombre minimal d'échantillons avant de classer une condition comme toujours ou jamais satisfaite.
+gateOutcomeSamples: 200
+
+# Niveaux pour les codes BIT enregistrés ; ils prévalent sur strictActions.
+# Valeurs admises : ERROR, WARNING, INFO, DEBUG, TRACE et OFF. OFF masque le constat.
+# Les codes et niveaux inconnus sont ignorés et consignés.
+overrides:
+
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
+version: 1.0

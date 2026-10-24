@@ -3,11 +3,11 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
@@ -24,7 +24,7 @@ class Adr079CauseTtlAndStagedExpirationTest {
   static void beforeAll() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 
@@ -33,9 +33,9 @@ class Adr079CauseTtlAndStagedExpirationTest {
   void testStaticAndDynamicDoNotCoalesce() {
     Circle circle = new Circle();
     // Index 10: static cause (biome, TTL = infinite <= 0)
-    circle.addBadLocation(10L, LocationGenerator.FailTypes.biome, 0L);
+    circle.addBadLocation(10L, FailTypes.biome, 0L);
     // Index 11: dynamic cause (safetyExternal, TTL = 100s > 0)
-    circle.addBadLocation(11L, LocationGenerator.FailTypes.safetyExternal, 100L);
+    circle.addBadLocation(11L, FailTypes.safetyExternal, 100L);
 
     // Trigger off-tick rebuild
     circle.flushAndRebuild(1L);
@@ -46,11 +46,11 @@ class Adr079CauseTtlAndStagedExpirationTest {
 
     assertEquals(2, keys.length, "Static and dynamic adjacent runs must not coalesce");
     assertEquals(10L, keys[0]);
-    assertEquals((byte) LocationGenerator.FailTypes.biome.ordinal(), causes[0]);
+    assertEquals((byte) FailTypes.biome.ordinal(), causes[0]);
     assertEquals(0L, expiries[0]);
 
     assertEquals(11L, keys[1]);
-    assertEquals((byte) LocationGenerator.FailTypes.safetyExternal.ordinal(), causes[1]);
+    assertEquals((byte) FailTypes.safetyExternal.ordinal(), causes[1]);
     assertTrue(expiries[1] > 0L);
   }
 
@@ -58,9 +58,9 @@ class Adr079CauseTtlAndStagedExpirationTest {
   @DisplayName("ADR-079 / REQ-CORE-F-005: transient causes are discarded, never stored as permanent")
   void testTransientCausesAreNotStored() {
     Circle circle = new Circle();
-    circle.addBadLocation(5L, LocationGenerator.FailTypes.nullChunk);
-    circle.addBadLocation(7L, LocationGenerator.FailTypes.ungenerated);
-    assertEquals(0, circle.addBadChunk(9L, LocationGenerator.FailTypes.timeout));
+    circle.addBadLocation(5L, FailTypes.nullChunk);
+    circle.addBadLocation(7L, FailTypes.ungenerated);
+    assertEquals(0, circle.addBadChunk(9L, FailTypes.timeout));
     circle.flushAndRebuild(1L);
 
     assertFalse(circle.isKnownBad(5L));
@@ -69,7 +69,7 @@ class Adr079CauseTtlAndStagedExpirationTest {
     assertEquals(0, circle.badKeysSnapshot().length, "no run may be stored for a transient cause");
 
     // Control: a terrain cause on the same index is stored; explicit 0L stays permanent
-    circle.addBadLocation(5L, LocationGenerator.FailTypes.biome, 0L);
+    circle.addBadLocation(5L, FailTypes.biome, 0L);
     circle.flushAndRebuild(1L);
     assertTrue(circle.isKnownBad(5L));
     assertEquals(0L, circle.badExpiriesSnapshot()[0]);
@@ -80,14 +80,14 @@ class Adr079CauseTtlAndStagedExpirationTest {
   void testTransientCauseOverrideIgnored() {
     try {
       TtlConfig.load(java.util.Map.of("timeout", "1h", "safetyExternal", "2h"), null);
-      assertTrue(TtlConfig.isTransient(LocationGenerator.FailTypes.timeout));
-      assertFalse(TtlConfig.isTransient(LocationGenerator.FailTypes.biome));
+      assertTrue(TtlConfig.isTransient(FailTypes.timeout));
+      assertFalse(TtlConfig.isTransient(FailTypes.biome));
       assertFalse(TtlConfig.isTransient(null));
-      assertEquals(0L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.timeout, null));
-      assertEquals(2L * 3600L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, null));
+      assertEquals(0L, TtlConfig.resolveTtlSeconds(FailTypes.timeout, null));
+      assertEquals(2L * 3600L, TtlConfig.resolveTtlSeconds(FailTypes.safetyExternal, null));
 
       Circle circle = new Circle();
-      circle.addBadLocation(12L, LocationGenerator.FailTypes.timeout);
+      circle.addBadLocation(12L, FailTypes.timeout);
       circle.flushAndRebuild(1L);
       assertFalse(circle.isKnownBad(12L));
     } finally {
@@ -100,9 +100,9 @@ class Adr079CauseTtlAndStagedExpirationTest {
   void testDynamicRunsCoalesceWithMaxTtl() {
     Circle circle = new Circle();
     // Index 20: dynamic cause A with 50s TTL
-    circle.addBadLocation(20L, LocationGenerator.FailTypes.safetyExternal, 50L);
+    circle.addBadLocation(20L, FailTypes.safetyExternal, 50L);
     // Index 21: dynamic cause B with 200s TTL
-    circle.addBadLocation(21L, LocationGenerator.FailTypes.uniquePlacement, 200L);
+    circle.addBadLocation(21L, FailTypes.uniquePlacement, 200L);
 
     circle.flushAndRebuild(1L);
 
@@ -112,7 +112,7 @@ class Adr079CauseTtlAndStagedExpirationTest {
 
     assertEquals(1, keys.length, "Adjacent dynamic runs must coalesce");
     assertEquals(20L, keys[0]);
-    assertEquals((byte) LocationGenerator.FailTypes.safetyExternal.ordinal(), causes[0], "First-cause-wins");
+    assertEquals((byte) FailTypes.safetyExternal.ordinal(), causes[0], "First-cause-wins");
     long now = java.time.Instant.now().getEpochSecond();
     assertTrue(expiries[0] >= now + 190L, "Merged run must inherit max TTL");
   }
@@ -151,19 +151,19 @@ class Adr079CauseTtlAndStagedExpirationTest {
       // Run 1: Phase 1/2 probation
       buf.putLong(100L);
       buf.putLong(5L);
-      buf.put((byte) LocationGenerator.FailTypes.safetyExternal.ordinal());
+      buf.put((byte) FailTypes.safetyExternal.ordinal());
       buf.putLong(now - 10L);
 
       // Run 2: Phase 3 evicted
       buf.putLong(200L);
       buf.putLong(5L);
-      buf.put((byte) LocationGenerator.FailTypes.safetyExternal.ordinal());
+      buf.put((byte) FailTypes.safetyExternal.ordinal());
       buf.putLong(now - (30L * 86400L));
 
       // Run 3: Active
       buf.putLong(300L);
       buf.putLong(5L);
-      buf.put((byte) LocationGenerator.FailTypes.safetyExternal.ordinal());
+      buf.put((byte) FailTypes.safetyExternal.ordinal());
       buf.putLong(now + 1000L);
 
       buf.putInt(0); // union: 0 biome names
@@ -277,16 +277,16 @@ class Adr079CauseTtlAndStagedExpirationTest {
     TtlConfig.resetDefaults();
 
     // Static natural terrain causes (-1 / infinite)
-    assertEquals(-1L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.biome, null));
-    assertEquals(-1L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.worldBorder, null));
-    assertEquals(-1L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.vert, null));
-    assertEquals(-1L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safety, null));
-    assertEquals(-1L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.prefilterBiome, null));
-    assertEquals(-1L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.prefilterBlock, null));
+    assertEquals(-1L, TtlConfig.resolveTtlSeconds(FailTypes.biome, null));
+    assertEquals(-1L, TtlConfig.resolveTtlSeconds(FailTypes.worldBorder, null));
+    assertEquals(-1L, TtlConfig.resolveTtlSeconds(FailTypes.vert, null));
+    assertEquals(-1L, TtlConfig.resolveTtlSeconds(FailTypes.safety, null));
+    assertEquals(-1L, TtlConfig.resolveTtlSeconds(FailTypes.prefilterBiome, null));
+    assertEquals(-1L, TtlConfig.resolveTtlSeconds(FailTypes.prefilterBlock, null));
 
     // Dynamic player / server state
-    assertEquals(30L * 86400L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.uniquePlacement, null));
-    assertEquals(14L * 86400L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, null));
+    assertEquals(30L * 86400L, TtlConfig.resolveTtlSeconds(FailTypes.uniquePlacement, null));
+    assertEquals(14L * 86400L, TtlConfig.resolveTtlSeconds(FailTypes.safetyExternal, null));
 
     // Per-verifier class override resolution order claimed in TTL.md
     class WorldGuardChecker {}
@@ -294,7 +294,7 @@ class Adr079CauseTtlAndStagedExpirationTest {
     class UnlistedChecker {}
 
     // 1. Unlisted verifier inherits causes.safetyExternal (14d)
-    assertEquals(14L * 86400L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, UnlistedChecker.class));
+    assertEquals(14L * 86400L, TtlConfig.resolveTtlSeconds(FailTypes.safetyExternal, UnlistedChecker.class));
 
     // 2. Custom config with per-verifier overrides
     TtlConfig.load(
@@ -302,11 +302,11 @@ class Adr079CauseTtlAndStagedExpirationTest {
         java.util.Map.of("WorldGuardChecker", "-1", "GriefPreventionChecker", "7d"));
 
     // WorldGuardChecker resolved to -1 (permanent admin area)
-    assertEquals(-1L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, WorldGuardChecker.class));
+    assertEquals(-1L, TtlConfig.resolveTtlSeconds(FailTypes.safetyExternal, WorldGuardChecker.class));
     // GriefPreventionChecker resolved to 7d
-    assertEquals(7L * 86400L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, GriefPreventionChecker.class));
+    assertEquals(7L * 86400L, TtlConfig.resolveTtlSeconds(FailTypes.safetyExternal, GriefPreventionChecker.class));
     // Unlisted verifier still falls back to causes.safetyExternal (14d)
-    assertEquals(14L * 86400L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, UnlistedChecker.class));
+    assertEquals(14L * 86400L, TtlConfig.resolveTtlSeconds(FailTypes.safetyExternal, UnlistedChecker.class));
   }
 
   @Test
@@ -332,11 +332,11 @@ class Adr079CauseTtlAndStagedExpirationTest {
       buf.putInt(2);          // 2 bad runs
       buf.putLong(50L);
       buf.putLong(10L);
-      buf.put((byte) LocationGenerator.FailTypes.biome.ordinal());
+      buf.put((byte) FailTypes.biome.ordinal());
 
       buf.putLong(100L);
       buf.putLong(5L);
-      buf.put((byte) LocationGenerator.FailTypes.safetyExternal.ordinal());
+      buf.put((byte) FailTypes.safetyExternal.ordinal());
 
       buf.putInt(0); // 0 biomes
       buf.flip();
@@ -357,8 +357,8 @@ class Adr079CauseTtlAndStagedExpirationTest {
     assertEquals(2, keys.length);
     assertEquals(50L, keys[0]);
     assertEquals(100L, keys[1]);
-    assertEquals((byte) LocationGenerator.FailTypes.biome.ordinal(), causes[0]);
-    assertEquals((byte) LocationGenerator.FailTypes.safetyExternal.ordinal(), causes[1]);
+    assertEquals((byte) FailTypes.biome.ordinal(), causes[0]);
+    assertEquals((byte) FailTypes.safetyExternal.ordinal(), causes[1]);
     // All legacy runs must default to 0L (static / permanent retention)
     assertEquals(0L, expiries[0]);
     assertEquals(0L, expiries[1]);
@@ -370,8 +370,8 @@ class Adr079CauseTtlAndStagedExpirationTest {
   @DisplayName("ADR-079: BIN_VERSION 3 save and load preserves TTL and causes")
   void testBinVersion3SaveLoad() {
     Circle circle = new Circle();
-    circle.addBadLocation(10L, LocationGenerator.FailTypes.biome, 0L);
-    circle.addBadLocation(100L, LocationGenerator.FailTypes.safetyExternal, 1000L);
+    circle.addBadLocation(10L, FailTypes.biome, 0L);
+    circle.addBadLocation(100L, FailTypes.safetyExternal, 1000L);
     circle.flushAndRebuild(1L);
 
     String file = "adr079TestBin";
@@ -388,8 +388,8 @@ class Adr079CauseTtlAndStagedExpirationTest {
     assertEquals(2, keys.length);
     assertEquals(10L, keys[0]);
     assertEquals(100L, keys[1]);
-    assertEquals((byte) LocationGenerator.FailTypes.biome.ordinal(), causes[0]);
-    assertEquals((byte) LocationGenerator.FailTypes.safetyExternal.ordinal(), causes[1]);
+    assertEquals((byte) FailTypes.biome.ordinal(), causes[0]);
+    assertEquals((byte) FailTypes.safetyExternal.ordinal(), causes[1]);
     assertEquals(0L, expiries[0]);
     assertTrue(expiries[1] > 0L);
   }

@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
@@ -57,7 +57,7 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
     int cooldown = ParsePermissions.getInt(this, "rtp.cooldown.");
     if (cooldown < 0) {
       ConfigParser<ConfigKeys> configParser =
-          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+          (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportCooldown, 0) : 0;
       return ConfigParser.parseSecondsDurationMillis(val, 0L);
     }
@@ -73,7 +73,7 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
     int delay = ParsePermissions.getInt(this, "rtp.delay.");
     if (delay < 0) {
       ConfigParser<ConfigKeys> configParser =
-          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+          (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportDelay, 0) : 0;
       return ConfigParser.parseSecondsDurationMillis(val, 0L);
     }
@@ -106,7 +106,7 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
     OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player.uuid()) : null;
     command = SendMessage.formatNoColor(bukkitPlayer, command);
     final String finalCommand = command;
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler()
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor().getScheduler()
         .runTask(() -> Bukkit.dispatchCommand(dispatcher, finalCommand));
   }
 

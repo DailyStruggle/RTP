@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -48,7 +48,7 @@ public class SetupCancelCmd extends BaseRTPCmdImpl {
         UUID effectiveCaller = (callerId == null) ? SetupSession.CONSOLE_CALLER_ID : callerId;
         var removed = sessionRegistry.remove(effectiveCaller);
         if (removed.isPresent()) {
-            RTP.log(Level.INFO, "[setup] caller=" + callerId + " cancelled setup wizard session");
+            RTPRuntime.log(Level.INFO, "[setup] caller=" + callerId + " cancelled setup wizard session");
             SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Setup wizard cancelled. No configuration changes were saved.");
         } else {
             SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] No active setup session found to cancel.");

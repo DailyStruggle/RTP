@@ -8,6 +8,12 @@ For the conceptual model and verification walkthroughs see [`INDEX.md`](INDEX.md
 
 ---
 
+## Duration values
+
+Keys marked **Integer / Duration** below accept a plain number or a duration with unit suffixes (e.g. `500ms`, `5s`, `2m`, `24h`, `1d`, or composites such as `1m30s`). A plain number keeps the key's own unit: milliseconds for every `*Ms` key, days for `editor.trust.maxAgeDays`. A suffixed value is converted from its own units, so `heartbeat.staleAfterMs: 5s` is `5000` ms and `editor.trust.maxAgeDays: 12h` is half a day. Full suffix list: [CORE_CONFIG.md -> Duration Unit Suffixes & Parsing](../configuration/CORE_CONFIG.md#duration-unit-suffixes--parsing).
+
+---
+
 ## `network` (Backend identity)
 
 | Key | Type | Default | Description |
@@ -62,7 +68,7 @@ Used when `type: proxy-direct`. The keys sit directly under `transport`, and the
 |---|---|---|---|
 | `proxies` | List | *(required)* | `host:port` of each proxy companion listener. |
 | `port` | Integer | `25599` | Port used for entries without one. |
-| `connectTimeoutMs` / `readTimeoutMs` | Integer | `1000` / `2000` | Socket timeouts. |
+| `connectTimeoutMs` / `readTimeoutMs` | Integer / Duration | `1000` / `2000` | Socket timeouts (ms). |
 | `tls` | Boolean | unset | `true` for TLS. The proxy refuses a non-loopback plain listener unless its side sets `tls: false` explicitly. |
 | `truststore` / `truststoreType` / `truststorePasswordEnv` | String | JVM trust / `PKCS12` / `RTP_DIRECT_TRUSTSTORE_PASSWORD` | Trust for the proxy's certificate. |
 | `keystore` / `keystoreType` / `keystorePasswordEnv` | String | none / `PKCS12` / `RTP_DIRECT_KEYSTORE_PASSWORD` | Client certificate, needed when the proxy requires one (mTLS). |
@@ -74,8 +80,8 @@ On the proxy, `transport.direct` binds `127.0.0.1` by default, accepts an `allow
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `intervalMs` | Integer | `1000` | How often this backend publishes its state row. On the plugin-message tier this also sets the region-availability gossip cadence. |
-| `staleAfterMs` | Integer | `5000` | How long a peer's last-seen state stays trusted before being treated as unknown. Keep comfortably above `intervalMs` so one dropped heartbeat does not flap a peer. |
+| `intervalMs` | Integer / Duration | `1000` | How often this backend publishes its state row (ms). On the plugin-message tier this also sets the region-availability gossip cadence. |
+| `staleAfterMs` | Integer / Duration | `5000` | How long (ms) a peer's last-seen state stays trusted before being treated as unknown. Keep comfortably above `intervalMs` so one dropped heartbeat does not flap a peer. |
 
 ## `routing` (Backend-side router)
 
@@ -91,9 +97,9 @@ Ignored when `network.enabled: false` or `routing.mode: local`.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `maxDepth` | Integer | `50` | Max locally-buffered enrolments before backpressure rejects new `/rtp` calls (`QUEUE_FULL`). |
-| `flushIntervalMs` | Integer | `250` | Backend dirty-write flush cadence (ms). Lower = lower latency, higher = fewer round trips. |
-| `pollIntervalMs` | Integer | `1000` | Backend status-cache poll cadence (ms); drives per-player progress refresh. |
-| `entryTtlMs` | Integer | `0` | Optional passive aging of envelope hashes. `0` disables (terminal transitions still delete explicitly). |
+| `flushIntervalMs` | Integer / Duration | `250` | Backend dirty-write flush cadence (ms). Lower = lower latency, higher = fewer round trips. |
+| `pollIntervalMs` | Integer / Duration | `1000` | Backend status-cache poll cadence (ms); drives per-player progress refresh. |
+| `entryTtlMs` | Integer / Duration | `0` | Cancels non-terminal queue entries whose last status update is at least this old (ms). `0` disables it. |
 | `crossServerRequestsPerSecond` | Integer | `5` | Cross-server `/rtp` enrolment rate limit (token bucket refill). |
 | `crossServerRequestsBurst` | Integer | `10` | Token-bucket burst capacity. |
 | `workerThreads` | Integer | `1` | Proxy-side BLPOP worker count. Increase only when a single worker is observed to saturate. |
@@ -102,8 +108,8 @@ Ignored when `network.enabled: false` or `routing.mode: local`.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `reapIntervalMs` | Integer | `30000` | Proxy-side TTL reaper cadence (ms). Sweeps expired tokens and fires release so co-located backends can return the coordinate. |
-| `ttlMs` | Integer | `60000` | Per-token TTL (ms). A claimed-but-not-consumed reservation older than this is treated as abandoned and released. |
+| `reapIntervalMs` | Integer / Duration | `30000` | Proxy-side TTL reaper cadence (ms). Sweeps expired tokens and fires release so co-located backends can return the coordinate. |
+| `ttlMs` | Integer / Duration | `60000` | Per-token TTL (ms). A claimed-but-not-consumed reservation older than this is treated as abandoned and released. |
 
 ## `regionCollision` (Region-collision policy)
 
@@ -144,6 +150,16 @@ Lower score wins. Each `terms` entry scores a backend by one metric through a cu
 | `heap` | `heapUsed` | `5.0` | `step` threshold=0.85 | Heap gate; fires at >= 85% used. |
 | `region` | `keptRegion` | `5.0` | `step` threshold=0.95 | Region gate; fires when kept pool >= 95% full. |
 | `kept` | `keptCount` | `0.25` | `logarithmic` k=9.0 | Gentle tie-breaker on kept count. |
+
+## `editor` (Web editor services)
+
+Used by `/rtp editor` whether or not network mode is enabled. See [`WEB_EDITOR_GUIDE.md`](../WEB_EDITOR_GUIDE.md).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `bytebinUrl` | String | `""` | Upload store for editor sessions. Empty = `https://bytebin.lucko.me`. |
+| `relayUrl` | String | `""` | Live-update relay (bytesocks-compatible). Empty = `https://usersockets.luckperms.net`. Point it at your own bytesocks server to avoid depending on a public one. |
+| `trust.maxAgeDays` | Integer / Duration | `0` | Days a browser stays trusted after `/rtp editor trust`. `0` = never expires. A negative or unreadable value is logged and treated as `0`. |
 
 ---
 

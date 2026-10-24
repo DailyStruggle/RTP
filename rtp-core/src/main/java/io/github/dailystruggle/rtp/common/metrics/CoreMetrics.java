@@ -1,10 +1,14 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -16,6 +20,18 @@ import java.util.logging.Level;
  * with platform-provided {@link io.github.dailystruggle.metrics.api.MetricsBinding}.
  */
 public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Metrics {
+
+    /**
+     * Process-wide aggregator (formerly {@code CoreMetrics.instance()}). Created on first access with the
+     * NOOP binding; platform adapters install a real binding via {@link #setBinding} at startup.
+     */
+    public static CoreMetrics instance() {
+        return Holder.INSTANCE;
+    }
+
+    private static final class Holder {
+        static final CoreMetrics INSTANCE = new CoreMetrics();
+    }
 
     /** Constructs a CoreMetrics instance with the NOOP binding. */
     public CoreMetrics() {
@@ -76,9 +92,10 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     public long slowPipelineThresholdMs() {
         try {
             ConfigParser<PerformanceKeys> perf =
-                    (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                    (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
             if (perf == null) return 5000L;
-            return perf.getNumber(PerformanceKeys.slowPipelineThresholdMs, 5000L).longValue();
+            return perf.getDuration(PerformanceKeys.slowPipelineThresholdMs,
+                    TemporalUnit.MILLISECOND, TemporalUnit.MILLISECOND, 5000L);
         } catch (Throwable ignored) {
             return 5000L;
         }
@@ -94,7 +111,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     public int queueGrowthWarnThreshold() {
         try {
             ConfigParser<PerformanceKeys> perf =
-                    (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                    (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
             if (perf == null) return 0;
             return perf.getNumber(PerformanceKeys.queueGrowthWarnThreshold, 0L).intValue();
         } catch (Throwable ignored) {
@@ -131,7 +148,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
             long threshold = slowPipelineThresholdMs();
             if (threshold > 0L && elapsedMs > threshold) {
                 long total = slowPipelineCount.incrementAndGet();
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] slow teleport: " + elapsedMs + "ms exceeded slowPipelineThresholdMs="
                                 + threshold + "ms (" + context + "); slowPipelineCount=" + total);
             }
@@ -157,7 +174,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
             if (above) {
                 if (queueGrowthArmed.compareAndSet(false, true)) {
                     long total = queueGrowthWarnCount.incrementAndGet();
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "[RTP] teleport queue growth: depth=" + queueDepth
                                     + " reached queueGrowthWarnThreshold=" + threshold
                                     + "; queueGrowthWarnCount=" + total);
@@ -247,6 +264,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
                 .probeGovernors(io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.snapshotAll())
                 .liveLoadGates(io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll())
                 .immediateGovernors(io.github.dailystruggle.rtp.common.selection.region.ImmediateLoadGovernor.snapshotAll())
+                .actionCbit(io.github.dailystruggle.rtp.common.action.ActionCbitCounters.snapshot())
+                .computeGovernor(io.github.dailystruggle.rtp.common.governor.ComputeGovernor.currentSnapshot())
                 .build());
         // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
         // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.
@@ -265,16 +284,16 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     }
 
     private static int computeQueueDepth() {
-        RTP rtp = RTP.getInstance();
-        if (rtp == null) return 0;
+        TeleportSessions sessions = TeleportSessions.current();
+        if (sessions == null) return 0;
         int total = 0;
         try {
-            for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+            for (Region region : ActiveSelection.get().permRegionLookup.values()) {
                 if (region != null && region.queueManager != null) {
                     total += region.queueManager.playerQueue.size();
                 }
             }
-            for (Region region : RTP.selectionAPI.tempRegions.values()) {
+            for (Region region : ActiveSelection.get().tempRegions.values()) {
                 if (region != null && region.queueManager != null) {
                     total += region.queueManager.playerQueue.size();
                 }
@@ -287,16 +306,16 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
 
     private static java.util.Map<String, io.github.dailystruggle.metrics.api.RegionQueueRow> computeRegionQueueStatus() {
         java.util.Map<String, io.github.dailystruggle.metrics.api.RegionQueueRow> result = new java.util.LinkedHashMap<>();
-        RTP rtp = RTP.getInstance();
-        if (rtp == null || RTP.selectionAPI == null) return result;
+        TeleportSessions sessions = TeleportSessions.current();
+        if (sessions == null || ActiveSelection.get() == null) return result;
 
         try {
             java.util.Map<String, Region> allRegions = new java.util.LinkedHashMap<>();
-            if (RTP.selectionAPI.permRegionLookup != null) {
-                allRegions.putAll(RTP.selectionAPI.permRegionLookup);
+            if (ActiveSelection.get().permRegionLookup != null) {
+                allRegions.putAll(ActiveSelection.get().permRegionLookup);
             }
-            if (RTP.selectionAPI.tempRegions != null) {
-                for (java.util.Map.Entry<java.util.UUID, Region> e : RTP.selectionAPI.tempRegions.entrySet()) {
+            if (ActiveSelection.get().tempRegions != null) {
+                for (java.util.Map.Entry<java.util.UUID, Region> e : ActiveSelection.get().tempRegions.entrySet()) {
                     if (e.getKey() != null && e.getValue() != null) {
                         allRegions.putIfAbsent(e.getKey().toString(), e.getValue());
                     }

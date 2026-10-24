@@ -3,8 +3,12 @@ package io.github.dailystruggle.rtp.countdownaddon;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
+import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 
 /**
  * LeafRTP countdown addon for RTP.
@@ -36,10 +40,14 @@ public final class RTPCountdownAddon implements RTPAddon {
   @Override
   public void onLoad() {
     // 1. Register the addon's config file (countdown.yml) with RTP's Configs registry.
-    RTP.configs.putParser(registerParser());
+    ActiveConfigs.get().putParser(registerParser());
 
     // 4. Re-register on /rtp reload so operators see config changes without a restart.
-    Configs.onReload(() -> RTP.configs.putParser(registerParser()));
+    Configs.onReload(() -> ActiveConfigs.get().putParser(registerParser()));
+
+    // /rtp test config-countdown: directives come from this jar, not RTP's (ADR-121).
+    ConfigPbit.register(DirectiveConfigCheck.bound(
+        "countdown", "addons/countdown.yml", getClass().getClassLoader()));
 
     // 2. Contribute a safety predicate via the public RTPHooks facade (ADR-026).
     //    The lambda is invoked asynchronously by the pipeline; it must NOT block, perform
@@ -48,7 +56,7 @@ public final class RTPCountdownAddon implements RTPAddon {
         coords -> {
           @SuppressWarnings("unchecked")
           ConfigParser<CountdownKeys> parser =
-              (ConfigParser<CountdownKeys>) RTP.configs.getParser(CountdownKeys.class);
+              (ConfigParser<CountdownKeys>) ActiveConfigs.get().getParser(CountdownKeys.class);
           if (parser == null) return true;
           Object flag = parser.getConfigValue(CountdownKeys.rejectInClaim, false);
           boolean reject =
@@ -71,14 +79,14 @@ public final class RTPCountdownAddon implements RTPAddon {
    * the RTP plugin data folder.
    */
   private ConfigParser<CountdownKeys> registerParser() {
-    migrateLegacyRoot(RTP.serverAccessor.getPluginDirectory(), "countdown.yml");
+    migrateLegacyRoot(RTPRuntime.serverAccessor().getPluginDirectory(), "countdown.yml");
     return new ConfigParser<>(
         CountdownKeys.class,
         "addons/countdown",
         "1.0",
-        RTP.serverAccessor.getPluginDirectory(),
+        RTPRuntime.serverAccessor().getPluginDirectory(),
         null,
-        RTP.configs.fileDatabase,
+        ActiveConfigs.get().fileDatabase,
         this.getClass().getClassLoader());
   }
 

@@ -1,5 +1,11 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitCodes;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -7,7 +13,12 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerSession;
+import io.github.dailystruggle.rtp.common.mock.RuntimeMockRTPPlayer;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
@@ -32,11 +43,44 @@ import org.jetbrains.annotations.Nullable;
  */
 public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
 
+  public static final BitCode OWNERSHIP = registerCode(4401, "PROBE_FOLIA_OWNERSHIP");
+  public static final BitCode WORLD_UNAVAILABLE = registerCode(4402, "PROBE_FOLIA_OWNERSHIP_WORLD_UNAVAILABLE");
+  public static final BitCode UNSUPPORTED = RtpBitCodes.PROBE.register(
+      4403,
+      "PROBE_FOLIA_OWNERSHIP_UNSUPPORTED",
+      java.lang.System.Logger.Level.INFO,
+      BitTier.IBIT,
+      "test.folia-ownership",
+      "",
+      "Run this probe on a Folia server to verify region ownership.");
+  public static final BitComponent COMPONENT = registerComponent();
+
   /** Wall-clock timeout for the full probe round-trip. */
   static final long PROBE_TIMEOUT_MS = 2_000L;
 
   public FoliaOwnershipTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
+  }
+
+  private static BitCode registerCode(int id, String key) {
+    return RtpBitCodes.PROBE.register(
+        id,
+        key,
+        java.lang.System.Logger.Level.ERROR,
+        BitTier.IBIT,
+        "test.folia-ownership",
+        "",
+        "Verify the region scheduler owns the location before changing the mock location.");
+  }
+
+  private static BitComponent registerComponent() {
+    return new BitComponent(
+            "folia-ownership",
+            "test.folia-ownership",
+            BitTier.IBIT,
+            BitSideEffect.NEEDS_WORLD,
+            5_000,
+            () -> ProbeBitReport.forProbe("folia-ownership").build());
   }
 
   @Override
@@ -60,9 +104,17 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand,
       java.util.function.Consumer<String> messageMethod) {
-    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+    if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+        || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.server.api.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name(), messageMethod);
+      ProbeVerdict.record(
+              COMPONENT,
+              CompletableFuture.completedFuture(
+                  ProbeBitReport.forProbe("folia-ownership")
+                      .note(UNSUPPORTED, "folia-ownership.platform", "Folia ownership is unavailable on Fabric.")
+                      .build()),
+              COMPONENT.timeoutMillis())
+          .thenAccept(result -> ProbeBitReport.emit(callerId, false, COMPONENT, result));
       return true;
     }
     return onCommand(callerId, parameterValues, nextCommand);
@@ -73,72 +125,107 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+    if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+        || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.server.api.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name());
+      ProbeVerdict.record(
+              COMPONENT,
+              CompletableFuture.completedFuture(
+                  ProbeBitReport.forProbe("folia-ownership")
+                      .note(UNSUPPORTED, "folia-ownership.platform", "Folia ownership is unavailable on Fabric.")
+                      .build()),
+              COMPONENT.timeoutMillis())
+          .thenAccept(result -> ProbeBitReport.emit(callerId, false, COMPONENT, result));
       return false;
     }
 
-    RTPScheduler scheduler = RTP.scheduler;
+    RTPScheduler scheduler = RTPRuntime.scheduler();
     if (scheduler == null) {
       fail(callerId, "RTP.scheduler is null; core not yet loaded");
+      recordFailure(callerId, "RTP.scheduler is null; core not yet loaded");
       return false;
     }
-
-    // Snapshot the caller location on the dispatch thread. A "synthetic
-    // player" for the purposes of this probe is simply a fabricated UUID
-    // reusing the caller's location as a stand-in spawn point; we do not
-    // touch the real entity, which keeps the probe read-only.
-    final UUID syntheticId = UUID.randomUUID();
-    RTPLocation callerLoc = null;
-    try {
-      RTPPlayer caller = RTP.serverAccessor.getPlayer(callerId);
-      if (caller != null) callerLoc = caller.getLocation();
-    } catch (Throwable ignored) {
-      // handled below
-    }
-    if (callerLoc == null) {
-      fail(callerId, "no caller location available; run as a player on a Folia/Paper server");
-      return false;
-    }
-    final RTPLocation loc = callerLoc;
-
-    // Fire-and-forget: run the probe pipeline on the async tier so the
-    // dispatch thread (possibly the main server thread on Paper/Spigot)
-    // is never blocked. The pipeline is a pure CompletableFuture chain.
-    //
-    // Register with ActiveTestJobs so the umbrella `rtp test full` sweep
-    // (TestFullCmd.dispatchNoArgAndWait) blocks until our async tail
-    // unregisters in `whenComplete` below; otherwise the next stage's
-    // output interleaves with ours.
-    final Runnable[] hookHolder = new Runnable[1];
-    hookHolder[0] = ActiveTestJobs.register(
-        callerId, new ActiveTestJobs.Job("folia-ownership", () -> { /* no cancel handle */ }));
-    scheduler.runTaskAsynchronously(
-        () -> {
-          report(callerId, "[RTP test/folia-ownership] begin synthetic=" + syntheticId);
-          dispatchMockTeleport(callerId, scheduler, loc)
-              .whenComplete(
-                  (result, err) -> {
-                    try {
-                      if (err != null) {
-                        fail(
-                            callerId,
-                            "pipeline failed ("
-                                + err.getClass().getSimpleName()
-                                + ": "
-                                + err.getMessage()
-                                + ")");
-                      } else {
-                        report(callerId, "[RTP test/folia-ownership] " + result);
-                      }
-                      report(callerId, "[RTP test/folia-ownership] end");
-                    } finally {
-                      if (hookHolder[0] != null) hookHolder[0].run();
-                    }
-                  });
-        });
+    Runnable unregister = ActiveTestJobs.register(
+        callerId, new ActiveTestJobs.Job("folia-ownership", () -> {}));
+    ProbeVerdict.runAsync(COMPONENT, () -> runProbe(callerId, scheduler))
+        .whenComplete(
+            (result, failure) -> {
+              try {
+                if (failure != null) {
+                  fail(callerId, "pipeline failed (" + failure.getClass().getSimpleName() + ": " + failure.getMessage() + ")");
+                } else {
+                  ProbeBitReport.emit(callerId, false, COMPONENT, result);
+                }
+              } finally {
+                unregister.run();
+              }
+            });
     return true;
+  }
+
+  private BitReport runProbe(UUID callerId, RTPScheduler scheduler) {
+    RTPLocation location = null;
+    RTPWorld<?> defaultWorld = MockProbeWorld.resolve(MockProbeWorld.DEFAULT_REGION);
+    if (defaultWorld != null) location = MockProbeWorld.spawn(defaultWorld);
+    if (location == null && RTPRuntime.serverAccessor() != null) {
+      try {
+        RTPPlayer caller = RTPRuntime.serverAccessor().getPlayer(callerId);
+        if (caller != null) location = caller.getLocation();
+      } catch (RuntimeException failure) {
+        RTP.log(Level.WARNING, "[RTP test/folia-ownership] caller location lookup failed", failure);
+      }
+    }
+    if (location == null || location.world() == null) {
+      String detail = "no caller location available; run as a player on a Folia/Paper server";
+      fail(callerId, detail);
+      report(callerId, "[RTP test/folia-ownership] end");
+      return ProbeBitReport.forProbe("folia-ownership")
+          .check(WORLD_UNAVAILABLE, false, "folia-ownership.world", detail)
+          .build();
+    }
+
+    RTPLocation probeLocation = location;
+    try (MockPlayerSession session = MockPlayerSession.open(probeLocation)) {
+      RuntimeMockRTPPlayer mock = session.player();
+      report(callerId, "[RTP test/folia-ownership] begin synthetic=" + mock.uuid());
+      String outcome;
+      try {
+        outcome = dispatchMockTeleport(scheduler, probeLocation, mock)
+            .get(PROBE_TIMEOUT_MS + 1_000L, TimeUnit.MILLISECONDS);
+      } catch (TimeoutException timeout) {
+        outcome = "TIMEOUT after " + PROBE_TIMEOUT_MS + "ms (region handoff never fired)";
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        outcome = "TIMEOUT after " + PROBE_TIMEOUT_MS + "ms (region handoff interrupted)";
+      } catch (Throwable failure) {
+        outcome = "FAIL dispatch (" + failure.getClass().getSimpleName() + ": " + failure.getMessage() + ")";
+      }
+      report(callerId, "[RTP test/folia-ownership] " + outcome);
+      report(callerId, "[RTP test/folia-ownership] end");
+      if (outcome.startsWith("PASS")) return ProbeBitReport.forProbe("folia-ownership").build();
+      if (outcome.startsWith("UNSUPPORTED")) {
+        return ProbeBitReport.forProbe("folia-ownership")
+            .note(UNSUPPORTED, "folia-ownership.platform", outcome)
+            .build();
+      }
+      if (outcome.startsWith("TIMEOUT")) {
+        return ProbeVerdict.failureReport(COMPONENT, BitCodes.COMPONENT_TIMEOUT, outcome);
+      }
+      return ProbeBitReport.forProbe("folia-ownership")
+          .check(OWNERSHIP, false, "folia-ownership.region", outcome)
+          .build();
+    }
+  }
+
+  private void recordFailure(UUID callerId, String detail) {
+    ProbeVerdict.record(
+            COMPONENT,
+            CompletableFuture.completedFuture(
+                ProbeBitReport.forProbe("folia-ownership")
+                    .check(WORLD_UNAVAILABLE, false, "folia-ownership.scheduler", detail)
+                    .build()),
+            COMPONENT.timeoutMillis())
+        .thenAccept(result -> ProbeBitReport.emit(callerId, false, COMPONENT, result));
   }
 
   /**
@@ -161,7 +248,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
    * down the server-accessor loop.
    */
   private CompletableFuture<String> dispatchMockTeleport(
-      UUID callerId, RTPScheduler scheduler, RTPLocation loc) {
+      RTPScheduler scheduler, RTPLocation loc, RuntimeMockRTPPlayer mock) {
     CompletableFuture<String> handoff = new CompletableFuture<>();
     long t0 = System.nanoTime();
     try {
@@ -172,6 +259,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
             // would apply any real change (teleportAsync, etc.), assert
             // that we hold the correct Entity Scheduler lock.
             String line = assertOwnership(loc, t0);
+            if (!line.startsWith("FAIL") && !line.startsWith("TIMEOUT")) mock.setLocation(loc);
             handoff.complete(line);
           });
     } catch (Throwable t) {
@@ -307,7 +395,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
 
   private void report(UUID callerId, String msg) {
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
     RTP.log(Level.INFO, msg);
   }
@@ -315,7 +403,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
   private void fail(UUID callerId, String msg) {
     String line = "[RTP test/folia-ownership] " + msg;
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, line);
+      RTPRuntime.serverAccessor().sendMessage(callerId, line);
     }
     RTP.log(Level.WARNING, line);
   }

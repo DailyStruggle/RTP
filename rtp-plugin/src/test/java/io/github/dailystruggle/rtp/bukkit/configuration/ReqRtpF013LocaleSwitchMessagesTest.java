@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import java.io.File;
 import java.nio.file.Files;
@@ -45,8 +46,8 @@ public class ReqRtpF013LocaleSwitchMessagesTest {
     RTPScheduler scheduler = mock(RTPScheduler.class);
     when(serverAccessor.getPluginDirectory()).thenReturn(dir);
     when(serverAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
-    RTP.serverAccessor = serverAccessor;
-    RTP.scheduler = scheduler;
+    RTPRuntime.setServerAccessor(serverAccessor);
+    RTPRuntime.setScheduler(scheduler);
     RTPAPI.serverAccessor = null;
     RTP rtp = new RTP() {};
     java.lang.reflect.Field instanceField = RTP.class.getDeclaredField("instance");

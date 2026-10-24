@@ -104,7 +104,7 @@ public interface MapBinding {
     // intentionally not part of this SPI yet. Until it lands, consumers shall reuse
     // the renderEphemeral + MapView path and route the allocate / paint / stamp
     // steps to the correct thread through the RTP scheduler abstraction
-    // (RTP.scheduler) - the same way MapDispatch already dispatches deliverTo - and
+    // (RTPRuntime.scheduler()) - the same way MapDispatch already dispatches deliverTo - and
     // shall not spin up raw threads for map work (project Scheduler Usage rule,
     // REQ-RTP-MAP-002).
 }

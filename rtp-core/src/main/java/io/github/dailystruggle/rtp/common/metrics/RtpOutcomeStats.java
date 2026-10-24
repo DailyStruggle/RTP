@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.Map;
 
 /**
@@ -17,7 +17,7 @@ public final class RtpOutcomeStats {
         GLOBAL.recordSuccess();
     }
 
-    public static void recordFailure(LocationGenerator.FailTypes cause) {
+    public static void recordFailure(FailTypes cause) {
         GLOBAL.recordFailure(cause);
     }
 
@@ -25,7 +25,7 @@ public final class RtpOutcomeStats {
         return GLOBAL.successCount();
     }
 
-    public static long failureCount(LocationGenerator.FailTypes cause) {
+    public static long failureCount(FailTypes cause) {
         return GLOBAL.failureCount(cause);
     }
 
@@ -37,7 +37,7 @@ public final class RtpOutcomeStats {
         return GLOBAL.successRate();
     }
 
-    public static Map<LocationGenerator.FailTypes, Long> failureBreakdown() {
+    public static Map<FailTypes, Long> failureBreakdown() {
         return GLOBAL.failureBreakdown();
     }
 

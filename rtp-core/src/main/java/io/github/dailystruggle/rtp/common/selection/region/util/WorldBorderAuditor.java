@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -45,7 +45,7 @@ public final class WorldBorderAuditor {
       return;
     }
 
-    Object wbObj = RTP.serverAccessor != null ? RTP.serverAccessor.getWorldBorder(world.name()) : null;
+    Object wbObj = RTPRuntime.serverAccessor() != null ? RTPRuntime.serverAccessor().getWorldBorder(world.name()) : null;
     if (!(wbObj instanceof WorldBorder wb)) {
       return;
     }
@@ -101,7 +101,8 @@ public final class WorldBorderAuditor {
     }
 
     DistanceParser.ParsedDistance interpreted =
-        DistanceParser.autoInterpret(parsed, borderRadBlocks, "region '" + regionName + "' " + paramName);
+        DistanceParser.autoInterpret(parsed, borderRadBlocks, "region '" + regionName + "' " + paramName,
+            message -> RTPRuntime.log(Level.INFO, message));
 
     if (interpreted != null && interpreted.unit() != SpatialUnit.CHUNK) {
       double chunks = interpreted.toChunks();
@@ -124,7 +125,7 @@ public final class WorldBorderAuditor {
       return true;
     }
 
-    Object wbObj = RTP.serverAccessor != null ? RTP.serverAccessor.getWorldBorder(world.name()) : null;
+    Object wbObj = RTPRuntime.serverAccessor() != null ? RTPRuntime.serverAccessor().getWorldBorder(world.name()) : null;
     if (!(wbObj instanceof WorldBorder wb)) {
       return true;
     }
@@ -190,7 +191,7 @@ public final class WorldBorderAuditor {
           borderRadChunks,
           borderRadiusBlocks
       );
-      RTP.log(Level.WARNING, msg);
+      RTPRuntime.log(Level.WARNING, msg);
       return false;
     }
 

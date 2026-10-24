@@ -11,7 +11,7 @@ RTP documentation is written for several distinct audiences. Because these words
 | Role | RTP-Specific Meaning |
 |------|----------------------|
 | **Developer** | A programmer who writes or modifies code. Split into two sub-roles when the distinction matters: a **contributor** works inside this repository (`rtp-core`, platform adapters, `commands-api`, etc.) and is bound by the S-00x prohibitions and ADR process; an **addon developer** builds an external plugin against `rtp-api` only (see *Addon*) and never touches core internals. Reads `REQUIREMENTS.md`, `DESIGN.md`, ADRs, and this glossary. |
-| **Operator** | The person who installs, configures, and runs the RTP plugin on a live server: edits `config.yml` / `regions.yml` / `messages.yml`, tunes queue depth and safety lists, and reads the operator docs (`docs/admin/`, bundled in the jar under `plugins/RTP/docs/`) and in-game admin messages. Does not write Java. The default audience for shipped config comments and `messages.yml` values (see *Locale Parity Maintenance* in `.junie/AGENTS.md`). Also called *server owner* or *admin* informally, but prefer *operator* for the config/runtime role. |
+| **Operator** | The person who installs, configures, and runs the RTP plugin on a live server: edits `config.yml` / `regions.yml` / `messages.yml`, tunes queue depth and safety lists, and reads the operator docs (`docs/admin/`, bundled in the jar and unpacked to `plugins/RTP/docs/` or `config/rtp/docs/`) and in-game admin messages. Does not write Java. The default audience for shipped config comments and `messages.yml` values (see *Locale Parity Maintenance* in `.junie/AGENTS.md`). Also called *server owner* or *admin* informally, but prefer *operator* for the config/runtime role. |
 | **Administrator** | An in-game or console actor holding elevated RTP permissions (e.g. `rtp.scan`, `rtp.other`, `rtp.reload`) who performs privileged runtime actions — starting a world scan, teleporting other players, reloading configuration — via `/rtp` sub-commands. This is a *permission-scoped runtime role*, distinct from the *operator* who edits files on disk, though the same person often fills both. |
 | **User** / **Player** | An ordinary player who triggers a teleport with `/rtp` (or an event trigger such as first-join) and holds only baseline permissions. The end recipient of a teleport. "Player" is the concrete Minecraft actor (wrapped as `RTPPlayer`); "user" is the same actor viewed as the consumer of the RTP feature. Never means an API caller — that is a *developer*. |
 
@@ -29,7 +29,7 @@ The words below have common meanings in Java, Minecraft, or software engineering
 | **Shape** | A visual or geometric figure | A *pluggable spatial boundary and random-sampling algorithm* registered with `rtp-api`. Not just a geometry class. See *Shape* entry below. |
 | **World** | A Minecraft `World` object | Always wrapped as `RTPWorld` inside `rtp-core`/`rtp-api`. Never pass a raw Bukkit `World` across module boundaries. See *RTPWorld* entry below. |
 | **Ticket** | Generic token or pass | A *Plugin Chunk Ticket* (`world.addPluginChunkTicket`) tracked by `ChunkReservation`. Must be released after validation. See *Plugin Chunk Ticket* entry below. |
-| **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
+| **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `rtp-neoforge`, `rtp-proxy`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
 | **Task** | Any `Runnable` or scheduled work | A `TeleportPipelineTask` — a stateful object that owns a `ChunkReservation` and must be registered with `MemoryTracker`. See *TeleportPipelineTask* entry (DESIGN.md). |
 | **Scan** | A generic word meaning "to examine sequentially" | The *administrative world-scan lifecycle* (`/rtp scan start`/`pause`/`resume`/`reset`/`cancel`) that pre-populates a region's spatial memory without teleporting any player. Supersedes the legacy term *Fill*. See *Scan Task* and *Scan Lifecycle* entries below. |
 | **Backend** | Any back-of-house server in generic web terminology | A *Minecraft server instance that hosts world data and runs the RTP teleport pipeline locally*, sitting behind a proxy in network mode. Not interchangeable with "the database" or "the rtp-core module". See *Backend* entry below. |
@@ -56,13 +56,13 @@ Informal shorthand and developer nicknames frequently used in code reviews, disc
 | "scan" / "scan task" | `ScanTask` family + `ScanPauseCmd`; `docs/architecture/05-scan-task-crawler.md` | Safety pre-scanner persisting bad-location bitmaps in `MemoryShape`. Does NOT warm queues. |
 | "spiral" / "spiral math" | Archimedean spiral 1D mapping; [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md) | Bounded distribution algorithm. |
 | "anvil" / "anvil prefilter" | `rtp-anvil` / `anvil-api` module; [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-077](../adr/ADR-077-multi-format-region-support.md) | NBT pre-filter reading Anvil (`.mca`) off-tick, plus any format an addon registers via `RegionFormatRegistry`. |
-| "claim plugin" / "claim integration" | Folded into plugin per [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md); S-003 | No inline claim calls in pipeline/commands. |
+| "claim plugin" / "claim integration" | Extracted to bundled addon `LeafRTPClaimAddon` per [ADR-069](../adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md) (superseding [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)); [ADR-118](../adr/ADR-118-claim-checkers-compile-against-published-apis.md); S-003 | No inline claim calls in pipeline/commands. |
 | "Brigadier bridge" | `BrigadierCommandAdapter` in `commands-api/` (commands-api-ADR-001) | Command bridge for Paper/Folia, Fabric, NeoForge, and Velocity. |
 | "cat locale" / `lang/cat/` | `rtp-plugin/src/main/resources/lang/cat/` | Internal Internet Cat dialect easter egg (NOT Catalan). Never document in public guides. |
-| "the lite jar" / "lite assembly" | See [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) | Trimmed assembly variant, not a separate codebase. |
+| "the lite jar" / "lite assembly" | See [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) (superseded by [ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md)) | Full technical parity with Pro; differs in support tier and release cadence ([ADR-117](../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)). |
 | "obf carrier" / "unobf carrier" | `rtp-fabric-common` vs `rtp-fabric-common-unobf` (ADR-009, effects-api-ADR-006) | Intermediary-remapped (1.20.x/1.21.x) vs Mojmap-unobfuscated (MC 26.x) carrier modules. |
 | "the proxy plan" / "network mode" | [`docs/dev/MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md); [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) | Multi-server cross-proxy architecture and reservation token pipeline. |
-| "devstack" / "proxy devstack" | [`platforms/rtp-proxy/devstack/`](../../platforms/rtp-proxy/devstack/) | Multi-server test stack (Redis + Velocity + Paper + Folia + Fabric). See `devstack/README.md`. |
+| "devstack" / "proxy devstack" | [`devstack/`](../../devstack/) | Multi-server test stack (Redis + Velocity + Paper + Folia + Fabric + NeoForge). See `devstack/README.md`. |
 
 ---
 
@@ -192,6 +192,13 @@ The in-memory representation of a teleport region's geometric boundary and its p
 
 **Network Snapshot**
 In network mode, the immutable value object (`NetworkSnapshot`) that aggregates the most recently observed backend telemetry rows readable by the proxy: per-backend availability fields (`pluginState`, `acceptingRequests`, `regionsAvailable[]`, `worldsLoaded[]`) and performance fields (`mspt`, `queueDepth`, `pendingTeleports`, `avgPipelineMs`, `chunkLoadBacklog`, `heapUsedMb`/`heapMaxMb`, `databaseLatencyMs`, `lastSeenEpochMs`). A `BackendSelector` consumes one snapshot per request and uses it for the entire capped-retry chain so retry decisions are internally consistent. Snapshots are *snapshots*, not deltas — the consumer does the math. See *Backend Telemetry Publication* in [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md).
+
+---
+
+## O
+
+**Operator Surface**
+A place where the *operator* can read what RTP is doing without reading source code: the console log, `/rtp info`, the built-in test report (`/rtp test`, ADR-121) or the metrics snapshot (REQ-RTP-OBS-001). Player chat is not an operator surface. Used by REQ-RTP-OPS-002.
 
 ---
 

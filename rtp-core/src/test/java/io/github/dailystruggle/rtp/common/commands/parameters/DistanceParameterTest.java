@@ -11,12 +11,14 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.*;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
+import io.github.dailystruggle.rtp.common.selection.region.SubspaceShape;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,8 +62,8 @@ public class DistanceParameterTest {
   @BeforeEach
   void setUp() {
     accessor = RTPTestSetup.install(tempDir);
-    if (RTP.selectionAPI == null) {
-      RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+    if (ActiveSelection.get() == null) {
+      ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
     }
 
     RTP.addShape(new Circle());
@@ -83,8 +85,8 @@ public class DistanceParameterTest {
             false, false,
             10L, 1000L, 0L, 5, 0.0, 1L, "", false);
     Region defRegion = new Region("default", settings);
-    RTP.selectionAPI.permRegionLookup.put("default", defRegion);
-    RTP.selectionAPI.permRegionLookup.put("DEFAULT", defRegion);
+    ActiveSelection.get().permRegionLookup.put("default", defRegion);
+    ActiveSelection.get().permRegionLookup.put("DEFAULT", defRegion);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -262,7 +264,7 @@ public class DistanceParameterTest {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "testPlayer", null));
 
-    Region region = RTP.selectionAPI.getRegion("default");
+    Region region = ActiveSelection.get().getRegion("default");
     assertNotNull(region);
     region.set(RegionKeys.shape, new Square());
 
@@ -277,7 +279,7 @@ public class DistanceParameterTest {
     } catch (Throwable ignored) {
     }
 
-    Region executedRegion = RTP.selectionAPI.tempRegions.get(playerId);
+    Region executedRegion = ActiveSelection.get().tempRegions.get(playerId);
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
@@ -294,7 +296,7 @@ public class DistanceParameterTest {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "testPlayer", null));
 
-    Region region = RTP.selectionAPI.getRegion("default");
+    Region region = ActiveSelection.get().getRegion("default");
     assertNotNull(region);
 
     TestRTPCmd cmd = new TestRTPCmd();
@@ -308,7 +310,7 @@ public class DistanceParameterTest {
     } catch (Throwable ignored) {
     }
 
-    Region executedRegion = RTP.selectionAPI.tempRegions.get(playerId);
+    Region executedRegion = ActiveSelection.get().tempRegions.get(playerId);
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
@@ -325,7 +327,7 @@ public class DistanceParameterTest {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "testPlayer", null));
 
-    Region region = RTP.selectionAPI.getRegion("default");
+    Region region = ActiveSelection.get().getRegion("default");
     assertNotNull(region);
 
     TestRTPCmd cmd = new TestRTPCmd();
@@ -339,7 +341,7 @@ public class DistanceParameterTest {
     } catch (Throwable ignored) {
     }
 
-    Region executedRegion = RTP.selectionAPI.tempRegions.get(playerId);
+    Region executedRegion = ActiveSelection.get().tempRegions.get(playerId);
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
@@ -356,7 +358,7 @@ public class DistanceParameterTest {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "testPlayer", null));
 
-    Region region = RTP.selectionAPI.getRegion("default");
+    Region region = ActiveSelection.get().getRegion("default");
     assertNotNull(region);
 
     TestRTPCmd cmd = new TestRTPCmd();
@@ -370,7 +372,7 @@ public class DistanceParameterTest {
     } catch (Throwable ignored) {
     }
 
-    Region executedRegion = RTP.selectionAPI.tempRegions.get(playerId);
+    Region executedRegion = ActiveSelection.get().tempRegions.get(playerId);
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
@@ -387,7 +389,7 @@ public class DistanceParameterTest {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "testPlayer", null));
 
-    Region region = RTP.selectionAPI.getRegion("default");
+    Region region = ActiveSelection.get().getRegion("default");
     assertNotNull(region);
 
     TestRTPCmd cmd = new TestRTPCmd();
@@ -401,7 +403,7 @@ public class DistanceParameterTest {
     } catch (Throwable ignored) {
     }
 
-    Region executedRegion = RTP.selectionAPI.tempRegions.get(playerId);
+    Region executedRegion = ActiveSelection.get().tempRegions.get(playerId);
     assertNotNull(executedRegion);
     Shape<?> shape = executedRegion.getShape();
     assertNotNull(shape);
@@ -417,7 +419,7 @@ public class DistanceParameterTest {
   @Test
   @DisplayName("SubspaceShape remains strictly unitless lattice cell coordinates")
   void testSubspaceShapeRemainsUnitless() {
-    Region region = RTP.selectionAPI.getRegion("default");
+    Region region = ActiveSelection.get().getRegion("default");
     assertNotNull(region);
     io.github.dailystruggle.rtp.common.selection.region.RTPLocation anchor =
         new io.github.dailystruggle.rtp.common.selection.region.RTPLocation(

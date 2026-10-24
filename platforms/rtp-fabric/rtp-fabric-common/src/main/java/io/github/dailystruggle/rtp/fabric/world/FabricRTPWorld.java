@@ -6,7 +6,9 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -163,7 +165,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
      *
      * <p>Invoked on the server thread by the caller (the teleport pipeline dispatches the paste
-     * through {@code RTP.scheduler.runTask(location, ...)}). Performs block writes only and never
+     * through {@code RTPRuntime.scheduler().runTask(location, ...)}). Performs block writes only and never
      * loads chunks (S-005). A single undecodable token is counted as a skip and audited, never
      * thrown (S-004).
      *
@@ -263,7 +265,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
-        return resolveChunkKey(chunkX, chunkZ, true);
+        return resolveChunkKey(chunkX, chunkZ, true,
+                io.github.dailystruggle.rtp.common.tools.GenerationBudget.currentReservation());
     }
 
     /**
@@ -272,10 +275,12 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Long> getChunkIfReadable(int chunkX, int chunkZ) {
-        return resolveChunkKey(chunkX, chunkZ, false);
+        return resolveChunkKey(chunkX, chunkZ, false, null);
     }
 
-    private CompletableFuture<Long> resolveChunkKey(int chunkX, int chunkZ, boolean allowLive) {
+    private CompletableFuture<Long> resolveChunkKey(
+            int chunkX, int chunkZ, boolean allowLive,
+            io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
         // Probe-entry: do NOT bump totalChunkLoads here. The increment happens inside
         // the server.submit body below, on the actual live chunk load. This avoids the
         // double-count via RTPWorld.getOrLoadChunk's probe-then-live composition; see
@@ -314,8 +319,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                     java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
                     return anvilProbeSupport
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
-                                    s -> (RTP.serverAccessor != null)
-                                            ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                                    s -> (RTPRuntime.serverAccessor() != null)
+                                            ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                                             : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s))
                             .thenCompose(result -> {
                                 io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
@@ -330,7 +335,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                                 }
                                 // No view available (UNKNOWN) → live load is authoritative.
                                 return allowLive
-                                        ? loadLiveChunk(chunkX, chunkZ, key)
+                                        ? loadLiveChunk(chunkX, chunkZ, key, generationSlot)
                                         : CompletableFuture.completedFuture(null);
                             });
                 }
@@ -338,7 +343,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         }
 
         if (!allowLive && !isChunkLoaded(chunkX, chunkZ)) return CompletableFuture.completedFuture(null);
-        return loadLiveChunk(chunkX, chunkZ, key);
+        return loadLiveChunk(chunkX, chunkZ, key, generationSlot);
     }
 
     /**
@@ -350,8 +355,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     @SuppressWarnings("unchecked")
     private static java.util.Set<String> currentUnsafeBlocks() {
         try {
-            if (RTP.configs == null) return java.util.Collections.emptySet();
-            Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
+            if (ActiveConfigs.get() == null) return java.util.Collections.emptySet();
+            Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
             if (raw instanceof java.util.Collection<?> c) {
                 java.util.Set<String> out = new java.util.HashSet<>(c.size());
                 for (Object o : c) if (o != null) out.add(o.toString());
@@ -397,9 +402,12 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * {@code completeOnTimeout} on {@link #getOrLoadChunk} remains as a
      * defense-in-depth deadline.</p>
      */
-    private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
+    private CompletableFuture<Long> loadLiveChunk(
+            int chunkX, int chunkZ, long key,
+            io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
         io.github.dailystruggle.rtp.common.tools.CfDiag.fabricLoadLiveChunk.increment();
         if (world == null) {
+            if (generationSlot != null) generationSlot.close();
             CompletableFuture<Long> failed = new CompletableFuture<>();
             failed.completeExceptionally(new IllegalStateException(
                 "FabricRTPWorld.getChunkAt: ServerLevel is null (world=" + name + ")"));
@@ -410,11 +418,17 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         // (1) Per-coordinate de-duplication - concurrent callers for the
         // same (cx,cz) share one in-flight future.
         CompletableFuture<Long> existing = inFlightLiveLoads.get(key);
-        if (existing != null) return existing;
+        if (existing != null) {
+            if (generationSlot != null) generationSlot.close();
+            return existing;
+        }
 
         CompletableFuture<Long> result = new CompletableFuture<>();
         CompletableFuture<Long> raced = inFlightLiveLoads.putIfAbsent(key, result);
-        if (raced != null) return raced;
+        if (raced != null) {
+            if (generationSlot != null) generationSlot.close();
+            return raced;
+        }
 
         // (2) Resolve the active version adapter. peek() is preferred over
         // require() because a caller racing with shutdown should fall through
@@ -423,6 +437,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         final io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
                 io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
         if (adapter == null) {
+            if (generationSlot != null) generationSlot.close();
             inFlightLiveLoads.remove(key, result);
             result.completeExceptionally(new IllegalStateException(
                     "FabricRTPWorld.loadLiveChunk: FabricVersionAdapter not yet installed"));
@@ -469,11 +484,12 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         // attributes the failure cleanly (REQ-RTP-S-004) instead of unbounded
         // queuing.
         Runnable dispatchLogic = () -> dispatchAdapterCall(
-                dispatchServer, adapter, levelHandle, chunkX, chunkZ, key, result);
+                dispatchServer, adapter, levelHandle, chunkX, chunkZ, key, result, generationSlot);
         if (liveLoadGate.tryAcquire()) {
             dispatchLogic.run();
         } else {
             if (!liveLoadWaiters.offer(dispatchLogic)) {
+                if (generationSlot != null) generationSlot.close();
                 inFlightLiveLoads.remove(key, result);
                 fabricLiveLoadInFlight.decrementAndGet();
                 totalChunkLoads.decrementAndGet();
@@ -499,19 +515,31 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter,
             io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle levelHandle,
             int chunkX, int chunkZ, long key,
-            CompletableFuture<Long> result) {
+            CompletableFuture<Long> result,
+            io.github.dailystruggle.rtp.common.tools.GenerationBudget.Reservation generationSlot) {
         CompletableFuture<CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle>> bridge =
                 new CompletableFuture<>();
+        // Counted until vanilla's own future settles, not until the deadlines below fire.
+        final Runnable releaseGeneration = GENERATION_BUDGET.begin(generationSlot);
+        final java.util.concurrent.atomic.AtomicBoolean ran = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-        dispatchServer.execute(() -> {
-            try {
-                CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> inner =
-                        adapter.requestFullChunkAsync(levelHandle, chunkX, chunkZ);
-                bridge.complete(inner);
-            } catch (Throwable t) {
-                bridge.completeExceptionally(t);
-            }
-        });
+        try {
+            dispatchServer.execute(() -> {
+                ran.set(true);
+                try {
+                    CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> inner =
+                            adapter.requestFullChunkAsync(levelHandle, chunkX, chunkZ);
+                    io.github.dailystruggle.rtp.common.tools.GenerationBudget.releaseOn(inner, releaseGeneration);
+                    bridge.complete(inner);
+                } catch (Throwable t) {
+                    releaseGeneration.run();
+                    bridge.completeExceptionally(t);
+                }
+            });
+        } catch (Throwable t) {
+            releaseGeneration.run();
+            bridge.completeExceptionally(t);
+        }
         // Bridge watchdog: dispatchServer.execute(...) silently drops the runnable
         // when the server is stopping. Without this, bridge would never complete,
         // dispatch would never complete, attachDispatchCompletion's whenComplete
@@ -524,6 +552,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         // (BiApply / BiRelay / CoCompletion). Heap-histogram signature: see
         // 2026-05-08 dump (~96 M CF, ~94 M CoCompletion, ~48 M BiApply).
         bridge.orTimeout(BRIDGE_DISPATCH_DEADLINE_MS, TimeUnit.MILLISECONDS);
+        // A dropped runnable (server stopping) never submits anything to release on.
+        bridge.whenComplete((f, ex) -> {
+            if (ex != null && !ran.get()) releaseGeneration.run();
+        });
         CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> dispatch =
                 bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
         // Hard per-load deadline. If vanilla's chunk system never completes the
@@ -699,6 +731,24 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * flow.
      */
     private final AtomicInteger fabricLiveLoadInFlight = new AtomicInteger();
+
+    /**
+     * Server-wide count of live loads vanilla is still generating (all levels share one chunk
+     * worker pool, served first-come, first-served). Background fill waits at the cap; see
+     * {@link io.github.dailystruggle.rtp.common.tools.GenerationBudget}. Unlike
+     * {@link #liveLoadGate}, a load stays counted after RTP's deadline fires.
+     */
+    private static final io.github.dailystruggle.rtp.common.tools.GenerationBudget GENERATION_BUDGET =
+            io.github.dailystruggle.rtp.common.tools.GenerationBudget.server();
+
+    static {
+        io.github.dailystruggle.rtp.common.tools.GenerationBudget.configureServerCap(() -> {
+            io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter a =
+                    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+            return io.github.dailystruggle.rtp.common.tools.GenerationBudget.capFor(
+                    a == null ? null : a.mcVersion());
+        });
+    }
 
     /**
      * Concurrent-generation cap for {@link #loadLiveChunk}.
@@ -984,8 +1034,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                 if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
-                    s -> (RTP.serverAccessor != null)
-                        ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                    s -> (RTPRuntime.serverAccessor() != null)
+                        ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                         : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
             } catch (Throwable t) {
                 RTP.log(java.util.logging.Level.FINE,
@@ -1143,7 +1193,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         try {
             @SuppressWarnings("unchecked")
             ConfigParser<SafetyKeys> safety =
-                (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
             if (safety == null) return true; // Config not yet loaded - default-on.
             Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
             if (raw instanceof Boolean b) return b;
@@ -1402,8 +1452,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (view != null) {
             int cx = (int) (key & 0xffffffffL);
             int cz = (int) (key >> 32);
-            java.util.Set<String> reconciled = (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
+            java.util.Set<String> reconciled = (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
                     : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
             return new FabricRTPChunk(view, cx, cz, id, reconciled);
         }
@@ -1412,12 +1462,12 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public void keepChunkAt(int chunkX, int chunkZ) {
-        RTP.scheduler.runTask(this, chunkX, chunkZ, () -> setForceLoaded(chunkX, chunkZ, true));
+        RTPRuntime.scheduler().runTask(this, chunkX, chunkZ, () -> setForceLoaded(chunkX, chunkZ, true));
     }
 
     @Override
     public void forgetChunkAt(int chunkX, int chunkZ) {
-        RTP.scheduler.runTask(this, chunkX, chunkZ, () -> {
+        RTPRuntime.scheduler().runTask(this, chunkX, chunkZ, () -> {
             setForceLoaded(chunkX, chunkZ, false);
             long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
             chunkCache.remove(key);

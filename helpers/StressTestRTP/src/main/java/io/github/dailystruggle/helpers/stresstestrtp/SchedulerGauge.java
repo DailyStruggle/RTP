@@ -21,7 +21,7 @@ import java.util.logging.Level;
  * <p>Answers one question: does the regional in-flight count sit at the cap
  * ({@code maxRegionalInflight}) while the harness offers more than the plugin
  * completes? It reads {@code getInFlightRegionalTasks}, {@code getMaxRegionalInflight}
- * and {@code getInteractiveQueueSize} by reflection from {@code RTP.scheduler},
+ * and {@code getInteractiveQueueSize} by reflection from {@code RTPRuntime.scheduler()},
  * located through whichever loaded plugin's class loader can see
  * {@code io.github.dailystruggle.rtp.common.RTP}. No plugin class is modified and
  * the harness takes no compile-time dependency on {@code rtp-core}.
@@ -136,7 +136,7 @@ public final class SchedulerGauge {
         }
     }
 
-    /** Locates RTP.scheduler through the loaded plugins' class loaders; retried at most every 5 s. */
+    /** Locates RTPRuntime.scheduler() through the loaded plugins' class loaders; retried at most every 5 s. */
     private boolean lookup() {
         long now = System.currentTimeMillis();
         if (now - lastLookupMs < 5000L) return false;

@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -110,7 +110,7 @@ public class CfDiagTest {
 
     @Test
     void ensureStartedHandlesSchedulerThrowAndResetsStarted() throws Exception {
-        RTPServerAccessor originalAccessor = RTP.serverAccessor;
+        RTPServerAccessor originalAccessor = RTPRuntime.serverAccessor();
         try {
             RTPServerAccessor throwingAccessor = (RTPServerAccessor) java.lang.reflect.Proxy.newProxyInstance(
                     getClass().getClassLoader(),
@@ -122,7 +122,7 @@ public class CfDiagTest {
                         return null;
                     }
             );
-            RTP.serverAccessor = throwingAccessor;
+            RTPRuntime.setServerAccessor(throwingAccessor);
 
             // Calling ensureStarted when scheduler throws should catch exception and reset STARTED to false
             assertDoesNotThrow(CfDiag::ensureStarted);
@@ -132,7 +132,7 @@ public class CfDiagTest {
             boolean started = ((AtomicBoolean) startedField.get(null)).get();
             assertFalse(started, "STARTED must be reset to false when scheduler fails");
         } finally {
-            RTP.serverAccessor = originalAccessor;
+            RTPRuntime.setServerAccessor(originalAccessor);
         }
     }
 
@@ -162,7 +162,7 @@ public class CfDiagTest {
 
         // Verify that the logged message actually contains formatted delta rates
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor mockAccessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         assertFalse(mockAccessor.logMessages.isEmpty());
         String lastLog = mockAccessor.logMessages.get(mockAccessor.logMessages.size() - 1);
         assertTrue(lastLog.contains("[RTP][CFDIAG] window="));
@@ -178,5 +178,110 @@ public class CfDiagTest {
 
         String dumpLog = mockAccessor.logMessages.get(mockAccessor.logMessages.size() - 1);
         assertTrue(dumpLog.contains("pregen{attempt="));
+    }
+
+    /** Counters in the order their rates appear in the dump line, with the label preceding each. */
+    private static Object[][] rateLayout() {
+        return new Object[][]{
+                {" locGen{pregen=", CfDiag.locationGenPregenEntry},
+                {"/s queue=", CfDiag.locationGenQueueEntry},
+                {"/s} regionCache=", CfDiag.regionCacheTaskIssue},
+                {"/s pregen{attempt=", CfDiag.pregenAttemptStart},
+                {"/s reschedule=", CfDiag.pregenReschedule},
+                {"/s allOf=", CfDiag.pregenAllOfDispatch},
+                {"/s timeout=", CfDiag.pregenAllOfTimeout},
+                {"/s} queue{allOf=", CfDiag.queueAllOfDispatch},
+                {"/s timeout=", CfDiag.queueAllOfTimeout},
+                {"/s} chunkSet{pregenLive=", CfDiag.chunkSetPregenLive},
+                {"/s pregenVer=", CfDiag.chunkSetPregenVerified},
+                {"/s queueLive=", CfDiag.chunkSetQueueLive},
+                {"/s queueVd=", CfDiag.chunkSetQueueVd},
+                {"/s region=", CfDiag.chunkSetRegion},
+                {"/s regionCache=", CfDiag.chunkSetRegionCache},
+                {"/s pipeline=", CfDiag.chunkSetPipeline},
+                {"/s fabricGCA=", CfDiag.chunkSetFabricGetChunk},
+                {"/s} fabric{getChunkAtAsync=", CfDiag.fabricGetChunkAtAsync},
+                {"/s loadLiveChunk=", CfDiag.fabricLoadLiveChunk},
+                {"/s} scan{run=", CfDiag.scanRunBatch},
+                {"/s testPos=", CfDiag.scanTestPos},
+                {"/s fullLoad=", CfDiag.scanRunFullLoad},
+                {"/s} region{execute=", CfDiag.regionExecute},
+                {"/s deficitDispatch=", CfDiag.regionDeficitDispatch},
+        };
+    }
+
+    private static String lastLog() {
+        java.util.List<String> logs =
+                ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).logMessages;
+        return logs.isEmpty() ? "" : logs.get(logs.size() - 1);
+    }
+
+    @Test
+    void dumpOnceReportsPerCounterDeltaRatesAndRunningTotals() throws Exception {
+        Method dumpOnce = CfDiag.class.getDeclaredMethod("dumpOnce");
+        dumpOnce.setAccessible(true);
+        Field lastDumpField = CfDiag.class.getDeclaredField("LAST_DUMP_NANOS");
+        lastDumpField.setAccessible(true);
+        AtomicLong lastDump = (AtomicLong) lastDumpField.get(null);
+        Object[][] layout = rateLayout();
+
+        // Non-zero snapshots, so a delta computed as n + s instead of n - s is visible.
+        for (Object[] row : layout) {
+            ((java.util.concurrent.atomic.LongAdder) row[1]).add(7);
+        }
+        dumpOnce.invoke(null);
+
+        // Counter k (1-based) gains (k - 0.5) * 10_000 over a 10_000 s window: rate k - 0.5 per
+        // second. Half-integers keep the few microseconds of extra window off the format boundaries.
+        final long windowSec = 10_000L;
+        StringBuilder expectedRates = new StringBuilder();
+        for (int i = 0; i < layout.length; i++) {
+            double rate = i + 0.5;
+            ((java.util.concurrent.atomic.LongAdder) layout[i][1]).add((long) (rate * windowSec));
+            expectedRates.append(layout[i][0])
+                    .append(rate < 10.0 ? String.format("%.2f", rate) : String.format("%.1f", rate));
+        }
+        expectedRates.append("/s} totals{");
+        lastDump.set(System.nanoTime() - windowSec * 1_000_000_000L);
+        dumpOnce.invoke(null);
+
+        String log = lastLog();
+        assertTrue(log.contains("[RTP][CFDIAG] window=10000."), log);
+        int ratesStart = log.indexOf(" locGen{");
+        int ratesEnd = log.indexOf("totals{") + "totals{".length();
+        assertEquals(expectedRates.toString(), log.substring(ratesStart, ratesEnd));
+
+        String expectedTotals = "totals{pregenAttempt=" + CfDiag.pregenAttemptStart.sum()
+                + " pregenAllOf=" + CfDiag.pregenAllOfDispatch.sum()
+                + " queueAllOf=" + CfDiag.queueAllOfDispatch.sum()
+                + " regionCache=" + CfDiag.regionCacheTaskIssue.sum()
+                + " chunkSetPregenVer=" + CfDiag.chunkSetPregenVerified.sum()
+                + " chunkSetQueueVd=" + CfDiag.chunkSetQueueVd.sum()
+                + " chunkSetFabricGCA=" + CfDiag.chunkSetFabricGetChunk.sum()
+                + " fabricGetChunkAtAsync=" + CfDiag.fabricGetChunkAtAsync.sum()
+                + " fabricLoadLiveChunk=" + CfDiag.fabricLoadLiveChunk.sum()
+                + " scanTestPos=" + CfDiag.scanTestPos.sum()
+                + " scanRunFullLoad=" + CfDiag.scanRunFullLoad.sum()
+                + " regionExecute=" + CfDiag.regionExecute.sum()
+                + " regionDeficitDispatch=" + CfDiag.regionDeficitDispatch.sum()
+                + "}";
+        assertTrue(log.endsWith(expectedTotals), log);
+    }
+
+    @Test
+    void dumpOnceLogsWhenOnlyOneCounterMoved() throws Exception {
+        Method dumpOnce = CfDiag.class.getDeclaredMethod("dumpOnce");
+        dumpOnce.setAccessible(true);
+        dumpOnce.invoke(null); // settle snapshots
+
+        for (Object[] row : rateLayout()) {
+            java.util.List<String> logs =
+                    ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).logMessages;
+            int before = logs.size();
+            ((java.util.concurrent.atomic.LongAdder) row[1]).add(1);
+            dumpOnce.invoke(null);
+            assertEquals(before + 1, logs.size(), "a single moved counter must emit a dump: " + row[0]);
+            assertTrue(lastLog().contains("[RTP][CFDIAG] window="));
+        }
     }
 }

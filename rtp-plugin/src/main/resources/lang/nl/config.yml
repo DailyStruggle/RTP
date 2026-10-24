@@ -132,6 +132,14 @@ defaults:
     direction: 2
     requireSkyLight: true
 
+    # Weigert landingen op hellingen of kliffranden die minstens zo steil zijn, in graden.
+    # "off" is het snelst. 30 weigert ongeveer 1 op 5 landplekken, 45 ongeveer 1 op 12, 60 ongeveer 1 op 60.
+    # Elk getal van 0 tot 89 werkt ook. Als het aan staat, leest de zoektocht de chunks rond elke plek.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
+
   # How many safe spots to pre-calculate.
   cacheCap: 50
 

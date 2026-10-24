@@ -18,7 +18,7 @@ If a critical subsystem file has a behavioral change (comment-, formatting-, and
 - Inspect the pull request description, commit messages, and attached CI artifacts for empirical validation proof:
   1. **Leak Fuzzing Attestation (ADR-111):**
      - Summary of a minimum 24-episode fuzzing run using `scripts/bench_fuzz.py`.
-     - Affirmation of `retained+0` player sessions post-GC across all client disconnect scenarios.
+     - Affirmation that no class is flagged by the per-departure or cumulative class screen against the `direct` control across all client disconnect scenarios.
      - Affirmation of zero `ServerLogOracle` exceptions.
   2. **Concurrency / Regional Ownership Verification:**
      - Traceable unit tests asserting regional thread ownership (`Bukkit.isOwnedByCurrentRegion`).
@@ -40,7 +40,7 @@ This pull request touches subsystems governing concurrent execution, regional th
 Please run the verification tooling and update the pull request description with the results:
 
 - [ ] **24-Episode Leak Fuzzing:** Execute `python scripts/bench_fuzz.py --mode leak --episodes 24 --reps 3` (see `helpers/StressTestRTP/LEAK_FUZZING.md`).
-- [ ] **Zero Retained Sessions:** Verify `retained+0` player sessions post-GC across all disconnect episodes.
+- [ ] **No Retained Classes:** Verify that `fit.json` lists no `departure_screen` or `screen` class above the control for any disconnect episode.
 - [ ] **Clean Log Oracle:** Verify zero `ServerLogOracle` exceptions or unhandled pipeline errors.
 - [ ] **Devstack Regional Verification:** Execute `.\devstack\run-acceptance.ps1 -Scenario rtptest` and verify all platform backends report passing accessors.
 ```

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkitplatform.entity;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import java.util.function.BooleanSupplier;
@@ -50,9 +50,9 @@ public final class TeleportPathSelector {
     try {
       @SuppressWarnings("unchecked")
       ConfigParser<PerformanceKeys> perf =
-          RTP.configs == null
+          ActiveConfigs.get() == null
               ? null
-              : (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+              : (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
       if (perf == null) return Mode.AUTO;
       Object o = perf.getConfigValue(PerformanceKeys.teleportPath, "AUTO");
       return o != null && "ASYNC".equalsIgnoreCase(o.toString().trim()) ? Mode.ASYNC : Mode.AUTO;

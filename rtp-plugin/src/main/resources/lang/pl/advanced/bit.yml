@@ -1,0 +1,21 @@
+# --- Konfiguracja testów wbudowanych (BIT) ---
+# Dokumentacja: docs/admin/configuration/BIT.md
+
+# Zapisuje strukturalne problemy akcji jako ostrzeżenia bez blokowania rejestracji.
+# Ustaw true, aby nie rejestrować akcji z efektywnym błędem.
+strictActions: false
+
+# Zapisuje jako ostrzeżenia uwagi do konfiguracji akceptowane przez starsze wersje, bez odrzucania /rtp reload.
+# Ustaw true, aby traktować je jako błędy; przeładowanie lub Hot-Apply z błędami zachowuje bieżącą konfigurację.
+strictConfig: false
+
+# Minimalna liczba próbek przed uznaniem bramki za zawsze lub nigdy spełnioną.
+gateOutcomeSamples: 200
+
+# Poziomy ważności zarejestrowanych kodów BIT; mają pierwszeństwo przed strictActions.
+# Dozwolone: ERROR, WARNING, INFO, DEBUG, TRACE i OFF. OFF ukrywa problem.
+# Nieznane kody i poziomy są ignorowane i zapisywane w dzienniku.
+overrides:
+
+# NIE ZMIENIAJ NUMERU WERSJI
+version: 1.0

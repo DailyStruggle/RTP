@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.playerData;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -128,7 +128,7 @@ public class FileBinStore {
           out.flush();
         }
       } catch (IOException e) {
-        RTP.log(Level.WARNING, "[RTP] Failed to write offline player bin file: " + binFile.getName(), e);
+        RTPRuntime.log(Level.WARNING, "[RTP] Failed to write offline player bin file: " + binFile.getName(), e);
       }
     }
   }
@@ -212,7 +212,7 @@ public class FileBinStore {
     } catch (EOFException ignored) {
       // Normal end of file
     } catch (IOException e) {
-      RTP.log(Level.WARNING, "[RTP] Failed to read bin file: " + binFile.getName(), e);
+      RTPRuntime.log(Level.WARNING, "[RTP] Failed to read bin file: " + binFile.getName(), e);
     }
     return null;
   }
@@ -239,7 +239,7 @@ public class FileBinStore {
             deleted++;
           }
         } catch (Exception e) {
-          RTP.log(Level.FINE, "[RTP] Failed to evaluate or purge bin file: " + file.getName(), e);
+          RTPRuntime.log(Level.FINE, "[RTP] Failed to evaluate or purge bin file: " + file.getName(), e);
         }
       }
     }

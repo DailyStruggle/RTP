@@ -7,18 +7,25 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.effects.EffectDispatch;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.mock.SyntheticSideEffects;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import io.github.dailystruggle.rtp.effects.EffectsResolver;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
@@ -32,6 +39,25 @@ import java.util.logging.Level;
 
 public class BukkitEffectsHandler {
     private BukkitEffectsHandler() {
+    }
+
+    /**
+     * Publish {@code event} on the Bukkit bus unless {@code player} is a registered BIT mock
+     * (ADR-121 section 11). Every RTP event in this class goes through this gate.
+     *
+     * @return {@code true} when the event was published
+     */
+    static boolean fire(RTPPlayer player, Event event) {
+        if (!SyntheticSideEffects.publishesEvents(player)) return false;
+        Bukkit.getPluginManager().callEvent(event);
+        return true;
+    }
+
+    /** UUID-keyed variant of {@link #fire(RTPPlayer, Event)}; a {@code null} id publishes. */
+    static boolean fire(UUID playerId, Event event) {
+        if (SyntheticSideEffects.isSynthetic(playerId)) return false;
+        Bukkit.getPluginManager().callEvent(event);
+        return true;
     }
 
     /**
@@ -68,9 +94,8 @@ public class BukkitEffectsHandler {
      *       {@code players:} gating the player passes (effects-api-ADR-005).</li>
      * </ol>
      *
-     * <p>S-005: resolution is in-memory; the effect itself is dispatched via
-     * {@code BukkitEffectsInitializer.runEffect} which already routes to the
-     * main thread.
+     * <p>S-005: resolution is in-memory; effects run only through the platform
+     * scheduler, never inline after a scheduling failure.
      */
     private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player) {
         dispatchEffects(plugin, prefix, player, null, null, null);
@@ -93,8 +118,8 @@ public class BukkitEffectsHandler {
         //    (hasPermission / uuid() / name()). Falls back to a permission-only
         //    union when the platform accessor isn't ready.
         String stage = stageOf(prefix);
-        RTPPlayer rp = (RTP.serverAccessor != null)
-                ? RTP.serverAccessor.getPlayer(player.getUniqueId())
+        RTPPlayer rp = (RTPRuntime.serverAccessor() != null)
+                ? RTPRuntime.serverAccessor().getPlayer(player.getUniqueId())
                 : null;
         Collection<String> union = (rp != null)
                 ? EffectsResolver.resolveUnioned(stage, rp, prefix, nodes)
@@ -113,10 +138,10 @@ public class BukkitEffectsHandler {
 
         // 3) Build and dispatch.
         List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
-        for (Effect<?> effect : effects) {
+        EffectDispatch.forEachIsolated(prefix, effects, effect -> {
             effect.setTarget(target);
             if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
-                RTP.deathEffectInFlight.add(player.getUniqueId());
+                DeathTeleports.effectInFlight().add(player.getUniqueId());
                 if (pipelineTask != null) {
                     pipelineTask.deathEffectTriggered = true;
                 }
@@ -125,32 +150,31 @@ public class BukkitEffectsHandler {
             // platform-restricted ops inside Effect#run (NoteEffect playSound,
             // FireworkEffect spawn, etc.) don't trip Paper's AsyncCatcher
             // (REQ-RTP-S-005). On Folia, Bukkit.getScheduler().runTask throws
-            // UnsupportedOperationException and BukkitEffectsInitializer's
-            // catch-block then falls back to running the effect directly on
-            // the calling async pipeline thread, which is the failure mode
-            // this routes around. We prefer RTP.scheduler.runTaskForPlayer
+            // UnsupportedOperationException; BukkitEffectsInitializer reports
+            // the rejection and drops the effect rather than running it on
+            // the calling async pipeline thread. We prefer RTPRuntime.scheduler().runTaskForPlayer
             // (Folia entity-scheduler aware; "runTaskForPlayer" is the
             // historic name for a generic "run runnable on a thread owning
             // the player after N ticks" path) and fall back to the legacy
             // runEffect helper when no RTPPlayer is available (Paper/Spigot).
             dispatchEffectForPlayer(plugin, effect, rp);
-        }
+        });
     }
 
     /**
      * Run {@code effect} on a thread that legally owns its target player.
-     * Folia: routes through {@link RTP#scheduler}'s
+     * Folia: routes through {@link RTPRuntime#scheduler()}'s
      * {@code runTaskForPlayer(RTPPlayer, RTPRunnable, delayTicks)} entry
      * point (per-entity scheduler hop). Paper/Spigot or when the
      * {@link RTPPlayer} view is unavailable: falls back to the legacy
      * {@link BukkitEffectsInitializer#runEffect(org.bukkit.plugin.Plugin, Effect)} helper,
-     * whose {@code Bukkit.getScheduler().runTask} path remains the correct
-     * main-thread dispatch on those platforms.
+     * which schedules on Bukkit's main thread or reports the rejection and
+     * drops the effect; it never runs the effect on the calling thread.
      */
     private static void dispatchEffectForPlayer(JavaPlugin plugin, Effect<?> effect, RTPPlayer rp) {
-        if (RTP.scheduler != null && rp != null) {
+        if (RTPRuntime.scheduler() != null && rp != null) {
             try {
-                RTP.scheduler.runTaskForPlayer(
+                RTPRuntime.scheduler().runTaskForPlayer(
                         rp,
                         new io.github.dailystruggle.rtp.common.tasks.RTPRunnable((Runnable) effect),
                         1L);
@@ -175,26 +199,25 @@ public class BukkitEffectsHandler {
     }
 
     public static void setupEffects(JavaPlugin plugin) {
+        EffectDispatch.installWarnSink();
         // Per effects-api-ADR-003: EffectFactory no longer registers Bukkit
         // effects in a static block - the platform initializer must be invoked
         // explicitly. Idempotent.
         BukkitEffectsInitializer.registerAll();
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
 
         TeleportPipelineTask.setupPreActions.add(
                 task -> {
                     PreSetupTeleportEvent event = new PreSetupTeleportEvent(task);
-                    Bukkit.getPluginManager().callEvent(event);
-                    if (event.isCancelled()) task.setCancelled(true);
+                    if (fire(task.player(), event) && event.isCancelled()) task.setCancelled(true);
                     if (task.player() != null) {
                         if (!Boolean.parseBoolean(
                                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "presetup");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.presetup", player));
                     }
                 });
@@ -202,24 +225,21 @@ public class BukkitEffectsHandler {
         TeleportPipelineTask.setupPostActions.add(
                 (task, aBoolean) -> {
                     if (!aBoolean) return;
-                    PostSetupTeleportEvent event = new PostSetupTeleportEvent(task);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(task.player(), new PostSetupTeleportEvent(task));
                     if (task.player() != null) {
                         if (!Boolean.parseBoolean(
                                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postsetup");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.postsetup", player));
                     }
                 });
 
         TeleportPipelineTask.loadPreActions.add(
                 task -> {
-                    PreLoadChunksEvent event = new PreLoadChunksEvent(task);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(task.player(), new PreLoadChunksEvent(task));
 
                     if (task.player() != null) {
                         if (!Boolean.parseBoolean(
@@ -227,16 +247,14 @@ public class BukkitEffectsHandler {
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "preload");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.preload", player));
                     }
                 });
 
         TeleportPipelineTask.loadPostActions.add(
                 task -> {
-                    PostLoadChunksEvent event = new PostLoadChunksEvent(task);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(task.player(), new PostLoadChunksEvent(task));
 
                     if (task.player() != null) {
                         if (!Boolean.parseBoolean(
@@ -244,16 +262,14 @@ public class BukkitEffectsHandler {
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postload");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.postload", player));
                     }
                 });
 
         TeleportPipelineTask.teleportPreActions.add(
                 task -> {
-                    PreTeleportEvent event = new PreTeleportEvent(task);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(task.player(), new PreTeleportEvent(task));
 
                     if (task.player() != null) {
                         if (!Boolean.parseBoolean(
@@ -278,8 +294,7 @@ public class BukkitEffectsHandler {
 
         TeleportPipelineTask.teleportPostActions.add(
                 task -> {
-                    PostTeleportEvent event = new PostTeleportEvent(task);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(task.player(), new PostTeleportEvent(task));
 
 
                     if (task.player() != null) {
@@ -295,31 +310,31 @@ public class BukkitEffectsHandler {
                          */
                         @SuppressWarnings("unchecked")
                         ConfigParser<PlayerMessages> lang =
-                                (ConfigParser<PlayerMessages>) RTP.configs.getParser(PlayerMessages.class);
+                                (ConfigParser<PlayerMessages>) ActiveConfigs.get().getParser(PlayerMessages.class);
                         if (lang == null) return;
 
-                        String title = RTP.configs.getConfigValue(PlayerMessages.title, "").toString();
-                        String subtitle = RTP.configs.getConfigValue(PlayerMessages.subtitle, "").toString();
+                        String title = ActiveConfigs.get().getConfigValue(PlayerMessages.title, "").toString();
+                        String subtitle = ActiveConfigs.get().getConfigValue(PlayerMessages.subtitle, "").toString();
 
                         int fadeIn = lang.getNumber(PlayerMessages.fadeIn, 0).intValue();
                         int stay = lang.getNumber(PlayerMessages.stay, 0).intValue();
                         int fadeOut = lang.getNumber(PlayerMessages.fadeOut, 0).intValue();
 
-                        String actionbar = RTP.configs.getConfigValue(PlayerMessages.actionbar, "").toString();
+                        String actionbar = ActiveConfigs.get().getConfigValue(PlayerMessages.actionbar, "").toString();
 
-                        RTP.scheduler.runTask(() -> {
+                        RTPRuntime.scheduler().runTask(() -> {
                             SendMessage.title(player, title, subtitle, fadeIn, stay, fadeOut);
                             SendMessage.actionbar(player, actionbar);
                         });
 
                         ConfigParser<ConfigKeys> configParser =
-                                (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                                (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
 
                         /*
                          * Folia note: command dispatch (Bukkit.dispatchCommand and player.performCommand)
                          * is handled by the global region. Region/entity threads throw
                          * IllegalStateException("Dispatching command async"). Always route to the
-                         * global region scheduler via RTP.scheduler.runTask(Runnable).
+                         * global region scheduler via RTPRuntime.scheduler().runTask(Runnable).
                          * Collect all commands and dispatch them in a single scheduled task to
                          * reduce per-command scheduling overhead.
                          */
@@ -348,7 +363,7 @@ public class BukkitEffectsHandler {
                         }
 
                         if (!consoleCommandsToRun.isEmpty() || !playerCommandsToRun.isEmpty()) {
-                            RTP.scheduler.runTask(() -> {
+                            RTPRuntime.scheduler().runTask(() -> {
                                 for (String c : consoleCommandsToRun) {
                                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), c);
                                 }
@@ -374,8 +389,7 @@ public class BukkitEffectsHandler {
 
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postteleport");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.postteleport", player));
                     }
                 });
@@ -387,11 +401,9 @@ public class BukkitEffectsHandler {
 
                     if (player == null) return;
 
-                    TeleportCancelEvent event = new TeleportCancelEvent(uuid);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(uuid, new TeleportCancelEvent(uuid));
 
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(
@@ -408,11 +420,9 @@ public class BukkitEffectsHandler {
                     Player player = resolveBukkitPlayer(uuid, "queuepush");
                     if (player == null) return;
 
-                    PlayerQueuePushEvent event = new PlayerQueuePushEvent(region, uuid);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(uuid, new PlayerQueuePushEvent(region, uuid));
 
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(
@@ -429,11 +439,9 @@ public class BukkitEffectsHandler {
                     Player player = resolveBukkitPlayer(uuid, "queuepop");
                     if (player == null) return;
 
-                    PlayerQueuePopEvent event = new PlayerQueuePopEvent(region, uuid);
-                    Bukkit.getPluginManager().callEvent(event);
+                    fire(uuid, new PlayerQueuePopEvent(region, uuid));
 
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(
@@ -450,8 +458,7 @@ public class BukkitEffectsHandler {
                 @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
                 public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
                     Player player = event.getEntity();
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(

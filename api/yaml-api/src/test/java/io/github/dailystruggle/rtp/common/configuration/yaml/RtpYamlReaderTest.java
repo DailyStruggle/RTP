@@ -310,10 +310,79 @@ class RtpYamlReaderTest {
     }
 
     @Test
-    @DisplayName("Block scalars and merge keys are rejected")
+    @DisplayName("Block scalars parse with literal, folded, chomping and indentation semantics")
     void blockScalarAndMergeKey() {
-        assertEquals("rtpYaml.unsupported.blockScalar",
-                assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("a: |\n")).messageKey());
+        String source = "literal: | # header comment\n"
+                + "  first\n"
+                + "  ---\n"
+                + "  # body comment\n"
+                + "  \tdata\n"
+                + "folded: >-\n"
+                + "  one\n"
+                + "  two\n"
+                + "\n"
+                + "  three\n"
+                + "foldedLeadingBlankLines: >-\n"
+                + "\n"
+                + "\n"
+                + "  start\n"
+                + "foldedIndented: >-\n"
+                + "  normal\n"
+                + "   indented\n"
+                + "  final\n"
+                + "stripped: |-\n"
+                + "  last\n"
+                + "clipped: |\n"
+                + "  last\n"
+                + "kept: |+2\n"
+                + "  last\n"
+                + "\n"
+                + "foldedBlankLines: >-\n"
+                + "  alpha\n"
+                + "\n"
+                + "\n"
+                + "  beta\n"
+                + "foldedKeep: >+\n"
+                + "  red\n"
+                + "  blue\n"
+                + "\n"
+                + "\n"
+                + "explicit: |2-\n"
+                + "  exact\n"
+                + "items:\n"
+                + "  - |\n"
+                + "    sequence\n"
+                + "    value\n"
+                + "  - key: >-\n"
+                + "      map\n"
+                + "      value\n";
+        RtpYamlMapping root = RtpYamlReader.parse(source);
+        assertEquals("first\n---\n# body comment\n\tdata\n",
+                ((RtpYamlScalar) root.get("literal")).rawValue());
+        assertEquals("one two\nthree", ((RtpYamlScalar) root.get("folded")).rawValue());
+        assertEquals("\n\nstart", ((RtpYamlScalar) root.get("foldedLeadingBlankLines")).rawValue());
+        assertEquals("normal\n indented\nfinal", ((RtpYamlScalar) root.get("foldedIndented")).rawValue());
+        assertEquals("last", ((RtpYamlScalar) root.get("stripped")).rawValue());
+        assertEquals("last\n", ((RtpYamlScalar) root.get("clipped")).rawValue());
+        assertEquals("last\n\n", ((RtpYamlScalar) root.get("kept")).rawValue());
+        assertEquals("alpha\n\nbeta", ((RtpYamlScalar) root.get("foldedBlankLines")).rawValue());
+        assertEquals("red blue\n\n\n", ((RtpYamlScalar) root.get("foldedKeep")).rawValue());
+        assertEquals("exact", ((RtpYamlScalar) root.get("explicit")).rawValue());
+        RtpYamlSequence items = (RtpYamlSequence) root.get("items");
+        assertEquals("sequence\nvalue\n", ((RtpYamlScalar) items.get(0)).rawValue());
+        RtpYamlMapping item = (RtpYamlMapping) items.get(1);
+        assertEquals("map value", ((RtpYamlScalar) item.get("key")).rawValue());
+
+        RtpYamlMapping reparsed = RtpYamlReader.parse(RtpYamlWriter.emit(root));
+        assertEquals(((RtpYamlScalar) root.get("literal")).rawValue(),
+                ((RtpYamlScalar) reparsed.get("literal")).rawValue());
+        assertEquals(((RtpYamlScalar) root.get("kept")).rawValue(),
+                ((RtpYamlScalar) reparsed.get("kept")).rawValue());
+
+        RtpYamlParseException badHeader = assertThrows(RtpYamlParseException.class,
+                () -> RtpYamlReader.parse("bad: |2x\n  body\n"));
+        assertEquals("rtpYaml.syntax.blockScalarHeader", badHeader.messageKey());
+
         assertEquals("rtpYaml.unsupported.mergeKey",
                 assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("<<: value\n")).messageKey());
     }

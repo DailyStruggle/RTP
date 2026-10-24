@@ -8,16 +8,17 @@ import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.BiomeSampleCapability;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.server.api.ServerAccessor;
 import java.io.File;
-import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.logging.Level;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Primary bridge between platform-neutral RTP core and concrete server runtimes.
@@ -28,7 +29,7 @@ import java.util.logging.Level;
  * <p>{@link #activeTasks} tracks active {@link TrackedRTPTask} instances thread-safely.
  */
 @PublicApi
-public interface RTPServerAccessor {
+public interface RTPServerAccessor extends ServerAccessor {
   ConcurrentHashMap<String, TrackedRTPTask> activeTasks = new ConcurrentHashMap<>();
 
   /**
@@ -64,25 +65,11 @@ public interface RTPServerAccessor {
   }
 
   /**
-   * Returns the platform-reported server version string (e.g. {@code "git-Paper-400 (MC: 1.21.1)"}).
-   *
-   * @return server version string; never {@code null}
-   */
-  String getServerVersion();
-
-  /**
    * Returns the RTP plugin version as declared in {@code plugin.yml}.
    *
    * @return plugin version string; never {@code null}
    */
   String getPluginVersion();
-
-  /**
-   * Returns a short identifier for the server platform (e.g. {@code "paper"}, {@code "folia"}).
-   *
-   * @return platform identifier; never {@code null}
-   */
-  String getPlatform();
 
   /**
    * Returns the server name or network identity if configured, or {@code null}.
@@ -91,102 +78,6 @@ public interface RTPServerAccessor {
    */
   default String getServerName() {
     return null;
-  }
-
-  /**
-   * Returns the coarse {@link PlatformFamily} this server belongs to.
-   *
-   * <p>Prefer over string-matching {@link #getPlatform()} for runtime gating.
-   * Default maps canonical platform strings; unrecognised platforms return UNKNOWN.
-   *
-   * @return the platform family; never {@code null}
-   */
-  default PlatformFamily getPlatformFamily() {
-    String platform = getPlatform();
-    if (platform != null) {
-      if (platform.equalsIgnoreCase("fabric")) return PlatformFamily.FABRIC;
-      if (platform.equalsIgnoreCase("neoforge")) return PlatformFamily.NEOFORGE;
-      if (platform.equalsIgnoreCase("Folia")
-          || platform.equalsIgnoreCase("Paper")
-          || platform.equalsIgnoreCase("Spigot")) {
-        return PlatformFamily.BUKKIT;
-      }
-    }
-    log(
-        Level.WARNING,
-        "[RTP] Unrecognised server platform '"
-            + platform
-            + "'; classifying as PlatformFamily.UNKNOWN. Platform-specific addon behaviour will be skipped.");
-    return PlatformFamily.UNKNOWN;
-  }
-
-  /**
-   * Returns the headline Minecraft version integer (e.g. 21 for 1.21.x, 26 for 26.x).
-   *
-   * <p>Opaque monotonically increasing integer used for version range comparisons.
-   *
-   * @return the integer server version; {@code null} if undetermined
-   */
-  Integer getServerIntVersion();
-
-  /**
-   * Tests whether this server belongs to the given {@link PlatformFamily}.
-   *
-   * @param family the family to test against; {@code null} returns {@code false}
-   * @return {@code true} if server matches {@code family}
-   */
-  default boolean isPlatformFamily(PlatformFamily family) {
-    return family != null && getPlatformFamily() == family;
-  }
-
-  /**
-   * Tests whether the integer Minecraft version is at least {@code minServerVersion}.
-   *
-   * <p>Returns {@code false} if version is unknown (fails closed).
-   *
-   * @param minServerVersion inclusive minimum version
-   * @return {@code true} if server version is known and {@code >= minServerVersion}
-   */
-  default boolean isServerVersionAtLeast(int minServerVersion) {
-    Integer v = getServerIntVersion();
-    return v != null && v >= minServerVersion;
-  }
-
-  /**
-   * Tests whether the integer Minecraft version is at most {@code maxServerVersion}.
-   *
-   * <p>Returns {@code false} if version is unknown (fails closed).
-   *
-   * @param maxServerVersion inclusive maximum version
-   * @return {@code true} if server version is known and {@code <= maxServerVersion}
-   */
-  default boolean isServerVersionAtMost(int maxServerVersion) {
-    Integer v = getServerIntVersion();
-    return v != null && v <= maxServerVersion;
-  }
-
-  /**
-   * Platform-and-version compatibility gate for addons.
-   *
-   * <p>Returns {@code true} if family matches and version falls in bounds.
-   *
-   * @param requiredFamily   required family, or {@code null} for any
-   * @param minServerVersion inclusive minimum ({@code 0} for no floor)
-   * @param maxServerVersion inclusive maximum ({@link Integer#MAX_VALUE} for no ceiling)
-   * @return {@code true} if runtime satisfies constraints
-   */
-  default boolean isCompatible(PlatformFamily requiredFamily, int minServerVersion, int maxServerVersion) {
-    if (requiredFamily != null && getPlatformFamily() != requiredFamily) {
-      return false;
-    }
-    boolean versionBounded = minServerVersion > 0 || maxServerVersion < Integer.MAX_VALUE;
-    if (versionBounded) {
-      Integer v = getServerIntVersion();
-      if (v == null || v < minServerVersion || v > maxServerVersion) {
-        return false;
-      }
-    }
-    return true;
   }
 
   /**
@@ -391,6 +282,17 @@ public interface RTPServerAccessor {
   }
 
   /**
+   * Returns whether the host exposes a scoreboard objective.
+   *
+   * @param objective the objective name; must not be {@code null}
+   * @return {@link Optional#of(Object)} containing {@code true} when present or {@code false} when
+   *     absent, or {@link Optional#empty()} when the host cannot determine whether it is present
+   */
+  default Optional<Boolean> hasScoreboardObjective(String objective) {
+    return Optional.empty();
+  }
+
+  /**
    * Applies colour codes and placeholders in player context.
    *
    * @param player player UUID for placeholders or {@code null} for console
@@ -408,23 +310,6 @@ public interface RTPServerAccessor {
    * @return the placeholder-substituted string without colour codes; never {@code null}
    */
   String formatNoColor(@Nullable UUID player, String text);
-
-  /**
-   * Writes a message to the server log at the given level.
-   *
-   * @param level the log level; must not be {@code null}
-   * @param msg   the message; must not be {@code null}
-   */
-  void log(Level level, String msg);
-
-  /**
-   * Writes a message and associated throwable to the server log at the given level.
-   *
-   * @param level     the log level; must not be {@code null}
-   * @param msg       the message; must not be {@code null}
-   * @param throwable the exception to log; must not be {@code null}
-   */
-  void log(Level level, String msg, Throwable throwable);
 
   /**
    * Broadcasts {@code msg} to all online players who hold {@code permission}.
@@ -954,7 +839,7 @@ public interface RTPServerAccessor {
    * Reconciles a raw on-disk block or biome palette identifier against the platform registry.
    *
    * <p>The default implementation applies namespace-stripping and uppercase normalization
-   * via {@link io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer#normalize(String)}.
+   * via {@link io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer#normalize(String)}.
    * Platform adapters (e.g. Bukkit, Paper, Folia, Fabric, NeoForge) should override this to
    * reconcile against live platform registries (e.g. Material/Registry.BIOME or BuiltInRegistries).
    *
@@ -962,7 +847,7 @@ public interface RTPServerAccessor {
    * @return canonical identifier for lookups, or null if raw is null
    */
   default String reconcilePaletteIdentifier(String raw) {
-    return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+    return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
 
   /**

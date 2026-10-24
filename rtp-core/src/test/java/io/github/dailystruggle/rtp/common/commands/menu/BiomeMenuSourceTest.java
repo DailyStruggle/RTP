@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -44,16 +45,16 @@ class BiomeMenuSourceTest {
   @BeforeEach
   void setUp() {
     RTPTestSetup.install(tempDir.toFile());
-    RTP.selectionAPI = new SelectionAPI();
+    ActiveSelection.set(new SelectionAPI());
     defaultShape = newRegion("default");
     wildShape = newRegion("wild");
   }
 
   @AfterEach
   void tearDown() {
-    if (RTP.selectionAPI != null) RTP.selectionAPI.permRegionLookup.clear();
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    if (ActiveSelection.get() != null) ActiveSelection.get().permRegionLookup.clear();
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
   }
 
@@ -66,7 +67,7 @@ class BiomeMenuSourceTest {
         false, false,
         10L, 1000L, 0L, 5, 0.0, 1L, "", false);
     Region region = new Region(name, settings);
-    RTP.selectionAPI.permRegionLookup.put(name, region);
+    ActiveSelection.get().permRegionLookup.put(name, region);
     return shape;
   }
 

@@ -27,6 +27,7 @@ Scan this table first. Read the detailed rule below only if you are touching cod
 | D-006 | Doc    | Mirror prose voice for external user copy          | self-contained                              |
 | D-007 | Doc    | New subsystem updates scope (REQUIREMENTS section 0) in the same change | `REQUIREMENTS.md` section 0      |
 | D-008 | Code   | Large deduplicated classes delegate to package-private helpers | self-contained                     |
+| D-009 | Doc    | Operator docs and CHANGELOG travel with operator-visible changes | self-contained                   |
 
 ## Core Development Rules
 
@@ -97,6 +98,9 @@ These rules govern how project documentation, requirements, and design specifica
 
 - **Rule D-008: Deduplicate Behind a Facade, Not Into One File**
   - **Description**: When deduplication concentrates shared behaviour in one class (e.g. `MemoryShape`, `MenuRedeemSubcommand`, `ScanTask`, `ConfigParser`), keep that class as the single public entry point and move cohesive concerns (codec, table, persistence, rendering) into package-private helpers in the same package. Apply this opportunistically when a change already touches the concern; do not open refactor-only changes without a D-005 proposal. Public API and persisted formats shall not change as part of such a split.
+
+- **Rule D-009: Operator Docs Travel With the Change**
+  - **Description**: A change that adds, renames or removes an operator-visible config key, command, permission or message key, or changes its default, shall update the operator documentation (`docs/admin/`) and `CHANGELOG.md` in the same change set. Message keys also follow *Locale Parity Maintenance* in `AGENTS.md`. This is the contributor-side form of a release invariant (every shipped key is documented); that invariant becomes a requirement once a mechanical check compares the shipped `.yml` keys, commands and permissions with `docs/admin/`.
 
 ## Maintenance Protocol
 

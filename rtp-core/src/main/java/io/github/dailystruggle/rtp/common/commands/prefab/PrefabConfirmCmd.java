@@ -5,13 +5,17 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
 import io.github.dailystruggle.rtp.api.event.PrefabChange;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigBackups;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -69,7 +73,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                              @Nullable CommandsAPICommand nextCommand) {
         if (nextCommand != null) return true;
         if (callerId == null) {
-            RTP.log(Level.WARNING, "/rtp admin prefab confirm rejected: no caller UUID");
+            RTPRuntime.log(Level.WARNING, "/rtp admin prefab confirm rejected: no caller UUID");
             return false;
         }
         List<String> idValues = parameterValues == null ? null : parameterValues.get("id");
@@ -84,7 +88,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         PrefabNonceStore.ConsumeResult cr = nonceStore.consumeByCaller(callerId, prefabId);
         switch (cr.kind()) {
             case NOT_FOUND:
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[prefab] confirm rejected NOT_FOUND: caller=" + callerId
                                 + " prefab=" + prefabId);
                 send(callerId, "&cNo pending confirmation for prefab &f" + prefabId
@@ -112,11 +116,37 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         // loaded world. These are created through the same region-creation path
         // the /rtp config command uses (MultiConfigParser.addParser, which
         // clones regions/default.yml), so no separate comment-template seeding
-        // is needed. defaultRegionFileId is retained only for the no-RTP.configs
+        // is needed. defaultRegionFileId is retained only for the no-ActiveConfigs.get()
         // fallback in writeFile().
         boolean expandPerWorld = PrefabRegistry.byId(entry.prefabId())
                 .map(Prefab::expandPerWorld).orElse(false);
         String defaultRegionFileId = "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID;
+        Map<String, String> candidateOverlays = new LinkedHashMap<>();
+        for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
+            String fileId = fe.getKey();
+            List<PrefabApplier.Change> changes = fe.getValue();
+            if (changes.isEmpty()) continue;
+            String templateFileId = (expandPerWorld
+                    && (fileId.startsWith("definitions/regions/") || fileId.startsWith("regions/"))
+                    && !fileId.equals(defaultRegionFileId)) ? defaultRegionFileId : null;
+            String path = pluginDir.toPath().toAbsolutePath().normalize()
+                    .relativize(PrefabDiskIO.resolveFile(pluginDir, fileId).toPath().toAbsolutePath().normalize())
+                    .toString().replace(File.separatorChar, '/');
+            try {
+                candidateOverlays.put(path,
+                        PrefabDiskIO.render(pluginDir, fileId, changes, templateFileId));
+            } catch (IOException renderFailure) {
+                RTPRuntime.log(Level.WARNING, "[prefab] candidate render failed for " + fileId, renderFailure);
+                send(callerId, "&cPrefab apply rejected because " + fileId + " could not be validated.");
+                return false;
+            }
+        }
+        ConfigCandidateGate.Result gate = ConfigCandidateGate.evaluate(pluginDir.toPath(), candidateOverlays);
+        if (gate.rejected()) {
+            ReloadSupport.sendReloadRejected(callerId, gate);
+            return false;
+        }
+
         List<String> writtenFiles = new ArrayList<>();
         List<String> writtenBaks = new ArrayList<>();
         for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
@@ -130,7 +160,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                 writtenFiles.add(fileId);
                 if (bak != null) writtenBaks.add(bak.getFileName().toString());
             } catch (IOException ioe) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[prefab] confirm write FAILED: caller=" + callerId
                                 + " prefab=" + entry.prefabId()
                                 + " file=" + fileId + " - " + ioe.getMessage(), ioe);
@@ -153,20 +183,20 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                         PrefabSchematicInstaller.install(pluginDir, prefab);
                 installedSchematics.addAll(sr.installed());
                 if (!sr.installed().isEmpty()) {
-                    RTP.log(Level.INFO,
+                    RTPRuntime.log(Level.INFO,
                             "[prefab] schematic install: caller=" + callerId
                                     + " prefab=" + entry.prefabId()
                                     + " installed=" + sr.installed());
                 }
                 if (!sr.missingResource().isEmpty()) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "[prefab] schematic install: caller=" + callerId
                                     + " prefab=" + entry.prefabId()
                                     + " missing bundled resource(s)=" + sr.missingResource()
                                     + " - paste will be a no-op until the file is supplied.");
                 }
             } catch (IOException ioe) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[prefab] schematic install FAILED: caller=" + callerId
                                 + " prefab=" + entry.prefabId()
                                 + " - " + ioe.getMessage(), ioe);
@@ -182,12 +212,12 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         boolean reloaded = false;
         Throwable reloadFailure = null;
         try {
-            if (RTP.configs != null) {
+            if (ActiveConfigs.get() != null) {
                 emitReloadStatus(callerId,
                         io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.reloading);
                 RTP.reloading.set(true);
                 try {
-                    reloaded = RTP.configs.reload();
+                    reloaded = ActiveConfigs.get().reload();
                 } finally {
                     RTP.reloading.set(false);
                 }
@@ -201,7 +231,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             RTP.reloading.set(false);
         }
 
-        RTP.log(Level.INFO,
+        RTPRuntime.log(Level.INFO,
                 "[prefab] confirm OK: caller=" + callerId
                         + " prefab=" + entry.prefabId()
                         + " files=" + writtenFiles.size()
@@ -272,7 +302,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                                   int retention,
                                   boolean expandPerWorld,
                                   String defaultRegionFileId) throws IOException {
-        ConfigParser<?> parser = (RTP.configs == null) ? null : resolveParser(fileId);
+        ConfigParser<?> parser = (ActiveConfigs.get() == null) ? null : resolveParser(fileId);
         if (parser != null) {
             RtpYamlConfig live = parser.fileDatabase.cachedLookup.get().get(parser.name);
             if (live != null) {
@@ -315,7 +345,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             if (fileId.startsWith("definitions/regions/")) {
                 String entry = fileId.substring("definitions/regions/".length());
                 MultiConfigParser<RegionKeys> regions =
-                        (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                        (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
                 if (regions == null) return null;
                 if (!regions.listParsers().contains(entry)) {
                     // Region-creation method (same as /rtp config regions add),
@@ -330,7 +360,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             if (fileId.startsWith("regions/")) {
                 String entry = fileId.substring("regions/".length());
                 MultiConfigParser<RegionKeys> regions =
-                        (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                        (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
                 if (regions == null) return null;
                 if (!regions.listParsers().contains(entry)) {
                     regions.addParser(entry, MultiWorldExpander.DEFAULT_REGION_ID);
@@ -339,20 +369,20 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             }
             if (fileId.startsWith("definitions/worlds/")) {
                 String world = fileId.substring("definitions/worlds/".length());
-                return RTP.configs.getWorldParser(world);
+                return ActiveConfigs.get().getWorldParser(world);
             }
             if (fileId.startsWith("worlds/")) {
                 String world = fileId.substring("worlds/".length());
-                return RTP.configs.getWorldParser(world);
+                return ActiveConfigs.get().getWorldParser(world);
             }
             // Top-level config file (performance, safety, etc.).
             String wantName = fileId.endsWith(".yml") ? fileId : fileId + ".yml";
-            for (ConfigParser<?> cp : RTP.configs.configParserMap.values()) {
+            for (ConfigParser<?> cp : ActiveConfigs.get().configParserMap.values()) {
                 if (cp.name != null && cp.name.equalsIgnoreCase(wantName)) return cp;
             }
             return null;
         } catch (RuntimeException re) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[prefab] resolveParser failed for " + fileId + " - using fallback writer: "
                             + re.getMessage());
             return null;
@@ -366,8 +396,8 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
     @SuppressWarnings("unchecked")
     private static int resolveBakRetention() {
         try {
-            if (RTP.serverAccessor == null) return PrefabDiskIO.DEFAULT_BAK_RETENTION;
-            File pluginDir = RTP.serverAccessor.getPluginDirectory();
+            if (RTPRuntime.serverAccessor() == null) return PrefabDiskIO.DEFAULT_BAK_RETENTION;
+            File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
             if (pluginDir == null) return PrefabDiskIO.DEFAULT_BAK_RETENTION;
             Map<String, Object> perf = PrefabDiskIO.readLive(pluginDir, "advanced/performance");
             if (perf.isEmpty()) {
@@ -407,18 +437,18 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         }
         if (tmpl == null || tmpl.isEmpty()) return;
         String resolved = FILENAME_PATTERN.matcher(tmpl).replaceAll("configs");
-        if (RTP.serverAccessor == null) return;
+        if (RTPRuntime.serverAccessor() == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, resolved);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, resolved);
         } catch (RuntimeException ignored) {
             // Test scaffolds without a real sender are not fatal.
         }
     }
 
     private static void send(UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
+        if (callerId == null || RTPRuntime.serverAccessor() == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg);
         } catch (RuntimeException ignored) {
             // Test scaffolds without a real sender are not fatal.
         }

@@ -150,11 +150,11 @@ SPAWN_EST_MS = 3000
 
 # Counts whose change marks an episode as new for the corpus: exact integers,
 # not heap megabytes or timings.
-EXACT_COUNT = re.compile(r"^(retained_player_objects|craftplayer_live|serverplayer_live|game_listener_live|"
-                         r"threads_live|threads_daemon|fd_open|"
+# Kinds of resource only: which objects leak is screened from the histogram.
+EXACT_COUNT = re.compile(r"^(threads_live|threads_daemon|fd_open|"
                          r"plugin\.[^.]+\.(pending_tasks|listeners|live_instances))$")
 NOT_DELTA = re.compile(lc.NOT_LEAK_METRICS.pattern + r"|^checkpoint_quick$|\.owned_classes$|^old_gen_after_gc_mb$")
-ALWAYS_DELTA = ("retained_player_objects", "heap_used_after_gc_mb")
+ALWAYS_DELTA = ("heap_used_after_gc_mb",)
 HARNESS_PLUGIN = "plugin.stresstestrtp."
 ATTRIBUTION_METRIC = re.compile(r"^(slope\.)?plugin\.[^.]+\.(pending_tasks|listeners|live_instances)$")
 
@@ -601,7 +601,8 @@ QUIT_BUCKETS = ((250, "quit_lt250"), (1000, "quit_lt1s"), (3000, "quit_lt3s"), (
 FEATURES = ACTIONS + tuple(b for _, b in QUIT_BUCKETS) + ("quit_no_rtp", "move_pending_tp", "console")
 FIT_FEATURES = tuple(k for k in FEATURES if k != "quit")
 # Counts every score sums over; a control fit adds the counts it measured.
-DEFAULT_SCORE_COUNTS = ("retained_player_objects", "serverplayer_live", "craftplayer_live", "game_listener_live")
+# No class is named: object-level evidence comes from the class screens.
+DEFAULT_SCORE_COUNTS = ("threads_live", "threads_daemon", "fd_open")
 # Growth per repetition of the same program (--reps): the leak signal that
 # does not depend on knowing what leaks. A cache fills in the first run and its
 # slope goes to 0; a leak keeps the slope up. Kinds of resource, not objects:
@@ -610,10 +611,18 @@ DEFAULT_SCORE_COUNTS = ("retained_player_objects", "serverplayer_live", "craftpl
 SLOPE = "slope."
 SLOPE_METRIC = re.compile(r"^(histogram_live_mb|heap_used_after_gc_mb|rss_mb|pool\.metaspace\.used_mb|"
                           r"pool\.compressed_class_space\.used_mb|buffer\.(direct|mapped)\.(used_mb|count)|"
-                          r"classes_loaded|threads_live|threads_daemon|fd_open|retained_player_objects|"
+                          r"classes_loaded|threads_live|threads_daemon|fd_open|"
                           r"plugin\.[^.]+\.(pending_tasks|listeners|live_instances))$")
 Z95 = 1.96
 NOISE_FLOOR = 0.5  # a count that never moved under the control still has integer noise
+
+
+def scorable(c: str) -> bool:
+    """A fixed (non-class) count the fit and score may use; keys from older
+    traces or control fits that no longer qualify are dropped."""
+    if c.startswith(SLOPE):
+        return bool(SLOPE_METRIC.match(c[len(SLOPE):]))
+    return c in DEFAULT_SCORE_COUNTS or bool(EXACT_COUNT.match(c))
 
 
 def quit_bucket(delay_ms: float) -> str:
@@ -735,7 +744,7 @@ def fit_from_records(records: list[dict], lam: float = 1.0, classes=()) -> dict:
     counts = set(DEFAULT_SCORE_COUNTS)
     for r in records:
         for k in (r.get("deltas") or {}):
-            if (EXACT_COUNT.match(k) or k.startswith(SLOPE)) and HARNESS_PLUGIN not in k:
+            if scorable(k) and HARNESS_PLUGIN not in k:
                 counts.add(k)
     counts.update(CLS + c for c in classes)
     return fit_counts(records, sorted(counts), lam)
@@ -793,6 +802,60 @@ def screen_classes(records: list[dict], control: dict | None, max_classes: int =
                         "mean": round(mean, 6), "noise": round(sd, 6), "in_control": c in ctl})
     out.sort(key=lambda d: (-d["z"], d["cls"]))
     return out[:max(0, max_classes)], len(own)
+
+
+def departures(before: dict, after: dict) -> int | None:
+    """Player sessions that ended between two checkpoints (the probe's quit
+    counter); None when either side did not measure it."""
+    b, a = before.get("quits_total"), after.get("quits_total")
+    if not isinstance(b, (int, float)) or not isinstance(a, (int, float)) or b < 0 or a < b:
+        return None
+    return int(a - b)
+
+
+def departure_slopes(records: list[dict]) -> tuple[dict, int]:
+    """({class: (post-GC instances per departed session, standard error)},
+    episodes used). Least squares through the origin over histogram episodes
+    with at least one departure: a class that something keeps per ended
+    session grows with departures whatever its name or platform."""
+    rows = [r for r in class_rows(records) if (r.get("departures") or 0) > 0]
+    n = len(rows)
+    if n < 2:
+        return {}, n
+    qs = [float(r["departures"]) for r in rows]
+    qq = sum(q * q for q in qs)
+    names = {k[len(CLS):] for r in rows for k in r["deltas"] if k.startswith(CLS)}
+    out = {}
+    for c in names:
+        ys = [float(r["deltas"].get(CLS + c, 0) or 0) for r in rows]
+        b = sum(y * q for y, q in zip(ys, qs)) / qq
+        rss = sum((y - b * q) ** 2 for y, q in zip(ys, qs))
+        sd = max(NOISE_FLOOR, math.sqrt(rss / (n - 1)))
+        out[c] = (b, sd / math.sqrt(qq))
+    return out, n
+
+
+def screen_departures(records: list[dict], control_records: list[dict] | None, max_classes: int = 64,
+                      min_n: int = 4) -> list[dict]:
+    """Classes whose per-departure growth exceeds the control's by the
+    Bonferroni z over every class tested; a class the control never saw is
+    compared against 0. At most max_classes, largest z first."""
+    own, n = departure_slopes(records)
+    if n < min_n:
+        return []
+    ctl, _ = departure_slopes(control_records or [])
+    stats = class_stats([r for r in class_rows(records) if (r.get("departures") or 0) > 0])["classes"]
+    zc = bonferroni_z(len(own))
+    out = []
+    for c, (b, se) in own.items():
+        cb, cse = ctl.get(c, (0.0, 0.0))
+        z = (b - cb) / math.sqrt(se * se + cse * cse)
+        if z > zc:
+            out.append({"cls": c, "per_departure": round(b, 4), "control_per_departure": round(cb, 4),
+                        "z": round(z, 4), "n": n, "noise": round(max(NOISE_FLOOR, stats.get(c, (0, 0))[1]), 6),
+                        "in_control": c in ctl})
+    out.sort(key=lambda d: (-d["z"], d["cls"]))
+    return out[:max(0, max_classes)]
 
 
 def bonferroni_z(tests: int, alpha: float = 0.05) -> float:
@@ -1989,6 +2052,10 @@ class SwarmError(Exception):
     pass
 
 
+class NoSpawnError(RuntimeError):
+    pass
+
+
 class Swarm:
     """bench-swarm.js in fuzz-control mode as a child process. stdin stays an
     open pipe: the swarm exits on its EOF, so it never outlives this process."""
@@ -2096,6 +2163,37 @@ class Swarm:
             if ev != "accepted":
                 events.append(msg)
 
+    def discover(
+        self,
+        did: str,
+        tier: str = "default",
+        bot: str | None = None,
+        max_ms: int = 15000,
+        timeout_s: float | None = None,
+    ) -> tuple[dict, dict]:
+        """Run a read-only `discover` op and return `(commands_event, done_event)`.
+
+        Raises `SwarmError` if the `commands` event is missing, `captured` is false,
+        or `done['reason'] != 'complete'`.
+        """
+        req: dict = {"op": "discover", "id": did, "tier": tier, "max_ms": int(max_ms)}
+        if bot is not None:
+            req["bot"] = bot
+        wait_s = timeout_s if timeout_s is not None else max(30.0, max_ms / 1000.0 + 10.0)
+        events, done = self.run_episode(req, wait_s)
+        cmd_ev = next((e for e in events if e.get("ev") == "commands"), None)
+        reason = done.get("reason")
+        if cmd_ev is None:
+            raise SwarmError(f"discover {did} ({tier}): missing commands event (reason={reason!r})")
+        if not cmd_ev.get("captured") or reason != "complete":
+            bot_errors = [str(e.get("text")) for e in events if e.get("ev") == "bot_error" and e.get("text")]
+            detail = f"; bot_errors={bot_errors}" if bot_errors else ""
+            raise SwarmError(
+                f"discover {did} ({tier}) failed to capture command graph: "
+                f"captured={bool(cmd_ev.get('captured'))}, reason={reason!r}{detail}"
+            )
+        return cmd_ev, done
+
     def close(self) -> None:
         if self.sock:
             try:
@@ -2188,6 +2286,7 @@ class TargetRun:
         self.a, self.drv, self.swarm, self.reader = a, drv, swarm, reader
         self.target, self.stamp, self.tdir = target, stamp, tdir
         self.cmd = command_for(target, parse_cmds(a.cmd))
+        self.empty_streak = 0
         self.probe_reader = CoverageReader(reader.runs_dir) if getattr(a, "coverage", False) else None
         # The direct control run always measures leaks (its fit is the reference for every target).
         self.faults = getattr(a, "mode", "leak") == "faults" and target != DIRECT
@@ -2210,9 +2309,11 @@ class TargetRun:
         self.control_classes = None if target == DIRECT else load_json(os.path.join(run_dir, CONTROL_CLASSES_FILE))
         self.control_dir = os.path.join(run_dir, DIRECT)
         self._control_recs: list[dict] | None = None
-        self.fixed_counts = sorted(self.control) if self.control else list(DEFAULT_SCORE_COUNTS)
+        self.fixed_counts = (sorted(c for c in self.control if scorable(c)) if self.control
+                             else list(DEFAULT_SCORE_COUNTS))
         self.score_counts = list(self.fixed_counts)
         self.screen: list[dict] = []
+        self.departure_screen: list[dict] = []
         self.classes_seen = 0
         self.class_ref: dict = {}  # control reference per screened class count
         self.fit: dict = {}
@@ -2260,19 +2361,24 @@ class TargetRun:
         reference: the control episodes' fit of that class when they are on
         disk (subtracts exploration growth per behaviour), else the control's
         per-episode mean and noise; a class the control never saw gets mean 0
-        and the target's own noise."""
+        and the target's own noise. Two screens feed it: cumulative growth per
+        episode, and growth per departed session against the control."""
         if self.target == DIRECT or self.a.max_classes <= 0:
             return
         self.screen, self.classes_seen = screen_classes(records, self.control_classes, self.a.max_classes)
-        names = [s["cls"] for s in self.screen]
+        self.departure_screen = screen_departures(records, self.control_records(), self.a.max_classes)
+        names = list(dict.fromkeys([s["cls"] for s in self.screen] + [s["cls"] for s in self.departure_screen]))
         missing = [CLS + c for c in names if CLS + c not in self.class_ref]
         if missing and self.control_records():
             self.class_ref.update(fit_counts(self.control_records(), missing, self.a.ridge_lam))
-        for s in self.screen:
+        # One entry per class; the cumulative screen's mean wins over the departure screen's 0.
+        by_cls = {s["cls"]: s for s in self.departure_screen}
+        by_cls.update({s["cls"]: s for s in self.screen})
+        for s in by_cls.values():
             c = CLS + s["cls"]
             ref = self.class_ref.get(c)
             if ref is None:
-                ref = {"n": 0, "intercept": s["mean"], "coef": {}, "ci": {}, "noise": s["noise"]}
+                ref = {"n": 0, "intercept": s.get("mean", 0.0), "coef": {}, "ci": {}, "noise": s["noise"]}
             if not s["in_control"]:
                 ref = dict(ref, noise=max(ref["noise"], s["noise"]))
             self.class_ref[c] = ref
@@ -2309,9 +2415,49 @@ class TargetRun:
             self.prev, self.prev_histo = None, {}
             return False
         self.prev, self.prev_histo = d, self.reader.histo(d)
-        log(f"{self.target}: baseline {label} retained={d.get('retained_player_objects', -1):.0f} "
+        log(f"{self.target}: baseline {label} "
             f"heap={d.get('heap_used_after_gc_mb', -1):.0f}MB classes={len(self.prev_histo)}")
         return True
+
+    def warm_up(self, seed: int) -> None:
+        """Exercise the target before the first scored baseline; never checkpoint or trace it."""
+        for i in range(getattr(self.a, "warmup", 1)):
+            bots = [{"name": bot_name(self.cfg["run"], seed, f"warm{i}", j),
+                     "program": [{"a": "rtp"}]} for j in range(self.a.min_bots)]
+            eid = f"{self.target}-s{seed}-warm{i}"[:64]
+            log(f"{self.target}: warm-up {i + 1}/{self.a.warmup} with {len(bots)} bot(s)")
+            try:
+                events, _ = self.run_bots(eid, bots, None)
+            except SwarmError as e:
+                # Same recovery as a scored episode; an unrecoverable swarm aborts via main's NoSpawnError path.
+                try:
+                    self.swarm_failed(f"warm{i}", e)
+                except SwarmError as e2:
+                    raise NoSpawnError(f"warm-up {eid}: {e2}") from e2
+                continue
+            if not any(e.get("ev") == "spawn" for e in events):
+                errors = list(dict.fromkeys(str(e.get("text", "")) for e in events
+                                            if e.get("ev") == "bot_error" and e.get("text")))
+                self.log_bot_errors(eid, errors)
+                raise NoSpawnError(self.no_spawn_message(eid, errors, warmup=True))
+            self.empty_streak = 0
+            self.settle()
+        self.prev, self.prev_histo = None, {}
+
+    @staticmethod
+    def log_bot_errors(eid: str, errors: list[str]) -> None:
+        if errors:
+            log(f"swarm {eid} bot errors: " + " | ".join(errors))
+
+    def no_spawn_message(self, eid: str, errors: list[str], warmup: bool = False) -> str:
+        detail = (": " + " | ".join(errors)) if errors else ""
+        hint = ("; version auto-detect failed, try --mc-version with a version supported by Mineflayer "
+                "and ViaVersion/ViaBackwards on the bench") if any("No data available for version" in e
+                                                                    for e in errors) else ""
+        if warmup:
+            return f"warm-up {eid}: no bot spawned{detail}{hint}"
+        return (f"{self.empty_streak} consecutive episodes had no bot spawn (last: {eid})"
+                f"{detail}{hint}")
 
     def write(self, rec: dict) -> None:
         line, side = split_classes(rec)
@@ -2369,6 +2515,20 @@ class TargetRun:
             self.write(rec)
             return rec
         rec["events"], rec["done"] = events, {k: done.get(k) for k in ("ms", "reason", "bots")}
+        if bots and not any(e.get("ev") == "spawn" for e in events):
+            self.empty_streak += 1
+            rec["excluded"] = "no bot spawned"
+            rec["bot_errors"] = list(dict.fromkeys(str(e.get("text", "")) for e in events
+                                                    if e.get("ev") == "bot_error" and e.get("text")))
+            self.prev, self.prev_histo = None, {}
+            self.log_bot_errors(eid, rec["bot_errors"])
+            log(f"{self.target}: episode {ep} excluded before checkpoint; "
+                f"{self.empty_streak}/{self.a.max_empty} consecutive episodes had no spawn")
+            self.write(rec)
+            if self.empty_streak >= self.a.max_empty:
+                raise NoSpawnError(self.no_spawn_message(eid, rec["bot_errors"]))
+            return rec
+        self.empty_streak = 0
         rec["ms"] = int((time.time() - t0) * 1000)
         new_findings = self.observe(seed, ep, rec["origin"], events, [b["program"] for b in bots])
         if new_findings:
@@ -2407,6 +2567,7 @@ class TargetRun:
             else:
                 h = self.reader.histo(d)
                 deltas = count_deltas(self.prev, d)
+                rec["departures"] = departures(self.prev, d)
                 if h and self.prev_histo:
                     deltas.update(class_deltas(self.prev_histo, h, self.a.top_classes))
                 else:
@@ -2440,7 +2601,7 @@ class TargetRun:
         log(f"{self.target}: s{seed} e{ep} {rec['origin']:<8} bots={len(bots)} acts="
             f"{sum(len(b['program']) for b in bots)} {rec['ms'] / 1000:.1f}s states={len(rec['states'])}"
             f"{' new=' + str(len(rec.get('new_states') or [])) if rec.get('kept') else ''} "
-            f"retained{ds.get('retained_player_objects', 0):+} heap{ds.get('heap_used_after_gc_mb', 0):+.1f}MB"
+            f"departed={rec.get('departures')} heap{ds.get('heap_used_after_gc_mb', 0):+.1f}MB"
             + (f" console={len(rec['console'])}" if rec.get("console") else "")
             + (f" live/rep{ds[SLOPE + 'histogram_live_mb']:+.2f}MB classes/rep"
                f"{ds.get(SLOPE + 'classes_loaded', 0):+.1f} x{rec.get('reps')}"
@@ -2542,10 +2703,17 @@ class TargetRun:
             bots = [{"name": bot_name(self.cfg["run"], seed, f"{ep}k{j}", i), "program": b["program"]}
                     for i, b in enumerate(rec["bots"])]
             try:
-                self.run_bots(f"{self.target}-s{seed}-e{ep}k{j}"[:64], bots, rec.get("console"))
+                events, _ = self.run_bots(f"{self.target}-s{seed}-e{ep}k{j}"[:64], bots, rec.get("console"))
             except SwarmError as e:
                 rec["reps_error"] = f"swarm: {e}"
                 self.swarm_failed(ep, e)
+                break
+            if bots and not any(e.get("ev") == "spawn" for e in events):
+                errors = list(dict.fromkeys(str(e.get("text", "")) for e in events
+                                            if e.get("ev") == "bot_error" and e.get("text")))
+                rec["reps_error"] = "no bot spawned"
+                rec["reps_bot_errors"] = errors
+                self.log_bot_errors(f"{self.target}-s{seed}-e{ep}k{j}", errors)
                 break
             lingering, foreign = self.settle()
             label = self.label(seed, f"e{ep}k{j}")
@@ -2687,18 +2855,20 @@ class TargetRun:
         return out
 
     def end_generation(self, seed: int, gen: int, cem: "Cem | None", gen_recs: list[dict],
-                       all_recs: list[dict], corpus: Corpus, gen_surprises=()) -> dict:
+                       all_recs: list[dict], corpus: Corpus, gen_surprises=(), rescore=()) -> dict:
         """Refit on every usable episode so far, report unexplained finds (kept in
         the corpus), update the search state, then move the CEM towards this
         generation's elite."""
         self.rescreen(all_recs)
-        self.fit = fit_from_records(all_recs, self.a.ridge_lam, [s["cls"] for s in self.screen])
+        self.fit = fit_from_records(all_recs, self.a.ridge_lam,
+                                    [c[len(CLS):] for c in self.score_counts if c.startswith(CLS)])
         flags = flag_features(self.fit, self.ref, self.classes_seen)
         if flags and self.target != DIRECT and self.search.confirm(
                 f"flag {flags[0]['count']}~{flags[0]['feature']}"):
             log(f"{self.target}: exploiting: {self.search.reason}")
-        for r in gen_recs:
-            # Rescore with this generation's screen (the trace keeps the at-run score).
+        for r in list(gen_recs) + [r for r in rescore if r.get("deltas") is not None]:
+            # Rescore with this generation's screen (the trace keeps the at-run score);
+            # `rescore` holds the leak re-runs, which only screened classes can score.
             r["score"] = score_episode(r, self.score_counts, self.ref, self.class_z, target_fit=self.fit)
         for r in gen_recs:
             un = unexplained_counts(r, self.fit, class_z=self.class_z)
@@ -2719,6 +2889,8 @@ class TargetRun:
                 if scores_all else None, "flags": flags[:10], "optimise": cem is not None,
                 "classes_seen": self.classes_seen,
                 "screen": [{k: s[k] for k in ("cls", "cum", "z")} for s in self.screen],
+                "departure_screen": [{k: s[k] for k in ("cls", "per_departure", "z")}
+                                     for s in self.departure_screen],
                 "surprises": [{k: s[k] for k in ("ep", "count", "k", "n")} for s in gen_surprises],
                 "novelty_used": self.search.novelty}
         if cem is not None:
@@ -2737,6 +2909,7 @@ class TargetRun:
         append_jsonl(self.opt_path, line)
         save_json(self.fit_path, {"fit": self.fit, "flags": flags, "control": bool(self.control),
                                   "score_counts": self.score_counts, "screen": self.screen,
+                                  "departure_screen": self.departure_screen,
                                   "classes_seen": self.classes_seen})
         top = ", ".join(f"{f['count']}~{f['feature']} {f['coef']:+.2f}" for f in flags[:3]) or "none"
         log(f"{self.target}: s{seed} gen {gen}: mean score {line['mean_score']}, best "
@@ -2838,7 +3011,7 @@ class TargetRun:
                 extra, extra_surprises = self.drain_promotions(seed, gen)
                 recs += extra
                 gen_surprises += extra_surprises
-                self.end_generation(seed, gen, cem, gen_recs, recs, corpus, gen_surprises)
+                self.end_generation(seed, gen, cem, gen_recs, recs, corpus, gen_surprises, rescore=extra)
                 gen_recs, gen_surprises = [], []
             if stop:
                 log(f"{self.target}: heap after GC above {self.heap_stop:.0f} MB; stopping this target")
@@ -3268,6 +3441,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-bots", type=int, default=8)
     p.add_argument("--min-episode-s", type=float, default=20)
     p.add_argument("--max-episode-s", type=float, default=60)
+    p.add_argument("--warmup", type=int, default=1,
+                   help="unscored target warm-up episodes before the first baseline per target (0 = off)")
+    p.add_argument("--max-empty", type=int, default=3,
+                   help="abort after this many consecutive planned episodes with no bot spawn")
     p.add_argument("--episode-max-s", type=float, default=180, help="hard per-episode deadline in the swarm")
     p.add_argument("--done-slack-s", type=float, default=20, help="extra wait for done beyond max_ms")
     p.add_argument("--quiet-s", type=float, default=3, help="pause after done before the checkpoint")
@@ -3288,9 +3465,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--files-wait-s", type=float, default=30, help="wait for rows in the (shared) runs files")
     p.add_argument("--coverage", action="store_true",
                    help="JaCoCo probes as a corpus key source (needs the bench server's -javaagent; ADR-111 2.6)")
-    p.add_argument("--mode", choices=("leak", "faults"), default="leak",
-                   help="faults: one checkpoint-free run per episode (finding oracles and coverage only); "
-                        "needs --coverage")
+    p.add_argument("--mode", choices=("leak", "faults", "server"), default="leak",
+                   help="leak/faults: ADR-111 target modes (faults needs --coverage); "
+                        "server: ADR-125 passive local server audit")
+    p.add_argument("--profile", default=None,
+                   help="server mode platform profile: paper, fabric, or neoforge (required for --mode server)")
+    p.add_argument("--tiers", default="default",
+                   help="permission tiers for --mode server (passive local audit allows 'default' only)")
+    p.add_argument("--deny", action="append", default=[],
+                   help="extra denylist pattern(s) for --mode server (comma-separated or repeatable)")
+    p.add_argument("--pid-file", default=None,
+                   help="local server JVM PID file for operator-selected jcmd snapshot in --mode server")
+    p.add_argument("--pid", type=int, default=None,
+                   help="local server JVM PID for operator-selected jcmd snapshot in --mode server")
+    p.add_argument("--jcmd-snapshot", action="store_true",
+                   help="collect a local read-only jcmd snapshot in --mode server")
+    p.add_argument("--container", default=None,
+                   help="container name (rejected in --mode server passive local audit)")
+    p.add_argument("--stall-ms", type=float, default=None,
+                   help="stall threshold in ms (rejected in --mode server passive local audit)")
+    p.add_argument("--default-budget-share", type=float, default=None,
+                   help="default-tier bandit share (rejected in --mode server passive local audit)")
     p.add_argument("--promote-max", type=int, default=4,
                    help="faults: leak re-runs per generation for episodes that reached new probes or signatures")
     p.add_argument("--top-classes", type=int, default=0, help="per-class deltas kept per episode (0 = all)")
@@ -3348,6 +3543,8 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
     tr = TargetRun(a, drv, swarm, reader, target, stamp, tdir)
     log(f"{target}: command '/{tr.cmd}', settling {a.settle_s}s")
     time.sleep(a.settle_s)
+    if replay_rec is None and a.warmup:
+        tr.warm_up(seeds[0] if seeds else 0)
     t0 = time.time()
     if replay_rec is not None:
         seed = int(replay_rec.get("seed", 0))
@@ -3408,8 +3605,13 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
 
 
 def main(argv=None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
     p = build_parser()
-    a = p.parse_args(argv)
+    a = p.parse_args(raw_argv)
+    import bench_fuzz_server as bfs
+    if a.mode == "server":
+        return bfs.run_server_mode(a, parser=p, argv=raw_argv)
+    bfs.validate_target_mode_args(a, parser=p, argv=raw_argv)
     props = bo.read_properties(a.server_dir)
     port = a.port or int(props.get("rcon.port", "25575"))
     password = a.password or props.get("rcon.password", "")
@@ -3420,6 +3622,8 @@ def main(argv=None) -> int:
         p.error("need 2 <= --min-bots <= --max-bots <= 64")
     if not 0 < a.min_episode_s <= a.max_episode_s:
         p.error("need 0 < --min-episode-s <= --max-episode-s")
+    if a.warmup < 0 or a.max_empty < 1:
+        p.error("need --warmup >= 0 and --max-empty >= 1")
     if not (0 < a.elite <= 1 and 0 < a.cem_alpha <= 1 and 1 <= a.shrink_k <= a.shrink_n and a.stall_gens >= 1):
         p.error("need 0 < --elite <= 1, 0 < --cem-alpha <= 1, 1 <= --shrink-k <= --shrink-n, --stall-gens >= 1")
     if a.surprise_n > 0 and not 1 <= a.surprise_k <= a.surprise_n:
@@ -3495,12 +3699,16 @@ def main(argv=None) -> int:
         swarm.start()
         log(f"swarm: control port {swarm.port} (pid {swarm.proc.pid})")
         grant.apply()
-        with open(os.path.join(run_dir, "manifest.csv"), "w", newline="", encoding="utf-8") as mf:
-            w = csv.writer(mf)
-            w.writerow(["target", "status", "label", "time", "result", "detail"])
-            for target in targets:
-                run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec)
-                mf.flush()
+        try:
+            with open(os.path.join(run_dir, "manifest.csv"), "w", newline="", encoding="utf-8") as mf:
+                w = csv.writer(mf)
+                w.writerow(["target", "status", "label", "time", "result", "detail"])
+                for target in targets:
+                    run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec)
+                    mf.flush()
+        except NoSpawnError as e:
+            log(f"aborting fuzz run: {e}")
+            return 3
     finally:
         signal.signal(signal.SIGTERM, prev_term)
         drv.stop_ramp()

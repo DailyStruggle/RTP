@@ -1,9 +1,11 @@
 package io.github.dailystruggle.rtp.common.commands.admin;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -49,11 +51,11 @@ public class ClearCooldownCmd extends PlayerTargetedClearCmd {
   @Override
   protected int clearAll() {
     Set<UUID> all = new LinkedHashSet<>();
-    RTP rtp = RTP.getInstance();
-    if (rtp != null) {
-      all.addAll(rtp.latestTeleportData.keySet());
-      all.addAll(rtp.priorTeleportData.keySet());
-      all.addAll(rtp.regionTeleportTimes.keySet());
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions != null) {
+      all.addAll(TeleportSessions.current().latestTeleportData.keySet());
+      all.addAll(TeleportSessions.current().priorTeleportData.keySet());
+      all.addAll(TeleportSessions.current().regionTeleportTimes.keySet());
     }
     int cleared = 0;
     for (UUID id : all) {
@@ -65,27 +67,27 @@ public class ClearCooldownCmd extends PlayerTargetedClearCmd {
   @Override
   protected boolean clearOne(UUID uuid) {
     if (uuid == null) return false;
-    RTP rtp = RTP.getInstance();
-    if (rtp == null) return false;
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return false;
 
-    TeleportData latest = rtp.latestTeleportData.remove(uuid);
-    TeleportData prior = rtp.priorTeleportData.remove(uuid);
-    Map<String, Long> regions = rtp.regionTeleportTimes.remove(uuid);
+    TeleportData latest = TeleportSessions.current().latestTeleportData.remove(uuid);
+    TeleportData prior = TeleportSessions.current().priorTeleportData.remove(uuid);
+    Map<String, Long> regions = TeleportSessions.current().regionTeleportTimes.remove(uuid);
     TeleportData existing = (latest != null) ? latest : prior;
 
-    if (existing != null && rtp.databaseAccessor != null) {
+    if (existing != null && ActiveDatabase.accessor() != null) {
       try {
         // Re-persist with a zeroed timestamp: the cooldown gate compares
         // now - time against the player's cooldown, so a zero time reads as
         // "no recent teleport" after a restart.
         existing.time = 0L;
         existing.completed = true;
-        rtp.databaseAccessor.cacheValue(existing);
+        ActiveDatabase.accessor().cacheValue(existing);
       } catch (RuntimeException ex) {
         // Durable clear is best-effort: the in-memory removal above already
         // lifts the live-session cooldown. Headless/test scaffolds without a
         // fully wired server accessor must not break the command.
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[RTP] clear cooldown: failed to persist cleared cooldown for " + uuid + ": " + ex.getMessage());
       }

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.claimaddon;
 import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -10,11 +11,13 @@ import java.util.logging.Level;
 /**
  * Shared failure policy for claim checkers (REQ-RTP-S-003).
  *
- * <p>An API-shape failure (missing class/method, linkage error) means the host plugin is absent
- * or incompatible: the integration disables itself for the session and reports "not claimed".
- * Any other error is a per-call failure: the location is rejected (fail closed) and the
- * integration stays active, so a transient or world-specific error never silently turns off claim
- * protection for the whole server. Per-call warnings are throttled per integration.
+ * <p>Checkers run only while the host plugin is enabled (gated at registration, and per call by
+ * the reflective checkers), so every failure means an enabled claim plugin could not answer: the
+ * location is rejected (fail closed). An API-shape failure (missing class/method, linkage error)
+ * means the installed plugin does not match the API the checker was written against; it is logged
+ * once per integration at SEVERE, and destinations stay rejected until the plugin is updated or
+ * its {@code integrations.yml} flag is turned off. Other errors are per-call failures, logged at
+ * WARNING and throttled per integration.
  */
 final class ClaimCheckFailure {
   private ClaimCheckFailure() {}
@@ -24,28 +27,40 @@ final class ClaimCheckFailure {
 
   private static final Map<String, AtomicLong> lastLogged = new ConcurrentHashMap<>();
   private static final Map<String, AtomicLong> suppressed = new ConcurrentHashMap<>();
+  private static final Set<String> incompatibleReported = ConcurrentHashMap.newKeySet();
 
   /**
-   * Resolve a checker failure.
+   * Resolve a checker failure. Precondition: the host plugin is enabled.
    *
    * @param integration display name of the claim plugin
    * @param t the failure
-   * @param disable invoked once when the failure is an API incompatibility
-   * @return the "in a claim" verdict: {@code false} on incompatibility (integration disabled),
-   *     {@code true} otherwise (location rejected)
+   * @return the "in a claim" verdict, always {@code true} (location rejected)
    */
-  static boolean handle(String integration, Throwable t, Runnable disable) {
+  static boolean handle(String integration, Throwable t) {
     if (isIncompatibility(t)) {
-      disable.run();
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] " + integration + " API is missing or incompatible. Disabling the "
-              + integration + " claim integration for this session.",
-          t);
-      return false;
+      if (incompatibleReported.add(integration)) {
+        RTP.log(
+            Level.SEVERE,
+            "[RTP] " + integration + " is enabled but its API is missing or incompatible with"
+                + " this LeafRTPClaimAddon. Rejecting every destination while it is enabled (fail"
+                + " closed per REQ-RTP-S-003); update " + integration + " or turn off its"
+                + " integrations.yml flag. Reported once until the next reload.",
+            t);
+      }
+      return true;
     }
     logThrottled(integration, t);
     return true;
+  }
+
+  /** True once an API incompatibility has been logged for {@code integration}. */
+  static boolean incompatibilityReported(String integration) {
+    return incompatibleReported.contains(integration);
+  }
+
+  /** Re-arms the once-per-integration reports; called on reload. */
+  static void resetReports() {
+    incompatibleReported.clear();
   }
 
   /** True when {@code t} (after unwrapping reflective invocation) signals an API-shape mismatch. */

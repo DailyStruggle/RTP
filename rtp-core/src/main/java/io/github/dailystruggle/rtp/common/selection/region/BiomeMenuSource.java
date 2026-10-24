@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
 
 import java.util.Map;
 import java.util.Set;
@@ -39,18 +41,18 @@ public final class BiomeMenuSource {
     public static Map<String, String> bestRegionByBiome(UUID senderId) {
         Map<String, String> best = new TreeMap<>();
         Map<String, Long> bestCount = new TreeMap<>();
-        if (RTP.selectionAPI == null) return best;
+        if (ActiveSelection.get() == null) return best;
 
         RTPPlayer player = null;
-        if (senderId != null && RTP.serverAccessor != null) {
+        if (senderId != null && RTPRuntime.serverAccessor() != null) {
             try {
-                player = RTP.serverAccessor.getPlayer(senderId);
+                player = RTPRuntime.serverAccessor().getPlayer(senderId);
             } catch (RuntimeException ignored) {
                 // degrade to no-player (console-like) view
             }
         }
 
-        for (Map.Entry<String, Region> e : RTP.selectionAPI.permRegionLookup.entrySet()) {
+        for (Map.Entry<String, Region> e : ActiveSelection.get().permRegionLookup.entrySet()) {
             String regionName = e.getKey();
             Region region = e.getValue();
             if (regionName == null || region == null) continue;
@@ -106,8 +108,8 @@ public final class BiomeMenuSource {
      * @return {@code true} if the region has observed the biome at least once
      */
     public static boolean regionObservesBiome(String regionName, String biome) {
-        if (regionName == null || biome == null || RTP.selectionAPI == null) return false;
-        Region region = RTP.selectionAPI.getRegion(regionName);
+        if (regionName == null || biome == null || ActiveSelection.get() == null) return false;
+        Region region = ActiveSelection.get().getRegion(regionName);
         if (region == null || !(region.shape instanceof MemoryShape<?> memoryShape)) return false;
         try {
             long[] sums = memoryShape.getBiomePrefixSums(biome);
@@ -125,9 +127,9 @@ public final class BiomeMenuSource {
      */
     public static Map<String, Long> biomeWeightsForWorld(String worldName) {
         Map<String, Long> weights = new TreeMap<>();
-        if (worldName == null || RTP.selectionAPI == null) return weights;
+        if (worldName == null || ActiveSelection.get() == null) return weights;
 
-        for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+        for (Region region : ActiveSelection.get().permRegionLookup.values()) {
             if (region == null) continue;
             if (!(region.shape instanceof MemoryShape<?> memoryShape)) continue;
 
@@ -164,9 +166,9 @@ public final class BiomeMenuSource {
      */
     public static Map<String, Long> biomeWeightsForRegion(String regionName) {
         Map<String, Long> weights = new TreeMap<>();
-        if (regionName == null || RTP.selectionAPI == null) return weights;
+        if (regionName == null || ActiveSelection.get() == null) return weights;
 
-        Region region = RTP.selectionAPI.getRegion(regionName);
+        Region region = ActiveSelection.get().getRegion(regionName);
         if (region == null || !(region.shape instanceof MemoryShape<?> memoryShape)) {
             return weights;
         }

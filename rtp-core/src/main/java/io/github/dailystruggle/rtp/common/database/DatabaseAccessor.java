@@ -5,9 +5,11 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.io.File;
 import java.util.*;
@@ -141,10 +143,10 @@ public abstract class DatabaseAccessor<D> {
    * @return {@code true} if system database logging is enabled
    */
   public boolean isSystemDatabaseLoggingEnabled() {
-    if (RTP.configs != null) {
+    if (ActiveConfigs.get() != null) {
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
           (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
-              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
+              ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
       if (logging != null) {
         Object o = logging.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.system_database, false);
         if (o instanceof Boolean) {
@@ -247,14 +249,14 @@ public abstract class DatabaseAccessor<D> {
 
       RTPCoords selectedCoords = teleportData.selectedCoords;
       if (selectedCoords == null)
-        selectedCoords = new RTPCoords(RTP.serverAccessor.getRTPWorlds().get(0).name(), 0, 0, 0);
+        selectedCoords = new RTPCoords(RTPRuntime.serverAccessor().getRTPWorlds().get(0).name(), 0, 0, 0);
 
       RTPCoords originalCoords = teleportData.originalCoords;
       if (originalCoords == null)
-        originalCoords = new RTPCoords(RTP.serverAccessor.getRTPWorlds().get(0).name(), 0, 0, 0);
+        originalCoords = new RTPCoords(RTPRuntime.serverAccessor().getRTPWorlds().get(0).name(), 0, 0, 0);
 
       Region targetRegion = teleportData.targetRegion;
-      if (targetRegion == null) targetRegion = RTP.selectionAPI.getRegion("default");
+      if (targetRegion == null) targetRegion = ActiveSelection.get().getRegion("default");
 
       if (sender != null) {
         res.put("senderName", sender.name());
@@ -269,7 +271,7 @@ public abstract class DatabaseAccessor<D> {
       res.put("selectedY", selectedCoords.y());
       res.put("selectedZ", selectedCoords.z());
       res.put("selectedWorldName", selectedCoords.worldName());
-      RTPWorld<?> selectedWorld = RTP.serverAccessor.getRTPWorld(selectedCoords.worldName());
+      RTPWorld<?> selectedWorld = RTPRuntime.serverAccessor().getRTPWorld(selectedCoords.worldName());
       if (selectedWorld != null) res.put("selectedWorldId", selectedWorld.id().toString());
 
       res.put("originalX", originalCoords.x());
@@ -280,7 +282,7 @@ public abstract class DatabaseAccessor<D> {
       if (teleportData.originServerId != null) {
         res.put("originServerId", teleportData.originServerId);
       }
-      RTPWorld<?> originalWorld = RTP.serverAccessor.getRTPWorld(originalCoords.worldName());
+      RTPWorld<?> originalWorld = RTPRuntime.serverAccessor().getRTPWorld(originalCoords.worldName());
       if (originalWorld != null) res.put("originalWorldId", originalWorld.id().toString());
 
       res.put("region", targetRegion.name);
@@ -299,7 +301,7 @@ public abstract class DatabaseAccessor<D> {
       // Falling back to the raw world seed here is safe for the rare path where toColumns
       // is invoked outside of the saveCachedLocation entry point - the value will still
       // mismatch on a world re-roll, only it will not pick up shape/vert edits.
-      RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(location.coords().worldName());
+      RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(location.coords().worldName());
       if (world != null) res.put("seed", world.getSeed());
     }
 
@@ -320,7 +322,7 @@ public abstract class DatabaseAccessor<D> {
    */
   @NotNull
   protected File getMainDirectory() {
-    return RTP.configs.pluginDirectory;
+    return ActiveConfigs.get().pluginDirectory;
   }
 
   /**
@@ -498,8 +500,8 @@ public abstract class DatabaseAccessor<D> {
     // Region.hydrateCacheFromDatabase compares this on load and drops mismatches, so any
     // edit to validity-affecting region config invalidates the persisted rows automatically
     // without a database schema migration. See ADR-022 and RegionCacheKey.
-    if (RTP.selectionAPI != null) {
-      Region region = RTP.selectionAPI.getRegion(regionName);
+    if (ActiveSelection.get() != null) {
+      Region region = ActiveSelection.get().getRegion(regionName);
       if (region != null) {
         columns.put("seed", region.cacheKeyLong());
       }
@@ -594,18 +596,18 @@ public abstract class DatabaseAccessor<D> {
    * subject to a save-vs-delete race in {@link #processQueries(long)} and to
    * missed drains when the server crashes between flush cycles).
    *
-   * <p>No-ops when {@link RTP#selectionAPI} is null or exposes no regions,
+   * <p>No-ops when {@link ActiveSelection#get()} is null or exposes no regions,
    * so direct unit-test calls to {@link #flushDirtyCache()} retain their
    * original semantics.
    */
   public void rebuildCachedLocationsFromMemory() {
-    if (RTP.selectionAPI == null) return;
-    if (RTP.selectionAPI.permRegionLookup.isEmpty()
-        && RTP.selectionAPI.tempRegions.isEmpty()) return;
+    if (ActiveSelection.get() == null) return;
+    if (ActiveSelection.get().permRegionLookup.isEmpty()
+        && ActiveSelection.get().tempRegions.isEmpty()) return;
 
     boolean anyDumped = false;
-    anyDumped |= dumpRegions(RTP.selectionAPI.permRegionLookup.values());
-    anyDumped |= dumpRegions(RTP.selectionAPI.tempRegions.values());
+    anyDumped |= dumpRegions(ActiveSelection.get().permRegionLookup.values());
+    anyDumped |= dumpRegions(ActiveSelection.get().tempRegions.values());
 
     if (!anyDumped) return;
 
@@ -701,12 +703,12 @@ public abstract class DatabaseAccessor<D> {
     }
 
     if (!saveCounts.isEmpty() && isSystemDatabaseLoggingEnabled()) {
-      String msgBase = RTP.configs.getConfigValue(SystemMessages.locationSaved, "").toString();
+      String msgBase = ActiveConfigs.get().getConfigValue(SystemMessages.locationSaved, "").toString();
       if (!msgBase.isEmpty()) {
         for (Map.Entry<String, Integer> countEntry : saveCounts.entrySet()) {
           String msg = msgBase.replace("[amount]", String.valueOf(countEntry.getValue()))
                   .replace("[region]", countEntry.getKey());
-          RTP.log(Level.INFO, msg);
+          RTPRuntime.log(Level.INFO, msg);
         }
       }
     }
@@ -733,7 +735,7 @@ public abstract class DatabaseAccessor<D> {
           java.nio.file.Files.createDirectories(p.getParent());
           java.nio.file.Files.write(p, req.data);
         } catch (Exception e) {
-          RTP.log(Level.WARNING, "[DatabaseAccessor] Failed to write file: " + req.path + " - " + e.getMessage(), e);
+          RTPRuntime.log(Level.WARNING, "[DatabaseAccessor] Failed to write file: " + req.path + " - " + e.getMessage(), e);
         }
         long localStop = System.nanoTime();
         if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction

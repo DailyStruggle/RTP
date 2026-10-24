@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
-import io.github.dailystruggle.rtp.common.RTP;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -57,7 +56,7 @@ public final class Messages {
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static Object valueByName(String name, Object def) {
     Enum<?> key = byName(name);
-    if (key == null || RTP.configs == null) return def;
-    return RTP.configs.getConfigValue((Enum) key, def);
+    if (key == null || ActiveConfigs.get() == null) return def;
+    return ActiveConfigs.get().getConfigValue((Enum) key, def);
   }
 }

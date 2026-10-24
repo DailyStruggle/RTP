@@ -1,11 +1,12 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuConcreteCommandLeaves.MenuActionLeafCmd;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuConcreteCommandLeaves.VisualizationExportCmd;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -45,7 +46,7 @@ class MenuConcreteCommandLeavesCoverageTest {
 
     @BeforeEach
     void setUp() {
-        previousSelection = RTP.selectionAPI;
+        previousSelection = ActiveSelection.get();
         RTPTestSetup.install(tempDir);
         caller = UUID.randomUUID();
     }
@@ -53,7 +54,7 @@ class MenuConcreteCommandLeavesCoverageTest {
     @AfterEach
     void tearDown() {
         RTPTestSetup.cleanUp();
-        RTP.selectionAPI = previousSelection;
+        ActiveSelection.set(previousSelection);
         File[] charts = new File("plugins/RTP/charts").listFiles((d, n) -> n.startsWith(REGION) || n.startsWith("mcclc_"));
         if (charts != null) {
             for (File f : charts) {
@@ -253,7 +254,7 @@ class MenuConcreteCommandLeavesCoverageTest {
     @Test
     @DisplayName("Export leaves return false when no scheduler is installed")
     void exportLeaves_noScheduler() {
-        RTP.scheduler = null;
+        RTPRuntime.setScheduler(null);
         VisualizationExportCmd.ExportAllCmd all = new VisualizationExportCmd.ExportAllCmd();
         VisualizationExportCmd.ExportComprehensiveCmd comp = new VisualizationExportCmd.ExportComprehensiveCmd();
         VisualizationExportCmd.ExportTypeCmd type =
@@ -333,23 +334,23 @@ class MenuConcreteCommandLeavesCoverageTest {
                 new VisualizationExportCmd.ExportComprehensiveCmd(),
                 new VisualizationExportCmd.ExportTypeCmd("walk", ChartSpec.Kind.REGION_WALK_PATH));
 
-        RTP.selectionAPI = new SelectionAPI();
-        RTP.selectionAPI.permRegionLookup.put(REGION, squareRegion(REGION));
+        ActiveSelection.set(new SelectionAPI());
+        ActiveSelection.get().permRegionLookup.put(REGION, squareRegion(REGION));
         for (var c : cmds) {
             assertTrue(c.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values().contains(REGION));
         }
 
-        RTP.selectionAPI = null;
+        ActiveSelection.set(null);
         for (var c : cmds) {
             assertTrue(c.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values().isEmpty());
         }
 
-        RTP.selectionAPI = new SelectionAPI() {
+        ActiveSelection.set(new SelectionAPI() {
             @Override
             public java.util.Set<String> regionNames() {
                 throw new IllegalStateException("boom");
             }
-        };
+        });
         for (var c : cmds) {
             assertTrue(c.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values().isEmpty());
         }
@@ -372,7 +373,7 @@ class MenuConcreteCommandLeavesCoverageTest {
     @Test
     @DisplayName("Export all and comprehensive report an uninitialised selection API")
     void export_noSelectionApi() {
-        RTP.selectionAPI = null;
+        ActiveSelection.set(null);
         List<String> out = new ArrayList<>();
         assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, Map.of(), null, out::add));
         assertTrue(new VisualizationExportCmd.ExportComprehensiveCmd().onCommand(caller, Map.of(), null, out::add));
@@ -386,7 +387,7 @@ class MenuConcreteCommandLeavesCoverageTest {
     @Test
     @DisplayName("Export all and comprehensive report an unknown region when lookup throws")
     void export_regionLookupThrows() {
-        RTP.selectionAPI = new SelectionAPI();
+        ActiveSelection.set(new SelectionAPI());
         List<String> out = new ArrayList<>();
         Map<String, List<String>> params = Map.of("region", List.of("mcclc_missing"));
         assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, params, null, out::add));
@@ -397,12 +398,12 @@ class MenuConcreteCommandLeavesCoverageTest {
     @Test
     @DisplayName("Export all and comprehensive report an unknown region when lookup returns null")
     void export_regionLookupNull() {
-        RTP.selectionAPI = new SelectionAPI() {
+        ActiveSelection.set(new SelectionAPI() {
             @Override
             public Region getRegionOrDefault(String regionName) {
                 return null;
             }
-        };
+        });
         List<String> out = new ArrayList<>();
         Map<String, List<String>> params = Map.of("region", List.of());
         assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, params, null, out::add));
@@ -418,8 +419,8 @@ class MenuConcreteCommandLeavesCoverageTest {
     // ---------------------------------------------------------------------
 
     private void registerRegion() {
-        RTP.selectionAPI = new SelectionAPI();
-        RTP.selectionAPI.permRegionLookup.put(REGION, squareRegion(REGION));
+        ActiveSelection.set(new SelectionAPI());
+        ActiveSelection.get().permRegionLookup.put(REGION, squareRegion(REGION));
     }
 
     private static Map<String, List<String>> smallExport() {
@@ -476,7 +477,7 @@ class MenuConcreteCommandLeavesCoverageTest {
     @Test
     @DisplayName("Export type reports a failure when the region cannot be resolved")
     void exportType_unresolvable() {
-        RTP.selectionAPI = new SelectionAPI();
+        ActiveSelection.set(new SelectionAPI());
         List<String> out = new ArrayList<>();
         VisualizationExportCmd.ExportTypeCmd cmd =
                 new VisualizationExportCmd.ExportTypeCmd("pipeline", ChartSpec.Kind.REGION_COMPOSITE);

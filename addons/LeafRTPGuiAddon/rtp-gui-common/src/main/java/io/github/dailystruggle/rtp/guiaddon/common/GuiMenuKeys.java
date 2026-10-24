@@ -1,12 +1,13 @@
 package io.github.dailystruggle.rtp.guiaddon.common;
 
+
 /**
  * Configuration keys for the RTP GUI addon menu.
  *
  * <p>Enum constants are matched against YAML keys in {@code guimenu.yml} by RTP's
  * {@link io.github.dailystruggle.rtp.common.configuration.ConfigParser}, exactly like
  * the reference {@code LeafRTPCountdownAddon}. Registering the parser with
- * {@code RTP.configs} gives first-boot default-file creation, {@code /rtp reload}
+ * {@code ActiveConfigs.get()} gives first-boot default-file creation, {@code /rtp reload}
  * integration, and save/reload for free, on every platform, with no Bukkit config
  * API. The values are deliberately platform-neutral strings (material <em>names</em>,
  * not {@code org.bukkit.Material}); each renderer maps them to its own item type.
@@ -14,6 +15,12 @@ package io.github.dailystruggle.rtp.guiaddon.common;
  * <p>The default values produce a "DonutSMP-style" destination picker out of the box.
  */
 public enum GuiMenuKeys {
+  /**
+   * When true (default {@link Boolean#TRUE}), a bare {@code /rtp} opens the destination picker
+   * GUI; when false, bare {@code /rtp} teleports immediately in the player's current world while
+   * keeping {@code /rtp gui} and {@code /rtp menu} active.
+   */
+  openOnBareRtp,
   /**
    * Renderer style to open for a bare {@code /rtp} (e.g. {@code chest}, {@code book}).
    * Matched against each installed renderer's {@code key()}; an unknown value falls

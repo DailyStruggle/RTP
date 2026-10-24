@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.fabric.effects;
 
+import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
 import io.github.dailystruggle.effectsapi.common.spi.HandleProvider;
 import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
@@ -467,28 +468,12 @@ public final class FabricHandles implements HandleProvider {
                 player.startFallFlying(); // begin gliding
                 player.hurtMarked = true;
             } catch (Throwable t) {
+                RTP.log(Level.WARNING, "[RTP][Fabric] GLIDE lift failed for " + player.getUUID(), t);
                 return;
             }
-
-            // Arm a landing watchdog on the server thread. Integer.MAX_VALUE is
-            // treated as "no timeout" - skip scheduling entirely.
-            if (landingTimeoutTicks > 0 && landingTimeoutTicks < Integer.MAX_VALUE) {
-                final UUID id = player.getUUID();
-                net.minecraft.server.MinecraftServer server = player.serverLevel().getServer();
-                final long deadline = (long) server.getTickCount() + landingTimeoutTicks;
-                final Runnable[] watchdog = new Runnable[1];
-                watchdog[0] = () -> {
-                    if (server.getTickCount() >= deadline) {
-                        ServerPlayer p = server.getPlayerList().getPlayer(id);
-                        if (p != null && p.isFallFlying()) {
-                            p.stopFallFlying(); // force landing
-                        }
-                    } else {
-                        server.execute(watchdog[0]);
-                    }
-                };
-                server.execute(watchdog[0]);
-            }
+            // Vanilla drops the glide flag next tick without an elytra; the keep-alive (driven from
+            // END_SERVER_TICK) holds it until landing and enforces landingTimeoutTicks.
+            GlideKeepAlive.track(new FabricGlider(player), landingTimeoutTicks);
         }
 
         private static boolean teleportGlide(ServerPlayer player, ServerLevel level,

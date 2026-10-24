@@ -7,10 +7,13 @@ import io.github.dailystruggle.rtp.api.group.GroupProfileSpec;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
 
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -80,7 +83,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
    */
   public CompletableFuture<PreparedPlacement> preparePlacement(GroupPlacementRequest request) {
     if (request == null) {
-      RTP.log(Level.WARNING, "[group] preparePlacement: request is null");
+      RTPRuntime.log(Level.WARNING, "[group] preparePlacement: request is null");
       return CompletableFuture.completedFuture(
           new PreparedPlacement(
               GroupPlacementResult.failure(GroupPlacementResult.Reason.ERROR, "null request"),
@@ -89,7 +92,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
               null));
     }
 
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[group] preparePlacement: region='"
             + request.regionName()
@@ -103,9 +106,9 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     String regionName = request.regionName();
     if (regionName != null && !regionName.isBlank()) {
       try {
-        region = RTP.selectionAPI.getRegion(regionName);
+        region = ActiveSelection.get().getRegion(regionName);
       } catch (Throwable t) {
-        RTP.log(Level.WARNING, "[group] region lookup failed for '" + regionName + "'", t);
+        RTPRuntime.log(Level.WARNING, "[group] region lookup failed for '" + regionName + "'", t);
         return CompletableFuture.completedFuture(
             new PreparedPlacement(
                 GroupPlacementResult.failure(
@@ -148,7 +151,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     return attemptPlacement(fRegion, spec, participants, n, request.anchorSource(), 1, maxAttempts)
         .exceptionally(
             ex -> {
-              RTP.log(Level.WARNING, "[group] placement failed for region '" + fRegion.name + "'", ex);
+              RTPRuntime.log(Level.WARNING, "[group] placement failed for region '" + fRegion.name + "'", ex);
               return new PreparedPlacement(
                   GroupPlacementResult.failure(
                       GroupPlacementResult.Reason.ERROR, String.valueOf(ex)),
@@ -200,7 +203,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     try {
       io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> factory =
           (io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>>)
-              RTP.factoryMap.get(RTP.factoryNames.shape);
+              FactoryRegistry.get(FactoryNames.shape);
       if (factory == null || !factory.contains(name)) {
         return null;
       }
@@ -261,8 +264,8 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                 coords.z(),
                 null));
       }
-    } else if (coords.worldName() != null && RTP.serverAccessor != null) {
-      resolvedWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+    } else if (coords.worldName() != null && RTPRuntime.serverAccessor() != null) {
+      resolvedWorld = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
     }
     final RTPWorld<?> world = resolvedWorld;
     if (world == null) {
@@ -293,7 +296,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     } catch (Throwable t) {
       releaseReservation(genResult);
       String rName = (region != null) ? region.name : "unspecified";
-      RTP.log(Level.WARNING, "[group] subspace construction failed for region '" + rName + "'", t);
+      RTPRuntime.log(Level.WARNING, "[group] subspace construction failed for region '" + rName + "'", t);
       return CompletableFuture.completedFuture(
           new PreparedPlacement(
               GroupPlacementResult.failure(GroupPlacementResult.Reason.ERROR, String.valueOf(t)),
@@ -355,7 +358,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                 long ck = ((long) cc[0] & 0xffffffffL) | ((long) cc[1] << 32);
                 if (world.getCachedChunk(ck) != null) residentCount++;
               }
-              RTP.log(
+              RTPRuntime.log(
                   Level.FINE,
                   "[group] chunk warming complete ("
                       + warmFutures.size()
@@ -384,7 +387,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
             })
         .thenCompose(
             slots -> {
-              RTP.log(
+              RTPRuntime.log(
                   Level.FINE,
                   "[group] safe slot selection returned "
                       + (slots == null ? 0 : slots.size())
@@ -446,7 +449,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                               int cx = rejected.x() >> 4;
                               int cz = rejected.z() >> 4;
                               long loc = memShape.xzToLocation(cx, cz);
-                              memShape.addBadChunk(loc, LocationGenerator.FailTypes.safetyExternal);
+                              memShape.addBadChunk(loc, FailTypes.safetyExternal);
                             }
                             unassignedOrRejected.add(cand);
                           }
@@ -507,7 +510,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
         .exceptionally(
             t -> {
               releaseReservation(genResult);
-              RTP.log(Level.WARNING, "[group] subspace selection failed for region '" + region.name + "'", t);
+              RTPRuntime.log(Level.WARNING, "[group] subspace selection failed for region '" + region.name + "'", t);
               return new PreparedPlacement(
                   GroupPlacementResult.failure(GroupPlacementResult.Reason.ERROR, String.valueOf(t)),
                   coords.x(),
@@ -538,7 +541,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
    * been initiated.
    *
    * <p>Rather than one scheduled hop per participant, participants sharing a destination chunk are
-   * batched into a single {@link RTP#scheduler}{@code .runTask(world, cx, cz, ...)} - which lands on
+   * batched into a single {@link RTPRuntime#scheduler()}{@code .runTask(world, cx, cz, ...)} - which lands on
    * that chunk's owning region thread on Folia and the main thread elsewhere. Because the subspace
    * footprint is a small NxN block of chunks, this collapses many per-player hops into a handful of
    * per-chunk tasks. Bins are launched together and run independently on their own region threads,
@@ -562,12 +565,12 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
 
       io.github.dailystruggle.rtp.api.entity.RTPPlayer player = null;
       try {
-        player = RTP.serverAccessor.getPlayer(uuid);
+        player = RTPRuntime.serverAccessor().getPlayer(uuid);
       } catch (Throwable t) {
-        RTP.log(Level.WARNING, "[group] failed to resolve participant " + uuid + " for dispatch", t);
+        RTPRuntime.log(Level.WARNING, "[group] failed to resolve participant " + uuid + " for dispatch", t);
       }
       if (player == null || !player.isOnline()) {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[group] participant " + uuid + " offline at dispatch; releasing slot and skipping");
         releaseSlotReservation(dest);
@@ -589,7 +592,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
               GroupPlacementResult.Reason.CANCELLED, "all participants offline at dispatch"));
     }
 
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[group] dispatching teleports for "
             + placements.size()
@@ -615,7 +618,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                         (ok, ex) -> {
                           releaseSlotReservation(m.dest);
                           if (ex != null) {
-                            RTP.log(
+                            RTPRuntime.log(
                                 Level.WARNING,
                                 "[group] teleport failed for participant " + m.uuid, ex);
                             m.done.complete(false);
@@ -625,15 +628,15 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                         });
               } catch (Throwable t) {
                 releaseSlotReservation(m.dest);
-                RTP.log(Level.WARNING, "[group] teleport threw for participant " + m.uuid, t);
+                RTPRuntime.log(Level.WARNING, "[group] teleport threw for participant " + m.uuid, t);
                 m.done.complete(false);
               }
             }
           };
       try {
-        RTP.scheduler.runTask(world, cx, cz, binTask);
+        RTPRuntime.scheduler().runTask(world, cx, cz, binTask);
       } catch (Throwable t) {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[group] failed to schedule teleport bin at chunk (" + cx + "," + cz + ")", t);
         for (Member m : members) {

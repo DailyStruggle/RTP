@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.metrics.bstats;
 
 import io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -75,7 +75,7 @@ class RtpBStatsCatalogueAntiFingerprintingTest {
         String cause = RtpBStatsCatalogue.detectTopFailureCause();
         assertNoFingerprint("aggregate_top_failure_cause", cause);
         boolean allowed = "none".equals(cause) || "unknown".equals(cause);
-        for (LocationGenerator.FailTypes ft : LocationGenerator.FailTypes.values()) {
+        for (FailTypes ft : FailTypes.values()) {
             allowed |= ft.name().equals(cause);
         }
         assertTrue(allowed, cause);

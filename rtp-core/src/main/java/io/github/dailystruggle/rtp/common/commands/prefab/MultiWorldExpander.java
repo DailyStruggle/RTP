@@ -165,7 +165,7 @@ public final class MultiWorldExpander {
                     putVert(vert, e.getKey(), e.getValue());
                 }
             } catch (RuntimeException re) {
-                io.github.dailystruggle.rtp.common.RTP.log(
+                io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                         java.util.logging.Level.WARNING,
                         "[prefab] dimension vert repair failed for world " + world
                                 + " - " + re.getMessage());

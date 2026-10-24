@@ -31,6 +31,10 @@ dependencies {
     // SPI (RTPPlayer#getClientBlock / #sendClientBlockChanges) and effects-api's
     // HandleRegistry, so the same class runs on any platform whose adapter implements
     // that SPI (Bukkit/Paper/Folia today) and is a harmless no-op elsewhere.
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
+    testImplementation project(':effects-api')
 }
 
 test {

@@ -6,11 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,9 +42,9 @@ class BiomeActivityTrackerTest {
 
   @AfterEach
   void tearDown() {
-    RTP.configs = null;
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    ActiveConfigs.set(null);
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
   }
 
   @Test
@@ -110,7 +111,7 @@ class BiomeActivityTrackerTest {
   @DisplayName("sample processes online players, skips offline or null players")
   void sampleOnlineAndOfflinePlayers() throws Exception {
     BiomeActivityTracker t = new BiomeActivityTracker();
-    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
     MockRTPWorld world = (MockRTPWorld) accessor.getRTPWorld("world");
     assertNotNull(world);
 
@@ -139,7 +140,7 @@ class BiomeActivityTrackerTest {
   @DisplayName("sample completes with null when player location or world is null")
   void samplePlayerWithNullLocationOrWorld() throws Exception {
     BiomeActivityTracker t = new BiomeActivityTracker();
-    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
     MockRTPPlayer playerWithoutLoc = new MockRTPPlayer(UUID.randomUUID(), "NoLocGuy", null);
     playerWithoutLoc.setOnline(true);
 
@@ -158,7 +159,7 @@ class BiomeActivityTrackerTest {
   @DisplayName("sample completes exceptionally when task execution throws")
   void sampleExecutionThrows() {
     BiomeActivityTracker t = new BiomeActivityTracker();
-    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
     MockRTPWorld world = Mockito.mock(MockRTPWorld.class);
     Mockito.when(world.getBiome(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt()))
         .thenThrow(new RuntimeException("boom"));

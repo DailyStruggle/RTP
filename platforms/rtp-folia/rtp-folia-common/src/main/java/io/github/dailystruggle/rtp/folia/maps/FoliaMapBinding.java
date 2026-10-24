@@ -18,7 +18,7 @@ import io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding;
  *       superclass is sufficient and S-005 compliant (no chunk I/O on any
  *       region thread).</li>
  *   <li>{@code bindLive} -- inherited from the superclass. The
- *       supplier-driven live renderer reads only {@code RTP.metrics}
+ *       supplier-driven live renderer reads only {@code CoreMetrics.instance()}
  *       (no chunk I/O, no region-affine state), so the per-tick
  *       {@code CraftMapView.render} dispatch on Folia is sufficient
  *       and no {@code EntityScheduler} hop is required.</li>
@@ -41,7 +41,7 @@ public class FoliaMapBinding extends BukkitMapBinding {
 
     // deliverTo is inherited from BukkitMapBinding: the FILLED_MAP drop is
     // dispatched onto the viewer's region thread by the caller (MapDispatch)
-    // via RTP.scheduler.runTask(location, ...), so no per-binding
+    // via RTPRuntime.scheduler().runTask(location, ...), so no per-binding
     // EntityScheduler hop is needed here.
 
     // bindLive is inherited from BukkitMapBinding: CraftMapView.render is

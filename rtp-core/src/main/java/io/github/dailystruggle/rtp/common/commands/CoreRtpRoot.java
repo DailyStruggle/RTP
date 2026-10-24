@@ -4,7 +4,6 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.base.RTPCommandEvents;
@@ -14,6 +13,7 @@ import io.github.dailystruggle.rtp.common.commands.menu.MenuPlatformBindings;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuWiringSupport;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -106,7 +106,7 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
             if (viewer.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
               return true;
             }
-            return RTP.serverAccessor.menuPermissionProbe(viewer).test(perm);
+            return RTPRuntime.serverAccessor().menuPermissionProbe(viewer).test(perm);
           };
       MenuWiringSupport.attachTo(
           this,
@@ -127,7 +127,7 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
       senderChecks.add(senderCheck);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     } finally {
       senderChecksGuard.release();
     }
@@ -146,7 +146,7 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
         && args.length > 0
         && getCommandLookup().containsKey(args[0].toUpperCase(java.util.Locale.ROOT));
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
 
     if (!isSubcommand) {
       boolean valid = true;
@@ -181,7 +181,7 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
     // Teleport-path sender checks (e.g. cross-server waitlist). Empty on
     // platforms that register none.
     if (!senderChecks.isEmpty()) {
-      RTPCommandSender checkSender = RTP.serverAccessor.getSender(senderId);
+      RTPCommandSender checkSender = RTPRuntime.serverAccessor().getSender(senderId);
       boolean valid = true;
       for (Predicate<RTPCommandSender> senderCheck : senderChecks) {
         valid &= senderCheck.test(checkSender);
@@ -193,14 +193,14 @@ public class CoreRtpRoot extends BaseRTPCmdImpl implements RTPCmd {
 
     // When a platform reply-renderer is installed (e.g. the Bukkit help-row
     // clickable chat sink) it owns reply delivery; otherwise the neutral
-    // message path (RTP.serverAccessor.sendMessage) applies.
+    // message path (RTPRuntime.serverAccessor().sendMessage) applies.
     Consumer<String> effective =
         (replyRenderer != null) ? replyRenderer.apply(senderId) : messageMethod;
 
     try {
       return compute(senderId, parameterValues, nextCommand, effective);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[RTP] CoreRtpRoot.compute threw: " + t.getMessage(), t);
+      RTPRuntime.log(Level.WARNING, "[RTP] CoreRtpRoot.compute threw: " + t.getMessage(), t);
       throw t;
     }
   }

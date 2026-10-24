@@ -8,8 +8,8 @@ import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,7 +27,7 @@ public final class ChatMenuRenderer implements MenuRenderer {
     @Override
     public void render(UUID playerId, MenuModel model) {
         if (playerId == null || model == null) return;
-        RTPCommandSender target = RTP.serverAccessor.getSender(playerId);
+        RTPCommandSender target = RTPRuntime.serverAccessor().getSender(playerId);
         if (target == null) {
             // No live sender on this server for the viewer - drop the render.
             // The caller (MenuRedeemSubcommand) is responsible for sending
@@ -136,7 +136,7 @@ public final class ChatMenuRenderer implements MenuRenderer {
         } else {
             // Reuse the existing rich-text sink with a null/empty click so
             // the line carries hover but no click action.
-            RTP.serverAccessor.sendMessage(target, text, hover, "", null);
+            RTPRuntime.serverAccessor().sendMessage(target, text, hover, "", null);
         }
     }
 
@@ -152,6 +152,6 @@ public final class ChatMenuRenderer implements MenuRenderer {
             target.sendMessage(text);
             return;
         }
-        RTP.serverAccessor.sendMessageWithRunCommand(target, text, hover, runCommand, null);
+        RTPRuntime.serverAccessor().sendMessageWithRunCommand(target, text, hover, runCommand, null);
     }
 }

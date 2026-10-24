@@ -291,6 +291,44 @@ The `vert` block controls the Y-coordinate (height) selection.
 - `name`: The vertical adjustor engine.
 - `minY` / `maxY`: The allowed Y-range for teleportation.
 - `requireSkyLight`: If true, only accepts locations with direct access to the sky (surface-only).
+- `maxSlope` (`LINEAR` and `JUMP` only): Largest floor-height step, in blocks, allowed between the landing spot and the floor `slopeRadius` blocks away to the north, south, east and west. A spot that fails is skipped and the search continues with the next height or column. Omit it, or set `-1`, to turn the check off. `0` accepts only flat ground.
+- `slopeRadius` (`LINEAR` and `JUMP` only): How far from the landing spot the floor is sampled. Default `2`, range `1`-`8`.
+
+#### Slope check details (`maxSlope`)
+- The check looks for the floor near the landing spot's own height (within `maxSlope` blocks up or down), not from the sky down. Cave roofs, the Nether ceiling and other cave layers are ignored, so it works underground and in the Nether.
+- A sample with no floor within `maxSlope` blocks counts as too steep, so drops (cliff edges, ravines) and walls are both rejected.
+- **Chunk-edge caveat:** samples stay inside the landing spot's chunk. Near a chunk edge the samples on that side are moved inward or skipped, so steep ground just across the edge is not seen. Larger `slopeRadius` values make this more common.
+- Adding, changing or removing `maxSlope` or `slopeRadius` rebuilds that region's saved location data once, because chunks rejected under the old setting may be fine under the new one.
+- Steep terrain with a low `maxSlope` rejects more chunks, so selection can take longer. Raise `maxSlope` if `/rtp` starts failing in hilly regions.
+- `FIXED` ignores both keys: it places players in mid-air, where there is no floor to measure.
+
+#### Hillside and cliff check (`maxHillAngle`)
+`maxHillAngle` (`LINEAR` and `JUMP` only) is the steepest hill, in degrees, a player may land on. It ships as `"off"` in `defaults.vert` of `config.yml`, because the check costs search time.
+
+| Value | Refuses (26.3 test world, land spots) | Use it for |
+|---|---|---|
+| `"off"` (default) | nothing | Fastest search; any terrain allowed. |
+| `30` | about 1 in 5 | Gentle landings; refuses most hillsides and many cliff edges. |
+| `45` | about 1 in 12 | Refuses steep slopes and cliff edges only. |
+| `60` | about 1 in 60 | Refuses only near-vertical ground. |
+
+Any number from `0` to `89` also works; `-1` means off, like `"off"`.
+
+```yaml
+vert:
+  name: "LINEAR"
+  # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.
+  # "off" (fastest, default), 30, 45 or 60.
+  maxHillAngle: 30
+```
+
+- **What it looks at:** the ground 16 blocks away in 8 directions, and the ground within 8 blocks of the landing spot, all inside the 3x3 chunks around the spot. A spot is refused when at least half of those directions rise or fall at `maxHillAngle` or more (a mountainside), or when the ground around the spot leans that steeply (a cliff edge or ledge).
+- **Blocks only:** it reads blocks, not the world generator, so it works the same with custom generators such as Iris or Terra. It follows the floor near the landing height, so it also works in caves and the Nether.
+- **Where it runs:** first on region files during the background search, then again on the chunks the server already has loaded around the spot. It never loads extra chunks. Ground it cannot see counts as unknown, not as steep.
+- **Effect on search:** with `selection_failure` logging on, refusals are listed as `terrain` and `prefilterTerrain` when a search gives up. Each region-file check reads about 2-3 chunks around the spot, so the background search does about 3-4 times the work per spot with the check on, and refused spots are picked again.
+- **Platforms:** every platform keeps at least the 3x3 chunks around a spot loaded, so the check behaves the same on Paper, Spigot, Folia, Fabric and NeoForge.
+- Turning `maxHillAngle` on, off or to another angle rebuilds that region's saved location data once. `"off"`, `-1` and a missing key count as the same setting, so they don't.
+- `FIXED` ignores it, as it does `maxSlope`.
 
 ### Vert Engines and Parameters
 
@@ -312,7 +350,7 @@ A thorough scan of every Y level in a specific order.
 Places the player at a single configured Y level in **mid-air**, with no terrain scan. Designed for skyblock-style worlds where the platform tool builds a foothold around the player after teleport.
 - `y`: The exact Y-level for placement. Default `64`.
 - The destination cell `(x, y, z)` and the head cell `(x, y+1, z)` must both be air; any non-air block at either cell is treated as unsafe and the chunk is rejected so a different one is rolled.
-- Ignores `minY`, `maxY`, `direction`, `requireSkyLight`, and the `unsafeBlocks` ground sweep — none of those apply to mid-air placement.
+- Ignores `minY`, `maxY`, `direction`, `requireSkyLight`, `maxSlope`, `slopeRadius`, and the `unsafeBlocks` ground sweep — none of those apply to mid-air placement.
 - **Enable a platform builder** when using `FIXED`. Without one the player will fall straight through air.
 
 ---

@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -53,17 +53,17 @@ public class TestCancelCmd extends BaseRTPCmdImpl {
       if (!callerHasAdmin(callerId)) {
         String denied = "&c[RTP test/cancel] 'all' requires rtp.test.admin";
         if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, denied);
+          RTPRuntime.serverAccessor().sendMessage(callerId, denied);
         }
-        RTP.log(Level.WARNING, "[RTP test/cancel] denied 'all' to " + callerId);
+        RTPRuntime.log(Level.WARNING, "[RTP test/cancel] denied 'all' to " + callerId);
         return false;
       }
       int n = ActiveTestJobs.cancelAll();
       String msg = "[RTP test/cancel] cancelled " + n + " job(s) across all owners";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
-      RTP.log(Level.INFO, msg);
+      RTPRuntime.log(Level.INFO, msg);
       return true;
     }
 
@@ -73,9 +73,9 @@ public class TestCancelCmd extends BaseRTPCmdImpl {
             ? "[RTP test/cancel] no active jobs owned by you"
             : "[RTP test/cancel] cancelled " + n + " job(s)";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
-    RTP.log(Level.INFO, msg);
+    RTPRuntime.log(Level.INFO, msg);
     return true;
   }
 
@@ -88,11 +88,11 @@ public class TestCancelCmd extends BaseRTPCmdImpl {
    */
   private static boolean callerHasAdmin(UUID callerId) {
     try {
-      var sender = RTP.serverAccessor.getPlayer(callerId);
+      var sender = RTPRuntime.serverAccessor().getPlayer(callerId);
       if (sender == null) return true; // console path
       return sender.hasPermission("rtp.test.admin");
     } catch (Throwable t) {
-      RTP.log(
+      RTPRuntime.log(
           Level.WARNING,
           "[RTP test/cancel] permission lookup failed for " + callerId + "; denying 'all'",
           t);

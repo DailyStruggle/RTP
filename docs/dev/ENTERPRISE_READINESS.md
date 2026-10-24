@@ -26,9 +26,7 @@ criteria they serve are graded separately in section 10.
   `subprojects` block: untagged = default **logic** tier; `slow` / `edge` /
   `simulation` / `drawing` / `demo` excluded by default; `-PfullTests` runs all.
   Heavy suites (e.g. `ScanCmdTest`'s full-scale scan) are already tagged.
-- **Opt-in JaCoCo** (`-Pcoverage`) is now centralized in the root `subprojects`
-  closure (partially satisfies item 3 - report wiring centralized; the
-  verification/floor block is still not).
+- **Opt-in JaCoCo** (`-Pcoverage`) and `jacocoTestCoverageVerification` floors (`coverageFloors` map) are centralized in the root `build.gradle` `subprojects` closure (satisfies item 3).
 - **Local programmable static analysis**: opt-in PMD gate (`-PstaticAnalysis`) over
   the appendable [`config/pmd/ruleset.xml`](../../config/pmd/ruleset.xml), including
   the custom `PreferNonLockingExecution` rule (relates to section 4.5).
@@ -37,10 +35,9 @@ criteria they serve are graded separately in section 10.
   (relates to section 4.1).
 - **Suite benchmarking**: [`scripts/bench-tests.py`](../../scripts/bench-tests.py)
   ranks per-suite wall time to guide which suites to tag out of the logic tier.
-- **Opt-in PIT mutation gate** (`-Pmutation`) on `rtp-core`'s three safety
-  packages, failing below a 60% mutation score (satisfies section 4.4 item 22 -
-  the gate exists and is enforced; holding all three packages at the floor by
-  adding tests where mutants survive is the remaining open work).
+- **Opt-in PIT mutation gate** (`-Pmutation`) on `rtp-core`'s four safety
+  package globs (`tasks.teleport.*`, `selection.region.*`, `selection.worldborder.*`, `tools.*`),
+  enforcing a >= 60% mutation score floor in local runs and weekly sharded CI (`.github/workflows/mutation-testing.yml`; satisfies section 4.4 item 22).
 
 ---
 
@@ -71,20 +68,23 @@ graph. These are instruction / branch percentages, not estimates.
 
 ### 2.1 Platform-neutral modules (the 90%+ target set)
 
-> Historical 2026-09-10 baseline (several rows are superseded). Current measured values
-> live in the section 10 scorecard; do not quote this table as current state.
+> **Historical progression & current gated state:** This table records the progression from the initial 2026-09-10 baseline to the current enforced `coverageFloors` in root `build.gradle` (see section 10 scorecard).
 
-| Module | Instr % | Branch % | Missed instr | Verdict |
+| Module | Instr % | Branch % | Missed instr | Verdict / Enforced Floor (`build.gradle`) |
 |---|---|---|---|---|
-| `yaml-api` | **no tests at all** | - | - | Zero test sources (10 main classes). Pure parser - trivially testable. |
-| `metrics-api` | 18.8 | 18.9 | 506 | Pure SPI, 8 classes. Should be ~100%. |
-| `commands-api` | 93.5 | 80.1 | 163 | Decoupled from Bukkit, pure Java + Brigadier library. Strict 90/80 JaCoCo gate enforced. |
-| `rtp-api` | 95.7 | 81.3 | 422 | Fully tested public API models, facades, and delegates. Strict 90/80 JaCoCo gate enforced. |
-| `rtp-core` | 81.6 | 65.8 | 26,604 | The dominant mass. Detail in section 2.3. Refreshed 2026-09-15 (was 80.7/65.2/27,953 earlier that day; 59.6/45.8/56,583 on 2026-09-10). Includes the now-running Docker-gated SQL tier. |
-| `rtp-proxy-common` | 82.2 | 69.1 | 3,303 | Raised from 59.0/44.1 via comprehensive unit suites; PIT mutation testing at 79% (375/474 killed). Floor ratcheted to 0.78/0.65. |
-| `maps-api` | 67.6 | 48.6 | 1,505 | `render` 73.8%, `bukkit` binding drags it down. |
-| `anvil-api` | 71.1 | 60.3 | 1,609 | Closest to target of the large modules. |
-| `tags-api` | 84.5 | 74.4 | 203 | Nearly done. |
+| `yaml-api` | 97.0 | 88.1 | 48 | Raised from 0 test files on 2026-09-10 to 7 test suites (~115 cases). Enforced JaCoCo floor `0.92 / 0.80`. |
+| `metrics-api` | 100.0 | 94.6 | 0 | Raised from 18.8% / 18.9% on 2026-09-10 to 100% instruction coverage. Enforced Stage A floor `0.95 / 0.85`. |
+| `commands-api` | 96.5 | 90.4 | 163 | Decoupled from Bukkit, pure Java + Brigadier library. Strict `0.90 / 0.80` JaCoCo gate enforced. |
+| `rtp-api` | 95.7 | 81.3 | 422 | Fully tested public API models, facades, and delegates. Strict `0.90 / 0.80` JaCoCo gate enforced. |
+| `rtp-core` | 81.6 | 65.8 | 26,604 | The dominant mass (was 59.6 / 45.8 on 2026-09-10). Enforced floor `0.80 / 0.64` plus per-package floors (`tasks.teleport` `0.87/0.75`, `selection.region` `0.82/0.68`, `selection.worldborder` `0.99/0.89`). Includes Docker-gated SQL tier and runtime-attested devstack coverage (section 10.1). |
+| `rtp-proxy-common` | 87.0 | 68.8 | 3,303 | Raised from 59.0 / 44.1 via unit + Testcontainers Redis suites; PIT mutation score at 79% (375/474 killed). Enforced floor `0.85 / 0.67`. |
+| `maps-api` | 96.2 | 84.6 | 210 | Raised from 67.6 / 48.6 on 2026-09-10. Strict `0.90 / 0.80` JaCoCo gate enforced. |
+| `anvil-api` | 91.7 | 82.7 | 460 | Raised from 71.1 / 60.3 on 2026-09-10. Strict `0.90 / 0.80` JaCoCo gate enforced. |
+| `tags-api` | 98.2 | 90.9 | 24 | Raised from 84.5 / 74.4 on 2026-09-10. Enforced Stage A floor `0.95 / 0.85`. |
+| `bit-api` | >= 90.0 | >= 80.0 | - | Standalone Built-In Test contract and code registry ([ADR-121](../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)). Strict `0.90 / 0.80` JaCoCo gate enforced. |
+| `bstats-api` | >= 90.0 | >= 80.0 | - | Dependency-free bStats v2 client ([bstats-api-ADR-001](../../api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)). Strict `0.90 / 0.80` JaCoCo gate enforced. |
+| `units-api` | 86.3 | 67.9 | - | Temporal, spatial, and data-size parsers extracted from `rtp-core`. Enforced floor `0.85 / 0.66`. |
+| `server-api` | >= 90.0 | >= 80.0 | - | Platform-neutral `ServerAccessor`, `PlatformFamily`, and `ServerAccessors` SPI ([ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md)). Covered by `ServerAccessorsTest` and `BootstrapLogBufferTest`. |
 
 `effects-api` (21.9 / 19.7) is listed with the platform set below: two of its three
 largest packages (`effectsapi/fabric`, `effectsapi/bukkit`) are platform bindings.
@@ -165,10 +165,7 @@ identifiers unquoted to match the folded columns.
 2. **The gate must not be set from a stale figure.** The `rtp-core` floors are
    deliberately set below the measured baseline for this reason; the ratchet script
    (item 5) must read a fresh run, not a cached report.
-3. As of 2026-09-10 the `rtp-core` suite has **2 failing tests** in `MemoryShapeTest`
-   (`testComputeAdmissibleGapContract`, `testBoundedDynamicGapBridgingAtResolution32`),
-   originating from uncommitted in-progress gap-policy work. The floors cannot be
-   ratcheted to their true values until that work lands green.
+3. *(Historical note, resolved 2026-09-11)*: During the initial 2026-09-10 baseline scan, `rtp-core` had 2 transient failures in `MemoryShapeTest` (`testComputeAdmissibleGapContract`, `testBoundedDynamicGapBridgingAtResolution32`) from in-progress gap-policy work. That work landed green and the `rtp-core` floors were ratcheted to `0.80` instruction / `0.64` branch (plus package-level floors up to `0.99 / 0.89`).
 
 ---
 
@@ -221,20 +218,22 @@ identifiers unquoted to match the folded columns.
 - [x] 2\. Add BRANCH counter rule to `rtp-core` (**0.42**, under the measured 0.464).
 - [x] 3\. Move the JaCoCo verification block into the root `build.gradle` `subprojects`
       closure so every module carries a floor, with per-module overrides for the
-      platform adapters. **Done:** the floor block is now driven by a central
+      platform adapters. **Done:** the floor block is driven by a central
       `coverageFloors` map in the root `subprojects` closure (single source of
       truth); `jacocoTestCoverageVerification` `dependsOn test` so it always reads a
       fresh exec file (section 2.4 caveat 1), and wires into `check` from there.
-      `rtp-core` (0.55/0.42) is the only gated module today; platform adapters get a
-      floor by adding their path to the map as they reach the section 2.2 ceilings.
+      All pure-logic and shared platform-neutral modules are gated in `coverageFloors`
+      (`:metrics-api`, `:tags-api`, `:yaml-api`, `:bstats-api`, `:anvil-api`, `:maps-api`,
+      `:rtp-api`, `:commands-api`, `:bit-api`, `:units-api`, `:rtp-proxy:rtp-proxy-common`,
+      and `:rtp-core` with package-level rules).
 - [x] 4\. Add a per-package rule for the safety-critical set (`tasks/teleport`,
       `selection/region`, `selection/worldborder`) at a higher floor than the module.
-      **Done (2026-09-12):** package-level rules added to `coverageFloors[':rtp-core']`
+      **Done (2026-09-12, ratcheted 2026-10-08):** package-level rules added to `coverageFloors[':rtp-core']`
       in root `build.gradle` and enforced via `jacocoTestCoverageVerification` using
       `element = 'PACKAGE'` blocks. Gated packages:
-      `tasks.teleport` (0.65 instruction / 0.45 branch),
-      `selection.region` (0.52 instruction / 0.40 branch), and
-      `selection.worldborder` (0.85 instruction / 0.60 branch).
+      `tasks.teleport` (`0.87` instruction / `0.75` branch, raised from initial `0.65 / 0.45`),
+      `selection.region` (`0.82` instruction / `0.68` branch, raised from initial `0.52 / 0.40`), and
+      `selection.worldborder` (`0.99` instruction / `0.89` branch, raised from initial `0.85 / 0.60`).
 - [x] 5\. Commit a ratchet script (`scripts/ratchet-coverage.py`) that reads the JaCoCo
       XML and rewrites the floors upward after a green run. Never downward.
       **Done (2026-09-12):** committed `scripts/ratchet-coverage.py` (stdlib-only, Python 3.12+)
@@ -761,10 +760,8 @@ identifiers unquoted to match the folded columns.
       comprehensive module scope inventory, out-of-scope criteria, and an auditable vulnerability disclosure
       history table.
 - [x] 46\. One-page licensing clarity across `LICENSE` / `LICENSE-MIT` and the
-      Pro / Lite split (ADR-024). Ambiguity blocks adoption more than bugs do.
-      **Done (2026-09-12):** Created [`docs/dev/LICENSING.md`](LICENSING.md) detailing the open-core
-      dual-licensing model (MIT vs PolyForm Noncommercial 1.0.0), per-module license mapping, Lite vs Pro
-      feature comparison matrix (ADR-024 / ADR-061), commercial usage guidelines, and build-time compliance auditing.
+      Pro / Lite split (ADR-024, superseded by ADR-100 and ADR-108). Ambiguity blocks adoption more than bugs do.
+      **Done (2026-09-12, updated 2026-10-05 per [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md)):** Created [`docs/dev/LICENSING.md`](LICENSING.md) detailing the all-MIT licensing model (superseding ADR-061's open-core split), per-module license mapping, Lite vs Pro technical parity and support-tier differentiation ([ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md), [ADR-117](../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)), commercial usage guidelines, and build-time compliance auditing.
 - [x] 47\. Add severity + status columns to `POTENTIAL_BUGS.md` so it reads as a
       managed backlog rather than a pile of open defects.
       **Done (2026-09-12):** Updated [`docs/dev/POTENTIAL_BUGS.md`](POTENTIAL_BUGS.md) adding explicit
@@ -843,7 +840,7 @@ still skips `anvil-api` and `tags-api` (no published baseline). F-8 was resolved
 
 | # | Criterion (section 9) | Status | Prior (10-05) | Evidence (2026-10-08) | Remaining work |
 |---|---|---|---|---|---|
-| 1 | Every platform-neutral module >= 90% instruction / 80% branch, build-gated (strict 90/80 **unit** floors for the pure-logic modules; the `rtp-core` platform/pipeline seams credited by **runtime-attested** devstack coverage - see 10.1) | **MET** | PARTIAL | Root `build.gradle` `coverageFloors` gates all pure-logic platform-neutral modules at or above 90/80 (`metrics-api` 0.95/0.85, `tags-api` 0.95/0.85, `yaml-api` 0.92/0.80, `rtp-api` 0.90/0.80, `commands-api` 0.90/0.80, `anvil-api` 0.90/0.80, `maps-api` 0.90/0.80, `bstats-api` 0.90/0.80). Platform-coupled `rtp-core` seams credited by runtime-attested devstack coverage per 10.1. | None. Monitored monotonically via `scripts/ratchet-coverage.py`. |
+| 1 | Every platform-neutral module >= 90% instruction / 80% branch, build-gated (strict 90/80 **unit** floors for the pure-logic modules; the `rtp-core` platform/pipeline seams credited by **runtime-attested** devstack coverage - see 10.1) | **MET** | PARTIAL | Root `build.gradle` `coverageFloors` gates all pure-logic platform-neutral modules (`metrics-api` 0.95/0.85, `tags-api` 0.95/0.85, `yaml-api` 0.92/0.80, `rtp-api` 0.90/0.80, `commands-api` 0.90/0.80, `bit-api` 0.90/0.80, `anvil-api` 0.90/0.80, `maps-api` 0.90/0.80, `bstats-api` 0.90/0.80, `units-api` 0.85/0.66, `rtp-proxy-common` 0.85/0.67, and `rtp-core` 0.80/0.64 + package floors). Platform-coupled `rtp-core` seams credited by runtime-attested devstack coverage per 10.1. | None. Monitored monotonically via `scripts/ratchet-coverage.py`. |
 | 2 | Mutation score >= 60% on the safety packages | **MET** | PARTIAL | `rtp-core/build.gradle` `-Pmutation` gates at 60% across safety packages (`tasks.teleport.*`, `selection.region.*`, `selection.worldborder.*`, `tools.*`). `.github/workflows/mutation-testing.yml` executes weekly shards covering all safety packages with `mutationThreshold=60`. | None. Automated weekly CI gate active. |
 | 3 | Every S-00x prohibition has an automated rule cited in `TRACEABILITY.md` | **MET** | MET | Every REQ-RTP-S-001..S-007 row in `TRACEABILITY.md` cites dedicated automated tests (`SafetyScanTest`, `ReqRtpS002PipelineLeakAssertionTest`, `ReqRtpS003SchematicFootprintClaimTest`, `ReqRtpS004VerifierFailSafeTest`, `AnvilPrefilterTest`, `RtpApiTeleportSurfaceTest`, `ReqRtpMenuConcreteCommandsTest`). | None. |
 | 4 | Support matrix distinguishes tested vs best-effort; tested cells re-verified by CI on a schedule | **MET** | PARTIAL | `SUPPORT_MATRIX.md` marks a cell Tested only when a scheduled CI job boots it (ADR-113 amendment 4): the nightly devstack (`devstack/docker-compose.yml`: Velocity, Paper 1.21.11, Folia 1.21.11, Fabric 1.21.11 on Java 25, NeoForge 1.21.1 on Java 21) and the nightly `versions-smoke` job (Paper 26.3, Fabric 26.3 on Java 25). | Bump the `versions-smoke` `VERSION` with each Minecraft release. |

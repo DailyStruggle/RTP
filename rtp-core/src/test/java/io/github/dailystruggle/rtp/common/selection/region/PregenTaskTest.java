@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -12,12 +12,14 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPChunk;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,7 +53,7 @@ class PregenTaskTest {
         world = new MockRTPWorld("pregen_world");
         accessor.addWorld(world);
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
         logging.set(LoggingKeys.selection_failure, true);
 
         square = new Square();
@@ -79,8 +81,8 @@ class PregenTaskTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         LocationGenerator.setRng(null);
     }
 
@@ -106,10 +108,10 @@ class PregenTaskTest {
     }
 
     private PregenState createState(long maxAttempts, boolean verbose) {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxAttempts, maxAttempts);
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
         logging.set(LoggingKeys.selection_failure, verbose);
 
         return PregenState.build(region, Set.of("PLAINS"));
@@ -146,7 +148,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Forced biome recall with unrecorded biomes aborts immediately")
     void testForcedBiomeRecallUnrecorded() throws ExecutionException, InterruptedException {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.biomeRecall, true);
         perf.set(PerformanceKeys.biomeRecallForced, true);
 
@@ -181,7 +183,7 @@ class PregenTaskTest {
         assertTrue(result.isDone());
         assertNull(result.get().coords());
         assertTrue(state.worldBorderFails > 0);
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.worldBorder).containsKey("OUTSIDE_BORDER"));
+        assertTrue(state.failMap.get(FailTypes.worldBorder).containsKey("OUTSIDE_BORDER"));
     }
 
     @Test
@@ -207,7 +209,7 @@ class PregenTaskTest {
     @DisplayName("Probabilistic pregenerated rejection rejects candidate chunk")
     void testPregeneratedPreferenceRejection() throws ExecutionException, InterruptedException {
         createState(1L, true);
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.pregeneratedPreference, 1.0); // 100% rejection if ungenerated
 
         MockRTPWorld spyWorld = spy(world);
@@ -223,7 +225,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.ungenerated).containsKey("UNGENERATED"));
+        assertTrue(state.failMap.get(FailTypes.ungenerated).containsKey("UNGENERATED"));
     }
 
     @Test
@@ -257,7 +259,7 @@ class PregenTaskTest {
         task.run();
 
         assertTrue(result.isDone());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.prefilterBiome).containsKey("biome=DESERT"));
+        assertTrue(state.failMap.get(FailTypes.prefilterBiome).containsKey("biome=DESERT"));
     }
 
     @Test
@@ -323,7 +325,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=ticketFailed"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=ticketFailed"));
     }
 
     @Test
@@ -345,13 +347,13 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
     }
 
     @Test
     @DisplayName("Self-contained chunk (Anvil) bypasses live reservation and succeeds")
     void testSelfContainedChunkSuccess() throws ExecutionException, InterruptedException {
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         safety.set(SafetyKeys.safetyRadius, 0);
 
         MockRTPChunk chunk = spy(new MockRTPChunk(0, 0, world));
@@ -379,7 +381,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Live-backed chunk dispatch evaluates on region thread and succeeds")
     void testLiveChunkSuccess() throws ExecutionException, InterruptedException {
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         safety.set(SafetyKeys.safetyRadius, 0);
 
         MockRTPChunk chunk = spy(new MockRTPChunk(0, 0, world));
@@ -409,7 +411,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("vert.adjust returning null marks bad chunk and records vert fail")
     void testVertAdjustFails() throws ExecutionException, InterruptedException {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.biomeRecall, true);
         perf.set(PerformanceKeys.maxAttempts, 1L);
 
@@ -437,13 +439,13 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.vert).containsKey("biome="));
+        assertTrue(state.failMap.get(FailTypes.vert).containsKey("biome="));
     }
 
     @Test
     @DisplayName("Biome mismatch marks bad chunk and records biome fail")
     void testBiomeMismatchFails() throws ExecutionException, InterruptedException {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxAttempts, 1L);
 
         MockRTPChunk chunk = spy(new MockRTPChunk(0, 0, world));
@@ -463,13 +465,13 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.biome).containsKey("biome=DESERT"));
+        assertTrue(state.failMap.get(FailTypes.biome).containsKey("biome=DESERT"));
     }
 
     @Test
     @DisplayName("Safety check failure records safety fail")
     void testSafetyCheckBlockReject() throws ExecutionException, InterruptedException {
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         safety.set(SafetyKeys.safetyRadius, 0);
 
         MockRTPWorld spyWorld = spy(world);
@@ -520,8 +522,8 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.safety).size() > 0
-                || state.failMap.get(LocationGenerator.FailTypes.nullChunk).size() > 0);
+        assertTrue(state.failMap.get(FailTypes.safety).size() > 0
+                || state.failMap.get(FailTypes.nullChunk).size() > 0);
     }
 
     @Test
@@ -608,7 +610,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).size() > 0);
+        assertTrue(state.failMap.get(FailTypes.nullChunk).size() > 0);
     }
 
     @Test
@@ -635,7 +637,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.vert).size() > 0);
+        assertTrue(state.failMap.get(FailTypes.vert).size() > 0);
     }
 
     @Test
@@ -668,7 +670,7 @@ class PregenTaskTest {
 
             assertTrue(result.isDone());
             assertNull(result.get().coords());
-            assertTrue(state.failMap.get(LocationGenerator.FailTypes.safetyExternal).size() > 0);
+            assertTrue(state.failMap.get(FailTypes.safetyExternal).size() > 0);
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
         }
@@ -750,7 +752,7 @@ class PregenTaskTest {
         assertNotNull(gr);
         assertNotNull(gr.coords(), "Should succeed on second attempt after recovering from null chunk");
         assertEquals(2L, gr.attempts(), "Retry count should have incremented from attempt 1 to 2");
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
     }
 
     @Test
@@ -792,7 +794,7 @@ class PregenTaskTest {
         assertNotNull(gr);
         assertNotNull(gr.coords(), "Should succeed on second attempt after recovering from exception");
         assertEquals(2L, gr.attempts(), "Retry count should increment after exceptional failure");
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=ticketFailed"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=ticketFailed"));
     }
 
     @Test
@@ -835,7 +837,7 @@ class PregenTaskTest {
             assertNotNull(gr);
             assertNotNull(gr.coords());
             assertEquals(2L, gr.attempts());
-            assertTrue(state.failMap.get(LocationGenerator.FailTypes.safetyExternal).size() > 0);
+            assertTrue(state.failMap.get(FailTypes.safetyExternal).size() > 0);
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
         }
@@ -844,7 +846,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Biome draw tables: multiple biomes with configured weight ratios and limits")
     void testBiomeDrawTablesWithWeightsAndLimits() throws Exception {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.biomeRecall, true);
         perf.set(PerformanceKeys.biomeRecallForced, false);
 

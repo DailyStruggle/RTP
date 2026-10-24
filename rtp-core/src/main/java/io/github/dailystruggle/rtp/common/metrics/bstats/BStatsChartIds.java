@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.metrics.bstats;
 
+
 /**
  * Centralised constants for the bStats chart IDs registered by RTP.
  *
@@ -98,7 +99,7 @@ public final class BStatsChartIds {
   // (RtpOutcomeStats), independent of per-invocation verbose flags. Both charts
   // are categorical / bucketised and therefore fingerprint-safe: the success
   // rate is bucketised (never a raw cumulative count) and the dominant failure
-  // cause is drawn from the fixed LocationGenerator.FailTypes catalogue.
+  // cause is drawn from the fixed FailTypes catalogue.
   public static final String AGGREGATE_SUCCESS_RATE = "aggregate_success_rate";
   public static final String AGGREGATE_TOP_FAILURE_CAUSE = "aggregate_top_failure_cause";
 

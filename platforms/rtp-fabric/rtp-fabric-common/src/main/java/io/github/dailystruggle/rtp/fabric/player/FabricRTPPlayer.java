@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.SenderTimings;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec;
 import io.github.dailystruggle.rtp.fabric.tools.FabricLegacyText;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
@@ -107,7 +109,7 @@ public final class FabricRTPPlayer
      * (maps-api parity). Mirrors {@link #openBookMenu}:
      * the maps path flows player-first, so the raw {@link ServerPlayer} handle
      * never leaves this class. We resolve the active {@link FabricVersionAdapter},
-     * hop to the server tick thread via {@code RTP.scheduler} (map saved-data
+     * hop to the server tick thread via {@code RTPRuntime.scheduler()} (map saved-data
      * allocation, packet dispatch, and inventory mutation all require
      * server-thread affinity), then delegate to the carrier's NM-free seam with
      * the live handle. Server/level state is reached <em>through</em> this player
@@ -127,7 +129,7 @@ public final class FabricRTPPlayer
         if (!isOnline() || chartKey == null || argb == null) return false;
         FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return false;
-        RTP.scheduler.runTask(() -> {
+        RTPRuntime.scheduler().runTask(() -> {
             ServerPlayer p = handleRef.get();
             if (p == null) return; // viewer went offline before the hop
             adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
@@ -412,13 +414,12 @@ public final class FabricRTPPlayer
 
     @Override
     public long cooldown() {
-        // Perms-driven cooldown groups not yet implemented. 0 means "use default" upstream.
-        return 0L;
+        return SenderTimings.cooldownMillis(this);
     }
 
     @Override
     public long delay() {
-        return 0L;
+        return SenderTimings.delayMillis(this);
     }
 
     @Override
@@ -762,9 +763,9 @@ public final class FabricRTPPlayer
         ServerPlayer p = handleRef.get();
         if (p == null) return null;
         ServerLevel level = p.serverLevel();
-        RTPWorld<?> rtpWorld = RTP.serverAccessor == null
+        RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor() == null
                 ? null
-                : RTP.serverAccessor.getRTPWorld(level.dimension().location().toString());
+                : RTPRuntime.serverAccessor().getRTPWorld(level.dimension().location().toString());
         if (rtpWorld == null) return null;
         return new RTPLocation(rtpWorld, p.getBlockX(), p.getBlockY(), p.getBlockZ());
     }

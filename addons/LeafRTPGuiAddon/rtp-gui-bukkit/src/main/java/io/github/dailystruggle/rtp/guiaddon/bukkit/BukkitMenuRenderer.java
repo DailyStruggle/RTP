@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.guiaddon.bukkit;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuModel;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuRenderer;
@@ -106,7 +107,7 @@ public final class BukkitMenuRenderer implements MenuRenderer {
 
     // Prefer the player's entity scheduler (Folia-safe; main thread on Paper/Spigot).
     RTPPlayer rtpPlayer =
-        (RTP.serverAccessor == null) ? null : RTP.serverAccessor.getPlayer(playerId);
+        (RTPRuntime.serverAccessor() == null) ? null : RTPRuntime.serverAccessor().getPlayer(playerId);
     RTP.log(java.util.logging.Level.FINE, "[RTP-GUI] open: scheduling picker for " + playerId
         + " via " + (rtpPlayer != null ? "entity scheduler" : "main-thread fallback"));
     if (rtpPlayer != null) {

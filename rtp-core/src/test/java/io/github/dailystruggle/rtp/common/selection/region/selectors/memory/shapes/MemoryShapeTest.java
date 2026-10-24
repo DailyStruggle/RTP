@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class MemoryShapeTest {
     static {
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
@@ -628,9 +628,9 @@ public class MemoryShapeTest {
     public void testLearnedStateSummary() {
         TestShape shape = new TestShape();
         // Three non-overlapping single-cell bad locations, all tagged safety.
-        shape.addBadLocation(10L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety);
-        shape.addBadLocation(20L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety);
-        shape.addBadLocation(30L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety);
+        shape.addBadLocation(10L, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety);
+        shape.addBadLocation(20L, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety);
+        shape.addBadLocation(30L, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety);
         shape.flushAndRebuild(1);
 
         MemoryShape.LearnedStateSummary summary = shape.learnedStateSummary();
@@ -746,18 +746,18 @@ public class MemoryShapeTest {
         assertEquals(0, initial.keys.length);
         assertEquals(0, initial.sums.length);
 
-        shape.addBadLocation(10L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety, 3600L);
+        shape.addBadLocation(10L, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety, 3600L);
         shape.flushAndRebuild(1L);
 
         MemoryShape.BadLocationsSnapshot snap = shape.badLocationsSnapshot;
         assertEquals(1, snap.keys.length);
         assertEquals(10L, snap.keys[0]);
         assertEquals(1L, snap.sums[0]);
-        assertEquals((byte) io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety.ordinal(), snap.causes[0]);
+        assertEquals((byte) io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety.ordinal(), snap.causes[0]);
         assertTrue(snap.expiries[0] > 0L);
 
         // Verify absorbIntoAdjacentRun atomically updates snapshot via copy-on-write
-        shape.addBadLocation(11L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety, 3600L);
+        shape.addBadLocation(11L, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety, 3600L);
         MemoryShape.BadLocationsSnapshot absorbedSnap = shape.badLocationsSnapshot;
         assertNotSame(snap, absorbedSnap);
         assertEquals(1, absorbedSnap.keys.length);

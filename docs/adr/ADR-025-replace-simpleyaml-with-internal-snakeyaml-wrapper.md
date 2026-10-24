@@ -114,14 +114,18 @@ reversal is preserved under *Decision History*.
 
 ### Scope: which YAML features the in-house library supports
 
-Bounded by the 2026-05-15 *YAML Feature Audit* over 187 shipped `.yml`
-files (see `docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`, to be
-folded into this ADR on acceptance).
+Initially bounded by the 2026-05-15 *YAML Feature Audit* over 187
+shipped `.yml` files (see `docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`,
+to be folded into this ADR on acceptance), with the block-scalar
+extension recorded in *Decision History* below.
 
 **Supported (reader and writer):**
 
 - Block-style mappings (nested, arbitrary depth).
 - Block-style sequences of scalars (`- item`).
+- Literal (`|`) and folded (`>`) block-scalar values with optional
+  indentation and chomping indicators. The reader normalizes these to
+  multiline scalar values; the writer emits equivalent double-quoted values.
 - Scalar types: integer, double, boolean, `null`/empty.
 - Bare (unquoted) string scalars.
 - Double-quoted string scalars with standard escape sequences
@@ -149,13 +153,13 @@ REQ-RTP-S-007):**
   the 64 raw hits were all Bukkit color codes `&a`/`&c` inside quoted
   strings, which are *not* anchors — they're string content).
 - Merge keys `<<:` (0 audited occurrences).
-- Flow-style mappings `{…}` or sequences `[…]` at value position
-  (0 audited real occurrences; the 234 raw hits were `[placeholder]`
-  substrings inside quoted strings or comments).
+- Flow-style mappings `{…}` at value position, including inside flow
+  sequences (0 audited real occurrences; the 234 raw hits were
+  `[placeholder]` substrings inside quoted strings or comments).
+- Flow sequences as a mapping key or document root
+  (`rtpYaml.unsupported.flowSeq`).
 - Explicit tags `!Tag` / `!!type` (0 audited occurrences).
 - Multi-document separators `---` / `...` (0 audited occurrences).
-- Block-scalar indicators `|` and `>` (4 audited occurrences, all
-  `usage: |` in `plugin.yml`, see *plugin.yml carve-out* below).
 
 The fail-fast error reports the offending line and column and the
 specific unsupported feature, in a `messages.yml`-resolved key
@@ -166,10 +170,10 @@ specific unsupported feature, in a `messages.yml`-resolved key
 `plugin.yml` is loaded by the Bukkit platform's plugin loader, not by
 RTP's configuration layer. It is never read or written by `rtp-core`,
 never mutated by `/rtp config`, and never round-tripped through the
-in-house parser. Its `usage: |` block-scalar fields therefore do not
-need to be supported by the in-house parser. The audit results
-documented this as the only place block scalars appear in the
-shipped tree.
+in-house parser, so the plugin descriptor does not depend on parser
+support for its `usage: |` fields. The 2026-05-15 audit documented
+`plugin.yml` as the only shipped-tree occurrence at that time; support
+for block scalars was later added for editor-authored vault files.
 
 ### Comment preservation strategy
 
@@ -251,10 +255,12 @@ parser too just removes the shaded dependency.
    `set()` rewrite of a *different* key in the same mapping, and
    golden-file byte-for-byte idempotence over every shipped `.yml`
    in `rtp-plugin/src/main/resources/`.
-5. **Subset-rejection tests** `RtpYamlUnsupportedFeatureTest`: one
+5. **Subset tests** `RtpYamlUnsupportedFeatureTest`: one
    case per rejected feature (anchor, alias, merge key, flow map,
-   flow sequence, tag, doc separator, block scalar), each asserting
+   flow sequence as a key/root, tag, doc separator), each asserting
    a precise line/column error and a configurable `messages.yml` key.
+   Block scalar parsing is covered separately, including flow-context
+   rejection.
 6. **Deep-keys parity test** `RtpYamlDeepKeysParityTest` locks in
    dotted-path semantics of `getKeys(true)` matching SimpleYaml's
    prior output.
@@ -315,6 +321,12 @@ Fabric mod jar gets the same in-house parser as every other variant.
   separators have **zero occurrences** in 187 shipped `.yml` files;
   block scalars exist only in `plugin.yml`, which is not parsed by
   RTP at all.
+- **2026-10-22 (block-scalar subset amendment):** Literal and folded
+  block scalars with optional indentation and chomping indicators are
+  accepted as input and normalized to multiline scalar values. The
+  existing writer emits equivalent quoted values, preserving their
+  contents without expanding the parser to full YAML. Block-scalar
+  indicators remain unsupported inside flow sequences.
 
 ## Alternatives Considered
 

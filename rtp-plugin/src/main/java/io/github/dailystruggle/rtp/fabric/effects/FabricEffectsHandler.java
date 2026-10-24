@@ -4,10 +4,14 @@ import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.effects.EffectDispatch;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.effects.EffectsResolver;
@@ -68,12 +72,13 @@ public final class FabricEffectsHandler {
      * lifecycle-hook lambdas are added once via the {@link AlreadyHooked} flag).
      */
     public static void setupEffects(MinecraftServer server) {
+        EffectDispatch.installWarnSink();
         FabricEffectRuntime.bindServer(server);
         FabricEffectsInitializer.registerAll();
 
         if (!AlreadyHooked.flip()) return; // already attached on a previous start
 
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
         FabricEffectRuntime runtime = new FabricEffectRuntime();
 
@@ -144,8 +149,8 @@ public final class FabricEffectsHandler {
                         // args[0] = LivingEntity entity, args[1] = DamageSource damageSource
                         if (args != null && args.length >= 1 && args[0] instanceof ServerPlayer sp) {
                             try {
-                                if (RTP.serverAccessor != null) {
-                                    RTPPlayer rp = RTP.serverAccessor.getPlayer(sp.getUUID());
+                                if (RTPRuntime.serverAccessor() != null) {
+                                    RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(sp.getUUID());
                                     if (rp != null) {
                                         dispatch("rtp.effect.death", rp, runtime);
                                     }
@@ -175,8 +180,8 @@ public final class FabricEffectsHandler {
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
     private static void dispatchByUuid(String prefix, UUID uuid, FabricEffectRuntime runtime) {
         try {
-            if (RTP.serverAccessor == null) return;
-            RTPPlayer rp = RTP.serverAccessor.getPlayer(uuid);
+            if (RTPRuntime.serverAccessor() == null) return;
+            RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(uuid);
             if (rp == null) return;
             dispatch(prefix, rp, runtime);
         } catch (Throwable t) {
@@ -227,16 +232,16 @@ public final class FabricEffectsHandler {
             }
 
             List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
-            for (Effect<?> effect : effects) {
+            EffectDispatch.forEachIsolated(prefix, effects, effect -> {
                 effect.setTarget(target);
                 if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
-                    RTP.deathEffectInFlight.add(handle.getUUID());
+                    DeathTeleports.effectInFlight().add(handle.getUUID());
                     if (pipelineTask != null) {
                         pipelineTask.deathEffectTriggered = true;
                     }
                 }
                 runtime.schedule(effect, 0);
-            }
+            });
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP] Fabric effect dispatch failed for " + prefix + ": "

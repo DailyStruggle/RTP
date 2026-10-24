@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -108,7 +109,7 @@ public class ReqRtpF013FullStartupRegressionTest {
   private static void bootStartup(File dir) {
     MockRTPServerAccessor accessor =
         RTPTestSetup.install(dir); // new RTP + Configs + full reloadConfigs()
-    RTP.configs.reloadRegions();
+    ActiveConfigs.get().reloadRegions();
     accessor.getMockScheduler().tick(5); // a few game ticks into startup
   }
 
@@ -121,12 +122,12 @@ public class ReqRtpF013FullStartupRegressionTest {
 
     for (Class<?> parser : EXPECTED_CONFIG_PARSERS) {
       assertTrue(
-          RTP.configs.configParserMap.containsKey(parser),
+          ActiveConfigs.get().configParserMap.containsKey(parser),
           "startup did not register config parser " + parser.getSimpleName());
     }
     for (Class<?> parser : EXPECTED_MULTI_PARSERS) {
       assertTrue(
-          RTP.configs.multiConfigParserMap.containsKey(parser),
+          ActiveConfigs.get().multiConfigParserMap.containsKey(parser),
           "startup did not register multi-config parser " + parser.getSimpleName());
     }
   }
@@ -166,8 +167,8 @@ public class ReqRtpF013FullStartupRegressionTest {
 
     assertDoesNotThrow(
         () -> {
-          RTP.configs.reloadConfigs();
-          RTP.configs.reloadRegions();
+          ActiveConfigs.get().reloadConfigs();
+          ActiveConfigs.get().reloadRegions();
           accessor.getMockScheduler().tick(5);
         },
         "startup with locale '" + locale + "' threw");
@@ -193,7 +194,7 @@ public class ReqRtpF013FullStartupRegressionTest {
     // .world.lang.yml.old<N> on every reload. MultiConfigParser now skips dotfile/.lang.yml maps
     // during its directory scan, so no new .old of either kind should appear here.
     Set<String> backupsBefore = configFileBackups(dir);
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
     Set<String> backupsAfter = configFileBackups(dir);
     Set<String> added = new TreeSet<>(backupsAfter);
     added.removeAll(backupsBefore);

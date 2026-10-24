@@ -8,19 +8,18 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.bit.BitFinding;
+import io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigEnvironment;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
-import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
-import io.github.dailystruggle.rtp.common.tasks.tick.TickBudget;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +28,9 @@ import java.util.logging.Level;
 /** Main configuration manager for RTP */
 public class Configs {
   private static final List<Runnable> onReload = new ArrayList<>();
+
+  /** Task, teleport and region steps of a reload; installed by the composition root (ADR-115). */
+  private static volatile ConfigReloadLifecycle reloadLifecycle = ConfigReloadLifecycle.NONE;
 
   /** The plugin directory */
   public final File pluginDirectory;
@@ -42,6 +44,8 @@ public class Configs {
   /** Map of multi-configuration parsers */
   public Map<Class<?>, MultiConfigParser<?>> multiConfigParserMap = new ConcurrentHashMap<>();
 
+  private volatile List<BitFinding> startupYamlFindings = List.of();
+
 
   /**
    * Constructor for Configs
@@ -49,7 +53,7 @@ public class Configs {
    * @param pluginDirectory the plugin directory
    */
   public Configs(File pluginDirectory) {
-    RTP.configs = this;
+    ActiveConfigs.set(this);
     this.pluginDirectory = pluginDirectory;
     this.fileDatabase = new YamlFileDatabase(pluginDirectory);
     this.fileDatabase.connect();
@@ -63,6 +67,24 @@ public class Configs {
    */
   public static void onReload(Runnable runnable) {
     onReload.add(runnable);
+  }
+
+  /**
+   * Installs the reload steps that act on tasks and regions.
+   *
+   * @param lifecycle the lifecycle to run on reload; {@code null} restores the no-op lifecycle
+   */
+  public static void setReloadLifecycle(ConfigReloadLifecycle lifecycle) {
+    reloadLifecycle = (lifecycle != null) ? lifecycle : ConfigReloadLifecycle.NONE;
+  }
+
+  /**
+   * Returns the installed reload lifecycle.
+   *
+   * @return the lifecycle; never {@code null}
+   */
+  public static ConfigReloadLifecycle getReloadLifecycle() {
+    return reloadLifecycle;
   }
 
   /**
@@ -80,13 +102,13 @@ public class Configs {
       name = ((ConfigParser<?>) instance).name;
       if (((ConfigParser<?>) instance).myClass.equals(LoggingKeys.class))
         logging = ((ConfigParser<LoggingKeys>) instance);
-      else logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+      else logging = (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
       configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
       if (((ConfigParser<?>) instance).myClass.equals(PerformanceKeys.class)) {
-        TickBudget.refresh();
+        reloadLifecycle.onParsersChanged();
       }
     } else if (instance instanceof MultiConfigParser<?>) {
-      logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+      logging = (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
       name = ((MultiConfigParser<?>) instance).name;
       multiConfigParserMap.put(
           ((MultiConfigParser<?>) instance).myClass, (MultiConfigParser<?>) instance);
@@ -105,7 +127,7 @@ public class Configs {
     }
 
     if (detailed_reload) {
-      RTP.log(Level.INFO, "&#00FFFF[RTP] loaded " + name);
+      RTPRuntime.log(Level.INFO, "&#00FFFF[RTP] loaded " + name);
     }
   }
 
@@ -210,7 +232,7 @@ public class Configs {
       if (section == null) return new HashMap<>();
       return section.getMapValues(false);
     } catch (Exception e) {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP] readLegacyConfigSection(" + sectionKey + ") failed: " + e.getMessage());
       return new HashMap<>();
     }
@@ -233,7 +255,7 @@ public class Configs {
       if (redis == null) return new HashMap<>();
       return redis.getMapValues(false);
     } catch (Exception e) {
-      RTP.log(Level.FINER, "[RTP] readLegacyNetworkRedis() failed: " + e.getMessage());
+      RTPRuntime.log(Level.FINER, "[RTP] readLegacyNetworkRedis() failed: " + e.getMessage());
       return new HashMap<>();
     }
   }
@@ -259,7 +281,7 @@ public class Configs {
       java.nio.file.Files.move(legacy.toPath(), archived.toPath());
       return true;
     } catch (Exception moveEx) {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP] archiveLegacy(" + legacyName + ") could not archive legacy path: "
               + moveEx.getMessage());
     }
@@ -267,7 +289,7 @@ public class Configs {
     try {
       java.nio.file.Files.deleteIfExists(legacy.toPath());
     } catch (Exception delEx) {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP] archiveLegacy(" + legacyName + ") could not delete legacy path: "
               + delEx.getMessage());
     }
@@ -301,18 +323,18 @@ public class Configs {
         try {
           parser.save();
         } catch (Exception saveEx) {
-          RTP.log(Level.FINER, "[RTP] migrateLegacyRootConfig(" + legacyFileName
+          RTPRuntime.log(Level.FINER, "[RTP] migrateLegacyRootConfig(" + legacyFileName
               + ") save failed: " + saveEx.getMessage());
         }
       }
       archiveLegacy(legacy, legacyFileName);
       if (warnedLegacyRootFiles.add(legacyFileName)) {
-        RTP.log(Level.WARNING, "[RTP] '" + legacyFileName + "' has moved to 'advanced/"
+        RTPRuntime.log(Level.WARNING, "[RTP] '" + legacyFileName + "' has moved to 'advanced/"
             + legacyFileName + "' (ADR-071). Your settings were migrated; the old file was "
             + "archived as '" + legacyFileName + ".migrated'.");
       }
     } catch (Exception ex) {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP] migrateLegacyRootConfig(" + legacyFileName + ") failed: " + ex.getMessage());
     }
   }
@@ -351,18 +373,18 @@ public class Configs {
         try {
           parser.save();
         } catch (Exception saveEx) {
-          RTP.log(Level.FINER, "[RTP] migrateLegacyKeysFromFile(" + categoryLabel
+          RTPRuntime.log(Level.FINER, "[RTP] migrateLegacyKeysFromFile(" + categoryLabel
               + ") save failed: " + saveEx.getMessage());
         }
         if (warnedLegacySplitKeys.add(categoryLabel)) {
-          RTP.log(Level.WARNING, "[RTP] the '" + categoryLabel + "' settings have moved out of "
+          RTPRuntime.log(Level.WARNING, "[RTP] the '" + categoryLabel + "' settings have moved out of "
               + "'" + legacySourceFile + "' into 'advanced/" + categoryLabel + ".yml' (ADR-071). "
               + "Your customized values were migrated; you may remove them from '"
               + legacySourceFile + "'.");
         }
       }
     } catch (Exception ex) {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP] migrateLegacyKeysFromFile(" + categoryLabel + ") failed: " + ex.getMessage());
     }
   }
@@ -402,19 +424,19 @@ public class Configs {
         try {
           parserMap.get(owner).save();
         } catch (Exception saveEx) {
-          RTP.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() save failed for "
+          RTPRuntime.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() save failed for "
               + owner.getSimpleName() + ": " + saveEx.getMessage());
         }
       }
       archiveLegacy(legacy, "messages.yml");
       if (!warnedLegacyFlatMessages) {
         warnedLegacyFlatMessages = true;
-        RTP.log(Level.WARNING, "[RTP] the flat 'messages.yml' has been split into the 'messages/' "
+        RTPRuntime.log(Level.WARNING, "[RTP] the flat 'messages.yml' has been split into the 'messages/' "
             + "directory (ADR-071). Your customized strings were migrated; the old file was "
             + "archived as 'messages.yml.migrated'.");
       }
     } catch (Exception ex) {
-      RTP.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() failed: " + ex.getMessage());
+      RTPRuntime.log(Level.FINER, "[RTP] migrateLegacyFlatMessages() failed: " + ex.getMessage());
     }
   }
 
@@ -435,7 +457,7 @@ public class Configs {
     File target = new File(pluginDirectory, newDir.replace('/', File.separatorChar));
     try {
       if (!target.exists() && !target.mkdirs()) {
-        RTP.log(Level.FINER,
+        RTPRuntime.log(Level.FINER,
             "[RTP] migrateLegacyMultiDir(" + legacyDir + ") could not create '" + newDir + "'");
         return;
       }
@@ -450,7 +472,7 @@ public class Configs {
             java.nio.file.Files.move(f.toPath(), dest.toPath());
             movedAny = true;
           } catch (Exception moveEx) {
-            RTP.log(Level.FINER, "[RTP] migrateLegacyMultiDir(" + legacyDir + ") move of '"
+            RTPRuntime.log(Level.FINER, "[RTP] migrateLegacyMultiDir(" + legacyDir + ") move of '"
                 + f.getName() + "' failed: " + moveEx.getMessage());
           }
         }
@@ -461,12 +483,12 @@ public class Configs {
         archiveLegacy(legacy, legacyDir);
       }
       if (movedAny && warnedLegacyMultiDirs.add(legacyDir)) {
-        RTP.log(Level.WARNING, "[RTP] the '" + legacyDir + "/' folder has moved to '"
+        RTPRuntime.log(Level.WARNING, "[RTP] the '" + legacyDir + "/' folder has moved to '"
             + newDir + "/' (ADR-076). Your files were migrated; the old folder was archived as '"
             + legacyDir + ".migrated'.");
       }
     } catch (Exception ex) {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP] migrateLegacyMultiDir(" + legacyDir + ") failed: " + ex.getMessage());
     }
   }
@@ -494,7 +516,7 @@ public class Configs {
   private void warnLegacyDatabaseOnce() {
     if (warnedLegacyDatabase) return;
     warnedLegacyDatabase = true;
-    RTP.log(Level.WARNING,
+    RTPRuntime.log(Level.WARNING,
         "[RTP] config.yml's 'database' block is deprecated and has moved to database.yml "
             + "(ADR-071). Your existing values are still honored, but database.yml takes "
             + "precedence; please move your settings into database.yml and remove the "
@@ -510,7 +532,7 @@ public class Configs {
     if (warnedLegacyNetworkRedis) return;
     if (readLegacyNetworkRedis().isEmpty()) return;
     warnedLegacyNetworkRedis = true;
-    RTP.log(Level.WARNING,
+    RTPRuntime.log(Level.WARNING,
         "[RTP] config.yml's 'network.redis' block is deprecated and has moved to network.yml "
             + "(ADR-071); the network.yml transport settings are authoritative. Please remove "
             + "the redundant 'network.redis' block from config.yml.");
@@ -524,7 +546,7 @@ public class Configs {
    */
   @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public ConfigParser<WorldKeys> getWorldParser(String worldName) {
-    if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
+    if (RTPRuntime.serverAccessor().getRTPWorld(worldName) == null) {
       return null;
     }
 
@@ -558,7 +580,7 @@ public class Configs {
    */
   @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public Object getWorldParserValue(String worldName, WorldKeys key) {
-    if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
+    if (RTPRuntime.serverAccessor().getRTPWorld(worldName) == null) {
       return null;
     }
 
@@ -583,20 +605,51 @@ public class Configs {
     return parser;
   }
 
+  private volatile ConfigCandidateGate.Result lastReloadRejection;
+
   /**
-   * Reload all configurations
+   * Rejection of the most recent {@link #reload()} by the config PBIT gate, or empty when it was
+   * accepted (or failed for another reason).
+   */
+  public java.util.Optional<ConfigCandidateGate.Result> lastReloadRejection() {
+    return java.util.Optional.ofNullable(lastReloadRejection);
+  }
+
+  /** YAML findings captured from disk before the first parser load can quarantine bad files. */
+  public List<BitFinding> startupYamlFindings() {
+    return startupYamlFindings;
+  }
+
+  /**
+   * Reload all configurations. The candidate on disk is first checked by
+   * {@link ConfigCandidateGate}; a rejected candidate leaves every parser, region and in-flight
+   * teleport untouched and returns false with {@link #lastReloadRejection()} set.
    *
    * @return true if successful
    */
   public boolean reload() {
-    RTP.log(Level.FINE, "[RTP] reload(): flushing fileDatabase queries before parser swap");
-    this.fileDatabase.processQueries(Long.MAX_VALUE);
-    RTP.log(Level.FINER, "[RTP] reload(): fileDatabase.processQueries complete; reconnecting");
-    this.fileDatabase.connect();
-    RTP.log(Level.FINER, "[RTP] reload(): fileDatabase reconnected; entering reloadAction");
-    reloadAction();
-    RTP.log(Level.FINE, "[RTP] reload(): complete");
-    return true;
+    try {
+      RTPRuntime.log(Level.FINE, "[RTP] reload(): flushing fileDatabase queries before parser swap");
+      this.fileDatabase.processQueries(Long.MAX_VALUE);
+      // ADR-121 section 7: PBIT the on-disk candidate before reconnect, teleport cancellation,
+      // migrations or the parser swap; any effective ERROR keeps the running config.
+      ConfigCandidateGate.Result gate =
+          ConfigCandidateGate.evaluate(pluginDirectory.toPath(), java.util.Map.of());
+      if (gate.rejected()) {
+        lastReloadRejection = gate;
+        return false;
+      }
+      lastReloadRejection = null;
+      RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase.processQueries complete; reconnecting");
+      this.fileDatabase.connect();
+      RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase reconnected; entering reloadAction");
+      reloadAction();
+      RTPRuntime.log(Level.FINE, "[RTP] reload(): complete");
+      return true;
+    } catch (RuntimeException failure) {
+      RTPRuntime.log(Level.SEVERE, "[RTP] reload() failed: " + failure.getMessage(), failure);
+      return false;
+    }
   }
 
   /**
@@ -604,19 +657,10 @@ public class Configs {
    * Cancels any in-flight teleports and kills the scan task before reloading.
    */
   public void reloadConfigs() {
-    RTP.log(Level.FINE, "[RTP] reloadConfigs(): killing ScanTask and clearing processingPlayers");
-    ScanTask.kill();
-    RTP.getInstance().processingPlayers.clear();
-
-    int cancelled = 0;
-    for (Map.Entry<UUID, TeleportData> e : RTP.getInstance().latestTeleportData.entrySet()) {
-      TeleportData data = e.getValue();
-      if (data == null || data.completed) continue;
-      RTP.log(Level.FINER, "[RTP] reloadConfigs(): cancelling in-flight teleport for " + e.getKey());
-      new RTPTeleportCancel(e.getKey()).run();
-      cancelled++;
+    if (configParserMap.isEmpty() && multiConfigParserMap.isEmpty()) {
+      recordStartupYamlFindings();
     }
-    RTP.log(Level.FINE, "[RTP] reloadConfigs(): cancelled " + cancelled + " in-flight teleport(s)");
+    reloadLifecycle.beforeReload();
 
     Map<Class<?>, ConfigParser<?>> newConfigParserMap = new ConcurrentHashMap<>();
     Map<Class<?>, MultiConfigParser<?>> newMultiConfigParserMap = new ConcurrentHashMap<>();
@@ -624,17 +668,17 @@ public class Configs {
     // REQ-RTP-F-013 / ADR-020: resolve the active locale BEFORE any other config is
     // loaded so that every parser can extract its locale-specific YAML directly.
     String locale = LanguageBootstrap.resolve(pluginDirectory);
-    RTP.log(Level.FINE, "[RTP] reloadConfigs(): active locale resolved as '" + locale + "'");
+    RTPRuntime.log(Level.FINE, "[RTP] reloadConfigs(): active locale resolved as '" + locale + "'");
 
     // ADR-071: logging.yml is advanced tuning, relocated under advanced/. A legacy
     // root logging.yml left by an older install is migrated and archived (rule 4).
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/logging.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/logging.yml");
     ConfigParser<LoggingKeys> logging =
             new ConfigParser<>(LoggingKeys.class, "advanced/logging.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(LoggingKeys.class, logging);
     migrateLegacyRootConfig(logging, "logging.yml");
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser config.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser config.yml");
     ConfigParser<ConfigKeys> config =
             new ConfigParser<>(ConfigKeys.class, "config.yml", "3.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(ConfigKeys.class, config);
@@ -651,13 +695,13 @@ public class Configs {
                     || new File(pluginDirectory, "advanced" + File.separator + "database.yml").exists()
                     || new File(pluginDirectory, "database.yml").exists();
     if (databaseResourcePresent) {
-      RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/database.yml");
+      RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/database.yml");
       ConfigParser<DatabaseKeys> database =
               new ConfigParser<>(DatabaseKeys.class, "advanced/database.yml", "1.1", pluginDirectory, fileDatabase, locale);
       newConfigParserMap.put(DatabaseKeys.class, database);
       migrateLegacyRootConfig(database, "database.yml");
     } else {
-      RTP.log(Level.FINER, "[RTP] reloadConfigs(): database.yml resource absent (lite); skipping parser");
+      RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): database.yml resource absent (lite); skipping parser");
     }
 
     // ADR-071 rule 3: messages.yml is split, per concern, into a messages/
@@ -668,34 +712,34 @@ public class Configs {
     // legacy root messages/ folder left by an older (ADR-071) install is relocated
     // first so an operator's customized per-concern files are not stranded (rule 4).
     migrateLegacyMultiDir("messages", "advanced/messages");
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/placeholders.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/placeholders.yml");
     newConfigParserMap.put(PlaceholderMessages.class,
             new ConfigParser<>(PlaceholderMessages.class, "advanced/messages/placeholders.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/player.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/player.yml");
     newConfigParserMap.put(PlayerMessages.class,
             new ConfigParser<>(PlayerMessages.class, "advanced/messages/player.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/network.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/network.yml");
     newConfigParserMap.put(NetworkMessages.class,
             new ConfigParser<>(NetworkMessages.class, "advanced/messages/network.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/commands.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/commands.yml");
     newConfigParserMap.put(CommandMessages.class,
-            new ConfigParser<>(CommandMessages.class, "advanced/messages/commands.yml", "1.0", pluginDirectory, fileDatabase, locale));
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/system.yml");
+            new ConfigParser<>(CommandMessages.class, "advanced/messages/commands.yml", "1.1", pluginDirectory, fileDatabase, locale));
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/system.yml");
     newConfigParserMap.put(SystemMessages.class,
-            new ConfigParser<>(SystemMessages.class, "advanced/messages/system.yml", "1.1", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(SystemMessages.class, "advanced/messages/system.yml", "1.2", pluginDirectory, fileDatabase, locale));
     // ADR-071 rule 4: a legacy flat messages.yml left by an older install is read
     // once, its operator customizations folded into the matching per-concern
     // files, archived (renamed, not deleted), and logged.
     migrateLegacyFlatMessages(newConfigParserMap);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser economy.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser economy.yml");
     ConfigParser<EconomyKeys> economy =
             new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(EconomyKeys.class, economy);
 
     // ADR-071: performance.yml is advanced tuning, relocated under advanced/. A legacy
     // root performance.yml left by an older install is migrated and archived (rule 4).
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/performance.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/performance.yml");
     ConfigParser<PerformanceKeys> performance =
             new ConfigParser<>(PerformanceKeys.class, "advanced/performance.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(PerformanceKeys.class, performance);
@@ -703,20 +747,26 @@ public class Configs {
 
     // ADR-071: metrics.yml is advanced tuning, relocated under advanced/. A legacy
     // root metrics.yml left by an older install is migrated and archived (rule 4).
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/metrics.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/metrics.yml");
     ConfigParser<MetricsKeys> metrics =
             new ConfigParser<>(MetricsKeys.class, "advanced/metrics.yml", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(MetricsKeys.class, metrics);
     migrateLegacyRootConfig(metrics, "metrics.yml");
 
     // ADR-079: ttl.yml defines cause-based and per-verifier spatial retention
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/ttl.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/ttl.yml");
     ConfigParser<TtlKeys> ttl =
             new ConfigParser<>(TtlKeys.class, "advanced/ttl.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(TtlKeys.class, ttl);
     io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.loadFromConfig(ttl);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/bit.yml");
+    ConfigParser<BitKeys> bit =
+            new ConfigParser<>(BitKeys.class, "advanced/bit.yml", "1.1", pluginDirectory, fileDatabase, locale);
+    newConfigParserMap.put(BitKeys.class, bit);
+    io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy.loadFromConfig(bit);
+
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety.yml");
     ConfigParser<SafetyKeys> safety =
             new ConfigParser<>(SafetyKeys.class, "safety", "1.1", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(SafetyKeys.class, safety);
@@ -725,12 +775,12 @@ public class Configs {
     // filter (biomeWhitelist / biomes) are split out of safety.yml into advanced/
     // tier files, each its own enum + file + parser. safety.yml keeps only the
     // high-touch safety knobs.
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/blocks.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/blocks.yml");
     ConfigParser<BlocksKeys> blocks =
             new ConfigParser<>(BlocksKeys.class, "advanced/blocks.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(BlocksKeys.class, blocks);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/biomes.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/biomes.yml");
     ConfigParser<BiomesKeys> biomes =
             new ConfigParser<>(BiomesKeys.class, "advanced/biomes.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(BiomesKeys.class, biomes);
@@ -755,7 +805,7 @@ public class Configs {
     // reload and removal-guards resolve unchanged); only the on-disk directory moves.
     // A legacy root regions/ folder left by an older install is relocated first so an
     // operator's authored region files are not stranded (rule 4).
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/regions/*.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/regions/*.yml");
     migrateLegacyMultiDir("regions", "definitions/regions");
     // The shared shape/vertical-adjustor rename-map catalogs now live hidden inside the
     // regions folder (definitions/regions/.shape and definitions/regions/.vert). Relocate
@@ -767,7 +817,7 @@ public class Configs {
             new MultiConfigParser<>(RegionKeys.class, "regions", "1.1", pluginDirectory, "definitions/regions", locale);
     newMultiConfigParserMap.put(RegionKeys.class, regions);
 
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/worlds/*.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/worlds/*.yml");
     migrateLegacyMultiDir("worlds", "definitions/worlds");
     MultiConfigParser<WorldKeys> worlds =
             new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory, "definitions/worlds", locale);
@@ -778,7 +828,7 @@ public class Configs {
     // inherit / effects). Outer keys (group names) are admin-chosen, hence MultiConfigParser
     // (one ConfigParser per file). EffectsResolver in rtp-plugin reads this on every
     // teleport so /rtp reload is honored automatically by the parser-map atomic swap above.
-    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/effects/*.yml");
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/effects/*.yml");
     migrateLegacyMultiDir("effects", "definitions/effects");
     MultiConfigParser<EffectsGroupKeys> effectsGroups =
             new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", pluginDirectory, "definitions/effects", locale);
@@ -791,22 +841,22 @@ public class Configs {
     migrateLegacyMultiDir("schematics", "advanced/schematics");
 
     int worldCount = 0;
-    for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
-      RTP.log(Level.FINER, "[RTP] reloadConfigs(): adding world parser '" + world.name() + "'");
+    for (RTPWorld world : RTPRuntime.serverAccessor().getRTPWorlds()) {
+      RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): adding world parser '" + world.name() + "'");
       worlds.addParser(world.name());
       worldCount++;
     }
-    RTP.log(Level.FINE, "[RTP] reloadConfigs(): " + worldCount + " world parser(s) registered");
+    RTPRuntime.log(Level.FINE, "[RTP] reloadConfigs(): " + worldCount + " world parser(s) registered");
 
-    RTP.log(Level.FINE, "[RTP] reloadConfigs(): atomic swap of configParserMap/multiConfigParserMap");
+    RTPRuntime.log(Level.FINE, "[RTP] reloadConfigs(): atomic swap of configParserMap/multiConfigParserMap");
     this.configParserMap = newConfigParserMap;
     this.multiConfigParserMap = newMultiConfigParserMap;
-    TickBudget.refresh();
-    // The logging parser is now visible via RTP.configs.getParser(LoggingKeys.class),
+    reloadLifecycle.onParsersChanged();
+    // The logging parser is now visible via ActiveConfigs.get().getParser(LoggingKeys.class),
     // so the platform sink can resolve logging.yml#min_level. Replay any sub-INFO
     // records buffered during bootstrap so the configured threshold gates them
     // retroactively instead of leaking past the (previously unfiltered) sink.
-    RTP.flushPendingLogs();
+    RTPRuntime.flushPendingLogs();
     // ADR-071 rule 5: surface a one-time deprecation warning if the operator still
     // carries the redundant network.redis block in config.yml (authoritative surface
     // is network.yml).
@@ -815,123 +865,29 @@ public class Configs {
     // is republished to visible generated markdown beside the region files. Derived
     // from the factories, so it cannot drift from what the server actually accepts.
     SelectorCatalogWriter.write(pluginDirectory);
-    RTP.log(Level.FINE, "[RTP] reloadConfigs(): complete (in-flight tasks retain old snapshots)");
+    RTPRuntime.log(Level.FINE, "[RTP] reloadConfigs(): complete (in-flight tasks retain old snapshots)");
+  }
+
+  private void recordStartupYamlFindings() {
+    ConfigSnapshot snapshot = ConfigSnapshot.read(pluginDirectory.toPath());
+    List<BitFinding> findings = ConfigPbit.run(
+            ConfigPbit.YAML_SYNTAX, snapshot, ConfigEnvironment.HEADLESS).findings();
+    startupYamlFindings = List.copyOf(findings);
+    for (BitFinding finding : findings) {
+      String path = finding.path().isEmpty() ? "" : " at " + finding.path();
+      RTPRuntime.log(BitSeverityPolicy.toJul(finding.severity()),
+              "[RTP bit] startup config " + finding.code() + " " + finding.source() + path
+                      + ": " + finding.message());
+    }
   }
 
   /**
    * Reloads all regions from the current region config parsers.
-   * Shuts down existing regions and re-instantiates them from disk.
+   * Shuts down existing regions and re-instantiates them from disk, through the installed
+   * {@link ConfigReloadLifecycle}.
    */
   public void reloadRegions() {
-    RTP.log(Level.FINE,
-        "[RTP] reloadRegions(): shutting down " + RTP.selectionAPI.permRegionLookup.size()
-            + " permanent and " + RTP.selectionAPI.tempRegions.size() + " temp region(s)");
-    io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.resetAll();
-    for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
-      RTP.log(Level.FINER, "[RTP] reloadRegions(): shutDown perm region '" + r.name + "'");
-      r.shutDown();
-    }
-    RTP.selectionAPI.permRegionLookup.clear();
-
-    for (Region r : RTP.selectionAPI.tempRegions.values()) {
-      RTP.log(Level.FINER, "[RTP] reloadRegions(): shutDown temp region '" + r.name + "'");
-      r.shutDown();
-    }
-    RTP.selectionAPI.tempRegions.clear();
-
-    @SuppressWarnings("unchecked")
-    MultiConfigParser<RegionKeys> regions =
-            (MultiConfigParser<RegionKeys>) this.multiConfigParserMap.get(RegionKeys.class);
-    if (regions == null) return;
-
-    @SuppressWarnings("unchecked")
-    ConfigParser<LoggingKeys> logging =
-            (ConfigParser<LoggingKeys>) this.configParserMap.get(LoggingKeys.class);
-
-    boolean detailed_region_init = true;
-    if (logging != null) {
-      Object o = logging.getConfigValue(LoggingKeys.detailed_region_init, false);
-      if (o instanceof Boolean) {
-        detailed_region_init = (Boolean) o;
-      } else {
-        detailed_region_init = Boolean.parseBoolean(o.toString());
-      }
-    }
-
-    // Lobby backends never serve teleports to local coords - they only
-    // dispatch players to peer backends via cross-server /rtp. Registering the
-    // default (or any) local region here would advertise a local destination via
-    // BackendStateSampler.regions and let /rtp resolve a no-arg request to the
-    // local region instead of routing it through the network. Skip the entire
-    // per-region instantiation loop; permRegionLookup stays empty on a lobby.
-    if (RTP.lobbyMode) {
-      RTP.log(Level.FINE,
-          "[RTP] reloadRegions(): lobbyMode=true, skipping local region registration");
-      return;
-    }
-
-    int regionCount = 0;
-    int dormantCount = 0;
-    for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
-      RTP.log(Level.FINER, "[RTP] reloadRegions(): loading RegionSettings from '" + regionConfig.name + "'");
-      RegionSettings settings = RegionConfigLoader.load(regionConfig);
-      String name = settings.name();
-      regionCount++;
-
-      // Detect "dormant region" - the configured world wasn't loaded yet (common when
-      // automatic world generators like Multiverse load their worlds after plugin enable).
-      // The region is constructed with a null world; OnWorldLoadUnload rebinds the real
-      // world via Region.rebindWorld once WorldLoadEvent fires.
-      String configuredWorldName =
-          RegionConfigLoader.detectFallbackConfiguredWorld(regionConfig, settings);
-      boolean worldFallback = configuredWorldName != null;
-      if (worldFallback) dormantCount++;
-      RTP.log(Level.FINER,
-          "[RTP] reloadRegions(): region '" + name + "' dormant=" + worldFallback
-              + (worldFallback ? " configuredWorld='" + configuredWorldName + "'" : ""));
-      if (worldFallback) {
-        RTP.log(
-            Level.INFO,
-            "[RTP] Region '" + name + "' configured for world '" + configuredWorldName
-                + "' which isn't loaded yet; region is dormant and will activate when the "
-                + "world loads.");
-      }
-
-      Region region = new Region(name, settings, worldFallback, configuredWorldName);
-
-      RTP.selectionAPI.permRegionLookup.put(region.name, region);
-      if (detailed_region_init) {
-        RTP.log(
-                Level.INFO,
-                "&#00FFFF[RTP] [" + name + "] successfully created teleport region - " + region.name);
-      }
-      RTP.getInstance()
-              .miscAsyncTasks
-              .add(
-                      new RTPRunnable(
-                              () -> {
-                                // Dormant regions (world not yet loaded) must not select a
-                                // shape region - the shape's data file hasn't been loaded.
-                                if (region.getWorld() == null) {
-                                  RTP.log(Level.FINER,
-                                      "[RTP] reloadRegions(): skipping shape.select for dormant region '"
-                                          + region.name + "'");
-                                  return;
-                                }
-                                if (region.getShape() == null) {
-                                  RTP.log(Level.FINER,
-                                      "[RTP] reloadRegions(): skipping shape.select for region '"
-                                          + region.name + "' (null shape)");
-                                  return;
-                                }
-                                RTP.log(Level.FINER,
-                                    "[RTP] reloadRegions(): shape.select for region '" + region.name + "'");
-                                region.getShape().select();
-                              },
-                              60));
-    }
-    RTP.log(Level.FINE,
-        "[RTP] reloadRegions(): built " + regionCount + " region(s) (" + dormantCount + " dormant)");
+    reloadLifecycle.reloadRegions(this);
   }
 
   /**
@@ -939,16 +895,16 @@ public class Configs {
    * {@link #onReload} callbacks.
    */
   public void reloadAction() {
-    RTP.log(Level.FINE, "[RTP] reloadAction(): begin");
+    RTPRuntime.log(Level.FINE, "[RTP] reloadAction(): begin");
     reloadConfigs();
     reloadRegions();
     if (!onReload.isEmpty()) {
-      RTP.log(Level.FINE, "[RTP] reloadAction(): firing " + onReload.size() + " onReload callback(s)");
+      RTPRuntime.log(Level.FINE, "[RTP] reloadAction(): firing " + onReload.size() + " onReload callback(s)");
       for (Runnable r : onReload) {
-        RTP.log(Level.FINER, "[RTP] reloadAction(): onReload callback " + r.getClass().getName());
+        RTPRuntime.log(Level.FINER, "[RTP] reloadAction(): onReload callback " + r.getClass().getName());
         r.run();
       }
     }
-    RTP.log(Level.FINE, "[RTP] reloadAction(): end");
+    RTPRuntime.log(Level.FINE, "[RTP] reloadAction(): end");
   }
 }

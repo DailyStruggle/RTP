@@ -1,8 +1,9 @@
 # --- RTP Sicherheitskonfiguration ---
-# Dokumentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Dokumentation: docs/admin/configuration/SAFETY.md
 
 # Sekunden der Unverwundbarkeit nach Abschluss eines Teleports.
 # 0 deaktiviert das Unverwundbarkeitsfenster nach dem Teleport.
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -48,6 +49,7 @@ platformMaterial: "GLASS"
 # Sekunden, nach denen der Abdruck der Plattform auf die ursprünglichen Blöcke
 # zurückgesetzt wird. -1 = nie (dauerhaft), 0 = sobald der Chunk neu lädt. Der
 # Countdown läuft nur bei geladenem Chunk; übersteht Neustarts.
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -63,6 +65,7 @@ pvpCheckEnabled: false
 
 # Sekunden, die ein Spieler nach PvP-Schaden "im Kampf" bleibt (nur nativer
 # Tracker; ignoriert, wenn ein externes Combat-Tag-Plugin gebunden ist).
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

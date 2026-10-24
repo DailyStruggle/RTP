@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.folia.thread.AnyThread;
 import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
@@ -125,10 +126,10 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @GlobalRegionThread
   public RTPWorld<?> getWorld() {
     if (anvilView != null) {
-      return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(anvilWorldId) : null;
+      return (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getRTPWorld(anvilWorldId) : null;
     }
     if (chunk == null) return null;
-    return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID()) : null;
+    return (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getRTPWorld(chunk.getWorld().getUID()) : null;
   }
 
   @Override
@@ -174,9 +175,9 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
         return;
       }
       io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
-          RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+          RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getScheduler();
       RTPWorld<?> rtpWorld =
-          RTP.serverAccessor == null ? null : RTP.serverAccessor.getRTPWorld(world.getUID());
+          RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getRTPWorld(world.getUID());
       if (scheduler != null && rtpWorld != null) {
         scheduler.runTask(rtpWorld, cx, cz, reconcile);
       } else {
@@ -248,8 +249,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
         // the RTP-config-comparable form ("PLAINS"). `PaletteNormalizer` is
         // for blocks (Material registry); biomes use the pure-string
         // namespace-strip + upper-case helper from `rtp-api`.
-        String normalized = io.github.dailystruggle.rtp.api.configuration
-            .PaletteIdentifierNormalizer.normalize(id);
+        String normalized = io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(id);
         return (normalized != null && !normalized.isEmpty()) ? normalized : id;
       }
       // Anvil view had no biome container at this Y; fall back to the world
@@ -292,17 +292,18 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
       if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
     }
     if (anvilView != null) {
-      Set<String> effective = (reconciledUnsafe != null)
-          ? reconciledUnsafe
-          : ((RTP.serverAccessor != null)
-              ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
-              : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks));
+      Set<String> effective = reconciledUnsafe;
+      if (effective == null) {
+        effective = RTPRuntime.serverAccessor() != null
+            ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(unsafeBlocks)
+            : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks);
+      }
       return anvilView.isSafe(x & 0xF, y, z & 0xF, effective);
     }
     if (chunk == null) return true;
     // Callers are required to invoke this on the chunk's owning region thread
     // (enforced upstream in QueueTask.evaluateSafety / Region.execute, which
-    // dispatch via RTP.scheduler.runTask(world, cx, cz, ...)). No defensive
+    // dispatch via RTPRuntime.scheduler().runTask(world, cx, cz, ...)). No defensive
     // region-ownership guard here - it would fail-closed on legitimate
     // candidates and pollute the "bad chunk" signal.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();

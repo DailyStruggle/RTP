@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       {@link MapBinding} / {@link MapBindingLifecycle} contracts.</li>
  *   <li>{@code deliverTo} is inherited from {@link BukkitMapBinding}: the
  *       region-thread hop for the {@code FILLED_MAP} drop is performed by
- *       the caller ({@code MapDispatch}) via {@code RTP.scheduler}, so this
+ *       the caller ({@code MapDispatch}) via {@code RTPRuntime.scheduler()}, so this
  *       subclass no longer reimplements an {@code EntityScheduler} hop.</li>
  * </ul>
  */

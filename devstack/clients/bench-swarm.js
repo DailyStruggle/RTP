@@ -56,8 +56,9 @@
  *
  * Fuzz mode (--fuzz-control): no roster, no workers, no reconnects. Listens on
  * 127.0.0.1:<port> for newline-delimited JSON, one episode at a time:
- *   {"op":"episode","id":7,"cmd":"rtp","max_ms":90000,
+ *   {"op":"episode","id":7,"cmd":"rtp","max_ms":90000,"telemetry":false,
  *    "bots":[{"name":"fz7_0","program":["rtp",{"a":"wait","ms":200},"quit"]}]}
+ *   {"op":"discover","id":1,"tier":"default","bot":"fzd_default"}
  *   {"op":"stop"}   abort any episode, reply {"ev":"stopped"}, exit
  *   {"op":"ping"}   reply {"ev":"pong"}
  * cmd is sent as /<cmd>[ <args>] with {self} replaced by the bot's current name.
@@ -68,7 +69,8 @@
  * program; actions needing a connection while offline are skipped.
  * Replies: {"ev":"accepted"|"error",id}; then events {ev,id,bot,t,...} with ev in
  * act, skip, spawn, chat{text,kind}, kick{text}, tp{pos}, death, bot_error, end
- * (t = ms since accept, id = episode id); finally
+ * (plus window and tick_gap{ms,at,keepalive_ms} when episode "telemetry":true,
+ * and commands on discover; t = ms since accept, id = episode id); finally
  * {"ev":"done",id,ms,reason,bots:[...]} once every bot has disconnected.
  * done always arrives: joins time out, quits are forced after 5 s, and the
  * episode deadline aborts the programs. tp is every server position packet:
@@ -106,6 +108,8 @@
  *     k * join-delay and spaces its own joins by workers * join-delay).
  */
 const mineflayer = require('mineflayer');
+const minecraftData = require('minecraft-data');
+const minecraftProtocol = require('minecraft-protocol');
 const childProcess = require('child_process');
 const os = require('os');
 const fs = require('fs');
@@ -131,7 +135,9 @@ const port = intArg('--port', 'BENCH_PORT', 25565);
 const count = Math.max(1, intArg('--count', 'BENCH_COUNT', 64));
 const prefix = getArg('--prefix', 'BENCH_PREFIX', 'bench_');
 const startIndex = Math.max(0, intArg('--start-index', 'BENCH_START_INDEX', 0));
-const version = getArg('--version', 'BENCH_VERSION', '') || false;
+const requestedVersion = getArg('--version', 'BENCH_VERSION', '') || false;
+let activeVersion = requestedVersion;
+let resolvedAutoVersion = null;
 const joinDelayMs = Math.max(0, intArg('--join-delay-ms', 'BENCH_JOIN_DELAY_MS', 4500));
 const viewDistanceRaw = getArg('--view-distance', 'BENCH_VIEW_DISTANCE', '2');
 const viewDistance = /^\d+$/.test(viewDistanceRaw) ? Math.max(2, parseInt(viewDistanceRaw, 10)) : viewDistanceRaw;
@@ -186,6 +192,48 @@ const LEAN_DISABLED = [
 ];
 const pluginOverrides = {};
 if (!fullPlugins) for (const p of LEAN_DISABLED) pluginOverrides[p] = false;
+
+async function resolveVersion() {
+  if (requestedVersion) return requestedVersion;
+  if (resolvedAutoVersion) return resolvedAutoVersion;
+  try {
+    const status = await minecraftProtocol.ping({ host, port, timeout: 5000 });
+    const serverVersion = status && status.version && status.version.name;
+    if (!serverVersion) throw new Error('server ping did not report a version');
+    // CraftBukkit-derived servers ping as "<mod> <version>" (e.g. "Paper 1.21.4"), so the raw
+    // name is not a minecraft-data key; match the protocol number first, then a parsed version.
+    const proto = status.version.protocol;
+    const supported = (v) => !!minecraftData(v);
+    const parsed = /\d+\.\d+(?:\.\d+)?/.exec(serverVersion);
+    const parsedVersion = parsed && supported(parsed[0]) ? parsed[0] : null;
+    let named = null;
+    if (parsedVersion && (typeof proto !== 'number' || minecraftData(parsedVersion).version.version === proto)) {
+      named = parsedVersion;
+    } else if (typeof proto === 'number') {
+      const byProto = minecraftData.versions.pc.filter((v) => v.version === proto && supported(v.minecraftVersion));
+      const best = byProto.find((v) => v.releaseType === 'release') || byProto[0];
+      if (best) named = best.minecraftVersion;
+    }
+    if (!named && supported(serverVersion)) named = serverVersion;
+    if (named) {
+      resolvedAutoVersion = named;
+      activeVersion = named;
+      return activeVersion;
+    }
+    const latestSupported = minecraftData.versions.pc.find((v) => v.releaseType === 'release'
+      && minecraftData(v.minecraftVersion));
+    if (!latestSupported) throw new Error(`no supported PC client version for server ${serverVersion}`);
+    resolvedAutoVersion = latestSupported.minecraftVersion;
+    activeVersion = resolvedAutoVersion;
+    console.warn(`[bench] server reports ${serverVersion}, which minecraft-data does not support; `
+      + `using ${activeVersion}. The bench server needs ViaVersion/ViaBackwards.`);
+    return activeVersion;
+  } catch (err) {
+    console.warn(`[bench] could not resolve server version (${err && err.message ? err.message : err}); `
+      + 'keeping Mineflayer auto-detect for this connection');
+    return false;
+  }
+}
 
 // Plugin-side rejection phrases seen in chat. Out-of-band evidence only: the
 // harness counts busy rejections from console lines, which player-directed
@@ -323,7 +371,7 @@ function connect(state) {
       port,
       username: state.username,
       auth: 'offline',
-      version,
+      version: activeVersion,
       viewDistance,
       physicsEnabled,
       respawn: true,
@@ -564,14 +612,15 @@ function runParent() {
   process.on('SIGTERM', () => stopAll('SIGTERM'));
 }
 
-function runBots() {
+async function runBots() {
+  await resolveVersion();
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('message', (m) => { if (m && m.cmd === 'shutdown') shutdown('parent'); });
   process.on('disconnect', () => shutdown('parent gone'));
 
   console.log(`[bench] ${workerLabel}${count} bot(s) ${nameFor(0)}..${nameFor(count - 1)} -> ${host}:${port}`
-    + ` version=${version || 'auto'} join-delay=${joinDelayMs}ms view-distance=${viewDistance}`
+    + ` version=${activeVersion || 'auto'} join-delay=${joinDelayMs}ms view-distance=${viewDistance}`
     + ` physics=${physicsEnabled ? 'on' : 'off'} plugins=${fullPlugins ? 'full' : 'lean'}`
     + ` world-decode=${keepWorld ? 'on' : 'off'}`);
   if (!isWorker) {
@@ -671,7 +720,232 @@ function parseEpisode(req) {
     if (b.program.length > FUZZ_MAX_PROGRAM) fail(`bots[${i}].program longer than ${FUZZ_MAX_PROGRAM}`);
     return { name: b.name, program: b.program.map((a, k) => parseAction(a, `bots[${i}].program[${k}]`)) };
   });
-  return { id, cmd, maxMs, bots };
+  if (req.telemetry !== undefined && typeof req.telemetry !== 'boolean') fail('telemetry must be a boolean');
+  const telemetry = req.telemetry === true;
+  return { id, cmd, maxMs, bots, telemetry };
+}
+
+const NODE_KINDS = ['root', 'literal', 'argument'];
+let prismarineWindows = null;
+try { prismarineWindows = require('prismarine-windows'); } catch (e) { prismarineWindows = null; }
+
+function jsonSafeValue(v, depth = 0) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'bigint') {
+    const n = Number(v);
+    return Number.isSafeInteger(n) ? n : v.toString();
+  }
+  if (typeof v === 'number') return Number.isFinite(v) ? v : String(v);
+  if (typeof v === 'boolean' || typeof v === 'string') return v;
+  if (depth > 8) return null;
+  if (Array.isArray(v)) {
+    return v.map((x) => jsonSafeValue(x, depth + 1));
+  }
+  if (typeof v === 'object') {
+    const out = {};
+    for (const k of Object.keys(v)) out[k] = jsonSafeValue(v[k], depth + 1);
+    return out;
+  }
+  return String(v);
+}
+
+/** Decode a 64-bit integer bound from brigadier:long min/max properties. */
+function decodeLongBound(v) {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v === 'bigint') {
+    const n = Number(v);
+    return Number.isSafeInteger(n) ? n : v.toString();
+  }
+  if (typeof v === 'number') return Number.isFinite(v) ? v : String(v);
+  if (typeof v === 'object') {
+    if (typeof v.valueOf === 'function') {
+      const val = v.valueOf();
+      if (typeof val === 'bigint') {
+        const n = Number(val);
+        return Number.isSafeInteger(n) ? n : val.toString();
+      }
+    }
+    if (Array.isArray(v) && v.length === 2 && Number.isInteger(v[0]) && Number.isInteger(v[1])) {
+      const big = (BigInt(v[0]) << 32n) | BigInt(v[1] >>> 0);
+      const n = Number(big);
+      return Number.isSafeInteger(n) ? n : big.toString();
+    }
+  }
+  return jsonSafeValue(v);
+}
+
+/** Serialise a declare_commands packet into a normalised Brigadier node graph. */
+function serializeCommandPacket(pkt) {
+  const rawNodes = (pkt && Array.isArray(pkt.nodes)) ? pkt.nodes : [];
+  const rootIndex = (pkt && Number.isInteger(pkt.rootIndex) && pkt.rootIndex >= 0 && pkt.rootIndex < rawNodes.length)
+    ? pkt.rootIndex : 0;
+  const nodes = rawNodes.map((raw, index) => {
+    const flags = (raw && typeof raw.flags === 'object' && raw.flags !== null) ? raw.flags : {};
+    const typeNum = typeof flags.command_node_type === 'number'
+      ? flags.command_node_type
+      : (typeof raw?.flags === 'number' ? (raw.flags & 0x03) : 0);
+    const kind = raw && typeof raw.kind === 'string'
+      ? raw.kind
+      : (NODE_KINDS[typeNum] || 'unknown');
+    const extra = (raw && typeof raw.extraNodeData === 'object' && raw.extraNodeData !== null)
+      ? raw.extraNodeData : {};
+    const name = typeof extra.name === 'string'
+      ? extra.name
+      : (typeof raw?.name === 'string' ? raw.name : '');
+    const parser = kind === 'argument'
+      ? (typeof extra.parser === 'string' ? extra.parser : (typeof raw?.parser === 'string' ? raw.parser : null))
+      : null;
+    const rawProps = extra.properties !== undefined ? extra.properties : raw?.properties;
+    let properties = {};
+    if (kind === 'argument' && rawProps !== undefined && rawProps !== null) {
+      properties = (typeof rawProps === 'object' && !Array.isArray(rawProps))
+        ? jsonSafeValue(rawProps)
+        : { value: jsonSafeValue(rawProps) };
+      if (parser === 'brigadier:long' && typeof rawProps === 'object' && !Array.isArray(rawProps)) {
+        if (rawProps.min !== undefined) properties.min = decodeLongBound(rawProps.min);
+        if (rawProps.max !== undefined) properties.max = decodeLongBound(rawProps.max);
+      }
+    }
+    const children = Array.isArray(raw?.children)
+      ? raw.children.filter((c) => Number.isInteger(c) && c >= 0 && c < rawNodes.length)
+      : [];
+    const hasRedirect = flags.has_redirect_node !== undefined
+      ? Boolean(flags.has_redirect_node)
+      : (typeof raw?.flags === 'number' ? Boolean(raw.flags & 0x08) : (raw?.redirectNode !== undefined || raw?.redirect !== undefined));
+    const redirVal = raw?.redirectNode !== undefined ? raw.redirectNode : raw?.redirect;
+    const redirect = (hasRedirect && Number.isInteger(redirVal) && redirVal >= 0 && redirVal < rawNodes.length)
+      ? redirVal : null;
+    const executable = flags.has_command !== undefined
+      ? Boolean(flags.has_command)
+      : (typeof raw?.flags === 'number' ? Boolean(raw.flags & 0x04) : Boolean(raw?.executable));
+    const hasSuggest = flags.has_custom_suggestions !== undefined
+      ? Boolean(flags.has_custom_suggestions)
+      : (typeof raw?.flags === 'number' ? Boolean(raw.flags & 0x10) : Boolean(extra.suggestionType || raw?.suggestionType || raw?.suggestions));
+    const suggestRaw = extra.suggestionType || raw?.suggestionType || raw?.suggestions || null;
+    const suggestionType = (hasSuggest && typeof suggestRaw === 'string') ? suggestRaw : null;
+    return {
+      index,
+      kind,
+      name,
+      parser,
+      properties,
+      children,
+      redirect,
+      executable,
+      suggestions: suggestionType,
+      suggestionType
+    };
+  });
+  return { rootIndex, nodes };
+}
+
+function parseDiscover(req) {
+  const id = req.id;
+  if (!((typeof id === 'string' && id.length > 0 && id.length <= 64) || Number.isSafeInteger(id))) {
+    fail('id must be a non-empty string (<=64) or an integer');
+  }
+  const tier = cleanText(req.tier || 'default', 32, 'tier') || 'default';
+  const rawName = req.bot !== undefined ? req.bot : (req.name !== undefined ? req.name : `fzd_${tier.slice(0, 8)}`);
+  if (typeof rawName !== 'string' || !FUZZ_NAME_RE.test(rawName)) {
+    fail(`bot must match ${FUZZ_NAME_RE}`);
+  }
+  const maxMs = Math.round(num(req.max_ms, 1000, 300000, fuzzSpawnTimeoutMs, 'max_ms'));
+  return { id, tier, username: rawName, maxMs };
+}
+
+/** Derive upper container slot count from an open_window inventoryType, or null when unknown. */
+function resolveWindowSlots(windowType, version) {
+  if (windowType === null || windowType === undefined) return null;
+  if (prismarineWindows) {
+    try {
+      const pw = prismarineWindows(version || activeVersion || '1.20.4');
+      if (pw && pw.windows) {
+        if (typeof windowType === 'string' && pw.windows[windowType] && pw.windows[windowType].inventory) {
+          const start = pw.windows[windowType].inventory.start;
+          if (Number.isInteger(start) && start >= 0) return start;
+        }
+        if (Number.isInteger(windowType)) {
+          for (const info of Object.values(pw.windows)) {
+            if (info && info.type === windowType && info.inventory && Number.isInteger(info.inventory.start)) {
+              return info.inventory.start;
+            }
+          }
+        }
+      }
+    } catch (e) { /* fall through to static generic table */ }
+  }
+  if (typeof windowType === 'string') {
+    const m = /^minecraft:generic_9x([1-6])$/.exec(windowType);
+    if (m) return Number(m[1]) * 9;
+    if (windowType === 'minecraft:generic_3x3') return 9;
+    if (windowType === 'minecraft:hopper' || windowType === 'minecraft:brewing_stand') return 5;
+    if (windowType === 'minecraft:shulker_box') return 27;
+  }
+  if (Number.isInteger(windowType)) {
+    if (windowType >= 0 && windowType <= 5) return (windowType + 1) * 9;
+    if (windowType === 6) return 9;
+  }
+  return null;
+}
+
+/** Parse an open_window packet into a passive telemetry event object. */
+function parseWindowPacket(botName, pkt, version) {
+  if (!pkt || typeof pkt !== 'object') return null;
+  const windowId = Number.isInteger(pkt.windowId) ? pkt.windowId : 0;
+  const windowType = pkt.inventoryType !== undefined ? pkt.inventoryType : (pkt.windowType !== undefined ? pkt.windowType : null);
+  const explicitSlots = Number.isInteger(pkt.slotCount) ? pkt.slotCount : (Number.isInteger(pkt.slots) ? pkt.slots : null);
+  const slots = explicitSlots !== null ? explicitSlots : resolveWindowSlots(windowType, version);
+  const title = pkt.windowTitle !== undefined ? reasonText(pkt.windowTitle).slice(0, 256) : '';
+  return {
+    ev: 'window',
+    bot: botName,
+    window_id: windowId,
+    window_type: windowType,
+    slots,
+    title
+  };
+}
+
+/** Attach passive protocol listeners: declare_commands only for discover, and
+ *  update_time/keep_alive/open_window only when ep.telemetry is enabled. */
+function attachProtocolTelemetry(ep, conn, bot, onCommands) {
+  const client = bot && bot._client;
+  if (!client || typeof client.on !== 'function') return;
+  conn.lastUpdateTimeAt = 0;
+  conn.lastKeepAliveAt = 0;
+  conn.keepAliveMs = null;
+  conn.openWindow = null;
+  if (typeof onCommands === 'function') {
+    client.on('declare_commands', (pkt) => {
+      try {
+        const graph = serializeCommandPacket(pkt);
+        onCommands(graph);
+      } catch (err) {
+        ep.emit({ ev: 'bot_error', bot: conn.username, text: `declare_commands parse failed: ${err && err.message ? err.message : err}`.slice(0, 256) });
+      }
+    });
+  }
+  if (!ep || !ep.telemetry) return;
+  client.on('keep_alive', () => {
+    const now = Date.now();
+    // Server keep_alive inter-arrival interval in ms (not round-trip latency).
+    if (conn.lastKeepAliveAt > 0) conn.keepAliveMs = now - conn.lastKeepAliveAt;
+    conn.lastKeepAliveAt = now;
+  });
+  client.on('update_time', () => {
+    const now = Date.now();
+    if (conn.spawned && conn.lastUpdateTimeAt > 0) {
+      const gapMs = now - conn.lastUpdateTimeAt;
+      ep.emit({ ev: 'tick_gap', bot: conn.username, ms: gapMs, at: now, keepalive_ms: conn.keepAliveMs });
+    }
+    conn.lastUpdateTimeAt = now;
+  });
+  client.on('open_window', (pkt) => {
+    const w = parseWindowPacket(conn.username, pkt, bot.version || activeVersion);
+    if (!w) return;
+    conn.openWindow = { windowId: w.window_id, windowType: w.window_type, slots: w.slots, title: w.title };
+    ep.emit(w);
+  });
 }
 
 function fuzzSend(sock, obj) {
@@ -728,6 +1002,7 @@ function finishConn(ep, bs, conn, text, forced) {
 
 /** Join as bs.username; resolves 'spawn', 'end' or 'aborted'. */
 async function fuzzConnect(ep, bs) {
+  await resolveVersion();
   await joinSlot(ep);
   if (ep.aborted) return 'aborted';
   const conn = { username: bs.username, bot: null, spawned: false, ended: false, waiters: [], spawnTimer: null };
@@ -746,7 +1021,7 @@ async function fuzzConnect(ep, bs) {
     conn.waiters.push(settle);
     let bot;
     try {
-      bot = mineflayer.createBot({ host, port, username: bs.username, auth: 'offline', version, viewDistance,
+      bot = mineflayer.createBot({ host, port, username: bs.username, auth: 'offline', version: activeVersion, viewDistance,
         physicsEnabled, respawn: true, hideErrors: true, checkTimeoutInterval: 60 * 1000, plugins: pluginOverrides });
     } catch (err) {
       ep.emit({ ev: 'bot_error', bot: bs.username, text: String(err && err.message ? err.message : err) });
@@ -754,6 +1029,7 @@ async function fuzzConnect(ep, bs) {
       return;
     }
     conn.bot = bot;
+    attachProtocolTelemetry(ep, conn, bot, bs.onCommands);
     if (!keepWorld) bot.once('login', () => { for (const p of WORLD_PACKETS) bot._client.removeAllListeners(p); });
     bot.on('spawn', () => {
       ep.emit({ ev: 'spawn', bot: conn.username, pos: posOf(bot) });
@@ -787,12 +1063,13 @@ async function fuzzConnect(ep, bs) {
       ep.emit({ ev: 'bot_error', bot: conn.username, text: String(err && err.message ? err.message : err).slice(0, 256) });
     });
     bot.on('end', (reason) => finishConn(ep, bs, conn, reasonText(reason), false));
+    const spawnWaitMs = ep.spawnTimeoutMs || fuzzSpawnTimeoutMs;
     conn.spawnTimer = setTimeout(() => {
       if (conn.spawned || conn.ended) return;
-      ep.emit({ ev: 'bot_error', bot: conn.username, text: `no spawn within ${fuzzSpawnTimeoutMs} ms` });
+      ep.emit({ ev: 'bot_error', bot: conn.username, text: `no spawn within ${spawnWaitMs} ms` });
       settle('end');
       fuzzDisconnect(ep, bs, 'spawn timeout');
-    }, fuzzSpawnTimeoutMs);
+    }, spawnWaitMs);
   });
 }
 
@@ -801,6 +1078,10 @@ async function fuzzConnect(ep, bs) {
 function fuzzDisconnect(ep, bs, why) {
   const conn = bs.conn;
   if (!conn || conn.ended) return Promise.resolve();
+  if (conn.spawnTimer) {
+    clearTimeout(conn.spawnTimer);
+    conn.spawnTimer = null;
+  }
   return new Promise((resolve) => {
     conn.waiters.push(() => resolve());
     const bot = conn.bot;
@@ -889,7 +1170,16 @@ async function runFuzzProgram(ep, bs) {
 }
 
 async function runFuzzEpisode(sock, spec) {
-  const ep = { id: spec.id, cmd: spec.cmd, start: Date.now(), aborted: null, wakers: new Set(), sock };
+  await resolveVersion();
+  const ep = {
+    id: spec.id,
+    cmd: spec.cmd,
+    telemetry: Boolean(spec.telemetry),
+    start: Date.now(),
+    aborted: null,
+    wakers: new Set(),
+    sock
+  };
   ep.emit = (obj) => fuzzSend(ep.sock, { ...obj, id: ep.id, t: Date.now() - ep.start });
   fuzzEpisode = ep;
   fuzzSend(sock, { ev: 'accepted', id: spec.id, bots: spec.bots.length });
@@ -911,6 +1201,87 @@ async function runFuzzEpisode(sock, spec) {
     bots: states.map((bs) => ({ name: bs.baseName, last: bs.username, joins: bs.joins, spawns: bs.spawns,
       ran: bs.ran, skipped: bs.skipped, kicked: bs.kicked })) });
   console.log(`[fuzz] episode ${spec.id} done in ${ms} ms (${ep.aborted || 'complete'})`);
+  fuzzEpisode = null;
+  return ep;
+}
+
+async function runFuzzDiscover(sock, spec) {
+  await resolveVersion();
+  const ep = {
+    id: spec.id,
+    telemetry: false,
+    spawnTimeoutMs: spec.maxMs,
+    start: Date.now(),
+    aborted: null,
+    wakers: new Set(),
+    sock
+  };
+  ep.emit = (obj) => fuzzSend(ep.sock, { ...obj, id: ep.id, t: Date.now() - ep.start });
+  fuzzEpisode = ep;
+  fuzzSend(sock, { ev: 'accepted', id: spec.id, tier: spec.tier, bot: spec.username });
+  console.log(`[fuzz] discover ${spec.id}: tier=${spec.tier}, bot=${spec.username}, max ${spec.maxMs} ms`);
+  const deadline = setTimeout(() => abortEpisode(ep, 'timeout'), spec.maxMs);
+  let captured = null;
+  let resolveGraph;
+  const graphPromise = new Promise((resolve) => { resolveGraph = resolve; });
+  ep.wakers.add(() => resolveGraph(null));
+  const bs = {
+    baseName: spec.username,
+    username: spec.username,
+    program: [],
+    generation: 0,
+    conn: null,
+    kicked: false,
+    joins: 0,
+    spawns: 0,
+    ran: 0,
+    skipped: 0,
+    lastCmd: null,
+    onCommands: (graph) => {
+      if (!captured) {
+        captured = graph;
+        if (bs.conn && bs.conn.spawnTimer) {
+          clearTimeout(bs.conn.spawnTimer);
+          bs.conn.spawnTimer = null;
+        }
+        resolveGraph(graph);
+      }
+    }
+  };
+  ep.states = [bs];
+  const connectPromise = fuzzConnect(ep, bs).then((res) => {
+    if (res !== 'spawn' || !bs.conn || bs.conn.ended) resolveGraph(null);
+    else bs.conn.waiters.push(() => resolveGraph(null));
+    return res;
+  });
+  try {
+    await graphPromise;
+  } finally {
+    clearTimeout(deadline);
+    await fuzzDisconnect(ep, bs, 'discover end');
+    await connectPromise;
+  }
+  const ms = Date.now() - ep.start;
+  const out = captured || { rootIndex: 0, nodes: [] };
+  fuzzSend(ep.sock, {
+    ev: 'commands',
+    id: spec.id,
+    tier: spec.tier,
+    bot: spec.username,
+    rootIndex: out.rootIndex,
+    nodes: out.nodes,
+    captured: !!captured,
+    ms
+  });
+  fuzzSend(ep.sock, {
+    ev: 'done',
+    id: spec.id,
+    tier: spec.tier,
+    ms,
+    reason: captured ? 'complete' : (ep.aborted || 'no_commands'),
+    bots: [{ name: bs.baseName, last: bs.username, joins: bs.joins, spawns: bs.spawns, kicked: bs.kicked }]
+  });
+  console.log(`[fuzz] discover ${spec.id} (${spec.tier}) done in ${ms} ms (${out.nodes.length} node(s))`);
   fuzzEpisode = null;
   return ep;
 }
@@ -950,6 +1321,17 @@ function handleFuzzLine(sock, line) {
       runFuzzEpisode(sock, spec).catch((e) => {
         fuzzEpisode = null;
         fuzzSend(sock, { ev: 'error', id, error: `episode failed: ${e && e.message ? e.message : e}` });
+      });
+      return;
+    }
+    case 'discover': {
+      if (shuttingDown) { fuzzSend(sock, { ev: 'error', id, error: 'stopping' }); return; }
+      if (fuzzEpisode) { fuzzSend(sock, { ev: 'error', id, error: `busy with episode ${fuzzEpisode.id}` }); return; }
+      let spec;
+      try { spec = parseDiscover(req); } catch (e) { fuzzSend(sock, { ev: 'error', id, error: e.message }); return; }
+      runFuzzDiscover(sock, spec).catch((e) => {
+        fuzzEpisode = null;
+        fuzzSend(sock, { ev: 'error', id, error: `discover failed: ${e && e.message ? e.message : e}` });
       });
       return;
     }
@@ -993,7 +1375,7 @@ function runFuzz() {
   });
   fuzzServer.listen(listenPort, '127.0.0.1', () => {
     console.log(`[fuzz] listening on 127.0.0.1:${fuzzServer.address().port} -> ${host}:${port}`
-      + ` version=${version || 'auto'} join-delay=${joinDelayMs}ms spawn-timeout=${fuzzSpawnTimeoutMs}ms`);
+      + ` version=${activeVersion || 'auto'} join-delay=${joinDelayMs}ms spawn-timeout=${fuzzSpawnTimeoutMs}ms`);
   });
   process.on('SIGINT', () => (shuttingDown ? process.exit(1) : stopFuzz(fuzzEpisode && fuzzEpisode.sock, 'SIGINT')));
   process.on('SIGTERM', () => stopFuzz(fuzzEpisode && fuzzEpisode.sock, 'SIGTERM'));
@@ -1006,4 +1388,22 @@ function runFuzz() {
   process.stdin.resume();
 }
 
-if (fuzzMode) runFuzz(); else if (workers > 1) runParent(); else runBots();
+if (require.main === module) {
+  if (fuzzMode) runFuzz(); else if (workers > 1) runParent(); else runBots().catch((err) => {
+    console.error(`[bench] startup failed: ${err && err.message ? err.message : err}`);
+    process.exit(2);
+  });
+} else {
+  module.exports = {
+    serializeCommandPacket,
+    decodeLongBound,
+    jsonSafeValue,
+    parseDiscover,
+    resolveWindowSlots,
+    parseWindowPacket,
+    attachProtocolTelemetry,
+    parseAction,
+    parseEpisode,
+    reasonText
+  };
+}

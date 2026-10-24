@@ -1,9 +1,20 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitReport;
+import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitSideEffect;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.test.ProbeBitReport;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -21,16 +32,27 @@ import org.jetbrains.annotations.Nullable;
  * names ({@code TreeCommand} upper-cases keys at insertion, so a lower-cased
  * registration is undispatchable by its own name); permission strings reused by
  * structurally distinct nodes are reported as advisory. Skips the {@code test}
- * subtree itself to avoid self-cancel/self-reload loops. Traces REQ-RTP-S-004;
- * see {@code RUNTIME_TEST_SUITE_PLAN.md &sect;3.6}.
+ * subtree itself to avoid self-cancel/self-reload loops. Traces REQ-RTP-S-004
+ * and REQ-API-F-009.
  */
 public class TestCommandsCmd extends BaseRTPCmdImpl {
+
+  public static final BitCode MISSING_NAME = registerCode(3301, "TEST_COMMANDS_MISSING_NAME");
+  public static final BitCode MISSING_PERMISSION = registerCode(3302, "TEST_COMMANDS_MISSING_PERMISSION");
+  public static final BitCode KEY_NAME_MISMATCH = registerCode(3303, "TEST_COMMANDS_KEY_NAME_MISMATCH");
+  public static final BitCode NULL_CHILD = registerCode(3304, "TEST_COMMANDS_NULL_CHILD");
+  public static final BitCode TRAVERSAL_ERROR = registerCode(3305, "TEST_COMMANDS_TRAVERSAL_ERROR");
+  public static final BitCode NO_TREE = registerCode(3306, "TEST_COMMANDS_NO_TREE");
+  public static final BitComponent COMPONENT = registerComponent();
+  private static volatile CommandsAPICommand treeAnchor;
 
   /** Max depth for the recursive walk; guards against accidental cycles. */
   static final int MAX_DEPTH = 16;
 
   public TestCommandsCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
+    treeAnchor = findRoot(parent == null ? this : parent);
+    addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
   }
 
   @Override
@@ -60,15 +82,61 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
     try {
       CommandsAPICommand root = findRoot(this);
       AuditReport report = new AuditReport();
+      report.rootAvailable = root != null;
       Set<CommandsAPICommand> visited =
           java.util.Collections.newSetFromMap(new IdentityHashMap<>());
       walk(root, 0, "", report, visited);
 
+      BitResult bitResult =
+          RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(report)), Runnable::run);
       emit(callerId, report);
+      ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
       return true;
     } finally {
       isProcessing.set(false);
     }
+  }
+
+  private static BitCode registerCode(int id, String key) {
+    return RtpBitCodes.TEST.register(
+        id,
+        key,
+        java.lang.System.Logger.Level.ERROR,
+        BitTier.IBIT,
+        "test.commands",
+        "",
+        "Repair the reported command-tree node or registration key.");
+  }
+
+  private static BitComponent registerComponent() {
+    return new BitComponent(
+            "commands",
+            "test.commands",
+            BitTier.IBIT,
+            BitSideEffect.SAFE,
+            15_000,
+            () -> toBitReport(auditForTest(treeAnchor)));
+  }
+
+  static BitReport toBitReport(AuditReport probe) {
+    ProbeBitReport.Builder report = ProbeBitReport.forProbe("commands");
+    report.check(NO_TREE, probe.rootAvailable, "commands.root", "The RTP command root is unavailable.");
+    for (String item : probe.missingName) {
+      report.check(MISSING_NAME, false, item, "The command node has no non-blank name.");
+    }
+    for (String item : probe.missingPermission) {
+      report.check(MISSING_PERMISSION, false, item, "The command node has no non-blank permission.");
+    }
+    for (String item : probe.keyNameMismatch) {
+      report.check(KEY_NAME_MISMATCH, false, item, "The command lookup key does not match its node name.");
+    }
+    for (String item : probe.nullChildren) {
+      report.check(NULL_CHILD, false, item, "The command lookup contains a null child.");
+    }
+    for (String item : probe.traversalErrors) {
+      report.check(TRAVERSAL_ERROR, false, item, "The command tree could not be traversed safely.");
+    }
+    return report.build();
   }
 
   /**
@@ -133,32 +201,21 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
         continue;
       }
       String childName = safeName(child);
-      // TreeCommand.addSubCommand upper-cases the key at insertion; the key
-      // must equal the child's own upper-cased name unless the child was
-      // installed as an explicit alias (documented at the call site).
-      if (!isBlank(childName)
-          && !key.equalsIgnoreCase(childName)
-          && !isDeclaredAlias(node, key, child)) {
-        report.keyNameMismatch.add(fullPath + " key=" + key + " name=" + childName);
+      // Dispatch upper-cases input, so lookup keys must be uppercase. Aliases
+      // are valid only while the child's canonical name resolves to that node.
+      if (!isBlank(childName)) {
+        String canonicalKey = childName.toUpperCase(java.util.Locale.ROOT);
+        boolean unreachableKey = key == null || !key.equals(key.toUpperCase(java.util.Locale.ROOT));
+        boolean orphanAlias = key != null && !key.equals(canonicalKey) && lookup.get(canonicalKey) != child;
+        if (unreachableKey || orphanAlias) {
+          report.keyNameMismatch.add(fullPath + " key=" + key + " name=" + childName
+              + " (lookup key is unreachable or is an alias without the node's own name)");
+        }
       }
       walk(child, depth + 1, fullPath, report, visited);
     }
   }
 
-  /**
-   * Recognises the one intentional alias in the tree: {@code ALL} -&gt; {@link TestFullCmd}
-   * under the {@code test} node, as documented in {@code TestCmd}. Matched by node name, not by
-   * type, so this audit does not depend on the parent that registers it. If more aliases are
-   * introduced, add them here (and, preferably, promote aliases to a first-class concept in
-   * {@link TreeCommand}).
-   */
-  private static boolean isDeclaredAlias(
-      CommandsAPICommand parent, String key, CommandsAPICommand child) {
-    if ("test".equalsIgnoreCase(safeName(parent))
-        && "ALL".equals(key)
-        && child instanceof TestFullCmd) return true;
-    return false;
-  }
 
   private void emit(UUID callerId, AuditReport report) {
     int issues =
@@ -185,7 +242,7 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
             + report.traversalErrors.size()
             + ")";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, summary);
+        RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     if (issues == 0) {
       RTP.log(Level.INFO, summary);
@@ -203,7 +260,7 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
     for (String item : items) {
       String line = "[RTP test/commands] " + tag + ": " + item;
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, line);
+          RTPRuntime.serverAccessor().sendMessage(callerId, line);
       }
       RTP.log(Level.WARNING, line);
     }
@@ -235,6 +292,7 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
    */
   static final class AuditReport {
     int auditedCount = 0;
+    boolean rootAvailable = true;
     final List<String> missingName = new ArrayList<>();
     final List<String> missingPermission = new ArrayList<>();
     final List<String> keyNameMismatch = new ArrayList<>();
@@ -254,6 +312,7 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
   /** Package-private hook so tests can exercise the walker without a real caller. */
   static AuditReport auditForTest(CommandsAPICommand root) {
     AuditReport report = new AuditReport();
+    report.rootAvailable = root != null;
     Set<CommandsAPICommand> visited =
         java.util.Collections.newSetFromMap(new IdentityHashMap<>());
     walk(root, 0, "", report, visited);

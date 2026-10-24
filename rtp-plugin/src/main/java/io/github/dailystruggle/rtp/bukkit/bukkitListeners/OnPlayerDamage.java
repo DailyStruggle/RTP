@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import java.util.concurrent.TimeUnit;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,23 +17,24 @@ public class OnPlayerDamage implements Listener {
   public void onPlayerDamage(EntityDamageEvent event) {
     Entity entity = event.getEntity();
     if (!(entity instanceof Player)) return;
-    if (!RTP.getInstance().invulnerablePlayers.containsKey(entity.getUniqueId())) return;
-    long lastTeleport = RTP.getInstance().invulnerablePlayers.get(entity.getUniqueId());
+    if (!TeleportSessions.current().invulnerablePlayers.containsKey(entity.getUniqueId())) return;
+    long lastTeleport = TeleportSessions.current().invulnerablePlayers.get(entity.getUniqueId());
     long current = System.currentTimeMillis();
 
     ConfigParser<SafetyKeys> safety =
-        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-    long max = safety.getNumber(SafetyKeys.invulnerabilityTime, 0).longValue();
+        (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
+    long maxMillis = safety.getDuration(SafetyKeys.invulnerabilityTime,
+        TemporalUnit.SECOND, TemporalUnit.MILLISECOND, 0L);
 
-    if (max <= 0) {
-      RTP.getInstance().invulnerablePlayers.remove(entity.getUniqueId());
+    if (maxMillis <= 0) {
+      TeleportSessions.current().invulnerablePlayers.remove(entity.getUniqueId());
       return;
     }
 
     long dt = current - lastTeleport;
     if (dt < 0) dt = dt - Long.MIN_VALUE;
 
-    if (dt < TimeUnit.SECONDS.toMillis(max)) event.setCancelled(true);
-    else RTP.getInstance().invulnerablePlayers.remove(entity.getUniqueId());
+    if (dt < maxMillis) event.setCancelled(true);
+    else TeleportSessions.current().invulnerablePlayers.remove(entity.getUniqueId());
   }
 }

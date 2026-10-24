@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.menu.multiconfig;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +41,7 @@ class MultiConfigRemovalGuardsTest {
     @AfterEach
     void tearDown() {
         MultiConfigRemovalGuards.clear();
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     // -----------------------------------------------------------------------
@@ -195,9 +195,9 @@ class MultiConfigRemovalGuardsTest {
             @Override
             public boolean isLocked(String entryName) {
                 if (entryName == null) return false;
-                if (RTP.serverAccessor == null) return false;
+                if (RTPRuntime.serverAccessor() == null) return false;
                 try {
-                    return RTP.serverAccessor.getRTPWorld(entryName) != null;
+                    return RTPRuntime.serverAccessor().getRTPWorld(entryName) != null;
                 } catch (RuntimeException ignored) {
                     return false;
                 }
@@ -238,7 +238,7 @@ class MultiConfigRemovalGuardsTest {
         @Test
         @DisplayName("guard tolerates a missing serverAccessor (null check)")
         void tolerateMissingAccessor() {
-            RTP.serverAccessor = null;
+            RTPRuntime.setServerAccessor(null);
             assertFalse(worldsGuard.isLocked("world"));
         }
 

@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.version;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,12 +44,12 @@ public class VersionCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
-    RTP.serverAccessor.sendMessage(callerId, "&2--- RTP ---");
-    RTP.serverAccessor.sendMessage(
-        callerId, "&7Plugin: &fRTP &7v&f" + RTP.serverAccessor.getPluginVersion());
-    RTP.serverAccessor.sendMessage(callerId, "&7Platform: &f" + RTP.serverAccessor.getPlatform());
-    RTP.serverAccessor.sendMessage(
-        callerId, "&7Server: &f" + RTP.serverAccessor.getServerVersion());
+    RTPRuntime.serverAccessor().sendMessage(callerId, "&2--- RTP ---");
+    RTPRuntime.serverAccessor().sendMessage(
+        callerId, "&7Plugin: &fRTP &7v&f" + RTPRuntime.serverAccessor().getPluginVersion());
+    RTPRuntime.serverAccessor().sendMessage(callerId, "&7Platform: &f" + RTPRuntime.serverAccessor().getPlatform());
+    RTPRuntime.serverAccessor().sendMessage(
+        callerId, "&7Server: &f" + RTPRuntime.serverAccessor().getServerVersion());
     return true;
   }
 }

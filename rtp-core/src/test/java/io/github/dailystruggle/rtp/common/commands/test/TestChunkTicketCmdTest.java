@@ -4,11 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import java.io.File;
 import java.util.HashMap;
@@ -18,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
  * fallback sentinel validation for mock/headless environments, and {@link MemoryTracker}
  * release paths (REQ-RTP-S-002).
  */
+@DisplayName("REQ-RTP-S-002 and REQ-API-F-009 chunk-ticket probe BIT report")
 class TestChunkTicketCmdTest {
 
   @TempDir File tempDir;
@@ -84,6 +89,12 @@ class TestChunkTicketCmdTest {
     assertFalse(r.liveProbed);
     // Baseline should be clean; the probe self-scopes its sentinel label.
     assertEquals(0, MemoryTracker.trackedCountByLabel(TestChunkTicketCmd.SENTINEL_LABEL));
+  }
+
+  @Test
+  void registeredComponentRunsItsCheckThroughTheRunner() {
+    assertEquals(BitHealth.HEALTHY,
+        RtpBit.RUNNER.run(TestChunkTicketCmd.COMPONENT, Runnable::run).report().health());
   }
 
   @Test
@@ -186,6 +197,34 @@ class TestChunkTicketCmdTest {
   }
 
   @Test
+  void toBitReport_identifiesFailedLiveOpenCheck() {
+    LiveTestWorld liveWorld = new LiveTestWorld("broken-open-world", 2);
+    liveWorld.failKeep = true;
+    TestChunkTicketCmd.Result result = TestChunkTicketCmd.runProbe(liveWorld, 0, 0);
+
+    BitReport report = TestChunkTicketCmd.toBitReport(result);
+
+    assertEquals(BitHealth.FAILED, report.health());
+    assertTrue(report.findings().stream().anyMatch(finding ->
+        finding.code().equals("TEST_CHUNK_TICKET_OPEN")
+            && finding.path().equals("chunk-ticket.open")));
+  }
+
+  @Test
+  void toBitReport_marksStaleSentinelsAsAdvisory() {
+    TestChunkTicketCmd.Result result = new TestChunkTicketCmd.Result();
+    result.staleBaseline = 2;
+    result.afterDiagnosticsOnLive = 1;
+
+    BitReport report = TestChunkTicketCmd.toBitReport(result);
+
+    assertEquals(BitHealth.DEGRADED, report.health());
+    assertEquals(1, report.findings().size());
+    assertEquals("TEST_CHUNK_TICKET_STALE_SENTINEL", report.findings().get(0).code());
+    assertEquals(java.lang.System.Logger.Level.WARNING, report.findings().get(0).severity());
+  }
+
+  @Test
   void runProbe_liveWorld_countDoesNotReturnToBaseline_failsAssertion() {
     LiveTestWorld liveWorld = new LiveTestWorld("broken-forget-world", 2);
     liveWorld.failForget = true;
@@ -240,6 +279,21 @@ class TestChunkTicketCmdTest {
     assertTrue(
         accessor.logMessages.stream().anyMatch(m -> m.contains("chunk-ticket")),
         accessor.logMessages.toString());
+  }
+
+  @Test
+  void onCommand_jsonEmitsBitReportAndKeepsLegacySummary() {
+    MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "json-player", null);
+    accessor.addPlayer(player);
+
+    boolean ret = new TestChunkTicketCmd(null).onCommand(
+        player.uuid(), Map.of("json", List.of("true")), null);
+
+    assertTrue(ret);
+    assertTrue(player.sentMessages.stream().anyMatch(m -> m.contains("[RTP test/chunk-ticket] ok")));
+    assertTrue(player.sentMessages.stream().anyMatch(m -> m.contains("[RTP bit/test.chunk-ticket]")));
+    assertTrue(accessor.logMessages.stream().anyMatch(m -> m.contains("[RTP bit/test.chunk-ticket]")));
+    assertEquals(BitHealth.HEALTHY, ProbeBitReport.last("chunk-ticket").health());
   }
 
   @Test

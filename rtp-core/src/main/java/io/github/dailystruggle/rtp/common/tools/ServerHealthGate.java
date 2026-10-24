@@ -2,10 +2,12 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -24,6 +26,11 @@ import java.util.logging.Level;
  * <p>{@link #regionUnhealthy(UUID, int, int)} is the per-region gate (ADR-087 regional circuit
  * breaker): a slow region stops receiving background work while healthy regions continue.
  *
+ * <p>Stalled tick: hosts that call {@link #tickStarted()} / {@link #tickFinished()} also pause
+ * while one tick has run for more than {@value #STALL_MS} ms. TPS / MSPT readings freeze during a
+ * stall, so they cannot detect a main thread blocked waiting on the chunk system. A server that
+ * is paused between ticks (vanilla {@code pause-when-empty-seconds}) is not stalled.
+ *
  * <p>Serving players already waiting is never gated. Unsampled metrics fail open.
  */
 public final class ServerHealthGate {
@@ -35,6 +42,12 @@ public final class ServerHealthGate {
   static final double TPS_HYSTERESIS = 0.5;
   /** Resume only once MSPT drops this far below {@code maxMSPT}. */
   static final double MSPT_HYSTERESIS = 5.0;
+  /** A tick that has run longer than this counts as stalled. */
+  static final long STALL_MS = 1_000L;
+
+  /** {@link System#nanoTime()} at the start of the running tick; 0 when no tick is running. */
+  private static final AtomicLong tickStartNanos = new AtomicLong(0L);
+  private static final AtomicLong lastStallWarnMs = new AtomicLong(0L);
 
   private static final AtomicLong lastSampleMs = new AtomicLong(0L);
   private static final AtomicLong lastWarnMs = new AtomicLong(0L);
@@ -57,6 +70,10 @@ public final class ServerHealthGate {
    * Cached for {@value #SAMPLE_INTERVAL_MS} ms; safe to call from any thread, many times per pulse.
    */
   public static boolean shouldPause() {
+    if (tickStalled(System.nanoTime())) {
+      warnStalled();
+      return true;
+    }
     long now = System.currentTimeMillis();
     long last = lastSampleMs.get();
     if (now - last >= SAMPLE_INTERVAL_MS && lastSampleMs.compareAndSet(last, now)) {
@@ -89,13 +106,13 @@ public final class ServerHealthGate {
               // fail open on diagnostic read
             }
           }
-          RTP.log(Level.WARNING, String.format(Locale.ROOT,
+          RTPRuntime.log(Level.WARNING, String.format(Locale.ROOT,
               "[RTP] Server tick unhealthy (%s%s; minTPS %.2f, maxMSPT %.1f); "
                   + "pausing background cache generation. Waiting players are still served.",
               reading, detail, minTps, maxMspt));
         }
       } else if (was) {
-        RTP.log(Level.INFO, String.format(Locale.ROOT,
+        RTPRuntime.log(Level.INFO, String.format(Locale.ROOT,
             "[RTP] Server tick recovered (%s); resuming background cache generation.", reading));
       }
     }
@@ -141,6 +158,37 @@ public final class ServerHealthGate {
     return tpsBad || msptBad;
   }
 
+  /**
+   * Records that a server tick started. Called from the server thread by single-loop hosts
+   * (Spigot, Fabric, NeoForge); never on regional hosts.
+   */
+  public static void tickStarted() {
+    long now = System.nanoTime();
+    tickStartNanos.set(now == 0L ? 1L : now);
+  }
+
+  /** Records that the running server tick finished (or that the server is idle between ticks). */
+  public static void tickFinished() {
+    tickStartNanos.set(0L);
+  }
+
+  /** Whether a tick is running and has lasted more than {@value #STALL_MS} ms. */
+  public static boolean tickStalled(long nowNanos) {
+    long start = tickStartNanos.get();
+    return start != 0L && nowNanos - start > STALL_MS * 1_000_000L;
+  }
+
+  private static void warnStalled() {
+    long now = System.currentTimeMillis();
+    long lastWarn = lastStallWarnMs.get();
+    if (now - lastWarn < WARN_INTERVAL_MS || !lastStallWarnMs.compareAndSet(lastWarn, now)) return;
+    long start = tickStartNanos.get();
+    long stalledMs = start == 0L ? 0L : (System.nanoTime() - start) / 1_000_000L;
+    RTPRuntime.log(Level.WARNING, String.format(Locale.ROOT,
+        "[RTP] The current server tick has run for %d ms; pausing background cache generation."
+            + " Waiting players are still served.", stalledMs));
+  }
+
   public static double lastTps() { return lastTps; }
 
   public static double lastMspt() { return lastMspt; }
@@ -163,6 +211,13 @@ public final class ServerHealthGate {
     lastMspt = Double.NaN;
     tpsOverride = null;
     msptOverride = null;
+    tickStartNanos.set(0L);
+    lastStallWarnMs.set(0L);
+  }
+
+  /** Test seam: sets the running tick's start ({@link System#nanoTime()} units; 0 = no tick). */
+  public static void setTickStartNanosForTesting(long nanos) {
+    tickStartNanos.set(nanos);
   }
 
   static String formatRegionalDetail(List<FoliaRegionSample> samples) {
@@ -189,7 +244,7 @@ public final class ServerHealthGate {
 
   private static MetricsBinding binding() {
     try {
-      return RTP.metrics.getBinding();
+      return CoreMetrics.instance().getBinding();
     } catch (Throwable ignored) {
       return null;
     }
@@ -225,8 +280,8 @@ public final class ServerHealthGate {
         v = regional ? binding.tps1m() : binding.worstTps1m();
       }
       if (!Double.isNaN(v) && v > 0.0) return v;
-      if (RTP.serverAccessor != null) {
-        double fallback = RTP.serverAccessor.getTPS(20);
+      if (RTPRuntime.serverAccessor() != null) {
+        double fallback = RTPRuntime.serverAccessor().getTPS(20);
         if (fallback > 0.0) return fallback;
       }
     } catch (Throwable ignored) {
@@ -247,10 +302,10 @@ public final class ServerHealthGate {
 
   private static double configured(PerformanceKeys key, double def) {
     try {
-      if (RTP.configs != null) {
+      if (ActiveConfigs.get() != null) {
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> perf =
-            (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+            (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         if (perf != null) return perf.getNumber(key, def).doubleValue();
       }
     } catch (Throwable ignored) {

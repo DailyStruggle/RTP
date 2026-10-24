@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
@@ -68,7 +69,7 @@ class RegionBacklogOutcomeStatsTest {
                     : AnvilPrefilterRegistry.Provider.Decision.ACCEPT;
         });
 
-        long initialFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.prefilterBlock);
+        long initialFailures = RtpOutcomeStats.GLOBAL.failureCount(FailTypes.prefilterBlock);
         long initialSuccesses = RtpOutcomeStats.GLOBAL.successCount();
 
         // First pulse fills the backlog and submits bin batches; later pulses apply them and promote.
@@ -77,7 +78,7 @@ class RegionBacklogOutcomeStatsTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         do {
             region.execute(TimeUnit.MILLISECONDS.toNanos(50));
-            deltaFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.prefilterBlock) - initialFailures;
+            deltaFailures = RtpOutcomeStats.GLOBAL.failureCount(FailTypes.prefilterBlock) - initialFailures;
             deltaSuccesses = RtpOutcomeStats.GLOBAL.successCount() - initialSuccesses;
             if (deltaFailures > 0 && deltaSuccesses > 0) break;
             Thread.sleep(5L);

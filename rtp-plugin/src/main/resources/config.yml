@@ -1,5 +1,5 @@
 # --- RTP Core Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# Documentation: docs/admin/configuration/CORE_CONFIG.md
 # Pick your language in language.yml.
 #
 # Where to find things (files/folders in this RTP folder):
@@ -114,6 +114,14 @@ defaults:
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
     requireSkyLight: true
+
+    # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.
+    # "off" is fastest. 30 refuses about 1 in 5 land spots, 45 about 1 in 12, 60 about 1 in 60.
+    # Any number from 0 to 89 also works. With it on, the search reads the chunks around each spot.
+    # @type: enum
+    # @options: ["off", 30, 45, 60]
+    # @default: "off"
+    maxHillAngle: "off"
 
   # How many safe spots to pre-calculate.
   cacheCap: 50

@@ -1,0 +1,10 @@
+# --- RTP Language Selection ---
+# Documentation: docs/admin/configuration/LANGUAGE.md
+
+# Loaded first so every other file reads from lang/<language>/.
+# Bundled: en, de, es, fr, ja, ko, nl, zh. Add more in lang/<code>/.
+# Run /rtp reload after changing this.
+language: en
+
+# Config schema version (do not edit).
+version: 1.0

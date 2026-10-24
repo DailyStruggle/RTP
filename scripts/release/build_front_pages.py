@@ -6,6 +6,7 @@ Targets (outputs go to scripts/release/generated/, which is gitignored: build th
 locally before pasting into BuiltByBit; release.yml builds them before pushing):
     bbb-pro    BuiltByBit paid-support listing   FRONT_PAGE_PRO.bbcode   (pasted by hand)
     bbb-lite   BuiltByBit free listing           FRONT_PAGE_LITE.bbcode  (pasted by hand)
+    spigot     SpigotMC free listing             FRONT_PAGE_SPIGOT.bbcode (pasted by hand)
     modrinth   Modrinth description              FRONT_PAGE_MODRINTH.md  (pushed by release.yml)
     hangar     Hangar main page                  FRONT_PAGE_HANGAR.md    (pushed by release.yml)
 
@@ -57,6 +58,9 @@ class Target:
     filename: str
     variables: dict = field(default_factory=dict)
     denylist: bool = False
+    # SpigotMC (XenForo 1) ignores `[IMG width=...]` and does not render SVG:
+    # badges become plain [IMG] tags pointing at PNG renders.
+    raster_badges: bool = False
 
 
 _LITE_VARS = {"name": "LeafRTP", "jar": "LeafRTP-x.y.z.jar"}
@@ -64,6 +68,8 @@ TARGETS = {
     "bbb-pro": Target("bbb-pro", "bbcode", "FRONT_PAGE_PRO.bbcode",
                       {"name": "LeafRTP-Pro", "jar": "LeafRTP-Pro-x.y.z.jar"}),
     "bbb-lite": Target("bbb-lite", "bbcode", "FRONT_PAGE_LITE.bbcode", _LITE_VARS),
+    "spigot": Target("spigot", "bbcode", "FRONT_PAGE_SPIGOT.bbcode", _LITE_VARS, denylist=True,
+                     raster_badges=True),
     "modrinth": Target("modrinth", "markdown", "FRONT_PAGE_MODRINTH.md", _LITE_VARS, denylist=True),
     "hangar": Target("hangar", "markdown", "FRONT_PAGE_HANGAR.md", _LITE_VARS, denylist=True),
 }
@@ -381,12 +387,29 @@ def badge_width(url):
     return round(float(m.group(1)))
 
 
-def _bb_img(url):
+_GH_WORKFLOW_BADGE = re.compile(r"https://github\.com/([^/]+)/([^/]+)/actions/workflows/([^/?]+)/badge\.svg$")
+
+
+def raster_badge_url(url, line_no=0):
+    """PNG equivalent of an SVG badge; raster URLs pass through unchanged."""
+    if url.startswith("https://img.shields.io/"):
+        return "https://raster.shields.io/" + url[len("https://img.shields.io/"):]
+    m = _GH_WORKFLOW_BADGE.match(url)
+    if m:
+        return "https://raster.shields.io/github/actions/workflow/status/{}/{}/{}".format(*m.groups())
+    if _is_svg_badge(url):
+        raise FrontPageError(f"line {line_no}: no PNG equivalent known for SVG image {url}")
+    return url
+
+
+def _bb_img(url, raster_badges=False, line_no=0):
+    if raster_badges:
+        return f"[IMG]{raster_badge_url(url, line_no)}[/IMG]"
     width = badge_width(url) if _is_svg_badge(url) else None
     return f'[IMG width="{width}px"]{url}[/IMG]' if width else f"[IMG]{url}[/IMG]"
 
 
-def inline_bbcode(text, line_no=0):
+def inline_bbcode(text, line_no=0, raster_badges=False):
     codes = []
 
     def stash(m):
@@ -395,8 +418,8 @@ def inline_bbcode(text, line_no=0):
 
     s = re.sub(r"`([^`]+)`", stash, text)
     s = re.sub(r"\[!\[[^\]]*\]\(([^)\s]+)\)\]\(([^)\s]+)\)",
-               lambda m: f"[URL='{m.group(2)}']{_bb_img(m.group(1))}[/URL]", s)
-    s = re.sub(r"!\[[^\]]*\]\(([^)\s]+)\)", lambda m: _bb_img(m.group(1)), s)
+               lambda m: f"[URL='{m.group(2)}']{_bb_img(m.group(1), raster_badges, line_no)}[/URL]", s)
+    s = re.sub(r"!\[[^\]]*\]\(([^)\s]+)\)", lambda m: _bb_img(m.group(1), raster_badges, line_no), s)
 
     def link(m):
         label, url = m.group(1), m.group(2)
@@ -421,7 +444,8 @@ def _cells(row):
     return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", body)]
 
 
-def to_bbcode(kept):
+def to_bbcode(kept, raster_badges=False):
+    inline = functools.partial(inline_bbcode, raster_badges=raster_badges)
     out = []
     list_depth = 0
     expect_summary = None
@@ -450,7 +474,7 @@ def to_bbcode(kept):
             while list_depth > depth:
                 out.append("[/LIST]")
                 list_depth -= 1
-            out.append("[*]" + inline_bbcode(item.group(2), line_no))
+            out.append("[*]" + inline(item.group(2), line_no))
             i += 1
             continue
         while list_depth:
@@ -469,14 +493,14 @@ def to_bbcode(kept):
                 if n == 1:
                     continue
                 tag = "TH" if n == 0 else "TD"
-                cells = "".join(f"[{tag}]{inline_bbcode(c, row_no)}[/{tag}]" for c in _cells(row))
+                cells = "".join(f"[{tag}]{inline(c, row_no)}[/{tag}]" for c in _cells(row))
                 out.append(f"[TR]{cells}[/TR]")
             out.append("[/TABLE]")
             continue
 
         heading = _HEADING.match(stripped)
         if heading:
-            level, text = len(heading.group(1)), inline_bbcode(heading.group(2), line_no)
+            level, text = len(heading.group(1)), inline(heading.group(2), line_no)
             if level == 1:
                 out.append(f"[SIZE=7][B][COLOR={HEADING_COLOR}]{text}[/COLOR][/B][/SIZE]")
             elif level == 2:
@@ -498,7 +522,7 @@ def to_bbcode(kept):
         elif stripped.startswith("<"):
             raise FrontPageError(f"line {line_no}: unsupported HTML for BBCode: {stripped}")
         else:
-            out.append(inline_bbcode(line, line_no) if stripped else "")
+            out.append(inline(line, line_no) if stripped else "")
         i += 1
 
     while list_depth:
@@ -581,7 +605,7 @@ def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
     if jargon:
         raise FrontPageError("\n".join(jargon))
     if target.fmt == "bbcode":
-        lines = to_bbcode(kept)
+        lines = to_bbcode(kept, raster_badges=target.raster_badges)
         text = "\n".join(lines) + "\n"
     else:
         header = (f"<!-- Generated from {SOURCE_REL} by scripts/release/build_front_pages.py "

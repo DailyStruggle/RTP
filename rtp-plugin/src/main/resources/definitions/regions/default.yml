@@ -1,5 +1,5 @@
 # --- RTP Region Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/REGIONS.md
+# Documentation: docs/admin/configuration/REGIONS.md
 
 # Target world name (e.g. "world", "world_nether").
 # "[0]" = main world, "[1]" = 2nd loaded world, etc.
@@ -26,7 +26,7 @@ worldBorderOverride: false
 #   2. Per-region override (this region only): replace "@config" with an inline
 #      `shape:` block here. An inline block wins over the config.yml default.
 #
-# See plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# See docs/admin/configuration/CORE_CONFIG.md
 # Example per-region override (mirrors the defaults.shape block in config.yml):
 #   shape:
 #     name: "CIRCLE"
@@ -36,7 +36,7 @@ worldBorderOverride: false
 shape: "@config"
 
 # Vertical landing window. "@config" inherits the whole `defaults.vert` block from
-# config.yml. See plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# config.yml. See docs/admin/configuration/CORE_CONFIG.md
 # Replace with an inline block to override per-region, e.g.:
 #   vert:
 #     name: "LINEAR"
@@ -44,10 +44,13 @@ shape: "@config"
 #     maxY: 128
 #     direction: 2
 #     requireSkyLight: false
+#     # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.
+#     # "off" (fastest, default), 30, 45 or 60.
+#     maxHillAngle: 30
 vert: "@config"
 
 # If true, rtp.regions.<name> is required. "@config" inherits defaults.requirePermission
-# from config.yml. See plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# from config.yml. See docs/admin/configuration/CORE_CONFIG.md
 # Replace with a literal to override per-region, e.g.:
 #   requirePermission: true
 requirePermission: "@config"
@@ -59,7 +62,7 @@ override: "default"
 
 # Economy cost override for this region (added on top of the economy.yml base price).
 # Use "@economy" to inherit the base price from economy.yml instead of a literal.
-# See plugins/RTP/docs/admin/configuration/ECONOMY.md
+# See docs/admin/configuration/ECONOMY.md
 # Replace with a number or the inheritance token to override per-region, e.g.:
 #   price: 100.0
 #   price: "@economy"
@@ -73,8 +76,8 @@ price: 0.0
 # --- Advanced (cache/precision tuning; defaults suit most servers) ---
 # Each "@config" inherits the matching defaults.<key> value from config.yml;
 # replace with a number to override per-region. See:
-#   plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
-#   plugins/RTP/docs/admin/configuration/REGIONS.md
+#   docs/admin/configuration/CORE_CONFIG.md
+#   docs/admin/configuration/REGIONS.md
 # Max pre-calculated safe locations. Example override:
 #   cacheCap: 64
 cacheCap: "@config"

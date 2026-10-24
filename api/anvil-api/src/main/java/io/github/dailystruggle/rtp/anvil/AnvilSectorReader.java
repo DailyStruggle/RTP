@@ -128,6 +128,15 @@ public final class AnvilSectorReader {
           (buf, len, x, z) -> AnvilReader.readColumnProbeFromSectors(buf, len, x, z, minY, maxY));
     }
 
+    /** {@link AnvilReader#readTerrainProbe} through this session's channel (ADR-120). */
+    public ColumnProbe readTerrainProbe(int chunkX, int chunkZ, int minY, int maxY) throws IOException {
+      if (minY > maxY) {
+        throw new IllegalArgumentException("minY (" + minY + ") > maxY (" + maxY + ")");
+      }
+      return read(chunkX, chunkZ,
+          (buf, len, x, z) -> AnvilReader.readTerrainProbeFromSectors(buf, len, x, z, minY, maxY));
+    }
+
     <T> T read(int chunkX, int chunkZ, Decoder<T> decoder) throws IOException {
       if (regionFile == null || !ensureOpen()) return null;
       try {

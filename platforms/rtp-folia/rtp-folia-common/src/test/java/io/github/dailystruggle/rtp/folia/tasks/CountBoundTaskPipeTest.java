@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,18 +30,20 @@ class CountBoundTaskPipeTest {
 
   @BeforeEach
   void setUp() {
-    previousAccessor = RTP.serverAccessor;
+    previousAccessor = RTPRuntime.serverAccessor();
     RTPScheduler scheduler = Mockito.mock(RTPScheduler.class);
     Mockito.doAnswer(inv -> regionalDispatches.add(inv.getArgument(1)))
         .when(scheduler).runTask(any(RTPLocation.class), any(Runnable.class));
     RTPServerAccessor accessor = Mockito.mock(RTPServerAccessor.class);
     when(accessor.getScheduler()).thenReturn(scheduler);
-    RTP.serverAccessor = accessor;
+    // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+    RTP.ensureInitialized();
+    RTPRuntime.setServerAccessor(accessor);
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = previousAccessor;
+    RTPRuntime.setServerAccessor(previousAccessor);
   }
 
   @Test

@@ -5,13 +5,20 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
 import io.github.dailystruggle.rtp.common.importer.ImportResult;
 import io.github.dailystruggle.rtp.common.permission.PermissionMigrationService;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Level;
@@ -51,10 +58,10 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                 Set<String> suggestions = new LinkedHashSet<>(ForeignConfigImporterRegistry.getRegisteredSourceNames());
 
                 File pluginDir = null;
-                if (RTP.configs != null && RTP.configs.pluginDirectory != null) {
-                    pluginDir = RTP.configs.pluginDirectory;
-                } else if (RTP.serverAccessor != null) {
-                    pluginDir = RTP.serverAccessor.getPluginDirectory();
+                if (ActiveConfigs.get() != null && ActiveConfigs.get().pluginDirectory != null) {
+                    pluginDir = ActiveConfigs.get().pluginDirectory;
+                } else if (RTPRuntime.serverAccessor() != null) {
+                    pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
                 }
 
                 // Only perform fast adjacent source detection if pluginDir has a valid parent directory
@@ -110,10 +117,10 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
         // Resolve destination and plugins directories
         File pluginDir = null;
-        if (RTP.configs != null && RTP.configs.pluginDirectory != null) {
-            pluginDir = RTP.configs.pluginDirectory;
-        } else if (RTP.serverAccessor != null) {
-            pluginDir = RTP.serverAccessor.getPluginDirectory();
+        if (ActiveConfigs.get() != null && ActiveConfigs.get().pluginDirectory != null) {
+            pluginDir = ActiveConfigs.get().pluginDirectory;
+        } else if (RTPRuntime.serverAccessor() != null) {
+            pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         }
 
         if (pluginDir == null) {
@@ -269,6 +276,40 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
         Runnable importTask = () -> {
             sendMessage(callerId, "&7[RTP] Importing from &f" + finalSourceDir.getFileName() + "&7 (overwrite=" + finalOverwrite + ")...");
+            Path stagingDir = null;
+            try {
+                Path cacheDir = destinationDir.resolve("cache");
+                Files.createDirectories(cacheDir);
+                stagingDir = Files.createTempDirectory(cacheDir, "config-import-");
+                copyYamlSnapshot(ConfigSnapshot.read(destinationDir), stagingDir);
+                ImportResult stagedResult = finalImporter.importConfiguration(finalSourceDir, stagingDir, finalOverwrite);
+
+                if (!stagedResult.isSuccess()) {
+                    for (String warn : stagedResult.getWarnings()) {
+                        sendMessage(callerId, "&e[WARN] " + warn);
+                    }
+                    reportImportFailure(callerId, stagedResult, finalOverwrite);
+                    return;
+                }
+
+                Map<String, String> overlay = readStagedYaml(stagingDir, stagedResult);
+                ConfigCandidateGate.Result candidate = ConfigCandidateGate.evaluate(destinationDir, overlay);
+                if (candidate.rejected()) {
+                    for (String warn : stagedResult.getWarnings()) {
+                        sendMessage(callerId, "&e[WARN] " + warn);
+                    }
+                    ReloadSupport.sendReloadRejected(callerId, candidate);
+                    return;
+                }
+            } catch (IOException | RuntimeException e) {
+                RTPRuntime.log(Level.WARNING, "[RTP] Could not stage or validate foreign configuration import", e);
+                sendMessage(callerId, "&c[RTP] Import failed!");
+                sendMessage(callerId, "&c[ERROR] Could not stage or validate imported configuration: " + e.getMessage());
+                return;
+            } finally {
+                deleteStagingDirectory(stagingDir);
+            }
+
             ImportResult result = finalImporter.importConfiguration(finalSourceDir, destinationDir, finalOverwrite);
 
             for (String warn : result.getWarnings()) {
@@ -276,13 +317,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             }
 
             if (!result.isSuccess()) {
-                sendMessage(callerId, "&c[RTP] Import failed!");
-                for (String err : result.getErrors()) {
-                    sendMessage(callerId, "&c[ERROR] " + err);
-                }
-                if (!finalOverwrite) {
-                    sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 to replace existing files.");
-                }
+                reportImportFailure(callerId, result, finalOverwrite);
                 return;
             }
 
@@ -293,16 +328,18 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
             boolean reloaded = false;
             Throwable reloadFailure = null;
+            boolean fallbackReload = false;
             try {
                 CommandsAPICommand reload = (RTP.baseCommand != null)
                         ? RTP.baseCommand.getCommandLookup().get("reload")
                         : null;
                 if (reload != null) {
                     reloaded = reload.onCommand(callerId, Collections.emptyMap(), null);
-                } else if (RTP.configs != null) {
+                } else if (ActiveConfigs.get() != null) {
+                    fallbackReload = true;
                     RTP.reloading.set(true);
                     try {
-                        reloaded = RTP.configs.reload();
+                        reloaded = ActiveConfigs.get().reload();
                     } finally {
                         RTP.reloading.set(false);
                     }
@@ -312,15 +349,27 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                 RTP.reloading.set(false);
             }
 
-            if (reloaded) {
-                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                        + "&a file(s). Configuration reload completed!");
-            } else if (reloadFailure != null) {
-                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                        + "&a file(s). &eReload failed: " + reloadFailure.getMessage() + " - run &f/rtp reload&e.");
-            } else {
-                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                        + "&a file(s). Run &f/rtp reload&a to apply.");
+            boolean reloadRejected = false;
+            if (!reloaded && fallbackReload && ActiveConfigs.get() != null) {
+                var rejection = ActiveConfigs.get().lastReloadRejection();
+                if (rejection.isPresent()) {
+                    ReloadSupport.sendReloadRejected(callerId, rejection.get());
+                    reloadRejected = true;
+                }
+            }
+
+            // A rejected reload already got the path-aware reloadRejected message.
+            if (!reloadRejected) {
+                if (reloaded) {
+                    sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                            + "&a file(s). Configuration reload completed!");
+                } else if (reloadFailure != null) {
+                    sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                            + "&a file(s). &eReload failed: " + reloadFailure.getMessage() + " - run &f/rtp reload&e.");
+                } else {
+                    sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                            + "&a file(s). Run &f/rtp reload&a to apply.");
+                }
             }
 
             // Unified permission migration step
@@ -330,13 +379,74 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             }
         };
 
-        if (RTP.scheduler != null) {
-            RTP.scheduler.runTaskAsynchronously(importTask);
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(importTask);
         } else {
             importTask.run();
         }
 
         return true;
+    }
+
+    private void copyYamlSnapshot(ConfigSnapshot snapshot, Path stagingDir) throws IOException {
+        Path stagingRoot = stagingDir.toAbsolutePath().normalize();
+        for (String file : snapshot.files()) {
+            var text = snapshot.text(file);
+            if (text.isEmpty()) continue;
+            Path stagedFile = stagingRoot.resolve(file).normalize();
+            if (!stagedFile.startsWith(stagingRoot)) {
+                throw new IOException("Configuration snapshot path escaped its root: " + file);
+            }
+            if (stagedFile.getParent() != null) java.nio.file.Files.createDirectories(stagedFile.getParent());
+            java.nio.file.Files.writeString(stagedFile, text.get(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    private Map<String, String> readStagedYaml(Path stagingDir, ImportResult result) throws IOException {
+        Path stagingRoot = stagingDir.toAbsolutePath().normalize();
+        Map<String, String> overlay = new TreeMap<>();
+        for (Path writtenFile : result.getWrittenFiles()) {
+            if (writtenFile != null) {
+                Path stagedFile = (writtenFile.isAbsolute() ? writtenFile : stagingRoot.resolve(writtenFile))
+                        .toAbsolutePath().normalize();
+                if (!stagedFile.startsWith(stagingRoot)) {
+                    throw new IOException("Importer reported a file outside its staging directory: " + writtenFile);
+                }
+                if (stagedFile.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".yml")) {
+                    if (!java.nio.file.Files.isRegularFile(stagedFile)) {
+                        throw new IOException("Importer-reported YAML file is missing from staging: " + writtenFile);
+                    }
+                    String relative = stagingRoot.relativize(stagedFile).toString().replace(File.separatorChar, '/');
+                    overlay.put(relative,
+                            java.nio.file.Files.readString(stagedFile, java.nio.charset.StandardCharsets.UTF_8));
+                }
+            }
+        }
+        return overlay;
+    }
+
+    private void deleteStagingDirectory(Path stagingDir) {
+        if (stagingDir == null) return;
+        try (var paths = java.nio.file.Files.walk(stagingDir)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                java.nio.file.Files.deleteIfExists(path);
+            }
+        } catch (IOException e) {
+            RTPRuntime.log(Level.WARNING, "[RTP] Could not remove configuration import staging directory " + stagingDir, e);
+        }
+    }
+
+    private void reportImportFailure(@Nullable UUID callerId, ImportResult result, boolean overwrite) {
+        sendMessage(callerId, "&c[RTP] Import failed!");
+        for (String err : result.getErrors()) {
+            sendMessage(callerId, "&c[ERROR] " + err);
+        }
+        if (result.getErrors().isEmpty()) {
+            sendMessage(callerId, "&c[ERROR] Importer did not produce a valid candidate.");
+        }
+        if (!overwrite) {
+            sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 to replace existing files.");
+        }
     }
 
     private void executePermissionMigration(@Nullable UUID callerId, @Nullable String sourceFilter, boolean apply) {
@@ -349,14 +459,14 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         String groupListCmd = permissionMigrationService.getGroupListTemplate();
         sendMessage(callerId, "&7[RTP] Permission provider discovery command: &8" + groupListCmd);
 
-        if (RTP.serverAccessor == null) {
+        if (RTPRuntime.serverAccessor() == null) {
             sendMessage(callerId, "&c[RTP] Server accessor unavailable; cannot execute commands.");
             return;
         }
 
         // Group Discovery: Dispatch configured group list template with capturing sender
         List<String> groupLines = new ArrayList<>();
-        boolean groupDispatched = RTP.serverAccessor.executeCommandWithCapture(groupListCmd, groupLines::add);
+        boolean groupDispatched = RTPRuntime.serverAccessor().executeCommandWithCapture(groupListCmd, groupLines::add);
         if (!groupDispatched && groupLines.isEmpty()) {
             sendMessage(callerId, "&e[WARN] Could not capture group list from permission provider.");
             return;
@@ -379,7 +489,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         for (String group : discoveredGroups) {
             String permInfoCmd = permissionMigrationService.formatGroupGet(group);
             List<String> permLines = new ArrayList<>();
-            RTP.serverAccessor.executeCommandWithCapture(permInfoCmd, permLines::add);
+            RTPRuntime.serverAccessor().executeCommandWithCapture(permInfoCmd, permLines::add);
 
             List<PermissionMigrationService.ParsedNode> parsedNodes =
                     permissionMigrationService.parsePermissionInfoOutput(permLines);
@@ -407,7 +517,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         if (apply) {
             sendMessage(callerId, "&a[RTP] Successfully migrated &f" + totalMigrated
                     + "&a competitor permission(s) across &f" + discoveredGroups.size() + "&a groups.");
-            RTP.log(Level.INFO, "[RTP] Permission migration applied " + totalMigrated
+            RTPRuntime.log(Level.INFO, "[RTP] Permission migration applied " + totalMigrated
                     + " permission set commands across " + discoveredGroups.size() + " groups.");
         } else {
             sendMessage(callerId, "&7[RTP] Dry-run complete: &f" + totalPlanned
@@ -417,10 +527,10 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
     }
 
     private void sendMessage(@Nullable UUID callerId, String msg) {
-        if (callerId != null && RTP.serverAccessor != null) {
-            RTP.serverAccessor.sendMessage(callerId, msg);
+        if (callerId != null && RTPRuntime.serverAccessor() != null) {
+            RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         } else {
-            RTP.log(Level.INFO, COLOR_CODE.matcher(msg).replaceAll(""));
+            RTPRuntime.log(Level.INFO, COLOR_CODE.matcher(msg).replaceAll(""));
         }
     }
 }

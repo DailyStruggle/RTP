@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
 import io.github.dailystruggle.rtp.common.commands.admin.ClearCmd;
 import io.github.dailystruggle.rtp.common.commands.back.BackCmd;
@@ -21,9 +20,13 @@ import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
 import io.github.dailystruggle.rtp.common.commands.version.VersionCmd;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.common.network.NetworkRouter;
 import io.github.dailystruggle.rtp.common.network.PeerRegionRegistry;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.util.Locale;
 import java.util.Set;
 
@@ -88,11 +91,11 @@ public final class CoreCommandTreeBuilder {
             "select a region to teleport to",
             (uuid, s) -> {
               if (s == null) return false;
-              RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+              RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
               // Path 1: bare local region name.
-              if (RTP.selectionAPI.regionNames().contains(s)) {
+              if (ActiveSelection.get().regionNames().contains(s)) {
                 io.github.dailystruggle.rtp.common.selection.region.Region localRegion =
-                    RTP.selectionAPI.getRegion(s);
+                    ActiveSelection.get().getRegion(s);
                 if (localRegion == null || !localRegion.getSettings().requirePermission()) {
                   return true;
                 }
@@ -139,8 +142,8 @@ public final class CoreCommandTreeBuilder {
             "rtp.params",
             "modify xz selection",
             (uuid, s) ->
-                RTP.serverAccessor.getRTPWorld(s) != null
-                    && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds." + s)));
+                RTPRuntime.serverAccessor().getRTPWorld(s) != null
+                    && RTPRuntime.serverAccessor().getSender(uuid).hasPermission("rtp.worlds." + s)));
     regionParameter.put(
         "price",
         new FloatParameter(
@@ -165,13 +168,13 @@ public final class CoreCommandTreeBuilder {
         new ShapeParameter(
             "rtp.params",
             "modify xz selection",
-            (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.shape).contains(s)));
+            (uuid, s) -> FactoryRegistry.get(FactoryNames.shape).contains(s)));
     regionParameter.put(
         "vert",
         new VertParameter(
             "rtp.params",
             "modify y selection",
-            (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.vert).contains(s)));
+            (uuid, s) -> FactoryRegistry.get(FactoryNames.vert).contains(s)));
     return regionParameter;
   }
 
@@ -188,12 +191,12 @@ public final class CoreCommandTreeBuilder {
         "rtp.biome",
         "select a biome to teleport to",
         (uuid, s) -> {
-          RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+          RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
           if (s == null) return false;
           int colon = s.indexOf(':');
           String bareKey = (colon >= 0) ? s.substring(colon + 1) : s;
           String upper = bareKey.toUpperCase(Locale.ROOT);
-          Set<String> biomes = RTP.serverAccessor.getBiomes();
+          Set<String> biomes = RTPRuntime.serverAccessor().getBiomes();
           boolean known =
               biomes.contains(s)
                   || biomes.contains(upper)
@@ -216,7 +219,7 @@ public final class CoreCommandTreeBuilder {
         "rtp.params",
         "check player's perms when running this command",
         (uuid, s) ->
-            RTP.serverAccessor.getSender(uuid).hasPermission("rtp.params")
+            RTPRuntime.serverAccessor().getSender(uuid).hasPermission("rtp.params")
                 && (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false")));
   }
 }

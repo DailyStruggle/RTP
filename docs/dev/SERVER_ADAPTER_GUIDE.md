@@ -50,7 +50,7 @@ Every platform adapter must strictly satisfy the core safety rules defined in [R
 | **S-002** | **No permanently force-loaded chunks** | `RTPWorld#keepChunkAt()` must use transient plugin chunk tickets (e.g. `addPluginChunkTicket`), NEVER persistent force-loading (like Bukkit `Chunk#setForceLoaded(true)` or native forge persistent tickets). All tickets must release on `reservation.close()`, `forgetChunkAt()`, and `forgetChunks()`. |
 | **S-003** | **No teleport into claim-protected land** | Platform adapters must expose or register external claim hooks (GriefPrevention, Towny, WorldGuard, FTB Chunks, etc.) through `RTPServerAccessor#registerClaimHandler()` or core `ClaimCheckProvider`. |
 | **S-004** | **No silently discarded teleport failures** | `RTPPlayer#setLocation()` must return a `CompletableFuture<Boolean>` that ALWAYS completes. Catch-and-swallow blocks are prohibited. Command overrides must log `msgInvalidCommand` and `msgBadParameter` at `WARNING` level (`REQ-RTP-S-004`). |
-| **S-005** | **Zero synchronous chunk loads on tick threads** | `RTPWorld#getChunkAtAsync()` must NEVER call synchronous `world.getChunkAt()` or blocking `.get()` on the main/tick thread. Off-tick Anvil reading ([ADR-016](ADR-016-anvil-subsystem.md)) must be utilized for ungenerated or unloaded pre-filtering. |
+| **S-005** | **Zero synchronous chunk loads on tick threads** | `RTPWorld#getChunkAtAsync()` must NEVER call synchronous `world.getChunkAt()` or blocking `.get()` on the main/tick thread. Off-tick Anvil reading ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) must be utilized for ungenerated or unloaded pre-filtering. |
 | **S-006** | **No NPE when addons call API before core loads** | Methods must fail closed with `IllegalStateException` if accessed pre-init, rather than returning `null` or silently no-oping. |
 | **S-007** | **Configurable messages** | User-facing messages must never be hardcoded; all responses route through `messages.yml` keys. |
 
@@ -70,7 +70,7 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 ---
 
 ### 3.1 `RTPServerAccessor`
-`io.github.dailystruggle.rtp.api.server.RTPServerAccessor` is the central service locator and lifecycle gateway instantiated and bound by the platform adapter on startup.
+`io.github.dailystruggle.rtp.api.server.RTPServerAccessor` is the central service locator and lifecycle gateway instantiated and bound by the platform adapter on startup. It extends the platform-neutral `io.github.dailystruggle.server.api.ServerAccessor` from `api/server-api`.
 
 #### Lifecycle & Subsystems
 - `void start()` / `void start(Object pluginHandle)`
@@ -89,16 +89,23 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 - `PlayerLifecycleHook getPlayerLifecycleHook()`
   - **Purpose:** Returns the platform-agnostic lifecycle hook that dispatches player join, quit, and teleportation events.
 
-#### Platform Identity & Compatibility
+#### Common Server Identity, Compatibility & Logging
+These methods are declared by `ServerAccessor` and are available through `RTPServerAccessor`:
 - `String getServerVersion()`
-  - **Purpose:** Returns human-readable platform string (e.g. `"Paper 1.21.4"`, `"Fabric 1.21.1"`).
-- `int getServerIntVersion()`
+  - **Purpose:** Returns the server-reported version string (e.g. `"git-Paper-400 (MC: 1.21.1)"`).
+- `String getPlatform()`
+  - **Purpose:** Returns a platform identifier such as `"paper"`, `"folia"`, `"fabric"`, or `"neoforge"`.
+- `Integer getServerIntVersion()`
   - **Purpose:** Normalized integer version (e.g. `20` for 1.20.x, `21` for 1.21.x) for quick version gating.
 - `PlatformFamily getPlatformFamily()`
-  - **Purpose:** Returns enum: `BUKKIT`, `PAPER`, `FOLIA`, `FABRIC`, `NEOFORGE`, `VELOCITY`, or `BUNGEECORD`.
+  - **Purpose:** Returns `BUKKIT`, `FABRIC`, `NEOFORGE`, or `UNKNOWN`; Bukkit-derived platforms including Paper and Folia use `BUKKIT`.
   - **Usage:** Used by addons and core for platform-aware capability gating.
 - `boolean isCompatible(PlatformFamily family, int minVersion, int maxVersion)`
   - **Purpose:** Compatibility check for addons to verify if the server platform satisfies their requirements.
+- `void log(Level level, String message)` / `void log(Level level, String message, Throwable throwable)`
+  - **Purpose:** Writes through the platform's server logger; `ServerAccessors.log(...)` uses a generic logger before the accessor is installed.
+
+#### RTP-Specific Services
 - `File getPluginDirectory()`
   - **Purpose:** Returns the base directory where `config.yml`, `regions.yml`, and `messages.yml` reside.
 - `Object getPlugin()`
@@ -217,7 +224,7 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 - `void releaseOrphanedTickets(Set<Long> keepAliveKeys)`
   - **Purpose:** Memory hygiene garbage collection hook called by `MemoryTracker`. Any ticket key not present in `keepAliveKeys` must be freed.
 
-#### Off-Tick Anvil / MCA File Access ([ADR-016](ADR-016-anvil-subsystem.md))
+#### Off-Tick Anvil / MCA File Access ([ADR-016](../adr/ADR-016-anvil-subsystem.md))
 - `Path anvilWorldFolder()`
   - **Purpose:** Path to the world save folder containing the `region/` directory. Enables off-tick Anvil prefiltering without live chunk loads.
 - `String anvilDimensionSubpath()`
@@ -231,9 +238,9 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 - `void platform(RTPLocation location)`
   - **Purpose:** Places an emergency landing platform if the landing site is over water or in the air.
 - `boolean restoreBlocks(List<BlockDelta> blocks)`
-  - **Purpose:** Restores original terrain after emergency platform timeout ([ADR-060](ADR-060-emergency-platform-block-restoration-timeout.md)).
+  - **Purpose:** Restores original terrain after emergency platform timeout ([ADR-060](../adr/ADR-060-emergency-platform-block-restoration-timeout.md)).
 - `int setBlocks(List<BlockDelta> blocks)` / `restoreBlockEntities(List<PlacedBlockEntity> entities)`
-  - **Purpose:** Bulk block and block-entity writes for schematic pasting ([ADR-058](ADR-058-schematic-paster-spi.md)).
+  - **Purpose:** Bulk block and block-entity writes for schematic pasting ([ADR-058](../adr/ADR-058-region-specific-schematic-paste.md)).
 
 ---
 
@@ -260,7 +267,7 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
   - **Purpose:** Evaluates destination safety.
   - **Rule S-001:** If the block material name is null, empty, or unresolvable, it MUST return `false` (fail-closed).
 - `boolean isSafe(int localX, int worldY, int localZ, CompiledUnsafeSet unsafeBlocks)`
-  - **Purpose:** Optimized compiled check ([ADR-017](ADR-017-block-tags-and-state-predicates-in-safety-lists.md)) supporting block tags and block-state properties.
+  - **Purpose:** Optimized compiled check ([ADR-017](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md)) supporting block tags and block-state properties.
 - `boolean isSelfContained()`
   - **Purpose:** Returns `true` if the chunk is backed by off-tick preformed data (e.g. `AnvilChunkView`) and requires zero live chunk I/O.
 
@@ -288,7 +295,7 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 - `boolean isOnline()`
   - **Purpose:** Returns whether the player is currently connected. Safe to call from any thread.
 - `void setRespawnLocation(RTPLocation location)`
-  - **Purpose:** Sets the player's respawn anchor / bed location ([ADR-023](ADR-023-login-reserve-cache.md)).
+  - **Purpose:** Sets the player's respawn anchor / bed location ([ADR-023](../adr/ADR-023-login-reserve-cache.md)).
 
 #### Client Visuals & HUD (Optional / Enhanced Capabilities)
 - `void sendClientBlockChange(RTPLocation location, String blockData)` / `sendClientBlockChanges(Map<RTPLocation, String> changes)`
@@ -298,7 +305,7 @@ along with the event bridge and lifecycle hook (`PlayerLifecycleHook`).
 - `void showProgressBar(String id, String title, double progress)` / `clearProgressBar(String id)`
   - **Purpose:** Displays a native boss-bar or progress bar during teleport warmups or queue generation.
 - `int getViewDistance()` / `void setViewDistance(int distance)`
-  - **Purpose:** Gets or tunes the player's server tracking chunk radius ([ADR-072](ADR-072-teleport-pre-load-view-distance.md)).
+  - **Purpose:** Gets or tunes the player's server tracking chunk radius ([ADR-072](../adr/ADR-072-teleport-view-distance-clamp-and-restore.md)).
 - `int getSendViewDistance()` / `void setSendViewDistance(int distance)`
   - **Purpose:** Gets or tunes client render chunk distance independently of server tracking.
 
@@ -334,7 +341,7 @@ The adapter must listen to native server events and translate them into RTP call
 1. **Player Join:**
    - Call `accessor.registerPlayer(nativePlayer)`.
    - Call `playerLifecycleHook.fireJoinFromPlayer(nativePlayer)`.
-   - On default world, check for Login Reserve Cache refill ([ADR-023](ADR-023-login-reserve-cache.md)).
+   - On default world, check for Login Reserve Cache refill ([ADR-023](../adr/ADR-023-login-reserve-cache.md)).
 2. **Player Quit:**
    - Call `playerLifecycleHook.fireQuitFromPlayer(nativePlayer)`.
    - Cancel any pending `TeleportPipelineTask` for that player via `MemoryTracker`.
@@ -371,7 +378,7 @@ Different platforms employ distinct concurrency constraints that the adapter mus
   - Always check `RTPScheduler#isOwnedByCurrentRegion` before touching world blocks or entity state.
   - Coordinate transitions using `runAtLocation` and `runAtEntity`.
   - Vault and global economy calls must be offloaded to `GlobalRegionScheduler` or async pools.
-  - Use `CountBoundTaskPipe` ([ADR-015](ADR-015-stale-chunk-guard-countbound-pipes.md)) to bound per-pulse slice work on region threads.
+  - Use `CountBoundTaskPipe` ([ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md)) to bound per-pulse slice work on region threads.
 
 ---
 
@@ -405,6 +412,7 @@ Adapters can enhance functionality by implementing optional SPI interfaces:
 
 | SPI Framework | Module | Purpose | Adapter Implementation |
 |---|---|---|---|
+| **`server-api`** | `api/server-api` | Server identity, platform family and logging | Implement the neutral `ServerAccessor` contract through the RTP server accessor. |
 | **`metrics-api`** | `api/metrics-api` | Runtime telemetry (TPS, MSPT, queue depth, memory) | Implement `MetricsBinding` to sample platform-specific tick timing and heap. |
 | **`effects-api`** | `api/effects-api` | Particles, sounds, and visual effects | Implement `EffectsHandler` to spawn platform-native particle packets and play sounds. |
 | **`maps-api`** | `api/maps-api` | In-game minimap / filled map rendering | Implement `MapBinding` to render RTP region bounds and biomes onto platform map canvases. |
@@ -420,7 +428,7 @@ Use this step-by-step checklist when building a new platform adapter from scratc
 - [ ] **1. Module & Repo Setup:**
   - Create `platforms/rtp-<platform>` directory.
   - Add `include 'rtp-<platform>'` (or version submodules) to `settings.gradle` and assign `project(':rtp-<platform>').projectDir = file('platforms/rtp-<platform>')`.
-  - Add new platform identifier to `io.github.dailystruggle.rtp.api.server.PlatformFamily` enum in `rtp-api`.
+  - Add new platform identifier to `io.github.dailystruggle.server.api.PlatformFamily` enum in `server-api`.
   - Configure `build.gradle` targeting Java 21+ with `api project(':rtp-api')`, `implementation project(':rtp-core')`, and `compileOnly project(':commands-api')`. Ensure zero platform imports leak into `rtp-core`.
 - [ ] **2. Scheduler Implementation:**
   - Implement `RTPScheduler` (synchronous tick dispatch, asynchronous thread pool, delayed/repeating tasks).
@@ -525,8 +533,8 @@ if (!exclude<Platform>) {
 }
 ```
 
-### 9.3 `rtp-api` PlatformFamily Registration
-Every platform adapter must have a recognized entry in `io.github.dailystruggle.rtp.api.server.PlatformFamily`:
+### 9.3 `server-api` PlatformFamily Registration
+Every platform adapter must have a recognized entry in `io.github.dailystruggle.server.api.PlatformFamily`:
 
 ```java
 public enum PlatformFamily {
@@ -583,7 +591,7 @@ dependencies {
 LeafRTP supports two distribution paradigms for platform adapters:
 
 1. **Unified Multi-Loader JAR (`rtp-plugin`):**
-   - For server modloaders where operators expect a single release jar that boots across loaders (Bukkit, Paper, Folia, Fabric, NeoForge, Velocity per **ADR-022** and **ADR-036**).
+   - For server modloaders where operators expect a single release jar that boots across loaders (Bukkit, Paper, Folia, Fabric, NeoForge, Velocity per [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md), and [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md)).
    - In `rtp-plugin/build.gradle`, add `implementation project(':rtp-<platform>')` (or merge post-remap bytecode).
    - Include the loader descriptor file (`plugin.yml`, `fabric.mod.json`, `neoforge.mods.toml`, `velocity-plugin.json`) in `rtp-plugin/src/main/resources/`.
 2. **Standalone Platform Artifact / Library:**
@@ -721,12 +729,12 @@ Understanding the architectural boundary between the **Platform Host Adapter** a
 | Subsystem | Integration Point | Example Use Case |
 |---|---|---|
 | **Claim / Territory Protection** | `RTPAPI.hooks().verifiers().register(...)` | Integrating GriefPrevention, Towny, WorldGuard, FTB Chunks, or custom instance tags without editing core. |
-| **Region File Formats** | `RegionFormatRegistry.register(...)` | Adding support for `.linear` region files ([ADR-077](ADR-077-multi-format-region-support.md)) or custom compressed world formats. |
+| **Region File Formats** | `RegionFormatRegistry.register(...)` | Adding support for `.linear` region files ([ADR-077](../adr/ADR-077-multi-format-region-support.md)) or custom compressed world formats. |
 | **Visual & Particle Effects** | `EffectFactory.addEffect(name, effect)` | Registering custom warmup/teleport animations (e.g. `LeafRTPRiftAddon`). |
 | **GUI & Menus** | `RTPAPI.selectionAPI` | Providing platform-specific inventory menus (e.g. `LeafRTPGuiAddon`). |
 | **Custom Region Shapes** | `RTP.serverAccessor.setShapeFunction(...)` | Adding non-standard region shapes (hexagons, polygons, spline curves). |
 | **Custom Biome Resolvers** | `RTP.serverAccessor.setBiomeGetter(...)` | Overriding biome detection for custom terraforming engines. |
-| **Declarative Actions** | `ActionManager.registerAction(...)` | Custom scripted actions on pre/post teleport ([ADR-093](ADR-093-declarative-scripted-actions.md)). |
+| **Declarative Actions** | `ActionManager.registerAction(...)` | Custom scripted actions on pre/post teleport ([ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md)). |
 
 ### 11.3 Authoring an `RTPAddon`
 To author a subsystem adapter addon:

@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.common.server;
 
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,22 +33,22 @@ class DatabaseProcessingTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir.toFile());
-        originalScheduler = RTP.scheduler;
-        originalAccessor = RTP.getInstance().databaseAccessor;
+        originalScheduler = RTPRuntime.scheduler();
+        originalAccessor = ActiveDatabase.accessor();
 
         mockScheduler = mock(RTPScheduler.class);
         mockAccessor = mock(DatabaseAccessor.class);
 
-        RTP.scheduler = mockScheduler;
-        RTP.getInstance().databaseAccessor = mockAccessor;
+        RTPRuntime.setScheduler(mockScheduler);
+        ActiveDatabase.setAccessor(mockAccessor);
         DatabaseProcessing.clear();
     }
 
     @AfterEach
     void tearDown() {
         DatabaseProcessing.kill();
-        RTP.scheduler = originalScheduler;
-        RTP.getInstance().databaseAccessor = originalAccessor;
+        RTPRuntime.setScheduler(originalScheduler);
+        ActiveDatabase.setAccessor(originalAccessor);
     }
 
     @Test

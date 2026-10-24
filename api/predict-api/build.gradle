@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+// predict-api -- zero-dependency stochastic estimation and control toolkit (ADR-115).
+// Pure Java 17 (java.base only): no Minecraft, Bukkit, or RTP domain dependencies.
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withJavadocJar()
+    withSourcesJar()
+}
+
+dependencies {
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}
+
+test {
+    useJUnitPlatform()
+}

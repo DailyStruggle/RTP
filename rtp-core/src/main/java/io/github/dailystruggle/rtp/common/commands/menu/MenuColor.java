@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.mapsapi.BiomeColorSource;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource;
@@ -67,7 +67,7 @@ public final class MenuColor {
         String regionName = "default";
         try {
             ConfigParser<WorldKeys> worldParser =
-                    RTP.configs == null ? null : RTP.configs.getWorldParser(world);
+                    ActiveConfigs.get() == null ? null : ActiveConfigs.get().getWorldParser(world);
             if (worldParser != null) {
                 Object r = worldParser.getConfigValue(WorldKeys.region, "default");
                 if (r != null && !r.toString().isEmpty()) {

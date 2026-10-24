@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools; // Moved out of commands/help
 
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import org.jetbrains.annotations.Nullable;
 
 public class MessageTagger {
@@ -10,8 +10,8 @@ public class MessageTagger {
         if (message == null || message.isEmpty()) return message;
 
         // Check whether the dev tag is enabled in messages.yml
-        if (RTP.configs != null) {
-            Object showDevTag = RTP.configs.getConfigValue(SystemMessages.showDevTag, false);
+        if (ActiveConfigs.get() != null) {
+            Object showDevTag = ActiveConfigs.get().getConfigValue(SystemMessages.showDevTag, false);
             boolean enabled = (showDevTag instanceof Boolean)
                     ? (Boolean) showDevTag
                     : Boolean.parseBoolean(showDevTag.toString());

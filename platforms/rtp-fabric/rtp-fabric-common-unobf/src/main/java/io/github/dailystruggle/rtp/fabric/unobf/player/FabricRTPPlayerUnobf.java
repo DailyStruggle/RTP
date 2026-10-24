@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.SenderTimings;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.unobf.tools.FabricLegacyText;
 import io.github.dailystruggle.rtp.fabric.unobf.world.FabricRTPWorldUnobf;
 import net.minecraft.network.chat.Component;
@@ -344,13 +346,12 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public long cooldown() {
-        // Perms-driven cooldown groups not yet implemented. 0 means "use default" upstream.
-        return 0L;
+        return SenderTimings.cooldownMillis(this);
     }
 
     @Override
     public long delay() {
-        return 0L;
+        return SenderTimings.delayMillis(this);
     }
 
     @Override
@@ -573,9 +574,9 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         ServerPlayer p = handleRef.get();
         if (p == null) return null;
         ServerLevel level = ((ServerLevel) p.level());
-        RTPWorld<?> rtpWorld = RTP.serverAccessor == null
+        RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor() == null
                 ? null
-                : RTP.serverAccessor.getRTPWorld(level.dimension().identifier().toString());
+                : RTPRuntime.serverAccessor().getRTPWorld(level.dimension().identifier().toString());
         if (rtpWorld == null) return null;
         return new RTPLocation(rtpWorld, p.getBlockX(), p.getBlockY(), p.getBlockZ());
     }

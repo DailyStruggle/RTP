@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.RtpTargetStatus;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.RTP;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -13,6 +15,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class MenuModelTest {
+
+    /** Core installs the RTPAPI delegates (metrics snapshot) during RTP static init. */
+    @BeforeAll
+    static void initCore() {
+        RTP.ensureInitialized();
+    }
 
     @Test
     void displayName_worldTarget_formatsWorldName() {

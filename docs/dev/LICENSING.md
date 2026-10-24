@@ -21,14 +21,14 @@ RTP is **MIT-licensed** ([ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-suppo
 | Module / Component | License | Permitted Commercial Usage | Governed By |
 |---|---|:---:|---|
 | **`rtp-api`**, **`rtp-core`** | **MIT** | Yes | `LICENSE` / `rtp-api/LICENSE` / `rtp-core/LICENSE` |
-| **SPI modules** (`commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`, `yaml-api`) | **MIT** | Yes | `LICENSE` |
+| **SPI modules** (`anvil-api`, `bit-api`, `bstats-api`, `commands-api`, `config-bit-api`, `effects-api`, `maps-api`, `menu-api`, `metrics-api`, `predict-api`, `server-api`, `tags-api`, `units-api`, `yaml-api`) | **MIT** | Yes | `LICENSE` |
 | **Platform Adapters** (Spigot/Paper, Folia, Fabric) | **MIT** | Yes | `LICENSE` |
 | **Network & Proxy Modules** (plugin-message transport, `RespRedisClient`, SQL/Redis bindings, `rtp-proxy-*`) | **MIT** | Yes | `LICENSE` |
 | **SQL Persistence & Pool** (SQLite / H2 / MySQL / PostgreSQL accessors, in-house pool per ADR-101) | **MIT** | Yes | `LICENSE` |
 | **Safety Tag / Predicate Grammar** (`SafetyTokenParser`, `SafetyTokenExpander`; offline `tags-api` resolver) | **MIT** | Yes | `LICENSE` |
 | **Login Reserve Cache** (`LoginCacheTask`, ADR-023) | **MIT** | Yes | `LICENSE` |
 | **NeoForge Carrier & Adapters** (`rtp-neoforge-*`) | **GPL-3.0-or-later** | Yes (per GPL terms) | `neoforge.mods.toml` |
-| **Bundled Addons** (`LeafRTPClaimAddon`, `LeafRTPGuiAddon`, `LeafRTPCountdownAddon`, `LeafRTPActionAddon`) | **MIT** unless the addon ships its own licence | Yes | Bundled in both Lite and Pro jars |
+| **Bundled Addons** (`LeafRTPClaimAddon`, `LeafRTPGuiAddon`, `LeafRTPCountdownAddon`, `LeafRTPActionAddon`, `LeafRTPRiftAddon`) | **MIT** unless the addon ships its own licence | Yes | Bundled in both Lite and Pro jars |
 | **LeafRTP Lite Jar** (`LeafRTP-<version>.jar`) | **MIT** | Yes | `LICENSE-MIT` (bundled inside jar as `LICENSE`) |
 | **LeafRTP Pro Jar** (`LeafRTP-Pro-<version>.jar`) | **MIT** | Yes | root `LICENSE` (bundled inside jar) |
 

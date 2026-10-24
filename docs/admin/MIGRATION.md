@@ -103,6 +103,8 @@ Every file touched or written is reported in the console and command sender chat
   - Potion effects (blindness, resistance, slow falling) and teleport titles/sounds map into `definitions/effects/imported_betterrtp_<name>.yml`.
 - **Approximations & Differences:**
   - Biome and block lists are mapped into `safety.yml` filter definitions.
+  - **No second per-world permission needed out of the box:** Unlike BetterRTP, which requires `betterrtp.world.<world>` alongside `betterrtp.use`, LeafRTP ships with `requirePermission: false` on world and region files, so `rtp.use` alone lets players `/rtp` in any configured world.
+  - **`/rtp world=<world>` vs `/rtp region=<region>`:** `/rtp world=<world>` looks up `<world>` in `definitions/worlds/<world>.yml` and teleports using that world's assigned region, whereas `/rtp region=<region>` targets `definitions/regions/<region>.yml` directly (including its own target `world`, shape, and radius). Per-world (`rtp.worlds.<world>`) or per-region (`rtp.regions.<region>`) nodes are only checked if you set `requirePermission: true` or let players pass explicit `world=` / `region=` command arguments (`rtp.world` / `rtp.region`).
 
 #### 2. JustRTP Migration Guide
 
@@ -229,7 +231,7 @@ lifecycle:
 |-----------------|--------------------|-------|
 | `betterrtp.use` / `ezrtp.use` / `justrtp.use` | `rtp.use` | Base teleport command access |
 | `betterrtp.world` / `ezrtp.world` / `justrtp.world` | `rtp.world` | Multi-world teleport access |
-| `betterrtp.world.<world>` / `justrtp.world.<world>` | `rtp.worlds.<world>` | Specific world targeting |
+| `betterrtp.world.<world>` / `justrtp.world.<world>` | `rtp.worlds.<world>` | Specific world targeting (optional in LeafRTP: `rtp.use` alone works out of the box while `requirePermission: false`) |
 | `betterrtp.world.*` / `justrtp.world.*` | `rtp.worlds.*` | Wildcard for all worlds |
 | `betterrtp.biome` / `justrtp.biome` | `rtp.biome.*` | Biome targeting access |
 | `betterrtp.biome.<biome>` / `justrtp.biome.<biome>` | `rtp.biome.<biome>` | Specific biome targeting |
@@ -311,7 +313,7 @@ permissions:
 1. **Bare `/rtp` Opens GUI Menu by Default:**
    - `LeafRTPGuiAddon` is bundled in the RTP jar and self-extracts into `plugins/RTP/addons/` on first startup when the folder does not exist.
    - By default, executing `/rtp` without arguments now opens the visual destination-picker GUI menu on platforms where a menu renderer is available (Paper, Folia, Fabric, NeoForge).
-   - *To restore instant teleportation on `/rtp`:* Delete `plugins/RTP/addons/LeafRTPGuiAddon.jar` (the `addons/` directory prevents re-extraction) or configure the bare root action in `config.yml`. The classic command remains directly accessible via `/rtp teleport` or menu items.
+   - *To restore instant teleportation on `/rtp`:* Set `openOnBareRtp: false` in `plugins/RTP/addons/guimenu.yml` (or toggle it in `/rtp admin setup`) so bare `/rtp` teleports immediately while keeping `/rtp gui` available. The classic command also remains directly accessible via `/rtp teleport` or menu items.
 
 2. **Tiered Configuration Directory Layout:**
    - The plugin data directory is reorganized into clean, tiered subdirectories:

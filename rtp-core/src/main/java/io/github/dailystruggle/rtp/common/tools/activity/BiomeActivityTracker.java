@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.tools.activity;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
@@ -78,10 +78,10 @@ public final class BiomeActivityTracker {
               });
       task.setTarget(player);
       try {
-        RTP.scheduler.runTaskForPlayer(player, task, 0L);
+        RTPRuntime.scheduler().runTaskForPlayer(player, task, 0L);
       } catch (Throwable t) {
         // Never let a single mis-scheduled player abort the whole sweep.
-        RTP.log(Level.FINE, "[RTP] biome activity sample dispatch failed", t);
+        RTPRuntime.log(Level.FINE, "[RTP] biome activity sample dispatch failed", t);
         future.completeExceptionally(t);
       }
     }

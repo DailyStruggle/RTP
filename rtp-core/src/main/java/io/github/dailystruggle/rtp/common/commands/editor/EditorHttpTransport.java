@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -96,7 +96,7 @@ public class EditorHttpTransport {
         Map<String, Object> block = null;
         File file = null;
         try {
-            File dir = RTP.serverAccessor != null ? RTP.serverAccessor.getPluginDirectory() : null;
+            File dir = RTPRuntime.serverAccessor() != null ? RTPRuntime.serverAccessor().getPluginDirectory() : null;
             if (dir != null) file = new File(dir, "advanced" + File.separator + "network.yml");
             if (file != null && file.isFile()) {
                 RtpYamlSection sec = RtpYamlConfig.load(file).getConfigurationSection("editor");
@@ -107,7 +107,7 @@ public class EditorHttpTransport {
                 }
             }
         } catch (IOException | RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] could not read " + file + " editor section; using the default URLs: "
+            RTPRuntime.log(Level.WARNING, "[editor] could not read " + file + " editor section; using the default URLs: "
                     + e.getMessage(), e);
         }
         String[] urls = settingsUrls(block);
@@ -164,7 +164,7 @@ public class EditorHttpTransport {
         } catch (IllegalArgumentException ignored) {
             // logged below
         }
-        RTP.log(Level.WARNING, "[editor] advanced/network.yml editor." + key + " '" + s
+        RTPRuntime.log(Level.WARNING, "[editor] advanced/network.yml editor." + key + " '" + s
                 + "' is not an https URL (http is allowed only to localhost / 127.0.0.1 / ::1); using the default");
         return null;
     }
@@ -286,7 +286,7 @@ public class EditorHttpTransport {
                         int statusCode = response.statusCode();
                         if (statusCode < 200 || statusCode >= 300) {
                             String err = "Bytebin POST failed with status code " + statusCode + ": " + response.body();
-                            RTP.log(Level.WARNING, err);
+                            RTPRuntime.log(Level.WARNING, err);
                             throw new RuntimeException(err);
                         }
 
@@ -295,7 +295,7 @@ public class EditorHttpTransport {
                         String key = extractKeyFromJsonOrPlain(body);
                         if (key == null || key.isBlank()) {
                             String err = "Bytebin returned empty or unparseable key: " + body;
-                            RTP.log(Level.WARNING, err);
+                            RTPRuntime.log(Level.WARNING, err);
                             throw new RuntimeException(err);
                         }
                         return key;
@@ -331,7 +331,7 @@ public class EditorHttpTransport {
                     if (statusCode < 200 || statusCode >= 300) {
                         String bodyStr = new String(response.body(), StandardCharsets.UTF_8);
                         String err = "Bytebin GET failed for token '" + shown + "' with status code " + statusCode + ": " + bodyStr;
-                        RTP.log(Level.WARNING, err);
+                        RTPRuntime.log(Level.WARNING, err);
                         throw new RuntimeException(err);
                     }
 
@@ -339,7 +339,7 @@ public class EditorHttpTransport {
                         return gzipDecompress(response.body());
                     } catch (IOException e) {
                         String err = "Failed to decompress bytebin payload for token '" + shown + "': " + e.getMessage();
-                        RTP.log(Level.WARNING, err, e);
+                        RTPRuntime.log(Level.WARNING, err, e);
                         throw new RuntimeException(err, e);
                     }
                 });

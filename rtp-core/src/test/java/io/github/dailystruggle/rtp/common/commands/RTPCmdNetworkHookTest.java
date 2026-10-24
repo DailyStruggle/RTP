@@ -9,10 +9,12 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,7 +73,7 @@ public class RTPCmdNetworkHookTest {
   @BeforeEach
   void setUp() {
     accessor = RTPTestSetup.install(tempDir);
-    originalHook = RTP.networkCommandHook;
+    originalHook = NetworkHooks.commandHook();
 
     // Seed deterministic templates for the network message keys the hook emits.
     @SuppressWarnings("unchecked")
@@ -81,7 +83,7 @@ public class RTPCmdNetworkHookTest {
     data.put(NetworkMessages.networkFallback, "FALLBACK reason=[reason]");
     data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
     data.forEach((k, v) -> {
-            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
             if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
                 ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
             }
@@ -90,7 +92,7 @@ public class RTPCmdNetworkHookTest {
 
   @AfterEach
   void tearDown() {
-    RTP.networkCommandHook = originalHook;
+    NetworkHooks.setCommandHook(originalHook);
   }
 
   // ── 1. Default install is LOCAL_ONLY → hook is invisible to the pipeline ─────
@@ -102,7 +104,7 @@ public class RTPCmdNetworkHookTest {
     // is ever called). We assert the field identity rather than running the
     // pipeline downstream, since fall-through behaviour is owned by the local
     // teleport tests, not the hook integration tests.
-    assertEquals(NetworkCommandHook.LOCAL_ONLY, RTP.networkCommandHook,
+    assertEquals(NetworkCommandHook.LOCAL_ONLY, NetworkHooks.commandHook(),
             "default install must be the LOCAL_ONLY singleton");
   }
 
@@ -114,10 +116,10 @@ public class RTPCmdNetworkHookTest {
     accessor.addPlayer(new MockRTPPlayer(playerId, "p2", null));
     UUID corr = UUID.randomUUID();
     AtomicInteger calls = new AtomicInteger(0);
-    RTP.networkCommandHook = (uuid, args) -> {
+    NetworkHooks.setCommandHook((uuid, args) -> {
       calls.incrementAndGet();
       return NetworkCommandHook.RoutingResult.crossServer(corr, "east", "backend-b");
-    };
+    });
 
     TestRTPCmd cmd = new TestRTPCmd();
     Map<String, List<String>> args = new HashMap<>();
@@ -156,14 +158,14 @@ public class RTPCmdNetworkHookTest {
     data.put(NetworkMessages.networkFallback, "FALLBACK reason=[reason]");
     data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
     data.forEach((k, v) -> {
-            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
             if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
                 ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).setData(java.util.Map.of(((Enum<?>) k).name(), v));
             }
         });
 
-    RTP.networkCommandHook = (uuid, args) ->
-            NetworkCommandHook.RoutingResult.crossServer(UUID.randomUUID(), "east", "backend-b");
+    NetworkHooks.setCommandHook((uuid, args) ->
+            NetworkCommandHook.RoutingResult.crossServer(UUID.randomUUID(), "east", "backend-b"));
 
     TestRTPCmd cmd = new TestRTPCmd();
     AtomicReference<String> msg = new AtomicReference<>();
@@ -183,8 +185,8 @@ public class RTPCmdNetworkHookTest {
   void rejectOutcome_emitsConfiguredKeyMessage_andShortCircuits() {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "p3", null));
-    RTP.networkCommandHook = (uuid, args) ->
-            NetworkCommandHook.RoutingResult.reject(NetworkMessages.networkRegionUnavailable.name(), "mars");
+    NetworkHooks.setCommandHook((uuid, args) ->
+            NetworkCommandHook.RoutingResult.reject(NetworkMessages.networkRegionUnavailable.name(), "mars"));
 
     TestRTPCmd cmd = new TestRTPCmd();
     Map<String, List<String>> args = new HashMap<>();
@@ -205,8 +207,8 @@ public class RTPCmdNetworkHookTest {
   void rejectOutcome_withUnknownMessageKey_fallsBackToNetworkRegionUnavailable() {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "p3b", null));
-    RTP.networkCommandHook = (uuid, args) ->
-            NetworkCommandHook.RoutingResult.reject("notARealEnumName", "venus");
+    NetworkHooks.setCommandHook((uuid, args) ->
+            NetworkCommandHook.RoutingResult.reject("notARealEnumName", "venus"));
 
     TestRTPCmd cmd = new TestRTPCmd();
     AtomicReference<String> msg = new AtomicReference<>();
@@ -236,15 +238,15 @@ public class RTPCmdNetworkHookTest {
   void crossServerOutcome_retainsProcessingPlayersLockForAntiSpam() {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "leakCheck1", null));
-    RTP.getInstance().processingPlayers.add(playerId); // simulate outer onCommand add
-    RTP.networkCommandHook = (uuid, args) ->
-            NetworkCommandHook.RoutingResult.crossServer(UUID.randomUUID(), "east", "backend-b");
+    TeleportSessions.current().processingPlayers.add(playerId); // simulate outer onCommand add
+    NetworkHooks.setCommandHook((uuid, args) ->
+            NetworkCommandHook.RoutingResult.crossServer(UUID.randomUUID(), "east", "backend-b"));
 
     TestRTPCmd cmd = new TestRTPCmd();
     boolean res = cmd.onCommand(playerId, new HashMap<>(), null, s -> {});
 
     assertTrue(res);
-    assertTrue(RTP.getInstance().processingPlayers.contains(playerId),
+    assertTrue(TeleportSessions.current().processingPlayers.contains(playerId),
             "CrossServer short-circuit must RETAIN the processingPlayers lock; "
                     + "otherwise subsequent /rtp re-enrols the player on the proxy "
                     + "(REJECTED_DUPLICATE) with no visible feedback");
@@ -254,26 +256,26 @@ public class RTPCmdNetworkHookTest {
   void rejectOutcome_releasesProcessingPlayersLock() {
     UUID playerId = UUID.randomUUID();
     accessor.addPlayer(new MockRTPPlayer(playerId, "leakCheck2", null));
-    RTP.getInstance().processingPlayers.add(playerId); // simulate outer onCommand add
-    RTP.networkCommandHook = (uuid, args) ->
+    TeleportSessions.current().processingPlayers.add(playerId); // simulate outer onCommand add
+    NetworkHooks.setCommandHook((uuid, args) ->
             NetworkCommandHook.RoutingResult.reject(
-                    NetworkMessages.networkRegionUnavailable.name(), "mars");
+                    NetworkMessages.networkRegionUnavailable.name(), "mars"));
 
     TestRTPCmd cmd = new TestRTPCmd();
     boolean res = cmd.onCommand(playerId, new HashMap<>(), null, s -> {});
 
     assertTrue(res);
-    assertTrue(!RTP.getInstance().processingPlayers.contains(playerId),
+    assertTrue(!TeleportSessions.current().processingPlayers.contains(playerId),
             "Reject short-circuit must remove playerId from processingPlayers");
   }
 
   @Test
   void consoleSenderWithoutPlayerArg_doesNotConsultHook() {
     AtomicInteger calls = new AtomicInteger(0);
-    RTP.networkCommandHook = (uuid, args) -> {
+    NetworkHooks.setCommandHook((uuid, args) -> {
       calls.incrementAndGet();
       return NetworkCommandHook.RoutingResult.crossServer(UUID.randomUUID(), "x", "y");
-    };
+    });
 
     TestRTPCmd cmd = new TestRTPCmd();
     AtomicReference<String> msg = new AtomicReference<>();

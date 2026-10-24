@@ -1,8 +1,11 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -40,13 +43,18 @@ class AsyncTaskProcessingTest {
     void setUp() {
         RTPTestSetup.install(tempDir);
         RTP.futures.clear();
-        RTP.selectionAPI.permRegionLookup.clear();
-        RTP.selectionAPI.selectionPipelineUrgent.clear();
-        RTP.selectionAPI.selectionPipeline.clear();
-        RTP.getInstance().cancelTasks.clear();
-        RTP.getInstance().cancelTasks.start();
-        RTP.getInstance().miscAsyncTasks.clear();
-        RTP.getInstance().miscAsyncTasks.start();
+        ActiveSelection.get().permRegionLookup.clear();
+        ActiveSelection.get().selectionPipelineUrgent.clear();
+        ActiveSelection.get().selectionPipeline.clear();
+        MiscTasks.cancel().clear();
+        MiscTasks.cancel().start();
+        MiscTasks.async().clear();
+        MiscTasks.async().start();
+        if (MiscTasks.backgroundSync() != null) {
+            MiscTasks.backgroundSync().clear();
+            MiscTasks.backgroundSync().start();
+        }
+        ComputeGovernor.active().reset();
         AsyncTaskProcessing.resetRotationForTesting();
         TickBudget.clear();
     }
@@ -54,9 +62,9 @@ class AsyncTaskProcessingTest {
     @AfterEach
     void tearDown() {
         RTP.futures.clear();
-        RTP.selectionAPI.permRegionLookup.clear();
-        RTP.selectionAPI.selectionPipelineUrgent.clear();
-        RTP.selectionAPI.selectionPipeline.clear();
+        ActiveSelection.get().permRegionLookup.clear();
+        ActiveSelection.get().selectionPipelineUrgent.clear();
+        ActiveSelection.get().selectionPipeline.clear();
     }
 
     private Region newRegion(String name) {
@@ -95,7 +103,7 @@ class AsyncTaskProcessingTest {
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void run_executesCancelTasksPipe() {
         boolean[] ran = {false};
-        RTP.getInstance().cancelTasks.add(() -> ran[0] = true);
+        MiscTasks.cancel().add(() -> ran[0] = true);
 
         new AsyncTaskProcessing(Long.MAX_VALUE).run();
 
@@ -106,7 +114,7 @@ class AsyncTaskProcessingTest {
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void run_executesMiscAsyncTasksPipe() {
         boolean[] ran = {false};
-        RTP.getInstance().miscAsyncTasks.add(() -> ran[0] = true);
+        MiscTasks.async().add(() -> ran[0] = true);
 
         new AsyncTaskProcessing(Long.MAX_VALUE).run();
 
@@ -117,7 +125,7 @@ class AsyncTaskProcessingTest {
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void cancelledBeforeRun_shortCircuits_withoutDrainingMiscAsync() {
         boolean[] ran = {false};
-        RTP.getInstance().miscAsyncTasks.add(() -> ran[0] = true);
+        MiscTasks.async().add(() -> ran[0] = true);
 
         AsyncTaskProcessing proc = new AsyncTaskProcessing(Long.MAX_VALUE);
         proc.setCancelled(true);
@@ -129,8 +137,8 @@ class AsyncTaskProcessingTest {
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void run_withRegion_doesNotThrow_andRotates() {
-        RTP.selectionAPI.permRegionLookup.put("regionA", newRegion("regionA"));
-        RTP.selectionAPI.permRegionLookup.put("regionB", newRegion("regionB"));
+        ActiveSelection.get().permRegionLookup.put("regionA", newRegion("regionA"));
+        ActiveSelection.get().permRegionLookup.put("regionB", newRegion("regionB"));
 
         // Multiple pulses to exercise the step / betweenStep rotation arithmetic.
         for (int i = 0; i < 4; i++) {
@@ -141,7 +149,7 @@ class AsyncTaskProcessingTest {
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void run_withZeroAvailableTime_doesNotThrow() {
-        RTP.selectionAPI.permRegionLookup.put("regionA", newRegion("regionA"));
+        ActiveSelection.get().permRegionLookup.put("regionA", newRegion("regionA"));
         assertDoesNotThrow(() -> new AsyncTaskProcessing(0L).run());
     }
 
@@ -156,7 +164,7 @@ class AsyncTaskProcessingTest {
                 throw new RuntimeException("simulated region execute error");
             }
         };
-        RTP.selectionAPI.permRegionLookup.put("throwingRegion", throwingRegion);
+        ActiveSelection.get().permRegionLookup.put("throwingRegion", throwingRegion);
 
         // Run pulse, verifying it catches the exception and logs it rather than crashing
         assertDoesNotThrow(() -> new AsyncTaskProcessing(100_000L).run());
@@ -182,7 +190,7 @@ class AsyncTaskProcessingTest {
                 }
             }
         };
-        RTP.selectionAPI.permRegionLookup.put("blockingRegion", blocking);
+        ActiveSelection.get().permRegionLookup.put("blockingRegion", blocking);
 
         Thread first = new Thread(() -> new AsyncTaskProcessing(Long.MAX_VALUE).run(), "pulse-1");
         first.start();
@@ -191,7 +199,7 @@ class AsyncTaskProcessingTest {
             assertTrue(AsyncTaskProcessing.isPulseActive());
 
             boolean[] drained = {false};
-            RTP.getInstance().miscAsyncTasks.add(() -> drained[0] = true);
+            MiscTasks.async().add(() -> drained[0] = true);
             for (int i = 0; i < 5; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
 
             assertEquals(1, executions.get(), "overlapping ticks must not re-enter the region");
@@ -205,8 +213,17 @@ class AsyncTaskProcessingTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    @DisplayName("performance.yml period: a single region refills exactly once per `period` pulses")
+    @DisplayName("performance.yml period: autoTune false refills once per `period` pulses; autoTune true refills every pulse with credit")
     void period_singleRegion_runsOncePerPeriod() {
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+        if (perf != null) {
+            perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.autoTune, false);
+            TickBudget.refresh();
+        }
+
         AtomicInteger executions = new AtomicInteger();
         Region base = newRegion("countingRegion");
         Region counting = new Region("countingRegion", base.getSettings()) {
@@ -215,13 +232,22 @@ class AsyncTaskProcessingTest {
                 executions.incrementAndGet();
             }
         };
-        RTP.selectionAPI.permRegionLookup.put("countingRegion", counting);
+        ActiveSelection.get().permRegionLookup.put("countingRegion", counting);
 
         long period = TickBudget.periodTicks();
         assertTrue(period > 1, "precondition: default period spans several pulses");
         for (long i = 0; i < period * 3; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
 
-        assertEquals(3, executions.get(), "one turn per period, not per period-1");
+        assertEquals(3, executions.get(), "autoTune false: one turn per period, not per period-1");
+
+        if (perf != null) {
+            perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.autoTune, true);
+            TickBudget.refresh();
+            ComputeGovernor.active().reset();
+            executions.set(0);
+            for (long i = 0; i < 5; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
+            assertEquals(5, executions.get(), "autoTune true: region with credit runs on every pulse");
+        }
     }
 
     @Test
@@ -236,7 +262,7 @@ class AsyncTaskProcessingTest {
                 seen[0] = allottedTime;
             }
         };
-        RTP.selectionAPI.permRegionLookup.put("budgetRegion", probe);
+        ActiveSelection.get().permRegionLookup.put("budgetRegion", probe);
 
         new AsyncTaskProcessing(Long.MAX_VALUE).run();
 
@@ -257,27 +283,27 @@ class AsyncTaskProcessingTest {
     void selectionApi_compute_drainsPipelines() {
         AtomicInteger urgentRan = new AtomicInteger();
         AtomicInteger standardRan = new AtomicInteger();
-        RTP.selectionAPI.selectionPipelineUrgent.add(urgentRan::incrementAndGet);
-        RTP.selectionAPI.selectionPipelineUrgent.add(() -> { throw new RuntimeException("simulated task error"); });
-        RTP.selectionAPI.selectionPipeline.add(standardRan::incrementAndGet);
+        ActiveSelection.get().selectionPipelineUrgent.add(urgentRan::incrementAndGet);
+        ActiveSelection.get().selectionPipelineUrgent.add(() -> { throw new RuntimeException("simulated task error"); });
+        ActiveSelection.get().selectionPipeline.add(standardRan::incrementAndGet);
 
-        assertDoesNotThrow(() -> RTP.selectionAPI.compute());
+        assertDoesNotThrow(() -> ActiveSelection.get().compute());
 
         assertEquals(1, urgentRan.get());
         assertEquals(1, standardRan.get());
-        assertTrue(RTP.selectionAPI.selectionPipelineUrgent.isEmpty());
-        assertTrue(RTP.selectionAPI.selectionPipeline.isEmpty());
+        assertTrue(ActiveSelection.get().selectionPipelineUrgent.isEmpty());
+        assertTrue(ActiveSelection.get().selectionPipeline.isEmpty());
     }
 
     @Test
     @DisplayName("AsyncTaskProcessing uses availableTime fallback when configs is null")
     void run_usesConstructorTimeWhenConfigsNull() {
-        io.github.dailystruggle.rtp.common.configuration.Configs saved = RTP.configs;
-        RTP.configs = null;
+        io.github.dailystruggle.rtp.common.configuration.Configs saved = ActiveConfigs.get();
+        ActiveConfigs.set(null);
         try {
             assertDoesNotThrow(() -> new AsyncTaskProcessing(1_000_000L).run());
         } finally {
-            RTP.configs = saved;
+            ActiveConfigs.set(saved);
         }
     }
 }

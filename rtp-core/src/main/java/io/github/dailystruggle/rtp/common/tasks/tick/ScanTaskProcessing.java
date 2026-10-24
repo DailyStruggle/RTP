@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import java.util.Map;
 
 public final class ScanTaskProcessing extends RTPRunnable {
@@ -15,7 +15,7 @@ public final class ScanTaskProcessing extends RTPRunnable {
   public void run() {
     if (isCancelled()) return;
 
-    for (Map.Entry<String, ScanTask> e : RTP.getInstance().scanTasks.entrySet()) {
+    for (Map.Entry<String, ScanTask> e : ScanTasks.current().entrySet()) {
       if (e.getValue().isRunning()) continue;
       e.getValue().run();
       if (isCancelled()) return;

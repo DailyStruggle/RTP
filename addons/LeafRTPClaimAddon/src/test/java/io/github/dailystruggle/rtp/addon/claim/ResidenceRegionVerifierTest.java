@@ -10,7 +10,6 @@ import com.bekvon.bukkit.residence.protection.ClaimedResidence;
 import com.bekvon.bukkit.residence.protection.ResidenceManager;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.claimaddon.ResidenceChecker;
 import java.lang.reflect.Field;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -30,6 +29,7 @@ class ResidenceRegionVerifierTest {
   private RTPWorld<?> mockRtpWorld;
 
   private ResidenceManager mockResidenceManager;
+  private Residence mockResidence;
   private ResidenceRegionVerifier verifier;
 
   @BeforeEach
@@ -40,6 +40,7 @@ class ResidenceRegionVerifierTest {
     mockRtpWorld = mock(RTPWorld.class);
 
     when(mockServer.getPluginManager()).thenReturn(mockPluginManager);
+    when(mockPluginManager.isPluginEnabled("Residence")).thenReturn(true);
     when(mockServer.getWorld("test_world")).thenReturn(mockBukkitWorld);
     when(mockBukkitWorld.getName()).thenReturn("test_world");
     when(mockRtpWorld.name()).thenReturn("test_world");
@@ -48,11 +49,10 @@ class ResidenceRegionVerifierTest {
     serverField.setAccessible(true);
     serverField.set(null, mockServer);
 
-    resetExists();
-
     mockResidenceManager = mock(ResidenceManager.class);
-    Residence.setResidenceManager(mockResidenceManager);
-    Residence.setInstance(new Residence());
+    mockResidence = mock(Residence.class);
+    when(mockResidence.getResidenceManager()).thenReturn(mockResidenceManager);
+    setResidenceInstance(mockResidence);
 
     verifier = new ResidenceRegionVerifier();
   }
@@ -63,19 +63,13 @@ class ResidenceRegionVerifierTest {
     serverField.setAccessible(true);
     serverField.set(null, null);
 
-    Residence.setResidenceManager(null);
-    Residence.setInstance(null);
-
-    resetExists();
+    setResidenceInstance(null);
   }
 
-  private void resetExists() {
-    try {
-      Field existsField = ResidenceChecker.class.getDeclaredField("exists");
-      existsField.setAccessible(true);
-      existsField.set(null, true);
-    } catch (Throwable ignored) {
-    }
+  private static void setResidenceInstance(Residence value) throws Exception {
+    Field instanceField = Residence.class.getDeclaredField("instance");
+    instanceField.setAccessible(true);
+    instanceField.set(null, value);
   }
 
   @Test
@@ -113,7 +107,7 @@ class ResidenceRegionVerifierTest {
   @Test
   @DisplayName("verify handles null residence manager gracefully")
   void testVerifyNullManagerFallback() {
-    Residence.setResidenceManager(null);
+    when(mockResidence.getResidenceManager()).thenReturn(null);
 
     RTPLocation loc = new RTPLocation(mockRtpWorld, 200, 64, 200);
     assertDoesNotThrow(() -> verifier.verify(loc));

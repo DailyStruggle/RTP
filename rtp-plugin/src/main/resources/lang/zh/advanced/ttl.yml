@@ -1,5 +1,5 @@
 # --- RTP 空间内存 TTL 设置 ---
-# 文档: plugins/RTP/docs/admin/configuration/TTL.md
+# 文档: docs/admin/configuration/TTL.md
 
 # 空间内存中被拒绝坐标序列的基础保留时长。
 # 支持的时长格式: 例如 14d, 12h, 30m, 3600s, 40t, 2500ms 或复合格式 1d12h。

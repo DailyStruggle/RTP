@@ -1,3 +1,9 @@
+# Dostosowuje obliczenia w tle, rozmiar goracego bufora i wspolbieznosc generowania do zapasu serwera i popytu.
+# Skonfigurowane ponizej wartosci dzialaja jako limity. Ustaw false dla stalych wartosci.
+# @type: boolean
+# @default: true
+automatyczneDostrajanie: true
+
 # Wstrzymaj wypełnianie pamięci podręcznej w tle, gdy TPS spadnie poniżej tej wartości.
 # Na Folii liczy się najwolniejszy region. Oczekujący gracze nadal są obsługiwani. 0 = wył.
 # @type: number
@@ -21,7 +27,7 @@ maxMSPT: 45.0
 maxHeapProcent: 85.0
 
 # --- Ustawienia wydajności RTP ---
-# Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
+# Documentation: docs/admin/configuration/PERFORMANCE.md
 # Maksymalna liczba prób wyszukiwania na wywołanie /rtp przed rezygnacją.
 # @type: integer
 # @range: [1, null]
@@ -29,6 +35,7 @@ maxHeapProcent: 85.0
 maksProby: 32
 
 # Ticki między uzupełnieniami tego samego regionu. Regiony działają na zmianę.
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -36,6 +43,7 @@ maksProby: 32
 okres: 20
 
 # Maks. ms na tick dla pracy w głównym wątku. Ograniczono do 25.
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -43,6 +51,7 @@ okres: 20
 przydzielonyCzasSync: 5
 
 # Maks. ms na impuls dla pracy w tle. Ograniczono do 25.
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -69,6 +78,7 @@ zasiegWidokuTeleport: 0
 # po przybyciu, wygładzając skok ładowania chunków. 0 wyłącza ograniczenie.
 # UWAGA: Tymczasowo wymuszone na 0. Stopniowe przywracanie powoduje migotanie /
 # ponowne renderowanie po stronie klienta przy przybyciu. Pozostaw 0 do odwołania.
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -133,6 +143,7 @@ pamiecBiomuWymuszona: false
 
 # Próg opóźnienia (ms), powyżej którego natychmiast obsłużona teleportacja jest
 # audytowana (WARN w logu, slowPipelineCount zwiększony). 0 lub mniej wyłącza.
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

@@ -19,6 +19,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.action.ActionCommand;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import org.junit.jupiter.api.AfterEach;
@@ -64,14 +65,14 @@ class Rtp5And6ActionSubsystemTest {
     serverAccessor = io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir);
     originalGroupService = RTP.groupPlacementService;
     actionManager = new ActionManager();
-    RTP.actionManager = actionManager;
+    ActionServices.setActionManager(actionManager);
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = actionManager;
   }
 
   @AfterEach
   void tearDown() {
     RTP.groupPlacementService = originalGroupService;
-    RTP.actionManager = null;
+    ActionServices.setActionManager(null);
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = null;
     io.github.dailystruggle.rtp.common.mock.RTPTestSetup.cleanUp();
   }
@@ -112,7 +113,7 @@ class Rtp5And6ActionSubsystemTest {
     when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
     when(mockRegion.candidateValidator()).thenReturn((x, z) -> new io.github.dailystruggle.rtp.common.selection.region.RTPLocation(new RTPCoords("world", x, 64, z), 1L));
 
-    RTP.selectionAPI.permRegionLookup.put("fail_teleport_region", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("fail_teleport_region", mockRegion);
 
     try {
       GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
@@ -127,7 +128,7 @@ class Rtp5And6ActionSubsystemTest {
       assertEquals(GroupPlacementResult.Reason.ERROR, result.reason());
       verify(ticket).close();
     } finally {
-      RTP.selectionAPI.permRegionLookup.remove("fail_teleport_region");
+      ActiveSelection.get().permRegionLookup.remove("fail_teleport_region");
     }
   }
 

@@ -80,4 +80,4 @@ Related documentation:
 - Teleport execution pipeline: [`docs/architecture/01-teleport-execution-pipeline.md`](01-teleport-execution-pipeline.md).
 - Candidate selection per attempt: [`docs/architecture/08-location-selection-per-attempt.md`](08-location-selection-per-attempt.md).
 - Cost-governed chunk resolution and native admission: [`docs/architecture/15-cost-governed-chunk-reads-and-native-admission.md`](15-cost-governed-chunk-reads-and-native-admission.md).
-- Governing ADRs: [ADR-010](../adr/ADR-010-budgeted-cache-refill-and-dynamic-pregen.md), [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md), [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-110](../adr/ADR-110-purpose-gated-live-loads.md).
+- Governing ADRs: [ADR-006](../adr/ADR-006-async-queue-pre-generation.md), [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md), [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-078](../adr/ADR-078-composable-cache-pipeline-stages.md), [ADR-087](../adr/ADR-087-adaptive-compute-governor.md), [ADR-110](../adr/ADR-110-purpose-gated-live-loads.md).

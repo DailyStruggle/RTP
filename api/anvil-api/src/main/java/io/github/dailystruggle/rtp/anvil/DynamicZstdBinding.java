@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.anvil;
 
-import io.github.dailystruggle.rtp.anvil.bit.BitHealth;
-import io.github.dailystruggle.rtp.anvil.bit.BuiltInTestable;
-import io.github.dailystruggle.rtp.anvil.bit.PbitResult;
+import io.github.dailystruggle.bit.BitHealth;
+import io.github.dailystruggle.bit.BuiltInTestable;
+import io.github.dailystruggle.bit.PbitResult;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
@@ -51,9 +51,11 @@ public final class DynamicZstdBinding implements BuiltInTestable {
     private static final DecompressorInvoker INVOKER;
     private static final PbitResult PBIT_RESULT;
     private static final BitHealth HEALTH;
+    private static final boolean HOST_ENGINE_MISSING;
 
     static {
         DecompressorInvoker resolvedInvoker = null;
+        boolean hostEngineMissing = false;
         PbitResult result;
         long start = System.nanoTime();
 
@@ -74,6 +76,7 @@ public final class DynamicZstdBinding implements BuiltInTestable {
                 }
             } else {
                 long duration = System.nanoTime() - start;
+                hostEngineMissing = true;
                 result = PbitResult.failed("DynamicZstdBinding", duration,
                         "Host Zstandard engine not present on classpath", null);
             }
@@ -87,6 +90,7 @@ public final class DynamicZstdBinding implements BuiltInTestable {
         INVOKER = resolvedInvoker;
         PBIT_RESULT = result;
         HEALTH = (resolvedInvoker != null) ? BitHealth.HEALTHY : BitHealth.DEGRADED;
+        HOST_ENGINE_MISSING = hostEngineMissing;
 
         if (resolvedInvoker != null) {
             LOG.fine("[RTP] DynamicZstdBinding passed PBIT in " + (PBIT_RESULT.durationNanos() / 1_000_000.0) + " ms");
@@ -103,6 +107,11 @@ public final class DynamicZstdBinding implements BuiltInTestable {
      */
     public static boolean isAvailable() {
         return INVOKER != null;
+    }
+
+    /** Returns whether no host Zstandard engine was found, rather than one failing its canary. */
+    public static boolean hostEngineMissing() {
+        return HOST_ENGINE_MISSING;
     }
 
     /**

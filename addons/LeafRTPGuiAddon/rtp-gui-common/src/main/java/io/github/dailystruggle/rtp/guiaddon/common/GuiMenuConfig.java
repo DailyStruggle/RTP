@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.RtpTargetStatus;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 /**
@@ -26,8 +26,8 @@ public final class GuiMenuConfig {
 
   @SuppressWarnings("unchecked")
   private ConfigParser<GuiMenuKeys> parser() {
-    if (RTP.configs == null) return null;
-    return (ConfigParser<GuiMenuKeys>) RTP.configs.getParser(GuiMenuKeys.class);
+    if (ActiveConfigs.get() == null) return null;
+    return (ConfigParser<GuiMenuKeys>) ActiveConfigs.get().getParser(GuiMenuKeys.class);
   }
 
   private String str(GuiMenuKeys key, String fallback) {
@@ -60,6 +60,22 @@ public final class GuiMenuConfig {
   /** Configured renderer style for a bare {@code /rtp} (e.g. {@code chest}, {@code book}). */
   public String menuStyle() {
     return str(GuiMenuKeys.menuStyle, "chest");
+  }
+
+  /**
+   * Whether bare {@code /rtp} opens the destination picker GUI rather than teleporting
+   * immediately. Defaults to {@code true}, and also returns {@code false} when
+   * {@link #menuStyle()} is {@code "none"} or {@code "off"}.
+   */
+  public boolean openOnBareRtp() {
+    String style = menuStyle();
+    if (style != null) {
+      String trimmed = style.trim();
+      if ("none".equalsIgnoreCase(trimmed) || "off".equalsIgnoreCase(trimmed)) {
+        return false;
+      }
+    }
+    return bool(GuiMenuKeys.openOnBareRtp, Boolean.TRUE);
   }
 
   public String title() {

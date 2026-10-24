@@ -4,10 +4,11 @@ import io.github.dailystruggle.mapsapi.PaletteIndex;
 import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
 import io.github.dailystruggle.mapsapi.render.RegionBadLocationsRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 
 /**
  * Resolver for {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE}.
@@ -24,7 +25,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
 
     @Override
     public Resolution resolve(ChartSpec spec) throws UnresolvableChartSpecException {
-        RTP.log(java.util.logging.Level.FINE,
+        RTPRuntime.log(java.util.logging.Level.FINE,
                 "[viz/bad-locations] resolver entry: spec="
                         + (spec == null ? "null"
                                 : (spec.kind() + " region=" + spec.regionName())));
@@ -39,7 +40,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
 
         Region region;
         try {
-            region = RTP.selectionAPI.getRegionOrDefault(spec.regionName());
+            region = ActiveSelection.get().getRegionOrDefault(spec.regionName());
         } catch (RuntimeException e) {
             throw new UnresolvableChartSpecException(
                     "no region resolved for '" + spec.regionName() + "'", e);
@@ -110,7 +111,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
         if (boundW <= 0L) boundW = 1L;
         if (boundH <= 0L) boundH = 1L;
 
-        RTP.log(java.util.logging.Level.FINE,
+        RTPRuntime.log(java.util.logging.Level.FINE,
                 "[viz/bad-locations] resolver bbox: region=" + region.name
                         + " range=" + range + " step=" + step
                         + " samples=" + samples
@@ -146,9 +147,9 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
     }
 
     /**
-     * Maps a {@link LocationGenerator.FailTypes} ordinal to a logical {@link PaletteIndex} byte.
+     * Maps a {@link FailTypes} ordinal to a logical {@link PaletteIndex} byte.
      *
-     * @param causeOrdinal a {@link LocationGenerator.FailTypes} ordinal
+     * @param causeOrdinal a {@link FailTypes} ordinal
      * @return a logical palette byte for the cause
      */
     static byte causeColor(int causeOrdinal) {
@@ -160,12 +161,12 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
         final byte ORANGE = (byte) (PaletteIndex.RAMP_MIN + 17); // red -> yellow
         final byte YELLOW = (byte) (PaletteIndex.RAMP_MIN + 22); // ~ yellow
         final byte CREAM = (byte) (PaletteIndex.RAMP_MIN + 25);  // yellow -> white
-        LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+        FailTypes[] values = FailTypes.values();
         if (causeOrdinal < 0 || causeOrdinal >= values.length) {
             return PaletteIndex.RED;
         }
         return switch (values[causeOrdinal]) {
-            case vert, prefilterRange -> MAROON;
+            case vert, prefilterRange, terrain, prefilterTerrain -> MAROON;
             case safety, prefilterBlock -> SCARLET;
             case safetyExternal -> ORANGE;
             case biome, prefilterBiome -> YELLOW;

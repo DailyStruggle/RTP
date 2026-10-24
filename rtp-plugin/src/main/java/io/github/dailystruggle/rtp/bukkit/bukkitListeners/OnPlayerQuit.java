@@ -1,7 +1,12 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import org.bukkit.event.EventHandler;
@@ -15,30 +20,30 @@ public final class OnPlayerQuit implements Listener {
   @EventHandler(priority = EventPriority.LOWEST)
   public void onPlayerQuit(PlayerQuitEvent event) {
     UUID uuid = event.getPlayer().getUniqueId();
-    RTP.getInstance().queuedPlayers.remove(uuid);
+    TeleportSessions.current().queuedPlayers.remove(uuid);
 
-    TeleportPipelineTask pendingDeath = RTP.pendingDeathTeleports.remove(uuid);
+    TeleportPipelineTask pendingDeath = DeathTeleports.pending().remove(uuid);
     if (pendingDeath != null) {
       pendingDeath.completeDeathTeleport(false);
     }
 
-    RTP.getInstance().invulnerablePlayers.remove(uuid);
-    RTP.getInstance().processingPlayers.remove(uuid);
+    TeleportSessions.current().invulnerablePlayers.remove(uuid);
+    TeleportSessions.current().processingPlayers.remove(uuid);
 
     // ADR-055: forget any native PvP combat tag so a reconnecting player is
     // never spuriously gated and the tracker map does not leak across sessions.
     io.github.dailystruggle.rtp.common.pvp.PvPGate.nativeTracker().clear(uuid);
 
-    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
     if (data != null) {
       if (!data.completed) {
         if (data.nextTask instanceof TeleportPipelineTask task) {
           task.setCancelled(true);
           if (task.coords() != null) {
-            RTP.scheduler.runTask(
+            RTPRuntime.scheduler().runTask(
                     task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
           } else {
-            RTP.scheduler.runTask(task);
+            RTPRuntime.scheduler().runTask(task);
           }
         }
       } else {
@@ -46,17 +51,17 @@ public final class OnPlayerQuit implements Listener {
         if (RTP.getInstance().fileBinStore != null) {
           RTP.getInstance().fileBinStore.save(data);
         }
-        RTP.getInstance().latestTeleportData.remove(uuid);
-        RTP.getInstance().priorTeleportData.remove(uuid);
-        RTP.getInstance().regionTeleportTimes.remove(uuid);
+        TeleportSessions.current().latestTeleportData.remove(uuid);
+        TeleportSessions.current().priorTeleportData.remove(uuid);
+        TeleportSessions.current().regionTeleportTimes.remove(uuid);
       }
     }
 
     new RTPTeleportCancel(uuid).run();
 
     try {
-      if (RTP.actionManager != null) {
-        RTP.actionManager.handlePlayerQuit(uuid);
+      if (ActionServices.actionManager() != null) {
+        ActionServices.actionManager().handlePlayerQuit(uuid);
       }
     } catch (Throwable ignored) {
       // never let the quit listener throw
@@ -85,8 +90,8 @@ public final class OnPlayerQuit implements Listener {
     // best-effort, guarded - the quit listener must never throw.
     try {
       java.util.Collection<io.github.dailystruggle.rtp.common.selection.region.Region> regions =
-          new java.util.ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
-      regions.addAll(RTP.selectionAPI.tempRegions.values());
+          new java.util.ArrayList<>(ActiveSelection.get().permRegionLookup.values());
+      regions.addAll(ActiveSelection.get().tempRegions.values());
       for (io.github.dailystruggle.rtp.common.selection.region.Region region : regions) {
         try {
           region.closePersonalQueue(uuid);
@@ -110,7 +115,7 @@ public final class OnPlayerQuit implements Listener {
     // enabled (in practice only the default-world region per ADR-023).
     try {
       for (io.github.dailystruggle.rtp.common.selection.region.Region region :
-          RTP.selectionAPI.permRegionLookup.values()) {
+          ActiveSelection.get().permRegionLookup.values()) {
         if (region.queueManager.loginLocations == null) continue;
         new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
             .promoteUpTo(1);

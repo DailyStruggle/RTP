@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Guards for {@link RtpProxy} mirroring the {@code RTP.serverAccessor} S-006
+ * Guards for {@link RtpProxy} mirroring the {@code RTPRuntime.serverAccessor()} S-006
  * contract: unregistered reads throw {@link IllegalStateException}, registered
  * reads return the exact instance, clear resets the slot.
  *

@@ -136,7 +136,7 @@ class DocsRegistryAndEditorTest {
     void visualizationPayloadGeneration(@TempDir Path tempDir) {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir.toFile());
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
         try {
             EditorSessionManager manager = new EditorSessionManager();
             io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square square =
@@ -217,7 +217,7 @@ class DocsRegistryAndEditorTest {
             assertEquals("viz_test_reg", delta.get("region"));
             assertNotNull(delta.get("rleBase64"));
         } finally {
-            io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
         }
     }
 
@@ -226,7 +226,7 @@ class DocsRegistryAndEditorTest {
     void hilbertWalkPathPayloadGeneration(@TempDir Path tempDir) {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir.toFile());
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
         try {
             EditorSessionManager manager = new EditorSessionManager();
             io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer hilbertSquare =
@@ -267,7 +267,7 @@ class DocsRegistryAndEditorTest {
             assertEquals("TEST_HILBERT_SQUARE", curve.get("shape"));
             assertEquals(walkPathData.get("pointChunks"), ((Map<?, ?>) curve.get("state")).get("p"));
         } finally {
-            io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
         }
     }
 }

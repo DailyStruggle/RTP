@@ -1,12 +1,14 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -68,10 +70,10 @@ class ConfigParserCoverageTest {
 
         RTPServerAccessor mockAccessor = mock(RTPServerAccessor.class);
         when(mockAccessor.getPluginDirectory()).thenReturn(pluginDir);
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
 
-        RTP.factoryMap.put(RTP.factoryNames.shape, new Factory<>());
-        RTP.factoryMap.put(RTP.factoryNames.vert, new Factory<>());
+        FactoryRegistry.map().put(FactoryNames.shape, new Factory<>());
+        FactoryRegistry.map().put(FactoryNames.vert, new Factory<>());
 
         db = new YamlFileDatabase(pluginDir);
         db.connect();
@@ -79,7 +81,7 @@ class ConfigParserCoverageTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     @Test
@@ -325,7 +327,7 @@ class ConfigParserCoverageTest {
         Factory<SubFactoryValue> shapeFactory = new Factory<>();
         SubFactoryValue circle = new SubFactoryValue("circle");
         shapeFactory.add("circle", circle);
-        RTP.factoryMap.put(RTP.factoryNames.shape, (Factory) shapeFactory);
+        FactoryRegistry.map().put(FactoryNames.shape, (Factory) shapeFactory);
 
         File configFile = new File(pluginDir, "shape_set.yml");
         Files.writeString(configFile.toPath(),

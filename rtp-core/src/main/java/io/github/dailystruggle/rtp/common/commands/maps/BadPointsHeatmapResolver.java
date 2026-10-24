@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.maps;
 import io.github.dailystruggle.mapsapi.model.Heatmap2D;
 import io.github.dailystruggle.mapsapi.render.HeatmapRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
@@ -35,7 +35,7 @@ public final class BadPointsHeatmapResolver implements ChartSpecResolver {
 
     Region region;
     try {
-      region = RTP.selectionAPI.getRegionOrDefault(spec.regionName());
+      region = ActiveSelection.get().getRegionOrDefault(spec.regionName());
     } catch (RuntimeException e) {
       throw new UnresolvableChartSpecException(
           "no region resolved for '" + spec.regionName() + "'", e);

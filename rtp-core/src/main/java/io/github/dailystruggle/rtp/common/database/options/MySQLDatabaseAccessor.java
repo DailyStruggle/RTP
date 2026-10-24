@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor.TableObj;
 import io.github.dailystruggle.rtp.common.database.pool.MiniConnectionPool;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.sql.*;
 import java.util.*;
 import java.util.logging.Level;
@@ -54,7 +54,7 @@ public class MySQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
                         + ");";
         statement.execute(schema);
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       close();
       throw new IllegalStateException("Failed to connect to MySQL database: " + e.getMessage(), e);
     }
@@ -110,7 +110,7 @@ public class MySQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
       }
       statement.executeUpdate();
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "Failed to write to MySQL table " + tableName, e);
+      RTPRuntime.log(Level.WARNING, "Failed to write to MySQL table " + tableName, e);
     }
   }
 }

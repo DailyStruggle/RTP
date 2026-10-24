@@ -1,0 +1,115 @@
+name: Gradle project-set build
+
+# Called by gradle.yml once per project set (core, proxy, bukkit, fabric,
+# neoforge, helpers, addons, plugin). Runs the set's Gradle tasks from
+# scripts/ci-scope.py with the coverage and static-analysis gates, and hands
+# the JaCoCo / PMD XML and compiled classes to the `analysis` job as
+# `reports-<set>`, so SonarCloud does not recompile what this job built.
+on:
+  workflow_call:
+    inputs:
+      set:
+        description: Project set name; used in check and artifact names.
+        required: true
+        type: string
+      tasks:
+        description: Space-separated Gradle tasks.
+        required: true
+        type: string
+      artifact-name:
+        description: Optional artifact to upload from artifact-path.
+        required: false
+        type: string
+        default: ''
+      artifact-path:
+        description: Newline-separated paths for artifact-name.
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # Both toolchains: the 26.x Fabric/NeoForge carriers (and the GUI renderers
+      # and effects-api unobf module built against them) pin Java 25.
+      - name: Set up JDK 21 and 25
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: |
+            21
+            25
+          distribution: 'temurin'
+
+      # PR runs write the cache too (the default is read-only off the default
+      # branch), so a later push to the same PR reuses task outputs. Every set
+      # runs as job `build` of this workflow; the per-set key keeps one set's
+      # Gradle home from being restored into, or blocking the save of, another.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        env:
+          GRADLE_BUILD_ACTION_CACHE_KEY_JOB: gradle-set-${{ inputs.set }}
+        with:
+          cache-read-only: false
+          cache-cleanup: on-success
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build and test
+        env:
+          TASKS: ${{ inputs.tasks }}
+        run: |
+          if [ -z "$TASKS" ]; then
+            echo "No tasks for this set."
+            exit 0
+          fi
+          echo "Running: $TASKS"
+          # Word splitting of $TASKS is intended: one Gradle task per word.
+          ./gradlew $TASKS -Pcoverage -PstaticAnalysis
+
+      - name: Publish test results
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6.6.1
+        if: always()
+        with:
+          report_paths: '**/build/test-results/test/TEST-*.xml'
+          check_name: 'Test Results (${{ inputs.set }})'
+
+      # A tarball keeps repo-relative paths; upload-artifact would strip the
+      # common prefix when only one module produced reports.
+      - name: Pack reports and classes
+        env:
+          SET: ${{ inputs.set }}
+        run: |
+          { find . -path ./.git -prune -o \( -path '*/build/reports/jacoco/test/jacocoTestReport.xml' \
+              -o -path '*/build/reports/pmd/*.xml' \) -type f -print
+            find . -path ./.git -prune -o -path '*/build/classes' -type d -print
+          } > report-files.txt
+          echo "$(wc -l < report-files.txt) report file(s) / class dir(s)"
+          tar -czf "reports-$SET.tgz" -T report-files.txt
+
+      - name: Upload reports and classes
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: reports-${{ inputs.set }}
+          path: reports-${{ inputs.set }}.tgz
+          retention-days: 3
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: jacoco-coverage-${{ inputs.set }}
+          path: '**/build/reports/jacoco/'
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload artifacts
+        if: inputs.artifact-name != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.artifact-path }}

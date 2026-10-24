@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.AfterEach;
@@ -36,8 +36,8 @@ public class MessageTaggerTest {
     @AfterEach
     void tearDown() {
         // Leave the shared config in the disabled default so no sibling test inherits the tag.
-        // Guard against tests that deliberately null out RTP.configs.
-        if (RTP.configs != null) {
+        // Guard against tests that deliberately null out ActiveConfigs.get().
+        if (ActiveConfigs.get() != null) {
             setDevTag(false);
         }
     }
@@ -45,7 +45,7 @@ public class MessageTaggerTest {
     @SuppressWarnings("unchecked")
     private void setDevTag(boolean enabled) {
         ConfigParser<SystemMessages> parser =
-                (ConfigParser<SystemMessages>) RTP.configs.getParser(SystemMessages.class);
+                (ConfigParser<SystemMessages>) ActiveConfigs.get().getParser(SystemMessages.class);
         parser.setConfigValue("showDevTag", enabled);
     }
 
@@ -65,7 +65,7 @@ public class MessageTaggerTest {
 
     @Test
     void nullConfigsSuppressesTheTag() {
-        RTP.configs = null;
+        ActiveConfigs.set(null);
         assertEquals("hello", MessageTagger.tagMessage("hello", "TAG"),
                 "with no config loaded the tag must be suppressed by default");
     }

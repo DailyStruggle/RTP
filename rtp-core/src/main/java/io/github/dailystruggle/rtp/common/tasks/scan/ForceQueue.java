@@ -1,0 +1,105 @@
+package io.github.dailystruggle.rtp.common.tasks.scan;
+
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+import org.jetbrains.annotations.Nullable;
+
+/** Task for forcing the generation of locations in regions */
+public final class ForceQueue extends RTPRunnable {
+  /** Actions to perform before forcing the queue */
+  public static final List<Consumer<ForceQueue>> preActions = new CopyOnWriteArrayList<>();
+
+  /** Actions to perform after forcing the queue */
+  public static final List<Consumer<ForceQueue>> postActions = new CopyOnWriteArrayList<>();
+
+  private final RTPCommandSender sender;
+  private final Collection<Region> regions;
+
+  /** Constructor for ForceQueue using console as sender and all regions */
+  public ForceQueue() {
+    sender = RTPRuntime.serverAccessor().getSender(CommandsAPI.serverId);
+    regions = ActiveSelection.get().permRegionLookup.values();
+  }
+
+  /**
+   * Constructor for ForceQueue with a specific sender and all regions
+   *
+   * @param sender the command sender
+   */
+  public ForceQueue(RTPCommandSender sender) {
+    this.sender = sender;
+    regions = ActiveSelection.get().permRegionLookup.values();
+  }
+
+  /**
+   * Constructor for ForceQueue with a specific sender and a specific set of regions
+   *
+   * @param sender the command sender
+   * @param regions the regions to force, or null for all regions
+   */
+  public ForceQueue(RTPCommandSender sender, @Nullable Collection<Region> regions) {
+    this.sender = sender;
+    if (regions == null || regions.isEmpty()) regions = ActiveSelection.get().permRegionLookup.values();
+    this.regions = regions;
+  }
+
+  /** Spark-profiler frame tag (diagram 02 force-queue trigger). See {@link RTPRunnable#sparkFrameName()}. */
+  @Override
+  protected String sparkFrameName() { return "rtp_force_queue"; }
+
+  @Override
+  public void run() {
+    preActions.forEach(consumer -> consumer.accept(this));
+
+    for (Region region : regions) {
+      region.execute(Long.MAX_VALUE);
+    }
+
+    postActions.forEach(consumer -> consumer.accept(this));
+  }
+
+  /**
+   * Get the command sender who initiated the force
+   *
+   * @return the command sender
+   */
+  public RTPCommandSender sender() {
+    return sender;
+  }
+
+  /**
+   * Get the regions being forced
+   *
+   * @return the collection of regions
+   */
+  public Collection<Region> regions() {
+    return regions;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == this) return true;
+    if (obj == null || obj.getClass() != this.getClass()) return false;
+    ForceQueue that = (ForceQueue) obj;
+    return Objects.equals(this.sender, that.sender) && Objects.equals(this.regions, that.regions);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(sender, regions);
+  }
+
+  @Override
+  public String toString() {
+    return "DoTeleport[" + "sender=" + sender + ", " + "regions=" + regions + ']';
+  }
+}

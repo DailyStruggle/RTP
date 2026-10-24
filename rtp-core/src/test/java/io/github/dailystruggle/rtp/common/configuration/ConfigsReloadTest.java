@@ -4,7 +4,10 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,21 +34,21 @@ public class ConfigsReloadTest {
         MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir.toFile());
         // Requires empty world list.
         accessor.clearWorlds();
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
         rtp = new RTP();
     }
 
     @Test
     public void testConcurrentReloadAndRead() throws InterruptedException {
         // 1. Construct an integration test that initializes a mock Configs instance with 10 dummy regions
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
 
         // Add dummy regions to selectionAPI.permRegionLookup
         for (int i = 0; i < 10; i++) {
             String name = "region" + i;
             Region mockRegion = mock(Region.class);
             mockRegion.name = name;
-            RTP.selectionAPI.permRegionLookup.put(name, mockRegion);
+            ActiveSelection.get().permRegionLookup.put(name, mockRegion);
         }
 
         // 2. Simulate a rapid succession of reload() calls while a separate thread pool attempts to read properties
@@ -107,22 +110,22 @@ public class ConfigsReloadTest {
 
     @AfterEach
     public void tearDown() {
-        if (RTP.configs != null && RTP.configs.fileDatabase != null) {
+        if (ActiveConfigs.get() != null && ActiveConfigs.get().fileDatabase != null) {
             try {
-                RTP.configs.fileDatabase.close();
+                ActiveConfigs.get().fileDatabase.close();
             } catch (Throwable ignored) {
             }
         }
         if (RTP.getInstance() != null) {
-            RTP.getInstance().miscAsyncTasks.clear();
-            RTP.getInstance().startupTasks.clear();
+            MiscTasks.async().clear();
+            MiscTasks.startup().clear();
             RTP.stop();
         }
-        if (RTP.serverAccessor instanceof MockRTPServerAccessor) {
-            ((MockRTPServerAccessor) RTP.serverAccessor).clearWorlds();
+        if (RTPRuntime.serverAccessor() instanceof MockRTPServerAccessor) {
+            ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).clearWorlds();
         }
-        RTP.selectionAPI = null;
-        RTP.configs = null;
+        ActiveSelection.set(null);
+        ActiveConfigs.set(null);
         // Prompt GC to drop any uncollected file mappings or descriptors before tempDir cleanup
         System.gc();
     }

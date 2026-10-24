@@ -111,7 +111,7 @@ Reviewer notes (read before reviewing the Performance section):
     70 blocks. Both figures are true; use them together.
 
 Private / Author notes:
-  - Run a future memory leak test using the behaviour leak fuzzer (`scripts/bench_fuzz.py`) across all candidate plugins on Folia/Paper to evaluate long-duration heap bounds and update the memory retention comparisons.
+  - Run a future memory leak test using the behaviour leak fuzzer (`scripts/bench_fuzz.py`) on LeafRTP only, on Folia/Paper, to evaluate long-duration heap bounds. Competitor leak runs are out of scope.
 -->
 
 <div align="center">
@@ -199,19 +199,17 @@ More setups: [Features](../site/features.md#common-setups), [recipes](../admin/R
 Nightly CI boots 1.21.11 and 26.3. I take bug reports from 1.21.11 to the latest release; older versions should run, but fixes there are best effort. Folia is the exception: it is experimental and only its current builds are maintained, so Folia older than 1.21.11 is not supported and can crash without RTP's involvement. Exact per-version status is in the [support matrix](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/SUPPORT_MATRIX.md).
 
 1. Drop `{{jar}}` into `plugins/` (or `mods/`).
-2. Type `/rtp`. With the bundled GUI addon it opens a picker listing your regions, with links to the map visualizations and the admin panel; without it, `/rtp` teleports straight away.
+2. Type `/rtp`. With the bundled GUI addon, regular players see a picker listing only the regions they have permission to use, while the admin panel and map visualization links are gated behind `rtp.admin` (OP) and hidden from regular players. To make bare `/rtp` teleport straight away while keeping `/rtp gui` available, set `openOnBareRtp: false` in `addons/guimenu.yml` (or toggle it in `/rtp admin setup`).
 
-That's enough to run. If you want to tune it, my recommended order is:
+That's enough to run. When you're ready to configure regions and settings, pick either self-contained setup path:
 
-1. `/rtp admin setup`.
-2. Set each region's radius for how players will use it. The wizard doesn't ask; use e.g. `/rtp config regions default shape.radius=10km`, or drag the border in `/rtp editor`.
-3. `/rtp scan start` to pre-check the terrain.
-4. A stress test if you expect heavy traffic.
+- **Browser map workspace (`/rtp editor`):** Opens your config and world map in the browser with no inbound port needed. Draw region borders on the map, edit settings with each key's docs beside it, and review a diff before applying ([web workspace guide](../admin/WEB_EDITOR_GUIDE.md)).
+- **In-game guided wizard (`/rtp admin setup`):** Walks through world layout, gameplay presets, region radius (via clickable presets or Anvil input), performance profile, and addon toggles (`openOnBareRtp`, claim checks, effects), then previews the diff before writing ([quick-start guide](../admin/QUICK_START.md)).
 
-**Customize (optional):**
-- **Web workspace:** `/rtp editor` opens it in your browser. Draw region borders on a map, edit settings with each key's docs beside it, and review a diff before applying. Screenshots and a walkthrough: [web workspace guide](../admin/WEB_EDITOR_GUIDE.md).
-- **Chat wizard:** `/rtp admin setup` ([guided setup](../admin/QUICK_START.md))
-- **YAML files:** `plugins/RTP/` (`radius: 10km`, `teleportCooldown: 30s`)
+After sizing your regions, run `/rtp scan start` to pre-check the terrain, and run a stress test if you expect heavy traffic.
+
+**Other ways to customize (optional):**
+- **One-line commands or YAML files:** `/rtp config regions default shape.radius=10km`, or edit `plugins/RTP/` directly (`radius: 10km`, `teleportCooldown: 30s`).
 - **Switching from another rtp plugin:** `/rtp config import` finds the old plugin's folder in `plugins/` on its own (or point it anywhere with `path=<dir>`), then previews the translated config and permissions; add `overwrite=true` to write them ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
 
 (Advanced database, network proxy, and cache tuning: see the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).)
@@ -223,7 +221,7 @@ That's enough to run. If you want to tune it, my recommended order is:
 - **Setting it up:** web editor, in-game admin book, chat wizard, `/rtp config import`, `/rtp scan`, live map visualizations, 11 languages.
 - **For players:** `/rtp` and `/wild`, region, world and biome picks, `/rtp back`, menus, per-player queues, effects, landing platforms.
 - **Gameplay and worlds:** any number of regions in six shapes, arrival schematics, auto-RTP on events, Vault pricing, an optional combat-tag check.
-- **Actions:** step-in portals, party scatter, 1v1 and 2v2 arenas, anchor drops.
+- **Actions:** step-in wilderness portals, launch pads, party and team wilderness scatter, and claim or faction anchor teleports (plus optional 1v1/2v2 duel queues and KOTH templates in the action addon).
 - **Claims and safety:** 16 claim plugins on Bukkit-family servers plus FTB Chunks and Open Parties and Claims on Fabric and NeoForge, and a configurable block safety filter.
 - **Networks and developers:** cross-server `/rtp` over Velocity; `rtp-api` addons, SPI-swappable parts, PlaceholderAPI, bStats.
 
@@ -269,6 +267,9 @@ Terms used on this page: **TP/s** is teleports per second. **TPS** is server tic
 
 - **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Above its safe max on Paper, LeafRTP still completed every teleport: 21,924 of 21,924 in the 80 and 160 TP/s stages, delivering up to 103.3 TP/s while the server slowed to about 9-10 TPS (MSPT p95 88-105 ms). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
 
+<details>
+<summary><b>Latency at equal load (Paper 26.2, p50 / p99 ms)</b></summary>
+
 **Latency at equal load:** time from `/rtp` to arrival, pooled over each plugin's Paper runs. Each cell is p50 / p99 in milliseconds ([full table with p95](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md#paper-262-linux-realtime---latency-at-5-to-40-tps)).
 
 | Plugin | 5 TP/s | 10 TP/s | 20 TP/s | 40 TP/s |
@@ -281,6 +282,8 @@ Terms used on this page: **TP/s** is teleports per second. **TPS** is server tic
 | JustRTP | 367 / 2,471 | 473 / 2,480 | 476 / 2,477 | failed (25.5 of 40 TP/s delivered) |
 
 `-` means no result in the pooled runs. For LeafRTP at 5, 10 and 20 TP/s the max was 58 ms over 4,194 teleports, and its MSPT p95 was 21-37 ms per run. [1] JakesRTP had the lowest median at those rates, but its MSPT p95 reached 77-118 ms at 40 TP/s. At 40 TP/s LeafRTP's ready queue runs out in this config, so those teleports wait on a live selection.
+
+</details>
 
 <details>
 <summary><b>What I changed on each plugin so they do the same job</b></summary>
@@ -310,9 +313,14 @@ Full benchmark tables, methodology, and per-run analyses: [`helpers/StressTestRT
 *Where each plugin landed 4,096 players in the Paper 26.2 run (`20261008-003310`), every one set to the same 1,024 to 16,384 block circle around 0,0. The green box under each panel is the LeafRTP region shape that gives the same distance-from-center spread, so any of these distributions is a config change in LeafRTP. Each config is replayed through LeafRTP's own shape code over the same terrain: LeafRTP and BetterRTP match CIRCLE, EzRTP and HuskHomes match CIRCLE_NORMAL, and JustRTP and JakesRTP match the spiral power curve.*
 
 
-**Caveats.** The region-file check only works on terrain that exists; any plugin has to generate a chunk that was never generated. The Linux stress test used 48 idle bots with server view distance capped at 2: real connections and chunk sends, with nobody moving or building. Heap reached the 16 GB limit in LeafRTP 100 TP/s runs under G1; separating long-term retention from deferred GC collection is ongoing. Hardware, view distance, world state (how much of it is unsafe, whether it's pregenerated) and other plugins will move the numbers. The other plugins update often; if a number here is out of date, open a GitHub issue with a repro or a doc link and I'll correct it. The harness measures dispatch-to-arrival latency, per-attempt cost, and success rate as defined above; it does not measure claim-plugin compatibility or safety rules.
+<details>
+<summary><b>Benchmark caveats and additional runs</b></summary>
+
+**Caveats.** The region-file check only works on terrain that exists; any plugin has to generate a chunk that was never generated. The Linux stress test used 48 idle bots with server view distance capped at 2: real connections and chunk sends, with nobody moving or building. Hardware, view distance, world state (how much of it is unsafe, whether it's pregenerated) and other plugins will move the numbers. The other plugins update often; if a number here is out of date, open a GitHub issue with a repro or a doc link and I'll correct it. The harness measures dispatch-to-arrival latency, per-attempt cost, and success rate as defined above; it does not measure claim-plugin compatibility or safety rules.
 
 Full methodology, per-run analyses, and the runs not shown here (equalized-radius Folia, pinned-heap GC profiling, the wide-radius single-plugin run): [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
+
+</details>
 
 ---
 
@@ -495,7 +503,7 @@ A: Rarely, and no player positions are tracked. In two Paper 26.2 runs of 4,096 
 A: Most `/rtp` calls are served from a queue of locations checked before anyone typed the command. The queue refills off the main thread: it skips ground it has already rejected and checks the rest against the region files before loading any chunk. Details are in [How it works](../site/how-it-works.md).
 
 **Q: Is it complicated to set up?**
-A: No. The guided setup wizard (`/rtp admin setup`) picks a preset for your server type. It doesn't ask for a radius, so size each region in the web workspace (`/rtp editor`), the in-game book (`/rtp admin`), or with one command (`/rtp config regions default shape.radius=10km`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
+A: No. Pick either the browser map workspace (`/rtp editor`) or the in-game guided wizard (`/rtp admin setup`): both configure your worlds, region radii (by dragging the border on the map, clicking a preset, or typing a distance in an Anvil prompt), and presets with a diff preview before anything is written. You can also set a radius with one command (`/rtp config regions default shape.radius=10km`) or in the in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
 
 **Q: How is the web editor secured? Does it open ports on my server?**
 A: Not to the outside. The hosted editor needs no inbound port: it connects outbound over TLS to an ephemeral WebSocket relay. Local mode (`/rtp editor local`) binds a token-authenticated socket on `127.0.0.1` only, which nothing outside the machine can reach. All messages require RSA-2048 signatures with strictly increasing sequence counters and single-use, expiring trust nonces.
@@ -551,20 +559,20 @@ A: Open a GitHub issue with your server version, LeafRTP version, platform, the 
 <!-- not: bbb-pro -->
 Support is me, in my spare time, so it's best effort.
 
-- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`): it shows each setting's docs next to the value. I help with bugs and anything still unclear after that.
-- A bug report needs: server version, LeafRTP version, platform, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the relevant part of the server log. If something's missing I'll ask for it.
+- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`), or open a thread in the [**LeafCraft Plugin Support** Discord `#support` Forum](DISCORD_LAYOUT.md) where the doc and `[RTP bit]` bot answers common setup questions right away. I help with bugs and anything still unclear after that.
+- A bug report in GitHub Issues or the Discord `#support` Forum needs: `/version`, `/rtp version`, `/rtp test` output, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the server log uploaded to `mclo.gs`. If something's missing I'll ask for it.
 - "It doesn't work" isn't something I can act on. Tell me what you did, what you expected, and what happened instead.
 - There's no guaranteed response time. Safety bugs (bad landings, chunk leaks, claim bypasses) get looked at first.
-- Feature requests go in GitHub issues.
+- Feature requests go in GitHub Discussions or the Discord `#support` Forum first.
 <!-- /not -->
 <!-- only: bbb-pro -->
 <!-- kind: promo -->
 Support comes from me, the person who wrote the code.
 
-- Tickets from this listing go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
+- Tickets from this listing and `@Pro Supporter` threads in the [**LeafCraft Plugin Support** Discord `#support` Forum](DISCORD_LAYOUT.md) (tagged `💎 Pro Priority` automatically) go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
 - Response time: 24-72 h on weekdays. Safety bugs go first regardless.
-- Bug reports with server version, plugin version, platform, configs and log lines get fixed fastest. Most setup questions are answered in the admin guide.
-- Feature requests go in GitHub issues.
+- Bug reports with `/version`, `/rtp version`, `/rtp test` output, configs and an `mclo.gs` log link get fixed fastest. Most setup questions are answered right away by the `#support` Forum bot or the admin guide.
+- Feature requests go in GitHub Discussions or the Discord `#support` Forum.
 <!-- /kind -->
 <!-- /only -->
 
@@ -576,6 +584,7 @@ Support comes from me, the person who wrote the code.
 
 - [**Documentation site**](https://dailystruggle.github.io/RTP/): every doc in one searchable place
 - [**Admin and configuration guide**](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/): install, configure, command reference
+- [**Discord `#support` Forum**](DISCORD_LAYOUT.md): interactive setup help, `[RTP bit]` log triage, and community channels
 - [**Addon / API developer guide**](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/): `rtp-api` and examples
 - [**Changelog**](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md)
 - [**Source on GitHub**](https://github.com/dailystruggle/RTP): issues, contributions, the benchmark harness

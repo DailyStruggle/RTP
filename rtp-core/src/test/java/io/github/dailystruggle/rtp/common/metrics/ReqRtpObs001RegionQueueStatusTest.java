@@ -3,10 +3,10 @@ package io.github.dailystruggle.rtp.common.metrics;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.metrics.api.RegionQueueRow;
 import io.github.dailystruggle.metrics.api.RegionQueueStatus;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -40,7 +40,7 @@ class ReqRtpObs001RegionQueueStatusTest {
                 50L, 0L, 0L, 10, 0.0, 16L, null, false
         );
         Region region = new Region("test_region", settings);
-        RTP.selectionAPI.permRegionLookup.put("test_region", region);
+        ActiveSelection.get().permRegionLookup.put("test_region", region);
 
         try {
             CoreMetrics metrics = new CoreMetrics();
@@ -75,7 +75,7 @@ class ReqRtpObs001RegionQueueStatusTest {
             assertEquals(1, satRow.playerQueueDepth);
             assertEquals(RegionQueueStatus.SATURATED, satRow.status);
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("test_region");
+            ActiveSelection.get().permRegionLookup.remove("test_region");
         }
     }
 }

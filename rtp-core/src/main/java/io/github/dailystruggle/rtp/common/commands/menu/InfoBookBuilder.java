@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -230,8 +231,8 @@ public final class InfoBookBuilder {
 
     @SuppressWarnings("unchecked")
     private static String lookupMsg(Enum<?> key, String fallback) {
-        if (RTP.configs == null) return fallback;
-        Object v = RTP.configs.getConfigValue(key, fallback);
+        if (ActiveConfigs.get() == null) return fallback;
+        Object v = ActiveConfigs.get().getConfigValue(key, fallback);
         return v == null ? fallback : v.toString();
     }
 

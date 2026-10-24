@@ -1,10 +1,15 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.cache.CacheStage;
 import io.github.dailystruggle.rtp.common.selection.region.cache.HotSink;
 import io.github.dailystruggle.rtp.common.selection.region.cache.KeyedCacheStage;
 import io.github.dailystruggle.rtp.common.selection.region.cache.RingCacheStage;
+import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,7 +20,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
@@ -106,6 +113,23 @@ public class RegionQueueManager {
 
     public final ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
 
+    private static final long TICKET_VALIDATION_RETRY_TICKS = 20L;
+    private final AtomicReference<TicketValidationSweep> ticketValidationSweep = new AtomicReference<>();
+
+    private static final class TicketValidationSweep {
+        private final RTPWorld<?> world;
+        private final ConcurrentLinkedQueue<RTPLocation> remaining;
+        private final AtomicBoolean pumping = new AtomicBoolean();
+        private final AtomicBoolean pumpScheduled = new AtomicBoolean();
+        private final AtomicBoolean cancelled = new AtomicBoolean();
+        private final AtomicInteger inFlight = new AtomicInteger();
+
+        private TicketValidationSweep(RTPWorld<?> world, List<RTPLocation> locations) {
+            this.world = world;
+            this.remaining = new ConcurrentLinkedQueue<>(locations);
+        }
+    }
+
     /**
      * Per-uuid in-flight guard for personal-bucket push-on-open fills (ADR-043).
      * When {@link #openPersonalQueue(UUID)} schedules a {@link RegionCacheTask}
@@ -124,7 +148,7 @@ public class RegionQueueManager {
                 try {
                     loc.reservation().close();
                 } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
+                    RTPRuntime.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
                 }
             }
         };
@@ -133,7 +157,7 @@ public class RegionQueueManager {
                 try {
                     loc.reservation().close();
                 } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] cold disposal: unexpected reservation closed at " + loc.coords() + ": " + t, t);
+                    RTPRuntime.log(Level.WARNING, "[RTP] cold disposal: unexpected reservation closed at " + loc.coords() + ": " + t, t);
                 }
             }
         };
@@ -240,13 +264,13 @@ public class RegionQueueManager {
      */
     public void installDatabaseCallbacks() {
         java.util.function.Consumer<RTPLocation> saveCallback = location -> {
-            if (RTP.getInstance().databaseAccessor != null) {
-                RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, null);
+            if (ActiveDatabase.accessor() != null) {
+                ActiveDatabase.accessor().saveCachedLocation(region.name, location, null);
             }
         };
         java.util.function.Consumer<RTPLocation> deleteCallback = location -> {
-            if (RTP.getInstance().databaseAccessor != null) {
-                RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, location);
+            if (ActiveDatabase.accessor() != null) {
+                ActiveDatabase.accessor().deleteCachedLocation(region.name, location);
             }
         };
         this.keptLocations.setCallbacks(saveCallback, deleteCallback);
@@ -342,7 +366,7 @@ public class RegionQueueManager {
             try {
                 loc.reservation().close();
             } catch (Throwable t) {
-                RTP.log(java.util.logging.Level.WARNING,
+                RTPRuntime.log(java.util.logging.Level.WARNING,
                         "[RTP] demoteToUnkept: reservation close failed at "
                                 + loc.coords() + ": " + t, t);
             }
@@ -410,7 +434,7 @@ public class RegionQueueManager {
                     try {
                         loc.reservation().close();
                     } catch (Throwable t) {
-                        RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
+                        RTPRuntime.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
                     }
                 }
             };
@@ -493,11 +517,11 @@ public class RegionQueueManager {
         try {
             // One selection attempt on an async worker; no tick-thread budget to apply.
             RegionCacheTask fill = new RegionCacheTask(region, uuid, 0L);
-            RTP.scheduler.runTaskAsynchronously(fill);
+            RTPRuntime.scheduler().runTaskAsynchronously(fill);
         } catch (Throwable t) {
             // Never let listener wiring throw: release the guard and log.
             perPlayerInFlight.remove(uuid);
-            RTP.log(java.util.logging.Level.WARNING,
+            RTPRuntime.log(java.util.logging.Level.WARNING,
                     "[RTP] openPersonalQueue: failed to schedule personal fill for "
                             + uuid + ": " + t, t);
         }
@@ -534,7 +558,7 @@ public class RegionQueueManager {
     public void requestTeleport(UUID uuid) {
         if (uuid == null) return;
         playerQueue.add(uuid);
-        RTP.getInstance().queuedPlayers.add(uuid);
+        TeleportSessions.current().queuedPlayers.add(uuid);
     }
 
     /**
@@ -550,6 +574,7 @@ public class RegionQueueManager {
         if (uuid != null) {
             CompletableFuture<RTPLocation> fast = fastLocations.remove(uuid);
             if (fast != null) {
+                region.recordLocationConsumed(uuid);
                 return fast;
             }
 
@@ -565,9 +590,10 @@ public class RegionQueueManager {
                 // so aborts the very teleport this poll is serving. The shared
                 // keptLocations branch below likewise just returns the location and
                 // lets the pipeline carry it through to completion.
-                if (RTP.getInstance().databaseAccessor != null) {
-                    RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, loc);
+                if (ActiveDatabase.accessor() != null) {
+                    ActiveDatabase.accessor().deleteCachedLocation(region.name, loc);
                 }
+                region.recordLocationConsumed(uuid);
                 return CompletableFuture.completedFuture(loc);
             }
             }
@@ -576,6 +602,7 @@ public class RegionQueueManager {
         if (!keptLocations.isEmpty()) {
             RTPLocation loc = keptLocations.poll();
             if (loc != null) {
+                region.recordLocationConsumed(uuid);
                 return CompletableFuture.completedFuture(loc);
             }
         }
@@ -631,12 +658,14 @@ public class RegionQueueManager {
      * refill the caches afterwards. Backs {@code /rtp clearcache}.
      */
     public void clearCaches() {
+        cancelTicketValidationSweep();
         keptLocations.clear();
         unkeptLocations.clear();
         if (backlogLocations != null) backlogLocations.clear();
     }
 
     public void shutDown() {
+        cancelTicketValidationSweep();
         // Disable DB removal during shutdown so the persisted rows survive for the next boot.
         keptLocations.setCallbacks(null, null);
         unkeptLocations.setCallbacks(null, null);
@@ -673,7 +702,7 @@ public class RegionQueueManager {
         });
         fastLocations.clear();
         playerQueue.clear();
-        RTP.getInstance().queuedPlayers.clear();
+        TeleportSessions.current().queuedPlayers.clear();
     }
 
     /**
@@ -718,8 +747,8 @@ public class RegionQueueManager {
         }
 
         queue.add(location);
-        if (RTP.getInstance().databaseAccessor != null) {
-            RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, uuid);
+        if (ActiveDatabase.accessor() != null) {
+            ActiveDatabase.accessor().saveCachedLocation(region.name, location, uuid);
         }
     }
 
@@ -778,29 +807,173 @@ public class RegionQueueManager {
         return unkeptLocations.offer(location);
     }
 
-    public void validateTickets(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world) {
+    public void validateTickets(RTPWorld<?> world) {
         if (world == null) return;
+        TicketValidationSweep active = ticketValidationSweep.get();
+        if (active != null) {
+            if (active.world == world) {
+                scheduleTicketValidationPump(active, 1L);
+                return;
+            }
+            active.cancelled.set(true);
+            active.remaining.clear();
+            if (active.inFlight.get() != 0 || !ticketValidationSweep.compareAndSet(active, null)) return;
+        }
 
-        // Sweep the fast queue to recover any dropped tickets
-        for (int i = 0; i < keptLocations.size(); i++) {
-            io.github.dailystruggle.rtp.common.selection.region.RTPLocation loc = keptLocations.get(i);
-            if (loc == null || loc.reservation() == null) continue;
+        List<RTPLocation> locations = new ArrayList<>();
+        int keptCount = keptLocations.size();
+        for (int i = 0; i < keptCount; i++) {
+            RTPLocation location = keptLocations.get(i);
+            if (location != null && location.reservation() != null) locations.add(location);
+        }
+        if (locations.isEmpty()) return;
 
-            int cx = loc.coords().x() >> 4;
-            int cz = loc.coords().z() >> 4;
+        TicketValidationSweep sweep = new TicketValidationSweep(world, locations);
+        if (!ticketValidationSweep.compareAndSet(null, sweep)) {
+            TicketValidationSweep current = ticketValidationSweep.get();
+            if (current != null && current.world == world) scheduleTicketValidationPump(current, 1L);
+            return;
+        }
+        pumpTicketValidationSweep(sweep);
+    }
 
-            // Asynchronously guarantee the chunk is still loaded.
-            // Re-calling refresh() is idempotent and will restore the plugin ticket
-            // if an admin command stripped it, without blocking Folia tick threads.
-            world.recordChunkLoadOrigin("RegionQueueManager.validateTickets");
-            world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+    private void pumpTicketValidationSweep(TicketValidationSweep sweep) {
+        if (ticketValidationSweep.get() != sweep
+                || sweep.cancelled.get()
+                || !sweep.pumping.compareAndSet(false, true)) return;
+        try {
+            while (!sweep.remaining.isEmpty()) {
+                if (ticketValidationSweep.get() != sweep || sweep.cancelled.get()) return;
+                GenerationBudget.Reservation generationSlot = GenerationBudget.server().reserve();
+                if (generationSlot == null) {
+                    scheduleTicketValidationPump(sweep, TICKET_VALIDATION_RETRY_TICKS);
+                    return;
+                }
+                RTPLocation location = sweep.remaining.poll();
+                if (location == null) {
+                    generationSlot.close();
+                    continue;
+                }
+                sweep.inFlight.incrementAndGet();
+                startTicketValidation(sweep, location, generationSlot);
+            }
+        } finally {
+            sweep.pumping.set(false);
+            finishTicketValidationSweepIfIdle(sweep);
+        }
+    }
+
+    private void startTicketValidation(
+            TicketValidationSweep sweep,
+            RTPLocation location,
+            GenerationBudget.Reservation generationSlot) {
+        AtomicBoolean settled = new AtomicBoolean();
+        int cx = location.coords().x() >> 4;
+        int cz = location.coords().z() >> 4;
+        try {
+            sweep.world.recordChunkLoadOrigin("RegionQueueManager.validateTickets");
+            CompletableFuture<ChunkSet> loadFuture = GenerationBudget.withReservation(
+                    generationSlot, () -> sweep.world.getChunkAtAsync(cx, cz));
+            if (loadFuture == null) {
+                RTPRuntime.log(Level.WARNING,
+                        "Failed to recover chunk ticket: chunk load returned no future at " + cx + "," + cz);
+                finishTicketValidation(sweep, generationSlot, settled);
+                return;
+            }
+            loadFuture.whenComplete((chunkSet, loadFailure) -> {
                 try {
-                    loc.reservation().refresh();
-                } catch (Exception e) {
-                    io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to recover chunk ticket: " + e.getMessage(), e);
+                    if (loadFailure != null) {
+                        RTPRuntime.log(Level.WARNING,
+                                "Failed to recover chunk ticket at " + cx + "," + cz, loadFailure);
+                        finishTicketValidation(sweep, generationSlot, settled);
+                        return;
+                    }
+                    CompletableFuture<Boolean> completion = chunkSet == null ? null : chunkSet.complete();
+                    if (completion == null) {
+                        RTPRuntime.log(Level.WARNING,
+                                "Failed to recover chunk ticket: chunk load returned no completion at " + cx + "," + cz);
+                        finishTicketValidation(sweep, generationSlot, settled);
+                        return;
+                    }
+                    completion.whenComplete((loaded, completionFailure) -> {
+                        try {
+                            if (completionFailure != null) {
+                                RTPRuntime.log(Level.WARNING,
+                                        "Failed to recover chunk ticket at " + cx + "," + cz, completionFailure);
+                            } else if (!Boolean.TRUE.equals(loaded)) {
+                                RTPRuntime.log(Level.WARNING,
+                                        "Failed to recover chunk ticket: chunk did not complete at " + cx + "," + cz);
+                            } else if (!sweep.cancelled.get()) {
+                                location.reservation().refresh();
+                            }
+                        } catch (Throwable failure) {
+                            RTPRuntime.log(Level.WARNING,
+                                    "Failed to recover chunk ticket at " + cx + "," +cz, failure);
+                        } finally {
+                            finishTicketValidation(sweep, generationSlot, settled);
+                        }
+                    });
+                } catch (Throwable failure) {
+                    RTPRuntime.log(Level.WARNING,
+                            "Failed to recover chunk ticket at " + cx + "," + cz, failure);
+                    finishTicketValidation(sweep, generationSlot, settled);
                 }
             });
+        } catch (Throwable failure) {
+            RTPRuntime.log(Level.WARNING,
+                    "Failed to recover chunk ticket at " + cx + "," + cz, failure);
+            finishTicketValidation(sweep, generationSlot, settled);
         }
+    }
+
+    private void finishTicketValidation(
+            TicketValidationSweep sweep,
+            GenerationBudget.Reservation generationSlot,
+            AtomicBoolean settled) {
+        if (!settled.compareAndSet(false, true)) return;
+        try {
+            generationSlot.close();
+        } finally {
+            sweep.inFlight.decrementAndGet();
+            finishTicketValidationSweepIfIdle(sweep);
+            if (!sweep.cancelled.get() && ticketValidationSweep.get() == sweep) {
+                scheduleTicketValidationPump(sweep, 1L);
+            }
+        }
+    }
+
+    private void finishTicketValidationSweepIfIdle(TicketValidationSweep sweep) {
+        if (sweep.remaining.isEmpty() && sweep.inFlight.get() == 0) {
+            ticketValidationSweep.compareAndSet(sweep, null);
+        }
+    }
+
+    private void scheduleTicketValidationPump(TicketValidationSweep sweep, long delayTicks) {
+        if (ticketValidationSweep.get() != sweep
+                || sweep.cancelled.get()
+                || !sweep.pumpScheduled.compareAndSet(false, true)) return;
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler = RTPRuntime.scheduler();
+        if (scheduler == null) {
+            sweep.pumpScheduled.set(false);
+            return;
+        }
+        try {
+            scheduler.runTaskLater(() -> {
+                sweep.pumpScheduled.set(false);
+                pumpTicketValidationSweep(sweep);
+            }, delayTicks);
+        } catch (Throwable failure) {
+            sweep.pumpScheduled.set(false);
+            RTPRuntime.log(Level.WARNING, "Ticket validation sweep could not be scheduled", failure);
+        }
+    }
+
+    private void cancelTicketValidationSweep() {
+        TicketValidationSweep sweep = ticketValidationSweep.get();
+        if (sweep == null) return;
+        sweep.cancelled.set(true);
+        sweep.remaining.clear();
+        if (sweep.inFlight.get() == 0) ticketValidationSweep.compareAndSet(sweep, null);
     }
 
     /**
@@ -843,14 +1016,14 @@ public class RegionQueueManager {
                     try {
                         loc.reservation().close();
                     } catch (Throwable t) {
-                        io.github.dailystruggle.rtp.common.RTP.log(
+                        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                                 java.util.logging.Level.WARNING,
                                 "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                     }
                 }
-                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
-                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
-                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                if (TeleportSessions.current() != null
+                        && ActiveDatabase.accessor() != null) {
+                    ActiveDatabase.accessor()
                             .deleteCachedLocation(region.name, loc);
                 }
             }
@@ -873,14 +1046,14 @@ public class RegionQueueManager {
                     try {
                         loc.reservation().close();
                     } catch (Throwable t) {
-                        io.github.dailystruggle.rtp.common.RTP.log(
+                        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                                 java.util.logging.Level.WARNING,
                                 "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                     }
                 }
-                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
-                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
-                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                if (TeleportSessions.current() != null
+                        && ActiveDatabase.accessor() != null) {
+                    ActiveDatabase.accessor()
                             .deleteCachedLocation(region.name, loc);
                 }
             }
@@ -901,14 +1074,14 @@ public class RegionQueueManager {
                         try {
                             loc.reservation().close();
                         } catch (Throwable t) {
-                            io.github.dailystruggle.rtp.common.RTP.log(
+                            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                                     java.util.logging.Level.WARNING,
                                     "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                         }
                     }
-                    if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
-                            && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
-                        io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                    if (TeleportSessions.current() != null
+                            && ActiveDatabase.accessor() != null) {
+                        ActiveDatabase.accessor()
                                 .deleteCachedLocation(region.name, loc);
                     }
                 }

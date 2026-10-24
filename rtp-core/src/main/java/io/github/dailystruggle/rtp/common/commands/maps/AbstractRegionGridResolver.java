@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.maps;
 
 import io.github.dailystruggle.mapsapi.BiomeColorSource;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
@@ -77,7 +77,7 @@ public abstract class AbstractRegionGridResolver implements ChartSpecResolver {
    */
   protected Region resolveRegion(ChartSpec spec) throws UnresolvableChartSpecException {
     try {
-      return RTP.selectionAPI.getRegionOrDefault(spec.regionName());
+      return ActiveSelection.get().getRegionOrDefault(spec.regionName());
     } catch (RuntimeException e) {
       throw new UnresolvableChartSpecException(
           "no region resolved for '" + spec.regionName() + "'", e);

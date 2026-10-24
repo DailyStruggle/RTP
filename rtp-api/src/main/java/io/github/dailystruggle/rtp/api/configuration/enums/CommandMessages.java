@@ -73,6 +73,14 @@ public enum CommandMessages {
   infoTopRejectionCause,
   /** Info line showing the per-cause rejection breakdown. See ADR-052. Empty template skips silently. */
   infoFailureBreakdown,
+  /** Info line showing configured vs. effective background async budget and reason (ADR-087 Section 6.2). */
+  infoGovernorAsync,
+  /** Info line showing configured vs. effective background sync budget and reason (ADR-087 Section 6.2). */
+  infoGovernorSync,
+  /** Info line showing configured vs. effective hot-cache capacity and reason (ADR-087 Section 6.2). */
+  infoGovernorHotCap,
+  /** Info line showing configured vs. effective generation cap, reason, and Folia regional in-flight vs. ceiling (ADR-087 Section 6.2). */
+  infoGovernorGeneration,
   /** Lower bound for the green band on TPS (1m/5m/15m). Default {@code 19.5}. */
   infoThresholdTpsGreen,
   /** Lower bound for the yellow band on TPS (1m/5m/15m). Default {@code 18.0}. */
@@ -192,7 +200,7 @@ public enum CommandMessages {
   menuAdminPanelRowEditor,
   /** Hover text for the admin-panel editor row. No placeholders. */
   menuAdminPanelHoverEditor,
-  /** Section divider above the Documentation & Editor block on the admin panel. */
+  /** Section divider above the Documentation &amp; Editor block on the admin panel. */
   menuAdminPanelSectionDocs,
   /** Admin-panel row: open the regions multi-config submenu. No placeholders. */
   menuAdminPanelRowRegions,
@@ -434,5 +442,10 @@ public enum CommandMessages {
   /** {@code /rtp editor apply}: the payload was applied and the configs reloaded. No placeholders. */
   editorApplySuccess,
   /** {@code /rtp editor apply}: fetching, validating or applying the payload failed. {@code [reason]}. */
-  editorApplyFailed
+  editorApplyFailed,
+  /**
+   * {@code /rtp editor apply}: config PBIT rejected the payload before any write (ADR-121).
+   * {@code [count]}, {@code [code]}, {@code [source]}, {@code [path]}.
+   */
+  editorApplyRejected
 }

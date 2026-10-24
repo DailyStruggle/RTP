@@ -1,5 +1,5 @@
 # --- effects/default.yml ---
-# Documentation: plugins/RTP/docs/admin/configuration/EVENTS_AND_EFFECTS.md
+# Documentation: docs/admin/configuration/EVENTS_AND_EFFECTS.md
 # Writing your own: https://github.com/DailyStruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md
 #
 # One file = one effect group (filename = group name).

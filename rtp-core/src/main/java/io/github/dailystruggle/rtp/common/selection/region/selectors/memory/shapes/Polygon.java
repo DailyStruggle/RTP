@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.PolygonMemoryShapeParams;
 
@@ -149,16 +149,16 @@ public class Polygon extends Square {
     if (walkerScheduled) return;
     if (vertices.isEmpty()) return;
     if (!isBadLocationsEmpty()) return;
-    if (RTP.scheduler == null) {
+    if (RTPRuntime.scheduler() == null) {
       // Test or pre-bootstrap context: fall back to per-sample predicate only.
       return;
     }
     walkerScheduled = true;
     try {
-      RTP.scheduler.runTaskAsynchronously(this::runMaskWalker);
+      RTPRuntime.scheduler().runTaskAsynchronously(this::runMaskWalker);
     } catch (Throwable t) {
       // Best-effort; never let a scheduling failure escape into the caller of setVertices.
-      RTP.log(Level.WARNING, "[Polygon] failed to schedule async mask walker: " + t.getMessage(), t);
+      RTPRuntime.log(Level.WARNING, "[Polygon] failed to schedule async mask walker: " + t.getMessage(), t);
       walkerScheduled = false;
     }
   }

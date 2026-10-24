@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.neoforge.commands.test;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaSender;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -14,7 +15,7 @@ import java.util.logging.Level;
  *
  * <p>Routes caller-facing log lines through {@link RTP#log(Level, String)}
  * and delivers to any active audit interceptors (REQ-RTP-S-004 audit channel).
- * Resolves caller {@link UUID} to a display name via {@link RTP#serverAccessor}.
+ * Resolves caller {@link UUID} to a display name via {@link RTPRuntime#serverAccessor()}.
  *
  * <p>Installed onto {@code RTP.testUmbrellaContext} during NeoForge server setup.
  */
@@ -41,8 +42,8 @@ public final class NeoForgeTestUmbrellaSender implements TestUmbrellaSender {
       return RTP.serverId.toString();
     }
     try {
-      if (RTP.serverAccessor != null) {
-        RTPPlayer player = RTP.serverAccessor.getPlayer(callerId);
+      if (RTPRuntime.serverAccessor() != null) {
+        RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(callerId);
         if (player != null) {
           String name = player.name();
           if (name != null) return name;

@@ -1,12 +1,14 @@
 package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -25,9 +27,9 @@ public class ConfigCmd extends BaseRTPCmdImpl {
   public ConfigCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
 
-    RTP rtp = RTP.getInstance();
-    if (rtp != null && rtp.miscAsyncTasks != null) {
-      rtp.miscAsyncTasks.add(new RTPRunnable(this::addCommands, 5));
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions != null && MiscTasks.async() != null) {
+      MiscTasks.async().add(new RTPRunnable(this::addCommands, 5));
     }
   }
 
@@ -53,10 +55,9 @@ public class ConfigCmd extends BaseRTPCmdImpl {
       addSubCommand(new LanguageCmd(this));
     }
 
-    if (!getCommandLookup().containsKey("IMPORT") && !getCommandLookup().containsKey("import")) {
+    if (!getCommandLookup().containsKey("IMPORT")) {
       ConfigImportCmd importCmd = new ConfigImportCmd(this);
       addSubCommand(importCmd);
-      getCommandLookup().put("import", importCmd);
     }
 
     // Register the submit-landing leaf for the menu config-search anvil prompt. The
@@ -67,7 +68,7 @@ public class ConfigCmd extends BaseRTPCmdImpl {
       addSubCommand(new ConfigSearchSubCmd(this));
     }
 
-    final Configs configs = RTP.configs;
+    final Configs configs = ActiveConfigs.get();
     for (ConfigParser<?> value : configs.configParserMap.values()) {
       String bare = value.name.replace(".yml", "");
       if (getCommandLookup().containsKey(bare)) continue;

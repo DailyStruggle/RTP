@@ -4,10 +4,11 @@ import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.util.logging.Level;
 
 /**
@@ -49,13 +50,14 @@ public final class RTPRiftAddon implements RTPAddon {
   }
 
   /**
-   * Install a ready-to-use {@code effects/rift.yml} group so RIFT is demonstrable out of the box.
+   * Install a ready-to-use {@code rift.yml} group so RIFT is demonstrable out of the box.
    *
    * <p>The addon ships the group as its own resource rather than having {@code rtp-core} or
    * {@code rtp-plugin} reference it - core must never know about an addon-provided effect, or it
-   * becomes a bad example for independent addon authors. The file is copied to
-   * {@code <pluginDir>/effects/rift.yml} on first run only ({@link Files#copy} is skipped when the
-   * file already exists), so operator edits and deletions are respected.
+   * becomes a bad example for independent addon authors. The file is written to the live parser's
+   * directory ({@code definitions/effects/rift.yml}, ADR-076) whenever it is missing and never
+   * overwritten, so operator edits are respected. See {@link DemoGroupInstaller} for why the legacy
+   * {@code effects/} folder must not be used.
    *
    * <p>This addon loads after the initial config load, so the live effects
    * {@link MultiConfigParser} is registered with the freshly-copied file directly; otherwise the
@@ -63,32 +65,31 @@ public final class RTPRiftAddon implements RTPAddon {
    */
   private void seedDemoGroup() {
     try {
-      if (RTP.serverAccessor == null || RTP.configs == null) return;
-      Object raw = RTP.configs.multiConfigParserMap.get(EffectsGroupKeys.class);
+      if (RTPRuntime.serverAccessor() == null || ActiveConfigs.get() == null) return;
+      Object raw = ActiveConfigs.get().multiConfigParserMap.get(EffectsGroupKeys.class);
       if (!(raw instanceof MultiConfigParser)) return;
       @SuppressWarnings("unchecked")
       MultiConfigParser<EffectsGroupKeys> effectsGroups = (MultiConfigParser<EffectsGroupKeys>) raw;
 
-      File effectsDir = new File(effectsGroups.getMainDirectory(), "effects");
-      File target = new File(effectsDir, DEMO_GROUP + ".yml");
-      if (!target.exists()) {
-        if (!effectsDir.exists() && !effectsDir.mkdirs()) {
-          RTP.log(Level.WARNING, "[LeafRTPRiftAddon] could not create effects directory; skipping demo group");
+      byte[] content;
+      try (InputStream in = getClass().getClassLoader().getResourceAsStream(DEMO_GROUP + ".yml")) {
+        if (in == null) {
+          RTP.log(Level.WARNING, "[LeafRTPRiftAddon] bundled rift.yml resource missing; skipping demo group");
           return;
         }
-        try (InputStream in = getClass().getClassLoader().getResourceAsStream(DEMO_GROUP + ".yml")) {
-          if (in == null) {
-            RTP.log(Level.WARNING, "[LeafRTPRiftAddon] bundled rift.yml resource missing; skipping demo group");
-            return;
-          }
-          Files.copy(in, target.toPath());
-        }
+        content = in.readAllBytes();
+      }
+      File legacyDir = new File(effectsGroups.getMainDirectory(), "effects");
+      DemoGroupInstaller.Outcome outcome = DemoGroupInstaller.install(
+          effectsGroups.myDirectory, legacyDir, DEMO_GROUP + ".yml", content);
+      if (outcome.removedLegacyCopy()) {
+        RTP.log(Level.INFO, "[LeafRTPRiftAddon] removed the stale effects/rift.yml left by an older version.");
       }
 
       if (!effectsGroups.listParsers().contains(DEMO_GROUP)) {
         // Clones the effects schema and re-reads the on-disk file we just wrote.
         effectsGroups.addParser(DEMO_GROUP);
-        RTP.log(Level.INFO, "[LeafRTPRiftAddon] installed default effects/rift.yml demo group (when: preload).");
+        RTP.log(Level.INFO, "[LeafRTPRiftAddon] installed default definitions/effects/rift.yml demo group (when: preload).");
       }
     } catch (Exception e) {
       // A failed demo install must never break addon load or the teleport pipeline.
