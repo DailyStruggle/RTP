@@ -19,6 +19,7 @@ import itertools
 import json
 import math
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -3684,6 +3685,23 @@ class JcmdAndStallOracleTest(unittest.TestCase):
             ],
         )
 
+        # Container mode with host `server_dir` and `jar_pattern` both set ignores the host path
+        # inside the container namespace and matches the in-container JVM by `jar_pattern`.
+        multi_container_jcmd = (
+            "110 jdk.jcmd/sun.tools.jcmd.JCmd -l\n"
+            "7 /data/paper-1.21.jar nogui\n"
+            "19 /opt/metrics/agent.jar\n"
+        )
+        c_both = bfs.JcmdObserver(
+            container="mc-paper",
+            server_dir="/home/u/RTP/devstack/data/paper",
+            jar_pattern="paper",
+            runner=lambda cmd, t: subprocess.CompletedProcess(
+                cmd, 0, stdout=multi_container_jcmd if cmd[-2:] == ["jcmd", "-l"] else self.SAMPLE_HISTO, stderr=""
+            ),
+        )
+        self.assertEqual(c_both.resolve_pid(), 7)
+
         # Container mode falls back to PID 1 when `jcmd -l` lists no candidate rows
         fallback_cmds = []
         c_fallback = bfs.JcmdObserver(
@@ -4063,22 +4081,23 @@ class JarIndexAndLeakScreenTest(unittest.TestCase):
                     }
                 )
 
-            # Exploration records across 12 episodes:
-            # - 6 episodes run `queue` with `quit_lt1s` -> leaks +200 `com.example.queue.RetainedSession` each
-            # - 6 episodes run `help` with `repeat` -> 0 `RetainedSession` growth
+            # Exploration records across 48 episodes:
+            # - 12 episodes run `queue` with `quit_lt1s` -> leaks +200 `com.example.queue.RetainedSession` each
+            # - 36 episodes run `help` with `repeat` -> 0 `RetainedSession` growth
             # - `com.example.queue.AmbientDriftCache` (plugin class absent from baseline) grows by ~20 in EVERY episode
             # - `net.minecraft.world.ChunkHolder` grows by ~50 in all episodes (same as baseline)
             # - 15 noisy background classes fluctuate around 0
             records = []
-            for ep in range(12):
-                is_leak_arm = ep % 2 == 0
+            noise_rng = random.Random(3)
+            for ep in range(48):
+                is_leak_arm = ep % 4 == 0
                 deltas = {
                     "cls:net.minecraft.world.ChunkHolder": 50.0 + (1.0 if ep % 3 == 0 else -1.0),
-                    "cls:com.example.queue.AmbientDriftCache": 20.0 + (0.5 if ep % 4 in (0, 1) else -0.5),
+                    "cls:com.example.queue.AmbientDriftCache": 20.0 + noise_rng.uniform(-0.5, 0.5),
                     "cls:com.example.queue.RetainedSession": 200.0 if is_leak_arm else 0.0,
                 }
                 for n_idx in range(15):
-                    deltas[f"cls:com.example.noise.NoiseClass{n_idx}"] = 1.0 if (ep + n_idx) % 2 == 0 else -1.0
+                    deltas[f"cls:com.example.noise.NoiseClass{n_idx}"] = noise_rng.gauss(0.0, 1.0)
                 records.append(
                     {
                         "ep": ep,
@@ -4095,7 +4114,7 @@ class JarIndexAndLeakScreenTest(unittest.TestCase):
                 jar_index=jar_index,
                 profile=bfs.get_platform_profile("paper"),
             )
-            self.assertEqual(screen["usable_episodes"], 12)
+            self.assertEqual(screen["usable_episodes"], 48)
             self.assertGreater(screen["total_tests"], 30)
             self.assertGreater(screen["bonferroni_z"], 3.0)
 
@@ -4108,6 +4127,11 @@ class JarIndexAndLeakScreenTest(unittest.TestCase):
             self.assertEqual(top["first_suspect"], "QueuePlugin.jar")
             # Passive correlation never claims confirmed exploit attribution
             self.assertEqual(top["attribution_status"], "unconfirmed_passive_correlation")
+
+            # 6 leak episodes out of 12 is only 1-in-924 by chance, above the Bonferroni level for this many
+            # (class, feature) cells: the screen must report insufficient evidence, not a leak.
+            small = bfs.screen_server_leaks(records=records[:12], baseline_records=baseline_records)
+            self.assertEqual(small["correlations"], [])
 
             # Negative assertions:
             # 1. Vanilla baseline class `ChunkHolder` is subtracted and never flagged
@@ -4206,6 +4230,1175 @@ class JarIndexAndLeakScreenTest(unittest.TestCase):
             self.assertEqual(row["instances_per_hour"], 400.0)
             self.assertEqual(row["first_suspect"], "QueuePlugin.jar")
             self.assertEqual(row["attribution_status"], "unconfirmed_passive_correlation")
+
+    def test_sparse_bursty_and_heavy_tail_null_vs_repeated_planted_leak(self):
+        follow_ups = ["quit_lt1s", "quit_delay", "rejoin", "repeat", "concurrent", "window_click"]
+
+        # 1. Sparse arms (200 episodes over 15 nodes x 6 follow-ups = 90 arms) with 15 bursty classes
+        #    (2% per-episode chance of a +500 one-off burst, no real leak) across 3 seeds -> 0 false positives.
+        for seed in (1, 2, 3):
+            rng = random.Random(seed)
+            burst_records = []
+            for ep in range(200):
+                node = f"n{rng.randrange(15)}"
+                fu = follow_ups[rng.randrange(len(follow_ups))]
+                deltas = {f"cls:com.example.burst.C{c}": (500.0 if rng.random() < 0.02 else 0.0) for c in range(15)}
+                burst_records.append(
+                    {
+                        "ep": ep,
+                        "node": node,
+                        "follow_up": fu,
+                        "departures": 1 if "quit" in fu else 0,
+                        "deltas": deltas,
+                    }
+                )
+            burst_screen = bfs.screen_server_leaks(burst_records)
+            self.assertEqual(burst_screen["correlations"], [], f"unexpected false positive on burst seed {seed}")
+
+        # 2. Heavy-tail exponential noise (mean 20, sd 20) over 200 episodes and 90 arms -> 0 false positives.
+        for seed in (101, 102):
+            rng = random.Random(seed)
+            exp_records = []
+            for ep in range(200):
+                node = f"n{rng.randrange(15)}"
+                fu = follow_ups[rng.randrange(len(follow_ups))]
+                deltas = {f"cls:com.example.exp.C{c}": rng.expovariate(1.0 / 20.0) for c in range(15)}
+                exp_records.append(
+                    {
+                        "ep": ep,
+                        "node": node,
+                        "follow_up": fu,
+                        "departures": 1 if "quit" in fu else 0,
+                        "deltas": deltas,
+                    }
+                )
+            exp_screen = bfs.screen_server_leaks(exp_records)
+            self.assertEqual(exp_screen["correlations"], [], f"unexpected false positive on exp seed {seed}")
+
+        # 3. Same sparse bursty 200-episode environment WITH a genuine repeated planted leak on `n0` x `quit_lt1s`
+        #    (active in 5 episodes, leaking +200 each time): only `RetainedSession` is flagged, 0 bursty classes.
+        rng = random.Random(7)
+        mixed_records = []
+        for ep in range(200):
+            if ep in (10, 40, 80, 120, 160):
+                node, fu = "n0", "quit_lt1s"
+            else:
+                node = f"n{1 + rng.randrange(14)}"
+                fu = follow_ups[rng.randrange(len(follow_ups))]
+            deltas = {f"cls:com.example.burst.C{c}": (500.0 if rng.random() < 0.02 else 0.0) for c in range(15)}
+            deltas["cls:com.example.queue.RetainedSession"] = 200.0 if (node == "n0" and fu == "quit_lt1s") else 0.0
+            mixed_records.append(
+                {
+                    "ep": ep,
+                    "node": node,
+                    "follow_up": fu,
+                    "departures": 1 if "quit" in fu else 0,
+                    "deltas": deltas,
+                }
+            )
+        mixed_screen = bfs.screen_server_leaks(mixed_records)
+        flagged_cls = {c["cls"] for c in mixed_screen["correlations"]}
+        self.assertEqual(flagged_cls, {"com.example.queue.RetainedSession"})
+        self.assertEqual(mixed_screen["correlations"][0]["feature"], "arm:n0:quit_lt1s")
+        self.assertAlmostEqual(mixed_screen["correlations"][0]["slope"], 200.0, places=1)
+
+    @staticmethod
+    def _synthetic_leak_records(seed, noise, arms_per_episode, planted=None, n_episodes=200, n_classes=15):
+        """Episodes over 15 nodes x 6 follow-ups; `planted` leaks on 7 episodes of one extra arm."""
+        follow_ups = ["quit_lt1s", "quit_delay", "rejoin", "repeat", "concurrent", "window_click"]
+        rng = random.Random(seed)
+        leak_eps = set(rng.sample(range(n_episodes), 7)) if planted else set()
+        records = []
+        for ep in range(n_episodes):
+            arms = [
+                {"node": f"n{rng.randrange(15)}", "follow_up": rng.choice(follow_ups)}
+                for _ in range(arms_per_episode)
+            ]
+            if ep in leak_eps:
+                arms[0] = {"node": "leaky", "follow_up": "quit_lt1s"}
+            deltas = {}
+            for c in range(n_classes):
+                if noise == "gauss":
+                    deltas[f"cls:com.example.bg.C{c}"] = rng.gauss(20.0, 10.0)
+                else:
+                    deltas[f"cls:com.example.bg.C{c}"] = float(rng.choice([0, 0, 0, 100]))
+            deltas["cls:com.example.queue.RetainedSession"] = rng.gauss(0.0, 20.0) + (planted if ep in leak_eps else 0.0)
+            records.append(
+                {
+                    "ep": ep,
+                    "arms": arms,
+                    "departures": sum(1 for a in arms if "quit" in a["follow_up"]),
+                    "deltas": deltas,
+                }
+            )
+        return records
+
+    def test_leak_screen_empirical_familywise_rate_and_planted_sensitivity(self):
+        # Exact hypergeometric top-rank test, Bonferroni over classes x features x thresholds:
+        # nominal familywise false-positive rate is 2.5% per run; assert a loose 5% empirically on 100 null
+        # seeds for continuous and quantised-bimodal deltas, with 1 and 3 arms per episode.
+        for noise in ("gauss", "bimodal"):
+            for arms_per_episode in (1, 3):
+                false_runs = sum(
+                    1
+                    for seed in range(100)
+                    if bfs.screen_server_leaks(self._synthetic_leak_records(seed, noise, arms_per_episode))[
+                        "correlations"
+                    ]
+                )
+                self.assertLessEqual(
+                    false_runs, 5, f"{noise}/{arms_per_episode} arms: {false_runs}/100 runs with a false positive"
+                )
+
+        # A +80 per-activation leak over 7 active episodes (noise sd 20) is found in nearly every run, on the
+        # right class and arm; weak signals (+40) are allowed to stay "insufficient evidence".
+        hits = 0
+        for seed in range(10):
+            screen = bfs.screen_server_leaks(self._synthetic_leak_records(1000 + seed, "gauss", 3, planted=80.0))
+            found = [
+                c
+                for c in screen["correlations"]
+                if c["cls"] == "com.example.queue.RetainedSession" and c["feature"] == "arm:leaky:quit_lt1s"
+            ]
+            self.assertTrue(all(c["cls"] == "com.example.queue.RetainedSession" for c in screen["correlations"]))
+            hits += 1 if found else 0
+        self.assertGreaterEqual(hits, 9)
+
+    def test_leak_screen_few_active_episodes_with_discrete_deltas_is_insufficient_evidence(self):
+        # 4 of 4 active episodes landing in a 25% "high" mode is 0.4% likely by chance: far above the Bonferroni
+        # level, so it must not be reported even though every active episode is high.
+        rng = random.Random(9)
+        records = []
+        active = set(rng.sample(range(200), 4))
+        for ep in range(200):
+            high = ep in active or rng.random() < 0.25
+            records.append(
+                {
+                    "ep": ep,
+                    "arms": [{"node": "rare" if ep in active else f"n{ep % 10}", "follow_up": "quit_lt1s"}],
+                    "departures": 1,
+                    "deltas": {"cls:com.example.bg.Batch": 100.0 if high else 0.0},
+                }
+            )
+        for c in range(14):
+            for rec in records:
+                rec["deltas"][f"cls:com.example.bg.Other{c}"] = float(rng.choice([0, 0, 0, 100]))
+        self.assertEqual(bfs.screen_server_leaks(records)["correlations"], [])
+
+    def test_leak_screen_runtime_bounded_at_thousands_of_classes(self):
+        follow_ups = ["quit_lt1s", "quit_delay", "rejoin", "repeat", "concurrent", "window_click"]
+        rng = random.Random(5)
+        records = []
+        for ep in range(300):
+            records.append(
+                {
+                    "ep": ep,
+                    "arms": [
+                        {"node": f"n{rng.randrange(60)}", "follow_up": rng.choice(follow_ups)} for _ in range(3)
+                    ],
+                    "departures": 1,
+                    "deltas": {f"cls:com.example.big.C{c}": rng.expovariate(1.0 / 20.0) for c in range(2000)},
+                }
+            )
+        t0 = time.monotonic()
+        screen = bfs.screen_server_leaks(records)
+        self.assertLess(time.monotonic() - t0, 20.0)
+        self.assertEqual(screen["correlations"], [])
+        self.assertGreater(screen["total_tests"], 100000)
+
+
+class ServerModePassiveAuditTest(unittest.TestCase):
+    """ADR-125 `--mode server` passive local audit validation, read-only discovery,
+    optional local JcmdObserver snapshot, offline JarIndex inventory, and report/verdict output."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.out_dir = tempfile.mkdtemp()
+        self.plugins_dir = os.path.join(self.dir, "plugins")
+        os.makedirs(self.plugins_dir, exist_ok=True)
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nrcon.port=25575\nrcon.password=secret\nonline-mode=false\n")
+        with open(os.path.join(self.dir, "bench-loop.sh"), "w", encoding="utf-8") as fh:
+            fh.write("#!/bin/sh\nwhile true; do ./start.sh; sleep 2; done\n")
+        self._write_jar(
+            os.path.join(self.plugins_dir, "ViaVersion-5.0.0.jar"),
+            plugin_yml="name: ViaVersion\nversion: 5.0.0\n",
+            classes=["com/viaversion/viaversion/ViaManagerImpl.class"],
+        )
+        self._write_jar(
+            os.path.join(self.plugins_dir, "ExamplePlugin-1.0.jar"),
+            plugin_yml="name: ExamplePlugin\nversion: 1.0\ndepend:\n- ViaVersion\n",
+            classes=[
+                "com/example/plugin/ExamplePlugin.class",
+                "com/example/plugin/SessionCache.class",
+            ],
+        )
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+        shutil.rmtree(self.out_dir, ignore_errors=True)
+
+    @staticmethod
+    def _write_jar(path: str, plugin_yml: str, classes: list[str]) -> None:
+        with zipfile.ZipFile(path, "w") as zf:
+            zf.writestr("plugin.yml", plugin_yml)
+            for cls_entry in classes:
+                zf.writestr(cls_entry, b"\xca\xfe\xba\xbe")
+
+    # Serverbound 1.20.1 packets a passive discovery session may send: handshake, client settings/brand,
+    # movement acknowledgements and keep-alives. Any other name (chat, commands, tab-complete, clicks) is active.
+    PASSIVE_SERVERBOUND = frozenset({
+        "login_start", "encryption_begin", "settings", "custom_payload", "teleport_confirm",
+        "position", "position_look", "look", "flying", "keep_alive", "message_acknowledgement",
+    })
+
+    @staticmethod
+    def _read_protocol_events(events_log: str) -> list[dict]:
+        time.sleep(0.3)
+        if not os.path.exists(events_log):
+            return []
+        with open(events_log, "r", encoding="utf-8") as fh:
+            return [json.loads(ln) for ln in fh if ln.strip()]
+
+    def _assert_passive_session(self, events_log: str, start: int, label: str) -> int:
+        new = self._read_protocol_events(events_log)[start:]
+        logins = [e for e in new if e["ev"] == "login"]
+        packets = {e["packet"] for e in new if e["ev"] == "packet"}
+        self.assertEqual(len(logins), 1, f"{label}: expected exactly one login")
+        self.assertEqual(sorted(packets - self.PASSIVE_SERVERBOUND), [], f"{label}: active serverbound packets")
+        return start + len(new)
+
+    def _assert_cli_rejected(self, extra_argv: list[str], expected_substr: str) -> None:
+        err = io.StringIO()
+        argv = ["--mode", "server", "--server-dir", self.dir, "--out-dir", self.out_dir] + extra_argv
+        with (
+            unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("RCON touched")),
+            unittest.mock.patch.object(bf, "PermissionGrant", side_effect=AssertionError("LP touched")),
+            unittest.mock.patch.object(bf, "Swarm", side_effect=AssertionError("Swarm touched")),
+            contextlib.redirect_stderr(err),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            bf.main(argv)
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn(expected_substr, err.getvalue())
+
+    def test_validates_explicit_profile_local_host_and_disposable_server_dir(self):
+        # Missing explicit --profile
+        self._assert_cli_rejected([], "requires an explicit --profile")
+
+        # Unknown --profile
+        self._assert_cli_rejected(["--profile", "spigot"], "invalid --profile")
+
+        # Profile jar directory mismatch (fabric needs mods/, only plugins/ exists)
+        self._assert_cli_rejected(["--profile", "fabric"], "requires jar directory")
+
+        # Non-local --host / --mc-host
+        self._assert_cli_rejected(["--profile", "paper", "--host", "10.0.0.5"], "local loopback --host")
+        self._assert_cli_rejected(["--profile", "paper", "--mc-host", "192.168.1.20"], "local loopback --mc-host")
+
+        # Non-disposable directory (remove bench-loop.sh marker)
+        os.remove(os.path.join(self.dir, "bench-loop.sh"))
+        self._assert_cli_rejected(["--profile", "paper"], "disposable bench copy")
+
+        # Restore marker via spigot.yml no-restart-script, but set online-mode=true
+        with open(os.path.join(self.dir, "spigot.yml"), "w", encoding="utf-8") as fh:
+            fh.write("settings:\n  restart-script: ./no-restart-script.sh\n")
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nonline-mode=true\n")
+        self._assert_cli_rejected(["--profile", "paper"], "online-mode=true")
+
+        # Missing online-mode key in server.properties (Minecraft defaults to online-mode=true) must also be rejected
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nrcon.port=25575\n")
+        self._assert_cli_rejected(["--profile", "paper"], "explicit online-mode=false")
+
+        # Restore online-mode=false and check that passing both --pid and --pid-file is rejected
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("server-port=25565\nrcon.port=25575\nonline-mode=false\n")
+        pid_file = os.path.join(self.dir, "server.pid")
+        with open(pid_file, "w", encoding="utf-8") as fh:
+            fh.write(f"{os.getpid()}\n")
+        self._assert_cli_rejected(
+            ["--profile", "paper", "--pid", str(os.getpid()), "--pid-file", pid_file],
+            "rejects passing both --pid and --pid-file",
+        )
+
+    def test_mc_port_must_match_server_port_and_pid_reverified_before_jcmd(self):
+        # Explicit --mc-port must equal the validated server-port; omitted uses the configured port.
+        self.assertEqual(bfs.resolve_server_port({"server-port": "25570"}, None), 25570)
+        self.assertEqual(bfs.resolve_server_port({"server-port": "25570"}, 25570), 25570)
+        with self.assertRaisesRegex(ValueError, "does not match server.properties server-port=25565"):
+            bfs.resolve_server_port({"server-port": "25565"}, 25566)
+        self._assert_cli_rejected(["--profile", "paper", "--mc-port", "25566"], "invalid --mc-port")
+
+        # PID ownership is re-verified before every jcmd call, so a recycled PID is never attached.
+        cwd = {"value": self.dir}
+        calls: list[list[str]] = []
+
+        def runner(cmd, timeout_s):
+            calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        obs = bfs.JcmdObserver(
+            pid=4242,
+            server_dir=self.dir,
+            runner=runner,
+            pid_cwd=lambda pid: cwd["value"],
+            pid_cmdline=lambda pid: None,
+        )
+        with unittest.mock.patch("os.kill", return_value=None):
+            self.assertEqual(obs._build_command("Thread.print")[1], "4242")
+            cwd["value"] = "/tmp/recycled-other-server"
+            with self.assertRaisesRegex(bfs.JcmdError, "does not match server_dir"):
+                obs._run_jcmd_op("GC.class_histogram")
+        self.assertEqual(calls, [])
+
+    @unittest.skipUnless(os.name == "posix", "local jcmd PID verification requires POSIX")
+    def test_jcmd_observer_rejects_stale_hint(self):
+        calls: list[list[str]] = []
+
+        def runner(cmd, timeout_s):
+            calls.append(cmd)
+            if cmd == ["jcmd", "-l"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout=f"4242 {self.dir}/paper.jar\n", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout='"Server"\nThread.run', stderr="")
+
+        obs = bfs.JcmdObserver(
+            server_dir=self.dir,
+            runner=runner,
+            pid_cwd=lambda pid: None,
+            pid_cmdline=lambda pid: None,
+        )
+        with unittest.mock.patch("os.kill", return_value=None):
+            with self.assertRaisesRegex(bfs.JcmdError, "cannot be positively verified"):
+                obs.thread_print()
+
+        self.assertEqual(calls, [["jcmd", "-l"]])
+
+    def test_requires_default_tier_only_and_rejects_prohibited_flags(self):
+        # Non-default tiers rejected
+        for bad_tier in ("op", "default,op", "op,default", "admin"):
+            self._assert_cli_rejected(["--profile", "paper", "--tiers", bad_tier], "requires --tiers default only")
+
+        # Target-specific flags rejected (even when matching default value)
+        for flag_args in (
+            ["--cmd", "rtp=rtp"],
+            ["--names", bf.bo.DEFAULT_NAMES],
+            ["--jars", bf.bo.DEFAULT_JARS],
+            ["--plugin-packages", "com.example=Example"],
+            ["--targets", "direct,rtp"],
+            ["--rtp-args", "world"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects target-specific flag")
+
+        # Unsafe / op / mutation / container flags rejected
+        for flag_args in (
+            ["--grant", "*"],
+            ["--lp-group", "default"],
+            ["--console", "rtp=rtp reload"],
+            ["--allow-online"],
+            ["--container", "mc-bench"],
+            ["--mat", "/opt/mat/ParseHeapDump.sh"],
+            ["--no-restart"],
+            ["--no-isolate"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects unsafe/op flag")
+
+        # Replay flags rejected
+        for flag_args in (
+            ["--replay", "trace.jsonl", "--ep", "0"],
+            ["--ep", "1"],
+            ["--replay-seed", "1"],
+            ["--replay-n", "3"],
+            ["--replay-budget", "10"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects replay flag")
+
+        # Budget / active / stall-probe flags rejected
+        for flag_args in (
+            ["--episodes", "10"],
+            ["--seeds", "1,2"],
+            ["--reps", "2"],
+            ["--rungs", "4x1"],
+            ["--warmup", "0"],
+            ["--shrink", "1"],
+            ["--finding-n", "2"],
+            ["--surprise-n", "2"],
+            ["--coverage"],
+            ["--stall-ms", "2000"],
+            ["--default-budget-share", "0.75"],
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, "rejects budget/active flag")
+
+        # Abbreviated prohibited flags rejected via explicit-vs-default attribute comparison
+        for flag_args, expected_cat in (
+            (["--no-rest"], "rejects unsafe/op flag --no-restart"),
+            (["--allow-on"], "rejects unsafe/op flag --allow-online"),
+            (["--cont", "mc-bench"], "rejects unsafe/op flag --container"),
+            (["--default-budget", "0.75"], "rejects budget/active flag --default-budget-share"),
+        ):
+            self._assert_cli_rejected(["--profile", "paper"] + flag_args, expected_cat)
+
+        # Ambiguous prefix abbreviations rejected by argparse
+        self._assert_cli_rejected(["--profile", "paper", "--repl", "trace.jsonl"], "ambiguous option")
+        self._assert_cli_rejected(["--profile", "paper", "--episo", "10"], "ambiguous option")
+        self._assert_cli_rejected(["--profile", "paper", "--stall", "1500"], "ambiguous option")
+
+        # Server-only flags rejected in ADR-111 target modes
+        err = io.StringIO()
+        with (
+            unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("server touched")),
+            contextlib.redirect_stderr(err),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            bf.main(["--server-dir", self.dir, "--mode", "leak", "--profile", "paper", "--out-dir", self.out_dir])
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("--profile is only valid with --mode server", err.getvalue())
+
+    def test_passive_audit_captures_commands_once_and_writes_passive_only_verdict_and_report(self):
+        discover_calls: list[dict] = []
+        created_swarms: list[Any] = []
+
+        class FakePassiveSwarm:
+            def __init__(self, argv, log_path):
+                self.argv = argv
+                self.log_path = log_path
+                self.started = False
+                self.closed = False
+                created_swarms.append(self)
+
+            def start(self):
+                self.started = True
+
+            def close(self):
+                self.closed = True
+
+            def discover(self, did, tier="default", bot=None, max_ms=15000, timeout_s=None):
+                discover_calls.append({"did": did, "tier": tier, "bot": bot, "max_ms": max_ms})
+                pkt = {
+                    "ev": "commands",
+                    "id": did,
+                    "tier": tier,
+                    "captured": True,
+                    "truncated": False,
+                    "rootIndex": 0,
+                    "nodes": [
+                        {"index": 0, "kind": "root", "name": "", "children": [1, 2, 3, 4]},
+                        {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                        {"index": 2, "kind": "literal", "name": "betterrtp:rtp", "executable": False, "redirect": 1, "children": []},
+                        {"index": 3, "kind": "literal", "name": "stop", "executable": True, "children": []},
+                        {"index": 4, "kind": "literal", "name": "customdanger", "executable": True, "children": []},
+                    ],
+                }
+                return pkt, {"ev": "done", "id": did, "reason": "complete"}
+
+        with (
+            unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("RCON must not be touched")),
+            unittest.mock.patch.object(bf, "PermissionGrant", side_effect=AssertionError("LP must not be touched")),
+            unittest.mock.patch.object(bf, "Swarm", side_effect=FakePassiveSwarm),
+        ):
+            rc = bf.main([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--tiers", "default",
+                "--deny", "customdanger",
+                "--out-dir", self.out_dir,
+            ])
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(discover_calls), 1)
+        self.assertEqual(discover_calls[0]["tier"], "default")
+        self.assertEqual(len(created_swarms), 1)
+        self.assertTrue(created_swarms[0].started)
+        self.assertTrue(created_swarms[0].closed)
+
+        # Verify no jars were renamed to .off
+        plugin_files = sorted(os.listdir(self.plugins_dir))
+        self.assertEqual(plugin_files, ["ExamplePlugin-1.0.jar", "ViaVersion-5.0.0.jar"])
+
+        runs_root = os.path.join(self.out_dir, "runs")
+        run_dirs = [os.path.join(runs_root, d) for d in os.listdir(runs_root)]
+        self.assertEqual(len(run_dirs), 1)
+        run_dir = run_dirs[0]
+
+        commands_file = os.path.join(run_dir, "commands.json")
+        verdict_file = os.path.join(run_dir, "verdict.json")
+        report_file = os.path.join(run_dir, "report.txt")
+        self.assertTrue(os.path.isfile(commands_file))
+        self.assertTrue(os.path.isfile(verdict_file))
+        self.assertTrue(os.path.isfile(report_file))
+
+        tree = bfs.CommandTree.read_json(commands_file)
+        self.assertEqual(tree.tiers, ["default"])
+        self.assertEqual([n.node_id for n in tree.allowed_executable_nodes(["default"])], ["rtp"])
+        self.assertTrue(tree.nodes["stop"].denied)
+        self.assertTrue(tree.nodes["customdanger"].denied)
+        self.assertEqual(tree.nodes["customdanger"].denied_by, "customdanger")
+
+        with open(verdict_file, "r", encoding="utf-8") as fh:
+            verdict = json.load(fh)
+        self.assertEqual(verdict["mode"], "server")
+        self.assertEqual(verdict["status"], "passive_only")
+        self.assertEqual(verdict["verdict"], "PASSIVE_ONLY")
+        self.assertEqual(verdict["profile"], "paper")
+        self.assertEqual(verdict["tiers"], ["default"])
+        self.assertEqual(verdict["baseline"]["available"], False)
+        self.assertEqual(verdict["baseline"]["status"], "unavailable")
+        self.assertEqual(verdict["confirmed_culprits"], [])
+        self.assertEqual(verdict["blamed_jars"], [])
+        self.assertEqual(verdict["findings"], [])
+        self.assertEqual(verdict["jcmd_snapshot"]["requested"], False)
+        self.assertEqual(verdict["jcmd_snapshot"]["status"], "not_requested")
+        self.assertEqual(verdict["jars"]["installed_jars"], ["ExamplePlugin-1.0.jar", "ViaVersion-5.0.0.jar"])
+        self.assertEqual(verdict["jars"]["prerequisite_jars"], ["ViaVersion-5.0.0.jar"])
+        self.assertEqual(verdict["jars"]["candidate_jars"], ["ExamplePlugin-1.0.jar"])
+        self.assertNotIn("replay_cmd", json.dumps(verdict))
+        self.assertNotIn("operator_mitigation", json.dumps(verdict))
+        self.assertNotIn("author_reproducer", json.dumps(verdict))
+
+        with open(report_file, "r", encoding="utf-8") as fh:
+            report_text = fh.read()
+        self.assertIn("status: passive_only", report_text)
+        self.assertIn("status: unavailable (available=False)", report_text)
+        self.assertIn("confirmed_culprits: none (0)", report_text)
+        self.assertNotIn("--replay", report_text)
+
+    def test_passive_audit_optional_local_jcmd_snapshot_and_truncation_warning(self):
+        pid_file = os.path.join(self.dir, "server.pid")
+        with open(pid_file, "w", encoding="utf-8") as fh:
+            fh.write(f"{os.getpid()}\n")
+
+        histo_out = (
+            " num     #instances         #bytes  class name (module)\n"
+            "-------------------------------------------------------\n"
+            "   1:           250          40000  com.example.plugin.SessionCache\n"
+            "   2:           100           8000  java.lang.String (java.base@21.0.2)\n"
+            "Total           350          48000\n"
+        )
+        tdump_out = (
+            '2026-10-24 03:00:00\n'
+            'Full thread dump OpenJDK 64-Bit Server VM:\n\n'
+            '"Server thread" #25 prio=5 os_prio=0 tid=0x01 nid=0x02 runnable\n'
+            '   java.lang.Thread.State: RUNNABLE\n'
+            '\tat com.example.plugin.ExamplePlugin.onTick(ExamplePlugin.java:42)\n'
+            '\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n'
+        )
+
+        def fake_runner(cmd, timeout_s):
+            op = cmd[-1]
+            if op == "GC.class_histogram":
+                return subprocess.CompletedProcess(cmd, 0, stdout=histo_out, stderr="")
+            if op == "Thread.print":
+                return subprocess.CompletedProcess(cmd, 0, stdout=tdump_out, stderr="")
+            raise AssertionError(f"unexpected jcmd call: {cmd}")
+
+        obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            runner=fake_runner,
+            pid_cwd=lambda p: os.path.realpath(self.dir) if p == os.getpid() else None,
+        )
+
+        class TruncatedSwarm:
+            def discover(self, did, tier="default", bot=None, max_ms=15000, timeout_s=None):
+                pkt = {
+                    "ev": "commands",
+                    "id": did,
+                    "tier": tier,
+                    "captured": True,
+                    "truncated": True,
+                    "rootIndex": 0,
+                    "nodes": [
+                        {"index": 0, "kind": "root", "name": "", "children": [1]},
+                        {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                    ],
+                }
+                return pkt, {"ev": "done", "id": did, "reason": "complete"}
+
+        args = bf.build_parser().parse_args([
+            "--mode", "server",
+            "--server-dir", self.dir,
+            "--profile", "paper",
+            "--pid-file", pid_file,
+            "--out-dir", self.out_dir,
+        ])
+        run_dir = os.path.join(self.out_dir, "audit-snap")
+        runner = bfs.ServerRun(args, run_dir, swarm=TruncatedSwarm(), observer=obs)
+        verdict = runner.run()
+
+        self.assertEqual(verdict["status"], "passive_only")
+        self.assertEqual(verdict["confirmed_culprits"], [])
+        self.assertEqual(verdict["blamed_jars"], [])
+        self.assertEqual(verdict["findings"], [])
+        self.assertTrue(verdict["commands"]["truncated"])
+        self.assertTrue(any("truncated" in w.lower() for w in verdict["warnings"]))
+
+        snap = verdict["jcmd_snapshot"]
+        self.assertTrue(snap["requested"])
+        self.assertEqual(snap["status"], "collected")
+        self.assertEqual(snap["pid"], os.getpid())
+        self.assertEqual(snap["attribution_status"], "passive_snapshot_only")
+        self.assertEqual(len(snap["exclusion_windows"]), 2)
+        self.assertEqual(snap["top_classes"][0]["class_name"], "com.example.plugin.SessionCache")
+        self.assertEqual(snap["top_classes"][0]["jar_owner"], "ExamplePlugin-1.0.jar")
+        self.assertEqual(snap["main_thread"]["first_suspect"], "ExamplePlugin-1.0.jar")
+
+        with open(os.path.join(run_dir, "report.txt"), "r", encoding="utf-8") as fh:
+            report_text = fh.read()
+        self.assertIn("non-causal", report_text)
+        self.assertIn("truncated", report_text.lower())
+
+        # Unowned / non-existent PID in --pid-file fails closed before starting Swarm
+        stale_pid_file = os.path.join(self.dir, "stale.pid")
+        with open(stale_pid_file, "w", encoding="utf-8") as fh:
+            fh.write("99999999\n")
+        err = io.StringIO()
+        with (
+            unittest.mock.patch.object(bf, "Swarm", side_effect=AssertionError("Swarm must not start on bad PID")),
+            contextlib.redirect_stderr(err),
+        ):
+            rc = bf.main([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--pid-file", stale_pid_file,
+                "--out-dir", self.out_dir,
+            ])
+        self.assertEqual(rc, 2)
+        self.assertIn("99999999", err.getvalue())
+
+        # Failed discover fails closed without writing a false verdict.json and always closes owned Swarm
+        failed_swarms: list[Any] = []
+
+        class FailingSwarm:
+            def __init__(self, argv, log_path):
+                self.started = False
+                self.closed = False
+                failed_swarms.append(self)
+
+            def start(self):
+                self.started = True
+
+            def close(self):
+                self.closed = True
+
+            def discover(self, did, tier="default", bot=None, max_ms=15000, timeout_s=None):
+                raise bf.SwarmError("discover timed out before declare_commands")
+
+        fail_out = os.path.join(self.out_dir, "fail-discover")
+        err2 = io.StringIO()
+        with (
+            unittest.mock.patch.object(bf, "Swarm", side_effect=FailingSwarm),
+            contextlib.redirect_stderr(err2),
+        ):
+            rc2 = bf.main([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--out-dir", fail_out,
+            ])
+        self.assertEqual(rc2, 2)
+        self.assertIn("discover timed out", err2.getvalue())
+        self.assertEqual(len(failed_swarms), 1)
+        self.assertTrue(failed_swarms[0].started)
+        self.assertTrue(failed_swarms[0].closed)
+
+        # Injected observer with container set or check_local_pid=False is rejected before discovery
+        container_obs = bfs.JcmdObserver(container="mc-container", runner=fake_runner)
+        with self.assertRaisesRegex(bfs.JcmdError, "container JcmdObserver.*not permitted"):
+            bfs.ServerRun(
+                args,
+                os.path.join(self.out_dir, "audit-container-obs"),
+                swarm=TruncatedSwarm(),
+                observer=container_obs,
+            ).run()
+
+        unchecked_obs = bfs.JcmdObserver(pid=os.getpid(), check_local_pid=False, runner=fake_runner)
+        with self.assertRaisesRegex(bfs.JcmdError, "check_local_pid=False is not permitted"):
+            bfs.ServerRun(
+                args,
+                os.path.join(self.out_dir, "audit-unchecked-obs"),
+                swarm=TruncatedSwarm(),
+                observer=unchecked_obs,
+            ).run()
+
+        # Unknown cwd (e.g. non-Linux without /proc) and unreadable/non-matching cmdline fails closed before discovery
+        unverified_obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            runner=fake_runner,
+            pid_cwd=lambda p: None,
+            pid_cmdline=lambda p: None,
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "cannot be positively verified"):
+            bfs.ServerRun(
+                args,
+                os.path.join(self.out_dir, "audit-unverified-pid"),
+                swarm=TruncatedSwarm(),
+                observer=unverified_obs,
+            ).run()
+
+        # Windows / non-POSIX host never calls os.kill(pid, 0) (which sends CTRL_C_EVENT on Windows) and fails closed
+        win_obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            runner=fake_runner,
+            pid_cwd=lambda p: os.path.realpath(self.dir),
+        )
+        with (
+            unittest.mock.patch.object(bfs.os, "name", "nt"),
+            unittest.mock.patch.object(bfs.os, "kill", side_effect=AssertionError("os.kill must never run on Windows")),
+        ):
+            with self.assertRaisesRegex(bfs.JcmdError, "unsupported on non-POSIX host"):
+                bfs.ServerRun(
+                    args,
+                    os.path.join(self.out_dir, "audit-win-pid"),
+                    swarm=TruncatedSwarm(),
+                    observer=win_obs,
+                ).run()
+
+    def test_tick_gap_timestamp_exclusion_with_actual_swarm_event_shape(self):
+        # Verify JcmdObserver exclusion windows and filter_tick_gaps / summarize_tick_gaps / StallOracle
+        # using the exact event payload emitted by bench-swarm.js:
+        #   {ev: 'tick_gap', bot, ms, at, keepalive_ms, id, t}
+        pid_file = os.path.join(self.dir, "server.pid")
+        with open(pid_file, "w", encoding="utf-8") as fh:
+            fh.write(f"{os.getpid()}\n")
+
+        histo_out = (
+            " num     #instances         #bytes  class name (module)\n"
+            "-------------------------------------------------------\n"
+            "   1:           120          19200  com.example.plugin.SessionCache\n"
+            "Total           120          19200\n"
+        )
+        tdump_out = (
+            "2026-10-24 03:00:00\n"
+            "Full thread dump OpenJDK 64-Bit Server VM:\n\n"
+            '"Server thread" #25 prio=5 os_prio=0 tid=0x01 nid=0x02 runnable\n'
+            "   java.lang.Thread.State: RUNNABLE\n"
+            "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n"
+        )
+        # GC.class_histogram runs across [50000, 50600] (+200ms grace -> [50000, 50800]);
+        # Thread.print runs across [55000, 55100] (+200ms grace -> [55000, 55300]).
+        clock_ticks = [50000, 50600, 55000, 55100]
+
+        def fake_runner(cmd, timeout_s):
+            if cmd[-1] == "GC.class_histogram":
+                return subprocess.CompletedProcess(cmd, 0, stdout=histo_out, stderr="")
+            if cmd[-1] == "Thread.print":
+                return subprocess.CompletedProcess(cmd, 0, stdout=tdump_out, stderr="")
+            raise AssertionError(f"unexpected jcmd call: {cmd}")
+
+        obs = bfs.JcmdObserver(
+            pid_file=pid_file,
+            server_dir=self.dir,
+            post_grace_ms=200,
+            clock_ms=lambda: clock_ticks.pop(0) if clock_ticks else 60000,
+            runner=fake_runner,
+            pid_cwd=lambda p: os.path.realpath(self.dir) if p == os.getpid() else None,
+        )
+        obs.class_histogram()
+        obs.thread_print()
+        serialized_windows = [w.to_dict() for w in obs.exclusion_windows]
+        self.assertEqual(
+            serialized_windows,
+            [
+                {"start_ms": 50000, "end_ms": 50800, "kind": "GC.class_histogram"},
+                {"start_ms": 55000, "end_ms": 55300, "kind": "Thread.print"},
+            ],
+        )
+
+        # Actual bench-swarm.js tick_gap events include `id` and episode-relative `t` alongside epoch `at`.
+        raw_tick_gaps = [
+            # 1. Strictly before GC window: [48000, 49000] -> kept
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1000, "at": 49000, "keepalive_ms": None, "id": "ep-1", "t": 1000},
+            # 2. Overlaps GC window interior: [49000, 52200] overlaps [50000, 50800] -> excluded (observer_window)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 3200, "at": 52200, "keepalive_ms": 1010, "id": "ep-1", "t": 4200},
+            # 3. Touches GC window upper boundary: [50800, 51800] touches 50800 -> excluded (observer_window)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1000, "at": 51800, "keepalive_ms": 1000, "id": "ep-1", "t": 5200},
+            # 4. Strictly between GC and Thread.print windows: [52000, 53000] -> kept
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1000, "at": 53000, "keepalive_ms": 995, "id": "ep-1", "t": 6400},
+            # 5. Touches Thread.print lower boundary: [52500, 55000] touches 55000 -> excluded (observer_window)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 2500, "at": 55000, "keepalive_ms": 1005, "id": "ep-1", "t": 8400},
+            # 6. Episode-relative `t` only (missing `at`): must NOT treat `t` as epoch timestamp -> excluded (unverifiable_timestamp)
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 3400, "keepalive_ms": 1000, "id": "ep-1", "t": 53500},
+            # 7. Strictly after Thread.print window: [56000, 57010] -> kept
+            {"ev": "tick_gap", "bot": "fz_0", "ms": 1010, "at": 57010, "keepalive_ms": 1020, "id": "ep-1", "t": 10410},
+        ]
+
+        kept, excluded = bfs.filter_tick_gaps(raw_tick_gaps, serialized_windows)
+        self.assertEqual([g["at"] for g in kept], [49000, 53000, 57010])
+        self.assertEqual(
+            [(g.get("at"), g.get("excluded_reason")) for g in excluded],
+            [
+                (52200, "observer_window"),
+                (51800, "observer_window"),
+                (55000, "observer_window"),
+                (None, "unverifiable_timestamp"),
+            ],
+        )
+
+        summary = bfs.summarize_tick_gaps(raw_tick_gaps, serialized_windows)
+        self.assertEqual(summary["count"], 3)
+        self.assertEqual(summary["excluded_count"], 4)
+        self.assertEqual(summary["unverifiable_count"], 1)
+        self.assertEqual(summary["max_ms"], 1010.0)
+        self.assertEqual(summary["max_keepalive_ms"], 1020.0)
+
+        baseline_gaps = [{"ms": 1000.0, "at": 1000 * i} for i in range(1, 25)]
+        oracle = bfs.StallOracle(baseline_gaps=baseline_gaps, stall_ms=2000.0, observer=obs)
+        eval_res = oracle.evaluate_episode(raw_tick_gaps, follow_up="quit_lt1s")
+        self.assertFalse(eval_res["stalled"])
+        self.assertEqual(eval_res["summary"]["count"], 3)
+        self.assertEqual(eval_res["summary"]["excluded_count"], 4)
+
+    @unittest.skipUnless(NODE and MINEFLAYER, "node or devstack/clients/node_modules missing")
+    def test_passive_audit_cli_against_local_fake_protocol_server_and_failure_cleanup(self):
+        events_log = os.path.join(self.out_dir, "protocol_events.jsonl")
+        drop_flag = os.path.join(self.out_dir, "drop_without_commands.flag")
+        server_js = r"""
+const fs = require('fs');
+const path = require('path');
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const mc = require(path.join(nm, 'minecraft-protocol'));
+const mcData = require(path.join(nm, 'minecraft-data'))('1.20.1');
+const eventsLog = process.argv[2];
+const dropFlag = process.argv[3];
+
+function recordEvent(obj) {
+  fs.appendFileSync(eventsLog, JSON.stringify(obj) + '\n');
+}
+
+const srv = mc.createServer({ 'online-mode': false, host: '127.0.0.1', port: 0, version: '1.20.1' });
+srv.on('login', (client) => {
+  recordEvent({ ev: 'login', username: client.username });
+  client.on('packet', (data, meta) => {
+    recordEvent({ ev: 'packet', packet: meta.name, username: client.username });
+  });
+  client.write('login', {
+    ...mcData.loginPacket,
+    entityId: 1,
+    isHardcore: false,
+    gameMode: 0,
+    previousGameMode: -1,
+    hashedSeed: [0, 0],
+    maxPlayers: 20,
+    viewDistance: 2,
+    simulationDistance: 2,
+    reducedDebugInfo: false,
+    enableRespawnScreen: true,
+    isDebug: false,
+    isFlat: true
+  });
+  if (fs.existsSync(dropFlag)) {
+    setTimeout(() => { try { client.end('dropped before declare_commands'); } catch (e) {} }, 40);
+    return;
+  }
+  client.write('declare_commands', {
+    rootIndex: 0,
+    nodes: [
+      {
+        flags: { command_node_type: 0, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [1, 3, 4, 5, 6, 8, 11]
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [2],
+        extraNodeData: { name: 'rtp' }
+      },
+      {
+        flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 1 },
+        children: [],
+        extraNodeData: {
+          name: 'radius',
+          parser: 'brigadier:integer',
+          properties: { flags: { min_present: 1, max_present: 1 }, min: 1, max: 256 },
+          suggestionType: 'minecraft:ask_server'
+        }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+        children: [],
+        redirectNode: 1,
+        extraNodeData: { name: 'betterrtp:rtp' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'stop' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+        children: [],
+        redirectNode: 4,
+        extraNodeData: { name: 'minecraft:stop' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [7],
+        extraNodeData: { name: 'kill' }
+      },
+      {
+        flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: {
+          name: 'target',
+          parser: 'minecraft:entity',
+          properties: { unused: 0, onlyAllowPlayers: 0, onlyAllowEntities: 0 }
+        }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [9, 10],
+        extraNodeData: { name: 'tick' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'query' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'freeze' }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'customdanger' }
+      }
+    ]
+  });
+  client.write('position', { x: 0, y: 64, z: 0, yaw: 0, pitch: 0, flags: 0, teleportId: 1 });
+  client.write('update_time', { age: [0, 100], time: [0, 100] });
+});
+srv.on('listening', () => {
+  console.log(JSON.stringify({ port: srv.socketServer.address().port }));
+});
+"""
+        t0 = time.monotonic()
+        srv_proc = subprocess.Popen(
+            [NODE, "-e", server_js, bf.SWARM_JS, events_log, drop_flag],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            line = srv_proc.stdout.readline()
+            self.assertTrue(line, "fake protocol server did not report listening port")
+            port = int(json.loads(line)["port"])
+            with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+                fh.write(f"server-port={port}\nrcon.port=25575\nrcon.password=secret\nonline-mode=false\n")
+
+            spawned_swarms: list[Any] = []
+            real_swarm_cls = bf.Swarm
+
+            class TrackingSwarm(real_swarm_cls):
+                def __init__(self, *a, **kw):
+                    super().__init__(*a, **kw)
+                    self.started_proc = None
+                    spawned_swarms.append(self)
+
+                def start(self):
+                    super().start()
+                    self.started_proc = self.proc
+
+            def guarded() -> contextlib.ExitStack:
+                stack = contextlib.ExitStack()
+                stack.enter_context(unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("RCON must not be touched")))
+                stack.enter_context(unittest.mock.patch.object(bf, "PermissionGrant", side_effect=AssertionError("LP must not be touched")))
+                stack.enter_context(unittest.mock.patch.object(bf.bo, "rcon", side_effect=AssertionError("rcon must not be called")))
+                stack.enter_context(unittest.mock.patch.object(bf, "Swarm", side_effect=TrackingSwarm))
+                return stack
+
+            live_out = os.path.join(self.out_dir, "live-passive")
+            with guarded():
+                rc = bf.main([
+                    "--mode", "server",
+                    "--server-dir", self.dir,
+                    "--profile", "paper",
+                    "--tiers", "default",
+                    "--deny", "customdanger",
+                    "--mc-port", str(port),
+                    "--mc-version", "1.20.1",
+                    "--join-delay-ms", "0",
+                    "--episode-max-s", "4",
+                    "--out-dir", live_out,
+                ])
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(len(spawned_swarms), 1)
+            self.assertIsNotNone(spawned_swarms[0].started_proc)
+            self.assertIsNone(spawned_swarms[0].proc)
+            self.assertIsNotNone(
+                spawned_swarms[0].started_proc.poll(), "bench-swarm.js child process must terminate cleanly"
+            )
+
+            cursor = self._assert_passive_session(events_log, 0, "discover run")
+
+            # Verify no jars were renamed or modified
+            self.assertEqual(sorted(os.listdir(self.plugins_dir)), ["ExamplePlugin-1.0.jar", "ViaVersion-5.0.0.jar"])
+
+            runs_root = os.path.join(live_out, "runs")
+            run_dirs = [os.path.join(runs_root, d) for d in os.listdir(runs_root)]
+            self.assertEqual(len(run_dirs), 1)
+            run_dir = run_dirs[0]
+
+            tree = bfs.CommandTree.read_json(os.path.join(run_dir, "commands.json"))
+            self.assertEqual(tree.tiers, ["default"])
+            self.assertFalse(tree.truncated)
+            self.assertEqual(tree.nodes["rtp"].aliases, ["rtp", "betterrtp:rtp"])
+            self.assertFalse(tree.nodes["rtp"].denied)
+            self.assertEqual(tree.nodes["rtp <radius>"].parser, "brigadier:integer")
+            self.assertEqual(tree.nodes["rtp <radius>"].properties["min"], 1)
+            self.assertEqual(tree.nodes["rtp <radius>"].properties["max"], 256)
+            self.assertFalse(tree.nodes["rtp <radius>"].denied)
+            self.assertFalse(tree.nodes["kill"].denied)
+            self.assertTrue(tree.nodes["kill <target>"].denied)
+            self.assertEqual(tree.nodes["kill <target>"].denied_by, "kill <entity>")
+            self.assertFalse(tree.nodes["tick query"].denied)
+            self.assertTrue(tree.nodes["tick freeze"].denied)
+            self.assertEqual(tree.nodes["tick freeze"].denied_by, "tick freeze")
+            self.assertTrue(tree.nodes["stop"].denied)
+            self.assertEqual(tree.nodes["stop"].denied_by, "stop")
+            self.assertIn("minecraft:stop", tree.nodes["stop"].aliases)
+            self.assertTrue(tree.nodes["customdanger"].denied)
+            self.assertEqual(tree.nodes["customdanger"].denied_by, "customdanger")
+            self.assertEqual(
+                sorted(n.node_id for n in tree.allowed_executable_nodes(["default"])),
+                ["kill", "rtp", "rtp <radius>", "tick query"],
+            )
+
+            with open(os.path.join(run_dir, "verdict.json"), "r", encoding="utf-8") as fh:
+                verdict = json.load(fh)
+            self.assertEqual(verdict["status"], "passive_only")
+            self.assertEqual(verdict["verdict"], "PASSIVE_ONLY")
+            self.assertFalse(verdict["baseline"]["available"])
+            self.assertEqual(verdict["confirmed_culprits"], [])
+            self.assertEqual(verdict["blamed_jars"], [])
+            self.assertEqual(verdict["findings"], [])
+            self.assertNotIn("replay_cmd", json.dumps(verdict))
+            self.assertNotIn("operator_mitigation", json.dumps(verdict))
+            self.assertNotIn("author_reproducer", json.dumps(verdict))
+
+            with open(os.path.join(run_dir, "report.txt"), "r", encoding="utf-8") as fh:
+                report_text = fh.read()
+            self.assertIn("status: passive_only", report_text)
+            self.assertIn("confirmed_culprits: none (0)", report_text)
+            self.assertNotIn("--replay", report_text)
+
+            # Failure cleanup 1: protocol server drops connection before declare_commands -> Swarm closed, no verdict
+            with open(drop_flag, "w", encoding="utf-8") as fh:
+                fh.write("drop\n")
+            drop_out = os.path.join(self.out_dir, "drop-passive")
+            err_drop = io.StringIO()
+            with guarded(), contextlib.redirect_stderr(err_drop):
+                rc_drop = bf.main([
+                    "--mode", "server",
+                    "--server-dir", self.dir,
+                    "--profile", "paper",
+                    "--tiers", "default",
+                    "--mc-port", str(port),
+                    "--mc-version", "1.20.1",
+                    "--join-delay-ms", "0",
+                    "--episode-max-s", "2",
+                    "--out-dir", drop_out,
+                ])
+            self.assertEqual(rc_drop, 2)
+            self.assertIn("failed to capture command graph", err_drop.getvalue())
+            cursor = self._assert_passive_session(events_log, cursor, "drop run")
+            self.assertEqual(len(spawned_swarms), 2)
+            self.assertIsNotNone(spawned_swarms[1].started_proc)
+            self.assertIsNone(spawned_swarms[1].proc)
+            self.assertIsNotNone(
+                spawned_swarms[1].started_proc.poll(), "bench-swarm.js must be cleaned up on discover failure"
+            )
+            for root_dir, _, files in os.walk(drop_out):
+                self.assertNotIn("verdict.json", files)
+                self.assertNotIn("report.txt", files)
+
+            # Failure cleanup 2: discover succeeds against protocol server, then post-discovery jcmd fails ->
+            # Swarm closed, no verdict.json or report.txt written
+            os.remove(drop_flag)
+            pid_file = os.path.join(self.dir, "server.pid")
+            with open(pid_file, "w", encoding="utf-8") as fh:
+                fh.write(f"{os.getpid()}\n")
+            jcmd_fail_dir = os.path.join(self.out_dir, "jcmd-fail-passive")
+            failing_obs = bfs.JcmdObserver(
+                pid_file=pid_file,
+                server_dir=self.dir,
+                pid_cwd=lambda p: os.path.realpath(self.dir) if p == os.getpid() else None,
+                runner=lambda cmd, t: subprocess.CompletedProcess(
+                    cmd, 1, stdout="", stderr="AttachNotSupportedException: target JVM refused attach"
+                ),
+            )
+            args_jcmd_fail = bf.build_parser().parse_args([
+                "--mode", "server",
+                "--server-dir", self.dir,
+                "--profile", "paper",
+                "--tiers", "default",
+                "--mc-port", str(port),
+                "--mc-version", "1.20.1",
+                "--join-delay-ms", "0",
+                "--episode-max-s", "4",
+                "--pid-file", pid_file,
+                "--out-dir", jcmd_fail_dir,
+            ])
+            with guarded():
+                with self.assertRaisesRegex(bfs.JcmdError, "AttachNotSupportedException"):
+                    bfs.ServerRun(args_jcmd_fail, jcmd_fail_dir, observer=failing_obs).run()
+            self.assertTrue(
+                os.path.exists(os.path.join(jcmd_fail_dir, "commands.json")),
+                "discovery must write commands.json before the jcmd attach fails",
+            )
+            cursor = self._assert_passive_session(events_log, cursor, "jcmd-fail run")
+            self.assertEqual(len(spawned_swarms), 3)
+            self.assertIsNotNone(spawned_swarms[2].started_proc)
+            self.assertIsNone(spawned_swarms[2].proc)
+            self.assertIsNotNone(
+                spawned_swarms[2].started_proc.poll(), "bench-swarm.js must be closed before jcmd failure exits"
+            )
+            self.assertFalse(os.path.exists(os.path.join(jcmd_fail_dir, "verdict.json")))
+            self.assertFalse(os.path.exists(os.path.join(jcmd_fail_dir, "report.txt")))
+
+            # Positive control: a raw client sending active 1.20.1 chat packets must be recorded and flagged.
+            probe_js = r"""
+const path = require('path');
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const mc = require(path.join(nm, 'minecraft-protocol'));
+const client = mc.createClient({ host: '127.0.0.1', port: Number(process.argv[2]), username: 'probe_active', version: '1.20.1', 'online-mode': false });
+client.on('error', () => process.exit(1));
+client.on('login', () => {
+  client.write('chat_message', { message: 'probe', timestamp: 0n, salt: 0n, signature: undefined, offset: 0, acknowledged: Buffer.alloc(3) });
+  client.write('chat_command', { command: 'rtp', timestamp: 0n, salt: 0n, argumentSignatures: [], messageCount: 0, acknowledged: Buffer.alloc(3) });
+  setTimeout(() => { client.end(); process.exit(0); }, 300);
+});
+setTimeout(() => process.exit(1), 15000);
+"""
+            probe = subprocess.run(
+                [NODE, "-e", probe_js, bf.SWARM_JS, str(port)],
+                capture_output=True, text=True, timeout=20,
+            )
+            self.assertEqual(probe.returncode, 0, probe.stderr)
+            probe_events = self._read_protocol_events(events_log)[cursor:]
+            probe_packets = {e["packet"] for e in probe_events if e["ev"] == "packet"}
+            self.assertIn("chat_message", probe_packets)
+            self.assertIn("chat_command", probe_packets)
+            self.assertTrue(probe_packets - self.PASSIVE_SERVERBOUND, "allowlist must flag active packets")
+            with self.assertRaises(AssertionError):
+                self._assert_passive_session(events_log, cursor, "active control probe session")
+            self.assertLess(time.monotonic() - t0, 20.0)
+        finally:
+            srv_proc.terminate()
+            try:
+                srv_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                srv_proc.kill()
+            if srv_proc.stdout:
+                srv_proc.stdout.close()
+            if srv_proc.stderr:
+                srv_proc.stderr.close()
 
 
 if __name__ == "__main__":
