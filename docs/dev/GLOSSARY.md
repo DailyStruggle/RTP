@@ -29,7 +29,7 @@ The words below have common meanings in Java, Minecraft, or software engineering
 | **Shape** | A visual or geometric figure | A *pluggable spatial boundary and random-sampling algorithm* registered with `rtp-api`. Not just a geometry class. See *Shape* entry below. |
 | **World** | A Minecraft `World` object | Always wrapped as `RTPWorld` inside `rtp-core`/`rtp-api`. Never pass a raw Bukkit `World` across module boundaries. See *RTPWorld* entry below. |
 | **Ticket** | Generic token or pass | A *Plugin Chunk Ticket* (`world.addPluginChunkTicket`) tracked by `ChunkReservation`. Must be released after validation. See *Plugin Chunk Ticket* entry below. |
-| **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
+| **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `rtp-neoforge`, `rtp-proxy`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
 | **Task** | Any `Runnable` or scheduled work | A `TeleportPipelineTask` — a stateful object that owns a `ChunkReservation` and must be registered with `MemoryTracker`. See *TeleportPipelineTask* entry (DESIGN.md). |
 | **Scan** | A generic word meaning "to examine sequentially" | The *administrative world-scan lifecycle* (`/rtp scan start`/`pause`/`resume`/`reset`/`cancel`) that pre-populates a region's spatial memory without teleporting any player. Supersedes the legacy term *Fill*. See *Scan Task* and *Scan Lifecycle* entries below. |
 | **Backend** | Any back-of-house server in generic web terminology | A *Minecraft server instance that hosts world data and runs the RTP teleport pipeline locally*, sitting behind a proxy in network mode. Not interchangeable with "the database" or "the rtp-core module". See *Backend* entry below. |
@@ -56,13 +56,13 @@ Informal shorthand and developer nicknames frequently used in code reviews, disc
 | "scan" / "scan task" | `ScanTask` family + `ScanPauseCmd`; `docs/architecture/05-scan-task-crawler.md` | Safety pre-scanner persisting bad-location bitmaps in `MemoryShape`. Does NOT warm queues. |
 | "spiral" / "spiral math" | Archimedean spiral 1D mapping; [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md) | Bounded distribution algorithm. |
 | "anvil" / "anvil prefilter" | `rtp-anvil` / `anvil-api` module; [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-077](../adr/ADR-077-multi-format-region-support.md) | NBT pre-filter reading Anvil (`.mca`) off-tick, plus any format an addon registers via `RegionFormatRegistry`. |
-| "claim plugin" / "claim integration" | Folded into plugin per [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md); S-003 | No inline claim calls in pipeline/commands. |
+| "claim plugin" / "claim integration" | Extracted to bundled addon `LeafRTPClaimAddon` per [ADR-069](../adr/ADR-069-claim-integrations-extracted-to-bundled-addon.md) (superseding [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md)); [ADR-118](../adr/ADR-118-claim-checkers-compile-against-published-apis.md); S-003 | No inline claim calls in pipeline/commands. |
 | "Brigadier bridge" | `BrigadierCommandAdapter` in `commands-api/` (commands-api-ADR-001) | Command bridge for Paper/Folia, Fabric, NeoForge, and Velocity. |
 | "cat locale" / `lang/cat/` | `rtp-plugin/src/main/resources/lang/cat/` | Internal Internet Cat dialect easter egg (NOT Catalan). Never document in public guides. |
-| "the lite jar" / "lite assembly" | See [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) | Trimmed assembly variant, not a separate codebase. |
+| "the lite jar" / "lite assembly" | See [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) (superseded by [ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md)) | Full technical parity with Pro; differs in support tier and release cadence ([ADR-117](../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)). |
 | "obf carrier" / "unobf carrier" | `rtp-fabric-common` vs `rtp-fabric-common-unobf` (ADR-009, effects-api-ADR-006) | Intermediary-remapped (1.20.x/1.21.x) vs Mojmap-unobfuscated (MC 26.x) carrier modules. |
 | "the proxy plan" / "network mode" | [`docs/dev/MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md); [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) | Multi-server cross-proxy architecture and reservation token pipeline. |
-| "devstack" / "proxy devstack" | [`platforms/rtp-proxy/devstack/`](../../platforms/rtp-proxy/devstack/) | Multi-server test stack (Redis + Velocity + Paper + Folia + Fabric). See `devstack/README.md`. |
+| "devstack" / "proxy devstack" | [`devstack/`](../../devstack/) | Multi-server test stack (Redis + Velocity + Paper + Folia + Fabric + NeoForge). See `devstack/README.md`. |
 
 ---
 

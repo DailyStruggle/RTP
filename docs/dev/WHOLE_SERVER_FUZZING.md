@@ -87,15 +87,15 @@ sequenceDiagram
     Drv->>Drv: merge tiers, fold aliases, resolve redirects, apply denylist -> commands.json
 ```
 
-- **Tree:** nodes carry kind (root, literal, argument), name, parser and properties, children, redirect, executable flag and suggestion type. Each merged node records which tiers can see it.
+- **Tree:** nodes carry kind (root, literal, argument), name, parser and properties, children, redirect, executable flag and suggestion type. Each merged node records which tiers can see it and its minimum visible tier (`default` before `op`).
 - **Aliases:** `betterrtp:rtp` and `rtp` (when both resolve to the same subtree) are one node with two names. Redirect cycles (`execute ... run`) are cut.
-- **Arguments** by parser: integer, float and double within the declared bounds; `bool`; word, quoted and greedy strings; entity and game-profile as `{self}` or another bot; block positions and vectors near the bot; dimensions and resource locations from completion replies. A usage or error reply moves mutation toward the other parser branches.
+- **Arguments** by parser: integer, long, float and double sampled from a boundary and magnitude ladder (`min`, `-1`, `0`, `1`, `16`, `64`, `256`, `1024`, a clamped upper cap and `max`, plus uniform within bounds) so threshold bugs are reached without wasting episodes on extreme 32-bit values; `bool`; word, quoted and greedy strings; entity and game-profile as `{self}` or another bot; block positions and vectors near the bot; dimensions and resource locations from completion replies. A usage or error reply moves mutation toward the other parser branches.
 - **No metadata:** `plugin.yml` and `fabric.mod.json` are never read for discovery. They are read only for hard dependencies during jar `ddmin`.
 
 ## 2. Goal heuristics
 
-- **Arms:** (command node, follow-up shape). Shapes: `quit_lt1s` (quit within a second), `quit_delay` (quit while a delay or countdown is pending), `rejoin`, `repeat`, `concurrent` (another bot runs the same node).
-- **Selection:** UCB1. **Reward:** novelty (a reply shape or log signature not seen before, the ADR-111 corpus keys) plus harm (class growth per action, tick-gap excess, kicks).
+- **Arms:** (command node, follow-up shape). Shapes: `quit_lt1s` (quit within a second), `quit_delay` (quit while a delay or countdown is pending), `rejoin`, `repeat`, `concurrent` (another bot runs the same node), and protocol-level `window_click` + `close_window` sequences when a command opens an inventory window (`bench-swarm.js` handles `open_window`, `window_click` and `close_window` packets directly because lean mode disables Mineflayer's `inventory` plugin).
+- **Selection:** UCB1, stratified by tier so `default`-visible (player-reachable) nodes get the primary episode share and cannot be starved by a much larger `op` tree (`--tiers default` restricts the run to player-reachable nodes). **Reward:** novelty (a reply shape or log signature not seen before, the ADR-111 corpus keys) plus harm (class growth per action, tick-gap excess, kicks).
 - **Why follow-ups matter:** both session-leak positives below (BetterRTP and the planted `ff:queue`) need the player to leave while something the command started is still pending. A bandit over nodes alone would send the command and wait, which retains nothing.
 
 ## 3. Detection
@@ -103,10 +103,10 @@ sequenceDiagram
 | Oracle | Signal | Compared with | Signature | First suspect |
 |---|---|---|---|---|
 | Leak | Post-GC class counts per episode (`jcmd GC.class_histogram`, live) fitted against feature counts `node`, `node x follow-up`, departures; Bonferroni over classes x features | Vanilla baseline fit; run's own episodes | Class + feature | Jar containing the class |
-| Stall | Gap between `update_time` packets (every 20 ticks) and keep-alive delay, minus gaps overlapping driver GCs, dumps or restarts | Baseline p99 + `--stall-ms` (2000) | Top main-thread frame that is not JDK or server code | Jar containing that frame |
+| Stall | Acute single `update_time` gap or episode-wide `update_time` interval inflation (mean/p95 excess during `repeat` and `concurrent`), minus intervals overlapping driver GCs, dumps or restarts | Baseline p99 + `--stall-ms` (2000) for acute spikes; baseline interval distribution for sustained inflation | Recurring top main-thread frame (`jcmd Thread.print`) that is not JDK or server code | Jar containing that frame |
 | Log | Exceptions with a stack trace (ADR-111 parsing) | Baseline signatures | ADR-111 signature | Jar of the first non-server frame |
 
-No class name is hardcoded anywhere. The class a leak finding reports (for example `AdvancementProgress` for a retained player) is an output of the screen, never an input.
+No class name is hardcoded anywhere. The class a leak finding reports (for example `AdvancementProgress` for a retained player) is an output of the screen, never an input. When a reproduced finding's shrunk program includes a numeric argument on the ladder, the shrinker bisects between a passing bound and the failing value to report the minimal reproducing threshold.
 
 ## 4. Attribution: jar `ddmin`
 
@@ -131,11 +131,12 @@ flowchart LR
 - **Prerequisites only:** a restart with only the prerequisites (and the harness, if it is the observer), then `--finding-n` replays. At least `--finding-k` hits: labelled `server`, no `ddmin`, no jar blamed. A shrunk program whose command does not exist in vanilla gets the unknown-command reply and so does not reproduce.
 - The index gives a first suspect; `ddmin` gives the verdict. A finding is blamed on a jar only if removing that jar makes it stop reproducing.
 - For one culprit among n jars, expect two pre-`ddmin` probes plus on the order of 2 x log2(n) subset probes, each one restart plus up to `--finding-n` replays. A bug that needs two jars returns both.
+- **Verdict and resolution output:** `verdict.json` and `report.txt` emit both **operator mitigation** (canonical command node, all discovered aliases, minimum reproducing tier `default` vs `op`, and any bisected argument bound to block or revoke in `commands.yml` or a permission plugin) and the **author reproducer** (blamed jar set or unconfirmed first suspect on `INCONCLUSIVE`, leaked class slope or culprit stack frame, shrunk program, reproduction count `k` of `n`, and a one-line `--replay` command).
 - **Baseline vs per-finding control:** the baseline uses the same seeds and generator on the tree vanilla itself declares, so it does not run the same programs as exploration. It gives population statistics (class-growth fits, tick-gap p99, log signatures); a signature it also produced is never reported. The per-finding vanilla check is the prerequisites-only replay above.
 
 ## 5. Permission tiers and the denylist
 
-- `--tiers default,op`. Op bots are opped through RCON `op` before joining and de-opped at episode end and at driver exit, including on error.
+- `--tiers default,op` (or `--tiers default` for player-reachable hardening). Default-tier bots join with no extra permissions and inherit whatever the server's existing configuration grants a new player; unlike target mode, server mode never runs `LuckPerms` or permission-plugin grants (`lp group default permission set ...`), preserving the boundary between `default` and `op`. Op bots are opped through RCON `op` before joining and de-opped at episode end and at driver exit, including on error.
 - **Entry syntax:** `root [subpath] [<argkind>]`, matched after alias folding (`minecraft:stop` matches `stop`). `root` may end in a `*` glob; a root-only entry denies the whole subtree; `subpath` denies only that literal path; `<argkind>` denies paths whose next argument has that parser kind.
 
 | Entry | Denies | Still allowed |

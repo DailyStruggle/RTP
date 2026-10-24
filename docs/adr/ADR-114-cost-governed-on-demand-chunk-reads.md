@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-10-14
-**Extends:** [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md) (Archimedean spiral 1D mapping), [ADR-009](ADR-009-configurable-spatial-distributions.md) (Configurable spatial distributions), [ADR-016](ADR-016-anvil-subsystem.md) (Anvil read-only subsystem), [ADR-028](ADR-028-l3-backlog-cache.md) (L3 backlog cache order preservation), [ADR-109](ADR-109-measured-cost-probe-first-gate.md) (Measured-cost probe-first gate), [ADR-110](ADR-110-purpose-gated-live-loads.md) (Purpose-gated live loads)
+**Extends:** [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md) (Archimedean spiral 1D mapping), [ADR-009](ADR-009-configurable-spatial-distributions.md) (Configurable spatial distributions), [ADR-016](ADR-016-anvil-subsystem.md) (Anvil read-only subsystem), [ADR-028](ADR-028-l3-backlog-cache.md) (L3 backlog cache order preservation), [ADR-087](ADR-087-adaptive-compute-governor.md) (Adaptive compute governor: `ComputeBudget#generationCap()` and `ComputeBudget#cpuTarget()`), [ADR-109](ADR-109-measured-cost-probe-first-gate.md) (Measured-cost probe-first gate), [ADR-110](ADR-110-purpose-gated-live-loads.md) (Purpose-gated live loads)
 **Related:** [ADR-067](ADR-067-adaptive-scan-rate-and-mca-header-generation-check.md) (MCA header generation check), [ADR-112](ADR-112-per-region-work-division-on-folia.md) (Per-region work division on Folia)
 
 ## Context
@@ -50,9 +50,9 @@ A critical structural disparity exists between computational work performed on o
 
 To maximize aggregate system welfare, computational expenditure must be decomposed into asynchronous worker core-time ($C_{\text{async}}$) and main/regional tick time ($C_{\text{sync}}$), weighted by the scarcity of the tick budget:
 $$\text{Cost}_{\text{effective}} = C_{\text{async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{sync}}$$
-where $W_{\text{tick}}(\text{MSPT})$ is the dynamic shadow price of main-thread tick time:
-$$W_{\text{tick}}(\text{MSPT}) = 1 + \alpha + \beta \cdot \left(\frac{\max(0, \text{MSPT} - 35)}{10}\right)^2$$
-Under healthy conditions ($\text{MSPT} \le 25\text{ ms}$), $W_{\text{tick}} \approx 5\text{--}10$; under tick distress ($\text{MSPT} > 35\text{ ms}$), $W_{\text{tick}}$ escalates quadratically, reflecting the severe penalty of tick stalls.
+where $W_{\text{tick}}(\text{MSPT})$ is the dynamic shadow price of main-thread tick time with knee $K_{\text{cpu}} = \min(35\text{ ms},\; T_{\text{cpu}})$ from `ComputeBudget#cpuTarget()` ([ADR-087](ADR-087-adaptive-compute-governor.md) section 4.3 item 7 & section 7.3; $35.0\text{ ms}$ when `autoTune: false`):
+$$W_{\text{tick}}(\text{MSPT}) = 1 + \alpha + \beta \cdot \left(\frac{\max(0, \text{MSPT} - K_{\text{cpu}})}{10}\right)^2$$
+Under healthy conditions ($\text{MSPT} \le 25\text{ ms}$), $W_{\text{tick}} \approx 5\text{--}10$; under tick distress ($\text{MSPT} > K_{\text{cpu}}$), $W_{\text{tick}}$ escalates quadratically, reflecting the severe penalty of tick stalls.
 
 #### Empirical Deduplication Equation
 
@@ -96,12 +96,12 @@ Therefore, on-demand governance must achieve CPU and tick savings without distor
 
 ## Decision
 
-1. **Three-Tier Chunk Resolution Hierarchy with Governed Deduplication:**
-   On-demand execution (`LoadPurpose.IMMEDIATE`) shall resolve candidates through three explicit tiers governed by empirical cost-outcome heuristics to eliminate duplicate parsing and redundant loading:
+1. **Three-Tier Chunk Resolution Hierarchy with Governed Deduplication (`io.github.dailystruggle.rtp.common.predict`):**
+   On-demand execution (`LoadPurpose.IMMEDIATE`) shall resolve candidates through three explicit tiers governed by empirical cost-outcome heuristics using the shared Tier 1 `io.github.dailystruggle.rtp.common.predict` stochastic foundation (`EwmaEstimator`, `BernoulliEstimator`, `CostContext`, `ComparativeCostGovernor`) rather than bespoke per-governor EWMA/variance trackers. `ComparativeCostGovernor` supports both shadow-weighted expected cost (`CostContext`) and variance-aware switching (`z`-score threshold over combined standard error, correlation-window sustain count, cooldown since last flip, and bounded $\epsilon$-exploration floor `~1 / (1 + |z|)` in `[1/32, 1/4]` shared with [ADR-109](ADR-109-measured-cost-probe-first-gate.md)):
    - **Tier 1 (Resident Cache):** Resident chunks (`isChunkLoaded(cx, cz)`) and cached views (`getCachedChunk(key)`) shall be evaluated immediately with zero disk I/O and zero generation overhead.
    - **Tier 2 (Governed Off-Thread Pre-Filter):** When the candidate chunk is present on disk (verified in $<1\ \mu\text{s}$ via `AnvilRegionOccupancyCache`), the decision whether to decode via `AnvilChunkView` off-thread vs. bypass directly to Tier 3 native loading is governed dynamically by `ImmediateLoadGovernor`:
-     * **Deduplication Bypass (Direct Native Load):** If empirical candidate rejection is below the thread-weighted threshold ($P_{\text{reject}} \le \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$) and server tick health is stable ($\text{MSPT} \le 30\text{ ms}$), the task bypasses off-thread Anvil decoding and dispatches directly to Tier 3 native loading. This eliminates the duplicate decompression and NBT parsing penalty on safe chunks, delivering the destination with a single read and minimizing both CPU expenditure and command-to-teleport latency.
-     * **Pre-Filter Engagement:** If candidate rejection exceeds the threshold ($P_{\text{reject}} > \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$), or the query is predicate-constrained, or the server is under tick distress ($\text{MSPT} > 35\text{ ms}$), the candidate is decoded and verified off-thread on `AnvilIoPool`. If rejected, it sheds an expensive discarded native load and protects the main/regional tick loop.
+     * **Deduplication Bypass (Direct Native Load):** If empirical candidate rejection is below the thread-weighted threshold ($P_{\text{reject}} \le \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$) and server tick health is below the knee ($\text{MSPT} \le K_{\text{cpu}}$, where $K_{\text{cpu}} = \min(35\text{ ms},\; T_{\text{cpu}})$ from `ComputeBudget#cpuTarget()`, equal to $35.0\text{ ms}$ when `autoTune: false`), the task bypasses off-thread Anvil decoding and dispatches directly to Tier 3 native loading. This eliminates the duplicate decompression and NBT parsing penalty on safe chunks, delivering the destination with a single read and minimizing both CPU expenditure and command-to-teleport latency.
+     * **Pre-Filter Engagement:** If candidate rejection exceeds the threshold ($P_{\text{reject}} > \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$), or the query is predicate-constrained, or the server is above the CPU target knee ($\text{MSPT} > K_{\text{cpu}}$), the candidate is decoded and verified off-thread on `AnvilIoPool`. If rejected, it sheds an expensive discarded native load and protects the main/regional tick loop.
    - **Tier 3 (Cost-Governed Native Load Admission):** Native generation of ungenerated chunks shall proceed under the supervision of the `ImmediateLoadGovernor` concurrency semaphore. Native loads of chunks already on disk (bypass candidates and Anvil-verified safe candidates) generate nothing and shall not take a generation permit; serialising them behind the per-region permit defeats the latency purpose of the bypass route.
 
    *Spatial & Deduplication Invariant:* When a candidate coordinate $(cx, cz)$ is drawn from $f(x, z)$, Tier 1 and Tier 2 serve as transparent acceleration and deduplication paths. In safe terrain, bypassing Anvil eliminates duplicate decode overhead; in hazardous terrain, Anvil pre-filtering eliminates deadweight native generation. In all cases, coordinates remain strictly distributed according to $f(x, z)$.
@@ -135,14 +135,12 @@ Therefore, on-demand governance must achieve CPU and tick savings without distor
    - Sequential traversal creates absorbing-boundary concentrations on the perimeters of generated zones and introduces directional/radial drift.
    - Whenever a candidate is rejected (due to safety hazards, biome mismatch, or macro-bin filtering), the task shall draw a new, independent pseudo-random sample $s_{i+1} \sim f(x, z)$ across the valid domain.
 
-4. **In-Flight Native Generation Bounding (`ImmediateLoadGovernor`):**
-   - Live chunk generation for on-demand tasks shall be bounded by an in-flight concurrency semaphore:
+4. **In-Flight Native Generation Bounding (`ImmediateLoadGovernor` & `ADR-087` `ComputeBudget`):**
+   - Live chunk generation for on-demand tasks shall be bounded by an in-flight concurrency semaphore aligned with [ADR-087](ADR-087-adaptive-compute-governor.md) section 4.3 item 7 & section 7.3:
      * Maximum 1 concurrent native generation per region.
-     * Maximum 2 concurrent native generations server-wide across all unqueued on-demand executions.
+     * Server-wide concurrent native generation permits in `ImmediateLoadGovernor` and `GenerationBudget` share `ComputeBudget#generationCap()` ($g_{\text{eff}} \in [1, \text{capFor(version)}]$), removing the separate `mspt > 35 -> 1 permit` step.
    - **Resource Backpressure:** If `HeapPressureMonitor.underPressure()` is true, native generation requests are held in a bounded FIFO wait queue until pressure subsides.
-   - **Tick Degradation Damping:** Candidate admission accounts for externalized tick penalties:
-     $$\Phi_{\text{tick}}(\text{MSPT}) = \begin{cases} 0 & \text{if } \text{MSPT} \le 35\text{ ms} \\ \gamma \cdot \left(\frac{\text{MSPT} - 35}{10}\right)^2 & \text{if } \text{MSPT} > 35\text{ ms} \end{cases}$$
-     When $\Phi_{\text{tick}}(\text{MSPT}) > 0$, concurrent native generation permits are restricted to 1 server-wide, pacing generation to protect the tick loop.
+   - **Tick-Target Knee & Limiter Integration:** The `PREFILTER` short-circuit in `PregenTask` and `ImmediateLoadGovernor` and the knee of `ImmediateLoadGovernor#computeTickWeight` read $K_{\text{cpu}} = \min(35\text{ ms},\; T_{\text{cpu}})$ from `ComputeBudget#cpuTarget()` ($35.0\text{ ms}$ when `autoTune: false`), while the global generation cap $g_{\text{eff}}$ is governed by the `ADR-087` `AimdLimiter` over chunk-system latency, process CPU, tick breach, and tick stall signals.
 
 5. **Pipelined Async Execution and Regional Thread Handoff:**
    In alignment with ADR-112:
@@ -199,6 +197,7 @@ Therefore, on-demand governance must achieve CPU and tick savings without distor
 - [ADR-016](ADR-016-anvil-subsystem.md) — Anvil read-only subsystem (prefilter, backed chunk view).
 - [ADR-028](ADR-028-l3-backlog-cache.md) — L3 backlog cache order preservation (distribution invariance contract).
 - [ADR-067](ADR-067-adaptive-scan-rate-and-mca-header-generation-check.md) — Automatic PRESCAN, adaptive scan rate control, and `.mca`-header generation check.
+- [ADR-087](ADR-087-adaptive-compute-governor.md) — Adaptive compute governor (`ComputeBudget#generationCap()`, `ComputeBudget#cpuTarget()`, and `AimdLimiter`).
 - [ADR-109](ADR-109-measured-cost-probe-first-gate.md) — Measured-cost probe-first gate.
 - [ADR-110](ADR-110-purpose-gated-live-loads.md) — Purpose-gated live loads.
 - [ADR-112](ADR-112-per-region-work-division-on-folia.md) — Per-region work division on Folia.
