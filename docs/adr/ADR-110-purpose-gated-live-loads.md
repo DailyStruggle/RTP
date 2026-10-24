@@ -3,7 +3,7 @@
 **Status:** Proposed
 **Date:** 2026-10-08 (amended 2026-10-13: unpinned fallback for fresh worlds)
 **Extends:** [ADR-016](ADR-016-anvil-subsystem.md) (Anvil read-only data source), [ADR-015](ADR-015-stale-chunk-guard-countbound-pipes.md) (chunk tickets and stale guard)
-**Related:** [ADR-109](ADR-109-measured-cost-probe-first-gate.md) (probe-first governor)
+**Related:** [ADR-087](ADR-087-adaptive-compute-governor.md) (dynamic `ComputeBudget#hotCap(region)` bounds pin slots), [ADR-109](ADR-109-measured-cost-probe-first-gate.md) (probe-first governor)
 
 ## Context
 
@@ -18,7 +18,7 @@ A native load costs the server far more than RTP's own timing shows: memory for 
 1. **Purpose travels with generation.** `LoadPurpose { IMMEDIATE, SPECULATIVE }` is set on `PregenState`. `RegionCacheTask` fills with `SPECULATIVE` (shared and per-player). Every other caller (empty-queue fallback, `/rtp biome:...`, immediate teleport) keeps `IMMEDIATE` and today's behaviour. Third-party `ILocationGenerator` implementations keep their own contract.
 2. **Non-loading read SPI.** `RTPWorld.getChunkIfReadable(cx, cz)` resolves from a resident chunk or the region file and completes with `null` where only a native load could answer; `getOrReadChunk` composes it with the cache. Bukkit/Paper, Folia, NeoForge and Fabric common / common-unobf override it with their region-file path. The default serves resident chunks only (used by the v26 Fabric adapters, which have no region-file path).
 3. **Speculative fill reads first and prefers a pin for native loads.** Center chunk and safety neighbours resolve through the read SPI. On a miss the attempt either:
-   - **pins**: claims a slot from `LiveLoadGate` (per region, `keptLocations.size() + pinsInFlight < activeChunkCap`), then proceeds with native loads and returns its result with a `ChunkReservation`, which `RegionCacheTask` hands to the kept (pinned) queue; if the kept queue refuses, the reservation is closed and the location is stored unpinned;
+   - **pins**: claims a slot from `LiveLoadGate` (per region, `keptLocations.size() + pinsInFlight < hotCap`, where `hotCap` is read from `ComputeBudget#hotCap(region)` under [ADR-087](ADR-087-adaptive-compute-governor.md) section 4.3 item 6 & section 7.3 when `autoTune` is active, falling back to configured `activeChunkCap` when `autoTune: false`, so pinned native loads cannot overcommit a heap-contracted hot tier), then proceeds with native loads and returns its result with a `ChunkReservation`, which `RegionCacheTask` hands to the kept (pinned) queue; if the kept queue refuses, the reservation is closed and the location is stored unpinned;
    - **loads unpinned**: no slot free, so center and safety neighbours load natively without a pin and are validated on load, and the result goes to `unkeptLocations` without a success ring (item 4). Public fills in flight are bounded by the cache deficit; the cache pipe's pacer, charged each fill's wall time to completion, sets how many start per pulse; or
    - **defers**: no slot free and the heap is under pressure (`HeapPressureMonitor`, `maxHeapPercent`), so the candidate is skipped (`deferred/...` outcome) without touching the bad-chunk tables and the fill run ends without the exhaustion dump; a backlog candidate returns to the backlog as `UNKNOWN` (ADR-028); the next fill pulse retries.
    A slot is released on every attempt exit (reschedule, success, exhaustion, deferral).

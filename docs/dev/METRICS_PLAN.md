@@ -392,7 +392,7 @@ This decision is internal to the metrics plan and does not need ADR-025 ratifica
 
 ## Module Placement
 
-> **Updated 2026-05-17**: the SPI was extracted into the standalone `metrics-api/` module (neutral root `io.github.dailystruggle.metrics.api.*`) per [metrics-api-ADR-001](../../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md). The diagram below reflects the post-extraction home. RTP-specific counters now live on `RTPMetricsExtension` (in `rtp-core`) rather than on the shared snapshot.
+> **Updated 2026-05-17**: the SPI was extracted into the standalone `metrics-api/` module (neutral root `io.github.dailystruggle.metrics.api.*`) per [metrics-api-ADR-001](../../api/metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md). The diagram below reflects the post-extraction home. RTP-specific counters now live on `RTPMetricsExtension` (in `rtp-core`) rather than on the shared snapshot.
 
 ```
 metrics-api/                 -- platform-neutral SPI (io.github.dailystruggle.metrics.api.*)

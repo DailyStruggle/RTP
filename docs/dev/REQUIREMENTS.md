@@ -101,7 +101,7 @@ These requirements establish the overarching contract for operating RTP across m
 
 ### 1.7 Maps / Runtime Cartography
 
-These requirements establish the overarching contract for the runtime cartography chart-generation surface (in-world 2D imagery delivered through the native Minecraft cartography map). Module shape, palette policy, binding lifecycle, and renderer catalogue are design-level concerns and shall be specified in [ADR-046](../adr/ADR-046-maps-api-module.md), in `maps-api/docs/adr/`, and in [`docs/dev/scratch/CHECKLIST-maps-api.md`](scratch/CHECKLIST-maps-api.md) until that checklist is retired.
+These requirements establish the overarching contract for the runtime cartography chart-generation surface (in-world 2D imagery delivered through the native Minecraft cartography map). Module shape, palette policy, binding lifecycle, and renderer catalogue are design-level concerns and shall be specified in [ADR-046](../adr/ADR-046-maps-api-module.md), [ADR-047](../adr/ADR-047-declarative-chart-composition-bridge.md), and [maps-api-ADR-001](../../api/maps-api/docs/adr/maps-api-ADR-001-bootstrap.md).
 
 - **REQ-RTP-MAP-001 — Require-by-Contract Map Binding:** A `MapBinding` implementation shall throw `IllegalStateException` when invoked before RTP core is loaded. The exception message shall identify the missing initialization step so addons can self-diagnose without inspecting RTP internals. This requirement extends REQ-RTP-S-006 to the map-binding surface.
 
@@ -151,7 +151,7 @@ These requirements bound what an operator must do to run the system and what the
 ## 3. Prohibition Requirements
 
 These requirements describe prohibited behaviours. Each maps to one or more hazards in
-[`HAZARDS.md`](../admin/HAZARDS.md).
+[`HAZARDS.md`](HAZARDS.md).
 
 - **REQ-RTP-S-001 — No Lethal Teleport Destination:** The system shall not teleport a player to
   a location where the landing block or surrounding blocks are lava, fire, magma, void air, or
@@ -185,5 +185,5 @@ These requirements describe prohibited behaviours. Each maps to one or more haza
   instead.
 
 ## 4. System Requirements
-- **REQ-RTP-SYS-001 — Runtime Environment:** The system shall run on Java 17 or higher, together with the Java runtime that the host Minecraft version itself requires (Java 17 for 1.18-1.20.4, Java 21 for 1.20.5-1.21.x, Java 25 for 26.x). The shared platform-neutral modules (`rtp-api`, `rtp-core`, `anvil-api`, `yaml-api`, `units-api`, `commands-api`, `effects-api`, `metrics-api`, `bstats-api`, `maps-api`, `rtp-proxy-common`), the pre-1.20.5 platform carriers with their common modules, and the `rtp-plugin` entry points shall compile to Java 17 bytecode (classfile 61) per [ADR-113](../adr/ADR-113-java-17-baseline-and-26x-support-boundary.md).
+- **REQ-RTP-SYS-001 — Runtime Environment:** The system shall run on Java 17 or higher, together with the Java runtime that the host Minecraft version itself requires (Java 17 for 1.18-1.20.4, Java 21 for 1.20.5-1.21.x, Java 25 for 26.x). The shared platform-neutral modules (`rtp-api`, `rtp-core`, `anvil-api`, `bit-api`, `bstats-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `server-api`, `tags-api`, `units-api`, `yaml-api`, `rtp-proxy-common`), the pre-1.20.5 platform carriers with their common modules, and the `rtp-plugin` entry points shall compile to Java 17 bytecode (classfile 61) per [ADR-113](../adr/ADR-113-java-17-baseline-and-26x-support-boundary.md).
 - **REQ-RTP-SYS-002 — Server Software:** The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia), with Fabric, and with NeoForge. All platforms are delivered through dedicated native platform adapters; rationale and decisions are recorded in [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) and [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md).

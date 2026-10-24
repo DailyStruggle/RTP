@@ -1,24 +1,18 @@
-# rtp-core Coverage Plan: 49% → 80%
+# rtp-core Coverage Plan & Historical Baseline Record
 
-> Updated: 2026-04-16 (rescanned from live JaCoCo run)
-> Scope: `rtp-core` only (rtp-folia-common's suite is green as of 2026-09-11 but intentionally shallow at 8.7% instr - it is platform-coupled and exercised in-game via the `test` command against a live Folia server, not by JVM unit tests; its server-bound paths and owning `rtp test *` subcommands are inventoried in `platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md`; rtp-bukkit-common is a server impl layer)
+> **Historical Baseline Notice:** The 2026-04-16 snapshot (49% instruction / 35% branch) and 2026-09-10 intermediate figures below are **historical records** of the initial coverage campaign.
 >
-> **Baseline superseded 2026-09-10.** The repo-wide measured baseline, the
-> per-module targets, and the enforced-gate plan now live in
-> [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md). `rtp-core` measured
-> 59.6% instruction / 45.8% branch on 2026-09-10, and the target is 90/80,
-> not 80. The per-package tactics below remain valid; the numbers in the
-> snapshot table are historical.
+> **Authoritative Current State:** See [`ENTERPRISE_READINESS.md` section 2.1 & section 10](ENTERPRISE_READINESS.md#10-definition-of-done-scorecard-reconciled-2026-10-08--all-met) and root `build.gradle` (`coverageFloors`).
+> - **`rtp-core` unit coverage:** Measured at **81.6% instruction / 65.8% branch** across >340 test suites, with an enforced unit JaCoCo floor of **`0.80` instruction / `0.64` branch** plus higher per-package floors (`tasks.teleport` `0.87/0.75`, `selection.region` `0.82/0.68`, `selection.worldborder` `0.99/0.89`) and a >= 60% PIT mutation threshold (`-Pmutation`).
+> - **Runtime-attested devstack coverage:** Server-bound `rtp-core` bootstrap and pipeline seams are verified by live devstack JaCoCo agents merged via `:jacocoServerReport` (see [`TESTING_GUIDE.md`](TESTING_GUIDE.md) and [`ENTERPRISE_READINESS.md` section 10.1](ENTERPRISE_READINESS.md#101-criterion-1-re-scope-runtime-attested-devstack-coverage)).
+> - **Platform-coupled modules:** `rtp-folia-common`'s unit suite is green (intentionally shallow at 8.7% instruction because Folia schedulers and world access are exercised in-game via `/rtp test *` and the devstack acceptance harness; inventoried in [`platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md`](../../platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md)).
 
-## Current Baseline
+## Historical 2026-04-16 Baseline
 
-- **49% instructions / 35% branches** across 38,863 instructions (19,540 covered)
-- ~12,050 more instructions need coverage to reach 80% (target: 31,090 covered)
-- JaCoCo is already configured in `build.gradle` for all subprojects
-- CI uploads HTML reports as `jacoco-coverage` artifact; a minimum threshold **is**
-  enforced on `rtp-core` as of 2026-09-10 (0.55 instruction / 0.42 branch,
-  ratcheted upward only)
-- 57 test files already exist in `rtp-core/src/test`
+- **49% instructions / 35% branches** across 38,863 instructions (19,540 covered) at the start of the campaign (now **81.6% / 65.8%**, gated at `0.80 / 0.64` in root `build.gradle`)
+- JaCoCo report generation (`-Pcoverage`) and `jacocoTestCoverageVerification` floors (`coverageFloors`) are centralized in the root `build.gradle` `subprojects` block and enforced on `check`
+- CI runs `./gradlew build shadowJar -Pcoverage -PstaticAnalysis` and enforces both module/package floors (`scripts/ratchet-coverage.py`) and an 80% changed-line diff-coverage gate (`scripts/diff-coverage.py`)
+- Over 340 test files now exist in `rtp-core/src/test` (up from 57 in the 2026-04-16 baseline)
 
 ---
 
@@ -154,18 +148,20 @@ These packages have tests but still have meaningful uncovered branches worth clo
 
 ---
 
-## What to Skip (for now)
+## Previously Skipped Areas (Now Covered)
 
-| Class | Reason |
+The following areas were initially deferred in the 2026-04-16 baseline and have since been covered (see [`ENTERPRISE_READINESS.md` section 4.3](ENTERPRISE_READINESS.md#43-the-structural-blockers)):
+
+| Class | Resolution |
 |---|---|
-| `ChunkyChecker` / `ChunkyRTPShape` | Requires Chunky plugin at runtime |
-| `RedisManager` | Requires live Redis server (`RedisManagerTest` should be `@Disabled`) |
-| `ScanCmd` family | Deeply server-coupled (currently 83% — don't regress) |
-| MySQL / PostgreSQL accessors | Require running DB server — use inline H2/SQLite instead |
+| `ChunkyChecker` / `ChunkyRTPShape` | Covered by `ChunkyIntegrationTest` (reflection-based shape registration, absent-provider fallback, and boundary/rand checks). |
+| `RedisManager` / Redis network bindings | Covered by `RespRedisClientTest` and Docker-gated Testcontainers Redis 7 suites (`RedisNetworkStateBindingIT`, `RedisLeaderLeaseIT`, `RedisNetworkRequestQueueIT`, `RedisNetworkWaitlistIT`, `RedisPlayerOwnershipTrackerIT`). |
+| `ScanCmd` family | Covered by `ScanCmdTest` (heavy full-scale scans tagged `@Tag("slow")` per [ADR-094](../adr/ADR-094-quality-engineering-gates.md)). |
+| MySQL / PostgreSQL accessors | Covered by `RealH2DatabaseAccessorTest`, `RealSQLiteDatabaseAccessorTest`, and Docker-gated Testcontainers suites `RealMySQLDatabaseAccessorTest` (MySQL 8.4) and `RealPostgreSQLDatabaseAccessorTest` (PostgreSQL 16). |
 
 ---
 
-## Revised Coverage Projection
+## Historical Coverage Projection (2026-04-16)
 
 | Tier | Package(s) | Est. Lines Gained | Cumulative % |
 |---|---|---|---|
@@ -183,40 +179,22 @@ These packages have tests but still have meaningful uncovered branches worth clo
 
 ---
 
-## Enforcing the Gate in CI
+## Enforcing the Gate in CI (Implemented)
 
-Add to `build.gradle` `subprojects` block once coverage is sufficient. Ratchet up gradually:
-
-```groovy
-jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                counter = 'INSTRUCTION'
-                minimum = 0.80  // raise gradually: 0.50 → 0.65 → 0.75 → 0.80
-            }
-        }
-    }
-}
-check.dependsOn jacocoTestCoverageVerification
-```
-
-Also enable XML reports for Codecov integration (optional):
+Coverage verification is centralized in the root `build.gradle` `subprojects` block via the `coverageFloors` map (ratcheted monotonically upward via `scripts/ratchet-coverage.py`) and complemented by changed-line diff coverage (`scripts/diff-coverage.py`, 80% floor) in `.github/workflows/gradle.yml`:
 
 ```groovy
-jacocoTestReport {
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-```
-
-Then add to `.github/workflows/gradle.yml`:
-
-```yaml
-- name: Upload coverage to Codecov
-  uses: codecov/codecov-action@v4
-  with:
-    files: '**/build/reports/jacoco/test/jacocoTestReport.xml'
+def coverageFloors = [
+    ':rtp-core': [
+        instruction: 0.80,
+        branch: 0.64,
+        packages: [
+            'io.github.dailystruggle.rtp.common.tasks.teleport': [instruction: 0.87, branch: 0.75],
+            'io.github.dailystruggle.rtp.common.selection.region': [instruction: 0.82, branch: 0.68],
+            'io.github.dailystruggle.rtp.common.selection.worldborder': [instruction: 0.99, branch: 0.89]
+        ]
+    ],
+    // ... plus :metrics-api, :tags-api, :yaml-api, :bstats-api, :anvil-api,
+    // :maps-api, :rtp-api, :commands-api, :bit-api, :units-api, :rtp-proxy:rtp-proxy-common
+]
 ```
