@@ -2052,6 +2052,10 @@ class SwarmError(Exception):
     pass
 
 
+class NoSpawnError(RuntimeError):
+    pass
+
+
 class Swarm:
     """bench-swarm.js in fuzz-control mode as a child process. stdin stays an
     open pipe: the swarm exits on its EOF, so it never outlives this process."""
@@ -2251,6 +2255,7 @@ class TargetRun:
         self.a, self.drv, self.swarm, self.reader = a, drv, swarm, reader
         self.target, self.stamp, self.tdir = target, stamp, tdir
         self.cmd = command_for(target, parse_cmds(a.cmd))
+        self.empty_streak = 0
         self.probe_reader = CoverageReader(reader.runs_dir) if getattr(a, "coverage", False) else None
         # The direct control run always measures leaks (its fit is the reference for every target).
         self.faults = getattr(a, "mode", "leak") == "faults" and target != DIRECT
@@ -2383,6 +2388,38 @@ class TargetRun:
             f"heap={d.get('heap_used_after_gc_mb', -1):.0f}MB classes={len(self.prev_histo)}")
         return True
 
+    def warm_up(self, seed: int) -> None:
+        """Exercise the target before the first scored baseline; never checkpoint or trace it."""
+        for i in range(getattr(self.a, "warmup", 1)):
+            bots = [{"name": bot_name(self.cfg["run"], seed, f"warm{i}", j),
+                     "program": [{"a": "rtp"}]} for j in range(self.a.min_bots)]
+            eid = f"{self.target}-s{seed}-warm{i}"[:64]
+            log(f"{self.target}: warm-up {i + 1}/{self.a.warmup} with {len(bots)} bot(s)")
+            events, _ = self.run_bots(eid, bots, None)
+            if not any(e.get("ev") == "spawn" for e in events):
+                errors = list(dict.fromkeys(str(e.get("text", "")) for e in events
+                                            if e.get("ev") == "bot_error" and e.get("text")))
+                self.log_bot_errors(eid, errors)
+                raise NoSpawnError(self.no_spawn_message(eid, errors, warmup=True))
+            self.empty_streak = 0
+            self.settle()
+        self.prev, self.prev_histo = None, {}
+
+    @staticmethod
+    def log_bot_errors(eid: str, errors: list[str]) -> None:
+        if errors:
+            log(f"swarm {eid} bot errors: " + " | ".join(errors))
+
+    def no_spawn_message(self, eid: str, errors: list[str], warmup: bool = False) -> str:
+        detail = (": " + " | ".join(errors)) if errors else ""
+        hint = ("; version auto-detect failed, try --mc-version with a version supported by Mineflayer "
+                "and ViaVersion/ViaBackwards on the bench") if any("No data available for version" in e
+                                                                    for e in errors) else ""
+        if warmup:
+            return f"warm-up {eid}: no bot spawned{detail}{hint}"
+        return (f"{self.empty_streak} consecutive episodes had no bot spawn (last: {eid})"
+                f"{detail}{hint}")
+
     def write(self, rec: dict) -> None:
         line, side = split_classes(rec)
         with open(self.trace, "a", encoding="utf-8") as fh:
@@ -2439,6 +2476,20 @@ class TargetRun:
             self.write(rec)
             return rec
         rec["events"], rec["done"] = events, {k: done.get(k) for k in ("ms", "reason", "bots")}
+        if bots and not any(e.get("ev") == "spawn" for e in events):
+            self.empty_streak += 1
+            rec["excluded"] = "no bot spawned"
+            rec["bot_errors"] = list(dict.fromkeys(str(e.get("text", "")) for e in events
+                                                    if e.get("ev") == "bot_error" and e.get("text")))
+            self.prev, self.prev_histo = None, {}
+            self.log_bot_errors(eid, rec["bot_errors"])
+            log(f"{self.target}: episode {ep} excluded before checkpoint; "
+                f"{self.empty_streak}/{self.a.max_empty} consecutive episodes had no spawn")
+            self.write(rec)
+            if self.empty_streak >= self.a.max_empty:
+                raise NoSpawnError(self.no_spawn_message(eid, rec["bot_errors"]))
+            return rec
+        self.empty_streak = 0
         rec["ms"] = int((time.time() - t0) * 1000)
         new_findings = self.observe(seed, ep, rec["origin"], events, [b["program"] for b in bots])
         if new_findings:
@@ -2613,10 +2664,17 @@ class TargetRun:
             bots = [{"name": bot_name(self.cfg["run"], seed, f"{ep}k{j}", i), "program": b["program"]}
                     for i, b in enumerate(rec["bots"])]
             try:
-                self.run_bots(f"{self.target}-s{seed}-e{ep}k{j}"[:64], bots, rec.get("console"))
+                events, _ = self.run_bots(f"{self.target}-s{seed}-e{ep}k{j}"[:64], bots, rec.get("console"))
             except SwarmError as e:
                 rec["reps_error"] = f"swarm: {e}"
                 self.swarm_failed(ep, e)
+                break
+            if bots and not any(e.get("ev") == "spawn" for e in events):
+                errors = list(dict.fromkeys(str(e.get("text", "")) for e in events
+                                            if e.get("ev") == "bot_error" and e.get("text")))
+                rec["reps_error"] = "no bot spawned"
+                rec["reps_bot_errors"] = errors
+                self.log_bot_errors(f"{self.target}-s{seed}-e{ep}k{j}", errors)
                 break
             lingering, foreign = self.settle()
             label = self.label(seed, f"e{ep}k{j}")
@@ -3344,6 +3402,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-bots", type=int, default=8)
     p.add_argument("--min-episode-s", type=float, default=20)
     p.add_argument("--max-episode-s", type=float, default=60)
+    p.add_argument("--warmup", type=int, default=1,
+                   help="unscored target warm-up episodes before the first baseline per target (0 = off)")
+    p.add_argument("--max-empty", type=int, default=3,
+                   help="abort after this many consecutive planned episodes with no bot spawn")
     p.add_argument("--episode-max-s", type=float, default=180, help="hard per-episode deadline in the swarm")
     p.add_argument("--done-slack-s", type=float, default=20, help="extra wait for done beyond max_ms")
     p.add_argument("--quiet-s", type=float, default=3, help="pause after done before the checkpoint")
@@ -3424,6 +3486,8 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
     tr = TargetRun(a, drv, swarm, reader, target, stamp, tdir)
     log(f"{target}: command '/{tr.cmd}', settling {a.settle_s}s")
     time.sleep(a.settle_s)
+    if replay_rec is None and a.warmup:
+        tr.warm_up(seeds[0] if seeds else 0)
     t0 = time.time()
     if replay_rec is not None:
         seed = int(replay_rec.get("seed", 0))
@@ -3496,6 +3560,8 @@ def main(argv=None) -> int:
         p.error("need 2 <= --min-bots <= --max-bots <= 64")
     if not 0 < a.min_episode_s <= a.max_episode_s:
         p.error("need 0 < --min-episode-s <= --max-episode-s")
+    if a.warmup < 0 or a.max_empty < 1:
+        p.error("need --warmup >= 0 and --max-empty >= 1")
     if not (0 < a.elite <= 1 and 0 < a.cem_alpha <= 1 and 1 <= a.shrink_k <= a.shrink_n and a.stall_gens >= 1):
         p.error("need 0 < --elite <= 1, 0 < --cem-alpha <= 1, 1 <= --shrink-k <= --shrink-n, --stall-gens >= 1")
     if a.surprise_n > 0 and not 1 <= a.surprise_k <= a.surprise_n:
@@ -3571,12 +3637,16 @@ def main(argv=None) -> int:
         swarm.start()
         log(f"swarm: control port {swarm.port} (pid {swarm.proc.pid})")
         grant.apply()
-        with open(os.path.join(run_dir, "manifest.csv"), "w", newline="", encoding="utf-8") as mf:
-            w = csv.writer(mf)
-            w.writerow(["target", "status", "label", "time", "result", "detail"])
-            for target in targets:
-                run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec)
-                mf.flush()
+        try:
+            with open(os.path.join(run_dir, "manifest.csv"), "w", newline="", encoding="utf-8") as mf:
+                w = csv.writer(mf)
+                w.writerow(["target", "status", "label", "time", "result", "detail"])
+                for target in targets:
+                    run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec)
+                    mf.flush()
+        except NoSpawnError as e:
+            log(f"aborting fuzz run: {e}")
+            return 3
     finally:
         signal.signal(signal.SIGTERM, prev_term)
         drv.stop_ramp()
