@@ -1,0 +1,222 @@
+# Whole-server fuzzing: finding leaks and stalls in a server you were not told about
+
+`scripts/bench_fuzz.py --mode server` is a proposed mode of the live-server behaviour fuzzer that takes a host, the RCON details and the server directory, and nothing else. It discovers the attack surface from the server itself, finds leaks and main-thread stalls by comparison with a vanilla baseline, and blames a jar only after the finding has reproduced.
+
+- **Governing decision:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (**Proposed**, awaiting Rule D-005 approval). It amends [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) section 2.2 for server mode only, and extends the platform profile of [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md) with a server-mode carve-out from its decision 6 (isolation and `--plugin-packages` attribution). ADR-122 is also Proposed.
+- **Status:** method only. Nothing described here is implemented, and no server-mode run exists. Every result below that is not explicitly attributed to a recorded run is a validation target, not evidence.
+- **Target mode** (one named plugin per restart, `--cmd`): unchanged; see [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) and [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md).
+
+---
+
+## Why a target-free mode
+
+Target mode found BetterRTP 3.6.13's quit-session retention because the operator isolated `BetterRTP-3.6.13.jar` and told the bots to send `/betterrtp:rtp`. A server admin with many plugins has neither piece of knowledge. Server mode replaces each piece of prior knowledge with something the server reports or a measurement:
+
+| Target mode needs | Server mode uses instead |
+|---|---|
+| `--cmd` (what to send) | The `declare_commands` Brigadier tree each bot receives at login, per permission tier |
+| A fixed action list | A bandit over (command node, follow-up shape), with parser-typed arguments and tab-completion values |
+| One jar per restart (isolation) | All jars at once; isolation only afterwards, by jar `ddmin` |
+| The `direct` control | A same-seed vanilla baseline with only the prerequisite jars (population control), plus a prerequisites-only replay of each shrunk finding (per-finding control) |
+| StressTestRTP histograms (Bukkit only) | `jcmd GC.class_histogram` and `Thread.print` from the host; StressTestRTP used if it answers |
+| `PLUGIN_PACKAGES` / `--plugin-packages` | A class-to-jar index scanned from `plugins/` or `mods/` |
+
+---
+
+## Pipeline
+
+```mermaid
+flowchart TD
+    A[Inputs: host, RCON, server dir, profile, tiers, budget] --> B[1. Vanilla baseline<br/>prerequisite jars only, same seeds on the vanilla tree]
+    B --> C[2. Discover<br/>one bot per tier logs in, sends declare_commands tree,<br/>tab-completion probes -> commands.json]
+    C --> D[3. Explore<br/>bandit picks node x follow-up,<br/>gen_args fills arguments, swarm runs episode]
+    D --> E{Oracles<br/>leak screen, stall, log}
+    E -- nothing new --> D
+    E -- candidate not in baseline --> F[Replay --finding-n times<br/>confirm on --finding-k]
+    F -- did not reproduce --> D
+    F -- reproduced --> G[4. Shrink program<br/>ddmin over actions, shrink_bots]
+    G --> V[5a. Restart with full jar set<br/>replay shrunk program]
+    V -- does not reproduce --> I
+    V -- reproduces --> W[5b. Restart with prerequisites only<br/>replay shrunk program]
+    W -- reproduces --> X[label server: no jar blamed]
+    X --> I
+    W -- does not reproduce --> H[5c. Jar ddmin<br/>restart with jar subsets + prerequisites,<br/>replay shrunk program]
+    H --> I[6. Report<br/>verdict.json, commands.json coverage]
+```
+
+### Components
+
+```mermaid
+graph LR
+D[bench_fuzz server mode] -->|discover op| S[bench-swarm bots]
+S -->|commands, completions, window, tick_gap| D
+D --> B[NodeBandit + gen_args]
+B -->|programs| S
+S -->|packets| M[MC server, any platform]
+D -->|jcmd histogram, Thread.print| M
+D -->|tail| L[latest.log]
+D --> J[JarIndex: plugins/ or mods/]
+D -->|restart with jar subsets| R[jar ddmin]
+D -.->|optional| H[StressTestRTP /rtpstress]
+```
+
+---
+
+## 1. Discovery
+
+```mermaid
+sequenceDiagram
+    participant Drv as Driver
+    participant R as RCON
+    participant Bd as Bot (default tier)
+    participant Bo as Bot (op tier)
+    participant Srv as Server
+    Drv->>R: op fuzz_op_0
+    Drv->>Bd: discover
+    Drv->>Bo: discover
+    Bd->>Srv: login
+    Srv-->>Bd: declare_commands (filtered for default)
+    Bo->>Srv: login
+    Srv-->>Bo: declare_commands (filtered for op)
+    Bd-->>Drv: {ev:commands, tier:default, tree}
+    Bo-->>Drv: {ev:commands, tier:op, tree}
+    Bo->>Srv: tab_complete "/ff:scan "
+    Srv-->>Bo: matches
+    Bo-->>Drv: {ev:completions, text, matches}
+    Drv->>R: deop fuzz_op_0
+    Drv->>Drv: merge tiers, fold aliases, resolve redirects, apply denylist -> commands.json
+```
+
+- **Tree:** nodes carry kind (root, literal, argument), name, parser and properties, children, redirect, executable flag and suggestion type. Each merged node records which tiers can see it.
+- **Aliases:** `betterrtp:rtp` and `rtp` (when both resolve to the same subtree) are one node with two names. Redirect cycles (`execute ... run`) are cut.
+- **Arguments** by parser: integer, float and double within the declared bounds; `bool`; word, quoted and greedy strings; entity and game-profile as `{self}` or another bot; block positions and vectors near the bot; dimensions and resource locations from completion replies. A usage or error reply moves mutation toward the other parser branches.
+- **No metadata:** `plugin.yml` and `fabric.mod.json` are never read for discovery. They are read only for hard dependencies during jar `ddmin`.
+
+## 2. Goal heuristics
+
+- **Arms:** (command node, follow-up shape). Shapes: `quit_lt1s` (quit within a second), `quit_delay` (quit while a delay or countdown is pending), `rejoin`, `repeat`, `concurrent` (another bot runs the same node).
+- **Selection:** UCB1. **Reward:** novelty (a reply shape or log signature not seen before, the ADR-111 corpus keys) plus harm (class growth per action, tick-gap excess, kicks).
+- **Why follow-ups matter:** both session-leak positives below (BetterRTP and the planted `ff:queue`) need the player to leave while something the command started is still pending. A bandit over nodes alone would send the command and wait, which retains nothing.
+
+## 3. Detection
+
+| Oracle | Signal | Compared with | Signature | First suspect |
+|---|---|---|---|---|
+| Leak | Post-GC class counts per episode (`jcmd GC.class_histogram`, live) fitted against feature counts `node`, `node x follow-up`, departures; Bonferroni over classes x features | Vanilla baseline fit; run's own episodes | Class + feature | Jar containing the class |
+| Stall | Gap between `update_time` packets (every 20 ticks) and keep-alive delay, minus gaps overlapping driver GCs, dumps or restarts | Baseline p99 + `--stall-ms` (2000) | Top main-thread frame that is not JDK or server code | Jar containing that frame |
+| Log | Exceptions with a stack trace (ADR-111 parsing) | Baseline signatures | ADR-111 signature | Jar of the first non-server frame |
+
+No class name is hardcoded anywhere. The class a leak finding reports (for example `AdvancementProgress` for a retained player) is an output of the screen, never an input.
+
+## 4. Attribution: jar `ddmin`
+
+```mermaid
+flowchart LR
+    F[Reproduced, shrunk finding] --> A{full set reproduces?}
+    A -->|no| U[not reproducible after restart: no blame]
+    A -->|yes| E{prerequisites only reproduces?}
+    E -->|yes| V[label server: no jar blamed, no ddmin]
+    E -->|no| S[jars J1..Jn + prerequisites]
+    S --> P{probe subset}
+    P -->|restart with subset + prerequisites + hard deps| Q[replay shrunk program --finding-n times]
+    Q -->|>= --finding-k hits| Y[reproduces: keep shrinking this subset]
+    Q -->|fewer hits or a jar failed to load| N[does not reproduce: try complement / finer split]
+    Y --> P
+    N --> P
+    P -->|1-minimal| Z[blamed jar set]
+```
+
+- **Why two probes first:** `ddmin` in `scripts/bench_fuzz.py` assumes the full set reproduces, never tests the empty set and always returns at least one item. Without the prerequisites-only probe, a vanilla stall or leak would be pinned on whichever jar `ddmin` ends on.
+- **Full set:** a restart with every jar, then `--finding-n` replays. Fewer than `--finding-k` hits: the finding is reported as not reproducible after restart and is not attributed.
+- **Prerequisites only:** a restart with only the prerequisites (and the harness, if it is the observer), then `--finding-n` replays. At least `--finding-k` hits: labelled `server`, no `ddmin`, no jar blamed. A shrunk program whose command does not exist in vanilla gets the unknown-command reply and so does not reproduce.
+- The index gives a first suspect; `ddmin` gives the verdict. A finding is blamed on a jar only if removing that jar makes it stop reproducing.
+- For one culprit among n jars, expect two pre-`ddmin` probes plus on the order of 2 x log2(n) subset probes, each one restart plus up to `--finding-n` replays. A bug that needs two jars returns both.
+- **Baseline vs per-finding control:** the baseline uses the same seeds and generator on the tree vanilla itself declares, so it does not run the same programs as exploration. It gives population statistics (class-growth fits, tick-gap p99, log signatures); a signature it also produced is never reported. The per-finding vanilla check is the prerequisites-only replay above.
+
+## 5. Permission tiers and the denylist
+
+- `--tiers default,op`. Op bots are opped through RCON `op` before joining and de-opped at episode end and at driver exit, including on error.
+- **Entry syntax:** `root [subpath] [<argkind>]`, matched after alias folding (`minecraft:stop` matches `stop`). `root` may end in a `*` glob; a root-only entry denies the whole subtree; `subpath` denies only that literal path; `<argkind>` denies paths whose next argument has that parser kind.
+
+| Entry | Denies | Still allowed |
+|---|---|---|
+| `stop`, `restart`, `op`, `deop`, `whitelist`, `save-off`, `execute`, `kick`, `difficulty`, `gamerule` | The root and its subtree | - |
+| `ban*`, `pardon*` | `ban`, `ban-ip`, `banlist`, `pardon`, `pardon-ip` and subtrees | - |
+| `kill <entity>` | `kill` followed by a selector | Bare `kill` (the sender) |
+| `reload confirm` | That path | `reload` alone |
+| `tick freeze`, `tick unfreeze`, `tick rate`, `tick sprint`, `tick step` | Changes to the tick loop the stall oracle measures (vanilla 1.20.3+) | `tick query` |
+
+- **Built-in vs operator entries:** the built-in list names no plugin, mod or class. `--deny` adds operator entries in the same syntax and may name plugin commands (site policy); nothing removes entries. Evidence runs pass no `--deny` entry naming BetterRTP or the fixture.
+- Denied nodes are never sent, including during shrinking and replay.
+- Server mode runs only on a disposable bench copy made by `scripts/bench_setup.py`. Nothing restores the world, `ops.json` or plugin configs between runs: start each run from a fresh copy.
+
+## 6. Platform profiles
+
+| Profile | Jar folder | Prerequisites always kept | Log patterns | Observation |
+|---|---|---|---|---|
+| `paper` | `plugins/` | Via plugins (Mineflayer on 26.x) | ADR-111 stack traces, `Could not pass event` | Host `jcmd`, PID from `--pid-file` or `jcmd -l` |
+| `fabric` | `mods/` | Fabric loader, Fabric API | Stack traces only | `docker exec <container> jcmd 1 ...` on the devstack |
+
+A missing `jcmd`, the wrong user or an unmatched PID fails the run at start with a hint. It is never read as an empty histogram.
+
+- **Python reads:** JSON, text, `jcmd` output and jar archives through the stdlib `zipfile` module (class entries for the index; `plugin.yml`, `paper-plugin.yml`, `fabric.mod.json` for hard dependencies). No third-party package.
+- **Optional harness:** if `/rtpstress` answers at the start of the run, StressTestRTP may be the observer for the whole run. Its jar then counts as a prerequisite: kept in the baseline, both pre-`ddmin` probes and every subset, and never a `ddmin` candidate, so every comparison uses the same observer.
+
+---
+
+## Validation targets
+
+The method is credible only if it finds bugs it was never told about. Two kinds of positive are used. Neither name appears in any input, oracle, rule or denylist.
+
+### Known real-world positive: BetterRTP 3.6.13
+
+**What is recorded** (target mode, [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md), run `fuzz-20261010-213747`):
+
+- With only `BetterRTP-3.6.13.jar` added, seeded programs retained +1 to +4 whole player sessions per episode (about 1,800 `AdvancementProgress` and 3,900 `CriterionProgress` each); `direct` retained 0 in 80 episodes. Replays of e12, e17, e30 and e40 each reproduced 3 of 3.
+- The shrinker reduced the trigger to one bot sending one `/betterrtp:rtp` and disconnecting about 1 s later (2 of 3). Probes lasting 2 s retained nothing.
+- Likely owner from bytecode: `PlayerInfo` keeps `rtping` (and inventory maps) keyed by the live `Player`, and the quit handler never clears it. This has not been confirmed by a GC root path.
+
+**What is not established:**
+
+- The run's verdict was INCONCLUSIVE because of a since-fixed swarm bot cap that rejected every rung-1 episode; the replays, not a ladder verdict, are the evidence.
+- The run was told the plugin and the command. The fit that flagged it scored a player census that named player classes; that census has been removed in favour of the per-departure class screen, and the class screen has not yet been run against BetterRTP.
+- The leak is intermittent: in that run the first reproducible candidate came at e12, and a later 8-episode screen returned PASS. About 24 or more episodes, or a replay of the shrunk program, are needed.
+- Server mode has never been run against it.
+
+**What server mode must show:** with BetterRTP installed among other plugins and never named, the screen flags a player-session class per `rtp x quit_lt1s` (or `quit_delay`) above the baseline, the finding reproduces, and jar `ddmin` reduces the jar set to `BetterRTP-3.6.13.jar`. If the exploration budget runs out first, the fallback evidence is a replay of the shrunk program plus the jar `ddmin`, with the episode count stated.
+
+### Planted-bug fixture
+
+A small fixture with a neutral core, a Paper plugin (`plugin.yml`, namespace `ff`) and a Fabric mod (Brigadier command through Fabric API). Its commands look ordinary:
+
+| Command | Planted bug | Expected oracle and feature |
+|---|---|---|
+| `/ff:queue <n>` | Stores the player in a static map; the entry is cleared only when a 1.5 s timer completes, so a player who quits first is retained. Same shape as BetterRTP. | Leak: a player-session class per `ff:queue x quit_lt1s`; `ddmin` to the fixture jar |
+| `/ff:scan <radius>` | With `radius > 48`, busy-loops the main thread for about 3 s. Smaller radii return at once. | Stall: tick gap > 2000 ms above baseline p99; top frame in the fixture; `ddmin` to the fixture jar |
+
+`scan` tests whether argument generation explores the declared integer range rather than a fixed value; `queue` tests whether the bandit reaches the quit-while-pending follow-up.
+
+### Planned evidence runs
+
+| Run | Server | Jars | Expected | Status |
+|---|---|---|---|---|
+| Paper | Paper on `leaf26` (`bench_setup.py` copy) | LuckPerms, Vault, Via, BetterRTP 3.6.13, fixture, 2 or 3 benign plugins | Fixture leak and stall found and attributed; BetterRTP retention found and `ddmin` to `BetterRTP-3.6.13.jar` | Not run |
+| Fabric | Fabric 1.21.11 devstack (`docker-compose.fabric.yml`-based) | Fixture mod, Fabric API | Both planted bugs found and attributed | Not run |
+
+Results, run IDs, episode counts and command coverage will be recorded here and in [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md), including anything that did not reproduce.
+
+---
+
+## Limits
+
+- **PASS means "nothing found within budget"** (ADR-111 section 2.5), and in server mode the budget is shared by every discovered node.
+- **Noise:** many plugins mean many classes and features; the Bonferroni correction costs sensitivity.
+- **Destructive commands** are limited by the denylist and bounded by the bench copy, not eliminated.
+- **Not covered:** JaCoCo coverage in server mode, NeoForge runs (the profile shape applies; no devstack yet), and the ADR-122 harness carriers.
+- **Attribution is to jars, not code paths.** A shaded library is blamed on the jar that ships it.
+
+## References
+
+- [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md), [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md), [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md), [ADR-080](../adr/ADR-080-opt-in-simulation-benchmark-tier.md)
+- `scripts/bench_fuzz.py`, `scripts/bench_overnight.py`, `scripts/bench_setup.py`, `devstack/clients/bench-swarm.js`
+- Zeller and Hildebrandt, *Simplifying and Isolating Failure-Inducing Input*, IEEE TSE 28(2), 2002

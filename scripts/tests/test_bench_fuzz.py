@@ -705,6 +705,27 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         self.assertEqual(len(self.swarm.requests), 1)
         self.assertFalse(any(c.startswith("rtpstress leakcheck ") for c in self.server.cmds))
 
+    def test_warm_up_swarm_failure_restarts_the_swarm_and_continues(self):
+        self.a.warmup = 2
+        self.swarm.fail_next = True
+
+        self.tr.warm_up(1)
+
+        self.assertEqual(self.swarm.restarts, 1)
+        self.assertEqual(len(self.swarm.requests), 2)
+        self.assertIsNone(self.tr.prev)
+
+    def test_warm_up_swarm_restart_failure_aborts_cleanly(self):
+        self.a.warmup = 1
+        self.swarm.fail_next = True
+
+        def broken_restart():
+            raise bf.SwarmError("port gone")
+        self.swarm.restart = broken_restart
+
+        with self.assertRaisesRegex(bf.NoSpawnError, "swarm restart failed"):
+            self.tr.warm_up(1)
+
     def test_repetition_with_no_spawn_is_not_checkpointed(self):
         self.a.episodes = 1
         self.a.reps = 2

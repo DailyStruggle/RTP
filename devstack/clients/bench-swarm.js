@@ -198,9 +198,24 @@ async function resolveVersion() {
     const status = await minecraftProtocol.ping({ host, port, timeout: 5000 });
     const serverVersion = status && status.version && status.version.name;
     if (!serverVersion) throw new Error('server ping did not report a version');
-    if (minecraftData(serverVersion)) {
-      resolvedAutoVersion = serverVersion;
-      activeVersion = serverVersion;
+    // CraftBukkit-derived servers ping as "<mod> <version>" (e.g. "Paper 1.21.4"), so the raw
+    // name is not a minecraft-data key; match the protocol number first, then a parsed version.
+    const proto = status.version.protocol;
+    const supported = (v) => !!minecraftData(v);
+    const parsed = /\d+\.\d+(?:\.\d+)?/.exec(serverVersion);
+    const parsedVersion = parsed && supported(parsed[0]) ? parsed[0] : null;
+    let named = null;
+    if (parsedVersion && (typeof proto !== 'number' || minecraftData(parsedVersion).version.version === proto)) {
+      named = parsedVersion;
+    } else if (typeof proto === 'number') {
+      const byProto = minecraftData.versions.pc.filter((v) => v.version === proto && supported(v.minecraftVersion));
+      const best = byProto.find((v) => v.releaseType === 'release') || byProto[0];
+      if (best) named = best.minecraftVersion;
+    }
+    if (!named && supported(serverVersion)) named = serverVersion;
+    if (named) {
+      resolvedAutoVersion = named;
+      activeVersion = named;
       return activeVersion;
     }
     const latestSupported = minecraftData.versions.pc.find((v) => v.releaseType === 'release'
