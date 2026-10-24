@@ -1,3 +1,9 @@
+# Adatta il calcolo in background, la cache attiva e la concorrenza di generazione al margine del server e alla domanda.
+# I valori configurati sotto fungono da massimali. Imposta false per usare valori fissi.
+# @type: boolean
+# @default: true
+regolazioneAutomatica: true
+
 # Sospende il riempimento della cache in background se i TPS scendono sotto questo valore.
 # Su Folia conta la regione più lenta. I giocatori in attesa continuano a essere serviti. 0 = disattivato.
 # @type: number

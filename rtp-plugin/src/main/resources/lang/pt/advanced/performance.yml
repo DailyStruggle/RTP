@@ -1,3 +1,9 @@
+# Adapta o processamento em segundo plano, o cache quente e a concorrencia de geracao a folga do servidor e a demanda.
+# Os valores configurados abaixo funcionam como tetos. Defina false para valores fixos.
+# @type: boolean
+# @default: true
+ajusteAutomatico: true
+
 # Pausa o preenchimento do cache em segundo plano se os TPS caírem abaixo deste valor.
 # No Folia, conta a região mais lenta. Jogadores aguardando continuam sendo atendidos. 0 = desativado.
 # @type: number

@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.anvil;
 
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -42,6 +43,20 @@ public final class AnvilPrefilterMetrics {
   /** Probes that returned {@link Verdict#UNKNOWN}. */
   public static final AtomicLong unknowns = new AtomicLong();
 
+  /** Probes that failed with an unrecognized or unsupported compression scheme (ADR-121 CBIT). */
+  public static final AtomicLong unsupportedCompressions = new AtomicLong();
+
+  /** Probes that encountered an unparseable chunk section, heightmap, or corrupt entry (ADR-121 CBIT). */
+  public static final AtomicLong unparseableSections = new AtomicLong();
+
+  private static volatile String lastUnsupportedCompressionRegion = "";
+  private static volatile String lastUnsupportedCompressionChunk = "";
+  private static volatile String lastUnsupportedCompressionDetail = "";
+
+  private static volatile String lastUnparseableSectionRegion = "";
+  private static volatile String lastUnparseableSectionChunk = "";
+  private static volatile String lastUnparseableSectionReason = "";
+
   private AnvilPrefilterMetrics() {}
 
   /**
@@ -56,5 +71,61 @@ public final class AnvilPrefilterMetrics {
       case REJECT -> rejects.incrementAndGet();
       case UNKNOWN -> unknowns.incrementAndGet();
     }
+  }
+
+  /**
+   * Records an unrecognized or unsupported compression scheme bailout with its region path and chunk coordinate.
+   */
+  public static void recordUnsupportedCompression(Path regionPath, int cx, int cz, String detail) {
+    unsupportedCompressions.incrementAndGet();
+    lastUnsupportedCompressionRegion = regionPath == null ? "<unknown>" : regionPath.toString();
+    lastUnsupportedCompressionChunk = "(" + cx + "," + cz + ")";
+    lastUnsupportedCompressionDetail = detail == null ? "" : detail;
+  }
+
+  /**
+   * Records an unparseable chunk section or corrupt entry bailout with its region path and chunk coordinate.
+   */
+  public static void recordUnparseableSection(Path regionPath, int cx, int cz, String reason) {
+    unparseableSections.incrementAndGet();
+    lastUnparseableSectionRegion = regionPath == null ? "<unknown>" : regionPath.toString();
+    lastUnparseableSectionChunk = "(" + cx + "," + cz + ")";
+    lastUnparseableSectionReason = reason == null ? "" : reason;
+  }
+
+  public static String lastUnsupportedCompressionRegion() {
+    return lastUnsupportedCompressionRegion;
+  }
+
+  public static String lastUnsupportedCompressionChunk() {
+    return lastUnsupportedCompressionChunk;
+  }
+
+  public static String lastUnsupportedCompressionDetail() {
+    return lastUnsupportedCompressionDetail;
+  }
+
+  public static String lastUnparseableSectionRegion() {
+    return lastUnparseableSectionRegion;
+  }
+
+  public static String lastUnparseableSectionChunk() {
+    return lastUnparseableSectionChunk;
+  }
+
+  public static String lastUnparseableSectionReason() {
+    return lastUnparseableSectionReason;
+  }
+
+  /** Clears CBIT bailout counters and last-seen metadata for test isolation. */
+  public static void resetBailouts() {
+    unsupportedCompressions.set(0);
+    unparseableSections.set(0);
+    lastUnsupportedCompressionRegion = "";
+    lastUnsupportedCompressionChunk = "";
+    lastUnsupportedCompressionDetail = "";
+    lastUnparseableSectionRegion = "";
+    lastUnparseableSectionChunk = "";
+    lastUnparseableSectionReason = "";
   }
 }

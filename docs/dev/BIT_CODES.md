@@ -8,6 +8,7 @@ Generated from the registered BIT catalog. IDs and keys are stable; retired code
 |---|
 | `ACTION` |
 | `BIT` |
+| `GOVERNOR` |
 | `HEATMAP` |
 | `PROBE` |
 | `RTP` |
@@ -55,6 +56,15 @@ Generated from the registered BIT catalog. IDs and keys are stable; retired code
 | 7 | `BIT_COMPONENT_UNKNOWN` | ERROR | IBIT | bit | - | Select a registered component or a matching tier/subsystem. |
 | 8 | `BIT_OPTIONAL_UNAVAILABLE` | INFO | PBIT | bit | - | Install zstd-jni to enable Zstandard-backed region-file support. |
 | 9 | `BIT_NAMESPACE_CONFLICT` | ERROR | PBIT | bit | - | Two plugins reserved the same BIT code prefix; change one plugin's prefix or remove one of them. |
+
+## `GOVERNOR`
+
+| ID | Code | Severity | Tier | Subsystem | Message key | Remediation |
+|---:|---|---|---|---|---|---|
+| 1 | `GOVERNOR_KNOB_REDUCED` | INFO | CBIT | governor | - | Inspect /rtp info and server load; the governor reduced background compute below configured ceilings. |
+| 2 | `GOVERNOR_KNOB_AT_FLOOR` | WARNING | CBIT | governor | - | A background compute knob has been held at its floor for over 10 minutes; check server overload or metrics health. |
+| 3 | `GOVERNOR_SIGNAL_STALE` | WARNING | CBIT | governor | - | A previously sampled telemetry signal has been stale for over 60 seconds; governed knobs are held. |
+| 4 | `GOVERNOR_EVALUATION_FAILED` | WARNING | CBIT | governor | - | Governor control-law evaluation threw an exception and retained the previous snapshot; inspect server logs. |
 
 ## `HEATMAP`
 
@@ -157,6 +167,10 @@ Generated from the registered BIT catalog. IDs and keys are stable; retired code
 | 1708 | `RTP_NETWORK_DURATION_INVALID` | WARNING | PBIT | config | - | Use a number of milliseconds or a duration with a unit (e.g. 500, 5s, 1m); invalid values fall back to the default. |
 | 1709 | `RTP_NETWORK_STALE_BEFORE_INTERVAL` | WARNING | PBIT | config | - | Keep heartbeat.staleAfterMs above heartbeat.intervalMs, or live peers flap to stale between beats. |
 | 1710 | `RTP_NETWORK_VALUE_UNKNOWN` | WARNING | PBIT | config | - | Use one of the listed values; unrecognised values silently fall back to the default. |
+| 1801 | `RTP_CBIT_PREFILTER_COMPRESSION_UNSUPPORTED` | WARNING | CBIT | pipeline | - | Check region-file-compression in server configuration or update anvil-api for the new chunk compression mode. |
+| 1802 | `RTP_CBIT_PREFILTER_SECTION_UNPARSEABLE` | WARNING | CBIT | pipeline | - | Inspect the reported region file and chunk coordinate or update anvil-api for the new chunk NBT section layout. |
+| 1803 | `RTP_CBIT_STALE_CHUNK_GUARD_TRIPPED` | WARNING | CBIT | pipeline | - | Check region-thread backlog or tune staleChunkRetryLimit in safety.yml (ADR-015). |
+| 1804 | `RTP_CBIT_CHUNK_TICKET_HIGH_WATER` | WARNING | CBIT | pipeline | - | Inspect active chunk ticket counts and activeChunkCap / memory tracker diagnostics (S-002). |
 
 ## `TEST`
 
@@ -229,3 +243,11 @@ Generated from the registered BIT catalog. IDs and keys are stable; retired code
 | 4001 | `TEST_API_COMPAT_MISSING_METHOD` | ERROR | IBIT | test.api-compat | - | Check the platform method signature required by the runtime adapter. |
 | 4002 | `TEST_API_COMPAT_RESOLUTION_ERROR` | ERROR | IBIT | test.api-compat | - | Resolve the reported class-loading or reflection error for this platform. |
 | 4003 | `TEST_API_COMPAT_OPTIONAL_METHOD_MISSING` | WARNING | IBIT | test.api-compat | - | Pre-generate destination worlds or use Paper/Folia for asynchronous chunk loading. |
+| 4011 | `TEST_ANVIL_WORLD_UNAVAILABLE` | INFO | PBIT | anvil | - | Generate or save at least one world region file before running live Anvil parity verification. |
+| 4012 | `TEST_ANVIL_DATA_VERSION_UNRECOGNIZED` | WARNING | PBIT | anvil | - | Verify compatibility with the server's chunk DataVersion and section NBT schema. |
+| 4013 | `TEST_ANVIL_SECTION_DECODE_FAILED` | ERROR | PBIT | anvil | - | Inspect region file integrity or update anvil-api for the new chunk section/heightmap layout. |
+| 4014 | `TEST_ANVIL_BIOME_PALETTE_MISMATCH` | WARNING | PBIT | anvil | - | Verify that block and biome palette entries use valid namespace:id identifiers. |
+| 4021 | `TEST_PLATFORM_ANVIL_INPUT_DEGRADED` | WARNING | PBIT | platform | - | Check AnvilInputOpenerProvider linkage for this server version; chat/command fallback is active. |
+| 4022 | `TEST_PLATFORM_MENU_RENDERER_DEGRADED` | WARNING | PBIT | platform | - | Check MenuRendererProvider / Adventure book support on this server; fallback rendering is active. |
+| 4023 | `TEST_PLATFORM_WORLD_BORDER_DEGRADED` | WARNING | PBIT | platform | - | Verify WorldBorder packet or native border API compatibility for this server version. |
+| 4024 | `TEST_PLATFORM_PALETTE_RECONCILER_DEGRADED` | WARNING | PBIT | platform | - | Verify platform Material/Biome registry lookup compatibility; string normalization fallback is active. |

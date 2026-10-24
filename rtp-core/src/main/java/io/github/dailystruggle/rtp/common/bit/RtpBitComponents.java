@@ -51,6 +51,10 @@ public final class RtpBitComponents {
     public static void registerDefaults() {
         for (BitComponent component : DEFAULTS) RtpBit.RUNNER.register(component);
         RtpBit.RUNNER.register(ACTION_CBIT);
+        RtpBit.RUNNER.register(GovernorBitComponent.COMPUTE_GOVERNOR);
+        RtpBit.RUNNER.register(TestBitCodes.ANVIL_LIVE_PARITY);
+        RtpBit.RUNNER.register(PlatformHookBitComponent.PLATFORM_HOOKS);
+        RtpBit.RUNNER.register(PipelineCbitCounters.PIPELINE_CBIT);
         io.github.dailystruggle.rtp.common.bit.config.ConfigPbit.registerComponents();
     }
 

@@ -3,10 +3,14 @@ package io.github.dailystruggle.rtp.common.tasks.tick;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
@@ -69,10 +73,28 @@ public final class SyncTaskProcessing extends RTPRunnable {
     }
 
     try {
-      // Floor of 1 ns: at least one due task per tick, so teleport stages queued here
-      // always progress even when the stages above spent the budget (S-004).
-      long remaining = budget - (System.nanoTime() - start);
-      MiscTasks.sync().execute(Math.max(1L, remaining));
+      long remainingBeforeMiscSync = budget - (System.nanoTime() - start);
+      if (MiscTasks.sync() != null) {
+        // Floor of 1 ns: at least one due player-facing task per tick, so teleport stages queued
+        // here always progress even when the stages above spent the budget (S-004, ADR-087 I4).
+        MiscTasks.sync().execute(Math.max(1L, remainingBeforeMiscSync));
+      }
+
+      RTPTaskPipe bgSyncPipe = MiscTasks.backgroundSync();
+      long remainingAfterPlayerSync = budget - (System.nanoTime() - start);
+      ComputeBudget govBudget = ComputeGovernor.currentBudget();
+      if (govBudget != null && govBudget.isActuating()) {
+        long bgSyncAvail = ComputeGovernor.active().beginBackgroundSyncSpan(remainingAfterPlayerSync);
+        long syncStart = System.nanoTime();
+        AtomicBoolean ranAnyBgSync = new AtomicBoolean(false);
+        if (bgSyncPipe != null && bgSyncAvail > 0L) {
+          bgSyncPipe.execute(bgSyncAvail, ranAnyBgSync);
+        }
+        long now = System.nanoTime();
+        ComputeGovernor.active().endBackgroundSyncSpan(now - syncStart, now - start, budget);
+      } else if (bgSyncPipe != null) {
+        bgSyncPipe.execute(Math.max(1L, remainingAfterPlayerSync));
+      }
     } catch (Throwable t) {
       RTPRuntime.log(Level.WARNING, "Exception during sync task processing", t);
     }

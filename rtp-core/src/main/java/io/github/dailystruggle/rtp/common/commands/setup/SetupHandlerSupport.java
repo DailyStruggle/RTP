@@ -139,8 +139,19 @@ public final class SetupHandlerSupport {
         Map<String, Map<String, Object>> baseline = new LinkedHashMap<>();
         if (baseDir != null && baseDir.exists()) {
             for (Prefab p : recipe) {
+                for (String regionOrFileKey : p.regionOverlays().keySet()) {
+                    if (regionOrFileKey.startsWith("addons/")) {
+                        Map<String, Object> addonLive = PrefabDiskIO.readLive(baseDir, regionOrFileKey);
+                        if (!addonLive.isEmpty()) {
+                            baseline.putIfAbsent(regionOrFileKey, addonLive);
+                        }
+                    }
+                }
                 Map<String, Map<String, Object>> snap = PrefabDiskIO.snapshotLive(baseDir, p);
                 for (Map.Entry<String, Map<String, Object>> e : snap.entrySet()) {
+                    if (e.getKey().startsWith("definitions/regions/addons/")) {
+                        continue;
+                    }
                     if (e.getValue() != null && !e.getValue().isEmpty()) {
                         baseline.putIfAbsent(e.getKey(), e.getValue());
                     }

@@ -5,12 +5,55 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.server.api.TaskHandle;
+import io.github.dailystruggle.server.api.TaskScheduler;
 
 /**
  * Platform-agnostic scheduler SPI for synchronous, asynchronous, and region-bound tasks.
  */
 @PublicApi
-public interface RTPScheduler {
+public interface RTPScheduler extends TaskScheduler {
+  @Override
+  default TaskHandle runAsync(Runnable task) {
+    TrackedRTPTask tracked = runTaskAsynchronously(task);
+    return TaskHandle.of(() -> {
+      if (tracked != null) {
+        tracked.setCancelled(true);
+      }
+    });
+  }
+
+  @Override
+  default TaskHandle runSync(Runnable task) {
+    runTask(task);
+    return TaskHandle.of(() -> {});
+  }
+
+  @Override
+  default TaskHandle runSyncDelayed(Runnable task, long delayTicks) {
+    runTaskLater(task, delayTicks);
+    return TaskHandle.of(() -> {});
+  }
+
+  @Override
+  default TaskHandle runSyncTimer(Runnable task, long delayTicks, long periodTicks) {
+    Object handle = runTaskTimer(task, delayTicks, periodTicks);
+    return TaskHandle.of(() -> {
+      if (handle != null) {
+        cancelTask(handle);
+      }
+    });
+  }
+
+  @Override
+  default TaskHandle runAsyncTimer(Runnable task, long delayTicks, long periodTicks) {
+    Object handle = runTaskTimerAsynchronously(task, delayTicks, periodTicks);
+    return TaskHandle.of(() -> {
+      if (handle != null) {
+        cancelTask(handle);
+      }
+    });
+  }
   /**
    * Executes a task in an asynchronous thread.
    *

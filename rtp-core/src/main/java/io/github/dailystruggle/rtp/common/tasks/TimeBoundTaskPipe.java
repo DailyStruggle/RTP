@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 public class TimeBoundTaskPipe extends RTPTaskPipe {
@@ -34,16 +35,21 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
      */
     @Override
     public boolean execute(long availableTime) {
+        return execute(availableTime, new AtomicBoolean(false));
+    }
+
+    @Override
+    public boolean execute(long availableTime, AtomicBoolean sharedRanAny) {
         if (stop) return true;
         if (runnables.isEmpty()) return true;
         if (availableTime <= 0) return false;
+        AtomicBoolean ranTracker = (sharedRanAny != null) ? sharedRanAny : new AtomicBoolean(false);
         long dt = 0;
         long start = System.nanoTime();
-        boolean ranAny = false;
 
         List<Runnable> delayedRunnables = new ArrayList<>(runnables.size());
 
-        while (!runnables.isEmpty() && pacer.canExecute(dt, availableTime, ranAny)) {
+        while (!runnables.isEmpty() && pacer.canExecute(dt, availableTime, ranTracker.get())) {
             try {
                 accessGuard.acquire();
             } catch (InterruptedException e) {
@@ -66,7 +72,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                         RTPRuntime.log(Level.WARNING, throwable.getMessage(), throwable);
                     }
                     long localStop = System.nanoTime();
-                    ranAny = true;
+                    ranTracker.set(true);
 
                     if (!selfTimed) pacer.recordDuration(localStop - localStart);
                     avgTime = pacer.predictedCostNanos();

@@ -31,6 +31,12 @@ public class SetupGameplayCmd extends AbstractSetupStepCmd {
                 return VALID_CHOICES;
             }
         });
+        addParameter("radius", new CommandParameter(CMD_PERMISSION, "region outer radius distance", (uuid, s) -> true) {
+            @Override
+            public Set<String> values() {
+                return SetupRadiusCmd.PRESET_RADII;
+            }
+        });
     }
 
     @Override
@@ -46,19 +52,34 @@ public class SetupGameplayCmd extends AbstractSetupStepCmd {
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, @Nullable CommandsAPICommand nextCommand) {
         String choice = SetupHandlerSupport.getFirstParam(parameterValues, "choice").toLowerCase(java.util.Locale.ROOT);
-        if (choice.isEmpty()) {
-            SetupHandlerSupport.sendMessage(callerId, "&cUsage: &f/rtp admin setup gameplay choice=<survival|arena|skyblock|oneblock>");
+        String radius = SetupHandlerSupport.getFirstParam(parameterValues, "radius").trim();
+        if (choice.isEmpty() && radius.isEmpty()) {
+            SetupHandlerSupport.sendMessage(callerId, "&cUsage: &f/rtp admin setup gameplay choice=<survival|arena|skyblock|oneblock> [radius=<distance>]");
             return false;
         }
 
-        if (VALID_CHOICES.contains(choice)) {
-            return updateStageAndRender(callerId, session -> {
-                session.setGameplayChoice(choice);
-                session.setCurrentStage(SetupStage.PERFORMANCE);
-            });
-        } else {
+        if (!choice.isEmpty() && !VALID_CHOICES.contains(choice)) {
             SetupHandlerSupport.sendMessage(callerId, "&cInvalid gameplay choice: " + choice + ". Valid: " + String.join(", ", VALID_CHOICES));
             return false;
         }
+
+        if (!radius.isEmpty() && !SetupSession.isValidRadius(radius)) {
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
+                    java.util.logging.Level.WARNING,
+                    "[setup] Rejected invalid radius input '" + radius + "' from caller=" + callerId);
+            SetupHandlerSupport.sendMessage(callerId,
+                    "&cInvalid radius distance: '" + radius + "'. Use a positive distance such as 2.5km, 5km, 10km, 25km, 4096b, or 500c.");
+            return false;
+        }
+
+        return updateStageAndRender(callerId, session -> {
+            if (!radius.isEmpty()) {
+                session.setRadiusChoice(radius);
+            }
+            if (!choice.isEmpty()) {
+                session.setGameplayChoice(choice);
+                session.setCurrentStage(SetupStage.PERFORMANCE);
+            }
+        });
     }
 }

@@ -1,3 +1,9 @@
+# Past achtergrondrekenwerk, hot-cachegrootte en generatie-gelijktijdigheid aan op serverruimte en vraag.
+# De waarden hieronder gelden als plafonds. Zet op false voor vaste waarden.
+# @type: boolean
+# @default: true
+automatischAfstemmen: true
+
 # Pauzeer het vullen van de achtergrondcache als de TPS onder deze waarde daalt.
 # Op Folia telt de langzaamste regio. Wachtende spelers worden nog steeds geholpen. 0 = uit.
 # @type: number

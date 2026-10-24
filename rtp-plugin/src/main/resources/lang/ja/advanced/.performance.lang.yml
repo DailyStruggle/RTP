@@ -2,6 +2,7 @@
 # Maps internal baseline keys (left) to user-visible key names used in
 # performance.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
+autoTune: "自動調整"
 minTPS: "最低TPS"
 maxMSPT: "maxMSPT"
 maxHeapPercent: "maxHeapパーセント"

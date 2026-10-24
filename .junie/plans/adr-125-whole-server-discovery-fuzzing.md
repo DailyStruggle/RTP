@@ -260,7 +260,7 @@ graph LR
 
 # Delivery Steps
 
-### * Step 1: Stage 1: Extend bench-swarm.js for protocol discovery, window packets, and tick-gap events
+### ! Step 1: Stage 1: Extend bench-swarm.js for protocol discovery, window packets, and tick-gap events
 `devstack/clients/bench-swarm.js` supports protocol-level command tree discovery, targeted tab-completion probing, inventory window click/close actions, and `update_time` tick-gap telemetry.
 
 - Add the `discover` control op to `handleFuzzLine` in `devstack/clients/bench-swarm.js` to log in one bot for a requested tier, capture the raw `declare_commands` packet on `_client`, serialise the Brigadier node graph (`kind`, `name`, `parser`, `properties`, `children`, `redirect`, `executable`, `suggestions`), emit `{ev: "commands", id, tier, nodes, rootIndex}`, and disconnect cleanly.
@@ -269,7 +269,7 @@ graph LR
 - Add `window_click` and `close_window` actions to `FUZZ_ACTIONS` and `parseAction` in `devstack/clients/bench-swarm.js` so `window_click` follow-ups work at the protocol level even with Mineflayer's `inventory` plugin disabled in lean mode.
 - Update `docs/adr/ADR-125-whole-server-discovery-fuzzing.md` and `docs/adr/README.md` status from `Proposed` to `Accepted` upon approval.
 
-###   Step 2: Stage 2: Implement CommandTree, Denylist, boundary-ladder generator, and NodeBandit in bench_fuzz_server.py
+### ! Step 2: Stage 2: Implement CommandTree, Denylist, boundary-ladder generator, and NodeBandit in bench_fuzz_server.py
 `scripts/bench_fuzz_server.py` merges multi-tier Brigadier command trees, enforces the path/argument-kind denylist, generates boundary-ladder arguments, and selects episodes via a tier-stratified UCB1 bandit.
 
 - Create `scripts/bench_fuzz_server.py` with `merge_command_trees`, folding `namespace:name` and `name` duplicates when their subtrees match, resolving redirects with cycle protection, and recording `tiers` plus `min_tier` (`default` before `op`) into `commands.json`.
@@ -278,7 +278,7 @@ graph LR
 - Implement `NodeBandit` over `(node_id, follow_up)` arms (`quit_lt1s`, `quit_delay`, `rejoin`, `repeat`, `concurrent`, `window_click`) using UCB1 stratified by `min_tier` (`--default-budget-share`, default `0.75`) and rewarded by corpus novelty plus harm.
 - Add `Swarm.discover` and `Swarm.complete` helper methods in `scripts/bench_fuzz.py`.
 
-###   Step 3: Stage 3: Implement JcmdObserver, Bonferroni leak screen, StallOracle, and JarIndex
+### * Step 3: Stage 3: Implement JcmdObserver, Bonferroni leak screen, StallOracle, and JarIndex
 `scripts/bench_fuzz_server.py` observes any HotSpot JVM via `jcmd` (or optional `StressTestRTP`), screens per-feature class leaks with Bonferroni correction, and detects acute or sustained main-thread stalls.
 
 - Implement `PlatformProfile` (`paper` and `fabric`) and `JcmdObserver` in `scripts/bench_fuzz_server.py` supporting `--pid-file`, `jcmd -l` matching, and `docker exec <container> jcmd 1 ...`, failing fast on missing `jcmd` or unreadable histograms and recording `[start_ms, end_ms]` exclusion windows during `GC.class_histogram` and `Thread.print`.

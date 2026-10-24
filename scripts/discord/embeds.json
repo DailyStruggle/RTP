@@ -1,0 +1,203 @@
+{
+  "guild_name": "LeafCraft Plugin Support",
+  "archive_category": "ARCHIVE (Read-Only)",
+  "legacy_categories_to_collapse": [
+    "info",
+    "Text Channels",
+    "RTP support",
+    "OnePlayerSleep support",
+    "TreeGen support"
+  ],
+  "legacy_channels_to_archive": [
+    "rules",
+    "welcome",
+    "role-assignment",
+    "info",
+    "faq",
+    "recommended-specs",
+    "issues",
+    "support",
+    "feature-requests"
+  ],
+  "roles": [
+    {
+      "name": "Pro Supporter",
+      "color": 2599520,
+      "hoist": true,
+      "mentionable": false,
+      "description": "Verified LeafRTP Pro supporter on BuiltByBit (#bbb-logs). Automatically tags #support Forum threads with Pro Priority."
+    }
+  ],
+  "categories": [
+    {
+      "name": "WELCOME & INFO",
+      "private": false,
+      "channels": [
+        {
+          "name": "start-here",
+          "type": "GUILD_TEXT",
+          "read_only": true,
+          "topic": "Start here: 60-second setup, documentation links, and how to use the #support Forum."
+        },
+        {
+          "name": "announcements",
+          "type": "GUILD_ANNOUNCEMENT",
+          "read_only": true,
+          "topic": "Cross-project updates for LeafRTP, OnePlayerSleep, TreeGen, and server tools."
+        },
+        {
+          "name": "releases",
+          "type": "GUILD_ANNOUNCEMENT",
+          "read_only": true,
+          "topic": "Release notes and build notifications from GitHub and Modrinth."
+        },
+        {
+          "name": "benchmarks",
+          "type": "GUILD_TEXT",
+          "read_only": true,
+          "topic": "Reproducible Paper 26.2 and Folia 26.2 benchmark tables, scatter charts, and heap guidance."
+        }
+      ]
+    },
+    {
+      "name": "SUPPORT & COMMUNITY",
+      "private": false,
+      "channels": [
+        {
+          "name": "support",
+          "type": "GUILD_FORUM",
+          "read_only": false,
+          "require_tag": true,
+          "default_reaction_emoji": "✅",
+          "default_sort_order": 0,
+          "default_forum_layout": 1,
+          "topic": "Pick 1 Project tag and 1 Platform tag. For setup questions, state what you want to change. For bug reports, attach /rtp version, /version, /rtp test output, and an https://mclo.gs/ log link."
+        },
+        {
+          "name": "general",
+          "type": "GUILD_TEXT",
+          "read_only": false,
+          "topic": "General discussion for server administrators and plugin developers."
+        }
+      ]
+    },
+    {
+      "name": "DEVELOPMENT",
+      "private": false,
+      "channels": [
+        {
+          "name": "development",
+          "type": "GUILD_TEXT",
+          "read_only": false,
+          "topic": "Engineering discussion, rtp-api addons, benchmarks, and server fuzzing tools."
+        }
+      ]
+    },
+    {
+      "name": "ADMIN",
+      "private": true,
+      "channels": [
+        {
+          "name": "bbb-logs",
+          "type": "GUILD_TEXT",
+          "read_only": true,
+          "preserve_existing": true,
+          "topic": "BuiltByBit license and supporter verification webhook logs."
+        },
+        {
+          "name": "bot-triage-queue",
+          "type": "GUILD_TEXT",
+          "read_only": true,
+          "topic": "Actionable support threads verified with complete diagnostics or @Pro Supporter priority."
+        }
+      ]
+    }
+  ],
+  "forum_tags": {
+    "project": [
+      {"name": "🌿 LeafRTP", "moderated": false},
+      {"name": "💤 OnePlayerSleep", "moderated": false},
+      {"name": "🌲 TreeGen", "moderated": false},
+      {"name": "🔬 Server Fuzzer / Tools", "moderated": false},
+      {"name": "📦 API / Addons", "moderated": false}
+    ],
+    "platform": [
+      {"name": "Paper / Spigot", "moderated": false},
+      {"name": "Folia", "moderated": false},
+      {"name": "Fabric", "moderated": false},
+      {"name": "NeoForge", "moderated": false},
+      {"name": "Velocity / Proxy", "moderated": false}
+    ],
+    "status": [
+      {"name": "✅ Solved", "moderated": false},
+      {"name": "⏳ Needs Info / Logs", "moderated": true},
+      {"name": "🐛 Confirmed Bug", "moderated": true},
+      {"name": "💎 Pro Priority", "moderated": true}
+    ]
+  },
+  "channel_embeds": {
+    "start-here": [
+      {
+        "title": "Welcome to LeafCraft Plugin Support",
+        "color": 2599520,
+        "description": "I maintain LeafRTP, OnePlayerSleep, TreeGen, and their shared server libraries here in my spare time. To keep answers searchable and stop questions from getting buried in a scrolling chat stream, all support lives in the **#support** Forum channel.\n\n**House Rules**\n1. **Use `#support` for all questions and bug reports.** Pick your project tag (`🌿 LeafRTP`, `💤 OnePlayerSleep`, `🌲 TreeGen`) and platform tag (`Paper / Spigot`, `Folia`, `Fabric`, `NeoForge`, `Velocity / Proxy`).\n2. **Do not ping me in `#general` or DMs for support.** The forum bot checks every new thread against the documentation and `[RTP bit]` catalog right away, and pings me once a bug report has logs.\n3. **Never paste raw passwords or `network.yml` secrets.** Use <https://mclo.gs/> for server logs; it strips IPs automatically."
+      },
+      {
+        "title": "LeafRTP 60-Second Quick Start",
+        "color": 2599520,
+        "description": "One jar runs on Paper, Spigot (1.18+), Folia (1.21.11+), Fabric (1.20.1, 1.21 - 26.3), NeoForge (1.21.1+), and Velocity. Drop it in `plugins/` (or `mods/`), restart, and run `/rtp`.\n\n- **Visual map editor:** Run `/rtp editor` to drag your region border on a live map of your world and review a YAML diff before saving (no open ports required).\n- **Guided in-game wizard:** Run `/rtp admin setup` to pick single/multi-world topology, gameplay presets, and region radius with automatic config backups.\n- **One-line radius change:** Run `/rtp config regions default shape.radius=10km shape.centerRadius=1km`.\n- **Switch from another plugin:** Run `/rtp config import` to translate an existing BetterRTP, EzRTP, or JustRTP folder with a preview before writing.",
+        "image_url": "https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/teleport_title.webp"
+      },
+      {
+        "title": "Downloads & Documentation",
+        "color": 2599520,
+        "description": "- **Searchable Docs:** <https://dailystruggle.github.io/RTP/>\n- **Server Admin Guide:** <https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/>\n- **Modrinth (Free MIT Jar):** <https://modrinth.com/plugin/leafrtp>\n- **SpigotMC:** <https://www.spigotmc.org/resources/leafrtp.94812/>\n- **BuiltByBit (LeafRTP Pro Support Tier):** <https://builtbybit.com/resources/leafrtp-pro.105418/>\n- **GitHub Source & Issues:** <https://github.com/DailyStruggle/RTP>"
+      },
+      {
+        "title": "How to Get Support & Claim @Pro Supporter",
+        "color": 2599520,
+        "description": "- **Check the 5 pinned threads in `#support` first** - they cover region radius, toggling the `/rtp` GUI (`openOnBareRtp`), importing from BetterRTP/EzRTP, platform notes, and `/rtp test`.\n- **Opening a `#support` post:** If the bot's cited doc answer solves your question, click **[✅ Solved]**. If you hit a bug, click **[❓ Still need help]** and include `/rtp version`, `/version`, `/rtp test` output, and an <https://mclo.gs/> link.\n- **LeafRTP Pro buyers (`BuiltByBit`):** Both editions run the same MIT code. Buying Pro on BuiltByBit funds development and grants the `@Pro Supporter` role via `#bbb-logs`. When you open a thread in `#support`, the bot attaches the `💎 Pro Priority` tag and routes your ticket to the front of my queue (24-72 h weekday target)."
+      }
+    ],
+    "benchmarks": [
+      {
+        "title": "Measured Performance: Paper 26.2 & Folia 26.2",
+        "color": 2599520,
+        "description": "Every number below comes from the open-source harness in `helpers/StressTestRTP/` running on the same host against a fresh world. Full CSVs and reproduction commands live in <https://dailystruggle.github.io/RTP/site/how-it-works/>.\n\n**Paper 26.2 (598 teleports at 5/s across 2 runs, 48 bots online)**\n- **Failed teleports / watchdog stalls:** `0 / 0`\n- **Median `/rtp`-to-arrival latency:** `5 ms` (prepared queue hit)\n- **Whole-server MSPT p95:** `21.2 - 21.3 ms` (`TPS >= 19.98`)\n- **At 40 teleports/s sustained:** `MSPT p95 42.6 - 45.2 ms` (`TPS >= 19.19`), `0` stalls\n\n**Folia 26.2 (regionalized threads, 1.21.11+ floor)**\n- **Watchdog stalls / thread-ownership violations:** `0 / 0`\n- **Execution model:** Count-bound task pipes on region threads with off-tick `.mca` / `.linear` region-file pre-filtering on the async pool.",
+        "image_url": "https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/bad_locations_map.webp"
+      },
+      {
+        "title": "Landing Spacing & Server Sizing Notes",
+        "color": 2599520,
+        "description": "- **Spacing between players:** In two Paper 26.2 runs of 4,096 teleports each, `0` spots repeated, `0` pairs landed within 48 blocks, and the closest pair was `70 blocks` apart (compared to ~80 close pairs with plain random picks).\n- **Heap headroom:** Prepared spots in the hot queue hold chunk tickets (`activeChunkCap: 10` by default) so arrival does not wait on disk I/O. When old-generation heap usage reaches `maxHeapPercent` (`85%` default in `advanced/performance.yml`), background refilling pauses and held tickets drop back to cold storage automatically.\n- **Pregeneration caveat:** You do not need Chunky, but running `/rtp scan start` (or Chunky) ahead of time lets the `.mca` / `.linear` pre-filter read existing region files from disk instead of waiting on first-time chunk generation."
+      }
+    ]
+  },
+  "pinned_forum_threads": [
+    {
+      "title": "Read First: How to get fast help (and /rtp test)",
+      "tags": ["🌿 LeafRTP", "Paper / Spigot"],
+      "body": "I maintain these projects solo, so `#support` is set up to get you an answer right away without waiting on time zones.\n\n### 1. How `#support` works\n- When you open a thread, the support bot checks your post (and any linked `mclo.gs` paste) against the operator docs, shipped YAML schemas, and the `[RTP bit]` fault catalog.\n- If the cited command or YAML key solves your problem, click **[✅ Solved]** to close the thread.\n- If you are reporting a bug or need me to look at your setup, click **[❓ Still need help]** and include the 4 items below.\n\n### 2. Run the built-in self-test (`/rtp test`)\nLeafRTP includes a non-destructive Built-In Test (BIT) suite that checks your YAML types, region references, world names, chunk tickets, and scheduler health in game:\n```text\n/rtp version\n/rtp info\n/rtp test\n```\nIf startup or `/rtp reload` printed a line starting with `[RTP bit]` (for example `RTP-1301 RTP_REGION_UNKNOWN_WORLD` or `RTP-1401 RTP_SHAPE_RADIUS_NOT_ABOVE_CENTER`), paste that exact line in your thread - the bot will reply immediately with the fix.\n\n### 3. The 4 items every bug report needs\n1. Output of `/rtp version` and `/version`.\n2. Output of `/rtp test` (or `/rtp info`).\n3. Full `logs/latest.log` uploaded to <https://mclo.gs/> (no console screenshots).\n4. One sentence on what you ran and what happened instead.\n\nFull support policy and version windows: <https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/>"
+    },
+    {
+      "title": "Quick Fix: Setting Region Radius, Inner Spawn Hole & World Border",
+      "tags": ["🌿 LeafRTP", "Paper / Spigot"],
+      "body": "By default, LeafRTP teleports players between `1,024 blocks` (`centerRadius: 64` chunks) and `4,096 blocks` (`radius: 256` chunks) from `(0, 0)`. You can change that in three ways.\n\n### Option A: One-line command in game or console\n```text\n/rtp config regions default shape.radius=10km shape.centerRadius=1km --dry-run\n/rtp config regions default shape.radius=10km shape.centerRadius=1km\n```\nUnit suffixes (`b` blocks, `c` chunks, `r` region files, `km` kilometers) work everywhere. A bare number without a suffix is read in **chunks** (`1 chunk = 16 blocks`).\n\n### Option B: Browser map workspace or guided wizard\n- Run `/rtp editor` to open your world map in the browser, drag the outer radius and inner donut hole directly on the map, and apply the diff.\n- Or run `/rtp admin setup` to step through world layout and radius presets in game.\n\n### Option C: Edit YAML directly\n- **Single-world servers:** edit `defaults.shape.radius` and `defaults.shape.centerRadius` in `plugins/RTP/config.yml` (on Fabric / NeoForge: `config/rtp/config.yml`). Every region with `shape: \"@config\"` inherits those values.\n- **Per-region override:** replace `shape: \"@config\"` in `definitions/regions/default.yml` with an inline block:\n```yaml\nshape:\n  name: \"CIRCLE\"\n  mode: \"REROLL\"\n  radius: 10000b\n  centerRadius: 1000b\n  centerX: 0\n  centerZ: 0\n```\n- **Follow vanilla `/worldborder`:** set `worldBorderOverride: true` in `definitions/regions/default.yml`.\n\n**Caveat:** `shape.radius` must always be strictly larger than `shape.centerRadius` (`RTP_SHAPE_RADIUS_NOT_ABOVE_CENTER`). After changing your region bounds, run `/rtp reload` and `/rtp scan start`.\n\nDocs: <https://dailystruggle.github.io/RTP/admin/QUICK_START/#step-4-adjust-the-teleport-area>"
+    },
+    {
+      "title": "Quick Fix: Toggling Bare /rtp GUI vs. Instant Teleport (openOnBareRtp)",
+      "tags": ["🌿 LeafRTP", "Paper / Spigot"],
+      "body": "Out of the box, LeafRTP ships with `LeafRTPGuiAddon` enabled so typing bare `/rtp` opens a chest-style destination picker.\n\n### Make bare `/rtp` teleport immediately (keep `/rtp gui` working)\nEdit `plugins/RTP/addons/guimenu.yml` (`config/rtp/addons/guimenu.yml` on Fabric / NeoForge) and set:\n```yaml\nopenOnBareRtp: false\n```\nThen run `/rtp reload`. You can also toggle this during `/rtp admin setup`.\n- With `openOnBareRtp: false`, typing `/rtp` teleports the player right away in their current world.\n- Players can still open the destination picker explicitly with `/rtp gui` (permission `rtp.gui`).\n\n### Remove the GUI addon completely\nDelete `LeafRTPGuiAddon-*.jar` from `plugins/RTP/addons/` and restart the server.\n\n**Caveat:** Delete the `.jar` file inside `plugins/RTP/addons/`, **not** the `addons/` folder itself. If you delete the whole `addons/` folder, LeafRTP treats the next boot as a fresh install and unpacks the bundled addon jars again.\n\nDocs: <https://dailystruggle.github.io/RTP/admin/ADDONS/#the-bundled-gui-demo>"
+    },
+    {
+      "title": "Quick Fix: 1-Command Migration from BetterRTP, EzRTP, or JustRTP (/rtp config import)",
+      "tags": ["🌿 LeafRTP", "Paper / Spigot"],
+      "body": "You do not need to rewrite your worlds, radii, cooldowns, or economy prices by hand when switching from another random teleport plugin.\n\n### 1. Preview the import (safe dry-run)\nKeep your old plugin's config folder in `plugins/` (for example `plugins/BetterRTP/`, `plugins/EzRTP/`, `plugins/justRTP/`, or `plugins/JakesRTP/`). The old plugin jar does **not** need to be running. Run:\n```text\n/rtp config import\n```\nThis scans `plugins/` and prints every region, world, cooldown, price, database setting, and effect it will create without overwriting existing files.\n\n### 2. Apply the import\n```text\n/rtp config import overwrite=true\n```\nOr target a specific plugin folder:\n```text\n/rtp config import betterrtp overwrite=true\n/rtp config import ezrtp overwrite=true\n/rtp config import justrtp overwrite=true\n```\n\n### 3. Migrate player permissions (LuckPerms)\n```text\n/rtp config import permissions\n/rtp config import permissions apply=true\n```\n**Note on permissions:** Unlike BetterRTP (which requires `betterrtp.world.<world>` alongside `betterrtp.use`), LeafRTP ships with `requirePermission: false` on world and region files, so `rtp.use` alone lets players `/rtp` in any configured world.\n\nDocs: <https://dailystruggle.github.io/RTP/admin/MIGRATION/>"
+    },
+    {
+      "title": "Folia, Fabric & NeoForge Platform Guide",
+      "tags": ["🌿 LeafRTP", "Folia", "Fabric", "NeoForge"],
+      "body": "One `LeafRTP-<version>.jar` runs across Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Here are the platform-specific details and caveats.\n\n### Folia (`1.21.11+` only)\n- **Floor:** Folia is supported on **Minecraft 1.21.11 and newer**. Folia is an experimental upstream fork that only maintains its current releases; older Folia builds (such as 1.20.4 or 1.21.4) crash on their own at boot and are unsupported.\n- **Threading:** All background queue work runs on count-bound task pipes (`ADR-004`) inside regional schedulers, and economy calls are isolated off region threads (`F-003`).\n\n### Fabric (`1.20.1` and `1.21 - 26.3`) & NeoForge (`1.21.1+`)\n- **Install path:** Drop the same `LeafRTP-<version>.jar` into `mods/` (not `plugins/`).\n- **Config path:** Files unpack to `config/rtp/` instead of `plugins/RTP/`.\n- **Unsupported gap:** Fabric `1.20.2 - 1.20.6` is not supported due to upstream chunk-future and item API breaks in those minor versions. Legacy Forge (`<= 1.20.1`) has no native adapter; run the jar under Arclight or Mohist if you are on legacy Forge.\n\n### Velocity / Multi-Server Proxy Mode\n- Configure `advanced/network.yml` (`network.enabled: true`, unique `network.serverId`) and set `RTP_NET_SECRET` in your environment. Never paste your `network.yml` secret or Redis password into a public thread.\n\nFull matrix: <https://dailystruggle.github.io/RTP/dev/SUPPORT_MATRIX/>"
+    }
+  ]
+}

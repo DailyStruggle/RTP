@@ -1438,6 +1438,7 @@ public class RTP {
     RTPRunnable.scheduler = RTPRuntime.scheduler();
 
     MiscTasks.setSync((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
+    MiscTasks.setBackgroundSync((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
     MiscTasks.setAsync((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
     MiscTasks.setStartup((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
     MiscTasks.setCancel((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
@@ -1993,6 +1994,9 @@ public class RTP {
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop StopPipes miscAsyncTasks/miscSyncTasks");
     MiscTasks.async().stop();
     MiscTasks.sync().stop();
+    if (MiscTasks.backgroundSync() != null) {
+      MiscTasks.backgroundSync().stop();
+    }
 
     log(Level.FINE,
         "[SHUTDOWN_TRACE] RTP.stop CancelTracked count=" + trackedTasks.size());

@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
 import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
@@ -58,6 +59,7 @@ public final class ConfigReloadCoordinator implements ConfigReloadLifecycle {
   @Override
   public void onParsersChanged() {
     TickBudget.refresh();
+    ComputeGovernor.active().reset();
   }
 
   /**

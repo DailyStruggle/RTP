@@ -42,15 +42,22 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
 
     @Override
     public boolean execute(long availableTime) {
+        return execute(availableTime, new java.util.concurrent.atomic.AtomicBoolean(false));
+    }
+
+    @Override
+    public boolean execute(long availableTime, java.util.concurrent.atomic.AtomicBoolean sharedRanAny) {
         if (stop) return true;
         if (runnables.isEmpty()) return true;
         if (availableTime <= 0) return false;
+        java.util.concurrent.atomic.AtomicBoolean ranTracker =
+            (sharedRanAny != null) ? sharedRanAny : new java.util.concurrent.atomic.AtomicBoolean(false);
         long start = System.nanoTime();
         List<Runnable> delayed = new ArrayList<>();
         int budget = 0;
         try {
-            // Clock checked only after the first task: a 1 ns budget still guarantees progress.
-            while (budget < maxTasksPerTick && (budget == 0 || System.nanoTime() - start < availableTime)) {
+            // Clock checked only after the first task in the shared scope: a 1 ns budget still guarantees progress.
+            while (budget < maxTasksPerTick && (!ranTracker.get() || System.nanoTime() - start < availableTime)) {
                 if (stop) return true;
                 Runnable runnable = runnables.poll();
                 if (runnable == null) break;
@@ -60,6 +67,7 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
                     continue;
                 }
                 budget++;
+                ranTracker.set(true);
                 RTPLocation location = runnable instanceof RTPRunnable rtpRunnable ? rtpRunnable.getLocation() : null;
                 if (location == null) {
                     runIsolated(runnable);

@@ -28,11 +28,13 @@ import time
 import types
 import unittest
 import unittest.mock
+import zipfile
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPTS))
 import bench_fuzz as bf  # noqa: E402
+import bench_fuzz_server as bfs  # noqa: E402
 
 CFG = {"min_bots": 2, "max_bots": 8, "min_s": 20, "max_s": 60, "novelty": 0.25, "rtp_args": []}
 LEAK_HEADER = ("epoch_ms,label,online,joins_total,quits_total,distinct_uuids,heap_used_after_gc_mb,"
@@ -1807,6 +1809,339 @@ class SwarmControlTest(unittest.TestCase):
             sw.close()
         self.assertIsNotNone(proc.poll())
 
+    def test_discover_op_validation_and_unreachable_server_completion(self):
+        sw = bf.Swarm([NODE, bf.SWARM_JS, "--fuzz-control", "0", "--host", "127.0.0.1", "--port", "1",
+                       "--join-delay-ms", "0", "--fuzz-spawn-timeout-ms", "2000"])
+        sw.start()
+        try:
+            events, done = sw.run_episode({"op": "discover", "id": "d-1", "tier": "default", "bot": "fzd_def"}, 30)
+            self.assertEqual(done["id"], "d-1")
+            self.assertEqual(done["tier"], "default")
+            self.assertEqual(done["reason"], "no_commands")
+            cmd_events = [e for e in events if e.get("ev") == "commands"]
+            self.assertEqual(len(cmd_events), 1)
+            self.assertEqual(cmd_events[0]["tier"], "default")
+            self.assertFalse(cmd_events[0]["captured"])
+            self.assertEqual(cmd_events[0]["rootIndex"], 0)
+            self.assertEqual(cmd_events[0]["nodes"], [])
+            with self.assertRaisesRegex(bf.SwarmError, "failed to capture command graph"):
+                sw.discover("d-unreach", tier="default", bot="fzd_def2", max_ms=1500, timeout_s=15)
+            with self.assertRaises(bf.SwarmError):
+                sw.run_episode({"op": "discover", "id": "d-2", "tier": "default", "bot": "bad name"}, 10)
+        finally:
+            sw.close()
+
+    def test_discover_happy_path_and_default_episode_no_telemetry_leak(self):
+        server_js = r"""
+const path = require('path');
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const mc = require(path.join(nm, 'minecraft-protocol'));
+const mcData = require(path.join(nm, 'minecraft-data'))('1.20.1');
+const srv = mc.createServer({ 'online-mode': false, host: '127.0.0.1', port: 0, version: '1.20.1' });
+srv.on('login', (client) => {
+  client.write('login', {
+    ...mcData.loginPacket,
+    entityId: 1,
+    isHardcore: false,
+    gameMode: 0,
+    previousGameMode: -1,
+    hashedSeed: [0, 0],
+    maxPlayers: 20,
+    viewDistance: 2,
+    simulationDistance: 2,
+    reducedDebugInfo: false,
+    enableRespawnScreen: true,
+    isDebug: false,
+    isFlat: true
+  });
+  const sendCmds = () => {
+    try {
+      client.write('declare_commands', {
+        rootIndex: 0,
+        nodes: [
+          {
+            flags: { command_node_type: 0, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+            children: [1, 2]
+          },
+          {
+            flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+            children: [],
+            extraNodeData: { name: 'rtp' }
+          },
+          {
+            flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+            children: [],
+            redirectNode: 1,
+            extraNodeData: { name: 'betterrtp:rtp' }
+          }
+        ]
+      });
+    } catch (e) { /* client disconnected */ }
+  };
+  if (client.username === 'fzd_late') {
+    setTimeout(sendCmds, 1200);
+  } else {
+    sendCmds();
+  }
+  client.write('position', { x: 0, y: 64, z: 0, yaw: 0, pitch: 0, flags: 0, teleportId: 1 });
+  client.write('update_time', { age: [0, 100], time: [0, 100] });
+});
+srv.on('listening', () => {
+  console.log(JSON.stringify({ port: srv.socketServer.address().port }));
+});
+"""
+        srv_proc = subprocess.Popen([NODE, "-e", server_js, bf.SWARM_JS],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            line = srv_proc.stdout.readline()
+            self.assertTrue(line, "fake server did not report listening port")
+            port = json.loads(line)["port"]
+            sw = bf.Swarm([NODE, bf.SWARM_JS, "--fuzz-control", "0", "--host", "127.0.0.1", "--port", str(port),
+                           "--version", "1.20.1", "--join-delay-ms", "0", "--fuzz-spawn-timeout-ms", "1500"])
+            sw.start()
+            try:
+                # 1. Immediate declare_commands (arrives before spawn): finishes right away with reason='complete'.
+                cmd_fast_ev, done_fast = sw.discover("d-fast", tier="default", bot="fzd_fast", max_ms=5000, timeout_s=15)
+                self.assertEqual(done_fast["reason"], "complete")
+                self.assertEqual(done_fast["tier"], "default")
+                self.assertTrue(cmd_fast_ev["captured"])
+                self.assertEqual([n["name"] for n in cmd_fast_ev["nodes"]], ["", "rtp", "betterrtp:rtp"])
+                self.assertEqual(cmd_fast_ev["nodes"][2]["redirect"], 1)
+
+                # 2. Delayed declare_commands (>1s after login): waits up to max_ms and completes with reason='complete'.
+                cmd_late_ev, done_late = sw.discover("d-late", tier="op", bot="fzd_late", max_ms=5000, timeout_s=15)
+                self.assertEqual(done_late["reason"], "complete")
+                self.assertEqual(done_late["tier"], "op")
+                self.assertTrue(cmd_late_ev["captured"])
+                self.assertEqual(len(cmd_late_ev["nodes"]), 3)
+
+                merged_tree = bfs.merge_command_trees({"default": cmd_fast_ev, "op": cmd_late_ev})
+                self.assertEqual(merged_tree.nodes["rtp"].aliases, ["rtp", "betterrtp:rtp"])
+                self.assertEqual(merged_tree.nodes["rtp"].min_tier, "default")
+
+                # 3. Default ADR-111 episode (no telemetry opt-in) emits zero commands, tick_gap, or window events.
+                ep_req = bf.episode_request(
+                    "ep-def", "rtp", [{"name": "fzE_0", "program": [{"a": "wait", "ms": 20}, {"a": "quit"}]}], 4000
+                )
+                ev_ep, done_ep = sw.run_episode(ep_req, 15)
+                self.assertEqual(done_ep["id"], "ep-def")
+                leaked_evs = [e["ev"] for e in ev_ep if e.get("ev") in ("commands", "tick_gap", "window")]
+                self.assertEqual(leaked_evs, [])
+            finally:
+                sw.close()
+        finally:
+            srv_proc.terminate()
+            try:
+                srv_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                srv_proc.kill()
+            if srv_proc.stdout:
+                srv_proc.stdout.close()
+            if srv_proc.stderr:
+                srv_proc.stderr.close()
+
+    def test_passive_protocol_event_parsing(self):
+        script = r"""
+const EventEmitter = require('events');
+const path = require('path');
+const sw = require(process.argv[1]);
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const { createSerializer, createDeserializer } = require(path.join(nm, 'minecraft-protocol/src/transforms/serializer'));
+
+function roundTrip(version, name, params) {
+  const ser = createSerializer({ state: 'play', isServer: true, version });
+  const des = createDeserializer({ state: 'play', isServer: false, version });
+  const buf = ser.createPacketBuffer({ name, params });
+  return des.parsePacketBuffer(buf).data.params;
+}
+
+const rawCmdParams = {
+  rootIndex: 0,
+  nodes: [
+    {
+      flags: { command_node_type: 0, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [1, 4]
+    },
+    {
+      flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [2, 3],
+      extraNodeData: { name: 'rtp' }
+    },
+    {
+      flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 1 },
+      children: [],
+      extraNodeData: {
+        name: 'radius',
+        parser: 'brigadier:integer',
+        properties: { flags: { min_present: 1, max_present: 1 }, min: 1, max: 256 },
+        suggestionType: 'minecraft:ask_server'
+      }
+    },
+    {
+      flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [5],
+      extraNodeData: {
+        name: 'seed',
+        parser: 'brigadier:long',
+        properties: {
+          flags: { min_present: 1, max_present: 1 },
+          min: -5000000000n,
+          max: 9007199254740993n
+        }
+      }
+    },
+    {
+      flags: { command_node_type: 1, has_command: 0, has_redirect_node: 1, has_custom_suggestions: 0 },
+      children: [],
+      redirectNode: 1,
+      extraNodeData: { name: 'betterrtp:rtp' }
+    },
+    {
+      flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+      children: [],
+      extraNodeData: {
+        name: 'target',
+        parser: 'minecraft:entity',
+        properties: { unused: 0, onlyAllowPlayers: 1, onlyAllowEntities: 1 }
+      }
+    }
+  ]
+};
+
+const pkt120 = roundTrip('1.20.1', 'declare_commands', rawCmdParams);
+const pkt121 = roundTrip('1.21.4', 'declare_commands', rawCmdParams);
+const graph120 = sw.serializeCommandPacket(pkt120);
+const graph121 = sw.serializeCommandPacket(pkt121);
+
+// Verify generic 2-int arrays are NOT coerced into 64-bit integers.
+const pairKept = sw.jsonSafeValue([1, 2]);
+
+// Real open_window packets (no slotCount in protocol):
+const win120 = sw.parseWindowPacket('fzP_0', roundTrip('1.20.1', 'open_window', {
+  windowId: 2,
+  inventoryType: 2, // minecraft:generic_9x3 -> 27 slots
+  windowTitle: JSON.stringify({ text: 'RTP Menu 1.20' })
+}), '1.20.1');
+const win121 = sw.parseWindowPacket('fzP_0', roundTrip('1.21.4', 'open_window', {
+  windowId: 3,
+  inventoryType: 5, // minecraft:generic_9x6 -> 54 slots
+  windowTitle: { type: 'compound', value: { text: { type: 'string', value: 'RTP Menu 1.21' } } }
+}), '1.21.4');
+const winUnknown = sw.parseWindowPacket('fzP_0', {
+  windowId: 4,
+  inventoryType: 999,
+  windowTitle: JSON.stringify({ text: 'Custom Unknown' })
+}, '1.20.1');
+
+// Default episode (telemetry: false) must emit no commands, tick_gap, or window events.
+const defaultEmitted = [];
+const epDefault = { telemetry: false, emit: (obj) => defaultEmitted.push(obj) };
+const clientDefault = new EventEmitter();
+const connDefault = { username: 'fzDef_0', spawned: true };
+sw.attachProtocolTelemetry(epDefault, connDefault, { _client: clientDefault, version: '1.20.1' });
+clientDefault.emit('declare_commands', pkt120);
+clientDefault.emit('keep_alive', { keepAliveId: 1n });
+clientDefault.emit('update_time', { age: 100n, time: 100n });
+clientDefault.emit('update_time', { age: 120n, time: 120n });
+clientDefault.emit('open_window', { windowId: 1, inventoryType: 2, windowTitle: '{"text":"No"}' });
+
+// Opt-in telemetry episode (telemetry: true) emits tick_gap and window, and discover callback receives graph.
+const emitted = [];
+const ep = { telemetry: true, emit: (obj) => emitted.push(obj) };
+const client = new EventEmitter();
+const bot = { _client: client, version: '1.21.4' };
+const conn = { username: 'fzP_0', spawned: false };
+let discovered = null;
+sw.attachProtocolTelemetry(ep, conn, bot, (g) => { discovered = g; });
+
+client.emit('declare_commands', pkt121);
+// Before spawn, update_time only records the timestamp without emitting tick_gap.
+client.emit('update_time', { age: 100n, time: 100n });
+conn.spawned = true;
+const t0 = Date.now();
+conn.lastKeepAliveAt = t0 - 150;
+client.emit('keep_alive', { keepAliveId: 1n });
+conn.lastUpdateTimeAt = Date.now() - 1050;
+client.emit('update_time', { age: 120n, time: 120n });
+client.emit('open_window', roundTrip('1.21.4', 'open_window', {
+  windowId: 2,
+  inventoryType: 2,
+  windowTitle: { type: 'compound', value: { text: { type: 'string', value: 'RTP Menu' } } }
+}));
+
+// Verify parseEpisode telemetry validation and action boundaries.
+const epParsedDefault = sw.parseEpisode({ id: 1, cmd: 'rtp', bots: [{ name: 'b0', program: ['quit'] }] });
+const epParsedTel = sw.parseEpisode({ id: 2, cmd: 'rtp', telemetry: true, bots: [{ name: 'b0', program: ['quit'] }] });
+let badActionRejected = false;
+try { sw.parseAction({ a: 'window_click', slot: 0 }, 'step0'); } catch (e) { badActionRejected = true; }
+
+console.log(JSON.stringify({
+  graph120,
+  graph121,
+  pairKept,
+  win120,
+  win121,
+  winUnknown,
+  defaultEmitted,
+  discovered: !!discovered,
+  emitted,
+  epTelemetryDefault: epParsedDefault.telemetry,
+  epTelemetryOptIn: epParsedTel.telemetry,
+  badActionRejected
+}));
+"""
+        proc = subprocess.run([NODE, "-e", script, bf.SWARM_JS], check=True, capture_output=True, text=True, timeout=30)
+        out = json.loads(proc.stdout.strip())
+        self.assertTrue(out["discovered"])
+        self.assertTrue(out["badActionRejected"])
+        self.assertFalse(out["epTelemetryDefault"])
+        self.assertTrue(out["epTelemetryOptIn"])
+        self.assertEqual(out["pairKept"], [1, 2])
+        self.assertEqual(out["defaultEmitted"], [])
+        for graph in (out["graph120"], out["graph121"]):
+            self.assertEqual(graph["rootIndex"], 0)
+            self.assertEqual(len(graph["nodes"]), 6)
+            n0, n1, n2, n3, n4, n5 = graph["nodes"]
+            self.assertEqual((n0["kind"], n0["children"], n0["executable"]), ("root", [1, 4], False))
+            self.assertEqual((n1["kind"], n1["name"], n1["children"], n1["executable"]), ("literal", "rtp", [2, 3], True))
+            self.assertEqual((n2["kind"], n2["name"], n2["parser"], n2["executable"], n2["suggestions"]),
+                             ("argument", "radius", "brigadier:integer", True, "minecraft:ask_server"))
+            self.assertEqual(n2["properties"]["min"], 1)
+            self.assertEqual(n2["properties"]["max"], 256)
+            self.assertEqual((n3["kind"], n3["name"], n3["parser"]), ("argument", "seed", "brigadier:long"))
+            self.assertEqual(n3["properties"]["min"], -5000000000)
+            self.assertEqual(n3["properties"]["max"], "9007199254740993")
+            self.assertEqual((n4["kind"], n4["name"], n4["redirect"]), ("literal", "betterrtp:rtp", 1))
+            self.assertEqual((n5["kind"], n5["name"], n5["parser"]), ("argument", "target", "minecraft:entity"))
+            self.assertEqual(n5["properties"]["onlyAllowPlayers"], 1)
+            self.assertEqual(n5["properties"]["onlyAllowEntities"], 1)
+        self.assertEqual(out["win120"], {
+            "ev": "window", "bot": "fzP_0", "window_id": 2, "window_type": 2, "slots": 27, "title": "RTP Menu 1.20"
+        })
+        self.assertEqual(out["win121"], {
+            "ev": "window", "bot": "fzP_0", "window_id": 3, "window_type": 5, "slots": 54, "title": "RTP Menu 1.21"
+        })
+        self.assertEqual(out["winUnknown"], {
+            "ev": "window", "bot": "fzP_0", "window_id": 4, "window_type": 999, "slots": None, "title": "Custom Unknown"
+        })
+        emitted = out["emitted"]
+        tick_gaps = [e for e in emitted if e["ev"] == "tick_gap"]
+        self.assertEqual(len(tick_gaps), 1)
+        self.assertEqual(tick_gaps[0]["bot"], "fzP_0")
+        self.assertGreaterEqual(tick_gaps[0]["ms"], 1000)
+        self.assertGreater(tick_gaps[0]["at"], 1700000000000)
+        self.assertGreaterEqual(tick_gaps[0]["keepalive_ms"], 100)
+        windows = [e for e in emitted if e["ev"] == "window"]
+        self.assertEqual(len(windows), 1)
+        self.assertEqual(windows[0], {
+            "ev": "window",
+            "bot": "fzP_0",
+            "window_id": 2,
+            "window_type": 2,
+            "slots": 27,
+            "title": "RTP Menu"
+        })
+
 
 class RepetitionTest(LoopFixture, unittest.TestCase):
     """--reps: growth per repetition separates a leak from a cache that fills once."""
@@ -2635,6 +2970,1242 @@ class FindingLoopTest(LoopFixture, unittest.TestCase):
         with self.assertRaises(SystemExit) as cm:
             bf.main(["--server-dir", self.dir, "--finding-n", "2", "--finding-k", "3"])
         self.assertEqual(2, cm.exception.code)
+
+
+class CommandTreeAndDenylistTest(unittest.TestCase):
+    """Tests for ADR-125 passive command tree merging, structural alias folding,
+    redirect cycle protection, minimum-visible-tier metadata, Denylist filtering,
+    and commands.json serialization."""
+
+    def test_merge_tiers_alias_folding_and_min_tier_metadata(self):
+        default_pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2, 4]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": [3]},
+                {"index": 2, "kind": "literal", "name": "betterrtp:rtp", "executable": False, "redirect": 1, "children": []},
+                {
+                    "index": 3,
+                    "kind": "argument",
+                    "name": "world",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 4, "kind": "literal", "name": "spawn", "executable": True, "children": []},
+            ],
+        }
+        op_pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2, 5, 7]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": [3, 6]},
+                {"index": 2, "kind": "literal", "name": "betterrtp:rtp", "executable": False, "redirect": 1, "children": []},
+                {
+                    "index": 3,
+                    "kind": "argument",
+                    "name": "world",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 5, "kind": "literal", "name": "spawn", "executable": True, "children": []},
+                {"index": 6, "kind": "literal", "name": "reload", "executable": True, "children": []},
+                {"index": 7, "kind": "literal", "name": "adminonly", "executable": True, "children": []},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = os.path.join(tmpdir, "commands.json")
+            tree = bfs.merge_command_trees({"default": default_pkt, "op": op_pkt}, out_path=out_file)
+
+            self.assertEqual(tree.tiers, ["default", "op"])
+            self.assertIn("rtp", tree.root_children)
+            self.assertNotIn("betterrtp:rtp", tree.root_children)
+            self.assertEqual(tree.alias_map["rtp"], "rtp")
+            self.assertEqual(tree.alias_map["betterrtp:rtp"], "rtp")
+
+            rtp_node = tree.nodes["rtp"]
+            self.assertEqual(rtp_node.aliases, ["rtp", "betterrtp:rtp"])
+            self.assertEqual(rtp_node.tiers, ["default", "op"])
+            self.assertEqual(rtp_node.min_tier, "default")
+            self.assertTrue(rtp_node.executable)
+            self.assertFalse(rtp_node.denied)
+
+            world_node = tree.nodes["rtp <world>"]
+            self.assertEqual(world_node.tiers, ["default", "op"])
+            self.assertEqual(world_node.min_tier, "default")
+            self.assertEqual(world_node.aliases, ["rtp <world>", "betterrtp:rtp <world>"])
+
+            reload_node = tree.nodes["rtp reload"]
+            self.assertEqual(reload_node.tiers, ["op"])
+            self.assertEqual(reload_node.min_tier, "op")
+            self.assertEqual(reload_node.aliases, ["rtp reload", "betterrtp:rtp reload"])
+
+            admin_node = tree.nodes["adminonly"]
+            self.assertEqual(admin_node.tiers, ["op"])
+            self.assertEqual(admin_node.min_tier, "op")
+
+            # Verify commands.json round-trip
+            reloaded = bfs.CommandTree.read_json(out_file)
+            self.assertEqual(reloaded.to_dict(), tree.to_dict())
+            default_allowed = [n.node_id for n in reloaded.allowed_executable_nodes(["default"])]
+            self.assertEqual(default_allowed, ["rtp", "rtp <world>", "spawn"])
+            all_allowed = [n.node_id for n in reloaded.allowed_executable_nodes(["default", "op"])]
+            self.assertEqual(all_allowed, ["adminonly", "rtp", "rtp <world>", "rtp reload", "spawn"])
+
+    def test_max_nodes_truncates_without_dangling_references_and_roundtrips(self):
+        packet = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 4]},
+                {"index": 1, "kind": "literal", "name": "alpha", "children": [2, 3]},
+                {"index": 2, "kind": "literal", "name": "first", "executable": True, "children": []},
+                {"index": 3, "kind": "literal", "name": "second", "executable": True, "children": []},
+                {"index": 4, "kind": "literal", "name": "beta", "executable": True, "children": []},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = os.path.join(tmpdir, "commands.json")
+            tree = bfs.merge_command_trees({"default": packet}, out_path=out_file, max_nodes=2)
+
+            self.assertEqual(len(tree.nodes), 2)
+            self.assertEqual(tree.root_children, ["alpha"])
+            self.assertEqual(tree.nodes["alpha"].children, ["alpha first"])
+            self.assertTrue(all(root in tree.nodes for root in tree.root_children))
+            self.assertTrue(all(child in tree.nodes for node in tree.nodes.values() for child in node.children))
+            self.assertTrue(tree.truncated)
+
+            reloaded = bfs.CommandTree.read_json(out_file)
+            self.assertEqual(reloaded.to_dict(), tree.to_dict())
+            self.assertTrue(reloaded.truncated)
+
+    def test_cross_tier_alias_subtree_inequality_does_not_fold(self):
+        # Case 1: Within the same tier, `pluginx:tp` and `tp` have different subtrees -> must stay separate.
+        pkt_same_tier = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2]},
+                {"index": 1, "kind": "literal", "name": "tp", "executable": False, "children": [3]},
+                {"index": 2, "kind": "literal", "name": "pluginx:tp", "executable": True, "children": [4]},
+                {
+                    "index": 3,
+                    "kind": "argument",
+                    "name": "target",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": True},
+                    "executable": True,
+                    "children": [],
+                },
+                {
+                    "index": 4,
+                    "kind": "literal",
+                    "name": "home",
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        tree1 = bfs.merge_command_trees({"default": pkt_same_tier})
+        self.assertIn("tp", tree1.nodes)
+        self.assertIn("pluginx:tp", tree1.nodes)
+        self.assertEqual(tree1.nodes["tp"].aliases, ["tp"])
+        self.assertEqual(tree1.nodes["pluginx:tp"].aliases, ["pluginx:tp"])
+
+        # Case 2: `msg` is in default tier only, `adminmod:msg` is in op tier only (never paired in the same tier).
+        # Even if both happen to be bare literals, cross-tier distinct commands without same-tier pairing must not fold.
+        default_only_bare = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "msg", "executable": True, "children": []},
+            ],
+        }
+        op_only_ns = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "adminmod:msg", "executable": True, "children": []},
+            ],
+        }
+        tree2 = bfs.merge_command_trees({"default": default_only_bare, "op": op_only_ns})
+        self.assertIn("msg", tree2.nodes)
+        self.assertIn("adminmod:msg", tree2.nodes)
+        self.assertEqual(tree2.nodes["msg"].min_tier, "default")
+        self.assertEqual(tree2.nodes["adminmod:msg"].min_tier, "op")
+
+        # Case 3: Same command in both tiers, but op tier has an argument with a different parser under the same name.
+        def_arg = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": " warp", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "dest",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        op_arg = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "warp", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "dest",
+                    "parser": "brigadier:integer",
+                    "properties": {"min": 1, "max": 10},
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        tree3 = bfs.merge_command_trees({"default": def_arg, "op": op_arg})
+        self.assertIn("warp <dest>", tree3.nodes)
+        self.assertIn("warp <dest:integer>", tree3.nodes)
+        self.assertEqual(tree3.nodes["warp <dest>"].min_tier, "default")
+        self.assertEqual(tree3.nodes["warp <dest:integer>"].min_tier, "op")
+
+        # Case 4: `default` has equal `rtp` and `x:rtp`, but `op` has ONLY `x:rtp` with an extra child `nuke`.
+        # Folding must be rejected so `rtp` never inherits the undeclared `rtp nuke` subcommand.
+        def_pair = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                {"index": 2, "kind": "literal", "name": "x:rtp", "executable": True, "children": []},
+            ],
+        }
+        op_ns_conflict = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "x:rtp", "executable": True, "children": [2]},
+                {"index": 2, "kind": "literal", "name": "nuke", "executable": True, "children": []},
+            ],
+        }
+        tree4 = bfs.merge_command_trees({"default": def_pair, "op": op_ns_conflict})
+        self.assertIn("rtp", tree4.nodes)
+        self.assertIn("x:rtp", tree4.nodes)
+        self.assertIn("x:rtp nuke", tree4.nodes)
+        self.assertNotIn("rtp nuke", tree4.nodes)
+        self.assertEqual(tree4.nodes["rtp"].tiers, ["default"])
+        self.assertEqual(tree4.nodes["x:rtp"].tiers, ["default", "op"])
+
+        # Case 5: `a:rtp` redirects to `rtp` AND also declares its own child `stop`.
+        # Redirect with own children is not a pure alias and must not fold into `rtp`.
+        redir_with_own_children = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 2]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+                {"index": 2, "kind": "literal", "name": "a:rtp", "executable": False, "redirect": 1, "children": [3]},
+                {"index": 3, "kind": "literal", "name": "stop", "executable": True, "children": []},
+            ],
+        }
+        tree5 = bfs.merge_command_trees({"default": redir_with_own_children})
+        self.assertIn("rtp", tree5.nodes)
+        self.assertIn("a:rtp", tree5.nodes)
+        self.assertNotIn("rtp stop", tree5.nodes)
+        self.assertEqual(tree5.nodes["rtp"].aliases, ["rtp"])
+
+    def test_redirect_cycle_protection_and_unsafe_redirects(self):
+        # Includes:
+        # - `execute -> run -> root (0)` cycle
+        # - mutual redirect cycle `loop_a <-> loop_b`
+        # - self-redirect `self_loop -> self_loop`
+        # - child cycle via `children` array (`child_cycle -> sub -> child_cycle`)
+        cyclic_pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 3, 4, 5, 6]},
+                {"index": 1, "kind": "literal", "name": "execute", "executable": False, "children": [2]},
+                {"index": 2, "kind": "literal", "name": "run", "executable": False, "redirect": 0, "children": []},
+                {"index": 3, "kind": "literal", "name": "loop_a", "executable": False, "redirect": 4, "children": []},
+                {"index": 4, "kind": "literal", "name": "loop_b", "executable": True, "redirect": 3, "children": []},
+                {"index": 5, "kind": "literal", "name": "self_loop", "executable": False, "redirect": 5, "children": []},
+                {"index": 6, "kind": "literal", "name": "child_cycle", "executable": True, "children": [7]},
+                {"index": 7, "kind": "literal", "name": "sub", "executable": True, "children": [6]},
+            ],
+        }
+        tree = bfs.merge_command_trees({"op": cyclic_pkt})
+        self.assertIn("execute", tree.nodes)
+        self.assertIn("execute run", tree.nodes)
+        self.assertTrue(tree.nodes["execute run"].cycle_cut)
+        self.assertTrue(tree.nodes["execute"].denied)
+        self.assertTrue(tree.nodes["execute run"].denied)
+
+        self.assertIn("loop_a", tree.nodes)
+        self.assertTrue(tree.nodes["loop_a"].cycle_cut)
+        # `loop_a` is not executable on its own and its redirect `loop_b -> loop_a` is a cycle,
+        # so it must not inherit executable=True from a cyclic redirect chain.
+        self.assertFalse(tree.nodes["loop_a"].executable)
+
+        self.assertIn("self_loop", tree.nodes)
+        self.assertTrue(tree.nodes["self_loop"].cycle_cut)
+        self.assertFalse(tree.nodes["self_loop"].executable)
+
+        self.assertIn("child_cycle sub", tree.nodes)
+        self.assertTrue(tree.nodes["child_cycle sub"].cycle_cut)
+
+    def test_denylist_default_rules_and_operator_extensions(self):
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {
+                    "index": 0,
+                    "kind": "root",
+                    "name": "",
+                    "children": [1, 2, 3, 4, 5, 8, 15, 17, 19],
+                },
+                {"index": 1, "kind": "literal", "name": "stop", "executable": True, "children": []},
+                {"index": 2, "kind": "literal", "name": "minecraft:stop", "executable": False, "redirect": 1, "children": []},
+                {"index": 3, "kind": "literal", "name": "ban", "executable": True, "children": []},
+                {"index": 4, "kind": "literal", "name": "ban-ip", "executable": True, "children": []},
+                {"index": 5, "kind": "literal", "name": "reload", "executable": True, "children": [6, 7]},
+                {"index": 6, "kind": "literal", "name": "confirm", "executable": True, "children": []},
+                {"index": 7, "kind": "literal", "name": "status", "executable": True, "children": []},
+                {"index": 8, "kind": "literal", "name": "tick", "executable": False, "children": [9, 10, 11, 12, 13, 14]},
+                {"index": 9, "kind": "literal", "name": "query", "executable": True, "children": []},
+                {"index": 10, "kind": "literal", "name": "freeze", "executable": True, "children": []},
+                {"index": 11, "kind": "literal", "name": "unfreeze", "executable": True, "children": []},
+                {"index": 12, "kind": "literal", "name": "rate", "executable": True, "children": []},
+                {"index": 13, "kind": "literal", "name": "sprint", "executable": True, "children": []},
+                {"index": 14, "kind": "literal", "name": "step", "executable": True, "children": []},
+                {"index": 15, "kind": "literal", "name": "kill", "executable": True, "children": [16]},
+                {
+                    "index": 16,
+                    "kind": "argument",
+                    "name": "targets",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": False},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 17, "kind": "literal", "name": "customadmin", "executable": True, "children": [18]},
+                {"index": 18, "kind": "literal", "name": "wipe", "executable": True, "children": []},
+                {"index": 19, "kind": "literal", "name": "minecraft:pardon-ip", "executable": True, "children": []},
+            ],
+        }
+        deny = bfs.Denylist(extra_entries=["customadmin wipe"])
+        tree = bfs.merge_command_trees({"op": pkt}, denylist=deny)
+
+        # `minecraft:stop` folds into `stop` and is denied by `stop`
+        self.assertEqual(tree.nodes["stop"].aliases, ["stop", "minecraft:stop"])
+        self.assertTrue(tree.nodes["stop"].denied)
+        self.assertEqual(tree.nodes["stop"].denied_by, "stop")
+
+        # Glob `ban*` and `pardon*` (even when namespaced without bare counterpart)
+        self.assertTrue(tree.nodes["ban"].denied)
+        self.assertEqual(tree.nodes["ban"].denied_by, "ban*")
+        self.assertTrue(tree.nodes["ban-ip"].denied)
+        self.assertTrue(tree.nodes["minecraft:pardon-ip"].denied)
+        self.assertEqual(tree.nodes["minecraft:pardon-ip"].denied_by, "pardon*")
+
+        # `reload confirm` is denied, but bare `reload` and `reload status` remain allowed
+        self.assertFalse(tree.nodes["reload"].denied)
+        self.assertFalse(tree.nodes["reload status"].denied)
+        self.assertTrue(tree.nodes["reload confirm"].denied)
+        self.assertEqual(tree.nodes["reload confirm"].denied_by, "reload confirm")
+
+        # `tick` state-changing subcommands denied; `tick query` allowed
+        self.assertFalse(tree.nodes["tick query"].denied)
+        for sub in ("freeze", "unfreeze", "rate", "sprint", "step"):
+            self.assertTrue(tree.nodes[f"tick {sub}"].denied, f"tick {sub} should be denied")
+            self.assertEqual(tree.nodes[f"tick {sub}"].denied_by, f"tick {sub}")
+
+        # `kill <entity>` denies `kill <targets>` (entity parser) while bare `kill` remains allowed
+        self.assertFalse(tree.nodes["kill"].denied)
+        self.assertTrue(tree.nodes["kill <targets>"].denied)
+        self.assertEqual(tree.nodes["kill <targets>"].denied_by, "kill <entity>")
+
+        # Operator `--deny` entry `customadmin wipe` denies `customadmin wipe`, leaving `customadmin` allowed
+        self.assertFalse(tree.nodes["customadmin"].denied)
+        self.assertTrue(tree.nodes["customadmin wipe"].denied)
+        self.assertEqual(tree.nodes["customadmin wipe"].denied_by, "customadmin wipe")
+
+        # Raw command-line checks (used for passive filtering / replay safety)
+        self.assertTrue(deny.is_denied_command_line("/minecraft:stop", tree))
+        self.assertTrue(deny.is_denied_command_line("kill @a", tree))
+        self.assertFalse(deny.is_denied_command_line("kill", tree))
+        self.assertTrue(deny.is_denied_command_line("reload confirm", tree))
+        self.assertFalse(deny.is_denied_command_line("reload", tree))
+        self.assertTrue(deny.is_denied_command_line("tick freeze", tree))
+        self.assertFalse(deny.is_denied_command_line("tick query", tree))
+
+    def test_redirect_to_denied_command_propagates_denial_and_command_line_matching(self):
+        # 1. `tp -> teleport` with `--deny teleport`
+        # 2. non-namespaced alias `slay -> kill` (built-in `kill <entity>`)
+        # 3. non-namespaced alias `boot -> kick` and multi-hop `punt -> boot -> kick` (built-in `kick`)
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 3, 4, 6, 7, 9]},
+                {"index": 1, "kind": "literal", "name": "teleport", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "t",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": True},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 3, "kind": "literal", "name": "tp", "executable": False, "redirect": 1, "children": []},
+                {"index": 4, "kind": "literal", "name": "kill", "executable": True, "children": [5]},
+                {
+                    "index": 5,
+                    "kind": "argument",
+                    "name": "targets",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": False},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 6, "kind": "literal", "name": "slay", "executable": False, "redirect": 4, "children": []},
+                {"index": 7, "kind": "literal", "name": "kick", "executable": False, "children": [8]},
+                {
+                    "index": 8,
+                    "kind": "argument",
+                    "name": "player",
+                    "parser": "minecraft:entity",
+                    "properties": {"single": True},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 9, "kind": "literal", "name": "boot", "executable": False, "redirect": 7, "children": []},
+                {"index": 10, "kind": "literal", "name": "punt", "executable": False, "redirect": 9, "children": []},
+            ],
+        }
+        pkt["nodes"][0]["children"].append(10)
+        deny = bfs.Denylist(extra_entries=["teleport"])
+        tree = bfs.merge_command_trees({"op": pkt}, denylist=deny)
+
+        # `teleport` and redirecting `tp` + `tp <t>` are all denied by `teleport`
+        self.assertTrue(tree.nodes["teleport"].denied)
+        self.assertTrue(tree.nodes["teleport <t>"].denied)
+        self.assertTrue(tree.nodes["tp"].denied)
+        self.assertEqual(tree.nodes["tp"].denied_by, "teleport")
+        self.assertTrue(tree.nodes["tp <t>"].denied)
+        self.assertEqual(tree.nodes["tp <t>"].denied_by, "teleport")
+        self.assertTrue(deny.is_denied_command_line("tp @s", tree))
+        self.assertTrue(deny.is_denied_command_line("/tp", tree))
+
+        # `slay -> kill`: bare `slay` is allowed (like bare `kill`), while `slay <targets>` is denied by `kill <entity>`
+        self.assertFalse(tree.nodes["slay"].denied)
+        self.assertTrue(tree.nodes["slay <targets>"].denied)
+        self.assertEqual(tree.nodes["slay <targets>"].denied_by, "kill <entity>")
+        self.assertTrue(deny.is_denied_command_line("slay @a", tree))
+        self.assertFalse(deny.is_denied_command_line("slay", tree))
+
+        # `boot -> kick` and `punt -> boot -> kick`: denied by built-in `kick`
+        for nid in ("kick", "kick <player>", "boot", "boot <player>", "punt", "punt <player>"):
+            self.assertTrue(tree.nodes[nid].denied, f"{nid} should be denied via redirect to kick")
+            self.assertEqual(tree.nodes[nid].denied_by, "kick")
+        self.assertTrue(deny.is_denied_command_line("boot player1", tree))
+        self.assertTrue(deny.is_denied_command_line("punt player1", tree))
+
+    def test_json_roundtrip_preserves_steps_and_apply_denylist_recomputes_flags(self):
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 3, 4]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "world",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 3, "kind": "literal", "name": "teleport", "executable": True, "children": []},
+                {"index": 4, "kind": "literal", "name": "tp", "executable": False, "redirect": 3, "children": []},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = os.path.join(tmpdir, "commands.json")
+            tree = bfs.merge_command_trees({"default": pkt}, out_path=out_file)
+            self.assertFalse(tree.nodes["rtp <world>"].denied)
+            self.assertFalse(tree.nodes["teleport"].denied)
+            self.assertFalse(tree.nodes["tp"].denied)
+
+            # Reload from commands.json: dataclass equality (including _steps and _root_id) holds
+            reloaded = bfs.CommandTree.read_json(out_file)
+            self.assertEqual(reloaded, tree)
+            self.assertEqual(reloaded.nodes["rtp <world>"]._steps, (("argument", "world", "brigadier:string"),))
+            self.assertEqual(reloaded.nodes["rtp <world>"]._root_id, "rtp")
+
+            # Re-apply a stricter denylist on the reloaded tree
+            new_deny = bfs.Denylist(extra_entries=["rtp <string>", "teleport"])
+            reloaded.apply_denylist(new_deny)
+            self.assertFalse(reloaded.nodes["rtp"].denied)
+            self.assertTrue(reloaded.nodes["rtp <world>"].denied)
+            self.assertEqual(reloaded.nodes["rtp <world>"].denied_by, "rtp <string>")
+            self.assertTrue(reloaded.nodes["teleport"].denied)
+            self.assertTrue(reloaded.nodes["tp"].denied)
+            self.assertEqual(reloaded.nodes["tp"].denied_by, "teleport")
+
+            # Also verify reconstruction when `steps` and `root_id` are absent from serialized dict
+            raw_dict = tree.to_dict()
+            for n_entry in raw_dict["nodes"]:
+                n_entry.pop("steps", None)
+                n_entry.pop("root_id", None)
+            reconstructed = bfs.CommandTree.from_dict(raw_dict)
+            reconstructed.apply_denylist(new_deny)
+            self.assertTrue(reconstructed.nodes["rtp <world>"].denied)
+            self.assertTrue(reconstructed.nodes["tp"].denied)
+
+    def test_swarm_discover_raises_on_missing_or_uncaptured_or_timeout_graph(self):
+        sw = bf.Swarm(["node"])
+        # 1. Missing `commands` event
+        with unittest.mock.patch.object(
+            sw, "run_episode", return_value=([], {"ev": "done", "id": "d1", "reason": "complete"})
+        ):
+            with self.assertRaisesRegex(bf.SwarmError, "missing commands event"):
+                sw.discover("d1", tier="default")
+
+        # 2. `captured: False` with `reason: 'no_commands'`
+        with unittest.mock.patch.object(
+            sw,
+            "run_episode",
+            return_value=(
+                [
+                    {"ev": "bot_error", "text": "no spawn within 2000 ms"},
+                    {"ev": "commands", "id": "d2", "tier": "default", "rootIndex": 0, "nodes": [], "captured": False},
+                ],
+                {"ev": "done", "id": "d2", "reason": "no_commands"},
+            ),
+        ):
+            with self.assertRaisesRegex(bf.SwarmError, "failed to capture command graph.*no_commands"):
+                sw.discover("d2", tier="default")
+
+        # 3. `captured: True` but `reason: 'timeout'`
+        with unittest.mock.patch.object(
+            sw,
+            "run_episode",
+            return_value=(
+                [{"ev": "commands", "id": "d3", "tier": "op", "rootIndex": 0, "nodes": [], "captured": True}],
+                {"ev": "done", "id": "d3", "reason": "timeout"},
+            ),
+        ):
+            with self.assertRaisesRegex(bf.SwarmError, "reason='timeout'"):
+                sw.discover("d3", tier="op")
+
+    def test_dag_command_graph_resolves_without_exponential_blowup(self):
+        # Width-3, depth-16 diamond DAG (shared child indices at each level)
+        nodes = [{"index": 0, "kind": "root", "name": "", "children": [1, 2, 3]}]
+        idx = 1
+        for depth in range(16):
+            next_base = idx + 3
+            children = [next_base, next_base + 1, next_base + 2] if depth < 15 else []
+            for w in range(3):
+                nodes.append(
+                    {
+                        "index": idx + w,
+                        "kind": "literal",
+                        "name": f"l{depth}_{w}",
+                        "executable": depth == 15,
+                        "children": list(children),
+                    }
+                )
+            idx += 3
+        pkt = {"rootIndex": 0, "nodes": nodes}
+        t0 = time.monotonic()
+        roots = bfs._resolve_raw_tier_graph(pkt)
+        elapsed = time.monotonic() - t0
+        self.assertEqual(sorted(roots.keys()), ["l0_0", "l0_1", "l0_2"])
+        self.assertLess(elapsed, 1.0)
+
+
+class JcmdAndStallOracleTest(unittest.TestCase):
+    """ADR-125 section 2.4 & 2.6: JcmdObserver PID/container selection, exclusion windows, and StallOracle."""
+
+    SAMPLE_HISTO = (
+        " num     #instances         #bytes  class name (module)\n"
+        "-------------------------------------------------------\n"
+        "   1:         12000        1500000  [B (java.base@21.0.2)\n"
+        "   2:           450          36000  jdk.internal.vm.FillerObject (java.base@21.0.2)\n"
+        "   3:           300          24000  jdk.internal.vm.FillerElement (java.base@21.0.2)\n"
+        "   4:            42           3360  com.example.alpha.SessionState\n"
+        "   5:            10            800  [Lcom.example.alpha.SessionState;\n"
+        "Total         12802        1564160\n"
+    )
+
+    SAMPLE_THREAD_DUMP = (
+        "2026-10-24 01:00:00\n"
+        "Full thread dump OpenJDK 64-Bit Server VM (21.0.2+13-LTS mixed mode):\n"
+        "\n"
+        '"Netty Epoll Server IO #0" #25 daemon prio=5 os_prio=0 tid=0x00007f01 nid=0x101 runnable\n'
+        "   java.lang.Thread.State: RUNNABLE\n"
+        "\tat io.netty.channel.epoll.Native.epollWait(Native Method)\n"
+        "\n"
+        '"Server thread" #30 prio=5 os_prio=0 tid=0x00007f02 nid=0x102 runnable\n'
+        "   java.lang.Thread.State: RUNNABLE\n"
+        "\tat java.base@21.0.2/java.lang.Thread.onSpinWait(Thread.java:310)\n"
+        "\tat com.example.alpha.ScanTask.runBusyScan(ScanTask.java:88)\n"
+        "\tat net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1020)\n"
+        "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:910)\n"
+        "\tat net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:700)\n"
+    )
+
+    def test_jcmd_observer_pid_file_and_histogram_parsing_and_window_recording(self):
+        clock_vals = [1000, 1400, 3000, 3120]
+        calls = []
+
+        def fake_clock():
+            return clock_vals.pop(0) if clock_vals else 5000
+
+        def fake_runner(cmd, timeout_s):
+            calls.append((cmd, timeout_s))
+            if cmd[-1] == "GC.class_histogram":
+                return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+            if cmd[-1] == "Thread.print":
+                return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_THREAD_DUMP, stderr="")
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="unexpected")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pid_path = os.path.join(tmpdir, "server.pid")
+            with open(pid_path, "w", encoding="utf-8") as fh:
+                fh.write(f"{os.getpid()}\n")
+
+            obs = bfs.JcmdObserver(
+                pid_file=pid_path,
+                post_grace_ms=200,
+                runner=fake_runner,
+                clock_ms=fake_clock,
+            )
+            self.assertEqual(obs.resolve_pid(), os.getpid())
+
+            histo = obs.class_histogram()
+            # FillerObject and FillerElement are filtered; raw array `[Lcom.example.alpha.SessionState;` stays distinct
+            self.assertNotIn("jdk.internal.vm.FillerObject", histo)
+            self.assertNotIn("jdk.internal.vm.FillerElement", histo)
+            self.assertEqual(histo["com.example.alpha.SessionState"], (42, 3360))
+            self.assertEqual(histo["[Lcom.example.alpha.SessionState;"], (10, 800))
+            self.assertEqual(histo["[B"], (12000, 1500000))
+
+            dump = obs.thread_print()
+            self.assertIn("com.example.alpha.ScanTask.runBusyScan", dump)
+
+            # Exclusion windows recorded for both GC.class_histogram and Thread.print (+200ms post_grace_ms)
+            self.assertEqual(len(obs.exclusion_windows), 2)
+            self.assertEqual(obs.exclusion_windows[0], bfs.ExclusionWindow(1000, 1600, "GC.class_histogram"))
+            self.assertEqual(obs.exclusion_windows[1], bfs.ExclusionWindow(3000, 3320, "Thread.print"))
+            self.assertTrue(obs.overlaps_exclusion(1500, 1550))
+            self.assertFalse(obs.overlaps_exclusion(2000, 2500))
+
+            # Stale --pid-file pointing to a process whose cwd does not match server_dir is rejected
+            stale_obs = bfs.JcmdObserver(
+                pid_file=pid_path,
+                server_dir="/srv/bench/expected-server",
+                pid_cwd=lambda p: "/tmp/unrelated-cwd",
+                runner=fake_runner,
+            )
+            with self.assertRaisesRegex(bfs.JcmdError, "does not match server_dir.*stale"):
+                stale_obs.resolve_pid()
+
+    def test_jcmd_observer_jcmd_list_matching_and_container_wrapping(self):
+        jcmd_list_out = (
+            "1011 jdk.jcmd/sun.tools.jcmd.JCmd -l\n"
+            "2048 /opt/other/app.jar\n"
+            "4096 /srv/bench/paper-server/paper.jar nogui\n"
+        )
+        recorded_cmds = []
+
+        def fake_runner(cmd, timeout_s):
+            recorded_cmds.append(cmd)
+            if cmd == ["jcmd", "-l"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout=jcmd_list_out, stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+
+        obs = bfs.JcmdObserver(
+            server_dir="/srv/bench/paper-server",
+            check_local_pid=False,
+            pid_cwd=lambda p: None,
+            runner=fake_runner,
+        )
+        self.assertEqual(obs.resolve_pid(), 4096)
+        counts = obs.class_counts()
+        self.assertEqual(counts["com.example.alpha.SessionState"], 42)
+        self.assertEqual(counts["[Lcom.example.alpha.SessionState;"], 10)
+        self.assertEqual(recorded_cmds[-1], ["jcmd", "4096", "GC.class_histogram"])
+
+        # Basename-only collision test: server_dir='/srv/bench/paper' must NEVER match unrelated
+        # `5000 /home/u/tools/paper-utils.jar`, and matches `4096 server.jar nogui` only when cwd matches.
+        collision_list = (
+            "4096 server.jar nogui\n"
+            "5000 /home/u/tools/paper-utils.jar\n"
+        )
+        obs_no_cwd = bfs.JcmdObserver(
+            server_dir="/srv/bench/paper",
+            check_local_pid=False,
+            pid_cwd=lambda p: "/home/u/tools" if p == 5000 else None,
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=collision_list, stderr=""),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "found no JVM matching"):
+            obs_no_cwd.resolve_pid()
+
+        obs_with_cwd = bfs.JcmdObserver(
+            server_dir="/srv/bench/paper",
+            check_local_pid=False,
+            pid_cwd=lambda p: "/srv/bench/paper" if p == 4096 else "/home/u/tools",
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=collision_list, stderr=""),
+        )
+        self.assertEqual(obs_with_cwd.resolve_pid(), 4096)
+
+        # Container mode resolves child JVM PID via `docker exec <container> jcmd -l` (e.g. itzg/minecraft-server)
+        container_cmds = []
+
+        def container_runner(cmd, timeout_s):
+            container_cmds.append(cmd)
+            if cmd[-2:] == ["jcmd", "-l"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="110 jdk.jcmd/sun.tools.jcmd.JCmd -l\n47 paper.jar nogui\n", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+
+        c_obs = bfs.JcmdObserver(container="mc-fabric-1", container_user="1000", runner=container_runner)
+        c_obs.class_histogram()
+        self.assertEqual(
+            container_cmds,
+            [
+                ["docker", "exec", "-u", "1000", "mc-fabric-1", "jcmd", "-l"],
+                ["docker", "exec", "-u", "1000", "mc-fabric-1", "jcmd", "47", "GC.class_histogram"],
+            ],
+        )
+
+        # Container mode falls back to PID 1 when `jcmd -l` lists no candidate rows
+        fallback_cmds = []
+        c_fallback = bfs.JcmdObserver(
+            container="mc-minimal",
+            runner=lambda cmd, t: (
+                fallback_cmds.append(cmd) or subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr="")
+            ),
+        )
+        c_fallback.class_histogram()
+        self.assertEqual(
+            fallback_cmds,
+            [
+                ["docker", "exec", "mc-minimal", "jcmd", "-l"],
+                ["docker", "exec", "mc-minimal", "jcmd", "1", "GC.class_histogram"],
+            ],
+        )
+
+        # Invalid container name starting with `-` is rejected immediately
+        with self.assertRaisesRegex(bfs.JcmdError, "invalid container name"):
+            bfs.JcmdObserver(container="--privileged")
+
+    def test_jcmd_observer_actionable_errors_and_read_only_enforcement(self):
+        # 1. Missing binary raises JcmdError with hint
+        def missing_bin_runner(cmd, timeout_s):
+            raise FileNotFoundError("jcmd")
+
+        obs_missing = bfs.JcmdObserver(pid=1234, check_local_pid=False, runner=missing_bin_runner)
+        with self.assertRaisesRegex(bfs.JcmdError, "not found.*Hint"):
+            obs_missing.class_histogram()
+        # Even when jcmd fails, the exclusion window is recorded
+        self.assertEqual(len(obs_missing.exclusion_windows), 1)
+
+        # 2. Empty or unparseable histogram raises JcmdError (never returns `{}`)
+        obs_empty = bfs.JcmdObserver(
+            pid=1234,
+            check_local_pid=False,
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout="1234:\nCommand executed successfully\n", stderr=""),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "no readable class rows"):
+            obs_empty.class_histogram()
+
+        # 3. Permission / wrong user attach failure raises JcmdError with user hint
+        obs_perm = bfs.JcmdObserver(
+            pid=1234,
+            check_local_pid=False,
+            runner=lambda cmd, t: subprocess.CompletedProcess(
+                cmd, 1, stdout="", stderr="com.sun.tools.attach.AttachNotSupportedException: Unable to open socket file"
+            ),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "Unable to open socket file.*Hint"):
+            obs_perm.thread_print()
+
+        # 4. Ambiguous `jcmd -l` raises JcmdError listing visible JVMs
+        ambig_out = "2001 /srv/a/paper.jar\n2002 /srv/b/paper.jar\n"
+        obs_ambig = bfs.JcmdObserver(
+            jar_pattern="paper.jar",
+            check_local_pid=False,
+            runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=ambig_out, stderr=""),
+        )
+        with self.assertRaisesRegex(bfs.JcmdError, "matched multiple JVMs.*--pid-file"):
+            obs_ambig.resolve_pid()
+
+        # 5. Disallowed jcmd operation is rejected
+        with self.assertRaisesRegex(bfs.JcmdError, "disallowed jcmd operation"):
+            obs_empty._build_command("VM.system_properties")
+
+        # 6. Local PID ownership check surfaces PermissionError and ProcessLookupError with hints
+        with unittest.mock.patch("os.kill", side_effect=PermissionError("Operation not permitted")):
+            obs_wrong_user = bfs.JcmdObserver(pid=9999, check_local_pid=True)
+            with self.assertRaisesRegex(bfs.JcmdError, "permission denied signalling JVM PID 9999.*same OS user"):
+                obs_wrong_user.resolve_pid()
+
+        with unittest.mock.patch("os.kill", side_effect=ProcessLookupError("No such process")):
+            obs_dead = bfs.JcmdObserver(pid=9998, check_local_pid=True)
+            with self.assertRaisesRegex(bfs.JcmdError, "JVM process PID 9998.*is not running"):
+                obs_dead.resolve_pid()
+
+    def test_stall_oracle_excludes_observer_windows_and_detects_acute_and_sustained_stalls(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plugins_dir = os.path.join(tmpdir, "plugins")
+            os.makedirs(plugins_dir)
+            jar_path = os.path.join(plugins_dir, "AlphaPlugin.jar")
+            with zipfile.ZipFile(jar_path, "w") as zf:
+                zf.writestr("plugin.yml", "name: AlphaPlugin\nmain: com.example.alpha.AlphaMain\n")
+                zf.writestr("com/example/alpha/ScanTask.class", b"\xca\xfe\xba\xbe")
+
+            jar_index = bfs.JarIndex(plugins_dir)
+            profile = bfs.get_platform_profile("paper")
+
+            # Baseline tick gaps: steady ~1000ms per 20 ticks
+            baseline_gaps = [
+                {"ms": 995.0, "end_ms": 1000 * i} if i % 2 == 0 else {"ms": 1005.0, "end_ms": 1000 * i}
+                for i in range(1, 25)
+            ]
+
+            clock_vals = [10000, 10500]
+            obs = bfs.JcmdObserver(
+                pid=1234,
+                check_local_pid=False,
+                post_grace_ms=200,
+                clock_ms=lambda: clock_vals.pop(0) if clock_vals else 20000,
+                runner=lambda cmd, t: subprocess.CompletedProcess(cmd, 0, stdout=self.SAMPLE_HISTO, stderr=""),
+            )
+            # Trigger a GC.class_histogram that records exclusion window [10000, 10700]
+            obs.class_histogram()
+
+            oracle = bfs.StallOracle(
+                baseline_gaps=baseline_gaps,
+                stall_ms=2000.0,
+                profile=profile,
+                jar_index=jar_index,
+                observer=obs,
+            )
+
+            # Case 1: Real bench-swarm.js `tick_gap` event shape (`at` epoch ms) overlapping [10000, 10700]
+            # and an untimed gap (when exclusion windows exist) both fail closed into `excluded` -> no stall
+            gc_overlapping_gaps = [
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1000.0, "at": 9000, "keepalive_ms": 980, "t": 500},
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 3500.0, "at": 11000, "keepalive_ms": 1000, "t": 2500},  # [7500, 11000] overlaps [10000, 10700]
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 4000.0},  # untimed gap rejected when exclusion windows exist
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1002.0, "at": 14002, "keepalive_ms": 990, "t": 5502},
+            ]
+            res_gc = oracle.evaluate_episode(gc_overlapping_gaps, follow_up="quit_lt1s")
+            self.assertFalse(res_gc["stalled"])
+            self.assertEqual(res_gc["summary"]["excluded_count"], 2)
+            self.assertEqual(res_gc["summary"]["unverifiable_count"], 1)
+            self.assertEqual(res_gc["summary"]["count"], 2)
+
+            # Case 2: Acute single-gap stall (3300ms > ~1005 + 2000ms) outside observer windows, attributed via Thread.print
+            acute_gaps = [
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1000.0, "at": 20000, "t": 1000},
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 3300.0, "at": 23300, "t": 4300},
+                {"ev": "tick_gap", "bot": "fz_0", "ms": 1000.0, "at": 24300, "t": 5300},
+            ]
+            res_acute = oracle.evaluate_episode(
+                acute_gaps,
+                follow_up="quit_lt1s",
+                thread_dumps=[self.SAMPLE_THREAD_DUMP],
+            )
+            self.assertTrue(res_acute["stalled"])
+            self.assertTrue(res_acute["acute"])
+            self.assertFalse(res_acute["sustained"])
+            self.assertEqual(res_acute["kind"], "acute")
+            self.assertEqual(res_acute["culprit_frame"], "com.example.alpha.ScanTask.runBusyScan")
+            self.assertEqual(res_acute["first_suspect"], "AlphaPlugin.jar")
+            self.assertEqual(res_acute["attribution_status"], "unconfirmed")
+
+            # Verify "Server thread" takes priority over an earlier "main" thread, and Kotlin mangled frame names parse cleanly
+            main_before_server_dump = (
+                '"main" #1 prio=5 runnable\n'
+                "\tat java.base/java.lang.Object.wait(Native Method)\n"
+                "\n"
+                '"Server thread" #30 prio=5 runnable\n'
+                "\tat knot//com.example.alpha.ScanTask.runBusyScan-7a8b9c$lambda$2(ScanTask.kt:88)\n"
+            )
+            parsed_kt = bfs.parse_main_thread_frame(main_before_server_dump, profile=profile, jar_index=jar_index)
+            self.assertEqual(parsed_kt["thread_name"], "Server thread")
+            self.assertEqual(parsed_kt["culprit_frame"], "com.example.alpha.ScanTask.runBusyScan-7a8b9c$lambda$2")
+            self.assertEqual(parsed_kt["first_suspect"], "AlphaPlugin.jar")
+
+            # Case 3: Sustained tick inflation during `repeat` (e.g. 1150ms per 20 ticks over 8 intervals:
+            # never crosses 3005ms acute threshold, but inflates mean by ~150ms and p95 by ~155ms)
+            sustained_gaps = [{"ms": 1150.0, "end_ms": 30000 + i * 1150} for i in range(1, 9)]
+            res_sustained = oracle.evaluate_episode(
+                sustained_gaps,
+                follow_up="repeat",
+                thread_dumps=[self.SAMPLE_THREAD_DUMP],
+            )
+            self.assertTrue(res_sustained["stalled"])
+            self.assertFalse(res_sustained["acute"])
+            self.assertTrue(res_sustained["sustained"])
+            self.assertEqual(res_sustained["kind"], "sustained")
+            self.assertEqual(res_sustained["first_suspect"], "AlphaPlugin.jar")
+
+            # Case 4: Stall with only JDK/Minecraft server frames stays attributed to `server`
+            vanilla_only_dump = (
+                '"Server thread" #30 prio=5 runnable\n'
+                "\tat java.base/java.util.HashMap.getNode(HashMap.java:560)\n"
+                "\tat net.minecraft.server.level.ServerChunkCache.tick(ServerChunkCache.java:400)\n"
+                "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:910)\n"
+            )
+            res_server = oracle.evaluate_episode(
+                acute_gaps,
+                follow_up="quit_lt1s",
+                thread_dumps=[vanilla_only_dump],
+            )
+            self.assertTrue(res_server["stalled"])
+            self.assertIsNone(res_server["culprit_frame"])
+            self.assertEqual(res_server["first_suspect"], "server")
+
+
+class JarIndexAndLeakScreenTest(unittest.TestCase):
+    """ADR-125 section 2.4 & 2.6: JarIndex class/dependency scanning and Bonferroni leak screen."""
+
+    def test_jar_index_class_ownership_and_dependency_closure_across_paper_fabric_neoforge(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 1. Paper plugins directory: CoreLib -> MidPlugin -> LeafPlugin, plus SharedLib in two jars
+            plugins_dir = os.path.join(tmpdir, "plugins")
+            os.makedirs(plugins_dir)
+
+            with zipfile.ZipFile(os.path.join(plugins_dir, "CoreLib-1.0.jar"), "w") as zf:
+                zf.writestr("plugin.yml", "name: CoreLib\nprovides: [CoreAPI]\n")
+                zf.writestr("com/example/core/CoreService.class", b"\xca\xfe")
+                zf.writestr("META-INF/versions/21/com/example/core/MultiReleaseHelper.class", b"\xca\xfe")
+                zf.writestr("META-INF/versions/21/module-info.class", b"\xca\xfe")
+                zf.writestr("com/example/shared/ShadedUtil.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(plugins_dir, "MidPlugin-2.0.jar"), "w") as zf:
+                zf.writestr(
+                    "paper-plugin.yml",
+                    "name: MidPlugin\n"
+                    "dependencies:\n"
+                    "  server:\n"
+                    "    CoreAPI:\n"
+                    "      required: true\n"
+                    "    OptionalHook:\n"
+                    "      required: false\n",
+                )
+                zf.writestr("com/example/mid/MidManager.class", b"\xca\xfe")
+                zf.writestr("com/example/shared/ShadedUtil.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(plugins_dir, "LeafPlugin-3.0.jar"), "w") as zf:
+                # Same-indent YAML list items (`depend:\n- MidPlugin`) are very common in Bukkit plugin.yml
+                zf.writestr(
+                    "plugin.yml",
+                    "name: LeafPlugin\n"
+                    "depend:\n"
+                    "- MidPlugin\n"
+                    "softdepend:\n"
+                    "- SomeSoftPlugin\n",
+                )
+                zf.writestr("com/example/leaf/LeafSession.class", b"\xca\xfe")
+
+            p_idx = bfs.JarIndex(plugins_dir)
+            self.assertEqual(p_idx.owner_of_class("com.example.core.CoreService"), "CoreLib-1.0.jar")
+            self.assertEqual(p_idx.owner_of_class("[Lcom.example.core.CoreService;"), "CoreLib-1.0.jar")
+            self.assertEqual(p_idx.owner_of_class("com.example.core.MultiReleaseHelper"), "CoreLib-1.0.jar")
+            # Inner / lambda class resolves via outer host class
+            self.assertEqual(
+                p_idx.owner_of_class("com.example.leaf.LeafSession$PendingTask$$Lambda$42/0x000001"),
+                "LeafPlugin-3.0.jar",
+            )
+            # Class shipped by multiple jars is marked `ambiguous` (never arbitrarily blamed on one jar)
+            self.assertEqual(p_idx.owner_of_class("com.example.shared.ShadedUtil"), "ambiguous")
+            self.assertEqual(
+                p_idx.jars_for_class("com.example.shared.ShadedUtil"),
+                ["CoreLib-1.0.jar", "MidPlugin-2.0.jar"],
+            )
+            # Unknown / JDK / vanilla server class defaults to `server`
+            self.assertEqual(p_idx.owner_of_class("net.minecraft.advancements.AdvancementProgress"), "server")
+            # Transitive hard dependency closure: LeafPlugin -> MidPlugin -> CoreLib (via `provides: [CoreAPI]`)
+            self.assertEqual(
+                p_idx.close_deps(["LeafPlugin-3.0.jar"]),
+                ["CoreLib-1.0.jar", "LeafPlugin-3.0.jar", "MidPlugin-2.0.jar"],
+            )
+
+            # 2. Fabric mods directory (including nested `META-INF/jars/*.jar` Jar-in-Jar)
+            fabric_dir = os.path.join(tmpdir, "fabric_mods")
+            os.makedirs(fabric_dir)
+            nested_fabric_buf = io.BytesIO()
+            with zipfile.ZipFile(nested_fabric_buf, "w") as nzf:
+                nzf.writestr(
+                    "fabric.mod.json",
+                    json.dumps(
+                        {
+                            "schemaVersion": 1,
+                            "id": "bundled-sublib",
+                            "provides": ["bundled-subapi"],
+                        }
+                    ),
+                )
+                nzf.writestr("net/example/bundled/BundledHelper.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(fabric_dir, "base-lib.jar"), "w") as zf:
+                zf.writestr(
+                    "fabric.mod.json",
+                    json.dumps(
+                        {
+                            "schemaVersion": 1,
+                            "id": "baselib",
+                            "provides": ["baselib-api"],
+                            "depends": {"fabricloader": ">=0.15.0", "minecraft": "~1.21"},
+                            "jars": [{"file": "META-INF/jars/bundled-sublib-1.0.jar"}],
+                        }
+                    ),
+                )
+                zf.writestr("net/example/baselib/BaseMod.class", b"\xca\xfe")
+                zf.writestr("META-INF/jars/bundled-sublib-1.0.jar", nested_fabric_buf.getvalue())
+
+            with zipfile.ZipFile(os.path.join(fabric_dir, "addon-mod.jar"), "w") as zf:
+                zf.writestr(
+                    "fabric.mod.json",
+                    json.dumps(
+                        {
+                            "schemaVersion": 1,
+                            "id": "addonmod",
+                            "depends": {"fabricloader": ">=0.15.0", "bundled-subapi": "*"},
+                            "recommends": {"optionalmod": "*"},
+                        }
+                    ),
+                )
+                zf.writestr("net/example/addon/AddonMod.class", b"\xca\xfe")
+
+            f_idx = bfs.JarIndex(fabric_dir)
+            self.assertEqual(f_idx.owner_of_class("net.example.addon.AddonMod"), "addon-mod.jar")
+            # Nested jar class is credited to the outer `base-lib.jar`
+            self.assertEqual(f_idx.owner_of_class("net.example.bundled.BundledHelper"), "base-lib.jar")
+            # Dependency on `bundled-subapi` (provided by nested jar inside `base-lib.jar`) resolves to `base-lib.jar`
+            self.assertEqual(f_idx.close_deps(["addon-mod.jar"]), ["addon-mod.jar", "base-lib.jar"])
+
+            # 3. NeoForge mods directory (`META-INF/neoforge.mods.toml` + `META-INF/jarjar/*.jar`)
+            neo_dir = os.path.join(tmpdir, "neo_mods")
+            os.makedirs(neo_dir)
+            nested_neo_buf = io.BytesIO()
+            with zipfile.ZipFile(nested_neo_buf, "w") as nzf:
+                nzf.writestr(
+                    "META-INF/neoforge.mods.toml",
+                    'modLoader="javafml"\n'
+                    "[[mods]]\n"
+                    'modId="neoshaded"\n',
+                )
+                nzf.writestr("net/example/neoshaded/ShadedCodec.class", b"\xca\xfe")
+
+            with zipfile.ZipFile(os.path.join(neo_dir, "neocore.jar"), "w") as zf:
+                zf.writestr(
+                    "META-INF/neoforge.mods.toml",
+                    'modLoader="javafml"\n'
+                    "[[mods]]\n"
+                    'modId="neocore"\n',
+                )
+                zf.writestr("META-INF/jarjar/neoshaded-1.0.jar", nested_neo_buf.getvalue())
+            with zipfile.ZipFile(os.path.join(neo_dir, "neoaddon.jar"), "w") as zf:
+                zf.writestr(
+                    "META-INF/neoforge.mods.toml",
+                    'modLoader="javafml"\n'
+                    "[[mods]]\n"
+                    'modId="neoaddon"\n'
+                    "[[dependencies.neoaddon]]\n"
+                    'modId="neoforge"\n'
+                    'type="required"\n'
+                    "[[dependencies.neoaddon]]\n"
+                    'modId="neoshaded"\n'
+                    'type="required"\n'
+                    "[[dependencies.neoaddon]]\n"
+                    'modId="optmod"\n'
+                    'type="optional"\n',
+                )
+            n_idx = bfs.JarIndex(neo_dir)
+            self.assertEqual(n_idx.owner_of_class("net.example.neoshaded.ShadedCodec"), "neocore.jar")
+            self.assertEqual(n_idx.close_deps(["neoaddon.jar"]), ["neoaddon.jar", "neocore.jar"])
+
+    def test_bonferroni_server_leak_screen_and_passive_histogram_summary(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plugins_dir = os.path.join(tmpdir, "plugins")
+            os.makedirs(plugins_dir)
+            with zipfile.ZipFile(os.path.join(plugins_dir, "QueuePlugin.jar"), "w") as zf:
+                zf.writestr("plugin.yml", "name: QueuePlugin\n")
+                zf.writestr("com/example/queue/RetainedSession.class", b"\xca\xfe")
+                zf.writestr("com/example/queue/AmbientDriftCache.class", b"\xca\xfe")
+
+            jar_index = bfs.JarIndex(plugins_dir)
+
+            # Vanilla baseline records: `net.minecraft.world.ChunkHolder` grows by ~50 per episode in vanilla,
+            # so exploration growth of ~50 must be subtracted and NOT flagged.
+            baseline_records = []
+            for ep in range(8):
+                baseline_records.append(
+                    {
+                        "ep": ep,
+                        "node": "help",
+                        "follow_up": "repeat",
+                        "departures": 1,
+                        "deltas": {
+                            "cls:net.minecraft.world.ChunkHolder": 50.0 + (1.0 if ep % 2 == 0 else -1.0),
+                            "cls:java.util.HashMap$Node": 2.0 if ep % 2 == 0 else -2.0,
+                        },
+                    }
+                )
+
+            # Exploration records across 12 episodes:
+            # - 6 episodes run `queue` with `quit_lt1s` -> leaks +200 `com.example.queue.RetainedSession` each
+            # - 6 episodes run `help` with `repeat` -> 0 `RetainedSession` growth
+            # - `com.example.queue.AmbientDriftCache` (plugin class absent from baseline) grows by ~20 in EVERY episode
+            # - `net.minecraft.world.ChunkHolder` grows by ~50 in all episodes (same as baseline)
+            # - 15 noisy background classes fluctuate around 0
+            records = []
+            for ep in range(12):
+                is_leak_arm = ep % 2 == 0
+                deltas = {
+                    "cls:net.minecraft.world.ChunkHolder": 50.0 + (1.0 if ep % 3 == 0 else -1.0),
+                    "cls:com.example.queue.AmbientDriftCache": 20.0 + (0.5 if ep % 4 in (0, 1) else -0.5),
+                    "cls:com.example.queue.RetainedSession": 200.0 if is_leak_arm else 0.0,
+                }
+                for n_idx in range(15):
+                    deltas[f"cls:com.example.noise.NoiseClass{n_idx}"] = 1.0 if (ep + n_idx) % 2 == 0 else -1.0
+                records.append(
+                    {
+                        "ep": ep,
+                        "node": "queue" if is_leak_arm else "help",
+                        "follow_up": "quit_lt1s" if is_leak_arm else "repeat",
+                        "departures": 1 if is_leak_arm else 0,
+                        "deltas": deltas,
+                    }
+                )
+
+            screen = bfs.screen_server_leaks(
+                records=records,
+                baseline_records=baseline_records,
+                jar_index=jar_index,
+                profile=bfs.get_platform_profile("paper"),
+            )
+            self.assertEqual(screen["usable_episodes"], 12)
+            self.assertGreater(screen["total_tests"], 30)
+            self.assertGreater(screen["bonferroni_z"], 3.0)
+
+            flagged = screen["correlations"]
+            self.assertTrue(flagged, "expected RetainedSession correlation above Bonferroni threshold")
+            top = flagged[0]
+            self.assertEqual(top["cls"], "com.example.queue.RetainedSession")
+            self.assertEqual(top["feature"], "arm:queue:quit_lt1s")
+            self.assertAlmostEqual(top["slope"], 200.0, places=2)
+            self.assertEqual(top["first_suspect"], "QueuePlugin.jar")
+            # Passive correlation never claims confirmed exploit attribution
+            self.assertEqual(top["attribution_status"], "unconfirmed_passive_correlation")
+
+            # Negative assertions:
+            # 1. Vanilla baseline class `ChunkHolder` is subtracted and never flagged
+            # 2. Plugin ambient-drift class `AmbientDriftCache` (growing in every episode) is absorbed by intercept and not flagged
+            # 3. Noise classes are never flagged
+            # 4. `RetainedSession` is NEVER flagged on `node:help` or `arm:help:repeat`
+            flagged_classes = {c["cls"] for c in flagged}
+            self.assertEqual(flagged_classes, {"com.example.queue.RetainedSession"})
+            flagged_features = {c["feature"] for c in flagged}
+            self.assertNotIn("node:help", flagged_features)
+            self.assertNotIn("arm:help:repeat", flagged_features)
+
+            # 200-episode ambient-drift probe over 5 nodes: a plugin class growing ~20 in every episode
+            # must have all 10 node/arm features absorbed by the intercept (0 features flagged).
+            ambient_records = []
+            for ep in range(200):
+                node_idx = ep % 5
+                ambient_records.append(
+                    {
+                        "ep": ep,
+                        "node": f"cmd{node_idx}",
+                        "follow_up": "repeat",
+                        "departures": 0,
+                        "deltas": {
+                            "cls:com.example.queue.AmbientDriftCache": 20.0 + (0.5 if ep % 2 == 0 else -0.5),
+                        },
+                    }
+                )
+            ambient_screen = bfs.screen_server_leaks(
+                records=ambient_records,
+                baseline_records=[],
+                jar_index=jar_index,
+                profile=bfs.get_platform_profile("paper"),
+            )
+            self.assertEqual(ambient_screen["correlations"], [])
+
+            # Correlated multi-arm episode probe: when `queue` and `help` run together in 6 episodes (+200),
+            # `help` runs alone in 6 episodes (0), and `list` runs alone in 6 episodes (0),
+            # joint ridge fitting blames `queue` and does NOT flag `help` or `list`.
+            corr_records = []
+            for ep in range(18):
+                if ep < 6:
+                    arms = [{"node": "queue", "follow_up": "quit_lt1s"}, {"node": "help", "follow_up": "repeat"}]
+                    leak_val = 200.0
+                elif ep < 12:
+                    arms = [{"node": "help", "follow_up": "repeat"}]
+                    leak_val = 0.0
+                else:
+                    arms = [{"node": "list", "follow_up": "repeat"}]
+                    leak_val = 0.0
+                corr_records.append(
+                    {
+                        "ep": ep,
+                        "arms": arms,
+                        "departures": 1 if ep < 6 else 0,
+                        "deltas": {"cls:com.example.queue.RetainedSession": leak_val},
+                    }
+                )
+            corr_screen = bfs.screen_server_leaks(
+                records=corr_records,
+                baseline_records=[],
+                jar_index=jar_index,
+                profile=bfs.get_platform_profile("paper"),
+            )
+            corr_feats = {c["feature"] for c in corr_screen["correlations"]}
+            self.assertIn("arm:queue:quit_lt1s", corr_feats)
+            self.assertIn("node:queue", corr_feats)
+            self.assertNotIn("arm:help:repeat", corr_feats)
+            self.assertNotIn("node:help", corr_feats)
+            self.assertNotIn("arm:list:repeat", corr_feats)
+            self.assertNotIn("node:list", corr_feats)
+
+            # Passive snapshot summary test
+            snapshots = [
+                {
+                    "epoch_ms": 0,
+                    "histogram": {
+                        "com.example.queue.RetainedSession": (10, 800),
+                        "jdk.internal.vm.FillerObject": (100, 8000),
+                    },
+                },
+                {
+                    "epoch_ms": 1800_000,  # 0.5 hours later
+                    "histogram": {
+                        "com.example.queue.RetainedSession": (210, 16800),
+                        "jdk.internal.vm.FillerObject": (500, 40000),
+                    },
+                },
+            ]
+            snap_summary = bfs.summarize_histogram_snapshots(snapshots, jar_index=jar_index)
+            self.assertEqual(snap_summary["snapshot_count"], 2)
+            self.assertEqual(len(snap_summary["top_growing_classes"]), 1)
+            row = snap_summary["top_growing_classes"][0]
+            self.assertEqual(row["cls"], "com.example.queue.RetainedSession")
+            self.assertEqual(row["delta_instances"], 200)
+            self.assertEqual(row["instances_per_hour"], 400.0)
+            self.assertEqual(row["first_suspect"], "QueuePlugin.jar")
+            self.assertEqual(row["attribution_status"], "unconfirmed_passive_correlation")
 
 
 if __name__ == "__main__":

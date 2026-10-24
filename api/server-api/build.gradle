@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: MIT
+// server-api -- reusable, platform-neutral server identity, logging, and scheduling SPI (ADR-116).
 plugins {
     id 'java-library'
 }
 
 java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
     withJavadocJar()
     withSourcesJar()
 }

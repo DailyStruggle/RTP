@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.bit.config;
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitTier;
-import io.github.dailystruggle.bit.Vocabulary;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
@@ -14,7 +13,6 @@ import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -53,6 +51,15 @@ public final class MessagesConfigCheck implements ConfigOwnerCheck {
             "RTP_MESSAGES_KEY_UNKNOWN", Level.WARNING, BitTier.PBIT, SUBSYSTEM, "",
             "Rename the key to a known message key or remove it; unknown keys are never read.");
 
+    public static final MessageParityCodes CODES = new MessageParityCodes(
+            BASELINE_UNMAPPED,
+            LOCALE_VALUES_MISSING,
+            LOCALE_KEY_MISSING,
+            LOCALE_STALE_ROW,
+            LOCALE_UNRESOLVED_ROW,
+            KEY_MISSING,
+            KEY_UNKNOWN);
+
     public static final MessagesConfigCheck INSTANCE = new MessagesConfigCheck();
 
     private MessagesConfigCheck() {}
@@ -77,11 +84,7 @@ public final class MessagesConfigCheck implements ConfigOwnerCheck {
 
     /** Bundled-locale parity findings for the split messages tree of {@code reader}. */
     public static List<BitFinding> bundledFindings(MessageKeyParity.ResourceReader reader) {
-        List<BitFinding> findings = new ArrayList<>();
-        for (MessageKeyParity.Gap gap : MessageKeyParity.gaps(reader, MessageKeyParity.messageCategories())) {
-            findings.add(finding(gap));
-        }
-        return findings;
+        return CODES.bundledFindings(reader);
     }
 
     /** Operator file findings: canonical keys missing from, or unknown to, each on-disk message file. */
@@ -91,20 +94,7 @@ public final class MessagesConfigCheck implements ConfigOwnerCheck {
             String path = MessageKeyParity.MESSAGES_DIR + "/" + file + ".yml";
             ConfigSnapshot.Document document = snapshot.document(path).orElse(null);
             if (document == null) continue;
-            Set<String> expected = expectedKeys(file, bundled);
-            Map<String, Object> values = document.values();
-            for (String key : expected) {
-                if (values.containsKey(key)) continue;
-                findings.add(BitFinding.of(KEY_MISSING, path, document.localizedKey(key),
-                        "Message key is missing; the English default is used", key, KEY_MISSING.remediation()));
-            }
-            Vocabulary vocabulary = new Vocabulary(file + " message keys", expected);
-            for (String key : values.keySet()) {
-                if (expected.contains(key)) continue;
-                String suggestion = vocabulary.suggest(key).map(s -> "did you mean " + s + "?").orElse(KEY_UNKNOWN.remediation());
-                findings.add(BitFinding.of(KEY_UNKNOWN, path, document.localizedKey(key),
-                        "Unknown message key: " + key, "a key of " + file + ".yml", suggestion));
-            }
+            findings.addAll(CODES.operatorFindings(document, file, expectedKeys(file, bundled)));
         }
         return findings;
     }
@@ -127,27 +117,6 @@ public final class MessagesConfigCheck implements ConfigOwnerCheck {
             case "player" -> PlayerMessages.values();
             case "system" -> SystemMessages.values();
             default -> new Enum<?>[0];
-        };
-    }
-
-    private static BitFinding finding(MessageKeyParity.Gap gap) {
-        String where = gap.locale().isEmpty() ? "baseline " + gap.category() : gap.locale() + "/" + gap.category();
-        return switch (gap.kind()) {
-            case BASELINE_UNMAPPED -> BitFinding.of(BASELINE_UNMAPPED, gap.path(), gap.key(),
-                    where + ".yml key has no rename-map row", gap.key() + ": <localized name>",
-                    BASELINE_UNMAPPED.remediation());
-            case LOCALE_VALUES_MISSING -> BitFinding.of(LOCALE_VALUES_MISSING, gap.path(), "",
-                    where + " ships a rename map but no value file; runtime falls back to English",
-                    gap.path(), LOCALE_VALUES_MISSING.remediation());
-            case LOCALE_KEY_MISSING -> BitFinding.of(LOCALE_KEY_MISSING, gap.path(), gap.expected(),
-                    where + " is missing baseline key " + gap.key() + "; runtime falls back to English",
-                    gap.expected(), LOCALE_KEY_MISSING.remediation());
-            case LOCALE_STALE_ROW -> BitFinding.of(LOCALE_STALE_ROW, gap.path(), gap.key(),
-                    where + " rename map has a row for a key the baseline does not ship", "a baseline key",
-                    LOCALE_STALE_ROW.remediation());
-            case LOCALE_UNRESOLVED_ROW -> BitFinding.of(LOCALE_UNRESOLVED_ROW, gap.path(), gap.key(),
-                    where + " maps " + gap.key() + " -> " + gap.expected() + " but the value file has no such key",
-                    gap.expected(), LOCALE_UNRESOLVED_ROW.remediation());
         };
     }
 }

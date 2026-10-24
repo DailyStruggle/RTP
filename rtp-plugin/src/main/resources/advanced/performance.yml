@@ -2,6 +2,12 @@
 # Documentation: docs/admin/configuration/PERFORMANCE.md
 
 # --- Server health ---
+# Adapts background compute, promotion rate, hot-cache size, and generation concurrency to server headroom and demand.
+# Configured values below act as ceilings while active. Set false to run at fixed configured values.
+# @type: boolean
+# @default: true
+autoTune: true
+
 # Pause background cache filling when TPS drops below this. On Folia the
 # slowest region counts. Waiting players are still served. 0 = off.
 # @type: number

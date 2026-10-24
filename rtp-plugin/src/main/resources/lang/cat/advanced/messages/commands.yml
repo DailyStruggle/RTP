@@ -80,6 +80,12 @@ infoTopRejectionCause: "&7Top hiss reason: #7E9CC8[genTopRejectionCause]&7 (#7E9
 # Placeholder: [genFailureBreakdown] - comma-separated cause=N list, busiest first.
 infoFailureBreakdown: "&7Hisses by reason: #7E9CC8[genFailureBreakdown]"
 
+# Adaptive nap-governor budgets and reason.
+infoGovernorAsync: "&7Back-alley zoomies (async): #7E9CC8[govAsyncConfiguredMs]&7 ms (purring at #7E9CC8[govAsyncEffectiveMs]&7, #7E9CC8[govAsyncReason]&7)"
+infoGovernorSync: "&7Main-den pounce (sync): #7E9CC8[govSyncConfiguredMs]&7 ms (purring at #7E9CC8[govSyncEffectiveMs]&7, #7E9CC8[govSyncReason]&7)"
+infoGovernorHotCap: "&7Warm cushion cap: #7E9CC8[govHotCapConfigured]&7 (purring at #7E9CC8[govHotCapEffective]&7, #7E9CC8[govHotCapReason]&7)"
+infoGovernorGeneration: "&7Kibble digging: #7E9CC8[govGenConfigured]&7 (purring at #7E9CC8[govGenEffective]&7, #7E9CC8[govGenReason]&7; den in-paw #7E9CC8[govRegionalInflight]&7/#7E9CC8[govRegionalInflightCap]&7)"
+
 # Health colour-band thresholds. Used to colour the coloured-variant
 # placeholders (e.g. [tps1mColoured]) green/yellow/red.
 infoThresholdTpsGreen: 19.5

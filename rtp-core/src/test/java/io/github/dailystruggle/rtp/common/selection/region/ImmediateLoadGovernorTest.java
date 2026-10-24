@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
+import io.github.dailystruggle.rtp.common.governor.ComputeSignals;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +21,7 @@ class ImmediateLoadGovernorTest {
     @AfterEach
     void cleanup() {
         ImmediateLoadGovernor.resetAll();
+        ComputeGovernor.active().reset();
     }
 
     @Test
@@ -110,15 +113,24 @@ class ImmediateLoadGovernorTest {
     }
 
     @Test
-    @DisplayName("tick distress damps global permit ceiling to 1 server-wide")
+    @DisplayName("tick distress damps global permit ceiling to 1 server-wide via ComputeBudget#generationCap")
     void tickDistressDampsGlobalPermitToOne() {
+        ComputeSignals signals = ComputeSignals.builder()
+                .autoTune(true)
+                .configuredGenerationCap(2)
+                .maxMspt(45.0)
+                .mspt(ComputeSignals.SampledSignal.fresh(40.0, 1_000_000_000L))
+                .build();
+        ComputeGovernor.active().evaluate(signals, 1_000_000_000L);
+        assertEquals(1, ComputeGovernor.currentBudget().generationCap());
+
         ImmediateLoadGovernor gA = ImmediateLoadGovernor.of("regA");
         ImmediateLoadGovernor.GenerationPermit pA = gA.tryAcquirePermit(40.0);
         assertNotNull(pA);
 
         ImmediateLoadGovernor gB = ImmediateLoadGovernor.of("regB");
         ImmediateLoadGovernor.GenerationPermit pB = gB.tryAcquirePermit(40.0);
-        assertNull(pB, "under tick distress (MSPT > 35), global permit ceiling is damped to 1");
+        assertNull(pB, "under tick distress (ComputeBudget#generationCap = 1), global permit ceiling is damped to 1");
 
         pA.close();
     }

@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -31,6 +33,12 @@ public final class AsyncTaskProcessing extends RTPRunnable {
   private static final AtomicBoolean pulseActive = new AtomicBoolean();
   private static final AtomicLong pulseStartNanos = new AtomicLong();
   private static final AtomicBoolean stallReported = new AtomicBoolean();
+
+  static {
+    if (ComputeGovernor.active().signalSource() == null) {
+      ComputeGovernor.active().setSignalSource(RuntimeSignalSource.instance());
+    }
+  }
 
   private final long availableTime;
 
@@ -106,79 +114,189 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     }
 
     if (isCancelled()) return;
-    long start = System.nanoTime();
 
     // Before configs load, the constructor budget applies (clamped like the configured one).
     long currentAvailableTime = (ActiveConfigs.get() == null && availableTime > 0L)
         ? Math.min(availableTime, TimeUnit.MILLISECONDS.toNanos(TickBudget.MAX_ALLOTTED_MS))
         : TickBudget.asyncNanos();
-    long period = TickBudget.periodTicks();
 
+    if (TickBudget.autoTune() || ComputeGovernor.isObservePropertyEnabled()) {
+      if (ComputeGovernor.active().signalSource() == null) {
+        ComputeGovernor.active().setSignalSource(RuntimeSignalSource.instance());
+      }
+      ComputeGovernor.active().maybeEvaluate(System.nanoTime());
+    }
+
+    // Cancellations run first and are excluded from the pulse budget and carry-forward debt (ADR-087 I2).
     MiscTasks.cancel().execute(Long.MAX_VALUE);
     if (isCancelled()) return;
+
+    long start = System.nanoTime();
     MiscTasks.async().execute(currentAvailableTime - (System.nanoTime() - start));
     if (isCancelled()) return;
 
-    // Diagram 02 (PulseTrigger): drain SelectionAPI urgent + standard pipelines.
-    ActiveSelection.get().compute(currentAvailableTime - (System.nanoTime() - start));
+    ComputeBudget govBudget = ComputeGovernor.currentBudget();
+    boolean actuating = govBudget != null && govBudget.isActuating();
 
-    // Avoid copying the whole region collection into a fresh ArrayList on every
-    // pulse: only one region (at index `step`) is ever used, and only when
-    // betweenStep == 0. Read the size directly and fetch the nth region by
-    // iteration when needed (below) so an idle pulse allocates nothing here.
-    int size = ActiveSelection.get().permRegionLookup.size();
+    if (!actuating) {
+      long period = TickBudget.periodTicks();
+      // Diagram 02 (PulseTrigger): drain SelectionAPI urgent + standard pipelines.
+      ActiveSelection.get().compute(currentAvailableTime - (System.nanoTime() - start));
 
-    if (size == 0) {
-      RTPRuntime.log(Level.FINER, "[Pulse] no regions configured; skipping budget loop");
-      return;
-    }
-    if (period < size) period = size;
+      // Avoid copying the whole region collection into a fresh ArrayList on every
+      // pulse: only one region (at index `step`) is ever used, and only when
+      // betweenStep == 0. Read the size directly and fetch the nth region by
+      // iteration when needed (below) so an idle pulse allocates nothing here.
+      int size = ActiveSelection.get().permRegionLookup.size();
 
-    // One region turn every `interval` pulses, so each region refills once per `period` ticks.
-    long interval = Math.max(period / size, 1L);
-    long turn;
-    long regionIndex;
-    try {
-      stepSemaphore.acquire();
-      // Post-increment: the first pulse takes a turn, then one turn every `interval` pulses.
-      turn = betweenStep.get() % interval;
-      betweenStep.set((turn + 1) % interval);
+      if (size == 0) {
+        RTPRuntime.log(Level.FINER, "[Pulse] no regions configured; skipping budget loop");
+        return;
+      }
+      if (period < size) period = size;
 
-      regionIndex = step.get();
-      if (turn == 0) regionIndex = (regionIndex + 1) % size;
+      // One region turn every `interval` pulses, so each region refills once per `period` ticks.
+      long interval = Math.max(period / size, 1L);
+      long turn;
+      long regionIndex;
+      try {
+        stepSemaphore.acquire();
+        // Post-increment: the first pulse takes a turn, then one turn every `interval` pulses.
+        turn = betweenStep.get() % interval;
+        betweenStep.set((turn + 1) % interval);
 
-      step.set(regionIndex);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
-      return;
-    } finally {
-      stepSemaphore.release();
-    }
+        regionIndex = step.get();
+        if (turn == 0) regionIndex = (regionIndex + 1) % size;
 
-    // step computation according to period
-    if (turn == 0) {
-      if (isCancelled()) return;
-      if (regionIndex >= size) return;
+        step.set(regionIndex);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
+        return;
+      } finally {
+        stepSemaphore.release();
+      }
 
-      Region region = null;
-      long idx = 0;
-      for (Region r : ActiveSelection.get().permRegionLookup.values()) {
-        if (idx++ == regionIndex) {
-          region = r;
-          break;
+      // step computation according to period
+      if (turn == 0) {
+        if (isCancelled()) return;
+        if (regionIndex >= size) return;
+
+        Region region = null;
+        long idx = 0;
+        for (Region r : ActiveSelection.get().permRegionLookup.values()) {
+          if (idx++ == regionIndex) {
+            region = r;
+            break;
+          }
+        }
+        if (region == null) return;
+        try {
+          region.execute(currentAvailableTime - (System.nanoTime() - start));
+        } catch (Exception e) {
+          RTPRuntime.log(Level.SEVERE, "Error executing processing for region: " + region.name, e);
         }
       }
-      if (region == null) return;
-      // Diagram 02 (CheckPeriod -> ExecuteRegion): this region's turn has come.
-//      RTPRuntime.log(Level.FINE,
-//          "[Pulse] executing region '" + region.name + "' (step=" + step
-//              + "/" + size + ", betweenStep=" + betweenStep + ")");
+      return;
+    }
+
+    // Governed pulse (ADR-087 Section 4.3 & 7.3):
+    // 1. Drain urgent/player-facing selection, region miscPipeline, and waiting playerQueue first (Invariant I4).
+    ActiveSelection.get().computeUrgent(currentAvailableTime - (System.nanoTime() - start));
+    if (isCancelled()) return;
+
+    for (Region region : ActiveSelection.get().permRegionLookup.values()) {
+      if (isCancelled()) return;
+      if (region == null) continue;
       try {
-        region.execute(currentAvailableTime - (System.nanoTime() - start));
+        region.executePlayerFacing(currentAvailableTime - (System.nanoTime() - start));
       } catch (Exception e) {
-        RTPRuntime.log(Level.SEVERE, "Error executing processing for region: " + region.name, e);
+        RTPRuntime.log(Level.SEVERE, "Error executing player-facing work for region: " + region.name, e);
       }
+    }
+    if (isCancelled()) return;
+
+    long cpuStart = RuntimeSignalSource.currentThreadCpuTimeNanos();
+    try {
+      long remainder = currentAvailableTime - (System.nanoTime() - start);
+      long bgAvailable = ComputeGovernor.active().beginBackgroundAsyncPhase(remainder);
+      long bgDeadline = System.nanoTime() + bgAvailable;
+      AtomicBoolean ranAnyBg = new AtomicBoolean(false);
+
+      if (bgAvailable > 0L) {
+        ActiveSelection.get().computeStandard(bgAvailable, false, ranAnyBg);
+      }
+      if (isCancelled()) return;
+
+      int size = ActiveSelection.get().permRegionLookup.size();
+      if (size == 0) {
+        RTPRuntime.log(Level.FINER, "[Pulse] no regions configured; skipping budget loop");
+        return;
+      }
+
+      List<String> creditOrdered = ComputeGovernor.active()
+          .orderRegionsByCredit(ActiveSelection.get().permRegionLookup.keySet());
+      if (!creditOrdered.isEmpty()) {
+        for (String regionName : creditOrdered) {
+          if (isCancelled()) break;
+          long remBg = bgDeadline - System.nanoTime();
+          if (bgAvailable <= 0L || (ranAnyBg.get() && remBg <= 0L)) break;
+          Region region = ActiveSelection.get().permRegionLookup.get(regionName);
+          if (region == null) continue;
+          try {
+            long regionBudget = (!ranAnyBg.get() && bgAvailable > 0L) ? Math.max(1L, remBg) : Math.max(0L, remBg);
+            region.execute(regionBudget, ranAnyBg);
+          } catch (Exception e) {
+            RTPRuntime.log(Level.SEVERE, "Error executing processing for region: " + region.name, e);
+          }
+        }
+      } else {
+        long period = Math.max(TickBudget.backgroundPeriodTicks(), (long) size);
+        long interval = Math.max(period / size, 1L);
+        long turn;
+        long regionIndex;
+        try {
+          stepSemaphore.acquire();
+          turn = betweenStep.get() % interval;
+          betweenStep.set((turn + 1) % interval);
+          regionIndex = step.get();
+          if (turn == 0) regionIndex = (regionIndex + 1) % size;
+          step.set(regionIndex);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          RTPRuntime.log(Level.WARNING, e.getMessage(), e);
+          return;
+        } finally {
+          stepSemaphore.release();
+        }
+        if (turn == 0 && !isCancelled() && regionIndex < size) {
+          long remBg = bgDeadline - System.nanoTime();
+          if (bgAvailable > 0L && (!ranAnyBg.get() || remBg > 0L)) {
+            Region region = null;
+            long idx = 0;
+            for (Region r : ActiveSelection.get().permRegionLookup.values()) {
+              if (idx++ == regionIndex) {
+                region = r;
+                break;
+              }
+            }
+            if (region != null) {
+              try {
+                long regionBudget = (!ranAnyBg.get() && bgAvailable > 0L) ? Math.max(1L, remBg) : Math.max(0L, remBg);
+                region.execute(regionBudget, ranAnyBg);
+              } catch (Exception e) {
+                RTPRuntime.log(Level.SEVERE, "Error executing processing for region: " + region.name, e);
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      long cpuEnd = RuntimeSignalSource.currentThreadCpuTimeNanos();
+      if (cpuStart >= 0L && cpuEnd > cpuStart) {
+        RuntimeSignalSource.instance().recordRtpBackgroundCpuNanos(cpuEnd - cpuStart);
+      }
+      ComputeGovernor.active().endAsyncPulse(System.nanoTime() - start, currentAvailableTime);
     }
   }
 }

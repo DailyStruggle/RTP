@@ -299,6 +299,8 @@ final class QueueTask {
                             RTPRuntime.serverAccessor().getScheduler().runTask(targetLoc, () -> {
                                 try {
                                     if (!world.isChunkLoaded(cx, cz)) {
+                                        io.github.dailystruggle.rtp.common.bit.PipelineCbitCounters.recordStaleChunkGuardTripped(
+                                                world.name(), cx, cz);
                                         RTPRuntime.log(Level.FINE,
                                                 "[RTP] Stale chunk on QueueTask region-thread dispatch ("
                                                         + world.name() + " " + cx + "," + cz + "); rejecting.");

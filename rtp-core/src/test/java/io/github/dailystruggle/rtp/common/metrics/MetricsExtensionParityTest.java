@@ -100,6 +100,8 @@ class MetricsExtensionParityTest {
             RTPMetricsExtension extension = new CoreMetrics().snapshot().extension(RTPMetricsExtension.class);
 
             assertEquals(1L, extension.actionCbit.missingObjectiveReads().get("metrics_objective"));
+            assertNotNull(extension.computeGovernor);
+            assertEquals(20L, extension.computeGovernor.configuredPeriodTicks());
         } finally {
             ActionCbitCounters.reset();
         }

@@ -31,10 +31,57 @@ class SetupRecipeTest {
         assertEquals("multi-world", recipe.get(0).id());
         // Second is Arena
         assertEquals("setup-arena", recipe.get(1).id());
-        // Third is LowPerformance
-        assertEquals("low-performance", recipe.get(2).id());
-        // Fourth is Addons
-        assertEquals("setup-addons", recipe.get(3).id());
+        // Third is Radius
+        assertEquals("setup-radius", recipe.get(2).id());
+        // Fourth is LowPerformance
+        assertEquals("low-performance", recipe.get(3).id());
+        // Fifth is Addons
+        assertEquals("setup-addons", recipe.get(4).id());
+    }
+
+    @Test
+    @DisplayName("compileRecipe sets shape.radius on default and synthesized multi-world regions and emits addons/guimenu when openGuiOnRtp is false")
+    void testRadiusAndOpenGuiOnRtpRecipeCompilation() {
+        SetupSession session = new SetupSession(UUID.randomUUID());
+        session.setWorldChoice("multi");
+        session.setRadiusChoice("5km");
+        session.setGameplayChoice("survival");
+        session.setPerformanceChoice("high");
+        session.setToggle("openGuiOnRtp", false);
+
+        List<String> worlds = List.of("world", "world_nether");
+        List<Prefab> recipe = SetupRecipe.compileRecipe(session, worlds);
+
+        Prefab radiusPrefab = recipe.stream()
+                .filter(p -> "setup-radius".equals(p.id()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("5km", radiusPrefab.regionOverlays().get("default").get("shape.radius"));
+        assertEquals("5km", radiusPrefab.regionOverlays().get("world").get("shape.radius"));
+        assertEquals("5km", radiusPrefab.regionOverlays().get("world_nether").get("shape.radius"));
+
+        Prefab guiPrefab = recipe.stream()
+                .filter(p -> "addons/guimenu".equals(p.id()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(false, guiPrefab.regionOverlays().get("addons/guimenu").get("openOnBareRtp"));
+
+        Map<String, Map<String, Object>> baseline = new LinkedHashMap<>();
+        Map<String, Object> defRegion = new LinkedHashMap<>();
+        defRegion.put("world", "[0]");
+        defRegion.put("shape", "@config");
+        defRegion.put("vert", "@config");
+        baseline.put("definitions/regions/default", defRegion);
+
+        PrefabApplier.Result result = SetupRecipe.applyPipeline(baseline, recipe, worlds);
+        assertEquals("5km", result.newTrees().get("definitions/regions/default").get("shape.radius"));
+        assertEquals("5km", result.newTrees().get("definitions/regions/world_nether").get("shape.radius"));
+        assertEquals(false, result.newTrees().get("addons/guimenu").get("openOnBareRtp"));
+        assertFalse(result.newTrees().containsKey("definitions/regions/addons/guimenu"));
+
+        List<PrefabApplier.Change> guiChanges = result.perFileDiff().get("addons/guimenu");
+        assertNotNull(guiChanges);
+        assertTrue(guiChanges.stream().anyMatch(c -> "openOnBareRtp".equals(c.keyPath()) && Boolean.FALSE.equals(c.newValue())));
     }
 
     @Test

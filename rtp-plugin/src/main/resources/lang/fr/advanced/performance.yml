@@ -1,3 +1,9 @@
+# Adapte le calcul en arriere-plan, le cache chaud et la concurrence de generation selon la marge du serveur et la demande.
+# Les valeurs configurees ci-dessous servent de plafonds. Mettre a false pour des valeurs fixes.
+# @type: boolean
+# @default: true
+reglageAutomatique: true
+
 # Met en pause le remplissage du cache en arrière-plan si les TPS passent sous cette valeur.
 # Sur Folia, la région la plus lente compte. Les joueurs en attente restent servis. 0 = désactivé.
 # @type: number

@@ -30,8 +30,6 @@ public final class ConfigConstraintCheck implements ConfigOwnerCheck {
 
     @Override
     public List<BitFinding> check(ConfigSnapshot snapshot, ConfigEnvironment environment) {
-        List<BitFinding> findings = new ArrayList<>();
-        for (ConfigConstraint constraint : constraints()) findings.addAll(constraint.evaluate(snapshot));
-        return findings;
+        return GenericConstraintCheck.evaluate(snapshot, constraints());
     }
 }

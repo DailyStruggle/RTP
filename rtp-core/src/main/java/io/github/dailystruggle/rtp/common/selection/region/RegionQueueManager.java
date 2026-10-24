@@ -574,6 +574,7 @@ public class RegionQueueManager {
         if (uuid != null) {
             CompletableFuture<RTPLocation> fast = fastLocations.remove(uuid);
             if (fast != null) {
+                region.recordLocationConsumed(uuid);
                 return fast;
             }
 
@@ -592,6 +593,7 @@ public class RegionQueueManager {
                 if (ActiveDatabase.accessor() != null) {
                     ActiveDatabase.accessor().deleteCachedLocation(region.name, loc);
                 }
+                region.recordLocationConsumed(uuid);
                 return CompletableFuture.completedFuture(loc);
             }
             }
@@ -600,6 +602,7 @@ public class RegionQueueManager {
         if (!keptLocations.isEmpty()) {
             RTPLocation loc = keptLocations.poll();
             if (loc != null) {
+                region.recordLocationConsumed(uuid);
                 return CompletableFuture.completedFuture(loc);
             }
         }

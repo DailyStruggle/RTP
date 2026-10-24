@@ -70,7 +70,20 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       RTPWorld<?> rtpWorld = getRTPWorld(s);
       if (!(rtpWorld instanceof BukkitRTPWorld)) return null;
       World world = ((BukkitRTPWorld) rtpWorld).world();
-      org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
+      org.bukkit.WorldBorder worldBorder;
+      try {
+        worldBorder = world.getWorldBorder();
+      } catch (Throwable t) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, t.getClass().getSimpleName() + ": " + t.getMessage());
+        log(Level.WARNING, "[RTP] Failed to resolve native WorldBorder for world " + s + ": " + t.getMessage(), t);
+        return null;
+      }
+      if (worldBorder == null) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, "world.getWorldBorder() returned null");
+        return null;
+      }
       return new WorldBorder(
           () -> {
             Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
@@ -554,6 +567,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         try {
           values = tag.getValues();
         } catch (Throwable t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+              key.getNamespace() + ":" + key.getKey(),
+              t.getClass().getSimpleName() + ": " + t.getMessage());
           log(Level.WARNING,
               "[RTP] tag.getValues() threw for key="
                   + key.getNamespace() + ":" + key.getKey()
@@ -576,12 +592,16 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       // NoSuchMethodError / NoClassDefFoundError on forks where the Tag API
       // signature differs, and those would otherwise silently escape our handler
       // with no operator-visible log line.
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", e.getClass().getSimpleName() + ": " + e.getMessage());
       log(Level.WARNING,
           "[RTP] Failed to snapshot block tag registry: "
               + e.getClass().getName() + ": " + e.getMessage(), e);
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", "empty-tag-snapshot(iterated=" + totalTags + ",empty=" + totalEmpty + ")");
       log(Level.WARNING,
           "[RTP] Bukkit block-tag registry yielded no usable tags (iterated="
               + totalTags + ", empty=" + totalEmpty

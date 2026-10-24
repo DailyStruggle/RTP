@@ -23,6 +23,10 @@ public final class SetupConsoleFormatter {
         out.add("[RTP Setup Wizard] Current Progress: Stage " + session.currentStage().stageNumber() + "/5 - " + session.currentStage().title());
         out.add("--------------------------------------------------");
         out.add("  1. World Topology:      " + session.worldChoice() + " (cmd: /rtp admin setup world choice=<single|multi>)");
+        if ("multi".equalsIgnoreCase(session.worldChoice())) {
+            out.add("     Multi-World Note:    Route players via /rtp world=<name> or /rtp region=<name>");
+        }
+        out.add("     Region Radius:       " + session.radiusChoice() + " (cmd: /rtp admin setup radius radius=<distance>)");
         out.add("  2. Gameplay Style:      " + session.gameplayChoice() + " (cmd: /rtp admin setup gameplay choice=<survival|arena|skyblock|oneblock>)");
         out.add("  3. Performance Profile: " + session.performanceChoice() + " (cmd: /rtp admin setup perf choice=<high|low|folia>)");
 

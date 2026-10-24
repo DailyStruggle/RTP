@@ -13,6 +13,9 @@ plugins {
 
 dependencies {
     api project(':rtp-api')
+    api project(':predict-api')
+    api project(':config-bit-api')
+    api project(':menu-api')
     // anvil-api -- platform-neutral vanilla Anvil region-file decode (ADR-016).
     // rtp-core hosts the platform-neutral palette reconciler (PaletteNormalizer)
     // and the ColumnProbe -> ChunkColumnProbe adapter (AnvilColumnProbeAdapter)

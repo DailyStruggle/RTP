@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.bit.config;
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitTier;
-import io.github.dailystruggle.bit.KeyPath;
 import io.github.dailystruggle.bit.Vocabulary;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy;
@@ -78,6 +77,11 @@ public final class ConfigReferenceCheck implements ConfigOwnerCheck {
             1306, "RTP_WORLD_REFERENCES_UNVERIFIED", Level.INFO, BitTier.PBIT, SUBSYSTEM, "",
             "Run the check on a server (or pass loaded world names) to verify world references.");
 
+    public static final ReferenceSettingCheck.Codes CODES = new ReferenceSettingCheck.Codes(
+            REFERENCE_UNKNOWN_FILE, REFERENCE_SETTING_MISSING);
+    private static final ReferenceSettingCheck FILE_REFERENCE_CHECK = new ReferenceSettingCheck(
+            REFERENCE_FILES, CODES);
+
     public static final ConfigReferenceCheck INSTANCE = new ConfigReferenceCheck();
 
     private ConfigReferenceCheck() {}
@@ -117,50 +121,15 @@ public final class ConfigReferenceCheck implements ConfigOwnerCheck {
     }
 
     private static void checkFileReferences(ConfigSnapshot snapshot, ConfigEnvironment env, List<BitFinding> findings) {
-        List<ConfigSnapshot.Document> documents = new ArrayList<>(snapshot.documentsIn(REGIONS).values());
-        documents.addAll(snapshot.documentsIn(WORLDS).values());
-        for (ConfigSnapshot.Document document : documents) {
-            for (Map.Entry<String, Object> entry : document.values().entrySet()) {
-                checkToken(snapshot, env, document.path(), KeyPath.root(document.localizedKey(entry.getKey())),
-                        entry.getKey(), entry.getValue(), findings);
-            }
+        ReferenceSettingCheck.SettingResolver resolver = (file, setting) -> resolves(snapshot, env, file, setting);
+        for (ConfigSnapshot.Document document : snapshot.documentsIn(REGIONS).values()) {
+            FILE_REFERENCE_CHECK.checkDocument(document, Set.of(), resolver, findings);
         }
-        snapshot.document(CONFIG_FILE).ifPresent(config -> {
-            for (Map.Entry<String, Object> entry : config.values().entrySet()) {
-                KeyPath path = KeyPath.root(config.localizedKey(entry.getKey()));
-                if (ConfigKeys.defaults.name().equals(entry.getKey())) {
-                    Map<?, ?> defaults = ConfigConstraint.asMap(entry.getValue());
-                    if (defaults == null) continue;
-                    for (Map.Entry<?, ?> nested : defaults.entrySet()) {
-                        String key = String.valueOf(nested.getKey());
-                        checkToken(snapshot, env, CONFIG_FILE, path.key(key), key, nested.getValue(), findings);
-                    }
-                } else {
-                    checkToken(snapshot, env, CONFIG_FILE, path, entry.getKey(), entry.getValue(), findings);
-                }
-            }
-        });
-    }
-
-    private static void checkToken(ConfigSnapshot snapshot, ConfigEnvironment env, String source, KeyPath path,
-                                   String setting, Object value, List<BitFinding> findings) {
-        String file = ConfigDefaultResolver.referencedFile(value);
-        if (file == null) return;
-        String token = String.valueOf(value).trim();
-        if (!REFERENCE_FILES.contains(file)) {
-            findings.add(BitFinding.of(REFERENCE_UNKNOWN_FILE, source, path.toString(),
-                    "Reference " + token + " names no supported file; the loader uses a hard-coded fallback",
-                    String.join(", ", REFERENCE_FILES.values().stream().map(name -> "@" + name).toList()),
-                    REFERENCE_FILES.suggest(file).map(name -> "@" + name).orElse(REFERENCE_UNKNOWN_FILE.remediation())));
-            return;
+        for (ConfigSnapshot.Document document : snapshot.documentsIn(WORLDS).values()) {
+            FILE_REFERENCE_CHECK.checkDocument(document, Set.of(), resolver, findings);
         }
-        Optional<Boolean> resolves = resolves(snapshot, env, file, setting);
-        if (Boolean.FALSE.equals(resolves.orElse(null))) {
-            String expected = "config".equals(file) ? "config.yml defaults." + setting : file + ".yml " + setting;
-            findings.add(BitFinding.of(REFERENCE_SETTING_MISSING, source, path.toString(),
-                    "Reference " + token + " has no " + expected + "; the loader uses a hard-coded fallback",
-                    expected, REFERENCE_SETTING_MISSING.remediation()));
-        }
+        snapshot.document(CONFIG_FILE).ifPresent(config ->
+                FILE_REFERENCE_CHECK.checkDocument(config, Set.of(ConfigKeys.defaults.name()), resolver, findings));
     }
 
     /** Whether {@code setting} exists in the referenced file; empty when the file is unknown here. */

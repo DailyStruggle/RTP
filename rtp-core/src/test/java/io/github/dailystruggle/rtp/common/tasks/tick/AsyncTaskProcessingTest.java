@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
@@ -49,6 +50,11 @@ class AsyncTaskProcessingTest {
         MiscTasks.cancel().start();
         MiscTasks.async().clear();
         MiscTasks.async().start();
+        if (MiscTasks.backgroundSync() != null) {
+            MiscTasks.backgroundSync().clear();
+            MiscTasks.backgroundSync().start();
+        }
+        ComputeGovernor.active().reset();
         AsyncTaskProcessing.resetRotationForTesting();
         TickBudget.clear();
     }
@@ -207,8 +213,17 @@ class AsyncTaskProcessingTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    @DisplayName("performance.yml period: a single region refills exactly once per `period` pulses")
+    @DisplayName("performance.yml period: autoTune false refills once per `period` pulses; autoTune true refills every pulse with credit")
     void period_singleRegion_runsOncePerPeriod() {
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+        if (perf != null) {
+            perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.autoTune, false);
+            TickBudget.refresh();
+        }
+
         AtomicInteger executions = new AtomicInteger();
         Region base = newRegion("countingRegion");
         Region counting = new Region("countingRegion", base.getSettings()) {
@@ -223,7 +238,16 @@ class AsyncTaskProcessingTest {
         assertTrue(period > 1, "precondition: default period spans several pulses");
         for (long i = 0; i < period * 3; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
 
-        assertEquals(3, executions.get(), "one turn per period, not per period-1");
+        assertEquals(3, executions.get(), "autoTune false: one turn per period, not per period-1");
+
+        if (perf != null) {
+            perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.autoTune, true);
+            TickBudget.refresh();
+            ComputeGovernor.active().reset();
+            executions.set(0);
+            for (long i = 0; i < 5; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
+            assertEquals(5, executions.get(), "autoTune true: region with credit runs on every pulse");
+        }
     }
 
     @Test

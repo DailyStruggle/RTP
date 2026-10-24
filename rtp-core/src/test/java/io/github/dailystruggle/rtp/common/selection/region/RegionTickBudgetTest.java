@@ -46,6 +46,11 @@ class RegionTickBudgetTest {
         GenerationBudget.configureServerCap(null);
         MiscTasks.sync().clear();
         MiscTasks.sync().start();
+        if (MiscTasks.backgroundSync() != null) {
+            MiscTasks.backgroundSync().clear();
+            MiscTasks.backgroundSync().start();
+        }
+        io.github.dailystruggle.rtp.common.governor.ComputeGovernor.active().reset();
     }
 
     @AfterEach
@@ -55,6 +60,10 @@ class RegionTickBudgetTest {
         GenerationBudget.configureServerAdmission(true);
         GenerationBudget.configureServerCap(null);
         MiscTasks.sync().clear();
+        if (MiscTasks.backgroundSync() != null) {
+            MiscTasks.backgroundSync().clear();
+        }
+        io.github.dailystruggle.rtp.common.governor.ComputeGovernor.active().reset();
     }
 
     /** Cold cache full of candidates, hot cap far above the per-pulse promotion cap. */
@@ -101,6 +110,42 @@ class RegionTickBudgetTest {
 
         MiscTasks.sync().execute(Long.MAX_VALUE);
         assertEquals(0, region.inFlightCalculations.get(), "draining the sync pipe settles every promotion");
+    }
+
+    @Test
+    @DisplayName("ADR-087 I4 & I5: executePlayerFacing promotes cold shortfall for waiting player even when S_eff = 0 and c_r = 0")
+    void executePlayerFacingPromotesForWaitingPlayerWhenBackgroundThrottled() {
+        Region region = regionWithColdCandidates("shortfall_reg", 4);
+        java.util.UUID waitingId = java.util.UUID.randomUUID();
+        ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+                        waitingId, "WaitingPlayer",
+                        new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0)));
+        region.queueManager.playerQueue.add(waitingId);
+
+        // Put governor into actuating state with B_cpu < 1 ms (S_eff = 0, p_eff = 0) and zero credit (c_r = 0)
+        io.github.dailystruggle.rtp.common.governor.ComputeSignals throttled =
+                io.github.dailystruggle.rtp.common.governor.ComputeSignals.builder()
+                        .autoTune(true)
+                        .regionalTicking(false)
+                        .maxMspt(45.0)
+                        .mspt(io.github.dailystruggle.rtp.common.governor.ComputeSignals.SampledSignal.fresh(35.5, TimeUnit.SECONDS.toNanos(10)))
+                        .region(new io.github.dailystruggle.rtp.common.governor.ComputeSignals.RegionDemand(
+                                "shortfall_reg", 0L, 0.0, 0, 10, 0, true))
+                        .build();
+        io.github.dailystruggle.rtp.common.governor.ComputeBudget b =
+                io.github.dailystruggle.rtp.common.governor.ComputeGovernor.active().evaluate(throttled, TimeUnit.SECONDS.toNanos(1));
+        assertEquals(0L, b.backgroundSyncNanos());
+        assertEquals(0, b.promotionsPerTurn());
+        assertEquals(0, b.unitsPerTurn("shortfall_reg"));
+
+        long before = CfDiag.regionDeficitDispatch.sum();
+        region.executePlayerFacing(TimeUnit.MILLISECONDS.toNanos(25));
+
+        long dispatched = CfDiag.regionDeficitDispatch.sum() - before;
+        assertEquals(1L, dispatched, "executePlayerFacing must promote cold shortfall for the 1 waiting player");
+        assertEquals(0L, MiscTasks.backgroundSync().size(),
+                "waiting-player promotion verify must route to player-facing MiscTasks.sync(), not backgroundSync()");
     }
 
     @Test

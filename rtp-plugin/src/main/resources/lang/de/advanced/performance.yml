@@ -1,3 +1,9 @@
+# Passt Hintergrund-Rechenzeit, Befoerderungsrate, Hot-Cache-Groesse und Generierung an Server-Reserven und Bedarf an.
+# Die konfigurierten Werte unten wirken als Obergrenzen. Auf false setzen fuer feste konfigurierte Werte.
+# @type: boolean
+# @default: true
+automatischeAnpassung: true
+
 # Hintergrund-Cache-Füllung pausieren, wenn die TPS unter diesen Wert fallen.
 # Auf Folia zählt die langsamste Region. Wartende Spieler werden weiterhin bedient. 0 = aus.
 # @type: number

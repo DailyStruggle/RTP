@@ -485,6 +485,10 @@ public class MemoryTracker {
         }
 
         // Focus leak detection on the positive discrepancy (orphaned tickets + cap overflows)
+        if (discrepancy > 0) {
+          io.github.dailystruggle.rtp.common.bit.PipelineCbitCounters.recordChunkTicketHighWater(
+                  "global", finalActiveTickets, expectedTickets);
+        }
         if (discrepancy > 0 && TeleportSessions.current().processingPlayers.isEmpty()) {
           double leakRate = (finalTotalLoads > 0) ? ((double) discrepancy / finalTotalLoads) * 100.0 : 0.0;
           if (isSystemLoggingEnabled()) {

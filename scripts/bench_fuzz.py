@@ -2163,6 +2163,37 @@ class Swarm:
             if ev != "accepted":
                 events.append(msg)
 
+    def discover(
+        self,
+        did: str,
+        tier: str = "default",
+        bot: str | None = None,
+        max_ms: int = 15000,
+        timeout_s: float | None = None,
+    ) -> tuple[dict, dict]:
+        """Run a read-only `discover` op and return `(commands_event, done_event)`.
+
+        Raises `SwarmError` if the `commands` event is missing, `captured` is false,
+        or `done['reason'] != 'complete'`.
+        """
+        req: dict = {"op": "discover", "id": did, "tier": tier, "max_ms": int(max_ms)}
+        if bot is not None:
+            req["bot"] = bot
+        wait_s = timeout_s if timeout_s is not None else max(30.0, max_ms / 1000.0 + 10.0)
+        events, done = self.run_episode(req, wait_s)
+        cmd_ev = next((e for e in events if e.get("ev") == "commands"), None)
+        reason = done.get("reason")
+        if cmd_ev is None:
+            raise SwarmError(f"discover {did} ({tier}): missing commands event (reason={reason!r})")
+        if not cmd_ev.get("captured") or reason != "complete":
+            bot_errors = [str(e.get("text")) for e in events if e.get("ev") == "bot_error" and e.get("text")]
+            detail = f"; bot_errors={bot_errors}" if bot_errors else ""
+            raise SwarmError(
+                f"discover {did} ({tier}) failed to capture command graph: "
+                f"captured={bool(cmd_ev.get('captured'))}, reason={reason!r}{detail}"
+            )
+        return cmd_ev, done
+
     def close(self) -> None:
         if self.sock:
             try:
