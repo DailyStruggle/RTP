@@ -150,11 +150,11 @@ SPAWN_EST_MS = 3000
 
 # Counts whose change marks an episode as new for the corpus: exact integers,
 # not heap megabytes or timings.
-EXACT_COUNT = re.compile(r"^(retained_player_objects|craftplayer_live|serverplayer_live|game_listener_live|"
-                         r"threads_live|threads_daemon|fd_open|"
+# Kinds of resource only: which objects leak is screened from the histogram.
+EXACT_COUNT = re.compile(r"^(threads_live|threads_daemon|fd_open|"
                          r"plugin\.[^.]+\.(pending_tasks|listeners|live_instances))$")
 NOT_DELTA = re.compile(lc.NOT_LEAK_METRICS.pattern + r"|^checkpoint_quick$|\.owned_classes$|^old_gen_after_gc_mb$")
-ALWAYS_DELTA = ("retained_player_objects", "heap_used_after_gc_mb")
+ALWAYS_DELTA = ("heap_used_after_gc_mb",)
 HARNESS_PLUGIN = "plugin.stresstestrtp."
 ATTRIBUTION_METRIC = re.compile(r"^(slope\.)?plugin\.[^.]+\.(pending_tasks|listeners|live_instances)$")
 
@@ -601,7 +601,8 @@ QUIT_BUCKETS = ((250, "quit_lt250"), (1000, "quit_lt1s"), (3000, "quit_lt3s"), (
 FEATURES = ACTIONS + tuple(b for _, b in QUIT_BUCKETS) + ("quit_no_rtp", "move_pending_tp", "console")
 FIT_FEATURES = tuple(k for k in FEATURES if k != "quit")
 # Counts every score sums over; a control fit adds the counts it measured.
-DEFAULT_SCORE_COUNTS = ("retained_player_objects", "serverplayer_live", "craftplayer_live", "game_listener_live")
+# No class is named: object-level evidence comes from the class screens.
+DEFAULT_SCORE_COUNTS = ("threads_live", "threads_daemon", "fd_open")
 # Growth per repetition of the same program (--reps): the leak signal that
 # does not depend on knowing what leaks. A cache fills in the first run and its
 # slope goes to 0; a leak keeps the slope up. Kinds of resource, not objects:
@@ -610,10 +611,18 @@ DEFAULT_SCORE_COUNTS = ("retained_player_objects", "serverplayer_live", "craftpl
 SLOPE = "slope."
 SLOPE_METRIC = re.compile(r"^(histogram_live_mb|heap_used_after_gc_mb|rss_mb|pool\.metaspace\.used_mb|"
                           r"pool\.compressed_class_space\.used_mb|buffer\.(direct|mapped)\.(used_mb|count)|"
-                          r"classes_loaded|threads_live|threads_daemon|fd_open|retained_player_objects|"
+                          r"classes_loaded|threads_live|threads_daemon|fd_open|"
                           r"plugin\.[^.]+\.(pending_tasks|listeners|live_instances))$")
 Z95 = 1.96
 NOISE_FLOOR = 0.5  # a count that never moved under the control still has integer noise
+
+
+def scorable(c: str) -> bool:
+    """A fixed (non-class) count the fit and score may use; keys from older
+    traces or control fits that no longer qualify are dropped."""
+    if c.startswith(SLOPE):
+        return bool(SLOPE_METRIC.match(c[len(SLOPE):]))
+    return c in DEFAULT_SCORE_COUNTS or bool(EXACT_COUNT.match(c))
 
 
 def quit_bucket(delay_ms: float) -> str:
@@ -735,7 +744,7 @@ def fit_from_records(records: list[dict], lam: float = 1.0, classes=()) -> dict:
     counts = set(DEFAULT_SCORE_COUNTS)
     for r in records:
         for k in (r.get("deltas") or {}):
-            if (EXACT_COUNT.match(k) or k.startswith(SLOPE)) and HARNESS_PLUGIN not in k:
+            if scorable(k) and HARNESS_PLUGIN not in k:
                 counts.add(k)
     counts.update(CLS + c for c in classes)
     return fit_counts(records, sorted(counts), lam)
@@ -793,6 +802,60 @@ def screen_classes(records: list[dict], control: dict | None, max_classes: int =
                         "mean": round(mean, 6), "noise": round(sd, 6), "in_control": c in ctl})
     out.sort(key=lambda d: (-d["z"], d["cls"]))
     return out[:max(0, max_classes)], len(own)
+
+
+def departures(before: dict, after: dict) -> int | None:
+    """Player sessions that ended between two checkpoints (the probe's quit
+    counter); None when either side did not measure it."""
+    b, a = before.get("quits_total"), after.get("quits_total")
+    if not isinstance(b, (int, float)) or not isinstance(a, (int, float)) or b < 0 or a < b:
+        return None
+    return int(a - b)
+
+
+def departure_slopes(records: list[dict]) -> tuple[dict, int]:
+    """({class: (post-GC instances per departed session, standard error)},
+    episodes used). Least squares through the origin over histogram episodes
+    with at least one departure: a class that something keeps per ended
+    session grows with departures whatever its name or platform."""
+    rows = [r for r in class_rows(records) if (r.get("departures") or 0) > 0]
+    n = len(rows)
+    if n < 2:
+        return {}, n
+    qs = [float(r["departures"]) for r in rows]
+    qq = sum(q * q for q in qs)
+    names = {k[len(CLS):] for r in rows for k in r["deltas"] if k.startswith(CLS)}
+    out = {}
+    for c in names:
+        ys = [float(r["deltas"].get(CLS + c, 0) or 0) for r in rows]
+        b = sum(y * q for y, q in zip(ys, qs)) / qq
+        rss = sum((y - b * q) ** 2 for y, q in zip(ys, qs))
+        sd = max(NOISE_FLOOR, math.sqrt(rss / (n - 1)))
+        out[c] = (b, sd / math.sqrt(qq))
+    return out, n
+
+
+def screen_departures(records: list[dict], control_records: list[dict] | None, max_classes: int = 64,
+                      min_n: int = 4) -> list[dict]:
+    """Classes whose per-departure growth exceeds the control's by the
+    Bonferroni z over every class tested; a class the control never saw is
+    compared against 0. At most max_classes, largest z first."""
+    own, n = departure_slopes(records)
+    if n < min_n:
+        return []
+    ctl, _ = departure_slopes(control_records or [])
+    stats = class_stats([r for r in class_rows(records) if (r.get("departures") or 0) > 0])["classes"]
+    zc = bonferroni_z(len(own))
+    out = []
+    for c, (b, se) in own.items():
+        cb, cse = ctl.get(c, (0.0, 0.0))
+        z = (b - cb) / math.sqrt(se * se + cse * cse)
+        if z > zc:
+            out.append({"cls": c, "per_departure": round(b, 4), "control_per_departure": round(cb, 4),
+                        "z": round(z, 4), "n": n, "noise": round(max(NOISE_FLOOR, stats.get(c, (0, 0))[1]), 6),
+                        "in_control": c in ctl})
+    out.sort(key=lambda d: (-d["z"], d["cls"]))
+    return out[:max(0, max_classes)]
 
 
 def bonferroni_z(tests: int, alpha: float = 0.05) -> float:
@@ -2210,9 +2273,11 @@ class TargetRun:
         self.control_classes = None if target == DIRECT else load_json(os.path.join(run_dir, CONTROL_CLASSES_FILE))
         self.control_dir = os.path.join(run_dir, DIRECT)
         self._control_recs: list[dict] | None = None
-        self.fixed_counts = sorted(self.control) if self.control else list(DEFAULT_SCORE_COUNTS)
+        self.fixed_counts = (sorted(c for c in self.control if scorable(c)) if self.control
+                             else list(DEFAULT_SCORE_COUNTS))
         self.score_counts = list(self.fixed_counts)
         self.screen: list[dict] = []
+        self.departure_screen: list[dict] = []
         self.classes_seen = 0
         self.class_ref: dict = {}  # control reference per screened class count
         self.fit: dict = {}
@@ -2260,19 +2325,24 @@ class TargetRun:
         reference: the control episodes' fit of that class when they are on
         disk (subtracts exploration growth per behaviour), else the control's
         per-episode mean and noise; a class the control never saw gets mean 0
-        and the target's own noise."""
+        and the target's own noise. Two screens feed it: cumulative growth per
+        episode, and growth per departed session against the control."""
         if self.target == DIRECT or self.a.max_classes <= 0:
             return
         self.screen, self.classes_seen = screen_classes(records, self.control_classes, self.a.max_classes)
-        names = [s["cls"] for s in self.screen]
+        self.departure_screen = screen_departures(records, self.control_records(), self.a.max_classes)
+        names = list(dict.fromkeys([s["cls"] for s in self.screen] + [s["cls"] for s in self.departure_screen]))
         missing = [CLS + c for c in names if CLS + c not in self.class_ref]
         if missing and self.control_records():
             self.class_ref.update(fit_counts(self.control_records(), missing, self.a.ridge_lam))
-        for s in self.screen:
+        # One entry per class; the cumulative screen's mean wins over the departure screen's 0.
+        by_cls = {s["cls"]: s for s in self.departure_screen}
+        by_cls.update({s["cls"]: s for s in self.screen})
+        for s in by_cls.values():
             c = CLS + s["cls"]
             ref = self.class_ref.get(c)
             if ref is None:
-                ref = {"n": 0, "intercept": s["mean"], "coef": {}, "ci": {}, "noise": s["noise"]}
+                ref = {"n": 0, "intercept": s.get("mean", 0.0), "coef": {}, "ci": {}, "noise": s["noise"]}
             if not s["in_control"]:
                 ref = dict(ref, noise=max(ref["noise"], s["noise"]))
             self.class_ref[c] = ref
@@ -2309,7 +2379,7 @@ class TargetRun:
             self.prev, self.prev_histo = None, {}
             return False
         self.prev, self.prev_histo = d, self.reader.histo(d)
-        log(f"{self.target}: baseline {label} retained={d.get('retained_player_objects', -1):.0f} "
+        log(f"{self.target}: baseline {label} "
             f"heap={d.get('heap_used_after_gc_mb', -1):.0f}MB classes={len(self.prev_histo)}")
         return True
 
@@ -2407,6 +2477,7 @@ class TargetRun:
             else:
                 h = self.reader.histo(d)
                 deltas = count_deltas(self.prev, d)
+                rec["departures"] = departures(self.prev, d)
                 if h and self.prev_histo:
                     deltas.update(class_deltas(self.prev_histo, h, self.a.top_classes))
                 else:
@@ -2440,7 +2511,7 @@ class TargetRun:
         log(f"{self.target}: s{seed} e{ep} {rec['origin']:<8} bots={len(bots)} acts="
             f"{sum(len(b['program']) for b in bots)} {rec['ms'] / 1000:.1f}s states={len(rec['states'])}"
             f"{' new=' + str(len(rec.get('new_states') or [])) if rec.get('kept') else ''} "
-            f"retained{ds.get('retained_player_objects', 0):+} heap{ds.get('heap_used_after_gc_mb', 0):+.1f}MB"
+            f"departed={rec.get('departures')} heap{ds.get('heap_used_after_gc_mb', 0):+.1f}MB"
             + (f" console={len(rec['console'])}" if rec.get("console") else "")
             + (f" live/rep{ds[SLOPE + 'histogram_live_mb']:+.2f}MB classes/rep"
                f"{ds.get(SLOPE + 'classes_loaded', 0):+.1f} x{rec.get('reps')}"
@@ -2687,18 +2758,20 @@ class TargetRun:
         return out
 
     def end_generation(self, seed: int, gen: int, cem: "Cem | None", gen_recs: list[dict],
-                       all_recs: list[dict], corpus: Corpus, gen_surprises=()) -> dict:
+                       all_recs: list[dict], corpus: Corpus, gen_surprises=(), rescore=()) -> dict:
         """Refit on every usable episode so far, report unexplained finds (kept in
         the corpus), update the search state, then move the CEM towards this
         generation's elite."""
         self.rescreen(all_recs)
-        self.fit = fit_from_records(all_recs, self.a.ridge_lam, [s["cls"] for s in self.screen])
+        self.fit = fit_from_records(all_recs, self.a.ridge_lam,
+                                    [c[len(CLS):] for c in self.score_counts if c.startswith(CLS)])
         flags = flag_features(self.fit, self.ref, self.classes_seen)
         if flags and self.target != DIRECT and self.search.confirm(
                 f"flag {flags[0]['count']}~{flags[0]['feature']}"):
             log(f"{self.target}: exploiting: {self.search.reason}")
-        for r in gen_recs:
-            # Rescore with this generation's screen (the trace keeps the at-run score).
+        for r in list(gen_recs) + [r for r in rescore if r.get("deltas") is not None]:
+            # Rescore with this generation's screen (the trace keeps the at-run score);
+            # `rescore` holds the leak re-runs, which only screened classes can score.
             r["score"] = score_episode(r, self.score_counts, self.ref, self.class_z, target_fit=self.fit)
         for r in gen_recs:
             un = unexplained_counts(r, self.fit, class_z=self.class_z)
@@ -2719,6 +2792,8 @@ class TargetRun:
                 if scores_all else None, "flags": flags[:10], "optimise": cem is not None,
                 "classes_seen": self.classes_seen,
                 "screen": [{k: s[k] for k in ("cls", "cum", "z")} for s in self.screen],
+                "departure_screen": [{k: s[k] for k in ("cls", "per_departure", "z")}
+                                     for s in self.departure_screen],
                 "surprises": [{k: s[k] for k in ("ep", "count", "k", "n")} for s in gen_surprises],
                 "novelty_used": self.search.novelty}
         if cem is not None:
@@ -2737,6 +2812,7 @@ class TargetRun:
         append_jsonl(self.opt_path, line)
         save_json(self.fit_path, {"fit": self.fit, "flags": flags, "control": bool(self.control),
                                   "score_counts": self.score_counts, "screen": self.screen,
+                                  "departure_screen": self.departure_screen,
                                   "classes_seen": self.classes_seen})
         top = ", ".join(f"{f['count']}~{f['feature']} {f['coef']:+.2f}" for f in flags[:3]) or "none"
         log(f"{self.target}: s{seed} gen {gen}: mean score {line['mean_score']}, best "
@@ -2838,7 +2914,7 @@ class TargetRun:
                 extra, extra_surprises = self.drain_promotions(seed, gen)
                 recs += extra
                 gen_surprises += extra_surprises
-                self.end_generation(seed, gen, cem, gen_recs, recs, corpus, gen_surprises)
+                self.end_generation(seed, gen, cem, gen_recs, recs, corpus, gen_surprises, rescore=extra)
                 gen_recs, gen_surprises = [], []
             if stop:
                 log(f"{self.target}: heap after GC above {self.heap_stop:.0f} MB; stopping this target")

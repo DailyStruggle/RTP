@@ -160,15 +160,13 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "disconnect-job",
             "test.disconnect-job",
             BitTier.IBIT,
             BitSideEffect.SAFE,
             5_000,
             DisconnectTestJob::quietReport);
-    return component;
   }
 
   private static State currentState() {

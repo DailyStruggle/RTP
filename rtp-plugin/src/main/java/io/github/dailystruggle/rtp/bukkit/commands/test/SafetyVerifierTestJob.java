@@ -111,15 +111,13 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "safety-verifier",
             "test.safety-verifier",
             BitTier.IBIT,
             BitSideEffect.SAFE,
             5_000,
             () -> toBitReport(runProbe()));
-    return component;
   }
 
   static BitReport toBitReport(Result result) {

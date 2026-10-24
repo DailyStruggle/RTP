@@ -118,15 +118,13 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
 
   private static BitComponent registerComponent(
       String id, BitSideEffect sideEffect, String subsystem) {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             id,
             subsystem,
             BitTier.IBIT,
             sideEffect,
             COMPONENT_TIMEOUT_MS,
             () -> ProbeBitReport.forProbe(id).build());
-    return component;
   }
 
   static BitReport timeoutReport(String detail) {

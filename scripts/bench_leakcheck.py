@@ -317,7 +317,7 @@ def analyze(runs_dir: str, stamp: str, out_path: str | None, top: int = 20, star
     ctl = pick_control(rows)
     lines = [f"leak check {stamp} (source {runs_dir}; control = {ctl or 'NONE - slopes are absolute'}"
              + (f"; from checkpoint index {start}" if start else "") + ")", ""]
-    lines.append("target | checkpoints | hours | teleports | departures | retained players first->last | "
+    lines.append("target | checkpoints | hours | teleports | departures | "
                  "heap after GC MB first->last (MB/h) | RSS MB first->last | NMT | flagged metrics")
     for target in sorted(rows, key=lambda t: (t not in CONTROLS, t)):
         rs = rows[target]
@@ -328,7 +328,6 @@ def analyze(runs_dir: str, stamp: str, out_path: str | None, top: int = 20, star
             target, str(len(rs)), f"{hours(rs)[-1]:.2f}",
             f"{g('teleports_total', -1) - g('teleports_total', 0):.0f}",
             f"{g('quits_total', -1) - g('quits_total', 0):.0f}",
-            f"{g('retained_player_objects', 0):.0f}->{g('retained_player_objects', -1):.0f}",
             f"{g('heap_used_after_gc_mb', 0):.0f}->{g('heap_used_after_gc_mb', -1):.0f} "
             f"({'n/a' if hb is None else f'{hb:+.1f}'})",
             f"{g('rss_mb', 0):.0f}->{g('rss_mb', -1):.0f}",

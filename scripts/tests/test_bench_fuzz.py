@@ -35,9 +35,8 @@ sys.path.insert(0, str(SCRIPTS))
 import bench_fuzz as bf  # noqa: E402
 
 CFG = {"min_bots": 2, "max_bots": 8, "min_s": 20, "max_s": 60, "novelty": 0.25, "rtp_args": []}
-LEAK_HEADER = ("epoch_ms,label,online,joins_total,quits_total,distinct_uuids,craftplayer_live,serverplayer_live,"
-               "game_listener_live,retained_player_objects,heap_used_after_gc_mb,old_gen_after_gc_mb,"
-               "histogram_ms,histogram_file")
+LEAK_HEADER = ("epoch_ms,label,online,joins_total,quits_total,distinct_uuids,heap_used_after_gc_mb,"
+               "old_gen_after_gc_mb,histogram_ms,histogram_file")
 
 
 def dumps(x) -> str:
@@ -247,15 +246,15 @@ class CorpusTest(unittest.TestCase):
 
     def test_count_changes_kept_by_direction_and_magnitude(self):
         c = bf.Corpus()
-        self.assertTrue(c.consider(0, [], [], {"retained_player_objects": 1})["kept"])
-        self.assertFalse(c.consider(1, [], [], {"retained_player_objects": 1})["kept"])
-        self.assertTrue(c.consider(2, [], [], {"retained_player_objects": 3})["kept"])
-        self.assertTrue(c.consider(3, [], [], {"retained_player_objects": -1})["kept"])
+        self.assertTrue(c.consider(0, [], [], {"threads_live": 1})["kept"])
+        self.assertFalse(c.consider(1, [], [], {"threads_live": 1})["kept"])
+        self.assertTrue(c.consider(2, [], [], {"threads_live": 3})["kept"])
+        self.assertTrue(c.consider(3, [], [], {"threads_live": -1})["kept"])
         self.assertTrue(c.consider(4, [], [], {"plugin.betterrtp.live_instances": 12})["kept"])
         # noise-like or harness-owned values do not count
         self.assertFalse(c.consider(5, [], [], {"heap_used_after_gc_mb": 50.0, "cls:java.lang.String": 900,
                                                 "plugin.stresstestrtp.live_instances": 99,
-                                                "retained_player_objects": 0})["kept"])
+                                                "threads_live": 0})["kept"])
 
     def test_cap_drops_oldest(self):
         c = bf.Corpus(cap=2)
@@ -266,13 +265,15 @@ class CorpusTest(unittest.TestCase):
 
 class DeltaTest(unittest.TestCase):
     def test_count_deltas(self):
-        before = {"_epoch": 1, "retained_player_objects": 2.0, "heap_used_after_gc_mb": 100.0, "fd_open": -1.0,
+        before = {"_epoch": 1, "threads_daemon": 2.0, "heap_used_after_gc_mb": 100.0, "fd_open": -1.0,
                   "teleports_total": 5.0, "threads_live": 40.0, "checkpoint_quick": 1.0,
                   "plugin.x.live_instances": 10.0, "plugin.x.owned_classes": 7.0}
         after = dict(before, _epoch=2, heap_used_after_gc_mb=101.25, fd_open=30.0, teleports_total=9.0,
                      threads_live=41.0, **{"plugin.x.live_instances": 13.0, "plugin.x.owned_classes": 9.0})
-        self.assertEqual(bf.count_deltas(before, after), {"retained_player_objects": 0, "heap_used_after_gc_mb": 1.25,
+        # an unchanged count is sparse; the heap is always reported
+        self.assertEqual(bf.count_deltas(before, after), {"heap_used_after_gc_mb": 1.25,
                                                           "threads_live": 1, "plugin.x.live_instances": 3})
+        self.assertEqual(bf.count_deltas(before, dict(before, _epoch=2)), {"heap_used_after_gc_mb": 0})
 
     def test_class_deltas_top_by_magnitude(self):
         h0 = {"A": (10, 100), "B": (5, 50), "C": (1, 10)}
@@ -311,11 +312,12 @@ class CsvTailTest(unittest.TestCase):
     def test_reader_merges_rows_and_times_out(self):
         r = bf.RunsReader(self.dir)
         with open(os.path.join(self.dir, "leak.csv"), "w", encoding="utf-8") as fh:
-            fh.write(LEAK_HEADER + "\n5,L1,0,1,1,1,0,0,0,3,100.5,80,10,h.txt\n")
+            fh.write(LEAK_HEADER + "\n5,L1,0,1,3,1,100.5,80,10,h.txt\n")
         with open(os.path.join(self.dir, "leak-metrics.csv"), "w", encoding="utf-8") as fh:
             fh.write("epoch_ms,label,metric,value\n5,L1,threads_live,40\n5,L2,threads_live,1\n")
         d = r.fetch("L1", 2, poll_s=0.01)
-        self.assertEqual(d["retained_player_objects"], 3.0)
+        self.assertEqual(d["quits_total"], 3.0)
+        self.assertEqual(d["heap_used_after_gc_mb"], 100.5)
         self.assertEqual(d["threads_live"], 40.0)
         self.assertEqual(d["_histo"], "h.txt")
         t0 = time.time()
@@ -489,14 +491,21 @@ class StopRampTest(unittest.TestCase):
         self.assertTrue(d.ramp_active)
 
 
+LEAKY = "com.example.Leaky"
+LEAK_CLS = bf.CLS + LEAKY
+
+
 class FakeServer:
     """RCON + runs files: a quick checkpoint writes the leak.csv row, metrics
-    rows and histogram at once. Each quit after an rtp retains one player."""
+    rows and histogram at once. Each quit after an rtp retains one LEAKY
+    instance in the histogram; every ended session counts in quits_total."""
 
     def __init__(self, runs_dir):
         self.runs = runs_dir
         self.completed = 0
         self.retained = 0
+        self.quits = 0
+        self.fds = 0  # file handles a fake plugin keeps open (fd_open = 100 + fds)
         self.last = "none"
         self.fail_labels: set[str] = set()
         self.no_histo_labels: set[str] = set()
@@ -505,7 +514,7 @@ class FakeServer:
         self.cmds: list[str] = []
         os.makedirs(runs_dir, exist_ok=True)
         with open(os.path.join(runs_dir, "leak.csv"), "w", encoding="utf-8") as fh:
-            fh.write(LEAK_HEADER + "\n1,soak-c00,32,0,0,0,0,0,0,0,1,1,1,old.txt\n")
+            fh.write(LEAK_HEADER + "\n1,soak-c00,32,0,0,0,1,1,1,old.txt\n")
         with open(os.path.join(runs_dir, "leak-metrics.csv"), "w", encoding="utf-8") as fh:
             fh.write("epoch_ms,label,metric,value\n")
 
@@ -538,18 +547,18 @@ class FakeServer:
         else:
             self.write_histo(histo)
         with open(os.path.join(self.runs, "leak.csv"), "a", encoding="utf-8") as fh:
-            fh.write(f"{int(time.time() * 1000)},{label},0,0,0,0,{self.retained},{self.retained},0,"
-                     f"{self.retained},{500 + self.retained},400,30,{histo}\n")
+            fh.write(f"{int(time.time() * 1000)},{label},0,0,{self.quits},0,{500 + self.retained},400,30,"
+                     f"{histo}\n")
         with open(os.path.join(self.runs, "leak-metrics.csv"), "a", encoding="utf-8") as fh:
-            for k, v in (("checkpoint_quick", 1), ("threads_live", 40), ("plugin.target.listeners", 3)):
+            for k, v in (("checkpoint_quick", 1), ("threads_live", 40), ("fd_open", 100 + self.fds),
+                         ("plugin.target.listeners", 3)):
                 fh.write(f"1,{label},{k},{v}\n")
 
     def write_histo(self, histo):
         with open(os.path.join(self.runs, histo), "w", encoding="utf-8") as fh:
             fh.write(" num     #instances         #bytes  class name (module)\n")
             fh.write(f"   1:          {100 + self.retained}       {8000 + self.retained}  java.lang.String\n")
-            fh.write(f"   2:          {self.retained}       {self.retained * 64}  "
-                     "net.minecraft.server.level.ServerPlayer\n")
+            fh.write(f"   2:          {self.retained}       {self.retained * 64}  {LEAKY}\n")
 
 
 class FakeSwarm:
@@ -559,7 +568,7 @@ class FakeSwarm:
         self.restarts = 0
         self.fail_next = False
         self.after = None  # hook(req) run once the episode's events are produced
-        self.leak_quit = True  # quit right after rtp retains a player
+        self.leak_quit = True  # quit right after rtp retains one LEAKY instance
 
     def run_episode(self, req, timeout_s):
         self.requests.append((req, timeout_s))
@@ -570,7 +579,7 @@ class FakeSwarm:
             raise bf.SwarmError("no done")
         events = []
         for b in req["bots"]:
-            last = None
+            last, online = None, True
             t = bf.SPAWN_EST_MS
             events.append({"ev": "spawn", "id": req["id"], "bot": b["name"], "t": t})
             for i, x in enumerate(b["program"]):
@@ -581,8 +590,14 @@ class FakeSwarm:
                                    "text": f"Teleporting {b['name']} in {i + 2}s"})
                 if x["a"] == "quit" and last == "rtp" and self.leak_quit:
                     self.server.retained += 1
+                if x["a"] in ("quit", "rejoin") and online:
+                    self.server.quits += 1
+                if x["a"] in ("quit", "rejoin"):
+                    online = x["a"] == "rejoin"
                 if x["a"] != "wait":
                     last = x["a"]
+            if online:
+                self.server.quits += 1  # the swarm disconnects every bot at the end
         done = {"ev": "done", "id": req["id"], "ms": req["max_ms"], "reason": "complete",
                 "bots": [{"name": b["name"], "last": b["name"]} for b in req["bots"]]}
         return events, done
@@ -633,13 +648,15 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
             self.assertNotIn("excluded", r)
             self.assertEqual(r["cmd"], "betterrtp:rtp")
             self.assertTrue(r["label"].startswith("fz20261010-200000-betterrtp-s1-e"))
-            self.assertIn("retained_player_objects", r["deltas"])
             self.assertIn("heap_used_after_gc_mb", r["deltas"])
             self.assertNotIn("threads_live", r["deltas"])  # unchanged, not kept
-            self.assertEqual(r["deltas"].get("cls:net.minecraft.server.level.ServerPlayer", 0),
-                             r["deltas"]["retained_player_objects"])
+            # The heap grows with the leaked instances the histogram counts.
+            self.assertEqual(r["deltas"].get(LEAK_CLS, 0), r["deltas"]["heap_used_after_gc_mb"])
+            self.assertGreaterEqual(r["departures"], len(r["bots"]))  # every bot leaves by the end
             self.assertTrue(all(len(p) == 2 for p in r["states"]))
-        self.assertEqual(sum(r["deltas"]["retained_player_objects"] for r in recs), self.server.retained)
+        self.assertEqual(sum(r["deltas"].get(LEAK_CLS, 0) for r in recs), self.server.retained)
+        self.assertGreater(self.server.retained, 0)
+        self.assertEqual(sum(r["departures"] for r in recs), self.server.quits)
         self.assertTrue(recs[0]["kept"])  # first replies are always new
         # Episode requests are the planned programs, bound for the swarm's deadline.
         req, timeout = self.swarm.requests[0]
@@ -721,7 +738,8 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         recs = self.records()
         self.assertTrue(recs[1]["no_histogram"])
         self.assertFalse(any(k.startswith("cls:") for k in recs[1]["deltas"]))
-        self.assertIn("retained_player_objects", recs[1]["deltas"])  # exact counts still measured
+        self.assertIn("heap_used_after_gc_mb", recs[1]["deltas"])  # exact counts still measured
+        self.assertIsNotNone(recs[1]["departures"])
         # The next episode compares against an empty histogram: flagged too, then back to normal.
         self.assertTrue(recs[2]["no_histogram"])
         self.assertNotIn("no_histogram", recs[3])
@@ -754,7 +772,7 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         self.assertNotEqual(lines[0]["sampled_from"]["mean"], lines[0]["next"]["mean"])  # moved
         self.assertEqual(lines[1]["sampled_from"], lines[0]["next"])
         fit = bf.load_json(self.tr.fit_path)
-        self.assertIn("retained_player_objects", fit["fit"])
+        self.assertIn(LEAK_CLS, fit["fit"])  # screened from the histogram, never named
         # Same seed, same server behaviour: the optimiser's trajectory is reproducible.
         other = bf.TargetRun(self.a, self.server, self.swarm, bf.RunsReader(self.runs), "betterrtp",
                              "20261010-200000", os.path.join(self.dir, "out2"))
@@ -763,16 +781,19 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         self.assertEqual([dumps(r["params"]) for r in recs], [dumps(r["params"]) for r in recs2])
 
     def test_control_fit_is_loaded_by_later_targets(self):
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.5,
-                                               "noise": 2.0, "ci": {}, "n": 9},
+        control = {"threads_live": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.5,
+                                    "noise": 2.0, "ci": {}, "n": 9},
                    "plugin.x.listeners": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.0,
-                                          "noise": 1.0, "ci": {}, "n": 9}}
+                                          "noise": 1.0, "ci": {}, "n": 9},
+                   # a key from an older control fit that no longer qualifies is dropped
+                   "retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.0,
+                                               "noise": 1.0, "ci": {}, "n": 9}}
         bf.save_json(os.path.join(self.dir, bf.CONTROL_FILE), control)
         tdir = os.path.join(self.dir, "betterrtp")
         os.makedirs(tdir)
         tr = bf.TargetRun(self.a, self.server, self.swarm, bf.RunsReader(self.runs), "betterrtp",
                           "20261010-200000", tdir)
-        self.assertEqual(tr.score_counts, ["plugin.x.listeners", "retained_player_objects"])
+        self.assertEqual(tr.score_counts, ["plugin.x.listeners", "threads_live"])
         ctl = bf.TargetRun(self.a, self.server, self.swarm, bf.RunsReader(self.runs), "direct",
                            "20261010-200000", os.path.join(self.dir, "direct"))
         self.assertIsNone(ctl.control)  # the control never subtracts itself
@@ -784,8 +805,8 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
                                                {"a": "rtp"}, {"a": "wait", "ms": 5}, {"a": "quit"}]},
                 {"name": "fzS_1", "program": [{"a": "wait", "ms": 5}, {"a": "die"}]}]
         rec = self.tr.execute(1, 0, {"origin": "cem", "parent": None, "params": None, "bots": bots}, None)
-        self.assertEqual(rec["deltas"]["retained_player_objects"], 1)
-        out = self.tr.shrink(1, rec, "retained_player_objects")
+        self.assertEqual(rec["deltas"][LEAK_CLS], 1)
+        out = self.tr.shrink(1, rec, LEAK_CLS)
         self.assertTrue(out["reproduced"])
         self.assertEqual(out["sequence"], [["rtp", "quit"]])  # the fake leaks on quit right after rtp
         self.assertEqual((out["hits"], out["n"]), (3, 3))
@@ -797,10 +818,10 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
         self.assertFalse(names & {"fzS_0", "fzS_1"})
 
     def test_ambient_drift_alone_does_not_reproduce(self):
-        # Every checkpoint drifts retained by +1 with no leak; the control's
+        # Every checkpoint drifts the leaky class by +1 with no leak; the control's
         # intercept explains it, so a replay needs more than the drift.
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 1.0,
-                                               "noise": 1.0, "ci": {}, "n": 9}}
+        control = {LEAK_CLS: {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 1.0,
+                              "noise": 1.0, "ci": {}, "n": 9}}
         self.tr.control = control
         self.assertTrue(self.tr.baseline(1, "base"))
         orig = self.server.write
@@ -810,9 +831,10 @@ class EpisodeLoopTest(LoopFixture, unittest.TestCase):
             orig(label)
         self.server.write = drift
         bots = [{"name": "fzD_0", "program": [{"a": "wait", "ms": 5}]}]
-        hits, n, ok = self.tr.reproduce(1, "d0", bots, "retained_player_objects", 1.0, 3, 2)
+        hits, n, ok = self.tr.reproduce(1, "d0", bots, LEAK_CLS, 1.0, 3, 2)
         self.assertFalse(ok)
         self.assertEqual(hits, 0)
+        self.assertGreater(n, 0)  # the replays were measured, not skipped
 
     def test_replay_reuses_programs_under_new_names(self):
         self.tr.run_seed(1)
@@ -879,7 +901,7 @@ class FeatureTest(unittest.TestCase):
 
 class RidgeTest(unittest.TestCase):
     def planted(self, coef, n=120, noise=0.6):
-        """Episodes whose retained delta is coef * quit_lt250 + integer noise."""
+        """Episodes whose count delta is coef * quit_lt250 + integer noise."""
         rng = __import__("random").Random(7)
         recs = []
         for ep in range(n):
@@ -887,12 +909,12 @@ class RidgeTest(unittest.TestCase):
             feats = {k: 0 for k in bf.FEATURES}
             feats.update(rtp=rtp, quit=q250 + qlate, quit_lt250=q250, quit_later=qlate)
             d = coef * q250 + round(rng.gauss(0, noise))
-            recs.append({"ep": ep, "features": feats, "deltas": {"retained_player_objects": d}, "ms": 40000})
+            recs.append({"ep": ep, "features": feats, "deltas": {"threads_live": d}, "ms": 40000})
         return recs
 
     def test_recovers_planted_coefficient(self):
-        fit = bf.fit_counts(self.planted(1.0), ["retained_player_objects"])
-        c = fit["retained_player_objects"]
+        fit = bf.fit_counts(self.planted(1.0), ["threads_live"])
+        c = fit["threads_live"]
         self.assertAlmostEqual(c["coef"]["quit_lt250"], 1.0, delta=0.2)
         self.assertTrue(bf.excludes_zero(c["ci"]["quit_lt250"]))
         for other in ("rtp", "quit_later", "move", "die"):
@@ -900,10 +922,10 @@ class RidgeTest(unittest.TestCase):
             self.assertFalse(bf.excludes_zero(c["ci"][other]), other)
 
     def test_flag_needs_control_to_be_clean(self):
-        target = bf.fit_counts(self.planted(1.0), ["retained_player_objects"])
+        target = bf.fit_counts(self.planted(1.0), ["threads_live"])
         # A control that also leaks on quit_lt250 masks the flag; a clean one does not.
-        leaky = bf.fit_counts(self.planted(1.0), ["retained_player_objects"])
-        clean = bf.fit_counts(self.planted(0.0), ["retained_player_objects"])
+        leaky = bf.fit_counts(self.planted(1.0), ["threads_live"])
+        clean = bf.fit_counts(self.planted(0.0), ["threads_live"])
         self.assertTrue(any(f["feature"] == "quit_lt250" for f in bf.flag_features(target, clean)))
         self.assertFalse(any(f["feature"] == "quit_lt250" for f in bf.flag_features(target, leaky)))
         self.assertFalse(bf.flag_features(target, target))
@@ -911,17 +933,17 @@ class RidgeTest(unittest.TestCase):
 
 class ScoreTest(unittest.TestCase):
     def test_net_leak_subtracts_control_and_is_per_minute(self):
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
-                                               "noise": 2.0, "ci": {}}}
-        control["retained_player_objects"]["coef"]["quit_lt250"] = 1.0
+        control = {"threads_live": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
+                                    "noise": 2.0, "ci": {}}}
+        control["threads_live"]["coef"]["quit_lt250"] = 1.0
         feats = {k: 0 for k in bf.FEATURES}
         feats["quit_lt250"] = 3
         # control predicts 2 + 1*3 = 5; delta 11 -> net 6 over noise 2 = 3, in 30 s -> *2 per min
-        rec = {"features": feats, "deltas": {"retained_player_objects": 11}, "ms": 30000}
-        self.assertAlmostEqual(bf.score_episode(rec, ["retained_player_objects"], control), 6.0, places=4)
+        rec = {"features": feats, "deltas": {"threads_live": 11}, "ms": 30000}
+        self.assertAlmostEqual(bf.score_episode(rec, ["threads_live"], control), 6.0, places=4)
         # Matching the control exactly scores ~0.
-        rec0 = {"features": feats, "deltas": {"retained_player_objects": 5}, "ms": 30000}
-        self.assertAlmostEqual(bf.score_episode(rec0, ["retained_player_objects"], control), 0.0, places=4)
+        rec0 = {"features": feats, "deltas": {"threads_live": 5}, "ms": 30000}
+        self.assertAlmostEqual(bf.score_episode(rec0, ["threads_live"], control), 0.0, places=4)
         self.assertIsNone(bf.score_episode({"excluded": "x", "deltas": None, "ms": 1}, ["x"], None))
 
     def test_unexplained_find(self):
@@ -987,7 +1009,7 @@ class ScoreTest(unittest.TestCase):
 
     def test_attribution_metrics_excluded_from_surprises(self):
         rec = {"features": {k: 0 for k in bf.FEATURES},
-               "deltas": {"plugin.rtp.live_instances": 100, "retained_player_objects": 0}, "ms": 40000}
+               "deltas": {"plugin.rtp.live_instances": 100, "threads_live": 0}, "ms": 40000}
         fit = {"plugin.rtp.live_instances": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 0.0, "noise": 1.0, "ci": {}}}
         found = bf.surprises(rec, ["plugin.rtp.live_instances"], None, fit, z=3.0)
         self.assertNotIn("plugin.rtp.live_instances", found)
@@ -1012,7 +1034,7 @@ class ClassScreenTest(unittest.TestCase):
             q250, qlate, rtp = rng.randint(0, 4), rng.randint(0, 4), rng.randint(1, 5)
             feats = {k: 0 for k in bf.FEATURES}
             feats.update(rtp=rtp, quit=q250 + qlate, quit_lt250=q250, quit_later=qlate)
-            d = {"retained_player_objects": 0}
+            d = {"threads_live": 0}
             for name, m, s in cls:
                 v = round(rng.gauss(m, s))
                 if v:
@@ -1050,8 +1072,8 @@ class ClassScreenTest(unittest.TestCase):
         rec = max(target, key=lambda r: r["features"]["quit_lt250"])
         ref["cls:plug.P"] = dict(ref["cls:plug.P"], noise=max(ref["cls:plug.P"]["noise"], screen[0]["noise"]))
         z = bf.bonferroni_z(seen)
-        base = bf.score_episode(rec, ["retained_player_objects"], ref, z)
-        with_cls = bf.score_episode(rec, ["retained_player_objects", "cls:plug.P"], ref, z)
+        base = bf.score_episode(rec, ["threads_live"], ref, z)
+        with_cls = bf.score_episode(rec, ["threads_live", "cls:plug.P"], ref, z)
         self.assertGreater(with_cls, base)
         self.assertLessEqual(with_cls - base, bf.CLASS_TERM_CAP * 60000 / rec["ms"] + 1e-9)
 
@@ -1091,7 +1113,7 @@ class ClassScreenTest(unittest.TestCase):
         self.assertIsNone(side)
         self.assertEqual(bf.class_stats(recs)["n"], 9)
         self.assertEqual(bf.fit_counts(recs, ["cls:plug.P"])["cls:plug.P"]["n"], 9)
-        self.assertEqual(bf.fit_counts(recs, ["retained_player_objects"])["retained_player_objects"]["n"], 10)
+        self.assertEqual(bf.fit_counts(recs, ["threads_live"])["threads_live"]["n"], 10)
 
     def test_target_run_rescreens_against_control_episodes_on_disk(self):
         run_dir = tempfile.mkdtemp()
@@ -1123,6 +1145,94 @@ class ClassScreenTest(unittest.TestCase):
     def test_bonferroni_is_stricter_with_more_classes(self):
         self.assertAlmostEqual(bf.bonferroni_z(1), 1.96, delta=0.01)
         self.assertGreater(bf.bonferroni_z(10000 * len(bf.FIT_FEATURES)), 5.0)
+
+
+class DepartureScreenTest(unittest.TestCase):
+    """Growth per departed session: a class something keeps per ended session
+    is found by its slope against the quit counter, whatever its name."""
+
+    def episodes(self, seed, n=12, leaky=0.0, shared=2.0):
+        """Histogram episodes with 1..10 departures each: x.Leaky grows `leaky`
+        per departure, x.Shared `shared` per departure, n.Noise is departure-free."""
+        rng = __import__("random").Random(seed)
+        recs = []
+        for ep in range(n):
+            q = rng.randint(1, 10)
+            d = {}
+            for name, v in (("x.Leaky", leaky * q + rng.gauss(0, 0.5)), ("x.Shared", shared * q + rng.gauss(0, 0.5)),
+                            ("n.Noise", rng.gauss(0, 2))):
+                if round(v):
+                    d[bf.CLS + name] = round(v)
+            recs.append({"seed": seed, "ep": ep, "rung": 0, "features": {k: 0 for k in bf.FEATURES},
+                         "deltas": d, "departures": q, "ms": 40000})
+        return recs
+
+    def test_departures_from_the_quit_counter(self):
+        self.assertEqual(bf.departures({"quits_total": 3.0}, {"quits_total": 7.0}), 4)
+        self.assertEqual(bf.departures({"quits_total": 7.0}, {"quits_total": 7.0}), 0)
+        self.assertIsNone(bf.departures({"quits_total": -1.0}, {"quits_total": 7.0}))  # -1 = not measured
+        self.assertIsNone(bf.departures({"quits_total": 3.0}, {"quits_total": -1.0}))
+        self.assertIsNone(bf.departures({}, {"quits_total": 7.0}))
+        self.assertIsNone(bf.departures({"quits_total": 3.0}, {}))
+        self.assertIsNone(bf.departures({"quits_total": 10.0}, {"quits_total": 2.0}))  # counter reset
+
+    def test_class_growing_per_departure_beyond_the_control_is_flagged(self):
+        target, control = self.episodes(2, leaky=3.0), self.episodes(1)
+        out = bf.screen_departures(target, control, 64)
+        names = [s["cls"] for s in out]
+        self.assertEqual(names, ["x.Leaky"])  # x.Shared grows as much in the control; n.Noise never
+        self.assertAlmostEqual(out[0]["per_departure"], 3.0, delta=0.2)
+        self.assertAlmostEqual(out[0]["control_per_departure"], 0.0, delta=0.2)
+        self.assertGreater(out[0]["z"], bf.bonferroni_z(3))
+        # Without the control's slope, the shared growth is indistinguishable from a leak.
+        self.assertIn("x.Shared", [s["cls"] for s in bf.screen_departures(target, None, 64)])
+
+    def test_noise_alone_flags_nothing(self):
+        self.assertEqual(bf.screen_departures(self.episodes(2), self.episodes(1), 64), [])
+
+    def test_too_few_departure_episodes_screen_nothing(self):
+        target, control = self.episodes(2, n=3, leaky=3.0), self.episodes(1)
+        self.assertEqual(bf.screen_departures(target, control, 64), [])
+        self.assertTrue(bf.screen_departures(self.episodes(2, n=4, leaky=3.0), control, 64))
+        # Episodes nobody left do not count towards min_n.
+        idle = [dict(r, departures=0) for r in self.episodes(2, leaky=3.0)]
+        self.assertEqual(bf.screen_departures(idle, control, 64), [])
+
+    def test_scorable_drops_retired_counts_and_keeps_resources(self):
+        self.assertFalse(bf.scorable("retained_player_objects"))
+        self.assertFalse(bf.scorable("slope.retained_player_objects"))
+        self.assertTrue(bf.scorable("threads_live"))
+        self.assertTrue(bf.scorable("slope.histogram_live_mb"))
+        self.assertFalse(bf.scorable(bf.CLS + "x.Leaky"))  # classes come from the screens
+
+    def test_target_run_scores_a_class_only_the_departure_screen_finds(self):
+        # Per episode the class grows by 10 in both runs, so the cumulative screen
+        # sees nothing; the control keeps 2 per departed session, the target 10.
+        def recs(seed, q):
+            return [{"seed": seed, "ep": ep, "rung": 0, "features": {k: 0 for k in bf.FEATURES},
+                     "deltas": {bf.CLS + "x.PerSession": 10}, "departures": q, "ms": 40000} for ep in range(8)]
+        run_dir = tempfile.mkdtemp()
+        try:
+            cdir = os.path.join(run_dir, bf.DIRECT)
+            os.makedirs(cdir)
+            control = recs(1, 5)
+            stub = types.SimpleNamespace(trace=os.path.join(cdir, "episodes.jsonl"), tdir=cdir)
+            for r in control:
+                bf.TargetRun.write(stub, r)
+            bf.save_json(os.path.join(run_dir, bf.CONTROL_CLASSES_FILE), bf.class_stats(control))
+            tdir = os.path.join(run_dir, "betterrtp")
+            os.makedirs(tdir)
+            a = bf.build_parser().parse_args(["--server-dir", run_dir])
+            tr = bf.TargetRun(a, None, None, None, "betterrtp", "20261010-200000", tdir)
+            tr.rescreen(recs(2, 1))
+            self.assertNotIn("x.PerSession", [s["cls"] for s in tr.screen])
+            self.assertEqual([s["cls"] for s in tr.departure_screen], ["x.PerSession"])
+            self.assertAlmostEqual(tr.departure_screen[0]["per_departure"], 10.0)
+            self.assertAlmostEqual(tr.departure_screen[0]["control_per_departure"], 2.0)
+            self.assertIn(bf.CLS + "x.PerSession", tr.score_counts)
+            self.assertEqual(tr.class_ref[bf.CLS + "x.PerSession"]["n"], len(control))  # fitted on the control
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
 
 
 class SearchLoopTest(unittest.TestCase):
@@ -1170,7 +1280,7 @@ class SearchLoopTest(unittest.TestCase):
             if req["id"].endswith("-e4"):
                 target["progs"] = progs
             if target.get("progs") == progs:
-                self.server.retained += 5
+                self.server.fds += 5
         self.swarm.after = rare
         recs = self.tr.run_seed(1)
         replays = [r for r in recs if r["origin"] == "replay"]
@@ -1179,10 +1289,8 @@ class SearchLoopTest(unittest.TestCase):
         self.assertEqual(len(planned), 24)
         self.assertEqual(len(replays), 3)
         self.assertEqual(len(recs), 27)  # replays do not consume the planned episode budget
-        # The fake moves every player count together; the largest net names the candidate.
-        players = {"retained_player_objects", "serverplayer_live", "craftplayer_live"}
         self.assertEqual([(c["ep"], c["k"], c["n"]) for c in self.tr.candidates], [(4, 3, 3)])
-        self.assertIn(self.tr.candidates[0]["count"], players)
+        self.assertEqual(self.tr.candidates[0]["count"], "fd_open")
         lines = self.opt()
         self.assertEqual(lines[0]["state"], "searching")
         flip = next(x for x in lines if x["state"] == "exploiting")
@@ -1202,7 +1310,7 @@ class SearchLoopTest(unittest.TestCase):
             if req["id"].endswith("-e4"):
                 target["progs"] = progs
             if target.get("progs") == progs:
-                self.server.retained += 5
+                self.server.fds += 5
         self.swarm.after = rare
         self.a.replay_budget = 0  # no replays allowed by budget
         recs = self.tr.run_seed(1)
@@ -1213,7 +1321,7 @@ class SearchLoopTest(unittest.TestCase):
     def test_one_off_spike_is_replayed_but_does_not_flip(self):
         def spike(req):
             if req["id"].endswith("-e4"):
-                self.server.retained += 5
+                self.server.fds += 5
         self.swarm.after = spike
         self.tr.run_seed(1)
         side = bf.read_trace(os.path.join(self.tdir, "surprises.jsonl"))
@@ -1223,12 +1331,12 @@ class SearchLoopTest(unittest.TestCase):
         self.assertFalse(self.tr.candidates)
 
     def test_candidates_are_shrunk_first(self):
-        self.tr.candidates.append({"seed": 1, "ep": 9, "count": "retained_player_objects",
+        self.tr.candidates.append({"seed": 1, "ep": 9, "count": "fd_open",
                                    "rec": {"ep": 9, "bots": [], "features": {}, "deltas": {}}})
         called = []
         self.tr.shrink = lambda seed, rec, count: called.append((rec["ep"], count)) or {}
         self.tr.shrink_top(1, [], 2)
-        self.assertEqual(called, [(9, "retained_player_objects")])
+        self.assertEqual(called, [(9, "fd_open")])
 
 
 class SearchStateTest(unittest.TestCase):
@@ -1260,14 +1368,14 @@ class SearchStateTest(unittest.TestCase):
 
     def test_surprise_detection(self):
         feats = {k: 0 for k in bf.FEATURES}
-        ref = {"retained_player_objects": {"coef": {}, "intercept": 0.0, "noise": 0.5, "sd": 0.0, "ci": {}}}
-        rec = {"features": feats, "deltas": {"retained_player_objects": 1}, "ms": 1}
+        ref = {"threads_live": {"coef": {}, "intercept": 0.0, "noise": 0.5, "sd": 0.0, "ci": {}}}
+        rec = {"features": feats, "deltas": {"threads_live": 1}, "ms": 1}
         # A count the control never moved: a single object is surprising.
-        self.assertEqual(bf.surprises(rec, ["retained_player_objects"], ref, {}, 4.0), {"retained_player_objects": 1.0})
-        noisy = {"retained_player_objects": dict(ref["retained_player_objects"], sd=2.0)}
-        self.assertEqual(bf.surprises(rec, ["retained_player_objects"], noisy, {}, 4.0), {})
-        down = dict(rec, deltas={"retained_player_objects": -9})
-        self.assertEqual(bf.surprises(down, ["retained_player_objects"], noisy, {}, 4.0), {})
+        self.assertEqual(bf.surprises(rec, ["threads_live"], ref, {}, 4.0), {"threads_live": 1.0})
+        noisy = {"threads_live": dict(ref["threads_live"], sd=2.0)}
+        self.assertEqual(bf.surprises(rec, ["threads_live"], noisy, {}, 4.0), {})
+        down = dict(rec, deltas={"threads_live": -9})
+        self.assertEqual(bf.surprises(down, ["threads_live"], noisy, {}, 4.0), {})
 
 
 class LadderRulesTest(unittest.TestCase):
@@ -1349,7 +1457,7 @@ class LadderLoopTest(unittest.TestCase):
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def cand(self, name, program):
-        return {"cand": name, "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+        return {"cand": name, "seed": 1, "ep": 0, "count": LEAK_CLS, "source": "flag",
                 "shrunk": False, "bots": [{"name": "x", "program": program}] * 2, "net0": 2.0, "bots0": 2}
 
     def test_climb_confirms_the_leak_and_drops_the_rest(self):
@@ -1366,7 +1474,7 @@ class LadderLoopTest(unittest.TestCase):
         self.assertEqual(dropped, {"noise": (0, "micro-only"), "micro4": (1, "micro-only")})
         top = [r for r in ladder if "confirm" in r]
         self.assertEqual([r["cand"] for r in top], ["leak"])
-        self.assertEqual(top[0]["nets"], [8.0, 8.0, 8.0])  # 8 bots, one retained player each
+        self.assertEqual(top[0]["nets"], [8.0, 8.0, 8.0])  # 8 bots, one leaked instance each
         self.assertTrue(top[0]["confirm"]["fail"])
         self.assertTrue(top[0]["dumps"]["final"].endswith(".hprof"))
         self.assertIn("heap_owner.py", top[0]["owner"]["command"])  # no --mat: the command to run
@@ -1533,12 +1641,12 @@ class ShrinkTest(unittest.TestCase):
 
     def test_required_effect_is_half_net_and_at_least_one(self):
         feats = {k: 0 for k in bf.FEATURES}
-        control = {"retained_player_objects": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
-                                               "noise": 1.0, "ci": {}}}
-        rec = {"features": feats, "deltas": {"retained_player_objects": 12}}  # net 10 over control intercept 2
-        self.assertEqual(bf.required_effect(rec, "retained_player_objects", control), 5.0)
-        small = {"features": feats, "deltas": {"retained_player_objects": 3}}
-        self.assertEqual(bf.required_effect(small, "retained_player_objects", control), 1.0)
+        control = {"threads_live": {"coef": {k: 0.0 for k in bf.FEATURES}, "intercept": 2.0,
+                                    "noise": 1.0, "ci": {}}}
+        rec = {"features": feats, "deltas": {"threads_live": 12}}  # net 10 over control intercept 2
+        self.assertEqual(bf.required_effect(rec, "threads_live", control), 5.0)
+        small = {"features": feats, "deltas": {"threads_live": 3}}
+        self.assertEqual(bf.required_effect(small, "threads_live", control), 1.0)
 
 
 class DdminTest(unittest.TestCase):
@@ -1612,10 +1720,14 @@ class RepetitionTest(LoopFixture, unittest.TestCase):
         return self.tr.execute(1, 0, plan, None)
 
     def test_leak_keeps_its_slope(self):
+        def leak_fd(req):
+            self.server.fds += 1
+        self.swarm.after = leak_fd
         rec = self.run_plan([{"a": "rtp"}, {"a": "quit"}])
         self.assertEqual(3, rec["reps"])
         self.assertEqual(3, len(rec["series"]))
-        self.assertEqual(1.0, rec["deltas"]["slope.retained_player_objects"])
+        self.assertEqual(1.0, rec["deltas"]["slope.fd_open"])
+        self.assertEqual(1.0, rec["deltas"]["slope.heap_used_after_gc_mb"])  # one leaked instance per rep
         self.assertEqual(0.0, rec["deltas"]["slope.threads_live"])
         self.assertEqual(3, self.server.retained)  # every repetition leaked
         labels = [c.split()[2] for c in self.server.cmds if c.endswith(" quick")]
@@ -1624,7 +1736,7 @@ class RepetitionTest(LoopFixture, unittest.TestCase):
         names = [b["name"] for req, _ in self.swarm.requests for b in req["bots"]]
         self.assertEqual(3, len(set(names)))
         # The next episode starts from the last repetition's checkpoint.
-        self.assertEqual(3, self.tr.prev["retained_player_objects"])
+        self.assertEqual(103, self.tr.prev["fd_open"])
 
     def test_cache_that_fills_once_has_no_slope(self):
         self.swarm.leak_quit = False
@@ -1633,12 +1745,12 @@ class RepetitionTest(LoopFixture, unittest.TestCase):
         def fill_once(req):
             calls.append(req["id"])
             if len(calls) == 1:
-                self.server.retained += 5
+                self.server.fds += 5
 
         self.swarm.after = fill_once
         rec = self.run_plan([{"a": "rtp"}, {"a": "quit"}])
-        self.assertEqual(5, rec["deltas"]["retained_player_objects"])  # first run: looks like a leak
-        self.assertEqual(0.0, rec["deltas"]["slope.retained_player_objects"])  # repetitions: flat
+        self.assertEqual(5, rec["deltas"]["fd_open"])  # first run: looks like a leak
+        self.assertEqual(0.0, rec["deltas"]["slope.fd_open"])  # repetitions: flat
 
     def test_console_actions_run_every_repetition_and_count_as_feature_and_state(self):
         rec = self.run_plan([{"a": "rtp"}], console=[{"at_ms": 0, "cmd": "betterrtp reload"}])
@@ -2160,7 +2272,8 @@ class FaultModeTest(LoopFixture, unittest.TestCase):
         self.assertEqual(sum(1 for c in self.server.cmds if c == f"rtpstress leakcheck {base} quick"), 1)
         self.assertEqual(sum(1 for c in self.server.cmds if c == "rtpstress leakcheck fz20261010-200000-betterrtp-s1-ep0 quick"), 1)  # the checkpointed run
         self.assertIsNotNone(rerun[0]["deltas"])
-        self.assertIn("retained_player_objects", rerun[0]["deltas"])
+        self.assertIn("heap_used_after_gc_mb", rerun[0]["deltas"])
+        self.assertGreater(rerun[0]["departures"], 0)
         self.assertNotIn("kept", rerun[0])  # re-runs are never offered to the corpus
         mine = [x for x in self.ladder_rows() if x.get("origin") == "leakrerun"]
         self.assertEqual(len(mine), 1)
@@ -2173,10 +2286,11 @@ class FaultModeTest(LoopFixture, unittest.TestCase):
         tr.run_seed(1)
         with open(os.path.join(self.tdir, "fit.json"), encoding="utf-8") as fh:
             fit = json.load(fh)["fit"]
-        self.assertEqual(fit["retained_player_objects"]["n"], 4)  # the 4 re-runs; fault episodes have no deltas
+        self.assertEqual(fit["threads_live"]["n"], 4)  # the 4 re-runs; fault episodes have no deltas
+        self.assertEqual(fit[LEAK_CLS]["n"], 4)  # the leaking class was screened from them
 
     def test_rung_on_a_faults_mode_candidate_takes_checkpointed_runs_and_a_confirm(self):
-        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": LEAK_CLS, "source": "flag",
              "shrunk": False, "bots": bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, self.tr.cfg), "console": None,
              "net0": 1.0, "bots0": 2, "params": None}
         res = self.tr.run_rung(c, 0, 2, 2, True)
@@ -2210,7 +2324,7 @@ class FaultModeTest(LoopFixture, unittest.TestCase):
                 self.server.online = ["fzlinger_0"]
 
         self.swarm.after = leave_player
-        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": LEAK_CLS, "source": "flag",
              "shrunk": False, "bots": bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, self.tr.cfg), "console": None,
              "net0": 1.0, "bots0": 2, "params": None}
         rung = self.tr.run_rung(c, 0, 2, 1, False)

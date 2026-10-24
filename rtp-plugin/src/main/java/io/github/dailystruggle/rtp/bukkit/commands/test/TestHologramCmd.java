@@ -91,15 +91,13 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "hologram",
             OWNER,
             BitTier.IBIT,
             BitSideEffect.NEEDS_PLAYER,
             COMPONENT_TIMEOUT_MS,
             () -> ProbeBitReport.forProbe("hologram").build());
-    return component;
   }
 
   public TestHologramCmd(@Nullable CommandsAPICommand parent) {

@@ -124,6 +124,8 @@ public final class ActionSetupBit {
             manager.getActionIds().stream().sorted().map(manager::getAction)
                     .flatMap(java.util.Optional::stream).forEach(actions::add);
         }
+        // The shared manager is owned by RTP and must not be closed here.
+        @SuppressWarnings("resource")
         PhysicalTriggerManager triggers = PhysicalTriggerManager.instance();
         Map<String, PhysicalTriggerSpec> registeredTriggers = new HashMap<>();
         for (PhysicalTriggerSpec trigger : triggers.getTriggers()) {

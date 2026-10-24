@@ -161,10 +161,10 @@ counts what survives a full GC instead, the same way for every plugin:
 /rtpstress churn all [namePrefix]   # kick players; bench-swarm reconnects them as new sessions
 ```
 
-- `retained_player_objects` = live `CraftPlayer` / `ServerPlayer`
-  instances after the histogram's full GC, minus players online. Any
-  value above 0 that grows with `quits_total` is a session something
-  still references.
+- `leak.csv` carries churn counters (joins, quits, distinct UUIDs) and
+  post-GC heap totals only; it names no class. Class-level retention
+  comes from the `.histo.txt` files, which `scripts/bench_fuzz.py`
+  screens class by class against the control and against departures.
 - Same-name churn (default swarm) gives each rejoin a new `Player`
   object with the same offline UUID, which exposes `Player`-keyed
   retention. `bench-swarm.js --churn-rename` rejoins churn-kicked bots as

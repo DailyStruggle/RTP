@@ -96,9 +96,9 @@ public final class ActionDefinitionValidator {
             "Provide a valid JSON text component where tellraw or title expects one.");
 
     private static final Pattern TELLRAW_COMPONENT = Pattern.compile(
-            "(?i)^\\s*/?(?:minecraft:)?tellraw\\s+\\S+\\s+(.++)$");
+            "(?i)^\\s*+/?(?:minecraft:)?tellraw\\s++\\S++(\\s++.*+)$");
     private static final Pattern TITLE_COMPONENT = Pattern.compile(
-            "(?i)^\\s*/?(?:minecraft:)?title\\s+\\S+\\s+(?:title|subtitle|actionbar)\\s+(.++)$");
+            "(?i)^\\s*+/?(?:minecraft:)?title\\s++\\S++\\s++(?:title|subtitle|actionbar)(\\s++.*+)$");
     private static final Pattern INTEGER_TOKEN = Pattern.compile("\\d+");
     private static final Set<String> EXPRESSION_SUB_KEYS = Set.of(
             "matches", "range", "distance", "elevationDelta", "elapsed", "remaining", "playerCount", "count");

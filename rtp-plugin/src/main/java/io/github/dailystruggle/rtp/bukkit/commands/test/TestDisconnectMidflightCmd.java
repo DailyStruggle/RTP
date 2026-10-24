@@ -144,15 +144,13 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "disconnect-midflight",
             "test.disconnect-midflight",
             BitTier.IBIT,
             BitSideEffect.NEEDS_WORLD,
             5_000,
             () -> ProbeBitReport.forProbe("disconnect-midflight").build());
-    return component;
   }
 
   static BitReport toBitReport(Result result) {

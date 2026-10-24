@@ -74,15 +74,13 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "folia-ownership",
             "test.folia-ownership",
             BitTier.IBIT,
             BitSideEffect.NEEDS_WORLD,
             5_000,
             () -> ProbeBitReport.forProbe("folia-ownership").build());
-    return component;
   }
 
   @Override

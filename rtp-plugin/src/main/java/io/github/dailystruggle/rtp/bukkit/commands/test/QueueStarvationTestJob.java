@@ -109,15 +109,13 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "queue-starvation",
             "test.queue-starvation",
             BitTier.IBIT,
             BitSideEffect.HEAVY,
             COMPONENT_TIMEOUT_MS,
             () -> ProbeBitReport.forProbe("queue-starvation").build());
-    return component;
   }
 
   @Override

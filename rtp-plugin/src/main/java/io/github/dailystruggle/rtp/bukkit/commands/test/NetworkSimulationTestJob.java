@@ -213,15 +213,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
         "Check network transport availability and the selected synthetic probe.");
   }
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "network",
             "test.network",
             BitTier.IBIT,
             BitSideEffect.SAFE,
             60_000,
             NetworkSimulationTestJob::runTokenCheck);
-    return component;
   }
   private static BitReport runTokenCheck() {
     Result result = new Result(ProbeKind.TOKENS);

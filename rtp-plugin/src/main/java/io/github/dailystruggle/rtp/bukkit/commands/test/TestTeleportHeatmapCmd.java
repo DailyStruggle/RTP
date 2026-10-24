@@ -187,13 +187,12 @@ public final class TestTeleportHeatmapCmd extends BaseRTPCmdImpl {
     }
 
     private static BitComponent registerComponent() {
-        BitComponent component = new BitComponent(
+        return new BitComponent(
                 "teleport-heatmap", OWNER, BitTier.IBIT, BitSideEffect.HEAVY,
                 COMPONENT_TIMEOUT_MILLIS,
                 () -> ProbeBitReport.forProbe("teleport-heatmap")
                         .note(HEATMAP_MOCKED, "heatmap.mocked", "No real player is teleported by this probe.")
                         .build());
-        return component;
     }
 
     private static BitReport unavailableReport(String detail) {

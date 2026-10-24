@@ -145,15 +145,13 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component =
-        new BitComponent(
+    return new BitComponent(
             "scheduler",
             "test.scheduler",
             BitTier.IBIT,
             BitSideEffect.SAFE,
             15_000,
             () -> toBitReport(runProbe(RTPAPI.serverId, RTPRuntime.scheduler(), null, false)));
-    return component;
   }
 
   static BitReport toBitReport(Result result) {

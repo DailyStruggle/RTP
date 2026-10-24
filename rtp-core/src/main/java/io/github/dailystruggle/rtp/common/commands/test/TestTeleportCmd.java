@@ -168,10 +168,9 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
   }
 
   private static BitComponent registerComponent() {
-    BitComponent component = new BitComponent("teleport", OWNER, BitTier.IBIT,
+    return new BitComponent("teleport", OWNER, BitTier.IBIT,
         BitSideEffect.HEAVY, 120_000,
         () -> runProbe(DEFAULT_REGION, MIN_COUNT, RTPAPI::teleport, AWAIT_MILLIS, () -> false));
-    return component;
   }
 
   static String region(@Nullable Map<String, List<String>> parameterValues) {

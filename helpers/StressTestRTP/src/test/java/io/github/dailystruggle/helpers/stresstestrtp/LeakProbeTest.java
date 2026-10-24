@@ -36,44 +36,23 @@ class LeakProbeTest {
     }
 
     @Test
-    @DisplayName("histogram: CraftPlayer matched by suffix across versioned packages")
-    void craftPlayerSuffix() {
-        List<LeakProbe.ClassCount> rows = LeakProbe.parseHistogram(HISTO);
-        assertEquals(55L, LeakProbe.sumInstances(rows, LeakProbe.CRAFT_PLAYER, true));
-        assertEquals(50L, LeakProbe.sumInstances(rows, LeakProbe.SERVER_PLAYER, false));
-        assertEquals(50L, LeakProbe.sumInstances(rows, LeakProbe.CONNECTION, false));
-    }
-
-    @Test
-    @DisplayName("histogram: absent class is not-measured (-1), never zero retention")
-    void absentIsSentinel() {
-        List<LeakProbe.ClassCount> rows = LeakProbe.parseHistogram("   1:  10  100  [B (java.base)");
-        assertEquals(-1L, LeakProbe.sumInstances(rows, LeakProbe.SERVER_PLAYER, false));
-    }
-
-    @Test
-    @DisplayName("checkpoint: retained player objects = max(live player classes) - online, floored at 0")
-    void retained() {
-        LeakProbe.Checkpoint c = new LeakProbe.Checkpoint(0L, "c1", 48, 96, 48, 96,
-                55L, 50L, 48L, 1000.0, 800.0, 10L, "f");
-        assertEquals(7L, c.retainedPlayerObjects());
-        LeakProbe.Checkpoint under = new LeakProbe.Checkpoint(0L, "c1", 48, 0, 0, 48,
-                40L, 40L, 40L, 1.0, 1.0, 1L, "f");
-        assertEquals(0L, under.retainedPlayerObjects());
-        LeakProbe.Checkpoint unknown = new LeakProbe.Checkpoint(0L, "c1", 48, 0, 0, 48,
-                -1L, -1L, -1L, -1, -1, 1L, "f");
-        assertEquals(-1L, unknown.retainedPlayerObjects());
-    }
-
-    @Test
-    @DisplayName("checkpoint: CSV row matches header column count and escapes commas")
+    @DisplayName("checkpoint: CSV row matches header column count, escapes commas, names no player class")
     void csvShape() {
         LeakProbe.Checkpoint c = new LeakProbe.Checkpoint(1L, "a,b", 1, 2, 3, 4,
-                5L, 6L, 7L, 8.25, -1, 9L, "x.txt");
+                8.5, -1, 9L, "x.txt");
+        String[] header = LeakProbe.CSV_HEADER.split(",", -1);
         String[] cols = c.csvRow().split(",", -1);
-        assertEquals(LeakProbe.CSV_HEADER.split(",").length, cols.length);
+        assertEquals(header.length, cols.length);
+        assertEquals(List.of("epoch_ms", "label", "online", "joins_total", "quits_total", "distinct_uuids",
+                "heap_used_after_gc_mb", "old_gen_after_gc_mb", "histogram_ms", "histogram_file"),
+                List.of(header));
+        for (String h : header) {
+            assertFalse(h.contains("player") || h.contains("listener") || h.contains("retained"), h);
+        }
         assertEquals("a;b", cols[1]);
-        assertEquals("-1", cols[11]);
+        assertEquals("8.5", cols[6]);
+        assertEquals("-1", cols[7]);
+        assertEquals("x.txt", cols[9]);
     }
 
     @Test
