@@ -5,7 +5,7 @@
 
 ## Context
 
-ADR-087 sizes RTP's total background refill rate $r^{*}$ and, when $r^{*}$ does not cover every region's deliverable demand $\bar d_r$, divides it in proportion to that demand (ADR-087 section 4.3, item 1, constrained allocation). Proportional sharing never clips the busiest region first, but it measures demand in locations, not in people: a region drained by one player's repeated teleports and a region drained at the same rate by 40 players get the same share. Under constraint the 40 players and the one player each see their region's ready cache refill at the same speed.
+ADR-087 sizes RTP's total background refill rate $r^{*}$ and, when $r^{*}$ does not cover every region's deliverable demand $\bar d_r$, divides it in proportion to smoothed demand $w_r$, capped at $\bar d_r$ (ADR-087 section 4.3, item 1, constrained allocation). Proportional sharing never clips the busiest region first, but it measures demand in locations, not in people: a region drained by one player's repeated teleports and a region drained at the same rate by 40 players get the same share. Under constraint the 40 players and the one player each see their region's ready cache refill at the same speed.
 
 Refill is constrained when a server-wide capacity limit binds through $r^{*}$: $B_{\text{cpu}}$ on single-loop hosts with a fresh MSPT reading, and the async limiter ($f_A < 1$, process CPU breach) on every platform, Folia included. How often that happens is not known; ADR-087's observe-only mode measures it (section 7).
 
@@ -26,7 +26,7 @@ It adds no invariant of its own. ADR-087 I4 (player-facing work unchanged) and I
 
 ### 2. Background refill across RTP regions
 
-This replaces ADR-087's proportional constrained allocation. When $r^{*}$ does not cover demand, the rate is divided by weighted max-min fairness (water-filling) with weights $n_r$:
+This replaces the weights of ADR-087's constrained allocation, smoothed demand $w_r$, with distinct players $n_r$. When $r^{*}$ does not cover demand, the rate is divided by weighted max-min fairness (water-filling) with weights $n_r$:
 
 $$x_r = \min\left(\bar d_r,\; n_r \cdot \theta\right), \qquad \theta \text{ chosen so that } \sum_r x_r = r^{*}$$
 

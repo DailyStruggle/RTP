@@ -2395,7 +2395,15 @@ class TargetRun:
                      "program": [{"a": "rtp"}]} for j in range(self.a.min_bots)]
             eid = f"{self.target}-s{seed}-warm{i}"[:64]
             log(f"{self.target}: warm-up {i + 1}/{self.a.warmup} with {len(bots)} bot(s)")
-            events, _ = self.run_bots(eid, bots, None)
+            try:
+                events, _ = self.run_bots(eid, bots, None)
+            except SwarmError as e:
+                # Same recovery as a scored episode; an unrecoverable swarm aborts via main's NoSpawnError path.
+                try:
+                    self.swarm_failed(f"warm{i}", e)
+                except SwarmError as e2:
+                    raise NoSpawnError(f"warm-up {eid}: {e2}") from e2
+                continue
             if not any(e.get("ev") == "spawn" for e in events):
                 errors = list(dict.fromkeys(str(e.get("text", "")) for e in events
                                             if e.get("ev") == "bot_error" and e.get("text")))

@@ -96,6 +96,7 @@
 - Command discovery from `plugin.yml` and tab completion; argument values learnt from tab completion (`/rtp region:... world:...`); GUI clicks and chat.
 - Prioritise by coverage gained per action type (a bandit over action types).
 - Cross-feed: arguments and config values that reach new coverage become Jazzer seeds.
+- **Proposed extension:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (Proposed, awaiting D-005 approval) takes this stage further as a target-free `--mode server`: commands come from the `declare_commands` Brigadier tree per permission tier (default and RCON `op`, with a denylist) instead of `plugin.yml`; a bandit runs over (command node, follow-up shape) rather than action types; leaks and stalls are detected against a same-seed vanilla baseline through host `jcmd`; and a jar is blamed only after a jar `ddmin` confirms it. Method and validation targets: [`WHOLE_SERVER_FUZZING.md`](WHOLE_SERVER_FUZZING.md). Target mode and the coverage-based prioritisation above are unchanged; JaCoCo coverage is out of scope for server mode.
 
 ---
 
