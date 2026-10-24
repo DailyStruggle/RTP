@@ -3465,9 +3465,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--files-wait-s", type=float, default=30, help="wait for rows in the (shared) runs files")
     p.add_argument("--coverage", action="store_true",
                    help="JaCoCo probes as a corpus key source (needs the bench server's -javaagent; ADR-111 2.6)")
-    p.add_argument("--mode", choices=("leak", "faults"), default="leak",
-                   help="faults: one checkpoint-free run per episode (finding oracles and coverage only); "
-                        "needs --coverage")
+    p.add_argument("--mode", choices=("leak", "faults", "server"), default="leak",
+                   help="leak/faults: ADR-111 target modes (faults needs --coverage); "
+                        "server: ADR-125 passive local server audit")
+    p.add_argument("--profile", default=None,
+                   help="server mode platform profile: paper, fabric, or neoforge (required for --mode server)")
+    p.add_argument("--tiers", default="default",
+                   help="permission tiers for --mode server (passive local audit allows 'default' only)")
+    p.add_argument("--deny", action="append", default=[],
+                   help="extra denylist pattern(s) for --mode server (comma-separated or repeatable)")
+    p.add_argument("--pid-file", default=None,
+                   help="local server JVM PID file for operator-selected jcmd snapshot in --mode server")
+    p.add_argument("--pid", type=int, default=None,
+                   help="local server JVM PID for operator-selected jcmd snapshot in --mode server")
+    p.add_argument("--jcmd-snapshot", action="store_true",
+                   help="collect a local read-only jcmd snapshot in --mode server")
+    p.add_argument("--container", default=None,
+                   help="container name (rejected in --mode server passive local audit)")
+    p.add_argument("--stall-ms", type=float, default=None,
+                   help="stall threshold in ms (rejected in --mode server passive local audit)")
+    p.add_argument("--default-budget-share", type=float, default=None,
+                   help="default-tier bandit share (rejected in --mode server passive local audit)")
     p.add_argument("--promote-max", type=int, default=4,
                    help="faults: leak re-runs per generation for episodes that reached new probes or signatures")
     p.add_argument("--top-classes", type=int, default=0, help="per-class deltas kept per episode (0 = all)")
@@ -3587,8 +3605,13 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
 
 
 def main(argv=None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
     p = build_parser()
-    a = p.parse_args(argv)
+    a = p.parse_args(raw_argv)
+    import bench_fuzz_server as bfs
+    if a.mode == "server":
+        return bfs.run_server_mode(a, parser=p, argv=raw_argv)
+    bfs.validate_target_mode_args(a, parser=p, argv=raw_argv)
     props = bo.read_properties(a.server_dir)
     port = a.port or int(props.get("rcon.port", "25575"))
     password = a.password or props.get("rcon.password", "")

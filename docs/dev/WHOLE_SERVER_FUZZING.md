@@ -1,10 +1,21 @@
 # Whole-server fuzzing: finding leaks and stalls in a server you were not told about
 
-`scripts/bench_fuzz.py --mode server` is a proposed mode of the live-server behaviour fuzzer that takes a host, the RCON details and the server directory, and nothing else. It discovers the attack surface from the server itself, finds leaks and main-thread stalls by comparison with a vanilla baseline, and blames a jar only after the finding has reproduced.
+`scripts/bench_fuzz.py --mode server` is the whole-server mode of the live-server behaviour fuzzer governed by [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md). The full ADR-125 design discovers the attack surface from the server itself, finds leaks and main-thread stalls by comparison with a vanilla baseline, and blames a jar only after the finding has reproduced; the shipped CLI slice implements only the defensive, non-executing **passive local audit** (`status: "passive_only"`).
 
-- **Governing decision:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (**Proposed**, awaiting Rule D-005 approval). It amends [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) section 2.2 for server mode only, and extends the platform profile of [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md) with a server-mode carve-out from its decision 6 (isolation and `--plugin-packages` attribution). ADR-122 is also Proposed.
-- **Status:** method only. Nothing described here is implemented, and no server-mode run exists. Every result below that is not explicitly attributed to a recorded run is a validation target, not evidence.
+- **Governing decision:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (**Accepted** under Rule D-005; ADR `Accepted` status records architectural design approval, not implementation completeness). It amends [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) section 2.2 for server mode only, and extends the platform profile of [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md) with a server-mode carve-out from its decision 6 (isolation and `--plugin-packages` attribution). ADR-122 is Proposed.
+- **Status (implemented passive snapshot vs. unimplemented active discovery fuzzing):** `scripts/bench_fuzz.py --mode server` (backed by `scripts/bench_fuzz_server.py`) implements only the read-only passive local audit described in [Passive local audit (`--mode server`)](#passive-local-audit---mode-server) below. Active discovery fuzzing - command argument generation and execution, `tab_complete` probing, the `(node, follow-up)` bandit, episode loops, RCON `op`/`deop` grants, the prerequisite-only vanilla baseline, replay confirmation, program shrinking, numeric threshold bisection and jar `ddmin` restarts - is **not** wired into `--mode server` execution, and no active server-mode fuzz run exists. Every active-fuzzing result below that is not explicitly attributed to a recorded target-mode run is a validation target, not evidence.
 - **Target mode** (one named plugin per restart, `--cmd`): unchanged; see [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) and [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md).
+
+---
+
+## Passive local audit (`--mode server`)
+
+The implemented `--mode server` CLI runs a single defensive, non-executing audit pass and refuses any flag that would execute commands, mutate permissions, toggle jars or claim a causal finding:
+
+- **Strict local disposable and offline validation:** requires an explicit `--profile` (`paper`, `fabric` or `neoforge` with an existing `plugins/` or `mods/` directory inside `--server-dir`), a local loopback `--host` and `--mc-host` (`127.0.0.1`, `localhost` or `::1`), and a local disposable bench directory produced by `scripts/bench_setup.py` (`server.properties` with explicit `online-mode=false`, `--mc-port` matching `server-port`, and a disposable marker `bench-loop.sh`, `no-restart-script` in `spigot.yml`, or `.bench-disposable`, outside any `.git` working tree or system root). Only `--tiers default` is accepted. Target-specific flags (`--cmd`, `--names`, `--jars`, `--plugin-packages`, `--targets`, `--rtp-args`), unsafe/op/container/mutation flags (`--grant`, `--lp-group`, `--console*`, `--allow-online`, `--container`, `--mat`, `--no-restart`, `--no-isolate`), replay flags (`--replay`, `--ep`, `--replay-seed`, `--replay-n`, `--replay-budget`), and active budget/stall flags (`--episodes`, `--seeds`, `--reps`, `--rungs`, `--warmup`, `--shrink*`, `--finding*`, `--surprise*`, `--coverage`, `--stall-ms`, `--default-budget-share`) are rejected with exit code `2`.
+- **Read-only `declare_commands` capture and offline `JarIndex` inventory:** logs in one `default`-tier bot via `bench-swarm.js` (`discover` op), captures the login `declare_commands` packet without sending any chat commands, `tab_complete` probes, window clicks or RCON commands, folds `namespace:cmd` and `cmd` aliases when their subtrees match, cuts redirect cycles, applies `DEFAULT_DENYLIST` plus any operator `--deny` patterns, and writes `commands.json` (recording an explicit truncation warning if the command graph hits the node cap). `JarIndex` scans `plugins/` or `mods/` offline via `zipfile` without renaming or toggling any `.jar` files.
+- **Linux-only verified `jcmd` PID snapshot and GC pause exclusion:** when the operator explicitly passes `--pid-file <path>`, `--pid <pid>` or `--jcmd-snapshot`, `JcmdObserver` verifies on POSIX hosts that the target PID is alive, owned by the current OS user, and positively tied to `--server-dir` via `/proc/<pid>/cwd` or a fresh `/proc/<pid>/cmdline` check (failing closed on Windows/non-POSIX hosts, unreadable `/proc` metadata, or recycled PIDs, and re-verifying PID ownership immediately before each `jcmd` call). It collects one read-only `GC.class_histogram` and one `Thread.print` dump. Because `jcmd <pid> GC.class_histogram` triggers a stop-the-world full GC pause on the target JVM, `JcmdObserver` records `[start_ms, end_ms]` wall-clock exclusion windows (including post-command grace) so `filter_tick_gaps` and `StallOracle` exclude any `tick_gap` event (`{ev: "tick_gap", bot, ms, at, keepalive_ms, id, t}`) whose `[at - ms, at]` interval overlaps a GC or thread-dump window (`observer_window`); untimed gaps (`unverifiable_timestamp`) are failed closed only when exclusion windows are defined.
+- **Non-causal report (`PASSIVE_ONLY`):** emits `verdict.json` and `report.txt` with `"status": "passive_only"`, `"verdict": "PASSIVE_ONLY"`, `"baseline": {"available": false, "status": "unavailable"}`, `"confirmed_culprits": []`, `"blamed_jars": []`, and `"findings": []`. Top histogram classes and the main-thread stack frame are annotated with their offline `JarIndex` owner (`jar_owner` / `first_suspect`) for inventory inspection only; statistical leak screening requires exchangeable episodes and a vanilla baseline, so a single snapshot makes no causal leak, stall, mitigation (`operator_mitigation`) or reproducer (`author_reproducer` / `replay_cmd`) claims.
 
 ---
 
@@ -23,7 +34,9 @@ Target mode found BetterRTP 3.6.13's quit-session retention because the operator
 
 ---
 
-## Pipeline
+## Pipeline (ADR-125 design, not implemented)
+
+The stages below are the ADR-125 active design. Only the passive local audit above is implemented; none of these stages run under `--mode server` today.
 
 ```mermaid
 flowchart TD
@@ -44,7 +57,7 @@ flowchart TD
     H --> I[6. Report<br/>verdict.json, commands.json coverage]
 ```
 
-### Components
+### Components (design)
 
 ```mermaid
 graph LR
@@ -62,7 +75,7 @@ D -.->|optional| H[StressTestRTP /rtpstress]
 
 ---
 
-## 1. Discovery
+## 1. Discovery (design; only the read-only `commands.json` capture above is implemented)
 
 ```mermaid
 sequenceDiagram
@@ -92,13 +105,13 @@ sequenceDiagram
 - **Arguments** by parser: integer, long, float and double sampled from a boundary and magnitude ladder (`min`, `-1`, `0`, `1`, `16`, `64`, `256`, `1024`, a clamped upper cap and `max`, plus uniform within bounds) so threshold bugs are reached without wasting episodes on extreme 32-bit values; `bool`; word, quoted and greedy strings; entity and game-profile as `{self}` or another bot; block positions and vectors near the bot; dimensions and resource locations from completion replies. A usage or error reply moves mutation toward the other parser branches.
 - **No metadata:** `plugin.yml` and `fabric.mod.json` are never read for discovery. They are read only for hard dependencies during jar `ddmin`.
 
-## 2. Goal heuristics
+## 2. Goal heuristics (design)
 
 - **Arms:** (command node, follow-up shape). Shapes: `quit_lt1s` (quit within a second), `quit_delay` (quit while a delay or countdown is pending), `rejoin`, `repeat`, `concurrent` (another bot runs the same node), and protocol-level `window_click` + `close_window` sequences when a command opens an inventory window (`bench-swarm.js` handles `open_window`, `window_click` and `close_window` packets directly because lean mode disables Mineflayer's `inventory` plugin).
 - **Selection:** UCB1, stratified by tier so `default`-visible (player-reachable) nodes get the primary episode share and cannot be starved by a much larger `op` tree (`--tiers default` restricts the run to player-reachable nodes). **Reward:** novelty (a reply shape or log signature not seen before, the ADR-111 corpus keys) plus harm (class growth per action, tick-gap excess, kicks).
 - **Why follow-ups matter:** both session-leak positives below (BetterRTP and the planted `ff:queue`) need the player to leave while something the command started is still pending. A bandit over nodes alone would send the command and wait, which retains nothing.
 
-## 3. Detection
+## 3. Detection (design)
 
 | Oracle | Signal | Compared with | Signature | First suspect |
 |---|---|---|---|---|
@@ -108,7 +121,7 @@ sequenceDiagram
 
 No class name is hardcoded anywhere. The class a leak finding reports (for example `AdvancementProgress` for a retained player) is an output of the screen, never an input. When a reproduced finding's shrunk program includes a numeric argument on the ladder, the shrinker bisects between a passing bound and the failing value to report the minimal reproducing threshold.
 
-## 4. Attribution: jar `ddmin`
+## 4. Attribution: jar `ddmin` (design)
 
 ```mermaid
 flowchart LR
@@ -134,7 +147,7 @@ flowchart LR
 - **Verdict and resolution output:** `verdict.json` and `report.txt` emit both **operator mitigation** (canonical command node, all discovered aliases, minimum reproducing tier `default` vs `op`, and any bisected argument bound to block or revoke in `commands.yml` or a permission plugin) and the **author reproducer** (blamed jar set or unconfirmed first suspect on `INCONCLUSIVE`, leaked class slope or culprit stack frame, shrunk program, reproduction count `k` of `n`, and a one-line `--replay` command).
 - **Baseline vs per-finding control:** the baseline uses the same seeds and generator on the tree vanilla itself declares, so it does not run the same programs as exploration. It gives population statistics (class-growth fits, tick-gap p99, log signatures); a signature it also produced is never reported. The per-finding vanilla check is the prerequisites-only replay above.
 
-## 5. Permission tiers and the denylist
+## 5. Permission tiers and the denylist (design; the denylist and tier rules are partly implemented for the passive audit)
 
 - `--tiers default,op` (or `--tiers default` for player-reachable hardening). Default-tier bots join with no extra permissions and inherit whatever the server's existing configuration grants a new player; unlike target mode, server mode never runs `LuckPerms` or permission-plugin grants (`lp group default permission set ...`), preserving the boundary between `default` and `op`. Op bots are opped through RCON `op` before joining and de-opped at episode end and at driver exit, including on error.
 - **Entry syntax:** `root [subpath] [<argkind>]`, matched after alias folding (`minecraft:stop` matches `stop`). `root` may end in a `*` glob; a root-only entry denies the whole subtree; `subpath` denies only that literal path; `<argkind>` denies paths whose next argument has that parser kind.
@@ -151,7 +164,7 @@ flowchart LR
 - Denied nodes are never sent, including during shrinking and replay.
 - Server mode runs only on a disposable bench copy made by `scripts/bench_setup.py`. Nothing restores the world, `ops.json` or plugin configs between runs: start each run from a fresh copy.
 
-## 6. Platform profiles
+## 6. Platform profiles (design)
 
 | Profile | Jar folder | Prerequisites always kept | Log patterns | Observation |
 |---|---|---|---|---|
@@ -165,7 +178,7 @@ A missing `jcmd`, the wrong user or an unmatched PID fails the run at start with
 
 ---
 
-## Validation targets
+## Validation targets (design; not evidence until a recorded run exists)
 
 The method is credible only if it finds bugs it was never told about. Two kinds of positive are used. Neither name appears in any input, oracle, rule or denylist.
 
@@ -219,5 +232,5 @@ Results, run IDs, episode counts and command coverage will be recorded here and 
 ## References
 
 - [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md), [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md), [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md), [ADR-080](../adr/ADR-080-opt-in-simulation-benchmark-tier.md)
-- `scripts/bench_fuzz.py`, `scripts/bench_overnight.py`, `scripts/bench_setup.py`, `devstack/clients/bench-swarm.js`
+- `scripts/bench_fuzz.py`, `scripts/bench_fuzz_server.py`, `scripts/bench_overnight.py`, `scripts/bench_setup.py`, `devstack/clients/bench-swarm.js`
 - Zeller and Hildebrandt, *Simplifying and Isolating Failure-Inducing Input*, IEEE TSE 28(2), 2002

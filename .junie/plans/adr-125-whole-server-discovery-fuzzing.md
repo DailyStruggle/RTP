@@ -62,10 +62,13 @@ Implement `ADR-125` (*Whole-Server Discovery Fuzzing: Protocol Discovery, Agentl
 # Technical Design
 
 ### Current Implementation
-- `scripts/bench_fuzz.py` (3,676 lines) implements `ADR-111` target mode (`--mode leak` and `--mode faults`). It relies on per-target CLI knowledge (`DEFAULT_CMDS`, `--cmd`, `--jars`, `--names`, `--plugin-packages`), isolates one target jar at a time via `FuzzDriver.set_jars`, mutates `LuckPerms` group `default` via `PermissionGrant`, reads histograms from `StressTestRTP` CSV/files via `RunsReader`, and attributes `ServerLogOracle` stack traces via package prefixes (`PLUGIN_PACKAGES`).
-- `devstack/clients/bench-swarm.js` (1,062 lines) runs Mineflayer bots in `--fuzz-control` mode supporting `ping`, `stop`, and `episode` ops with actions `rtp`, `rtp2`, `wait`, `move`, `quit`, `rejoin`, `die`, and `cmd`. It disables Mineflayer's `inventory` plugin in `LEAN_DISABLED` and does not capture `declare_commands`, `open_window`, or `update_time` packets.
-- `scripts/bench_overnight.py` provides RCON client helpers (`rcon`, `Driver.cmd`, `Driver.restart`, `Driver.wait_up`, `Driver.wait_down`) and `OFF_SUFFIX = ".off"` jar toggling.
-- `scripts/bench_leakcheck.py` provides `HISTO_LINE` and `GC_FILLER` regexes for parsing HotSpot `GC.class_histogram` output.
+- `scripts/bench_fuzz.py` (3,730 lines) implements `ADR-111` target mode (`--mode leak` and `--mode faults`) plus `Swarm.discover` (`lines 2166-2196`) and CLI flags for `--mode server` (`lines 3468-3488`).
+- `scripts/bench_fuzz_server.py` (3,844 lines) already implements the passive/library half of `ADR-125`:
+  - `Denylist` (`lines 147-351`), `CommandTree`, and `merge_command_trees` (`lines 479-1144`) with multi-tier merging, `namespace:cmd` <-> `cmd` alias folding, redirect cycle cutting, and `min_tier` (`default` before `op`).
+  - `PlatformProfile` (`lines 1166-1242`) for `paper`, `fabric`, and `neoforge`, `JcmdObserver` (`lines 1348-1738`) with `[start_ms, end_ms]` exclusion windows, `JarIndex` (`lines 2072-2334`) with `.class` ownership and transitive `close_deps`, `screen_server_leaks` (`lines 2680-2776`), and `StallOracle` (`lines 2998-3202`).
+  - **Audit gap (`BLOCKED`, 7 open blockers):** `ServerRun` (`lines 3578-3798`) and `validate_server_mode_args` (`lines 3379-3484`) currently wire only a `PASSIVE_ONLY` local snapshot and reject active flags (`--tiers default,op`, `--container`, `--stall-ms`, `--default-budget-share`, `--replay`, and budget flags). `gen_args`, `NodeBandit`, `OpGrantGuard`, `bisect_numeric_arg`, `run_pre_ddmin_probes`, `ddmin_jars`, and `operator_mitigation` / `author_reproducer` reporting are not yet implemented.
+- `devstack/clients/bench-swarm.js` (1,410 lines) implements `discover` (`runFuzzDiscover`, `lines 1208-1287`) and passive `tick_gap` / `open_window` telemetry (`attachProtocolTelemetry`, `lines 911-949`), but still lacks the `complete` (`tab_complete`) control op and `window_click` / `close_window` actions in `FUZZ_ACTIONS` (`line 650`).
+- `scripts/tests/test_bench_fuzz.py` (5,406 lines, 197 passing tests) covers `CommandTreeAndDenylistTest`, `JcmdAndStallOracleTest`, `JarIndexAndLeakScreenTest`, and `ServerModePassiveAuditTest`, but still lacks `BoundaryLadderAndBisectTest`, `TierStratifiedBanditTest`, `JarDdminTest`, `ServerModeLoopTest`, and the `helpers/FuzzFixturePaper` / `helpers/FuzzFixtureFabric` Gradle modules.
 
 ### Key Decisions
 1. **Sibling Server-Mode Module (`scripts/bench_fuzz_server.py`):**
@@ -278,7 +281,7 @@ graph LR
 - Implement `NodeBandit` over `(node_id, follow_up)` arms (`quit_lt1s`, `quit_delay`, `rejoin`, `repeat`, `concurrent`, `window_click`) using UCB1 stratified by `min_tier` (`--default-budget-share`, default `0.75`) and rewarded by corpus novelty plus harm.
 - Add `Swarm.discover` and `Swarm.complete` helper methods in `scripts/bench_fuzz.py`.
 
-### * Step 3: Stage 3: Implement JcmdObserver, Bonferroni leak screen, StallOracle, and JarIndex
+### ! Step 3: Stage 3: Implement JcmdObserver, Bonferroni leak screen, StallOracle, and JarIndex
 `scripts/bench_fuzz_server.py` observes any HotSpot JVM via `jcmd` (or optional `StressTestRTP`), screens per-feature class leaks with Bonferroni correction, and detects acute or sustained main-thread stalls.
 
 - Implement `PlatformProfile` (`paper` and `fabric`) and `JcmdObserver` in `scripts/bench_fuzz_server.py` supporting `--pid-file`, `jcmd -l` matching, and `docker exec <container> jcmd 1 ...`, failing fast on missing `jcmd` or unreadable histograms and recording `[start_ms, end_ms]` exclusion windows during `GC.class_histogram` and `Thread.print`.
@@ -286,7 +289,7 @@ graph LR
 - Implement `StallOracle` scoring both acute `update_time` gaps (`> baseline_p99 + --stall-ms`) and sustained episode-wide interval inflation (`mean` / `p95` excess during `repeat` and `concurrent` arms) outside observer exclusion windows, attributing the culprit stack frame from `jcmd <pid> Thread.print`.
 - Implement `JarIndex` scanning `plugins/` or `mods/` via `zipfile` to map `.class` entries to jars (defaulting unknown classes to `server`) and parsing hard dependencies from `plugin.yml`, `paper-plugin.yml`, `fabric.mod.json`, and `META-INF/neoforge.mods.toml`.
 
-###   Step 4: Stage 4: Wire ServerRun orchestration, numeric bisection, jar ddmin, and verdict reporting into bench_fuzz.py
+### ! Step 4: Stage 4: Wire ServerRun orchestration, numeric bisection, jar ddmin, and verdict reporting into bench_fuzz.py
 `scripts/bench_fuzz.py --mode server` executes the end-to-end baseline, discovery, exploration, numeric threshold bisection, pre-`ddmin` guardrails, dependency-closed jar `ddmin`, and resolution reporting.
 
 - Implement `bisect_numeric_arg`, `run_pre_ddmin_probes` (full jar set, then prerequisites-only), and `ddmin_jars` (closing candidate subsets under `JarIndex.close_deps` and verifying every subset jar loaded after restart) in `scripts/bench_fuzz_server.py`.
@@ -294,7 +297,7 @@ graph LR
 - Emit `verdict.json` and `report.txt` containing both the `operator_mitigation` block (canonical node, aliases, `min_tier`, bisected argument bound) and the `author_reproducer` block (`oracle`, `blamed_jars` or `first_suspect`, class slope or stack frame, shrunk program, `k` of `n`, and `--replay` command).
 - Wire `--mode server` and server-mode CLI flags (`--profile`, `--tiers`, `--deny`, `--stall-ms`, `--pid-file`, `--container`, `--default-budget-share`) into `build_parser` and `main` in `scripts/bench_fuzz.py`, rejecting target-specific flags (`--cmd`, `--names`, `--jars`, `--plugin-packages`).
 
-###   Step 5: Stage 5: Add planted-bug unit test suite and Gradle helper fixtures (FuzzFixturePaper & FuzzFixtureFabric)
+### ! Step 5: Stage 5: Add planted-bug unit test suite and Gradle helper fixtures (FuzzFixturePaper & FuzzFixtureFabric)
 `scripts/tests/test_bench_fuzz.py` verifies all server-mode components and planted-bug gates, and standalone `FuzzFixturePaper` and `FuzzFixtureFabric` helper modules build cleanly.
 
 - Add unit and fake-server planted-bug tests in `scripts/tests/test_bench_fuzz.py` covering tree merge, alias folding, redirect cycle breaking, denylist matching, boundary-ladder generation, numeric threshold bisection, tier-stratified UCB1, Bonferroni leak screening, acute + sustained stall detection, `JarIndex` dependency closure, and both pre-`ddmin` guardrails.

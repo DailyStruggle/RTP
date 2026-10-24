@@ -14,12 +14,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import fnmatch
+import functools
 import glob
 import io
 import json
 import math
 import os
 import re
+import statistics
 from statistics import NormalDist
 import subprocess
 import sys
@@ -671,6 +673,8 @@ class CommandTree:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, sort_keys=False)
             fh.write("\n")
+        if self.truncated:
+            bf.log(f"WARNING: command tree truncated at {len(self.nodes)} nodes when writing {path}")
         return payload
 
     @classmethod
@@ -1029,7 +1033,7 @@ def merge_command_trees(
     nodes: dict[str, CommandNode] = {}
     root_children: list[str] = []
     alias_map: dict[str, str] = {}
-    truncated = False
+    truncated = any(bool((tier_packets.get(t) or {}).get("truncated")) for t in active_tiers)
 
     for canon in sorted(canonical_roots.keys()):
         aliases = root_aliases[canon]
@@ -1305,15 +1309,27 @@ def _default_pid_cwd(pid: int) -> str | None:
     return None
 
 
+def _default_pid_cmdline(pid: int) -> str | None:
+    proc_cmd = f"/proc/{pid}/cmdline"
+    try:
+        with open(proc_cmd, "rb") as fh:
+            raw = fh.read()
+        if raw:
+            return raw.replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()
+    except OSError:
+        return None
+    return None
+
+
 def _cmd_contains_dir_path(cmd_desc: str, *dir_paths: str) -> bool:
     """Return True only when a directory path (with a separator, never a bare basename) appears as a path prefix in `cmd_desc`."""
-    norm_cmd = (cmd_desc or "").replace("\\", "/").lower()
+    norm_cmd = os.path.normcase((cmd_desc or "").replace("\\", "/"))
     if not norm_cmd:
         return False
     for dp in dir_paths:
         if not dp:
             continue
-        clean = dp.replace("\\", "/").rstrip("/").lower()
+        clean = os.path.normcase(dp.replace("\\", "/").rstrip("/"))
         if not clean or "/" not in clean:
             continue
         start = 0
@@ -1357,6 +1373,7 @@ class JcmdObserver:
         runner: Callable[[list[str], float], subprocess.CompletedProcess[str]] | None = None,
         clock_ms: Callable[[], int] | None = None,
         pid_cwd: Callable[[int], str | None] | None = None,
+        pid_cmdline: Callable[[int], str | None] | None = None,
     ):
         self._explicit_pid = pid
         self.pid_file = pid_file
@@ -1372,6 +1389,7 @@ class JcmdObserver:
         self._runner = runner or self._default_runner
         self._clock_ms = clock_ms or _default_clock_ms
         self._pid_cwd = pid_cwd or _default_pid_cwd
+        self._pid_cmdline = pid_cmdline or _default_pid_cmdline
         self._resolved_pid: int | None = None
         self.exclusion_windows: list[ExclusionWindow] = []
 
@@ -1413,6 +1431,14 @@ class JcmdObserver:
             raise JcmdError(f"invalid PID {pid} from {source_desc}; expected a positive integer")
         if self.container is not None or not self.check_local_pid:
             return pid
+
+        # Never call os.kill(pid, 0) on Windows: signal 0 == CTRL_C_EVENT and sends Ctrl+C.
+        if os.name != "posix":
+            raise JcmdError(
+                f"local PID liveness and ownership verification for PID {pid} ({source_desc}) "
+                f"is unsupported on non-POSIX host ({os.name!r}); refusing to probe or attach."
+            )
+
         try:
             os.kill(pid, 0)
         except ProcessLookupError as exc:
@@ -1429,23 +1455,26 @@ class JcmdObserver:
             raise JcmdError(f"cannot access JVM PID {pid} ({source_desc}): {exc}") from exc
 
         if self.server_dir:
+            real_dir = os.path.normcase(os.path.normpath(os.path.realpath(self.server_dir)))
+            raw_dir = os.path.normpath(self.server_dir)
             cand_cwd = self._pid_cwd(pid)
-            if cand_cwd is not None:
-                real_dir = os.path.normpath(os.path.realpath(self.server_dir)).lower()
-                raw_dir = os.path.normpath(self.server_dir)
-                real_cwd = os.path.normpath(os.path.realpath(cand_cwd)).lower()
-                if real_cwd != real_dir:
-                    cmdline_txt = ""
-                    try:
-                        with open(f"/proc/{pid}/cmdline", "rb") as fh:
-                            cmdline_txt = fh.read().replace(b"\x00", b" ").decode("utf-8", errors="replace")
-                    except OSError:
-                        cmdline_txt = ""
-                    if not _cmd_contains_dir_path(cmdline_txt, raw_dir, real_dir):
+            cwd_matches = (
+                cand_cwd is not None
+                and os.path.normcase(os.path.normpath(os.path.realpath(cand_cwd))) == real_dir
+            )
+            if not cwd_matches:
+                cmdline_txt = self._pid_cmdline(pid)
+                if not _cmd_contains_dir_path(cmdline_txt or "", raw_dir, real_dir):
+                    if cand_cwd is None:
                         raise JcmdError(
-                            f"PID {pid} ({source_desc}) has working directory {cand_cwd!r}, which does not match "
-                            f"server_dir={self.server_dir!r}. Hint: --pid-file may be stale."
+                            f"PID {pid} ({source_desc}) ownership of server_dir={self.server_dir!r} "
+                            "cannot be positively verified (unknown working directory and unreadable or "
+                            "non-matching command line). Refusing to run jcmd against an unverified JVM."
                         )
+                    raise JcmdError(
+                        f"PID {pid} ({source_desc}) has working directory {cand_cwd!r}, which does not match "
+                        f"server_dir={self.server_dir!r}. Hint: --pid-file may be stale."
+                    )
         return pid
 
     @staticmethod
@@ -1469,24 +1498,27 @@ class JcmdObserver:
         self,
         candidates: list[tuple[int, str]],
         check_cwd: bool = True,
+        use_server_dir: bool = True,
     ) -> list[tuple[int, str]]:
-        if not self.jar_pattern and not self.server_dir:
+        eff_server_dir = self.server_dir if use_server_dir else None
+        if not self.jar_pattern and not eff_server_dir:
             return list(candidates)
 
         jar_pat_low = self.jar_pattern.lower() if self.jar_pattern else None
-        raw_dir = os.path.normpath(self.server_dir) if self.server_dir else ""
-        real_dir = os.path.normpath(os.path.realpath(self.server_dir)) if self.server_dir else ""
+        raw_dir = os.path.normpath(eff_server_dir) if eff_server_dir else ""
+        real_dir = os.path.normpath(os.path.realpath(eff_server_dir)) if eff_server_dir else ""
+        real_dir_norm = os.path.normcase(real_dir) if real_dir else ""
 
         matched: list[tuple[int, str]] = []
         for cand_pid, cmd_desc in candidates:
             low_desc = cmd_desc.lower()
             if jar_pat_low and jar_pat_low not in low_desc:
                 continue
-            if self.server_dir:
+            if eff_server_dir:
                 cand_cwd = self._pid_cwd(cand_pid) if check_cwd else None
                 cwd_ok = (
                     cand_cwd is not None
-                    and os.path.normpath(os.path.realpath(cand_cwd)).lower() == real_dir.lower()
+                    and os.path.normcase(os.path.normpath(os.path.realpath(cand_cwd))) == real_dir_norm
                 )
                 path_ok = _cmd_contains_dir_path(cmd_desc, raw_dir, real_dir)
                 if cand_cwd is not None:
@@ -1546,7 +1578,8 @@ class JcmdObserver:
             if not candidates:
                 self._resolved_pid = 1
                 return self._resolved_pid
-            matched = self._match_jcmd_candidates(candidates, check_cwd=False)
+            # Ignore host `server_dir` inside the container namespace; match by `jar_pattern` or single JVM.
+            matched = self._match_jcmd_candidates(candidates, check_cwd=False, use_server_dir=False)
             if len(matched) == 1:
                 self._resolved_pid = matched[0][0]
                 return self._resolved_pid
@@ -1556,8 +1589,8 @@ class JcmdObserver:
             cand_summary = ", ".join(f"{p} ({d or '<no main class>'})" for p, d in candidates)
             if not matched:
                 raise JcmdError(
-                    f"`{' '.join(list_cmd)}` found no JVM matching jar_pattern={self.jar_pattern!r} / "
-                    f"server_dir={self.server_dir!r}; container JVMs: [{cand_summary}]."
+                    f"`{' '.join(list_cmd)}` found no JVM matching jar_pattern={self.jar_pattern!r}; "
+                    f"container JVMs: [{cand_summary}]."
                 )
             match_summary = ", ".join(f"{p} ({d})" for p, d in matched)
             raise JcmdError(
@@ -1616,6 +1649,9 @@ class JcmdObserver:
                 f"disallowed jcmd operation {op!r}; JcmdObserver only permits read-only {sorted(ALLOWED_JCMD_OPS)}"
             )
         target_pid = self.resolve_pid()
+        if self.container is None and self.check_local_pid:
+            # Re-check liveness and ownership before every jcmd call to guard against PID recycling.
+            target_pid = self._verify_local_pid(target_pid, "re-check before jcmd")
         if self.container is not None:
             return self._docker_exec_prefix() + [self.jcmd_bin, str(target_pid), op]
         return [self.jcmd_bin, str(target_pid), op]
@@ -1944,9 +1980,6 @@ def parse_fabric_mod_json_metadata(text: str) -> tuple[str | None, list[str], li
         for p in raw_prov:
             if isinstance(p, str) and p.strip():
                 provides.append(p.strip())
-    name = str(data.get("name") or "").strip()
-    if name and name != mod_id and name not in provides:
-        provides.append(name)
 
     hard_deps: list[str] = []
     raw_deps = data.get("depends")
@@ -2059,6 +2092,16 @@ class JarIndex:
         self.class_to_jars: dict[str, list[str]] = {}
         self.id_to_jar: dict[str, str] = {}
         self._scan()
+
+    @classmethod
+    def from_server_dir(
+        cls,
+        server_dir: str,
+        profile: PlatformProfile | str = "paper",
+        include_disabled: bool = False,
+    ) -> JarIndex:
+        prof = profile if isinstance(profile, PlatformProfile) else get_platform_profile(profile)
+        return cls(prof.jar_dir(server_dir), include_disabled=include_disabled)
 
     def _scan_zip_archive(
         self,
@@ -2374,113 +2417,142 @@ def _usable_server_record(record: dict[str, Any]) -> bool:
     )
 
 
-def _fit_family_ridge(
-    row_feats: list[dict[str, float]],
-    row_deltas: list[dict[str, float]],
-    feat_list: list[str],
-    classes: set[str],
-    lam: float = 1.0,
-) -> dict[tuple[str, str], tuple[float, float, int]]:
-    """Fit a feature family (`arm:*`, `node:*`, or `departures`) jointly with an unpenalised intercept via `bf.ridge_fit`."""
-    n_total = len(row_feats)
-    slopes: dict[tuple[str, str], tuple[float, float, int]] = {}
-    if not feat_list or n_total < 2:
-        return slopes
-
-    active_counts = {f: sum(1 for rf in row_feats if rf.get(f, 0.0) > 0) for f in feat_list}
-    valid_feats = [f for f in feat_list if active_counts[f] >= 2]
-    if not valid_feats:
-        return slopes
-
-    sxx_map: dict[str, float] = {}
-    for f in valid_feats:
-        xs = [rf.get(f, 0.0) for rf in row_feats]
-        mx = sum(xs) / n_total
-        sxx_map[f] = sum((x - mx) ** 2 for x in xs)
-
-    varied_feats = [f for f in valid_feats if sxx_map[f] > 1e-12]
-    if not varied_feats:
-        return slopes
-
-    se_floors = {f: max(1.0, NOISE_FLOOR) / math.sqrt(max(1e-6, sxx_map[f])) for f in varied_feats}
-    x1 = [[1.0] + [rf.get(f, 0.0) for f in varied_feats] for rf in row_feats]
-
-    for cls in classes:
-        ys = [d.get(cls, 0.0) for d in row_deltas]
-        # A real leak accumulates positive net instances over the run; mean-reverting series (sum <= 0) are not leaks.
-        if sum(ys) <= 0.0:
-            continue
-        try:
-            b1, se1 = bf.ridge_fit(x1, ys, lam=lam)
-        except ValueError:
-            continue
-
-        cur_b = {f: b1[i + 1] for i, f in enumerate(varied_feats)}
-        cur_se = {f: max(se1[i + 1], se_floors[f]) for i, f in enumerate(varied_feats)}
-
-        # When only a proper subset of features in the family has clearly positive growth above noise,
-        # refit jointly over that subset so non-leaking arms anchor the unpenalised intercept without
-        # dummy-variable shrinkage (`sum_j x_j == 1`) or noise-pooling bias.
-        pos_feats = [f for f in varied_feats if cur_b[f] > 2.0 * cur_se[f]]
-        while 0 < len(pos_feats) < len(varied_feats):
-            x2 = [[1.0] + [rf.get(f, 0.0) for f in pos_feats] for rf in row_feats]
-            try:
-                b2, se2 = bf.ridge_fit(x2, ys, lam=1e-6)
-            except ValueError:
-                break
-            next_pos: list[str] = []
-            for i, f in enumerate(pos_feats):
-                f_se = max(se2[i + 1], se_floors[f])
-                cur_b[f] = b2[i + 1]
-                cur_se[f] = f_se
-                if b2[i + 1] > 2.0 * f_se:
-                    next_pos.append(f)
-            if len(next_pos) == len(pos_feats):
-                break
-            pos_feats = next_pos
-
-        for f in varied_feats:
-            slopes[(cls, f)] = (cur_b[f], cur_se[f], active_counts[f])
-
-    return slopes
+#: Top-rank exceedance thresholds. Each threshold is a function of the class deltas alone, so the
+#: permutation null stays exact; the ladder length is the within-class multiplicity charged to every p-value.
+_TOP_RANK_LADDER: tuple[int, ...] = (4, 8, 16, 32, 64)
+#: Cheap normal-score gate: skips only (class, feature, threshold) cells that cannot reach a Bonferroni p-value.
+_PREFILTER_Z = 2.0
 
 
-def _fit_feature_slopes(
-    records: list[dict[str, Any]],
-) -> tuple[dict[tuple[str, str], tuple[float, float, int]], dict[str, tuple[float, float, int]], set[str], set[str]]:
-    """Compute per `(class, feature)` slope `(b, se, n_active)` and per-class episode `(mean, sd, n)`."""
-    usable = [r for r in records if _usable_server_record(r)]
-    n_total = len(usable)
-    if n_total < 2:
-        return {}, {}, set(), set()
+@functools.lru_cache(maxsize=1 << 16)
+def _hypergeom_upper_tail(n: int, high: int, draws: int, hits: int) -> float:
+    """Exact `P(X >= hits)` for `X ~ Hypergeometric(population n, high successes, draws)`."""
+    if hits <= 0:
+        return 1.0
+    lo = max(hits, draws - (n - high), 0)
+    hi = min(draws, high)
+    if lo > hi:
+        return 0.0
+    num = sum(math.comb(high, i) * math.comb(n - high, draws - i) for i in range(lo, hi + 1))
+    return min(1.0, num / math.comb(n, draws))
 
-    row_feats: list[dict[str, float]] = [extract_server_episode_features(r) for r in usable]
-    row_deltas: list[dict[str, float]] = [_extract_record_class_deltas(r) for r in usable]
 
-    classes: set[str] = set()
-    features: set[str] = set()
-    for d in row_deltas:
-        classes.update(d.keys())
-    for f in row_feats:
-        features.update(k for k, v in f.items() if v > 0)
+class _LeakDesign:
+    """Episode x feature design plus per-class deltas for the passive leak screen.
 
-    class_baseline: dict[str, tuple[float, float, int]] = {}
-    for cls in classes:
-        ys = [d.get(cls, 0.0) for d in row_deltas]
-        mean = sum(ys) / n_total
-        var = sum((y - mean) ** 2 for y in ys) / max(1, n_total - 1)
-        sd = max(NOISE_FLOOR, math.sqrt(max(0.0, var)))
-        class_baseline[cls] = (mean, sd, n_total)
+    A feature is *active* in an episode when its count is positive (features active everywhere are split
+    at the median count). Significance never depends on a fitted model: for each class the episodes whose
+    delta falls in the top-`m` ranks (ties included) are compared with the feature's active set through an
+    exact hypergeometric tail. That test is distribution-free (discrete, bimodal and heavy-tailed deltas
+    included) and exact for any active count, under the null that deltas are exchangeable across episodes.
+    """
 
-    arm_feats = sorted(f for f in features if f.startswith("arm:"))
-    node_feats = sorted(f for f in features if f.startswith("node:"))
-    dep_feats = ["departures"] if "departures" in features else []
+    def __init__(self, records: list[dict[str, Any]], min_feature_episodes: int) -> None:
+        self.n = len(records)
+        self.row_feats = [extract_server_episode_features(r) for r in records]
+        self.row_deltas = [_extract_record_class_deltas(r) for r in records]
+        self.min_act = max(2, int(min_feature_episodes))
+        self.classes: set[str] = set()
+        self.features: set[str] = set()
+        for d in self.row_deltas:
+            self.classes.update(d.keys())
+        for f in self.row_feats:
+            self.features.update(k for k, v in f.items() if v > 0)
+        self.cols: dict[str, list[float]] = {}
+        self.act: dict[str, list[int]] = {}
+        self.flags: list[list[str]] = [[] for _ in range(self.n)]
+        for feat in sorted(self.features):
+            col = [rf.get(feat, 0.0) for rf in self.row_feats]
+            act = [i for i, v in enumerate(col) if v > 0.0]
+            if len(act) >= self.n:
+                med = statistics.median(col)
+                act = [i for i, v in enumerate(col) if v > med]
+            if len(act) < self.min_act or self.n - len(act) < 2:
+                continue
+            self.cols[feat] = col
+            self.act[feat] = act
+            for i in act:
+                self.flags[i].append(feat)
 
-    slopes: dict[tuple[str, str], tuple[float, float, int]] = {}
-    for fam in (arm_feats, node_feats, dep_feats):
-        slopes.update(_fit_family_ridge(row_feats, row_deltas, fam, classes, lam=1.0))
+    def scan(self, p_crit: float) -> dict[tuple[str, str], float]:
+        """Return `{(class, feature): adjusted_p}` for cells at or below `p_crit`."""
+        n = self.n
+        out: dict[tuple[str, str], float] = {}
+        if n < 4 or not self.cols:
+            return out
+        multiplicity = len(_TOP_RANK_LADDER)
+        ladder = [m for m in _TOP_RANK_LADDER if m < n]
+        for cls in self.classes:
+            ys = [d.get(cls, 0.0) for d in self.row_deltas]
+            # Functions of the deltas only (not of the feature assignment), so they keep the null exact.
+            if sum(ys) <= 0.0 or max(ys) <= min(ys):
+                continue
+            order = sorted(range(n), key=ys.__getitem__, reverse=True)
+            best: dict[str, float] = {}
+            seen_high: set[int] = set()
+            for m in ladder:
+                tau = ys[order[m - 1]]
+                high = m
+                while high < n and ys[order[high]] >= tau:
+                    high += 1
+                if high > n // 2 or high in seen_high:
+                    continue
+                seen_high.add(high)
+                counts: dict[str, int] = {}
+                for i in order[:high]:
+                    for f in self.flags[i]:
+                        counts[f] = counts.get(f, 0) + 1
+                frac = high / n
+                for f, hits in counts.items():
+                    n_act = len(self.act[f])
+                    mu = n_act * frac
+                    if hits < 2 or hits <= mu:
+                        continue
+                    var = n_act * frac * (1.0 - frac) * (n - n_act) / (n - 1)
+                    if var > 0.0 and (hits - mu) / math.sqrt(var) < _PREFILTER_Z:
+                        continue
+                    p = _hypergeom_upper_tail(n, high, n_act, hits)
+                    if p < best.get(f, 1.0):
+                        best[f] = p
+            for f, p in best.items():
+                p_adj = min(1.0, p * multiplicity)
+                if p_adj <= p_crit:
+                    out[(cls, f)] = p_adj
+        return out
 
-    return slopes, class_baseline, classes, features
+    def contrast(self, cls: str, feat: str) -> tuple[float, float, int, float] | None:
+        """Active-vs-inactive effect `(per_unit_slope, se, n_active, ctrl_ref)` for one pair, or None."""
+        col = self.cols.get(feat)
+        if col is None:
+            return None
+        act = self.act[feat]
+        act_set = set(act)
+        ys = [d.get(cls, 0.0) for d in self.row_deltas]
+        a_ys = [ys[i] for i in act]
+        c_ys = [y for i, y in enumerate(ys) if i not in act_set]
+        n_act, n_ctl = len(a_ys), len(c_ys)
+        mean_x = sum(col[i] for i in act) / n_act
+        if mean_x <= 0.0 or n_ctl < 1:
+            return None
+        mean_a = sum(a_ys) / n_act
+        mean_c = sum(c_ys) / n_ctl
+        var_a = sum((y - mean_a) ** 2 for y in a_ys) / max(1, n_act - 1)
+        var_c = sum((y - mean_c) ** 2 for y in c_ys) / max(1, n_ctl - 1)
+        se = math.sqrt(var_a / n_act + var_c / n_ctl) / mean_x
+        ctrl_ref = max(statistics.median(c_ys), mean_c)
+        return (mean_a - mean_c) / mean_x, se, n_act, ctrl_ref
+
+
+def _class_drift_stats(design: _LeakDesign) -> dict[str, tuple[float, float, int]]:
+    """Per-class episode `(mean, sd, n)` used to net vanilla-baseline drift out of a finding."""
+    stats: dict[str, tuple[float, float, int]] = {}
+    n = design.n
+    for cls in design.classes:
+        ys = [d.get(cls, 0.0) for d in design.row_deltas]
+        mean = sum(ys) / n
+        var = sum((y - mean) ** 2 for y in ys) / max(1, n - 1)
+        stats[cls] = (mean, max(NOISE_FLOOR, math.sqrt(max(0.0, var))), n)
+    return stats
 
 
 def screen_server_leaks(
@@ -2490,74 +2562,82 @@ def screen_server_leaks(
     profile: PlatformProfile | None = None,
     alpha: float = 0.05,
     min_n: int = 4,
-    min_feature_episodes: int = 2,
+    min_feature_episodes: int = 4,
     max_results: int = 64,
 ) -> dict[str, Any]:
     """Passively screen post-GC class growth against `node`, `arm` (`node x follow_up`), and `departures`.
 
-    Applies Bonferroni correction over `n_classes * n_features` comparisons and subtracts
-    the vanilla baseline slope (or baseline per-episode drift when the feature was absent
-    in the vanilla baseline). Results are reported as passive statistical correlations
-    (`attribution_status: 'unconfirmed_passive_correlation'`) with `first_suspect` from `JarIndex`.
+    Each (class, feature) cell gets an exact hypergeometric top-rank exceedance p-value (see
+    `_LeakDesign`), multiplied by the threshold-ladder length and compared with `alpha / (2 * classes x
+    features)`: Bonferroni, valid under arbitrary dependence between cells. Intended familywise
+    false-positive rate under exchangeable deltas is `alpha / 2`; positives are one-sided. Cells with too
+    little evidence (few active episodes, or hits that rank plausibly by chance) are simply not reported.
+    A flagged cell must also exceed the vanilla baseline's per-feature slope or unabsorbed class drift
+    by `max(NOISE_FLOOR, 2 x baseline_se)`. Results stay `unconfirmed_passive_correlation`, with
+    `first_suspect` from `JarIndex`.
     """
     usable = [r for r in records if _usable_server_record(r)]
-    if len(usable) < min_n:
-        return {
-            "usable_episodes": len(usable),
-            "classes_tested": 0,
-            "features_tested": 0,
-            "total_tests": 0,
-            "bonferroni_z": 0.0,
-            "correlations": [],
-        }
+    eff_min_ep = max(4, int(min_feature_episodes))
+    empty = {
+        "usable_episodes": len(usable),
+        "classes_tested": 0,
+        "features_tested": 0,
+        "total_tests": 0,
+        "bonferroni_z": 0.0,
+        "correlations": [],
+    }
+    if len(usable) < max(min_n, eff_min_ep):
+        return empty
 
-    slopes, cls_stats, classes, features = _fit_feature_slopes(usable)
-    base_slopes, base_cls_stats, _, _ = _fit_feature_slopes(baseline_records or [])
-
-    n_classes = len(classes)
-    n_features = len(features)
+    design = _LeakDesign(usable, eff_min_ep)
+    n_classes = len(design.classes)
+    n_features = len(design.features)
     total_tests = n_classes * n_features
     if total_tests == 0:
-        return {
-            "usable_episodes": len(usable),
-            "classes_tested": n_classes,
-            "features_tested": n_features,
-            "total_tests": 0,
-            "bonferroni_z": 0.0,
-            "correlations": [],
-        }
+        return {**empty, "classes_tested": n_classes, "features_tested": n_features}
 
     z_crit = bonferroni_z(total_tests, alpha=alpha)
-    correlations: list[dict[str, Any]] = []
+    p_crit = alpha / (2.0 * total_tests)
+    cells = design.scan(p_crit)
 
-    for (cls, feat), (b, se, active_n) in slopes.items():
-        if active_n < min_feature_episodes or b <= 0:
+    base_usable = [r for r in (baseline_records or []) if _usable_server_record(r)]
+    base_design = _LeakDesign(base_usable, 2) if len(base_usable) >= 2 else None
+    base_stats = _class_drift_stats(base_design) if base_design is not None else {}
+
+    correlations: list[dict[str, Any]] = []
+    for (cls, feat), p_adj in cells.items():
+        eff = design.contrast(cls, feat)
+        if eff is None:
             continue
-        if (cls, feat) in base_slopes:
-            cb_raw, cse_raw, _ = base_slopes[(cls, feat)]
-            cb = max(0.0, cb_raw)
-            cse = cse_raw
-            if cls in base_cls_stats and base_cls_stats[cls][0] > cb:
-                c_mean, c_sd, c_n = base_cls_stats[cls]
-                cb = max(cb, c_mean)
-                cse = max(cse, c_sd / math.sqrt(max(1, c_n)))
+        b, se, active_n, ctrl_ref = eff
+        if b <= NOISE_FLOOR:
+            continue
+        unabsorbed_base = 0.0
+        base_drift_se = 0.0
+        if cls in base_stats:
+            c_mean, c_sd, c_n = base_stats[cls]
+            unabsorbed_base = max(0.0, c_mean - max(0.0, ctrl_ref))
+            base_drift_se = c_sd / math.sqrt(max(1, c_n))
+
+        base_eff = base_design.contrast(cls, feat) if base_design is not None else None
+        if base_eff is not None and base_eff[0] > NOISE_FLOOR:
+            cb, cse = base_eff[0], base_eff[1]
+            if unabsorbed_base > cb:
+                cb = unabsorbed_base
+                cse = max(cse, base_drift_se)
             in_baseline = True
-        elif cls in base_cls_stats:
-            c_mean, c_sd, c_n = base_cls_stats[cls]
-            cb = max(0.0, c_mean)
-            cse = c_sd / math.sqrt(max(1, c_n))
+        elif cls in base_stats:
+            cb, cse = unabsorbed_base, base_drift_se
             in_baseline = True
         else:
             cb, cse = 0.0, 0.0
             in_baseline = False
 
         excess = b - cb
-        if excess <= 0:
+        if excess <= max(NOISE_FLOOR, 2.0 * cse):
             continue
         combined_se = math.sqrt(se * se + cse * cse)
-        z = excess / combined_se if combined_se > 0 else 0.0
-        if z <= z_crit:
-            continue
+        z = -NormalDist().inv_cdf(max(p_adj, 1e-300))
 
         suspect = jar_index.owner_of_class(cls, profile=profile) if jar_index is not None else "server"
         candidate_jars = jar_index.jars_for_class(cls) if jar_index is not None else []
@@ -2570,6 +2650,7 @@ def screen_server_leaks(
                 "excess_slope": round(excess, 4),
                 "se": round(combined_se, 4),
                 "z": round(z, 4),
+                "p_value": p_adj,
                 "bonferroni_z": round(z_crit, 4),
                 "feature_episodes": active_n,
                 "usable_episodes": len(usable),
@@ -2580,11 +2661,11 @@ def screen_server_leaks(
             }
         )
 
-    # Sort by highest z-score first; prefer specific `arm:` features over aggregate `node:`/`departures` on ties
+    # Sort by smallest p-value first; prefer specific `arm:` features over aggregate `node:`/`departures` on ties
     def _sort_key(item: dict[str, Any]) -> tuple[float, int, str, str]:
         f_str = str(item["feature"])
         specificity = 0 if f_str.startswith("arm:") else (1 if f_str.startswith("node:") else 2)
-        return (-float(item["z"]), specificity, str(item["cls"]), f_str)
+        return (float(item["p_value"]), specificity, str(item["cls"]), f_str)
 
     correlations.sort(key=_sort_key)
     return {
@@ -3075,3 +3156,688 @@ class StallOracle:
             "signature": signature,
             "attribution_status": "unconfirmed",
         }
+
+
+# --- Passive local server audit (`--mode server`, ADR-125) -------------------
+
+LOCAL_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1"})
+DISPOSABLE_MARKER_FILES: tuple[str, ...] = (
+    "bench-loop.sh",
+    ".bench-disposable",
+    "no-restart-script.sh",
+)
+
+# Flags prohibited in `--mode server` passive local audit, grouped by category.
+SERVER_PROHIBITED_FLAGS: dict[str, tuple[str, str]] = {
+    # Target-specific flags (ADR-125 section 2.1)
+    "--cmd": ("cmd", "target-specific"),
+    "--names": ("names", "target-specific"),
+    "--jars": ("jars", "target-specific"),
+    "--plugin-packages": ("plugin_packages", "target-specific"),
+    "--targets": ("targets", "target-specific"),
+    "--rtp-args": ("rtp_args", "target-specific"),
+    # Unsafe / op / mutation / container flags
+    "--grant": ("grant", "unsafe/op"),
+    "--lp-group": ("lp_group", "unsafe/op"),
+    "--console": ("console", "unsafe/op"),
+    "--console-p": ("console_p", "unsafe/op"),
+    "--console-max": ("console_max", "unsafe/op"),
+    "--console-timeout-s": ("console_timeout_s", "unsafe/op"),
+    "--allow-online": ("allow_online", "unsafe/op"),
+    "--container": ("container", "unsafe/op"),
+    "--mat": ("mat", "unsafe/op"),
+    "--no-restart": ("no_restart", "unsafe/op"),
+    "--no-isolate": ("isolate", "unsafe/op"),
+    "--restart-retries": ("restart_retries", "unsafe/op"),
+    # Replay flags
+    "--replay": ("replay", "replay"),
+    "--ep": ("ep", "replay"),
+    "--replay-seed": ("replay_seed", "replay"),
+    "--replay-n": ("replay_n", "replay"),
+    "--replay-budget": ("replay_budget", "replay"),
+    # Budget / active execution / stall-probe flags
+    "--episodes": ("episodes", "budget/active"),
+    "--seeds": ("seeds", "budget/active"),
+    "--reps": ("reps", "budget/active"),
+    "--rungs": ("rungs", "budget/active"),
+    "--eta": ("eta", "budget/active"),
+    "--ladder-candidates": ("ladder_candidates", "budget/active"),
+    "--explore-extra": ("explore_extra", "budget/active"),
+    "--warmup": ("warmup", "budget/active"),
+    "--max-empty": ("max_empty", "budget/active"),
+    "--min-bots": ("min_bots", "budget/active"),
+    "--max-bots": ("max_bots", "budget/active"),
+    "--min-episode-s": ("min_episode_s", "budget/active"),
+    "--max-episode-s": ("max_episode_s", "budget/active"),
+    "--done-slack-s": ("done_slack_s", "budget/active"),
+    "--quiet-s": ("quiet_s", "budget/active"),
+    "--quiet-wait-s": ("quiet_wait_s", "budget/active"),
+    "--checkpoint-wait-s": ("checkpoint_wait_s", "budget/active"),
+    "--checkpoint-poll-s": ("checkpoint_poll_s", "budget/active"),
+    "--files-wait-s": ("files_wait_s", "budget/active"),
+    "--settle-s": ("settle_s", "budget/active"),
+    "--shutdown-wait-s": ("shutdown_wait_s", "budget/active"),
+    "--startup-wait-s": ("startup_wait_s", "budget/active"),
+    "--min-players": ("min_players", "budget/active"),
+    "--player-wait-s": ("player_wait_s", "budget/active"),
+    "--output-subdir": ("output_subdir", "budget/active"),
+    "--generation": ("generation", "budget/active"),
+    "--novelty": ("novelty", "budget/active"),
+    "--novelty-max": ("novelty_max", "budget/active"),
+    "--novelty-step": ("novelty_step", "budget/active"),
+    "--surprise-z": ("surprise_z", "budget/active"),
+    "--surprise-n": ("surprise_n", "budget/active"),
+    "--surprise-k": ("surprise_k", "budget/active"),
+    "--shrink": ("shrink", "budget/active"),
+    "--shrink-n": ("shrink_n", "budget/active"),
+    "--shrink-k": ("shrink_k", "budget/active"),
+    "--shrink-probes": ("shrink_probes", "budget/active"),
+    "--shrink-budget": ("shrink_budget", "budget/active"),
+    "--finding-n": ("finding_n", "budget/active"),
+    "--finding-k": ("finding_k", "budget/active"),
+    "--finding-shrink": ("finding_shrink", "budget/active"),
+    "--elite": ("elite", "budget/active"),
+    "--cem-alpha": ("cem_alpha", "budget/active"),
+    "--stall-gens": ("stall_gens", "budget/active"),
+    "--ridge-lam": ("ridge_lam", "budget/active"),
+    "--no-optimise": ("no_optimise", "budget/active"),
+    "--coverage": ("coverage", "budget/active"),
+    "--promote-max": ("promote_max", "budget/active"),
+    "--top-classes": ("top_classes", "budget/active"),
+    "--max-classes": ("max_classes", "budget/active"),
+    "--heap-stop-mb": ("heap_stop_mb", "budget/active"),
+    "--heap-stop-frac": ("heap_stop_frac", "budget/active"),
+    "--no-dump": ("dump", "budget/active"),
+    "--dump-wait-s": ("dump_wait_s", "budget/active"),
+    "--owner-timeout-s": ("owner_timeout_s", "budget/active"),
+    "--stall-ms": ("stall_ms", "budget/active"),
+    "--default-budget-share": ("default_budget_share", "budget/active"),
+}
+
+SERVER_ONLY_FLAGS: dict[str, str] = {
+    "--profile": "profile",
+    "--tiers": "tiers",
+    "--deny": "deny",
+    "--pid-file": "pid_file",
+    "--pid": "pid",
+    "--jcmd-snapshot": "jcmd_snapshot",
+    "--container": "container",
+    "--stall-ms": "stall_ms",
+    "--default-budget-share": "default_budget_share",
+}
+
+
+def _extract_cli_option_tokens(argv: Iterable[str] | None) -> list[str]:
+    if not argv:
+        return []
+    tokens: list[str] = []
+    for raw in argv:
+        s = str(raw)
+        if s == "--":
+            break
+        if s.startswith("--"):
+            opt = s.split("=", 1)[0]
+            tokens.append(opt)
+    return tokens
+
+
+def resolve_server_port(props: dict[str, str], explicit_port: int | None = None) -> int:
+    """Return the configured `server-port`; an explicit `--mc-port` must equal it."""
+    raw = str(props.get("server-port", "25565")).strip()
+    try:
+        configured = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"server.properties server-port is not an integer: {raw!r}") from exc
+    if explicit_port is not None and int(explicit_port) != configured:
+        raise ValueError(
+            f"--mc-port {explicit_port} does not match server.properties server-port={configured}; "
+            "omit --mc-port or pass the configured port"
+        )
+    return configured
+
+
+def is_disposable_server_dir(server_dir: str, props: dict[str, str] | None = None) -> tuple[bool, str]:
+    """Validate that `server_dir` is an explicit, local, disposable bench server copy."""
+    raw = (server_dir or "").strip()
+    if not raw:
+        return False, "--server-dir must not be empty"
+    if raw.startswith("\\\\") or raw.startswith("//"):
+        return False, f"--server-dir must be a local filesystem path, not a network share: {server_dir!r}"
+    if not os.path.isdir(raw):
+        return False, f"--server-dir does not exist or is not a directory: {server_dir!r}"
+
+    real_dir = os.path.normcase(os.path.realpath(raw))
+    root_dir = os.path.normcase(os.path.realpath(os.path.abspath(os.sep)))
+    home_dir = os.path.normcase(os.path.realpath(os.path.expanduser("~")))
+    repo_root = os.path.normcase(os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")))
+    if real_dir in (root_dir, home_dir, repo_root):
+        return False, f"--server-dir must not point to root, home, or repository root: {server_dir!r}"
+    if os.path.exists(os.path.join(raw, ".git")):
+        return False, f"--server-dir must be a disposable server copy, not a git repository: {server_dir!r}"
+
+    props_file = os.path.join(raw, "server.properties")
+    if not os.path.isfile(props_file):
+        return False, f"--server-dir is missing server.properties: {props_file!r}"
+
+    parsed_props = props if props is not None else bf.bo.read_properties(raw)
+    online_mode_val = parsed_props.get("online-mode", "").strip().lower()
+    if online_mode_val != "false":
+        return (
+            False,
+            f"--server-dir has online-mode={online_mode_val or '<missing>'} in server.properties; "
+            "--mode server requires an offline disposable bench copy with explicit online-mode=false",
+        )
+
+    has_marker = any(os.path.isfile(os.path.join(raw, m)) for m in DISPOSABLE_MARKER_FILES)
+    if not has_marker:
+        spigot_yml = os.path.join(raw, "spigot.yml")
+        if os.path.isfile(spigot_yml):
+            try:
+                with open(spigot_yml, "r", encoding="utf-8", errors="replace") as fh:
+                    if "no-restart-script" in fh.read():
+                        has_marker = True
+            except OSError:
+                pass
+    if not has_marker:
+        return (
+            False,
+            "--server-dir must be a disposable bench copy prepared by scripts/bench_setup.py "
+            "(missing bench-loop.sh, no-restart-script in spigot.yml, or .bench-disposable marker)",
+        )
+    return True, "ok"
+
+
+def validate_target_mode_args(
+    args: Any,
+    parser: Any | None = None,
+    argv: Iterable[str] | None = None,
+) -> None:
+    """Reject `--mode server`-only flags when running in `leak` or `faults` target mode."""
+    def _fail(msg: str) -> None:
+        if parser is not None:
+            parser.error(msg)
+        raise ValueError(msg)
+
+    opt_tokens = set(_extract_cli_option_tokens(argv))
+    for flag, attr in SERVER_ONLY_FLAGS.items():
+        if flag in opt_tokens:
+            _fail(f"{flag} is only valid with --mode server")
+        val = getattr(args, attr, None)
+        if attr == "tiers":
+            if val is not None and str(val).strip().lower() != "default":
+                _fail(f"{flag} is only valid with --mode server")
+        elif attr == "deny":
+            if val:
+                _fail(f"{flag} is only valid with --mode server")
+        elif attr == "jcmd_snapshot":
+            if bool(val):
+                _fail(f"{flag} is only valid with --mode server")
+        elif val is not None:
+            _fail(f"{flag} is only valid with --mode server")
+
+
+def validate_server_mode_args(
+    args: Any,
+    parser: Any | None = None,
+    argv: Iterable[str] | None = None,
+) -> tuple[PlatformProfile, Denylist]:
+    """Validate `--mode server` passive local audit arguments and fail closed on prohibited inputs."""
+    def _fail(msg: str) -> None:
+        if parser is not None:
+            parser.error(msg)
+        raise ValueError(msg)
+
+    opt_tokens = _extract_cli_option_tokens(argv)
+    opt_set = set(opt_tokens)
+
+    # 1. Reject prohibited target-specific, unsafe/op, replay, and budget/active flags in argv.
+    for tok in opt_tokens:
+        if tok in SERVER_PROHIBITED_FLAGS:
+            _, category = SERVER_PROHIBITED_FLAGS[tok]
+            _fail(f"--mode server (passive_only local audit) rejects {category} flag {tok}")
+
+    # Also compare attributes on `args` against parser defaults in case `args` was mutated directly.
+    default_ns = bf.build_parser().parse_args(["--server-dir", "."])
+    for flag, (attr, category) in SERVER_PROHIBITED_FLAGS.items():
+        if hasattr(args, attr) and hasattr(default_ns, attr):
+            if getattr(args, attr) != getattr(default_ns, attr):
+                _fail(f"--mode server (passive_only local audit) rejects {category} flag {flag}")
+
+    # 2. Require explicit `--profile` and validate against known profiles.
+    raw_profile = getattr(args, "profile", None)
+    if raw_profile is None or not str(raw_profile).strip():
+        _fail("--mode server requires an explicit --profile (paper, fabric, or neoforge)")
+    try:
+        profile = get_platform_profile(str(raw_profile))
+    except ValueError as exc:
+        _fail(f"--mode server invalid --profile: {exc}")
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    # 3. Require `--tiers default` only (reject `op`, `default,op`, or empty/unknown tiers).
+    raw_tiers = getattr(args, "tiers", "default")
+    parsed_tiers = [t.strip().lower() for t in str(raw_tiers or "").split(",") if t.strip()]
+    if parsed_tiers != ["default"]:
+        _fail(
+            f"--mode server passive_only audit requires --tiers default only "
+            f"(got {raw_tiers!r}; op and multi-tier execution are prohibited)"
+        )
+
+    # 4. Require local loopback `--host` and `--mc-host` (no cross-server / remote workflows).
+    host = (getattr(args, "host", None) or "127.0.0.1").strip().lower()
+    if host not in LOCAL_LOOPBACK_HOSTS:
+        _fail(
+            f"--mode server passive_only local audit requires a local loopback --host "
+            f"(127.0.0.1, localhost, or ::1); got {getattr(args, 'host', None)!r}"
+        )
+    mc_host = getattr(args, "mc_host", None)
+    if mc_host is not None and str(mc_host).strip().lower() not in LOCAL_LOOPBACK_HOSTS:
+        _fail(
+            f"--mode server passive_only local audit requires a local loopback --mc-host "
+            f"(127.0.0.1, localhost, or ::1); got {mc_host!r}"
+        )
+
+    # 5. Validate explicit local disposable `--server-dir` and profile jar directory.
+    server_dir = getattr(args, "server_dir", None)
+    ok_disp, disp_reason = is_disposable_server_dir(server_dir)
+    if not ok_disp:
+        _fail(f"--mode server invalid --server-dir: {disp_reason}")
+    try:
+        resolve_server_port(bf.bo.read_properties(server_dir), getattr(args, "mc_port", None))
+    except ValueError as exc:
+        _fail(f"--mode server invalid --mc-port: {exc}")
+
+    jar_dir = profile.jar_dir(server_dir)
+    if not os.path.isdir(jar_dir):
+        _fail(
+            f"--mode server with --profile {profile.name} requires jar directory "
+            f"{jar_dir!r} inside --server-dir"
+        )
+
+    # 6. Validate `--deny` patterns (if any) without shrinking DEFAULT_DENYLIST.
+    raw_deny = getattr(args, "deny", None) or []
+    if isinstance(raw_deny, str):
+        raw_deny = [raw_deny]
+    extra_deny: list[str] = []
+    for entry in raw_deny:
+        parts = [p.strip() for p in str(entry).split(",") if p.strip()]
+        if not parts:
+            _fail("--mode server --deny entry must not be empty")
+        extra_deny.extend(parts)
+    try:
+        denylist = Denylist(extra_deny)
+    except ValueError as exc:
+        _fail(f"--mode server invalid --deny pattern: {exc}")
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    # 7. Validate `--pid-file` / `--pid` if provided (mutually exclusive).
+    pid_file = getattr(args, "pid_file", None)
+    pid_val = getattr(args, "pid", None)
+    if pid_file is not None and pid_val is not None:
+        _fail("--mode server rejects passing both --pid and --pid-file; pass at most one")
+    if pid_file is not None:
+        pf = str(pid_file).strip()
+        if not pf or not os.path.isfile(pf):
+            _fail(f"--mode server --pid-file does not exist or is not a file: {pid_file!r}")
+    if pid_val is not None and int(pid_val) <= 0:
+        _fail(f"--mode server --pid must be a positive integer; got {pid_val!r}")
+
+    return profile, denylist
+
+
+def format_server_passive_report(verdict: dict[str, Any]) -> str:
+    """Format human-readable `report.txt` for `--mode server` passive local audit."""
+    lines: list[str] = []
+    lines.append("=== Whole-Server Passive Local Audit (ADR-125) ===")
+    lines.append(f"mode: {verdict.get('mode', 'server')}")
+    lines.append(f"status: {verdict.get('status', 'passive_only')}")
+    lines.append(f"verdict: {verdict.get('verdict', 'PASSIVE_ONLY')}")
+    lines.append(f"profile: {verdict.get('profile')}")
+    lines.append(f"server_dir: {verdict.get('server_dir')}")
+    lines.append(f"tiers: {', '.join(verdict.get('tiers') or ['default'])}")
+    lines.append("")
+
+    baseline = verdict.get("baseline") or {}
+    lines.append("Baseline:")
+    lines.append(
+        f"  status: {baseline.get('status', 'unavailable')} "
+        f"(available={bool(baseline.get('available', False))})"
+    )
+    if baseline.get("reason"):
+        lines.append(f"  reason: {baseline['reason']}")
+    lines.append("")
+
+    cmds = verdict.get("commands") or {}
+    lines.append("Command Graph Discovery (read-only declare_commands):")
+    lines.append(f"  commands_json: {cmds.get('file')}")
+    lines.append(f"  total_nodes: {cmds.get('total_nodes', 0)}")
+    lines.append(f"  allowed_executable_default_nodes: {cmds.get('allowed_executable_nodes', 0)}")
+    lines.append(f"  denied_nodes: {cmds.get('denied_nodes', 0)}")
+    lines.append(f"  truncated: {bool(cmds.get('truncated', False))}")
+    lines.append("")
+
+    jars = verdict.get("jars") or {}
+    installed = jars.get("installed_jars") or []
+    prereqs = jars.get("prerequisite_jars") or []
+    cands = jars.get("candidate_jars") or []
+    lines.append("Offline JarIndex Inventory:")
+    lines.append(f"  jar_dir: {jars.get('jar_dir')}")
+    lines.append(f"  installed_jars ({len(installed)}): {', '.join(installed) if installed else 'none'}")
+    lines.append(f"  prerequisite_jars ({len(prereqs)}): {', '.join(prereqs) if prereqs else 'none'}")
+    lines.append(f"  candidate_jars ({len(cands)}): {', '.join(cands) if cands else 'none'}")
+    lines.append(f"  indexed_classes: {jars.get('indexed_classes', 0)}")
+    lines.append("")
+
+    snap = verdict.get("jcmd_snapshot") or {}
+    lines.append("Local JcmdObserver Snapshot:")
+    lines.append(f"  requested: {bool(snap.get('requested', False))}")
+    lines.append(f"  status: {snap.get('status', 'not_requested')}")
+    if snap.get("pid") is not None:
+        lines.append(f"  pid: {snap['pid']}")
+    if snap.get("total_classes") is not None:
+        lines.append(
+            f"  histogram: {snap.get('total_classes', 0)} classes, "
+            f"{snap.get('total_instances', 0)} instances, "
+            f"{snap.get('total_bytes', 0)} bytes"
+        )
+    top_cls = snap.get("top_classes") or []
+    if top_cls:
+        lines.append("  top_classes_by_bytes (offline jar owner only; non-causal):")
+        for entry in top_cls[:5]:
+            lines.append(
+                f"    {entry['class_name']}: {entry['instances']} inst, "
+                f"{entry['bytes']} B (owner={entry['jar_owner']})"
+            )
+    mt = snap.get("main_thread")
+    if isinstance(mt, dict) and mt.get("top_frame"):
+        lines.append(
+            f"  main_thread: {mt.get('thread_name') or 'Server thread'} "
+            f"top={mt.get('top_frame')} non_server_frame={mt.get('culprit_frame') or 'none'} "
+            f"(owner={mt.get('first_suspect') or 'server'}; non-causal snapshot)"
+        )
+    if snap.get("note"):
+        lines.append(f"  note: {snap['note']}")
+    lines.append("")
+
+    warnings = verdict.get("warnings") or []
+    if warnings:
+        lines.append("Warnings:")
+        for w in warnings:
+            lines.append(f"  - {w}")
+        lines.append("")
+
+    lines.append("Attribution & Culprits:")
+    lines.append("  confirmed_culprits: none (0)")
+    lines.append("  blamed_jars: none (0)")
+    lines.append(
+        "  note: passive_only audit executes no commands, runs no episodes, grants no op permissions, "
+        "toggles no jars, and makes no causal leak, stall, mitigation, or replay claims."
+    )
+    return "\n".join(lines) + "\n"
+
+
+class ServerRun:
+    """Passive local server audit runner (`--mode server`, ADR-125).
+
+    Validates the local disposable `--server-dir` and `--profile`, captures the
+    `default` tier `declare_commands` graph once in read-only mode, writes
+    denylist-filtered `commands.json`, scans the offline `JarIndex` inventory,
+    optionally collects an operator-selected local `JcmdObserver` snapshot (with
+    process ownership verification), and writes `verdict.json` and `report.txt`
+    with `status: 'passive_only'` and zero confirmed culprits or mitigation claims.
+    """
+
+    def __init__(
+        self,
+        args: Any,
+        run_dir: str,
+        *,
+        swarm: Any | None = None,
+        observer: JcmdObserver | None = None,
+        jar_index: JarIndex | None = None,
+        stamp: str | None = None,
+    ):
+        self.args = args
+        self.run_dir = os.path.abspath(run_dir)
+        self.profile, self.denylist = validate_server_mode_args(args)
+        self.server_dir = os.path.abspath(args.server_dir)
+        self.swarm = swarm
+        self.observer = observer
+        self.jar_index = jar_index
+        self.stamp = stamp or time.strftime("%Y%m%d-%H%M%S")
+
+    def _wants_jcmd_snapshot(self) -> bool:
+        return bool(
+            self.observer is not None
+            or getattr(self.args, "pid_file", None)
+            or getattr(self.args, "pid", None) is not None
+            or getattr(self.args, "jcmd_snapshot", False)
+        )
+
+    def _build_observer(self) -> JcmdObserver:
+        if self.observer is not None:
+            if self.observer.container is not None or not self.observer.check_local_pid:
+                raise JcmdError(
+                    "--mode server passive_only local audit requires local JVM ownership verification "
+                    "(container JcmdObserver or check_local_pid=False is not permitted)"
+                )
+            if not self.observer.server_dir:
+                self.observer.server_dir = self.server_dir
+            return self.observer
+        pid_val = getattr(self.args, "pid", None)
+        pid_file = getattr(self.args, "pid_file", None)
+        return JcmdObserver(
+            pid=int(pid_val) if pid_val is not None else None,
+            pid_file=str(pid_file) if pid_file else None,
+            server_dir=self.server_dir,
+            container=None,
+        )
+
+    def _collect_jcmd_snapshot(self, obs: JcmdObserver, jar_index: JarIndex) -> dict[str, Any]:
+        resolved_pid = obs.resolve_pid()
+        histo = obs.class_histogram()
+        tdump = obs.thread_print()
+
+        total_instances = sum(v[0] for v in histo.values())
+        total_bytes = sum(v[1] for v in histo.values())
+        ranked = sorted(histo.items(), key=lambda kv: (-kv[1][1], -kv[1][0], kv[0]))[:15]
+        top_classes = [
+            {
+                "class_name": cls_name,
+                "instances": int(inst),
+                "bytes": int(nbytes),
+                "jar_owner": jar_index.owner_of_class(cls_name, profile=self.profile),
+            }
+            for cls_name, (inst, nbytes) in ranked
+        ]
+        main_thread = parse_main_thread_frame(tdump, profile=self.profile, jar_index=jar_index)
+
+        return {
+            "requested": True,
+            "status": "collected",
+            "pid": resolved_pid,
+            "total_classes": len(histo),
+            "total_instances": int(total_instances),
+            "total_bytes": int(total_bytes),
+            "top_classes": top_classes,
+            "main_thread": {
+                "thread_name": main_thread.get("thread_name"),
+                "top_frame": main_thread.get("top_frame"),
+                "culprit_frame": main_thread.get("culprit_frame"),
+                "culprit_class": main_thread.get("culprit_class"),
+                "first_suspect": main_thread.get("first_suspect"),
+            },
+            "exclusion_windows": [w.to_dict() for w in obs.exclusion_windows],
+            "attribution_status": "passive_snapshot_only",
+            "note": (
+                "Single passive snapshot only; statistical leak screening requires exchangeable episodes "
+                "and a vanilla baseline, so no causal leak or stall claims are made."
+            ),
+        }
+
+    def run(self) -> dict[str, Any]:
+        os.makedirs(self.run_dir, exist_ok=True)
+        warnings: list[str] = []
+
+        # 1. Offline JarIndex scan (read-only; never renames or toggles jars).
+        jar_index = self.jar_index or JarIndex.from_server_dir(self.server_dir, self.profile)
+        installed_jars = sorted(jar_index.jars.keys())
+        prereq_jars = sorted(j for j in installed_jars if self.profile.is_prerequisite_jar(j))
+        candidate_jars = sorted(j for j in installed_jars if not self.profile.is_prerequisite_jar(j))
+
+        # 2. If operator requested a local JcmdObserver snapshot, verify PID ownership up front.
+        want_jcmd = self._wants_jcmd_snapshot()
+        obs: JcmdObserver | None = None
+        if want_jcmd:
+            obs = self._build_observer()
+            obs.resolve_pid()
+
+        # 3. Single read-only `declare_commands` discovery for `default` tier.
+        props = bf.bo.read_properties(self.server_dir)
+        mc_port = resolve_server_port(props, getattr(self.args, "mc_port", None))
+        own_swarm = self.swarm is None
+        swarm = self.swarm
+        if own_swarm:
+            swarm = bf.Swarm(
+                bf.swarm_argv(self.args, mc_port),
+                os.path.join(self.run_dir, "swarm.log"),
+            )
+        try:
+            if own_swarm:
+                swarm.start()
+            episode_max_s = float(getattr(self.args, "episode_max_s", 15.0) or 15.0)
+            discover_max_ms = max(1000, min(60000, int(episode_max_s * 1000)))
+            cmd_ev, _done = swarm.discover(
+                "discover-default",
+                tier="default",
+                bot=bf.bot_name(self.stamp, 0, "disc", 0),
+                max_ms=discover_max_ms,
+            )
+        finally:
+            if own_swarm and swarm is not None:
+                swarm.close()
+
+        commands_path = os.path.join(self.run_dir, "commands.json")
+        tree = merge_command_trees(
+            {"default": cmd_ev},
+            denylist=self.denylist,
+            out_path=commands_path,
+        )
+        if tree.truncated:
+            trunc_msg = (
+                f"Command graph truncated at {len(tree.nodes)} nodes; "
+                f"inspect {commands_path} for partial inventory."
+            )
+            warnings.append(trunc_msg)
+
+        allowed_exec = tree.allowed_executable_nodes(["default"])
+        denied_nodes = [n for n in tree.nodes.values() if n.denied]
+
+        # 4. Optional operator-selected local JcmdObserver snapshot.
+        if obs is not None:
+            jcmd_summary = self._collect_jcmd_snapshot(obs, jar_index)
+        else:
+            jcmd_summary = {
+                "requested": False,
+                "status": "not_requested",
+                "note": "Pass --pid-file <path> (or --jcmd-snapshot) to collect a local read-only jcmd snapshot.",
+            }
+
+        verdict: dict[str, Any] = {
+            "mode": "server",
+            "status": "passive_only",
+            "verdict": "PASSIVE_ONLY",
+            "profile": self.profile.name,
+            "server_dir": self.server_dir,
+            "tiers": ["default"],
+            "baseline": {
+                "available": False,
+                "status": "unavailable",
+                "reason": (
+                    "passive_only local audit does not toggle jars, restart the server, "
+                    "or execute baseline episodes"
+                ),
+            },
+            "commands": {
+                "file": commands_path,
+                "total_nodes": len(tree.nodes),
+                "allowed_executable_nodes": len(allowed_exec),
+                "denied_nodes": len(denied_nodes),
+                "truncated": bool(tree.truncated),
+                "denylist": list(self.denylist.entries),
+            },
+            "jars": {
+                "jar_dir": jar_index.jar_dir,
+                "installed_jars": installed_jars,
+                "prerequisite_jars": prereq_jars,
+                "candidate_jars": candidate_jars,
+                "indexed_classes": len(jar_index.class_to_jars),
+                "metadata": {
+                    j: {
+                        "plugin_id": jar_index.jars[j].plugin_id,
+                        "depends": sorted(jar_index.jars[j].hard_depends),
+                        "soft_depends": sorted(jar_index.jars[j].soft_depends),
+                        "provides": sorted(jar_index.jars[j].provides),
+                        "class_count": int(jar_index.jars[j].class_count),
+                    }
+                    for j in installed_jars
+                },
+            },
+            "jcmd_snapshot": jcmd_summary,
+            "confirmed_culprits": [],
+            "blamed_jars": [],
+            "findings": [],
+            "warnings": warnings,
+        }
+
+        verdict_path = os.path.join(self.run_dir, getattr(bf, "VERDICT_FILE", "verdict.json"))
+        bf.save_json(verdict_path, verdict)
+        report_path = os.path.join(self.run_dir, getattr(bf, "REPORT_FILE", "report.txt"))
+        with open(report_path, "w", encoding="utf-8") as fh:
+            fh.write(format_server_passive_report(verdict))
+
+        return verdict
+
+
+def run_server_mode(
+    args: Any,
+    parser: Any | None = None,
+    argv: Iterable[str] | None = None,
+    *,
+    swarm: Any | None = None,
+    observer: JcmdObserver | None = None,
+    jar_index: JarIndex | None = None,
+) -> int:
+    """Entry point for `bench_fuzz.py --mode server` passive local audit."""
+    validate_server_mode_args(args, parser=parser, argv=argv)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    out_dir = getattr(args, "out_dir", None) or os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
+    run_dir = os.path.join(out_dir, "runs", f"fuzz-{stamp}")
+    os.makedirs(run_dir, exist_ok=True)
+    prev_log_fh = bf.bo.LOG_FH
+    bf.bo.LOG_FH = open(os.path.join(run_dir, "fuzz.log"), "a", encoding="utf-8")
+    try:
+        bf.log(
+            f"server passive audit: stamp={stamp} profile={args.profile} "
+            f"server_dir={args.server_dir} tiers=['default'] run_dir={run_dir}"
+        )
+        runner = ServerRun(
+            args,
+            run_dir,
+            swarm=swarm,
+            observer=observer,
+            jar_index=jar_index,
+            stamp=stamp,
+        )
+        runner.run()
+        bf.log(f"done (passive_only); artifacts under {run_dir}")
+        return 0
+    except (bf.SwarmError, JcmdError, ValueError) as exc:
+        bf.log(f"server passive audit failed: {exc}")
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        try:
+            bf.bo.LOG_FH.close()
+        except OSError:
+            pass
+        bf.bo.LOG_FH = prev_log_fh
