@@ -130,4 +130,11 @@ public final class BackendStatePublisher {
      * @return the interval in milliseconds
      */
     public long intervalMs() { return intervalMs; }
+
+    /**
+     * Returns the monotonic count of heartbeats published by this instance.
+     *
+     * @return the published heartbeat count
+     */
+    public long publishedCount() { return publishedCount.get(); }
 }

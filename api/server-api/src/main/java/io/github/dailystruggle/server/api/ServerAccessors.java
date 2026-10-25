@@ -10,6 +10,7 @@ public final class ServerAccessors {
   private static volatile ServerAccessor accessor;
   private static volatile TaskScheduler schedulerOverride;
   private static volatile LogSink logSink;
+  private static volatile ServerAccessor effectAccessorOverride;
 
   /**
    * Pluggable log sink override (e.g. {@code RTPRuntime::log} for bootstrap sub-INFO log
@@ -76,6 +77,123 @@ public final class ServerAccessors {
     }
     ServerAccessor current = accessor;
     return current == null ? Optional.empty() : current.scheduler();
+  }
+
+  /**
+   * Installs or clears an explicit {@link ServerAccessor} delegate used for effect target
+   * resolution and console command dispatch (ADR-116 Decision 2).
+   *
+   * @param effectAccessor effect accessor delegate, or {@code null} to clear
+   */
+  public static void setEffectAccessor(ServerAccessor effectAccessor) {
+    effectAccessorOverride = effectAccessor;
+  }
+
+  /**
+   * Returns the active effect {@link ServerAccessor} (explicit delegate or installed server
+   * accessor).
+   *
+   * @return effect accessor, or {@code null} if none is installed
+   */
+  public static ServerAccessor effectAccessor() {
+    ServerAccessor explicit = effectAccessorOverride;
+    return explicit != null ? explicit : accessor;
+  }
+
+  /**
+   * Returns whether an effect-capable {@link ServerAccessor} is currently installed.
+   *
+   * @return {@code true} if an explicit effect accessor or primary server accessor is installed
+   */
+  public static boolean hasEffectAccessor() {
+    return effectAccessorOverride != null || accessor != null;
+  }
+
+  /**
+   * Wraps a platform player object into an effect player handle through the active {@link
+   * ServerAccessor} (ADR-116 Decision 2).
+   *
+   * @param player platform player or handle object
+   * @return wrapped player handle, or {@code null}
+   */
+  public static Object wrapEffectPlayer(Object player) {
+    if (player == null) {
+      return null;
+    }
+    ServerAccessor current = accessor;
+    if (current != null) {
+      Object wrapped = current.wrapEffectPlayer(player);
+      if (wrapped != null) {
+        return wrapped;
+      }
+    }
+    ServerAccessor explicit = effectAccessorOverride;
+    return explicit != null ? explicit.wrapEffectPlayer(player) : null;
+  }
+
+  /**
+   * Wraps a platform location or entity object into an effect location handle through the active
+   * {@link ServerAccessor} (ADR-116 Decision 2).
+   *
+   * @param location platform location, entity, or handle object
+   * @return wrapped location handle, or {@code null}
+   */
+  public static Object wrapEffectLocation(Object location) {
+    if (location == null) {
+      return null;
+    }
+    ServerAccessor current = accessor;
+    if (current != null) {
+      Object wrapped = current.wrapEffectLocation(location);
+      if (wrapped != null) {
+        return wrapped;
+      }
+    }
+    ServerAccessor explicit = effectAccessorOverride;
+    return explicit != null ? explicit.wrapEffectLocation(location) : null;
+  }
+
+  /**
+   * Resolves the online player standing at the given effect location handle through the active
+   * {@link ServerAccessor} (ADR-116 Decision 2).
+   *
+   * @param location effect location handle or platform location
+   * @return wrapped player handle, or {@code null}
+   */
+  public static Object resolveEffectPlayerAt(Object location) {
+    if (location == null) {
+      return null;
+    }
+    ServerAccessor current = accessor;
+    if (current != null) {
+      Object wrapped = current.resolveEffectPlayerAt(location);
+      if (wrapped != null) {
+        return wrapped;
+      }
+    }
+    ServerAccessor explicit = effectAccessorOverride;
+    return explicit != null ? explicit.resolveEffectPlayerAt(location) : null;
+  }
+
+  /**
+   * Dispatches a console command through the active effect or primary {@link ServerAccessor}
+   * (ADR-116 Decision 2).
+   *
+   * @param command command string to execute
+   */
+  public static void dispatchConsoleCommand(String command) {
+    if (command == null || command.isEmpty()) {
+      return;
+    }
+    ServerAccessor explicit = effectAccessorOverride;
+    if (explicit != null) {
+      explicit.dispatchConsoleCommand(command);
+      return;
+    }
+    ServerAccessor current = accessor;
+    if (current != null) {
+      current.dispatchConsoleCommand(command);
+    }
   }
 
   /** Logs through the installed log sink, server bridge, or generic server logger. */

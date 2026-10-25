@@ -128,8 +128,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (!version.contains("1_")) {
         String bukkitVersion = Bukkit.getServer().getBukkitVersion();
         int end = bukkitVersion.indexOf("-R");
-        if (end < 0) return "1_13_2";
-        bukkitVersion = bukkitVersion.substring(0, end).replace(".", "_");
+        if (end < 0) end = bukkitVersion.indexOf(".build");
+        if (end < 0) end = bukkitVersion.indexOf('-');
+        if (end < 0 && !bukkitVersion.startsWith("26.") && !bukkitVersion.startsWith("1.")) {
+          return "1_13_2";
+        }
+        if (end > 0) bukkitVersion = bukkitVersion.substring(0, end);
+        bukkitVersion = bukkitVersion.replace(".", "_");
         return bukkitVersion;
       } else version = versionPattern.matcher(version).replaceAll("");
     }
@@ -214,8 +219,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       else if (v.contains("1_19")) intVersion = 19;
       else if (v.contains("1_20")) intVersion = 20;
       else if (v.contains("1_21")) intVersion = 21;
-      else if (v.contains("26_1")) intVersion = 26;
-      else if (v.contains("26_2")) intVersion = 26;
+      else if (v.contains("26_") || v.contains("26.")) intVersion = 26;
       else intVersion = 13;
     }
     return intVersion;
@@ -1561,6 +1565,40 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
           "[RTP] setupMapBinding failed; MapDispatch will fall back to NoopMapBinding", t);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Effects target & command dispatch SPI (ADR-116 Decision 2)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public Object wrapEffectPlayer(Object player) {
+    return player == null
+        ? null
+        : io.github.dailystruggle.effectsapi.bukkit.BukkitHandles.getInstance().wrapPlayer(player);
+  }
+
+  @Override
+  public Object wrapEffectLocation(Object location) {
+    return location == null
+        ? null
+        : io.github.dailystruggle.effectsapi.bukkit.BukkitHandles.getInstance()
+            .wrapLocation(location);
+  }
+
+  @Override
+  public Object resolveEffectPlayerAt(Object location) {
+    return location instanceof io.github.dailystruggle.effectsapi.common.spi.LocationHandle lh
+        ? io.github.dailystruggle.effectsapi.bukkit.BukkitHandles.getInstance().playerAt(lh)
+        : null;
+  }
+
+  @Override
+  public void dispatchConsoleCommand(String command) {
+    if (command != null && !command.isEmpty()) {
+      io.github.dailystruggle.effectsapi.bukkit.BukkitHandles.getInstance()
+          .dispatchConsoleCommand(command);
     }
   }
 }

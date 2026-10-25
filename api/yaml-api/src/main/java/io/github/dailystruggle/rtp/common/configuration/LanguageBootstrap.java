@@ -74,7 +74,7 @@ public final class LanguageBootstrap {
       String sanitized = sanitize(locale);
       log(Level.FINE, "[RTP] LanguageBootstrap: resolved locale '" + sanitized + "'");
       return sanitized;
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       log(Level.WARNING,
           "[RTP] Failed to read " + FILE_NAME + "; falling back to '" + DEFAULT_LOCALE + "'.", e);
       return DEFAULT_LOCALE;

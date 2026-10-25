@@ -432,7 +432,7 @@ All counters are **snapshots**, not deltas — the consumer (selector) does the 
 
 - Default heartbeat interval: **1 second** (configurable via `network.heartbeat.intervalTicks`, default `20`). Aligns with the heartbeat/staleness pattern already drafted under `NetworkSnapshot`.
 - Writes happen on `RTP.scheduler.runTaskTimerAsynchronously` — **never on a tick / region thread** (REQ-RTP-NET-007, S-005 spirit).
-- Single-row UPSERT keyed on `serverId` (no historical retention by default — keeps the table tiny). A separate optional `BackendHeartbeatHistoryTable` is a Phase 4 hardening item if ops want longitudinal data.
+- Single-row UPSERT keyed on `serverId` (no historical retention by default — keeps the table tiny). Longitudinal cross-backend metric time-series buckets (`rtp_metric_bucket` in SQL / `rtp:metric:<backend_id>:<metric_key>` in Redis) are published separately on tier promotion when `metrics.networkTimeSeries.publish: true` in `advanced/network.yml` ([ADR-040](../adr/ADR-040-cross-backend-metric-time-series-publication.md)).
 - On Folia, the publisher is async-only; per-region TPS is sampled via the platform's `RegionScheduler` API and folded into the row before write.
 - On graceful shutdown, the backend writes a final row with `pluginState=SHUTTING_DOWN` and `acceptingRequests=false` so the selector drops it immediately rather than waiting for the staleness window. Best-effort — a hard crash relies on the staleness filter.
 - Failure to publish must **not** abort RTP operation locally; it shall log under S-004 attribution rules and the selector treats the backend as stale until publication resumes.

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from dataclasses import dataclass
 import datetime as dt
 import os
 import re
@@ -34,7 +35,7 @@ import sys
 import time
 
 DEFAULT_TARGETS = "rtp,betterrtp,huskhomes,justrtp,jakesrtp,ezrtp"
-# target label -> plugins/ jar filename prefix (case-insensitive). With isolation
+# target label -> plugins/ or mods/ jar filename prefix (case-insensitive). With isolation
 # only the target's jar is enabled; the rest are renamed *.jar.off while the
 # server is down, so no competitor's background work (pre-caches, queues) runs
 # during another plugin's ramp.
@@ -42,15 +43,128 @@ DEFAULT_JARS = (
     "rtp=LeafRTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=justRTP,"
     "jakesrtp=JakesRTP,ezrtp=EzRTP,advancedrtp=AdvancedRTP,asyrtp=asyrtp,sorekillrtp=SorekillRTP"
 )
-# target label -> plugin name as listed by the server's `plugins` command; checked after
-# every restart so a ramp never runs against the wrong plugin set.
+# target label -> plugin/mod name as listed by the server's loaded-target check; checked after
+# every restart so a ramp never runs against the wrong plugin/mod set.
 DEFAULT_NAMES = (
     "rtp=RTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=JustRTP,"
     "jakesrtp=JakesRTP,ezrtp=EzRTP,advancedrtp=AdvancedRTP,asyrtp=AsyRTP,sorekillrtp=SorekillRTP"
 )
+DEFAULT_FABRIC_NAMES = (
+    "rtp=leafrtp,betterrtp=betterrtp,huskhomes=huskhomes,justrtp=justrtp,"
+    "jakesrtp=jakesrtp,ezrtp=ezrtp,advancedrtp=advancedrtp,asyrtp=asyrtp,sorekillrtp=sorekillrtp"
+)
 OFF_SUFFIX = ".off"
 # Ladder first: it yields the stress point; flat 100 is the headline comparison.
 DEFAULT_ROUNDS = ["5,10,20,40,80,160,320@60", "100@120"]
+
+
+@dataclass(frozen=True)
+class PlatformProfile:
+    """Platform profile for bench_overnight.py and bench_fuzz.py (ADR-122 Decision 6)."""
+    name: str
+    family: str  # "bukkit" or "fabric"
+    jar_subdir: str  # "plugins" or "mods"
+    harness_data_rel: str  # "plugins/StressTestRTP" or "config/StressTestRTP"
+    lp_data_rel: str  # "plugins/LuckPerms" or "config/luckperms"
+    loaded_check_cmd: str  # "plugins" or "fabric mods"
+    event_error_oracle: bool  # True on Bukkit/Paper/Folia, False on Fabric
+    permission_strategy: str  # "luckperms" or "fabric"
+    default_names: str = DEFAULT_NAMES
+
+    def jar_dir(self, server_dir: str) -> str:
+        return os.path.join(server_dir, self.jar_subdir)
+
+    def harness_runs_dir(self, server_dir: str, output_subdir: str = "runs") -> str:
+        primary = os.path.join(server_dir, self.harness_data_rel, output_subdir)
+        if os.path.isdir(primary):
+            return primary
+        fallback = os.path.join(server_dir, "plugins", "StressTestRTP", output_subdir)
+        if os.path.isdir(fallback):
+            return fallback
+        return primary
+
+    def lp_export_dir(self, server_dir: str) -> str:
+        return os.path.join(server_dir, self.lp_data_rel)
+
+
+def _make_bukkit_profile(name: str) -> PlatformProfile:
+    return PlatformProfile(
+        name=name,
+        family="bukkit",
+        jar_subdir="plugins",
+        harness_data_rel=os.path.join("plugins", "StressTestRTP"),
+        lp_data_rel=os.path.join("plugins", "LuckPerms"),
+        loaded_check_cmd="plugins",
+        event_error_oracle=True,
+        permission_strategy="luckperms",
+        default_names=DEFAULT_NAMES,
+    )
+
+
+PLATFORM_PROFILES: dict[str, PlatformProfile] = {
+    "bukkit": _make_bukkit_profile("bukkit"),
+    "paper": _make_bukkit_profile("paper"),
+    "folia": _make_bukkit_profile("folia"),
+    "fabric": PlatformProfile(
+        name="fabric",
+        family="fabric",
+        jar_subdir="mods",
+        harness_data_rel=os.path.join("config", "StressTestRTP"),
+        lp_data_rel=os.path.join("config", "luckperms"),
+        loaded_check_cmd="fabric mods",
+        event_error_oracle=False,
+        permission_strategy="fabric",
+        default_names=DEFAULT_FABRIC_NAMES,
+    ),
+}
+
+
+def get_platform_profile(name: str | None = None, server_dir: str | None = None) -> PlatformProfile:
+    """Resolve a `PlatformProfile` by explicit name or by inspecting `server_dir`."""
+    if name is not None and str(name).strip():
+        key = str(name).strip().lower()
+        if key not in PLATFORM_PROFILES:
+            raise ValueError(f"unknown platform profile {name!r}; expected one of {sorted(PLATFORM_PROFILES)}")
+        return PLATFORM_PROFILES[key]
+    if server_dir:
+        mods_dir = os.path.join(server_dir, "mods")
+        plugins_dir = os.path.join(server_dir, "plugins")
+        if os.path.isdir(mods_dir) and not os.path.isdir(plugins_dir):
+            return PLATFORM_PROFILES["fabric"]
+    return PLATFORM_PROFILES["paper"]
+
+
+def parse_fabric_mod_list(reply: str | None) -> set[str] | None:
+    """Extract mod IDs / names from a Fabric RCON mod-list reply (`fabric mods` / `mods`)."""
+    if reply is None:
+        return None
+    low = reply.strip().lower()
+    if not low or "unknown or incomplete command" in low or "unknown command" in low:
+        return None
+    names: set[str] = set()
+    for raw in reply.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        # Bullet style: `- leafrtp 3.3.0` or `* fabric-api (0.100.0)`
+        m_bullet = re.match(r"^[-*•]\s*([A-Za-z0-9_.-]+)", line)
+        if m_bullet:
+            names.add(m_bullet.group(1).strip())
+            continue
+        if ":" in line:
+            head, _, tail = line.partition(":")
+            if any(k in head.lower() for k in ("mod", "loaded", "fabric")):
+                line = tail.strip()
+            elif line.endswith(":"):
+                continue
+        for tok in line.split(","):
+            tok = tok.strip().lstrip("-*").strip()
+            if not tok:
+                continue
+            mod_id = tok.split()[0].strip("():")
+            if mod_id:
+                names.add(mod_id)
+    return names if names else None
 
 LOG_FH = None
 
@@ -151,20 +265,24 @@ class Driver:
     def __init__(self, a: argparse.Namespace, host: str, port: int, password: str):
         self.a, self.host, self.port, self.password = a, host, port, password
         self.ramp_active = False  # a ramp this process started may still run server-side
+        self.profile = get_platform_profile(getattr(a, "platform", None), getattr(a, "server_dir", None))
         self.jars: dict[str, str] = {}
-        if a.isolate:
-            for pair in a.jars.split(","):
+        if getattr(a, "isolate", False):
+            for pair in getattr(a, "jars", DEFAULT_JARS).split(","):
                 t, _, prefix = pair.partition("=")
                 if t.strip() and prefix.strip():
                     self.jars[t.strip().lower()] = prefix.strip().lower()
         self.names: dict[str, str] = {}
-        for pair in getattr(a, "names", DEFAULT_NAMES).split(","):
+        raw_names = getattr(a, "names", None)
+        if not raw_names or (raw_names == DEFAULT_NAMES and self.profile.family == "fabric"):
+            raw_names = self.profile.default_names
+        for pair in raw_names.split(","):
             t, _, name = pair.partition("=")
             if t.strip() and name.strip():
                 self.names[t.strip().lower()] = name.strip()
 
     def plugins_dir(self) -> str:
-        return os.path.join(self.a.server_dir, "plugins")
+        return self.profile.jar_dir(self.a.server_dir)
 
     def jar_files(self, prefix: str) -> list[str]:
         return [f for f in os.listdir(self.plugins_dir())
@@ -235,7 +353,20 @@ class Driver:
         return n
 
     def loaded_plugins(self) -> set[str] | None:
-        r = self.try_cmd("plugins")
+        if self.profile.family == "fabric":
+            r = self.try_cmd(self.profile.loaded_check_cmd)
+            parsed = parse_fabric_mod_list(r)
+            if parsed is not None:
+                return parsed
+            # Fallback when RCON `fabric mods` is not registered: inspect active jars in mods/
+            if getattr(self.a, "server_dir", None) and os.path.isdir(self.plugins_dir()):
+                active: set[str] = set()
+                for t, prefix in self.jars.items():
+                    if any(f.lower().endswith(".jar") for f in self.jar_files(prefix)):
+                        active.add(self.names.get(t, t))
+                return active
+            return None
+        r = self.try_cmd(self.profile.loaded_check_cmd)
         if r is None:
             return None
         names: set[str] = set()
@@ -251,15 +382,20 @@ class Driver:
         return names
 
     def jar_set_ok(self, target: str) -> tuple[bool, str]:
-        """Target's plugin loaded and, with isolation, no other RTP plugin loaded."""
+        """Target's plugin/mod loaded and, with isolation, no other RTP plugin/mod loaded."""
         loaded = self.loaded_plugins()
         if loaded is None:
-            return False, "plugins: no reply"
-        rtp_loaded = sorted(n for t, n in self.names.items() if n in loaded and (not self.jars or t in self.jars))
+            return False, f"{self.profile.loaded_check_cmd}: no reply"
+        loaded_lower = {x.lower() for x in loaded}
+        rtp_loaded = sorted(
+            n for t, n in self.names.items()
+            if (n in loaded or n.lower() in loaded_lower or t.lower() in loaded_lower)
+            and (not self.jars or t in self.jars)
+        )
         want = self.names.get(target.lower())
         if want is None:
             return True, ",".join(rtp_loaded)
-        ok = want in loaded and (not self.jars or rtp_loaded == [want])
+        ok = (want in loaded or want.lower() in loaded_lower) and (not self.jars or rtp_loaded == [want])
         return ok, ",".join(rtp_loaded)
 
     def restart_once(self) -> bool:
@@ -385,6 +521,8 @@ class Driver:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--server-dir", help="server root (reads rcon.port / rcon.password from server.properties)")
+    p.add_argument("--platform", choices=tuple(PLATFORM_PROFILES), default=None,
+                   help="server platform profile: bukkit, paper, folia, or fabric (default auto-detected)")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int)
     p.add_argument("--password", default=os.environ.get("RCON_PASSWORD"))

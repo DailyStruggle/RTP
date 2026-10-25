@@ -1,5 +1,8 @@
 # Why
 
+!!! note "Note for server administrators"
+    This page explains the **internal engine math** behind LeafRTP. **You never configure space-filling curves, spirals, or math equations to use LeafRTP.** Out of the box, `/rtp` and `/wild` use a standard `CIRCLE` region, and server owners only set a radius in blocks (e.g. `radius: 5000b` or `10km`) or drag a region border in `/rtp editor`. For setup instructions, see [Quick Start](../admin/QUICK_START.md).
+
 I made this plugin originally to fix 2 major holes in RTP plugin design:
 
 1. placement distribution

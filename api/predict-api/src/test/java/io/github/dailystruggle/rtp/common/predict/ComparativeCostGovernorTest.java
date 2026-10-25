@@ -138,4 +138,76 @@ class ComparativeCostGovernorTest {
         }
         assertEquals(16, trials);
     }
+
+    @Test
+    @DisplayName("HysteresisConfig validation, z-score edge cases, deterministic explore stride, and context evaluation")
+    void hysteresisValidationAndEdgeCases() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(null, TestBranch.BYPASS, 3.0, 4, 8L, 0.05, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, null, 3.0, 4, 8L, 0.05, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.PREFILTER, 3.0, 4, 8L, 0.05, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 0.0, 4, 8L, 0.05, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, Double.NaN, 4, 8L, 0.05, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 0, 8L, 0.05, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 4, -1L, 0.05, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 4, 8L, -0.1, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 4, 8L, 0.05, 1.5));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 4, 8L, 0.5, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 4, 8L, Double.NaN, 0.25));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ComparativeCostGovernor.HysteresisConfig<>(TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 4, 8L, 0.05, Double.NaN));
+
+        assertThrows(IllegalArgumentException.class, () -> ComparativeCostGovernor.ofVarianceHysteresis(null));
+        assertThrows(IllegalArgumentException.class, () -> new ComparativeCostGovernor.CoalescedTrialAccrual(0L, 0, 10));
+        assertThrows(IllegalArgumentException.class, () -> new ComparativeCostGovernor.CoalescedTrialAccrual(0L, 4, 0));
+
+        // Stateless governor throws on evaluateVarianceGated
+        ComparativeCostGovernor<TestBranch> stateless = ComparativeCostGovernor.of(ctx -> TestBranch.PREFILTER);
+        assertNotNull(stateless.policy());
+        assertThrows(IllegalStateException.class, () -> stateless.evaluateVarianceGated(1.0, 2.0, 1.0));
+
+        // Variance governor evaluated via CostContext and latestDecision
+        ComparativeCostGovernor.HysteresisConfig<TestBranch> cfg =
+                new ComparativeCostGovernor.HysteresisConfig<>(
+                        TestBranch.PREFILTER, TestBranch.BYPASS, 3.0, 1, 0L, 0.05, 0.25);
+        ComparativeCostGovernor<TestBranch> varGov = ComparativeCostGovernor.ofVarianceHysteresis(cfg);
+        assertNotNull(varGov.latestDecision());
+        CostContext ctx = CostContext.builder().with("costA", 20.0).with("costB", 5.0).with("se2", 1.0).build();
+        assertEquals(TestBranch.BYPASS, varGov.evaluate(ctx));
+        assertEquals(TestBranch.BYPASS, varGov.latestDecision().mode());
+
+        // computeZScore and computeExploreShare edge cases
+        assertTrue(Double.isNaN(ComparativeCostGovernor.computeZScore(Double.NaN, 1.0)));
+        assertTrue(Double.isNaN(ComparativeCostGovernor.computeZScore(1.0, Double.NaN)));
+        assertEquals(Double.POSITIVE_INFINITY, ComparativeCostGovernor.computeZScore(5.0, 0.0));
+        assertEquals(Double.NEGATIVE_INFINITY, ComparativeCostGovernor.computeZScore(-5.0, 0.0));
+        assertEquals(0.0, ComparativeCostGovernor.computeZScore(0.0, 0.0));
+        assertEquals(0.05, ComparativeCostGovernor.computeExploreShare(Double.POSITIVE_INFINITY, 0.05, 0.25), 1e-9);
+        assertEquals(0.25, ComparativeCostGovernor.computeExploreShare(Double.NaN, 0.05, 0.25), 1e-9);
+
+        // shouldExploreDeterministic
+        assertFalse(ComparativeCostGovernor.shouldExploreDeterministic(1L, 0.0));
+        assertFalse(ComparativeCostGovernor.shouldExploreDeterministic(1L, -0.1));
+        assertFalse(ComparativeCostGovernor.shouldExploreDeterministic(3L, 0.25));
+        assertTrue(ComparativeCostGovernor.shouldExploreDeterministic(4L, 0.25));
+
+        // CoalescedTrialAccrual window expiry, noBinKey, and reset
+        ComparativeCostGovernor.CoalescedTrialAccrual accrual =
+                new ComparativeCostGovernor.CoalescedTrialAccrual(-1L, 3, 5);
+        assertTrue(accrual.shouldTrial(10L, 1.0, 1L)); // starts run on bin 10, until = 6
+        assertTrue(accrual.shouldTrial(10L, 0.0, 10L) == false); // expired because d=10 > until=6
+        assertTrue(accrual.shouldTrial(-1L, 1.0, 11L)); // noBinKey leaves left=0
+        accrual.reset();
+        assertFalse(accrual.shouldTrial(10L, 0.1, 12L));
+    }
 }

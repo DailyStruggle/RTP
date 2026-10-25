@@ -1,6 +1,6 @@
 # ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
 
-**Status:** Proposed
+**Status:** Accepted (implemented 2026-10-24)
 **Date:** 2026-05-13
 **Target release:** `3.0.0-beta.5` (post-beta.4; gated on ADR-039 acceptance and `MemoryTracker`'s in-memory time-series ring landing)
 **Supersedes:** —
@@ -38,13 +38,13 @@ Adopt a **batch-mode, tier-promotion-driven, hybrid-payload publisher** of metri
 5. **Bounded write rate.** Maximum write rate per backend is `metric_count × published_tier_buckets_per_minute`. With the beta.4 default tier set, that is `N_metrics × 1 /min` per backend — well under any sane shared-store budget even at 50 metrics × 20 backends (~1000 writes/min cluster-wide). A safety throttle in the publisher caps the per-pass batch (default 64 rows) and defers overflow to the next pass; sustained overflow is an audit warning, never a drop without a log line (S-004).
 6. **Bounded retention.** A periodic `DELETE WHERE window_start_epoch < now - retention` runs on the same `MemoryTracker` pass as part of the same flush. Default retention is 7 days, configurable. Retention is local-effect (each backend reaps its own rows by `backend_id`), so reaping work scales with the originating node's metric count, not cluster size.
 7. **Reader is ADR-039.** No new consumer command, no new menu surface. ADR-039's `NetworkSnapshotReader` gains an additional method to range-scan these rows; `MetricChartSnapshot` gains an optional `(min, max)` series the chart renderer draws as a high-water band behind the mean line. Origin-only chart behavior is unchanged when network mode is off or the publisher is disabled.
-8. **Origin-only opt-out.** A single config key (`metrics.networkTimeSeries.publish`, default `false`) gates the entire writer. With it off, ADR-040 is dormant; ADR-039 keeps working exactly as in beta.4. With it on and network mode off, the writer logs one structured warning and stays dormant — it does not invent a transport.
+8. **Origin-only opt-out.** A single config key in `advanced/network.yml` (`metrics.networkTimeSeries.publish`, default `false`) gates the entire writer. With it off, ADR-040 is dormant; ADR-039 keeps working exactly as in beta.4. With it on and network mode off, the writer logs one structured warning and stays dormant — it does not invent a transport.
 
 ### What ties this to existing ADRs
 
 - **ADR-035** — no UI in this ADR; the chart-with-cross-backend-history is rendered by the existing `MetricChartRenderer` against the existing `MenuModel`. Token model unchanged.
 - **ADR-036** — the publisher reuses the same `AbstractSQLDatabaseAccessor` / Redis driver, the same connection pool, the same `backend_id` / `generation` semantics, and the same store-down "warn and degrade" policy ADR-036 already defines for the heartbeat. **No** new transport, **no** new connection pool, **no** new heartbeat, **no** new scheduler.
-- **ADR-037** — `metrics.networkTimeSeries.*` config keys are governed by the ADR-037 hardened config command surface (`/rtp set metrics.networkTimeSeries.publish true` runs through the normal validation + audit + transaction path).
+- **ADR-037** — `metrics.networkTimeSeries.*` config keys in `advanced/network.yml` are governed by the ADR-037 / ADR-121 config validation surface (`NetworkConfigCheck`).
 - **ADR-038** — wizard `performance.tune` and a new `network.tune` flow may toggle the publisher. ADR-040 itself adds no wizard.
 - **ADR-039** — strict read/write split: ADR-039 reads, ADR-040 writes. The chart surface composes both at render time. ADR-039's "zero writes" contract (REQ-RTP-DIAG-008) remains satisfied — ADR-040's writer is owned by `rtp-core/.../metrics/` (where the metrics subsystem lives), not by `rtp-core/.../diagnostics/`.
 
@@ -131,7 +131,7 @@ The row carries **no metric-specific schema** — every metric writes the same s
 
 ## Migration / Rollout
 
-- **Phase 1 (beta.5):** Ship the writer behind `metrics.networkTimeSeries.publish` (default `false`). Add `metrics.networkTimeSeries.{tier,retentionDays,perPassWriteCap}` config keys (defaults: tier = `24h@1m`, retention = 7 days, cap = 64 rows/pass). Schema bootstrap on first enabled startup. ADR-039's `NetworkSnapshotReader` extended to range-scan `rtp_metric_bucket`; `MetricChartRenderer` draws the `(min, max)` band when present. Document the new table in `MULTI_SERVER_PLAN.md` and `METRICS_PLAN.md section Phased Roadmap`.
+- **Phase 1 (beta.5):** Ship the writer behind `metrics.networkTimeSeries.publish` (default `false`) in `advanced/network.yml`. Add `metrics.networkTimeSeries.{tier,retentionDays,perPassWriteCap}` config keys in `advanced/network.yml` (defaults: tier = `24h@1m`, retention = 7 days, cap = 64 rows/pass). Schema bootstrap on first enabled startup. ADR-039's `NetworkSnapshotReader` extended to range-scan `rtp_metric_bucket`; `MetricChartRenderer` draws the `(min, max)` band when present. Document the new table in `MULTI_SERVER_PLAN.md` and `METRICS_PLAN.md section Phased Roadmap`.
 - **Phase 2 (post-beta.5):** Optional per-metric publish allowlist (cap shared-store cost when only a subset of metrics is operationally interesting). Optional second published tier (`1h@10s`) for high-resolution chart pages, gated on shared-store budget.
 - **Phase 3 (post-network-mode-GA):** Evaluate live push (event-bus or similar) for sub-minute cross-backend visibility; gated on a separate ADR and on ADR-035 relaxing its no-live-update stance.
 

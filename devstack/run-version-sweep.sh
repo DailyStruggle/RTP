@@ -18,7 +18,7 @@
 # Rows whose bot column is `-` stop after step 2 (no client for that protocol).
 #
 # Usage:
-#   ./run-version-sweep.sh [--only <slug-regex>] [--wait-seconds N]
+#   ./run-version-sweep.sh [--only <slug-regex>] [--wait-seconds N] [--keep]
 #
 # Build the jar first: ./gradlew :rtp-plugin:remapJar
 # Results: logs/sweep-<ts>/summary.tsv plus per-row server.log / bot-*.log.
@@ -26,10 +26,13 @@ set -uo pipefail
 
 Only=''
 WaitSeconds=600
+Keep=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --only) Only="$2"; shift 2 ;;
     --wait-seconds) WaitSeconds="$2"; shift 2 ;;
+    --keep|--keep-running|--no-teardown) Keep=1; shift ;;
+    --teardown) Keep=0; shift ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -59,12 +62,14 @@ fabric-1_21_5|FABRIC|1.21.5|java21|1.21.5|6G|fabric-api
 fabric-1_21_10|FABRIC|1.21.10|java21|1.21.9|6G|fabric-api
 fabric-1_21_11|FABRIC|1.21.11|java21|1.21.11|6G|fabric-api
 fabric-26_1_2|FABRIC|26.1.2|java25|26.1|6G|fabric-api
-fabric-26_2|FABRIC|26.2|java25|26.1|6G|fabric-api,viafabric,viabackwards
-fabric-26_3|FABRIC|26.3|java25|26.1|6G|fabric-api,viafabric,viabackwards
+fabric-26_2|FABRIC|26.2|java25|26.1|6G|fabric-api,viafabric,viabackwards:5.12.1
+fabric-26_3|FABRIC|26.3|java25|26.1|6G|fabric-api,viafabric,viabackwards:5.12.1
+fabric-26_4|FABRIC|26.4-snapshot-5|java25|-|6G|fabric-api
 neoforge-1_21_1|NEOFORGE|1.21.1|java21|1.21.1|6G|
 neoforge-1_21_4|NEOFORGE|1.21.4|java21|1.21.4|6G|
 neoforge-1_21_11|NEOFORGE|1.21.11|java21|1.21.11|6G|
 neoforge-26_1_2|NEOFORGE|26.1.2|java25|26.1|6G|
+neoforge-26_2|NEOFORGE|26.2|java25|-|6G|
 neoforge-26_3|NEOFORGE|26.3|java25|-|6G|
 EOF
 )
@@ -79,15 +84,15 @@ printf 'slug\tresult\taccessor\tqueue\tbot_effects\tbot_death\tlinkage\tnote\n' 
 
 mapfile -t jars < <(find "$repoRoot/rtp-plugin/build/libs" -maxdepth 1 -name 'LeafRTP-Pro-*.jar' \
   ! -name '*-dev.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' 2>/dev/null | LC_ALL=C sort)
-if [ "${#jars[@]}" -ne 1 ]; then
-  echo "[stage] FAIL - expected one LeafRTP-Pro-*.jar under rtp-plugin/build/libs, found ${#jars[@]}" >&2
+if [ "${#jars[@]}" -lt 1 ]; then
+  echo "[stage] FAIL - expected LeafRTP-Pro-*.jar under rtp-plugin/build/libs, found 0" >&2
   exit 1
 fi
-jar="${jars[0]}"
+jar="${jars[-1]}"
 
-compose() { docker compose --project-directory "$scriptDir" -f "$composeFile" "$@"; }
-rcon() { compose exec -T sweep rcon-cli "$@" </dev/null >/dev/null 2>&1 || true; }
-running() { [ -n "$(compose ps --status running -q sweep 2>/dev/null)" ]; }
+compose() { (cd "$scriptDir" && docker compose -f "$composeFile" "$@"); }
+rcon() { docker exec -i rtp-devstack-sweep rcon-cli "$@" </dev/null >/dev/null 2>&1 || true; }
+running() { [ "$(docker inspect -f '{{.State.Running}}' rtp-devstack-sweep 2>/dev/null)" = "true" ]; }
 
 write_effects_phase1() {
   cat > "$1/sweep.yml" <<'EOF'
@@ -169,9 +174,10 @@ sweep_row() {
   export SWEEP_SLUG="$slug" SWEEP_TYPE="$type" SWEEP_VERSION="$version" SWEEP_IMAGE="$image" \
          SWEEP_MEMORY="$mem" SWEEP_MODRINTH="$modrinth" SWEEP_BUILD_FROM_SOURCE=FALSE
   [ "$type" = SPIGOT ] && export SWEEP_BUILD_FROM_SOURCE=TRUE
-  # ViaFabric publishes 26.x builds as alpha only.
+  # ViaFabric publishes 26.x builds as alpha only; snapshot fabric-api builds are beta/alpha.
   export SWEEP_MODRINTH_TYPE=release
   case "$modrinth" in *viafabric*) export SWEEP_MODRINTH_TYPE=alpha ;; esac
+  case "$version" in *-snapshot-*|*-pre-*|*-rc-*) export SWEEP_MODRINTH_TYPE=alpha ;; esac
   # BuildTools compiles Spigot on first boot.
   local budget=$WaitSeconds
   [ "$type" = SPIGOT ] && [ "$budget" -lt 1800 ] && budget=1800
@@ -224,7 +230,13 @@ sweep_row() {
           compose start sweep >/dev/null 2>&1 || true
           deadline=$(( $(date +%s) + budget ))
           if wait_rcon "$log" "$deadline"; then
-            sleep 10
+            while :; do
+              rcon rtp info
+              sleep 5
+              grep -qE 'keptCache \((hot|cold)\): [1-9][0-9]*' "$log" && break
+              if ! running || [ "$(date +%s)" -ge "$deadline" ]; then break; fi
+              sleep 5
+            done
             r="$(run_bot "$botv" death "$rowDir/bot-death.log")"; rc=$?
             if [ $rc -eq 0 ]; then botD=pass; else botD="fail($rc)"; note="${note:+$note; }death: $(printf '%s' "$r" | grep -oE '"why":"[^"]*"' | head -n1)"; fi
             echo "[$slug] death: $r"
@@ -250,8 +262,8 @@ sweep_row() {
     fi
     running || note="${note:+$note; }container not running at end"
   fi
-  compose logs --no-log-prefix sweep > "$rowDir/container.log" 2>&1 || true
-  compose down >/dev/null 2>&1 || true
+  docker logs rtp-devstack-sweep > "$rowDir/container.log" 2>&1 || true
+  if [ "$Keep" -eq 0 ]; then compose down >/dev/null 2>&1 || true; fi
 
   if [ "$accessor" = pass ] && [ "$queue" != empty ] && [ "$queue" != '-' ] && [ "$linkage" = 0 ] \
      && { [ "$botv" = '-' ] || { [ "$botE" = pass ] && [ "$botD" = pass ]; }; } && [ -z "$note" ]; then
@@ -260,6 +272,8 @@ sweep_row() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$result" "$accessor" "$queue" "$botE" "$botD" "$linkage" "$note" >> "$summary"
   echo "[$slug] $result (accessor=$accessor queue=$queue effects=$botE death=$botD linkage=$linkage) $note"
 }
+
+trap 'if [ "$Keep" -eq 0 ]; then compose down >/dev/null 2>&1 || true; fi' EXIT
 
 # fd 3: docker and node inside the loop must not read the matrix from stdin.
 while IFS='|' read -r -u 3 slug type version image botv mem modrinth; do

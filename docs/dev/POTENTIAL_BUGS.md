@@ -104,17 +104,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Fix pending the first scheduled CI run: the workflow runs one job per `@FuzzTest` method with `JAZZER_MAX_DURATION`, the root `Test` config declares the Jazzer env vars as inputs and disables up-to-date checks in fuzz mode, and `fuzzReadChunkView` / `fuzzReadColumnProbe` carry real-region seeds (local 15 s runs of both passed). Remaining: seeds for the LZ4 and NBT targets (needs extracted payloads); crash reproducers go under `<Class>Inputs/`. Remove this entry once a CI run shows all five jobs fuzzing for the set duration.
 - **Linear:** RTP-21
 
-### 2026-10-18 - `effectsapi.bukkit` and `HandleRegistry` remain in `api/effects-api` pending carrier relocation (`ADR-116` Decisions 2 & 4)
-
-- **Severity:** Medium
-- **Status:** In Progress
-- **Discovered during:** review of the claim that `TITLE` is only wired on Fabric and NeoForge
-- **Location:** `api/effects-api/src/main/java/io/github/dailystruggle/effectsapi/bukkit/`; `api/effects-api/src/main/java/io/github/dailystruggle/effectsapi/common/spi/HandleRegistry.java`; `api/effects-api/build.gradle` (`spigot-api` dependency)
-- **Symptom / hypothesis:** `api/effects-api` now depends on `api/server-api`, `EffectFactory.registerBuiltInEffects(...)` registers the full 11-effect canonical key set once across Bukkit, Fabric (obf + 26.x unobf), and NeoForge, `NeoForgeHandles` implements `sendTitle`, `playNote`, and `spawnFirework` with `EffectFactory.reportUnsupportedPrimitive` diagnostics, and `EffectRegistrationParityTest` + `EffectsApiCommonNoPlatformImportsTest` guard cross-platform parity and `effectsapi.common` package boundaries ([ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md), implemented 2026-10-24). The remaining slice of `ADR-116` Decisions 2 and 4 is relocating `io.github.dailystruggle.effectsapi.bukkit` (`BukkitHandles`, Bukkit listeners, `/effectsapi` Bukkit commands) to the Bukkit carrier, removing `spigot-api` from `api/effects-api/build.gradle`, and retiring `HandleRegistry` / `PlayerHandle` in favor of direct `ServerAccessor` primitive methods.
-- **Impact:** `api/effects-api` still compiles against `spigot-api` for the `effectsapi.bukkit` package and retains the `HandleRegistry` seam alongside `ServerAccessor`.
-- **Suggested next step:** Move `io.github.dailystruggle.effectsapi.bukkit` to the Bukkit carrier, drop `spigot-api` from `api/effects-api/build.gradle`, and fold the remaining `HandleRegistry` / `PlayerHandle` calls onto the neutral `ServerAccessor` contract per [ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md) Decisions 2 and 4 (`RTP-70`).
-- **Linear:** RTP-70 (3.3.x stopgap RTP-78 complete; glide without an elytra: RTP-79)
-
 ### 2026-10-18 - Web editor paints whole walk-path squares red when hazard runs exceed the cap
 
 - **Severity:** Medium

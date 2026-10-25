@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
 import java.util.EnumMap;
@@ -54,7 +54,7 @@ public class PotionEffect extends Effect<PotionEffect.PotionKeys> {
         if (o instanceof Boolean) icon = (Boolean) o;
 
         Object type = data.get(PotionKeys.TYPE);
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
         if (ph != null) {
             ph.applyPotionEffect(type, duration, amplifier, ambient, particles, icon);
         }

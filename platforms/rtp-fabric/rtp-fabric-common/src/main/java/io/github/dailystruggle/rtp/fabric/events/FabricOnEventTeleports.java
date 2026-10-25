@@ -255,19 +255,22 @@ public final class FabricOnEventTeleports {
     static boolean hasPlayedBefore(MinecraftServer server, UUID uuid) {
         if (server == null || uuid == null) return false;
         try {
+            // Try Mojmap reflective lookup first so 26.x deobf runtimes never
+            // touch intermediary class_5218 (LevelResource) in the constant pool.
+            Class<?> levelResCls = Class.forName("net.minecraft.world.level.storage.LevelResource");
+            Object rootField = levelResCls.getField("ROOT").get(null);
+            java.lang.reflect.Method m = server.getClass().getMethod("getWorldPath", levelResCls);
+            Object p = m.invoke(server, rootField);
+            if (p instanceof Path path) {
+                return hasPlayedBefore(path, uuid);
+            }
+        } catch (Throwable ignored) {
+            // Fall through to intermediary-compiled call on 1.20/1.21 runtimes.
+        }
+        try {
             Path worldRoot = server.getWorldPath(LevelResource.ROOT);
             return hasPlayedBefore(worldRoot, uuid);
         } catch (LinkageError | RuntimeException e) {
-            // Fallback for mapping drift: try reflectively.
-            try {
-                java.lang.reflect.Method m = server.getClass().getMethod("getWorldPath", LevelResource.class);
-                Object p = m.invoke(server, LevelResource.ROOT);
-                if (p instanceof Path path) {
-                    return hasPlayedBefore(path, uuid);
-                }
-            } catch (Throwable ignored) {
-                // best-effort
-            }
             return false;
         }
     }

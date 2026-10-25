@@ -32,18 +32,17 @@ Check these first. Most questions are already answered:
 
 | Intent | Channel |
 |---|---|
-| Interactive setup help, `[RTP bit]` log triage, or quick config questions | **LeafCraft Plugin Support** Discord `#support` Forum ([server layout & guide](docs/publishing/DISCORD_LAYOUT.md)) |
-| "How do I configure / use X?" (long-form question, not a bug) | [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) or Discord `#support` Forum |
-| Real-time chat with the community | Discord `#general` or SpigotMC resource discussion thread |
-| Suspected bug (crash, stack trace, broken behavior) | [New bug report](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md) or Discord `#support` Forum (with `/rtp version`, `/version`, `/rtp test`, and an `mclo.gs` log) |
-| LeafRTP Pro priority support (`@Pro Supporter`) | Discord `#support` Forum (automatically tagged `💎 Pro Priority` via `#bbb-logs`) or BuiltByBit ticket |
-| Feature idea | Open a **Discussion** or Discord `#support` thread first; issues only after triage |
-| **Security vulnerability** | **Do not open a public issue or Discord thread.** See [`SECURITY.md`](SECURITY.md) and use [private advisories](https://github.com/DailyStruggle/RTP/security/advisories/new) |
-| Addon development help | [Addon developer guide](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/) first, then Discord `#development` or Discussions |
+| "How do I configure / use X?" (not a bug) | [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) |
+| Community discussion | SpigotMC resource discussion thread |
+| Suspected bug (crash, stack trace, broken behavior) | [New bug report](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md) (with `/rtp version`, `/version`, `/rtp test`, and an `mclo.gs` log) |
+| LeafRTP Pro priority support | BuiltByBit ticket |
+| Feature idea | Open a **Discussion** first; issues only after triage |
+| **Security vulnerability** | **Do not open a public issue.** See [`SECURITY.md`](SECURITY.md) and use [private advisories](https://github.com/DailyStruggle/RTP/security/advisories/new) |
+| Addon development help | [Addon developer guide](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/) first, then [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) |
 
 **Do not** use the GitHub issue tracker for questions, "how do I" requests, or
 plugin-conflict debugging without first reproducing with RTP alone. Those
-will be closed and redirected to Discord `#support` or GitHub Discussions.
+will be closed and redirected to GitHub Discussions.
 
 ---
 
@@ -100,7 +99,7 @@ RTP is actively maintained by an open-source team. While we do not offer commerc
 - **Initial Triage & Acknowledgement:** Typically within **3 to 7 business days** for well-formed reports containing complete logs and reproduction steps.
 - **Bug Fix Delivery:** Confirmed defects on tested platforms are typically addressed in the next patch release (typically **2 to 4 weeks**), or an intermediate snapshot build if critical.
 - **Critical Security Hazards:** Handled on an expedited track via [`SECURITY.md`](SECURITY.md) (acknowledgement within **72 hours**, triage within **7 days**).
-- **Pro Support Priority:** Operators running LeafRTP Pro on BuiltByBit receive the `@Pro Supporter` role (synced via `#bbb-logs`), which automatically applies the `💎 Pro Priority` tag in the Discord `#support` Forum and routes confirmed issues to the front of my queue (24-72 h weekday target).
+- **Pro Support Priority:** Operators running LeafRTP Pro on BuiltByBit receive priority support via BuiltByBit tickets, routing confirmed issues to the front of the queue (24-72 h weekday target).
 - **Incomplete Reports:** Reports missing required reproduction steps, configuration diffs, or `latest.log` links may be flagged or closed until the required context is provided.
 - Pinging the maintainer in DMs, other repositories, or unrelated threads will not speed anything up and is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
 

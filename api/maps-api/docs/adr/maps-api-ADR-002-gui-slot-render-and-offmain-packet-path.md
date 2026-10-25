@@ -1,6 +1,6 @@
 # maps-api-ADR-002 - GUI-Slot Map Delivery and a Future Off-Main Raw-Packet Render Path
 
-- **Status:** Proposed (2026-06-14)
+- **Status:** Accepted (Decision 1 raw-packet path deferred) (2026-06-14)
 - **Supersedes:** -
 - **Superseded by:** -
 - **Related:**

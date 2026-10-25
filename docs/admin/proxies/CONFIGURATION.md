@@ -161,6 +161,17 @@ Used by `/rtp editor` whether or not network mode is enabled. See [`WEB_EDITOR_G
 | `relayUrl` | String | `""` | Live-update relay (bytesocks-compatible). Empty = `https://usersockets.luckperms.net`. Point it at your own bytesocks server to avoid depending on a public one. |
 | `trust.maxAgeDays` | Integer / Duration | `0` | Days a browser stays trusted after `/rtp editor trust`. `0` = never expires. A negative or unreadable value is logged and treated as `0`. |
 
+## `metrics` (Cross-backend metric time-series publication)
+
+Controls batched publication of condensed metric time-series buckets (`rtp_metric_bucket` in SQL or `rtp:metric:<backend_id>:<metric_key>` in Redis) for cross-backend chart and diagnostic history reads. Ignored when `network.enabled: false` (setting `publish: true` while `network.enabled: false` logs a one-time warning and stays dormant).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `networkTimeSeries.publish` | Boolean | `false` | Master toggle to publish condensed metric buckets to the shared network store. |
+| `networkTimeSeries.tier` | String | `"24h@1m"` | Condensed local ring tier to publish cross-backend on tier promotion. |
+| `networkTimeSeries.retentionDays` | Integer | `7` | Days to retain published metric buckets for this backend before the periodic retention sweep purges them (`>= 1`). |
+| `networkTimeSeries.perPassWriteCap` | Integer | `64` | Maximum metric bucket rows written per periodic flush pass (`>= 1`). Overflow is deferred to the next pass with a structured warning. |
+
 ---
 
 > The `config.yml` `network.redis` block is a separate, simpler Redis-backed state binding for single-network cached-location sync; see [`CORE_CONFIG.md`](../configuration/CORE_CONFIG.md#network-redis).

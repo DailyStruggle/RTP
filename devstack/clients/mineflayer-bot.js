@@ -43,6 +43,15 @@ try {
     version: mcVersion,
     checkTimeoutInterval: 60 * 1000
   });
+  const origWrite = bot._client.write.bind(bot._client);
+  const hasTickEnd = !!(require('minecraft-data')(mcVersion)?.protocol?.play?.toServer?.types?.packet_tick_end);
+  bot._client.write = function (name, params) {
+    const res = origWrite(name, params);
+    if (hasTickEnd && bot._client.state === 'play' && (name === 'position' || name === 'position_look' || name === 'look' || name === 'flying')) {
+      origWrite('tick_end', {});
+    }
+    return res;
+  };
 } catch (err) {
   console.error(`[bot] Failed to initialize bot:`, err);
   process.exit(1);

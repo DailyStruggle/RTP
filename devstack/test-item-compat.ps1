@@ -11,14 +11,18 @@
     that LeafRTPGuiAddon resolves them without errors.
 
 .EXAMPLE
-    .\test-item-compat.ps1             # build, stage, boot single-server stack and verify
+    .\test-item-compat.ps1             # build, stage, boot single-server stack, verify, and tear down
+    .\test-item-compat.ps1 -Keep       # leave the single-server stack running after verification
     .\test-item-compat.ps1 -Down       # tear down the single-server stack
     .\test-item-compat.ps1 -SkipBuild  # reuse already-built jars
 #>
 [CmdletBinding()]
 param(
     [switch]$Down,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [Alias('KeepRunning', 'NoTearDown')]
+    [switch]$Keep,
+    [switch]$TearDown
 )
 
 $ErrorActionPreference = 'Stop'
@@ -119,48 +123,57 @@ if (-not $dockerRunning) {
     return
 }
 
-Write-Host "Launching single-server Paper devstack..."
-docker compose -f $composeFile up -d
+try {
+    Write-Host "Launching single-server Paper devstack..."
+    docker compose -f $composeFile up -d
 
-Write-Host "Waiting for Paper server to boot..."
-$timeoutSec = 180
-$elapsed = 0
-$booted = $false
+    Write-Host "Waiting for Paper server to boot..."
+    $timeoutSec = 180
+    $elapsed = 0
+    $booted = $false
 
-while ($elapsed -lt $timeoutSec) {
-    Start-Sleep -Seconds 5
-    $elapsed += 5
+    while ($elapsed -lt $timeoutSec) {
+        Start-Sleep -Seconds 5
+        $elapsed += 5
+        $logs = docker compose -f $composeFile logs backend-compat 2>&1
+        if ($logs -match 'Done \([0-9\.]+s\)! For help, type "help"') {
+            $booted = $true
+            break
+        }
+    }
+
+    if (-not $booted) {
+        Write-Error "Server failed to boot within $timeoutSec seconds. Check logs with 'docker compose -f $composeFile logs'."
+        return
+    }
+
+    Write-Host "Server successfully booted!" -ForegroundColor Green
+
+    # Verify loaded plugins in log
     $logs = docker compose -f $composeFile logs backend-compat 2>&1
-    if ($logs -match 'Done \([0-9\.]+s\)! For help, type "help"') {
-        $booted = $true
-        break
+    $checks = @(
+        'MockItemsAdder',
+        'MockOraxen',
+        'MockNexo',
+        'MockHeadDatabase',
+        'LeafRTP'
+    )
+
+    foreach ($c in $checks) {
+        if ($logs -match $c) {
+            Write-Host "  [OK] Found plugin: $c" -ForegroundColor Green
+        } else {
+            Write-Warning "  [MISSING] Plugin $c was not found in server logs"
+        }
     }
-}
 
-if (-not $booted) {
-    Write-Error "Server failed to boot within $timeoutSec seconds. Check logs with 'docker compose -f $composeFile logs'."
-    return
-}
-
-Write-Host "Server successfully booted!" -ForegroundColor Green
-
-# Verify loaded plugins in log
-$logs = docker compose -f $composeFile logs backend-compat 2>&1
-$checks = @(
-    'MockItemsAdder',
-    'MockOraxen',
-    'MockNexo',
-    'MockHeadDatabase',
-    'LeafRTP'
-)
-
-foreach ($c in $checks) {
-    if ($logs -match $c) {
-        Write-Host "  [OK] Found plugin: $c" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Single-server devstack verification passed successfully." -ForegroundColor Green
+} finally {
+    if (-not $Keep) {
+        Write-Host "Tearing down single-server item compatibility devstack (pass -Keep to leave it running)..." -ForegroundColor Cyan
+        docker compose -f $composeFile down -v | Out-Null
     } else {
-        Write-Warning "  [MISSING] Plugin $c was not found in server logs"
+        Write-Host "-Keep set: leaving single-server item compatibility devstack running (run '.\test-item-compat.ps1 -Down' to stop)." -ForegroundColor Yellow
     }
 }
-
-Write-Host ""
-Write-Host "Single-server devstack verification passed successfully." -ForegroundColor Green

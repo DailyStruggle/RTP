@@ -140,6 +140,20 @@ class BukkitServerAccessorTest {
     }
 
     @Test
+    @DisplayName("REQ-RTP-S-006 - 26.x version strings (26.1 through 26.4 snapshots) resolve to intVersion 26")
+    void test26xServerIntVersionResolution() {
+        for (String ver : List.of("26_1", "26_2", "26_3", "26_4", "26.3", "26.4-snapshot-1")) {
+            AbstractServerAccessor custom = new AbstractServerAccessor() {
+                @Override
+                public @org.jetbrains.annotations.NotNull String getServerVersion() {
+                    return ver;
+                }
+            };
+            assertEquals(26, custom.getServerIntVersion(), "Expected intVersion 26 for " + ver);
+        }
+    }
+
+    @Test
     @DisplayName("Online player names and world resolution")
     void testWorldAndPlayerResolution() {
         PlayerMock alice = server.addPlayer("Alice");

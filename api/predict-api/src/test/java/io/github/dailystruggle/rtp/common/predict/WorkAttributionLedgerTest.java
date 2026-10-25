@@ -153,5 +153,15 @@ class WorkAttributionLedgerTest {
         ledger.reset();
         assertEquals(0, ledger.size());
         assertTrue(ledger.topActors(5, SEC).isEmpty());
+        assertTrue(ledger.topActors(0, SEC).isEmpty());
+        assertTrue(ledger.topActors(5, SEC, null).isEmpty());
+        assertNull(ledger.entry(null, SEC));
+        assertEquals(0.0, ledger.attributedCostMsPerMin(null, SEC), 1e-9);
+        assertEquals(WorkAttributionLedger.DEFAULT_MAX_ACTOR_ENTRIES, ledger.maxActorEntries());
+        assertEquals(WorkAttributionLedger.DEFAULT_MAX_SCOPE_CONSUMERS, ledger.maxScopeConsumers());
+        assertEquals(WorkAttributionLedger.DEFAULT_SCOPE_WINDOW_NANOS, ledger.scopeWindowNanos());
+        assertEquals(WorkAttributionLedger.DEFAULT_IDLE_EXPIRY_NANOS, ledger.idleExpiryNanos());
+        assertEquals(WorkAttributionLedger.DEFAULT_SHORT_HALF_LIFE_NANOS, ledger.shortHalfLifeNanos());
+        assertEquals(WorkAttributionLedger.DEFAULT_LONG_HALF_LIFE_NANOS, ledger.longHalfLifeNanos());
     }
 }

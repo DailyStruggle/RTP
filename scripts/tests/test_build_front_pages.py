@@ -12,9 +12,13 @@ from scripts.release.build_front_pages import (
     TARGETS,
     FrontPageError,
     build_all,
+    check_curve_attribution,
     check_denylist,
+    check_listing_metadata,
+    check_reference_table_caps,
     check_short_version_labels,
     check_zone1_jargon,
+    check_zone2_onramp,
     inline_bbcode,
     main,
     render,
@@ -123,10 +127,42 @@ class Zone1JargonTest(unittest.TestCase):
 
     def test_jargon_above_the_fold_fails(self):
         for line in ("40 TP/s on Paper", "Checks run off the tick thread", "MSPT stays flat",
-                     "`REROLL` mode", "candidates are screened"):
+                     "`REROLL` mode", "candidates are screened", "uses a space-filling curve",
+                     "Hilbert order", "L3 queue"):
             body = f"# T\n\n## What it is\n\n{line}\n\n## Common setups\n\nok\n"
             with self.subTest(line=line), self.assertRaises(FrontPageError):
                 _render(body, "hangar")
+
+    def test_listing_metadata_jargon_fails(self):
+        bad_notes = '<!--\n  tagline: "Off-tick Random Teleportation engine"\n-->\n# T\n'
+        with self.assertRaises(FrontPageError):
+            render(bad_notes, TARGETS["hangar"])
+        good_notes = '<!--\n  tagline: "Fast Minecraft random teleport (/rtp & /wild) plugin and mod"\n-->\n'
+        self.assertEqual([], check_listing_metadata(good_notes))
+
+    def test_zone2_onramp_rejects_curves_and_cli_config_paths(self):
+        for section in ("## Common setups", "## Install", "## Features"):
+            for bad_line in ("Configure a space-filling curve", "Run /rtp config regions default shape.radius=10km",
+                             "Run /rtp test 50"):
+                body = f"# T\n\n## What it is\n\nok\n\n{section}\n\n{bad_line}\n\n## Performance\n\nok\n"
+                with self.subTest(section=section, bad_line=bad_line), self.assertRaises(FrontPageError):
+                    _render(body, "hangar")
+
+    def test_curve_attribution_required_when_section_mentions_spiral_or_curve(self):
+        unattributed = [(1, "## Why I made it"), (2, "Built a space-filling spiral to map 2D territory.")]
+        self.assertEqual(1, len(check_curve_attribution(unattributed)))
+        attributed = [
+            (1, "## Why I made it"),
+            (2, "Built an internal space-filling spiral that runs automatically under the hood."),
+        ]
+        self.assertEqual([], check_curve_attribution(attributed))
+
+    def test_reference_table_row_cap_enforced_after_why_i_made_it(self):
+        header = [(1, "## Why I made it"), (2, "story"), (3, "| Cmd | Desc |"), (4, "|---|---|")]
+        ten_rows = header + [(4 + i, f"| c{i} | d{i} |") for i in range(1, 11)]
+        self.assertEqual([], check_reference_table_caps(ten_rows))
+        eleven_rows = header + [(4 + i, f"| c{i} | d{i} |") for i in range(1, 12)]
+        self.assertEqual(1, len(check_reference_table_caps(eleven_rows)))
 
     def test_jargon_below_the_fold_and_in_link_targets_passes(self):
         body = ("# T\n\n## What it is\n\n[No lag spikes](#performance-tp-s)\n\n"

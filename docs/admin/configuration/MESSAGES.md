@@ -42,6 +42,7 @@ Message values accept, in any combination:
 
 - **Shared `[Pn]` placeholders** are defined in the `placeholders:` list inside `advanced/messages/placeholders.yml`. Every `[Pn]` placeholder corresponds to the entry at index `n` of that list (`[P0]` is the 0th item, `[P1]` is the 1st item, and so on).
 - **Per-message placeholders** (e.g. `[attempts]`, `[world]`, `[delay]`, `[remainingCooldown]`, `[money]`, `[spot]`, `[filename]`) are documented in comments directly above each message that uses them. Only the placeholders listed for a given key are substituted in that message.
+- **External & addon placeholders:** For PlaceholderAPI (`%rtp_<key>%`, such as `%rtp_delay%`, `%rtp_remainingCooldown%`, `%rtp_queued%`, `%rtp_player_status%`), see [COMMANDS.md - PlaceholderAPI Placeholders](../COMMANDS.md#placeholderapi-placeholders). For GUI menu lore placeholders (`{status}`, `{cooldown}`, `{uses}`, `{price}`, `{region}`, `{world}` in `addons/guimenu.yml`), see [CUSTOM_ITEMS.md - Template Placeholders](../CUSTOM_ITEMS.md#template-placeholders). For action step tokens (`[player]`, `[x]`, `[y]`, `[z]`, `[world]`, `[region]`), see [ACTIONS.md - Available Tokens & Placeholders](../ACTIONS.md#available-tokens--placeholders).
 
 ---
 

@@ -1,0 +1,36 @@
+name: StressTestRTP
+main: io.github.dailystruggle.helpers.stresstestrtp.StressTestRTPPlugin
+version: '${version}'
+api-version: '1.13'
+folia-supported: true
+load: POSTWORLD
+description: >
+  Black-box stress-test driver and TPS/MSPT/heap/latency sampler for /rtp-style
+  commands. Dispatches a configurable command at a configurable concurrency and
+  measures dispatch-to-PlayerTeleportEvent latency alongside server health, so
+  RTP, RTP-Pro, and competitor plugins can be benchmarked under identical
+  workloads on Spigot, Paper, and Folia.
+
+commands:
+  rtpstress:
+    description: Control and inspect the RTP stress-test harness.
+    usage: |
+      /<command> start [seconds] [concurrency]   - start a timed stress run
+      /<command> sequence [perTargetSec] [gapSec] [concurrency] - run each target in turn with recovery gaps
+      /<command> ramp [target] [stageSeconds] [rates] - step offered TP/s up until the target fails (stress point)
+      /<command> burst [count]                   - fire N one-shot attempts now
+      /<command> reset-cold                      - run configured cache-reset commands (cold-start prep)
+      /<command> probe-footprint                 - re-run the one-ticket chunk-footprint calibration
+      /<command> leakcheck [label] [force] [dump] [quick] | status - full GC + class histogram (+ heap dump with 'dump'; 'quick' skips NMT/threads)
+      /<command> coverage [label]                - dump + reset JaCoCo execution data to runs/coverage-<label>.json
+      /<command> tp <player>                     - plugin-free random teleport (leak-check control arm)
+      /<command> churn [n|all] [namePrefix]      - kick players so the bot swarm reconnects them
+      /<command> stop                            - abort the current run and flush CSV
+      /<command> status                          - print live percentiles and TPS/MSPT/heap
+      /<command> export                          - write markdown/CSV summary of the last run
+    permission: stresstestrtp.admin
+
+permissions:
+  stresstestrtp.admin:
+    description: Start, stop, and export StressTestRTP runs.
+    default: op

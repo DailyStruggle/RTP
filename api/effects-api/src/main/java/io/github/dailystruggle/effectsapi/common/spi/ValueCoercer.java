@@ -1,6 +1,9 @@
 package io.github.dailystruggle.effectsapi.common.spi;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Per-platform leaf operations of the <em>effects-api-ADR-002</em> adaptive
@@ -26,6 +29,163 @@ import java.util.List;
  * with a human-readable diagnostic. It must not return {@code null}.
  */
 public interface ValueCoercer {
+
+    /** Canonical named color tokens accepted by {@link #DEFAULT}. */
+    Set<String> NAMED_COLORS = Set.of(
+            "WHITE", "SILVER", "GRAY", "BLACK", "RED", "MAROON",
+            "YELLOW", "OLIVE", "LIME", "GREEN", "AQUA", "TEAL",
+            "BLUE", "NAVY", "FUCHSIA", "PURPLE", "ORANGE"
+    );
+
+    /**
+     * Platform-neutral {@link ValueCoercer} handling primitive, string, color, and enum tokens
+     * without requiring a platform jar on the classpath (ADR-116 Decision 2).
+     */
+    ValueCoercer DEFAULT = new ValueCoercer() {
+        @Override
+        public TypeKey classify(Object def) {
+            if (def == null || def instanceof String) return TypeKey.STRING;
+            if (def instanceof Boolean) return TypeKey.BOOLEAN;
+            if (def instanceof Long) return TypeKey.LONG;
+            if (def instanceof Integer || def instanceof Short || def instanceof Byte) return TypeKey.INT;
+            if (def instanceof Double) return TypeKey.DOUBLE;
+            if (def instanceof Float) return TypeKey.FLOAT;
+            return TypeKey.UNKNOWN;
+        }
+
+        @Override
+        public boolean canParse(TypeKey type, String raw) {
+            if (raw == null) return false;
+            switch (type) {
+                case STRING:
+                    return true;
+                case BOOLEAN: {
+                    String upper = raw.toUpperCase(Locale.ROOT);
+                    return upper.equals("TRUE") || upper.equals("FALSE");
+                }
+                case INT:
+                case LONG:
+                    try {
+                        Long.parseLong(raw);
+                        return true;
+                    } catch (NumberFormatException nfe) {
+                        return false;
+                    }
+                case DOUBLE:
+                case FLOAT:
+                    try {
+                        float f = Float.parseFloat(raw);
+                        return !Float.isNaN(f) && !Float.isInfinite(f);
+                    } catch (NumberFormatException nfe) {
+                        return false;
+                    }
+                case COLOR: {
+                    String upper = raw.toUpperCase(Locale.ROOT);
+                    if (NAMED_COLORS.contains(upper)) return true;
+                    String hex = raw.startsWith("#") ? raw.substring(1) : raw;
+                    if (hex.length() != 6) return false;
+                    try {
+                        Integer.parseInt(hex, 16);
+                        return true;
+                    } catch (NumberFormatException nfe) {
+                        return false;
+                    }
+                }
+                case SOUND:
+                case PARTICLE:
+                case POTION_EFFECT:
+                case MATERIAL:
+                    return !raw.isBlank();
+                case WORLD:
+                case UNKNOWN:
+                default:
+                    return false;
+            }
+        }
+
+        @Override
+        public Object parse(TypeKey type, String raw) {
+            if (raw == null) {
+                throw new IllegalArgumentException("[effects-api] null token");
+            }
+            switch (type) {
+                case STRING:
+                    return raw.toUpperCase(Locale.ROOT);
+                case BOOLEAN:
+                    return Boolean.parseBoolean(raw.toUpperCase(Locale.ROOT));
+                case INT:
+                case LONG:
+                    try {
+                        return Integer.parseInt(raw.toUpperCase(Locale.ROOT));
+                    } catch (NumberFormatException nfe) {
+                        throw new IllegalArgumentException(
+                                "[effects-api] expected integer but got \"" + raw + "\"", nfe);
+                    }
+                case DOUBLE:
+                case FLOAT:
+                    try {
+                        return Float.parseFloat(raw.toUpperCase(Locale.ROOT)) / 100f;
+                    } catch (NumberFormatException nfe) {
+                        throw new IllegalArgumentException(
+                                "[effects-api] expected float but got \"" + raw + "\"", nfe);
+                    }
+                case COLOR: {
+                    String upper = raw.toUpperCase(Locale.ROOT);
+                    if (NAMED_COLORS.contains(upper)) return upper;
+                    String hex = upper.startsWith("#") ? upper.substring(1) : upper;
+                    if (hex.length() == 6) {
+                        try {
+                            Integer.parseInt(hex, 16);
+                            return hex;
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                    throw new IllegalArgumentException(
+                            "[effects-api] expected Color (named constant or 6-digit hex RRGGBB) but got \""
+                                    + raw + "\"");
+                }
+                case SOUND:
+                case PARTICLE:
+                case POTION_EFFECT:
+                case MATERIAL:
+                    if (raw.isBlank()) {
+                        throw new IllegalArgumentException("[effects-api] empty token for " + type);
+                    }
+                    return raw.toUpperCase(Locale.ROOT);
+                case WORLD:
+                case UNKNOWN:
+                default:
+                    throw new IllegalArgumentException(
+                            "[effects-api] cannot parse \"" + raw + "\" — type "
+                                    + type + " has no neutral parser");
+            }
+        }
+
+        @Override
+        public Object resolveReflective(Class<?> targetType, String raw) {
+            if (targetType == null || raw == null) return null;
+            try {
+                return targetType.getMethod("valueOf", String.class)
+                        .invoke(null, raw.toUpperCase(Locale.ROOT));
+            } catch (Throwable ignored) {
+                // fall through
+            }
+            try {
+                return targetType.getMethod("getByName", String.class).invoke(null, raw);
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        @Override
+        public List<TypeKey> readingOrder() {
+            return Arrays.asList(
+                    TypeKey.STRING, TypeKey.BOOLEAN, TypeKey.INT, TypeKey.LONG,
+                    TypeKey.DOUBLE, TypeKey.FLOAT,
+                    TypeKey.COLOR, TypeKey.SOUND, TypeKey.PARTICLE,
+                    TypeKey.POTION_EFFECT, TypeKey.MATERIAL, TypeKey.WORLD);
+        }
+    };
 
     /**
      * Map a defaults-map value to its logical {@link TypeKey}. Implementations

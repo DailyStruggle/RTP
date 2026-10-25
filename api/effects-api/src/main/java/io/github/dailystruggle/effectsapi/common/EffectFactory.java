@@ -153,6 +153,7 @@ public class EffectFactory {
      * platform-specific prototype registered prior to this call is preserved.
      */
     public static void registerBuiltInEffects() {
+        COERCER.compareAndSet(null, ValueCoercer.DEFAULT);
         addEffect("TITLE", new TitleEffect());
         addEffect("GLIDE", new GlideEffect());
         addEffect("COMMAND", new CommandEffect());

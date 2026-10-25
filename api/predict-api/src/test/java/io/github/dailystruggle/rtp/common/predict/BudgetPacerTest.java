@@ -66,4 +66,20 @@ class BudgetPacerTest {
         long expected = ((50_000_000L * 7L) / 8L) + (10_000_000L / 8L);
         assertEquals(expected, pacer.predictedCostNanos());
     }
+
+    @Test
+    @DisplayName("Validation guards, two-arg canExecute, and accessors")
+    void validationGuardsAndAccessors() {
+        EwmaEstimator est = EwmaEstimator.ofWindow(16, 1_000_000.0);
+        assertThrows(IllegalArgumentException.class, () -> BudgetPacer.ofEstimator(null, 1.0));
+        assertThrows(IllegalArgumentException.class, () -> BudgetPacer.ofEstimator(est, 0.0));
+        assertThrows(IllegalArgumentException.class, () -> BudgetPacer.ofEstimator(est, -1.0));
+        assertThrows(IllegalArgumentException.class, () -> BudgetPacer.ofEstimator(est, Double.NaN));
+
+        BudgetPacer pacer = BudgetPacer.ofEstimator(est);
+        assertSame(est, pacer.estimator());
+        assertEquals(1.0, pacer.safetyMultiplier(), 1e-9);
+        assertTrue(pacer.canExecute(0L, 500_000L));
+        assertFalse(pacer.canExecute(600_000L, 500_000L));
+    }
 }

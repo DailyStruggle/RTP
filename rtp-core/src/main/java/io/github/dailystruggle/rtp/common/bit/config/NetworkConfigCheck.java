@@ -34,7 +34,7 @@ public final class NetworkConfigCheck implements ConfigOwnerCheck {
 
     /** Top-level sections read by the backend and proxy readers. */
     public static final Set<String> KNOWN_TOP_LEVEL = Set.of("network", "transport", "heartbeat", "routing",
-            "queue", "reservation", "regionCollision", "loadBalancer", "editor", "servers", "version");
+            "queue", "reservation", "regionCollision", "loadBalancer", "editor", "metrics", "servers", "version");
     /** {@code transport.type} values accepted by {@code NetworkModeBootstrap.openTransport}. */
     public static final Set<String> TRANSPORT_TYPES = Set.of("auto", "in-memory", "memory", "plugin-message",
             "pluginmessage", "proxy-cache", "proxycache", "proxy-direct", "proxydirect", "sql", "redis");

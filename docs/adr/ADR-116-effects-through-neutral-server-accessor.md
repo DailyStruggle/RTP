@@ -31,14 +31,14 @@ Effects used per-platform initializers because effects-api could not depend on t
 
 2. **Platform code implements effect primitives on the accessor.** The accessor gains the primitives effects need: title, glide start/stop, sound / particle / potion by string key, note, firework, inventory and experience drop, kill, and command dispatch. Each platform implements them once in its existing accessor. `HandleRegistry`, `PlayerHandle` and the effect registration in the per-platform initializers are removed. Registry lookups (`Sound`, `Particle`, `PotionEffectType`, Minecraft registries) stay platform-side behind string keys, which also replaces the `ValueCoercer` binding.
 
-   **Status (2026-10-24):** `EffectFactory.registerBuiltInEffects(...)` and the `NeoForgeHandles` / Fabric handle primitive implementations (`sendTitle`, `playNote`, `spawnFirework`) have landed with `EffectFactory.reportUnsupportedPrimitive` diagnostics; retiring `HandleRegistry` / `PlayerHandle` in favor of direct `ServerAccessor` primitive methods remains paired with the Decision 4 carrier move.
+   **Implemented 2026-10-24:** `ServerAccessor` and `ServerAccessors` expose the neutral effect target resolution and console command dispatch contract (`wrapEffectPlayer`, `wrapEffectLocation`, `resolveEffectPlayerAt`, `dispatchConsoleCommand`), implemented on `AbstractServerAccessor` and bound by `BukkitHandles`, `FabricHandles`, `FabricHandlesUnobf`, and `NeoForgeHandles`. `EffectTarget` and all eleven built-in effects in `io.github.dailystruggle.effectsapi.common.effects.*` route directly through `ServerAccessors`, `ValueCoercer.DEFAULT` provides a platform-neutral default coercer, and `HandleRegistry` / `HandleProvider` are retired (`@Deprecated(forRemoval = true)`) as stateless forwarding shims over `ServerAccessors`.
 
 3. **One registration.** effects-api registers every built-in effect once (`EffectFactory.registerBuiltInEffects`). A platform that cannot run a primitive reports that explicitly (logged once per primitive via `EffectFactory.reportUnsupportedPrimitive`, visible from `/effectsapi`). An empty method body is not allowed.
 4. **effects-api carries no platform code.** `effectsapi/bukkit` (`BukkitHandles`, Bukkit listeners, `/effectsapi` Bukkit commands) moves to the Bukkit carrier, and `spigot-api` leaves `effects-api/build.gradle`. The Fabric and NeoForge effect classes stay in their carriers as accessor implementations.
 
-   **Status (2026-10-24):** `io.github.dailystruggle.effectsapi.common` is verified free of platform and RTP imports by `EffectsApiCommonNoPlatformImportsTest` and depends on `api/server-api`; relocating `io.github.dailystruggle.effectsapi.bukkit` and `HandleRegistry` out of `api/effects-api` into the Bukkit carrier is tracked as the remaining `RTP-70` slice in `docs/dev/POTENTIAL_BUGS.md`.
+   **Implemented 2026-10-24:** `io.github.dailystruggle.effectsapi.bukkit.*` and `io.github.dailystruggle.effectsapi.EffectsAPI` (along with the Bukkit-specific effect tests) have been relocated from `api/effects-api` into `platforms/rtp-bukkit/rtp-bukkit-common`, `org.spigotmc:spigot-api` has been removed from `api/effects-api/build.gradle`, and `EffectsApiCommonNoPlatformImportsTest` verifies that the entire `:effects-api` module contains zero `org.bukkit.*`, `net.minecraft.*`, or `io.github.dailystruggle.rtp.*` imports or class references.
 
-5. **Mechanical guards.** `EffectRegistrationParityTest` asserts every platform initializer exposes the full built-in effect set or declares each unsupported primitive. `EffectsApiCommonNoPlatformImportsTest` asserts `effectsapi.common` imports no `org.bukkit.*`, `net.minecraft.*` or `io.github.dailystruggle.rtp.*` type.
+5. **Mechanical guards.** `EffectRegistrationParityTest` asserts every platform initializer exposes the full built-in effect set or declares each unsupported primitive. `EffectsApiCommonNoPlatformImportsTest` asserts `:effects-api` imports no `org.bukkit.*`, `net.minecraft.*` or `io.github.dailystruggle.rtp.*` type.
 
 ## Alternatives Considered
 
@@ -57,11 +57,11 @@ Effects used per-platform initializers because effects-api could not depend on t
 ## References
 
 - Linear: RTP-70.
-- `api/effects-api/src/main/java/io/github/dailystruggle/effectsapi/bukkit/BukkitEffectsInitializer.java` (`registerAll`)
+- `platforms/rtp-bukkit/rtp-bukkit-common/src/main/java/io/github/dailystruggle/effectsapi/bukkit/BukkitEffectsInitializer.java` (`registerAll`)
 - `api/effects-api/effects-api-fabric-unobf/src/main/java/io/github/dailystruggle/effectsapi/fabric_unobf/FabricEffectsInitializer.java`
 - `platforms/rtp-fabric/rtp-fabric-common/src/main/java/io/github/dailystruggle/rtp/fabric/effects/FabricEffectsInitializer.java`
 - `platforms/rtp-neoforge/rtp-neoforge-common/src/main/java/io/github/dailystruggle/rtp/neoforge/effects/local/NeoForgeEffectsInitializer.java`
-- `api/effects-api/src/main/java/io/github/dailystruggle/effectsapi/common/spi/HandleRegistry.java`
+- `api/server-api/src/main/java/io/github/dailystruggle/server/api/ServerAccessor.java`
 - `rtp-api/src/main/java/io/github/dailystruggle/rtp/api/server/RTPServerAccessor.java`
 - [effects-api-ADR-003](../../api/effects-api/docs/adr/effects-api-ADR-003-platform-split-bukkit-fabric.md), [effects-api-ADR-006](../../api/effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md), [ADR-048](ADR-048-menu-builders-behind-server-accessor.md), [ADR-113](ADR-113-java-17-baseline-and-26x-support-boundary.md)
 - Operator-facing platform table: [`EVENTS_AND_EFFECTS.md`](../admin/configuration/EVENTS_AND_EFFECTS.md)

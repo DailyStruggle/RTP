@@ -1,5 +1,8 @@
 # Shape Algorithm Verification & Visual Unit Tests
 
+!!! note "Note for server administrators"
+    This page documents the **internal engine math and JUnit benchmark tests** inside LeafRTP. **You do not need to configure space-filling curves, spirals, Hilbert orders, or math parameters to use LeafRTP.** Out of the box, `/rtp` and `/wild` use a standard `CIRCLE` region, and server owners only set a radius in blocks (e.g. `radius: 5000b` or `10km`) or drag a region border in `/rtp editor`. For setup instructions, see [Quick Start](../admin/QUICK_START.md).
+
 In LeafRTP, spatial selection algorithms are not tested as black boxes with blind assertions. Instead, the test suite (`rtp-core/src/test/java/.../benchmark/`) includes comprehensive visual test fixtures that run production Java shape code against real-world Minecraft Anvil (`.mca`) terrain data, measure quantitative performance metrics, and render high-resolution comparative charts to share publicly.
 
 This page documents how shape algorithms are tested in unit test format, what metrics are measured, and the charts generated directly by our JUnit tests.
@@ -114,7 +117,7 @@ Visualization: Localized 4x4 Sub-Bin Zoom with Intra-Bin Hilbert Paths & Inter-B
 
 ### Localized Curve Structure Across Varying Bin Sizes
 
-In LeafRTP's dual-layer space-filling architecture, the domain radius configuration directly determines the macro-cell sub-bin size $P$ (chunks per cell edge) via `PointEdgeSelector.derivePFromRadius(R)`. This ensures that each macro-cell contains an optimal power-of-two number of chunks ($P \times P$) while preserving at least 64 coarse cells per edge:
+In LeafRTP's internal dual-layer space-filling architecture, the engine automatically derives the macro-cell sub-bin size $P$ (chunks per cell edge) from the region's radius via `PointEdgeSelector.derivePFromRadius(R)` (server admins never set $P$ or configure curves). This ensures that each macro-cell contains an optimal power-of-two number of chunks ($P \times P$) while preserving at least 64 coarse cells per edge:
 
 - **$P = 1$ ($R < 64$, 1 chunk/cell):** No sub-binning. The key order is the bare Archimedean spiral where each key addresses an individual chunk in outward concentric rings.
 - **$P = 2$ ($R \ge 64$, 4 chunks/bin, $2 \times 2$ window):** The spiral steps through $2 \times 2$ macro-cells, filling each via a 4-step Hilbert curve before stepping to the adjacent cell.

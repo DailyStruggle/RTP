@@ -31,7 +31,8 @@ while [ $# -gt 0 ]; do
     --service) Services+=("$2"); shift 2 ;;
     --wait-seconds) WaitSeconds="$2"; shift 2 ;;
     --fresh) Fresh=1; shift ;;
-    --keep) Keep=1; shift ;;
+    --keep|--keep-running|--no-teardown) Keep=1; shift ;;
+    --teardown) Keep=0; shift ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -73,6 +74,7 @@ for svc in "${Services[@]}"; do
   echo "[stage] $(basename "$jar") -> ${dst#"$scriptDir"/}"
 done
 
+trap 'if [ "$Keep" -eq 0 ]; then compose down >/dev/null 2>&1 || true; fi' EXIT
 if ! compose up -d "${Services[@]}"; then
   echo "[up] FAIL - docker compose up failed" >&2
   exit 1
@@ -130,7 +132,6 @@ for svc in "${Services[@]}"; do
   svc_logs "$svc" > "$RunLogDir/$svc.log" 2>&1 || true
 done
 
-if [ "$Keep" -eq 0 ]; then compose down >/dev/null 2>&1 || true; fi
 echo "[versions] logs: ${RunLogDir#"$repoRoot"/}"
 if [ "$anyFail" -eq 0 ]; then echo "[versions] PASS"; exit 0; fi
 echo "[versions] FAIL"; exit 1

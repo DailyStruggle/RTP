@@ -184,4 +184,62 @@ class EwmaEstimatorTest {
         assertEquals(25.0, withPrior.mean(), 1e-9);
         assertEquals(0L, withPrior.sampleCount());
     }
+
+    @Test
+    @DisplayName("Validation guards, integer mode methods, and standard error calculations")
+    void validationGuardsAndCrossModeMethods() {
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofWindow(0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofWindow(0, 10.0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofWindow(10, -1.0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofWindow(10, Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(0.0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(1.5));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(0.0, 10.0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(1.5, 10.0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(Double.NaN, 10.0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(0.5, -1.0));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofAlpha(0.5, Double.NaN));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofIntegerDecay(0, 1, 0L));
+        assertThrows(IllegalArgumentException.class, () -> EwmaEstimator.ofIntegerDecay(1, 0, 0L));
+
+        // Fractional mode: meanNanos, recordNanos, standardErrorSquared, effectiveSampleCount, windowSize
+        EwmaEstimator frac = EwmaEstimator.ofWindow(10);
+        assertEquals(10, frac.windowSize());
+        assertEquals(EwmaEstimator.DecayMode.FRACTIONAL, frac.decayMode());
+        assertEquals(0L, frac.meanNanos());
+        assertEquals(0.0, frac.standardErrorSquared(), 1e-9);
+        assertEquals(0.0, frac.effectiveSampleCount(), 1e-9);
+
+        frac.recordNanos(-50L); // clamped to 0L
+        assertEquals(0L, frac.meanNanos());
+        frac.recordNanos(100L);
+        assertEquals(50L, frac.meanNanos());
+        assertEquals(2.0, frac.effectiveSampleCount(), 1e-9);
+        assertTrue(frac.standardErrorSquared() > 0.0);
+
+        frac.setMean(-10.0); // ignored
+        frac.setMean(Double.POSITIVE_INFINITY); // ignored
+        assertEquals(50.0, frac.mean(), 1e-9);
+        frac.setMean(Double.NaN);
+        assertTrue(Double.isNaN(frac.mean()));
+
+        // Integer mode: custom weights (e.g. 3/4), recordSample, mean, variance, standardDeviation, setMean, reset
+        EwmaEstimator intEst = EwmaEstimator.ofIntegerDecay(3, 1, 100L);
+        assertEquals(4, intEst.windowSize());
+        assertEquals(100.0, intEst.mean(), 1e-9);
+        assertEquals(0.0, intEst.variance(), 1e-9);
+        assertEquals(0.0, intEst.standardDeviation(), 1e-9);
+        assertEquals(0.0, intEst.standardErrorSquared(), 1e-9);
+
+        intEst.recordSample(200.0);
+        assertEquals(125L, intEst.meanNanos());
+        intEst.setMean(80.0);
+        assertEquals(80L, intEst.meanNanos());
+        intEst.setMean(Double.NaN);
+        assertEquals(0L, intEst.meanNanos());
+        intEst.reset();
+        assertEquals(100L, intEst.meanNanos());
+        assertEquals(0L, intEst.sampleCount());
+    }
 }

@@ -112,6 +112,8 @@ ZONE1_JARGON = [
     (re.compile(r"(?i)\bcandidates?\b"), "'candidate' (say 'spot')"),
     (re.compile(r"\b(SPI|TTL)\b"), "engineering acronym"),
     (re.compile(r"(?i)\b(closed|open)-loop\b"), "harness jargon"),
+    (re.compile(r"(?i)space-filling|\bspiral\b|\bhilbert\b|\bcurves?\b|\bL[123]\b|\bradix\b"),
+     "internal curve/tier jargon"),
 ]
 # Lines the author has removed and rejected; they keep reappearing in rewrites.
 ZONE1_REJECTED = [
@@ -121,10 +123,37 @@ ZONE1_REJECTED = [
      "'works with no setup'"),
 ]
 _LINK_TARGET = re.compile(r"\]\([^)]*\)")
+_TAGLINE_LINE = re.compile(r'tagline:\s*"([^"]+)"')
 # Short-version bullets are `[**Adjective**](link): fact.`; a label of one or two
 # words, never a sentence.
 SHORT_VERSION_START = "### The short version"
 _SHORT_BULLET = re.compile(r"^- \[\*\*[A-Z][\w-]*( [\w-]+)?\*\*\]\([^)]+\): \S")
+
+# Zone 2 (`## Common setups` through `## Features`, stopping at `## Performance`)
+# is the operator on-ramp: keep internal math, dotted CLI config paths, and
+# stress-harness commands out of it.
+ZONE2_SECTIONS = {"## Common setups", "## Install", "## Features"}
+ZONE2_STOP = "## Performance"
+ZONE2_JARGON = [
+    (re.compile(r"(?i)space-filling|\bspiral\b|\bhilbert\b|\bcurves?\b"),
+     "curve/spiral math jargon in Zone 2 operator on-ramp"),
+    (re.compile(r"\bshape\.radius="), "dotted CLI config path in Zone 2 (keep in FAQ/Reference)"),
+    (re.compile(r"/rtp\s+test\b"), "stress-test command in Zone 2"),
+]
+
+# Any section that mentions `space-filling` or `spiral` must also state in the
+# same section that the math is internal/automatic and users only configure
+# standard shapes (CIRCLE/SQUARE) or a block radius, so search engines and LLMs
+# never infer that operators have to configure space-filling curves.
+_CURVE_TERM = re.compile(r"(?i)space-filling|\bspiral\b")
+_CURVE_ATTRIBUTION = re.compile(
+    r"(?i)(never (a |configure )[^\n]*curve|under the hood|internal space-filling|runs automatically)"
+)
+
+# Section 6 (reference block after `## Why I made it` / `## What paying gets you`)
+# keeps compact summary tables only; full catalogs live in docs/admin/.
+REFERENCE_START_HEADINGS = {"## Why I made it", "## What paying gets you"}
+MAX_REFERENCE_TABLE_ROWS = 10
 
 # Share of source lines that are audience-specific before the report warns that
 # the pages are drifting back toward separate copies.
@@ -593,6 +622,103 @@ def check_short_version_labels(kept):
     return problems
 
 
+def check_listing_metadata(source_text):
+    """Checks `tagline: "..."` entries in the author-notes header against ZONE1_JARGON."""
+    problems = []
+    for n, line in enumerate(source_text.split("\n"), start=1):
+        if line.strip() == "-->":
+            break
+        for m in _TAGLINE_LINE.finditer(line):
+            tagline = m.group(1)
+            for pattern, label in ZONE1_JARGON:
+                if pattern.search(tagline):
+                    problems.append(f"line {n}: {label} in listing metadata tagline; "
+                                    f"use plain head-query copy: {tagline[:120]}")
+    return problems
+
+
+def check_zone2_onramp(kept):
+    """Returns problems for curve/math jargon or CLI config paths in the Zone 2 operator on-ramp."""
+    problems = []
+    in_zone2 = False
+    for n, line in kept:
+        stripped = line.strip()
+        if stripped in ZONE2_SECTIONS:
+            in_zone2 = True
+            continue
+        if stripped.startswith("## ") and stripped not in ZONE2_SECTIONS:
+            if stripped == ZONE2_STOP or in_zone2:
+                in_zone2 = False
+        if not in_zone2:
+            continue
+        text = _LINK_TARGET.sub("]", line)
+        for pattern, label in ZONE2_JARGON:
+            if pattern.search(text):
+                problems.append(f"line {n}: {label}: {stripped[:120]}")
+    return problems
+
+
+def check_curve_attribution(kept):
+    """Ensures any section mentioning `space-filling` or `spiral` states that the math is internal."""
+    problems = []
+    sections = []
+    current_heading = "top"
+    current_lines = []
+    for n, line in kept:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if current_lines:
+                sections.append((current_heading, current_lines))
+            current_heading = stripped
+            current_lines = []
+        else:
+            current_lines.append((n, line))
+    if current_lines:
+        sections.append((current_heading, current_lines))
+
+    for heading, lines in sections:
+        cleaned = [(n, _LINK_TARGET.sub("]", line)) for n, line in lines]
+        hits = [(n, text) for n, text in cleaned if _CURVE_TERM.search(text)]
+        if not hits:
+            continue
+        section_text = "\n".join(text for _, text in cleaned)
+        if not _CURVE_ATTRIBUTION.search(section_text):
+            first_line, snippet = hits[0]
+            problems.append(
+                f"line {first_line}: '{heading}' mentions space-filling/spiral math without stating "
+                f"that it is internal and admins only configure standard shapes/radii: {snippet.strip()[:120]}"
+            )
+    return problems
+
+
+def check_reference_table_caps(kept):
+    """Caps markdown pipe tables in the post-story reference block to MAX_REFERENCE_TABLE_ROWS rows."""
+    problems = []
+    in_reference = False
+    i = 0
+    while i < len(kept):
+        line_no, line = kept[i]
+        stripped = line.strip()
+        if stripped in REFERENCE_START_HEADINGS:
+            in_reference = True
+        elif stripped.startswith("## ") and stripped not in REFERENCE_START_HEADINGS:
+            in_reference = False
+        if in_reference and stripped.startswith("|"):
+            rows = []
+            while i < len(kept) and kept[i][1].strip().startswith("|"):
+                rows.append(kept[i])
+                i += 1
+            data_rows = max(0, len(rows) - 2)
+            if data_rows > MAX_REFERENCE_TABLE_ROWS:
+                problems.append(
+                    f"line {rows[0][0]}: reference table has {data_rows} rows "
+                    f"(max {MAX_REFERENCE_TABLE_ROWS}); link to docs/admin/ for the full catalog"
+                )
+            continue
+        i += 1
+    return problems
+
+
 def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
     """Returns (output text, audience-specific line count, shared line count)."""
     source_dir = source_path.parent if isinstance(source_path, pathlib.Path) else pathlib.Path(source_path).parent
@@ -601,7 +727,14 @@ def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
     kept = [(n, _resolve_images(n, line, source_dir=source_dir, raw_base=raw_base)) for n, line in kept]
     kept = [(n, _resolve_doc_links(n, line, source_dir=source_dir)) for n, line in kept]
     _lint(kept)
-    jargon = check_zone1_jargon(kept) + check_short_version_labels(kept)
+    jargon = (
+        check_listing_metadata(source_text)
+        + check_zone1_jargon(kept)
+        + check_short_version_labels(kept)
+        + check_zone2_onramp(kept)
+        + check_curve_attribution(kept)
+        + check_reference_table_caps(kept)
+    )
     if jargon:
         raise FrontPageError("\n".join(jargon))
     if target.fmt == "bbcode":

@@ -1,6 +1,6 @@
 # ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
 
-**Status:** Proposed
+**Status:** Accepted (implemented 2026-10-24)
 **Date:** 2026-10-23
 **Linear:** RTP-55
 

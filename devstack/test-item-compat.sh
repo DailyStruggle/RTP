@@ -11,11 +11,14 @@ COMPAT_PLUGINS="$DEVSTACK_DIR/compat/plugins"
 
 SKIP_BUILD=0
 DOWN=0
+KEEP=0
 
 for arg in "$@"; do
     case "$arg" in
         --down|-Down|-down) DOWN=1 ;;
         --skip-build|-SkipBuild|-skip-build) SKIP_BUILD=1 ;;
+        --keep|-Keep|-keep|--keep-running|--no-teardown) KEEP=1 ;;
+        --teardown|-TearDown|-teardown) KEEP=0 ;;
     esac
 done
 
@@ -67,6 +70,16 @@ if ! docker ps >/dev/null 2>&1; then
     echo "=========================================================================="
     exit 0
 fi
+
+cleanup_on_exit() {
+    if [ "$KEEP" -eq 0 ]; then
+        echo "Tearing down single-server item compatibility devstack (pass --keep to leave it running)..."
+        docker compose -f "$COMPOSE_FILE" down -v >/dev/null 2>&1 || true
+    else
+        echo "--keep set: leaving single-server item compatibility devstack running (run './test-item-compat.sh --down' to stop)."
+    fi
+}
+trap cleanup_on_exit EXIT
 
 echo "Launching single-server Paper devstack..."
 docker compose -f "$COMPOSE_FILE" up -d

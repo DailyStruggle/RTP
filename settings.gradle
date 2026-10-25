@@ -456,7 +456,10 @@ if (!excludeNeoforge && !excludeJdk25) {
 include 'helpers:PeriodicWorldSaver'
 // Black-box stress-test driver for /rtp-style commands. Drives RTP, RTP-Pro,
 // and competitor plugins under identical workloads to fill the front-page
-// comparison table. See helpers/StressTestRTP/README.md.
+// comparison table. See helpers/StressTestRTP/README.md and ADR-122.
 include 'helpers:StressTestRTP'
+include 'helpers:stresstest-core'
+include 'helpers:stresstest-bukkit'
+include 'helpers:stresstest-fabric'
 // Mock stub plugins for testing third-party item integrations (ItemsAdder, Oraxen, Nexo, HeadDatabase).
 include 'helpers:MockItemPlugins'

@@ -1,6 +1,6 @@
 # rtp-proxy-ADR-007 — `PostgresNetworkStateBinding`
 
-**Status:** Proposed
+**Status:** Superseded by [rtp-proxy-ADR-011](rtp-proxy-ADR-011-sql-network-state-binding.md) (2026-05-18)
 **Date:** 2026-05-13
 **Refines:** [ADR-036](../../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-002](rtp-proxy-ADR-002-network-yml-schema.md)

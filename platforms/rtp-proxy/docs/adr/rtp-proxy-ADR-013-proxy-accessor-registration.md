@@ -1,6 +1,6 @@
 # rtp-proxy-ADR-013 - `RTPProxyAccessor` Registration (Mirror of `RTPServerAccessor`)
 
-**Status:** Proposed
+**Status:** Accepted (2026-05-18)
 **Date:** 2026-05-18
 **Refines:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md), [rtp-proxy-ADR-002](rtp-proxy-ADR-002-network-yml-schema.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md)

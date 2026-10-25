@@ -1,8 +1,8 @@
 package io.github.dailystruggle.effectsapi;
 
-import io.github.dailystruggle.effectsapi.bukkit.BukkitValueCoercer;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
+import io.github.dailystruggle.effectsapi.common.spi.ValueCoercer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -50,7 +50,7 @@ class EffectRegistrationParityTest {
 
     static {
         INITIALIZERS.put("bukkit",
-                "src/main/java/io/github/dailystruggle/effectsapi/bukkit/BukkitEffectsInitializer.java");
+                "../../platforms/rtp-bukkit/rtp-bukkit-common/src/main/java/io/github/dailystruggle/effectsapi/bukkit/BukkitEffectsInitializer.java");
         INITIALIZERS.put("fabric",
                 "../../platforms/rtp-fabric/rtp-fabric-common/src/main/java/io/github/dailystruggle/rtp/fabric/effects/FabricEffectsInitializer.java");
         INITIALIZERS.put("fabric-26.x",
@@ -101,7 +101,7 @@ class EffectRegistrationParityTest {
     @Test
     @DisplayName("EffectFactory.registerBuiltInEffects() registers all 11 built-in keys and aliases")
     void registerBuiltInEffectsRegistersAllCanonicalKeys() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
         EffectFactory.registerBuiltInEffects();
 
         Set<String> actual = new TreeSet<>(EffectFactory.registeredNames());
@@ -129,40 +129,6 @@ class EffectRegistrationParityTest {
         } finally {
             EffectFactory.clearUnsupportedPrimitives();
             Effect.setDefaultWarn(msg -> System.err.println("[effects-api] " + msg));
-        }
-    }
-
-    @Test
-    @DisplayName("BukkitEffectsInitializer.registerAll() registers the full common effect key set")
-    void bukkitEffectsInitializerRegistersExpectedCommonKeySet() throws Exception {
-        java.lang.reflect.Field intVersionField = EffectsAPI.class.getDeclaredField("intVersion");
-        intVersionField.setAccessible(true);
-        Integer priorVersion = (Integer) intVersionField.get(null);
-
-        java.lang.reflect.Field registeredField =
-                io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer.class.getDeclaredField("REGISTERED");
-        registeredField.setAccessible(true);
-        java.util.concurrent.atomic.AtomicBoolean registeredFlag =
-                (java.util.concurrent.atomic.AtomicBoolean) registeredField.get(null);
-        boolean priorRegistered = registeredFlag.getAndSet(false);
-
-        try {
-            intVersionField.set(null, 20);
-            io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer.registerAll();
-
-            Set<String> expected = Set.of(
-                    "SOUND", "PARTICLE", "POTION", "TITLE", "GLIDE", "COMMAND",
-                    "DROP_INVENTORY", "DROP_EXP", "DROP_EXPERIENCE", "DEATH", "KILL",
-                    "FIREWORK", "NOTE"
-            );
-            Set<String> actual = new TreeSet<>(io.github.dailystruggle.effectsapi.common.EffectFactory.registeredNames());
-            for (String key : expected) {
-                assertTrue(actual.contains(key),
-                        "BukkitEffectsInitializer.registerAll() must register " + key + " (actual: " + actual + ")");
-            }
-        } finally {
-            intVersionField.set(null, priorVersion);
-            registeredFlag.set(priorRegistered);
         }
     }
 

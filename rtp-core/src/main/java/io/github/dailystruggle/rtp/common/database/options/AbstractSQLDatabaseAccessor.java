@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
+import io.github.dailystruggle.rtp.api.metrics.MetricBucketRow;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -11,9 +12,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -270,6 +275,326 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
    * @return the SQL statement
    */
   protected abstract String getInsertStatement();
+
+  /**
+   * Returns the dialect-appropriate {@code CREATE TABLE IF NOT EXISTS rtp_metric_bucket} DDL
+   * statement (ADR-040, REQ-RTP-METTS-008).
+   *
+   * @return SQL DDL statement for {@code rtp_metric_bucket}
+   */
+  public String getMetricBucketTableDdl() {
+    return "CREATE TABLE IF NOT EXISTS rtp_metric_bucket ("
+        + "backend_id VARCHAR(128) NOT NULL, "
+        + "metric_key VARCHAR(128) NOT NULL, "
+        + "window_start_epoch BIGINT NOT NULL, "
+        + "window_seconds INT NOT NULL, "
+        + "sample_count INT NOT NULL, "
+        + "mean DOUBLE PRECISION NOT NULL, "
+        + "min DOUBLE PRECISION NOT NULL, "
+        + "max DOUBLE PRECISION NOT NULL, "
+        + "p95 DOUBLE PRECISION, "
+        + "generation BIGINT NOT NULL, "
+        + "PRIMARY KEY (backend_id, metric_key, window_start_epoch)"
+        + ");";
+  }
+
+  /**
+   * Returns the dialect-appropriate index DDL on {@code (metric_key, window_start_epoch)}
+   * supporting cross-backend range scans (ADR-040, REQ-RTP-METTS-008).
+   *
+   * @return SQL index DDL statement
+   */
+  public String getMetricBucketIndexDdl() {
+    return "CREATE INDEX IF NOT EXISTS idx_rtp_metric_bucket_key_epoch "
+        + "ON rtp_metric_bucket (metric_key, window_start_epoch);";
+  }
+
+  /**
+   * Returns the dialect-appropriate idempotent {@code INSERT} statement for
+   * {@code rtp_metric_bucket} (ADR-040, REQ-RTP-METTS-001, REQ-RTP-METTS-008).
+   *
+   * @return SQL insert statement ignoring duplicate primary keys
+   */
+  public String getMetricBucketInsertStatement() {
+    String n = name() == null ? "" : name().toLowerCase(Locale.ROOT);
+    if (n.contains("sqlite")) {
+      return "INSERT OR IGNORE INTO rtp_metric_bucket "
+          + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    }
+    if (n.contains("postgresql")) {
+      return "INSERT INTO rtp_metric_bucket "
+          + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+          + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+          + "ON CONFLICT (backend_id, metric_key, window_start_epoch) DO NOTHING";
+    }
+    return "INSERT IGNORE INTO rtp_metric_bucket "
+        + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  }
+
+  /**
+   * Idempotently creates the {@code rtp_metric_bucket} table and its
+   * {@code (metric_key, window_start_epoch)} index on the supplied connection
+   * (ADR-040, REQ-RTP-METTS-008).
+   *
+   * @param connection open JDBC connection
+   * @throws SQLException if table creation fails
+   */
+  public void ensureMetricBucketSchema(Connection connection) throws SQLException {
+    if (connection == null) return;
+    try (Statement statement = connection.createStatement()) {
+      statement.execute(getMetricBucketTableDdl());
+      String indexDdl = getMetricBucketIndexDdl();
+      if (indexDdl != null && !indexDdl.isBlank()) {
+        try {
+          statement.execute(indexDdl);
+        } catch (SQLException indexEx) {
+          // MySQL 8.0 error 1061 (Duplicate key name) when CREATE INDEX IF NOT EXISTS is unsupported
+          if (indexEx.getErrorCode() != 1061
+              && (indexEx.getMessage() == null
+                  || !indexEx.getMessage().toLowerCase(Locale.ROOT).contains("duplicate"))) {
+            throw indexEx;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Idempotently creates the {@code rtp_metric_bucket} table and index using a managed connection
+   * (ADR-040, REQ-RTP-METTS-008).
+   */
+  public void ensureMetricBucketSchema() {
+    Connection connection = connect();
+    if (connection == null) return;
+    try {
+      ensureMetricBucketSchema(connection);
+    } catch (SQLException e) {
+      RTPRuntime.log(Level.WARNING, "Failed to bootstrap rtp_metric_bucket schema", e);
+    } finally {
+      disconnect(connection);
+    }
+  }
+
+  /**
+   * Inserts a batch of {@link MetricBucketRow} instances idempotently into {@code rtp_metric_bucket}
+   * (ADR-040, REQ-RTP-METTS-001). Re-publication of an existing
+   * {@code (backend_id, metric_key, window_start_epoch)} key is a no-op.
+   *
+   * @param rows non-null list of bucket rows to insert
+   * @return number of rows inserted (excluding duplicates)
+   */
+  public synchronized int insertMetricBuckets(List<MetricBucketRow> rows) {
+    if (rows == null || rows.isEmpty()) return 0;
+    for (MetricBucketRow row : rows) {
+      if (row == null) {
+        throw new IllegalArgumentException("MetricBucketRow batch element must not be null");
+      }
+    }
+
+    Connection connection = connect();
+    if (connection == null) return 0;
+    boolean autoCommitToggled = false;
+    int insertedCount = 0;
+    try {
+      ensureMetricBucketSchema(connection);
+      if (connection.getAutoCommit()) {
+        connection.setAutoCommit(false);
+        autoCommitToggled = true;
+      }
+      String sql = getMetricBucketInsertStatement();
+      try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+        for (MetricBucketRow row : rows) {
+          bindMetricBucketRow(stmt, row);
+          stmt.addBatch();
+        }
+        int[] counts = stmt.executeBatch();
+        if (!connection.getAutoCommit()) {
+          connection.commit();
+        }
+        for (int c : counts) {
+          if (c > 0 || c == Statement.SUCCESS_NO_INFO) {
+            insertedCount += (c > 0 ? c : 1);
+          }
+        }
+      } catch (SQLException batchEx) {
+        // Fallback for generic JDBC connections (e.g. plain H2 without MODE=MySQL) that reject
+        // dialect-specific INSERT IGNORE syntax: check primary key and insert standard SQL.
+        try {
+          if (!connection.getAutoCommit()) {
+            connection.rollback();
+          }
+        } catch (SQLException ignored) {}
+        insertedCount = insertMetricBucketsFallback(connection, rows);
+        if (!connection.getAutoCommit()) {
+          connection.commit();
+        }
+      }
+    } catch (SQLException e) {
+      try {
+        if (!connection.getAutoCommit()) {
+          connection.rollback();
+        }
+      } catch (SQLException ignored) {}
+      RTPRuntime.log(Level.WARNING, "Failed to insert metric bucket batch", e);
+    } finally {
+      if (autoCommitToggled) {
+        try {
+          connection.setAutoCommit(true);
+        } catch (SQLException ignored) {}
+      }
+      disconnect(connection);
+    }
+    return insertedCount;
+  }
+
+  private int insertMetricBucketsFallback(Connection connection, List<MetricBucketRow> rows)
+      throws SQLException {
+    int inserted = 0;
+    String checkSql =
+        "SELECT 1 FROM rtp_metric_bucket WHERE backend_id = ? AND metric_key = ? AND window_start_epoch = ?";
+    String insertSql =
+        "INSERT INTO rtp_metric_bucket "
+            + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    try (PreparedStatement checkStmt = connection.prepareStatement(checkSql);
+        PreparedStatement insertStmt = connection.prepareStatement(insertSql)) {
+      for (MetricBucketRow row : rows) {
+        checkStmt.setString(1, row.backendId());
+        checkStmt.setString(2, row.metricKey());
+        checkStmt.setLong(3, row.windowStartEpoch());
+        boolean exists;
+        try (ResultSet rs = checkStmt.executeQuery()) {
+          exists = rs.next();
+        }
+        if (!exists) {
+          bindMetricBucketRow(insertStmt, row);
+          inserted += insertStmt.executeUpdate();
+        }
+      }
+    }
+    return inserted;
+  }
+
+  private static void bindMetricBucketRow(PreparedStatement stmt, MetricBucketRow row)
+      throws SQLException {
+    stmt.setString(1, row.backendId());
+    stmt.setString(2, row.metricKey());
+    stmt.setLong(3, row.windowStartEpoch());
+    stmt.setInt(4, row.windowSeconds());
+    stmt.setInt(5, row.sampleCount());
+    stmt.setDouble(6, row.mean());
+    stmt.setDouble(7, row.min());
+    stmt.setDouble(8, row.max());
+    if (row.p95() != null) {
+      stmt.setDouble(9, row.p95());
+    } else {
+      stmt.setNull(9, Types.DOUBLE);
+    }
+    stmt.setLong(10, row.generation());
+  }
+
+  /**
+   * Purges expired metric buckets older than {@code cutoffEpochExclusive} for the specified
+   * {@code backendId} only (ADR-040, REQ-RTP-METTS-005).
+   *
+   * @param backendId            originating backend identifier
+   * @param cutoffEpochExclusive epoch seconds cutoff; rows with {@code window_start_epoch < cutoffEpochExclusive} are deleted
+   * @return number of rows deleted
+   */
+  public synchronized int purgeExpiredMetricBuckets(String backendId, long cutoffEpochExclusive) {
+    if (backendId == null || backendId.isBlank()) return 0;
+    Connection connection = connect();
+    if (connection == null) return 0;
+    try {
+      String sql =
+          "DELETE FROM rtp_metric_bucket WHERE backend_id = ? AND window_start_epoch < ?";
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.setString(1, backendId);
+        statement.setLong(2, cutoffEpochExclusive);
+        return statement.executeUpdate();
+      }
+    } catch (SQLException e) {
+      // Table may not exist yet if no buckets have been published.
+      return 0;
+    } finally {
+      disconnect(connection);
+    }
+  }
+
+  /**
+   * Queries metric bucket rows for {@code metricKey} within
+   * {@code [fromEpochInclusive, toEpochInclusive]}, ordered by {@code window_start_epoch} ascending
+   * (ADR-040, REQ-RTP-METTS-006).
+   *
+   * @param backendId          specific backend id, or {@code null}/{@code "all"}/{@code "*"} for all backends
+   * @param metricKey          metric key to query
+   * @param fromEpochInclusive minimum {@code window_start_epoch} (inclusive)
+   * @param toEpochInclusive   maximum {@code window_start_epoch} (inclusive)
+   * @return immutable list of matching {@link MetricBucketRow}s ordered by {@code window_start_epoch}
+   */
+  public synchronized List<MetricBucketRow> queryMetricBuckets(
+      @Nullable String backendId,
+      String metricKey,
+      long fromEpochInclusive,
+      long toEpochInclusive) {
+    if (metricKey == null || metricKey.isBlank() || toEpochInclusive < fromEpochInclusive) {
+      return Collections.emptyList();
+    }
+    Connection connection = connect();
+    if (connection == null) return Collections.emptyList();
+    List<MetricBucketRow> out = new ArrayList<>();
+    boolean allBackends =
+        backendId == null
+            || backendId.isBlank()
+            || "all".equalsIgnoreCase(backendId)
+            || "*".equals(backendId);
+    String sql =
+        allBackends
+            ? "SELECT backend_id, metric_key, window_start_epoch, window_seconds, sample_count, "
+                + "mean, min, max, p95, generation "
+                + "FROM rtp_metric_bucket "
+                + "WHERE metric_key = ? AND window_start_epoch >= ? AND window_start_epoch <= ? "
+                + "ORDER BY window_start_epoch ASC, backend_id ASC"
+            : "SELECT backend_id, metric_key, window_start_epoch, window_seconds, sample_count, "
+                + "mean, min, max, p95, generation "
+                + "FROM rtp_metric_bucket "
+                + "WHERE backend_id = ? AND metric_key = ? AND window_start_epoch >= ? AND window_start_epoch <= ? "
+                + "ORDER BY window_start_epoch ASC";
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      int idx = 1;
+      if (!allBackends) {
+        stmt.setString(idx++, backendId);
+      }
+      stmt.setString(idx++, metricKey);
+      stmt.setLong(idx++, fromEpochInclusive);
+      stmt.setLong(idx, toEpochInclusive);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          String bId = rs.getString("backend_id");
+          String mKey = rs.getString("metric_key");
+          long winStart = rs.getLong("window_start_epoch");
+          int winSec = rs.getInt("window_seconds");
+          int count = rs.getInt("sample_count");
+          double mean = rs.getDouble("mean");
+          double min = rs.getDouble("min");
+          double max = rs.getDouble("max");
+          double p95Raw = rs.getDouble("p95");
+          Double p95 = rs.wasNull() ? null : Double.valueOf(p95Raw);
+          long gen = rs.getLong("generation");
+          out.add(
+              new MetricBucketRow(
+                  bId, mKey, winStart, winSec, count, mean, min, max, p95, gen));
+        }
+      }
+    } catch (SQLException e) {
+      // Table may not exist yet; return empty list.
+    } finally {
+      disconnect(connection);
+    }
+    return Collections.unmodifiableList(out);
+  }
 
   @Override
   @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding

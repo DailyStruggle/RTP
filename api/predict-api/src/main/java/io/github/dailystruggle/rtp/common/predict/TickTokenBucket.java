@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.predict;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Ceiling-adaptive tick-refilled token bucket for bounding execution work per tick interval
@@ -23,9 +24,9 @@ public final class TickTokenBucket {
     public static final long DEFAULT_TICK_NANOS = TimeUnit.MILLISECONDS.toNanos(50);
 
     private final long tickNanos;
-    private volatile long lastRefillNanos = Long.MIN_VALUE;
-    private volatile long tokensNanos;
-    private volatile long configuredCeilingNanos;
+    private final AtomicLong lastRefillNanos = new AtomicLong(Long.MIN_VALUE);
+    private final AtomicLong tokensNanos = new AtomicLong(0L);
+    private final AtomicLong configuredCeilingNanos = new AtomicLong(0L);
 
     public TickTokenBucket() {
         this(DEFAULT_TICK_NANOS);
@@ -41,10 +42,10 @@ public final class TickTokenBucket {
     public TickTokenBucket(long tickNanos, long initialCeilingNanos, boolean prefillAtZero, long nowNanos) {
         this(tickNanos);
         long ceil = Math.max(0L, initialCeilingNanos);
-        this.configuredCeilingNanos = ceil;
-        this.tokensNanos = ceil;
+        this.configuredCeilingNanos.set(ceil);
+        this.tokensNanos.set(ceil);
         if (prefillAtZero) {
-            this.lastRefillNanos = nowNanos;
+            this.lastRefillNanos.set(nowNanos);
         }
     }
 
@@ -56,9 +57,9 @@ public final class TickTokenBucket {
      */
     public void initializeFull(long ceilingNanos, long nowNanos) {
         long ceil = Math.max(0L, ceilingNanos);
-        this.configuredCeilingNanos = ceil;
-        this.tokensNanos = ceil;
-        this.lastRefillNanos = nowNanos;
+        this.configuredCeilingNanos.set(ceil);
+        this.tokensNanos.set(ceil);
+        this.lastRefillNanos.set(nowNanos);
     }
 
     /**
@@ -70,32 +71,31 @@ public final class TickTokenBucket {
      */
     public long refill(long ceilingNanos, long nowNanos) {
         long ceil = Math.max(0L, ceilingNanos);
-        long prevCeil = this.configuredCeilingNanos;
-        this.configuredCeilingNanos = ceil;
-        long last = this.lastRefillNanos;
+        long prevCeil = this.configuredCeilingNanos.getAndSet(ceil);
+        long last = this.lastRefillNanos.get();
         if (last == Long.MIN_VALUE) {
-            this.lastRefillNanos = nowNanos;
-            this.tokensNanos = ceil;
+            this.lastRefillNanos.set(nowNanos);
+            this.tokensNanos.set(ceil);
             return ceil;
         }
-        long tok = this.tokensNanos;
+        long tok = this.tokensNanos.get();
         if (ceil > prevCeil) {
             tok = Math.min(ceil, tok + (ceil - prevCeil));
         }
         long dt = nowNanos - last;
         if (dt <= 0L) {
             tok = Math.min(ceil, tok);
-            this.tokensNanos = tok;
+            this.tokensNanos.set(tok);
             return tok;
         }
         long earned = dt >= tickNanos ? ceil : (ceil * dt) / tickNanos;
         if (earned > 0L) {
             tok = Math.min(ceil, tok + earned);
-            this.lastRefillNanos = nowNanos;
+            this.lastRefillNanos.set(nowNanos);
         } else {
             tok = Math.min(ceil, tok);
         }
-        this.tokensNanos = tok;
+        this.tokensNanos.set(tok);
         return tok;
     }
 
@@ -113,7 +113,7 @@ public final class TickTokenBucket {
         long ceil = Math.max(0L, ceilingNanos);
         long tok = refill(ceil, nowNanos);
         long next = Math.max(-ceil, tok - debit);
-        this.tokensNanos = next;
+        this.tokensNanos.set(next);
         return next;
     }
 
@@ -125,20 +125,22 @@ public final class TickTokenBucket {
      */
     public void clampToMin(TickTokenBucket other) {
         if (other == null) return;
-        this.configuredCeilingNanos = Math.min(this.configuredCeilingNanos, other.configuredCeilingNanos);
-        this.tokensNanos = Math.min(this.tokensNanos, other.tokensNanos);
+        long otherCeiling = other.configuredCeilingNanos.get();
+        long otherTokens = other.tokensNanos.get();
+        this.configuredCeilingNanos.accumulateAndGet(otherCeiling, Math::min);
+        this.tokensNanos.accumulateAndGet(otherTokens, Math::min);
     }
 
     public long tokensNanos() {
-        return tokensNanos;
+        return tokensNanos.get();
     }
 
     public long configuredCeilingNanos() {
-        return configuredCeilingNanos;
+        return configuredCeilingNanos.get();
     }
 
     public long lastRefillNanos() {
-        return lastRefillNanos;
+        return lastRefillNanos.get();
     }
 
     public long tickNanos() {
@@ -147,8 +149,8 @@ public final class TickTokenBucket {
 
     /** Resets the bucket to its uninitialized state so the next refill starts with a full ceiling. */
     public void reset() {
-        this.lastRefillNanos = Long.MIN_VALUE;
-        this.tokensNanos = 0L;
-        this.configuredCeilingNanos = 0L;
+        this.lastRefillNanos.set(Long.MIN_VALUE);
+        this.tokensNanos.set(0L);
+        this.configuredCeilingNanos.set(0L);
     }
 }

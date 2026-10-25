@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
@@ -70,8 +70,8 @@ public class FireworkEffect extends Effect<FireworkEffect.FireworkKeys> {
 
     @Override
     public void run() {
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
-        LocationHandle lh = (ph == null) ? HandleRegistry.wrapLocation(target) : null;
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
+        LocationHandle lh = (ph == null) ? EffectTarget.wrapLocation(target) : null;
 
         Map<String, Object> dataMap = new HashMap<>();
         for (Map.Entry<FireworkKeys, Object> entry : data.entrySet()) {

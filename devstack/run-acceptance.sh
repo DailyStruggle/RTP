@@ -9,11 +9,13 @@
 #   ./run-acceptance.sh [--scenario all|boot|heartbeat|roundtrip|killmidflight|killswitch|rtptest|gui|rtpgui|burst|stress|down|logs]
 #                       [--wait-seconds N] [--skip-up] [--build] [--skip-build]
 #                       [--no-logs] [--purge] [--lite] [--assert-effects] [--gui]
-#                       [--bot-count N]
+#                       [--bot-count N] [--keep]
 #
 #   --build       Opt IN to the gradle clean+jar build. Default: OFF - the harness
 #                 does not invoke gradle; build the jars yourself, then it stages
 #                 whatever is under */build/libs.
+#   --keep        Leave the devstack containers running after scenarios finish
+#                 (default: tear down containers automatically on exit).
 #
 # Notes:
 #   - Requires `docker compose` and (optionally) `redis-cli` on PATH; falls
@@ -37,6 +39,7 @@ Lite=0
 AssertEffects=0
 GuiMode=0
 BotCount=12
+Keep=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --scenario) Scenario="$2"; shift 2 ;;
@@ -50,6 +53,8 @@ while [ $# -gt 0 ]; do
     --lite) Lite=1; shift ;;
     --assert-effects) AssertEffects=1; shift ;;
     --gui) GuiMode=1; shift ;;
+    --keep|--keep-running|--no-teardown) Keep=1; shift ;;
+    --teardown) Keep=0; shift ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -745,10 +750,20 @@ if [ "$Scenario" = "logs" ]; then
   exit 0
 fi
 
+cleanup_on_exit() {
+  stop_log_streams
+  if [ "$Keep" -eq 0 ]; then
+    echo "[teardown] stopping devstack containers (pass --keep to leave them running)..."
+    compose_down "$Purge"
+  else
+    echo "[teardown] --keep set: leaving devstack containers running (run './run-acceptance.sh --scenario down' to stop)."
+  fi
+}
+trap cleanup_on_exit EXIT
+
 [ "$SkipUp" -eq 1 ] || compose_up
 if [ "$NoLogs" -eq 0 ]; then
   show_log_streams
-  trap stop_log_streams EXIT
 fi
 
 declare -a plan=()

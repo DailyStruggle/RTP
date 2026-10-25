@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Adaptive Compute Governor evaluating server headroom and regional demand to publish an
@@ -62,6 +63,7 @@ public final class ComputeGovernor {
     private static volatile ComputeGovernor active = new ComputeGovernor();
 
     /** Returns the process-wide active governor instance. */
+    @NotNull
     public static ComputeGovernor active() {
         return active;
     }

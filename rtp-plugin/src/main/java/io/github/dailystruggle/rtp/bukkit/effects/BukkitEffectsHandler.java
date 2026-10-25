@@ -130,8 +130,8 @@ public class BukkitEffectsHandler {
         if (explicitLocation != null) {
             target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
                     io.github.dailystruggle.effectsapi.bukkit.BukkitHandles.wrap(player),
-                    io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
-                    destinationLocation != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destinationLocation) : null);
+                    io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(explicitLocation),
+                    destinationLocation != null ? io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(destinationLocation) : null);
         } else {
             target = player;
         }

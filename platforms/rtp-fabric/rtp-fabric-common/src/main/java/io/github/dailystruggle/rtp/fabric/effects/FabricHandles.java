@@ -2,12 +2,12 @@ package io.github.dailystruggle.rtp.fabric.effects;
 
 import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
 import io.github.dailystruggle.effectsapi.common.spi.HandleProvider;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
@@ -36,7 +36,7 @@ public final class FabricHandles implements HandleProvider {
     private FabricHandles() {}
 
     public static void register() {
-        HandleRegistry.setProvider(INSTANCE);
+        ServerAccessors.setEffectAccessor(INSTANCE);
     }
 
     @Override

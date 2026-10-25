@@ -28,6 +28,7 @@ class NeoForgeServerIntVersionTest {
     void modernStringsUseMajor() {
         assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.1.2"));
         assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.2"));
+        assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.3"));
         assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.4"));
     }
 
@@ -35,6 +36,7 @@ class NeoForgeServerIntVersionTest {
     @DisplayName("pre-release suffixes parse as their numeric component")
     void preReleaseSuffixesTolerated() {
         assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.2-rc-2"));
+        assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.4-snapshot-1"));
         assertEquals(21, NeoForgeServerAccessor.parseIntVersion("1.21-pre1"));
     }
 

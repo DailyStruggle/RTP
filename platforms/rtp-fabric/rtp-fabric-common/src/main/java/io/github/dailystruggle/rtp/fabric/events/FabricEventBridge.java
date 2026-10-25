@@ -246,14 +246,21 @@ public final class FabricEventBridge {
      */
     private void registerWorldEventsReflective() {
         try {
-            Class<?> swe = Class.forName("net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents");
             Class<?> eventCls = Class.forName("net.fabricmc.fabric.api.event.Event");
             java.lang.reflect.Method register = eventCls.getMethod("register", Object.class);
 
-            Class<?> loadCallback = Class.forName(
-                    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents$Load");
-            Class<?> unloadCallback = Class.forName(
-                    "net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents$Unload");
+            // Fabric API 26.x renamed ServerWorldEvents -> ServerLevelEvents under Mojmap.
+            String baseFqn = "net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents";
+            Class<?> swe;
+            try {
+                swe = Class.forName(baseFqn);
+            } catch (ClassNotFoundException cnfe) {
+                baseFqn = "net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents";
+                swe = Class.forName(baseFqn);
+            }
+
+            Class<?> loadCallback = Class.forName(baseFqn + "$Load");
+            Class<?> unloadCallback = Class.forName(baseFqn + "$Unload");
 
             Object loadEvent = swe.getField("LOAD").get(null);
             Object unloadEvent = swe.getField("UNLOAD").get(null);
@@ -262,10 +269,12 @@ public final class FabricEventBridge {
                     loadCallback.getClassLoader(),
                     new Class<?>[]{loadCallback},
                     (proxy, method, args) -> {
-                        if (args != null && args.length >= 2
-                                && args[0] instanceof MinecraftServer s
-                                && args[1] instanceof ServerLevel lvl) {
-                            onWorldLoad(s, lvl);
+                        if (args != null && args.length >= 2 && args[1] != null) {
+                            try {
+                                accessor.registerWorldObject(args[1]);
+                            } catch (Throwable t) {
+                                RTP.log(Level.WARNING, "[RTP] FabricEventBridge world LOAD failed", t);
+                            }
                         }
                         return null;
                     });
@@ -273,10 +282,12 @@ public final class FabricEventBridge {
                     unloadCallback.getClassLoader(),
                     new Class<?>[]{unloadCallback},
                     (proxy, method, args) -> {
-                        if (args != null && args.length >= 2
-                                && args[0] instanceof MinecraftServer s
-                                && args[1] instanceof ServerLevel lvl) {
-                            onWorldUnload(s, lvl);
+                        if (args != null && args.length >= 2 && args[1] != null) {
+                            try {
+                                accessor.unregisterWorldObject(args[1]);
+                            } catch (Throwable t) {
+                                RTP.log(Level.WARNING, "[RTP] FabricEventBridge world UNLOAD failed", t);
+                            }
                         }
                         return null;
                     });
@@ -285,7 +296,7 @@ public final class FabricEventBridge {
             register.invoke(unloadEvent, unloadProxy);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
-                    "[RTP][Fabric] ServerWorldEvents not available (" + t.getClass().getSimpleName()
+                    "[RTP][Fabric] ServerWorldEvents/ServerLevelEvents not available (" + t.getClass().getSimpleName()
                             + "): per-world LOAD/UNLOAD callbacks disabled."
                             + " Worlds loaded at server start are still registered via SERVER_STARTED.");
         }
@@ -546,17 +557,18 @@ public final class FabricEventBridge {
             try {
                 java.lang.reflect.Method m = server.getClass().getMethod(name);
                 Object level = m.invoke(server);
-                if (level instanceof ServerLevel sl) {
-                    return sl.dimension().location().toString();
-                }
-                if (level != null) {
-                    // Some runtimes (26.1 deobf) may not link ServerLevel here.
-                    // Reflectively walk: level.dimension().location().toString().
-                    Object dim = level.getClass().getMethod("dimension").invoke(level);
-                    if (dim == null) continue;
-                    Object loc = dim.getClass().getMethod("location").invoke(dim);
-                    if (loc == null) continue;
-                    return loc.toString();
+                if (level == null) continue;
+                for (String dimMethod : new String[] { "dimension", "method_27983" }) {
+                    try {
+                        Object dim = level.getClass().getMethod(dimMethod).invoke(level);
+                        if (dim == null) continue;
+                        for (String locMethod : new String[] { "identifier", "location", "method_29177" }) {
+                            try {
+                                Object loc = dim.getClass().getMethod(locMethod).invoke(dim);
+                                if (loc != null) return loc.toString();
+                            } catch (NoSuchMethodException ignored) {}
+                        }
+                    } catch (NoSuchMethodException ignored) {}
                 }
             } catch (NoSuchMethodException ignored) {
                 // try next

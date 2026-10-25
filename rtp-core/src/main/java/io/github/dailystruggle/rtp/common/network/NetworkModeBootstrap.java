@@ -38,6 +38,8 @@ import java.util.logging.Level;
  */
 public final class NetworkModeBootstrap {
     private static final Set<String> LOGGED_INVALID_DURATIONS = ConcurrentHashMap.newKeySet();
+    private static final java.util.concurrent.atomic.AtomicLong BOOT_GENERATION =
+            new java.util.concurrent.atomic.AtomicLong(0L);
 
     /**
      * Most-recently-booted instance, or {@code null} when network mode is
@@ -45,6 +47,7 @@ public final class NetworkModeBootstrap {
      */
     public static volatile NetworkModeBootstrap LIVE;
 
+    private volatile long generation = 1L;
     private NetworkTransport transport;
     private BackendStatePublisher publisher;
     private ReservationTokenReaper reservationReaper;
@@ -118,6 +121,10 @@ public final class NetworkModeBootstrap {
                             + " - network mode stays disabled.", e);
             return;
         }
+
+        // ADR-040: cache metrics.networkTimeSeries.* from network.yml even when network.enabled=false
+        // so NetworkMetricTimeSeriesPublisher can audit publish=true with network mode disabled (REQ-RTP-METTS-007).
+        io.github.dailystruggle.rtp.common.metrics.networkTimeSeries.NetworkTimeSeriesConfig.updateFromYaml(cfg);
 
         RtpYamlSection network = cfg.getConfigurationSection("network");
         boolean enabled = network != null && network.getBoolean("enabled", false);
@@ -600,6 +607,7 @@ public final class NetworkModeBootstrap {
             }
 
             NetworkHooks.setCommandHook(this.commandHook);
+            this.generation = Math.max(1L, BOOT_GENERATION.incrementAndGet());
             LIVE = this;
 
             // One-shot region collision audit on boot.
@@ -851,6 +859,28 @@ public final class NetworkModeBootstrap {
      * The configured network server ID for this backend instance.
      */
     public String serverId() { return serverId; }
+
+    /**
+     * Returns the active ADR-036 generation for this backend instance, advancing
+     * with published heartbeats when the publisher is active (ADR-040).
+     */
+    public long generation() {
+        BackendStatePublisher pub = this.publisher;
+        if (pub != null) {
+            long hb = pub.publishedCount();
+            if (hb > this.generation) {
+                return hb;
+            }
+        }
+        return Math.max(1L, this.generation);
+    }
+
+    /**
+     * Overrides the base generation for this bootstrap instance (minimum {@code 1L}).
+     */
+    public void setGeneration(long generation) {
+        this.generation = Math.max(1L, generation);
+    }
 
     /**
      * The effective dispatch mode (rtp-proxy-ADR-020).

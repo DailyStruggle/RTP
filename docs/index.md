@@ -1,26 +1,29 @@
-# LeafRTP
+# LeafRTP: Minecraft Random Teleport (`/rtp` & `/wild`) Plugin and Mod
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Coverage](assets/badges/coverage.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
 [![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://adoptium.net/)
 
-A random-teleportation plugin built to fill operator needs still unmet by the more
-popular RTP plugins:
+**LeafRTP is a Minecraft random teleport (`/rtp` and `/wild`) plugin and mod** for Paper,
+Spigot, Folia, Fabric, NeoForge, and Velocity. Drop the single jar into `plugins/` or
+`mods/` and the default circular region works out of the box - players run `/rtp` or
+`/wild` to teleport to a safe random location without lagging the server.
 
-- performance management (no synchronous chunk loads on the main thread)
-- instant response times via a pre-warmed location cache
-- multiple regions per world
-- placement learning (spatial memory), improving time-stability as the plugin learns
-- unique placements, so players more easily find new places with fewer teleports and
-  less exploration
-- optionally grow regions to add new area as space is used up
-- cache locations ahead of time on a timer
-- queue teleporting players by command input times
+Server owners can adjust region borders visually on a browser map (`/rtp editor`), run the
+60-second in-game setup wizard (`/rtp admin setup`), or migrate existing settings in one
+command (`/rtp config import`) from BetterRTP, JustRTP, or EzRTP:
 
-A custom selection algorithm lets the plugin step over learned placements rather than
-reroll, without affecting the random distribution. See [Why](site/why.md) for the source
-algorithm.
+- **Zero main-thread chunk stalls:** checks terrain from region files on disk (`.mca` and
+  `.linear`) and keeps a pre-warmed queue of safe destinations ready before anyone types
+  `/rtp`
+- **Easy region setup:** configure simple `CIRCLE`, `SQUARE`, `RECTANGLE`, `ELLIPSE`, or
+  `POLYGON` regions using block or kilometer radii (e.g. `radius: 5000b` or `10km`)
+- **Even player spacing:** spreads players across the region without clumping at the center
+  or repeating known-bad ocean/lava chunks (see [How it works](site/how-it-works.md) and
+  [Why](site/why.md) for the internal engine design)
+- **Built-in gameplay & claim support:** wilderness portals, party scatter, arrival
+  schematics, Vault economy, and 18+ land-claim integrations
 
 ## Supported platforms
 
@@ -36,34 +39,34 @@ Spigot/Paper jar under Arclight / Mohist.
 proxy, where it acts as the router/transport for cross-server "network mode" rather than
 teleporting players itself. Drop the jar in the proxy's `plugins/`, install RTP on each
 backend as usual, and a bare `/rtp` on one server can send a player to a region on
-another. The free build ships the `proxy-direct` transport: a lightweight TCP socket that
-needs no Redis or SQL, so cross-server `/rtp` works with just the jar on the proxy and each
-backend. (Redis and SQL shared-state transports are not bundled in the free jar - they are
-LeafRTP-Pro extras.) See [Proxy mode](admin/proxies/INDEX.md).
+another over `proxy-direct` (zero external dependencies), SQL, or Redis. See
+[Proxy mode](admin/proxies/INDEX.md).
 
 ## Install
 
 One jar covers every platform - there is no per-platform download.
 
-1. Download the jar ([Modrinth](https://modrinth.com/plugin/leafrtp) for the free build,
-   or [BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/) for Pro).
-2. Bukkit-family servers (Paper, Spigot, Folia and their forks, Arclight, Mohist): drop
-   the jar in `plugins/`. Fabric / NeoForge: drop it in `mods/`. Restart the server.
-3. Configuration generates on first run under `plugins/RTP/` on the Bukkit family, or
-   `config/rtp/` on Fabric / NeoForge.
+1. Download the jar ([Modrinth](https://modrinth.com/plugin/leafrtp) for the free download,
+   or [BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/) for paid priority support).
+2. Bukkit-family servers (Paper, Spigot, Folia and their forks, Arclight, Mohist, Velocity): drop
+   the jar in `plugins/`. Fabric / NeoForge: drop it in `mods/`. Start the server.
+3. Run `/rtp` (or `/wild`). Configuration generates on first run under `plugins/RTP/` on
+   the Bukkit family, or `config/rtp/` on Fabric / NeoForge. Use `/rtp editor` or
+   `/rtp admin setup` whenever you want to customize borders or presets.
 
 !!! note
-    The free jar runs on Paper, Spigot, Folia, Fabric, and NeoForge as-is - including
-    single-jar cross-server `/rtp` through the bundled `proxy-direct` transport. LeafRTP-Pro
-    adds the shaded database drivers (the SQL/Redis shared-state transports) and a
-    parallelized Folia scheduler tuned for regionised threading; on the free build Folia
-    runs on the Paper-optimized scheduler and still performs well. Optional soft dependencies
-    (all auto-detected): Vault (economy charge), PlaceholderAPI, ProtocolLib.
+    Both the free Modrinth download and the paid BuiltByBit listing ship the exact same MIT-licensed
+    code, features, Folia scheduler, and cross-server transports (`proxy-direct`, SQL, and Redis) -
+    nothing in the plugin is locked. Optional soft dependencies (all auto-detected): Vault
+    (economy charge), PlaceholderAPI, ProtocolLib.
 
 ## Where to start
 
-- Read [Intended usage](site/intended-usage.md) first - it is the mental model the rest
-  of the documentation assumes.
+- [Quick start](admin/QUICK_START.md) and [Server administrators guide](FOR_SERVER_ADMINS.md)
+- [Web Workspace & Editor (`/rtp editor`)](admin/WEB_EDITOR_GUIDE.md) and
+  [Migration guide (`/rtp config import`)](admin/MIGRATION.md)
+- [Intended usage](site/intended-usage.md) - the mental model the rest of the
+  documentation assumes
 - [Commands](admin/COMMANDS.md), the interactive menu, and permissions
 - [Core Configuration](admin/configuration/CORE_CONFIG.md) and the
   [Configuration overview](admin/configuration/CONFIGURATION.md)

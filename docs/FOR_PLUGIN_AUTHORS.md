@@ -534,7 +534,6 @@ python3 scripts/bench_fuzz.py --mode server --active \
 
 ### Additional Reusable Repository Tooling (`scripts/*` & `devstack/*`)
 
-- **Discord `#support` Forum & BIT Triage Bot (`scripts/discord/`):** Self-hosted stdlib-Python Discord bot backed by SQLite FTS5 over your documentation, ADRs, and `BitCode` registry (`bit-api`). Uses two-pass multilingual harvesting, an orderless corpus-facet prompt-injection bottleneck, combinatorial subspace retrieval, and local chain-of-thought causal reasoning (`deepseek-r1:32b`) to answer setup questions and gate maintainer pings on complete diagnostics ([`docs/dev/DISCORD_SUPPORT_BOT_DESIGN.md`](dev/DISCORD_SUPPORT_BOT_DESIGN.md), [`docs/publishing/DISCORD_LAYOUT.md`](publishing/DISCORD_LAYOUT.md)).
 - **Zero-Backend Interactive Web Config Editor (`scripts/generate_web_editor.py`):** Generates a static HTML/JS configuration editor directly from the `@type`, `@options`, `@range`, and `@pattern` comment directives in your YAML files.
 - **Single-Source Storefront Builder (`scripts/release/build_front_pages.py`):** Compiles a single tagged Markdown source ([`docs/publishing/FRONT_PAGE.md`](publishing/FRONT_PAGE.md)) into platform-tailored pages for Modrinth, Hangar, SpigotMC (BBCode), CurseForge, and BuiltByBit.
 - **Multi-Server Docker Devstack (`devstack/`):** Scriptable containers and headless Mineflayer acceptance runners (`devstack/run-acceptance.sh`) for validating cross-server Velocity/Redis/MySQL topologies.

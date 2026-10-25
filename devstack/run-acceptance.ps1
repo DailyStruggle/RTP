@@ -105,7 +105,10 @@ param(
   [switch]$NeoForge,
   # Assert client effect packets (sounds, particles, titles) in headless bot acceptance
   [switch]$AssertEffects,
-  # Tear down and stop containers/images once testing is complete, freeing CPU and memory
+  # Leave containers running after scenarios finish (by default containers are torn down automatically on exit)
+  [Alias('KeepRunning', 'NoTearDown')]
+  [switch]$Keep,
+  # Retained for backwards compatibility (teardown on exit is now the default unless -Keep is set)
   [switch]$TearDown
 )
 
@@ -1428,109 +1431,113 @@ if ($Scenario -eq 'logs') {
   exit 0
 }
 
-# Bring the stack up unless the operator explicitly opted out. This makes the
-# harness a one-command experience for new users: `.\run-acceptance.ps1` boots
-# the stack if needed, then drives the scenarios.
-if (-not $SkipUp) {
-  Invoke-ComposeUp
-}
-
-# Auto-open per-service log windows once the stack is up, so the operator can
-# watch each server live while scenarios run. Opt out with -NoLogs (e.g. CI).
-if (-not $NoLogs) {
-  Show-LogWindows
-}
-
-$results = [ordered]@{}
-$plan = if ($Scenario -eq 'all') {
-  if ($Lite) {
-    # The lite edition uses the plugin-message transport and never touches
-    # Redis, so the Redis-backed scenarios (heartbeat / killmidflight /
-    # killswitch all introspect or drive Redis keys via redis-cli) do not
-    # apply. Run only the transport-agnostic checks under `all`; an operator
-    # can still force a Redis scenario explicitly with -Scenario for a mixed
-    # stack, but it will not pass against lite seeds.
-    @('boot', 'roundtrip')
-  } else {
-    @('boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest')
-  }
-} else {
-  @($Scenario)
-}
-
-# All scenario helpers shell out to `docker compose ...` without an explicit
-# `-f` argument, so they require the working directory to contain
-# docker-compose.yml. The user may invoke this script from anywhere
-# (e.g. repo root). Pin cwd to $PSScriptRoot for the duration of scenario
-# execution; otherwise diagnostic helpers like Get-ContainerLiveness and
-# Get-RecentLogTail fail with "no configuration file provided: not found"
-# and the heartbeat poll appears to hang silently.
-Push-Location $PSScriptRoot
 try {
-  foreach ($s in $plan) {
-    switch ($s) {
-      'boot'          { $results[$s] = Test-Boot }
-      'heartbeat'     { $results[$s] = Test-Heartbeat }
-      'roundtrip'     { $results[$s] = Test-Roundtrip }
-      'killmidflight' { $results[$s] = Test-KillMidFlight }
-      'killswitch'    { $results[$s] = Test-KillSwitch }
-      'rtptest'       { $results[$s] = Test-RtpTest }
-      'gui'           { $results[$s] = Test-Gui -GuiScenario 'teleport' -TargetServer $TargetServer }
-      'gui-submenu'   { $results[$s] = Test-Gui -GuiScenario 'submenu' -TargetServer $TargetServer }
-      'gui-setup'     { $results[$s] = Test-Gui -GuiScenario 'setup' -TargetServer $TargetServer }
-      'rtpgui'        { $results[$s] = Test-Gui -GuiScenario 'teleport' -TargetServer $TargetServer }
-      'burst'         { $results[$s] = Test-BurstStress }
-      'stress'        { $results[$s] = Test-BurstStress }
-      'burst-stress'  { $results[$s] = Test-BurstStress }
-    }
+  # Bring the stack up unless the operator explicitly opted out. This makes the
+  # harness a one-command experience for new users: `.\run-acceptance.ps1` boots
+  # the stack if needed, then drives the scenarios.
+  if (-not $SkipUp) {
+    Invoke-ComposeUp
   }
-} finally {
-  Pop-Location
-}
 
-Write-Host ''
-Write-Host '==== summary ====' -ForegroundColor Magenta
-foreach ($kv in $results.GetEnumerator()) {
-  $verdict = if ($kv.Value) { 'PASS' } else { 'FAIL' }
-  $color = if ($kv.Value) { 'Green' } else { 'Red' }
-  Write-Host ("  {0,-16} {1}" -f $kv.Key, $verdict) -ForegroundColor $color
-}
-Write-Host "Evidence written to: $EvidenceLog" -ForegroundColor Cyan
-Write-Host "Per-run log dir:    $RunLogDir" -ForegroundColor Cyan
+  # Auto-open per-service log windows once the stack is up, so the operator can
+  # watch each server live while scenarios run. Opt out with -NoLogs (e.g. CI).
+  if (-not $NoLogs) {
+    Show-LogWindows
+  }
 
-if ($Coverage) {
-  Write-Host '[coverage] generating JaCoCo server coverage report...' -ForegroundColor Cyan
-  $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-  $gradlew = if ($IsWindows -or ($env:OS -match 'Windows')) { Join-Path $repoRoot 'gradlew.bat' } else { Join-Path $repoRoot 'gradlew' }
+  $results = [ordered]@{}
+  $plan = if ($Scenario -eq 'all') {
+    if ($Lite) {
+      # The lite edition uses the plugin-message transport and never touches
+      # Redis, so the Redis-backed scenarios (heartbeat / killmidflight /
+      # killswitch all introspect or drive Redis keys via redis-cli) do not
+      # apply. Run only the transport-agnostic checks under `all`; an operator
+      # can still force a Redis scenario explicitly with -Scenario for a mixed
+      # stack, but it will not pass against lite seeds.
+      @('boot', 'roundtrip')
+    } else {
+      @('boot', 'heartbeat', 'roundtrip', 'killmidflight', 'killswitch', 'rtptest')
+    }
+  } else {
+    @($Scenario)
+  }
 
-  # On Docker Desktop for Windows, bind-mount write-behind buffering (VirtioFS/9p) can cause
-  # host-side .exec files to lag or truncate while containers keep file descriptors open.
-  # Copying each .exec directly from the container via `docker compose cp` guarantees
-  # byte-for-byte complete execution data.
+  # All scenario helpers shell out to `docker compose ...` without an explicit
+  # `-f` argument, so they require the working directory to contain
+  # docker-compose.yml. The user may invoke this script from anywhere
+  # (e.g. repo root). Pin cwd to $PSScriptRoot for the duration of scenario
+  # execution; otherwise diagnostic helpers like Get-ContainerLiveness and
+  # Get-RecentLogTail fail with "no configuration file provided: not found"
+  # and the heartbeat poll appears to hang silently.
   Push-Location $PSScriptRoot
   try {
-    foreach ($svc in @('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')) {
-      $null = Invoke-Native { docker compose cp "${svc}:/jacoco/${svc}.exec" "jacoco/${svc}.exec" }
+    foreach ($s in $plan) {
+      switch ($s) {
+        'boot'          { $results[$s] = Test-Boot }
+        'heartbeat'     { $results[$s] = Test-Heartbeat }
+        'roundtrip'     { $results[$s] = Test-Roundtrip }
+        'killmidflight' { $results[$s] = Test-KillMidFlight }
+        'killswitch'    { $results[$s] = Test-KillSwitch }
+        'rtptest'       { $results[$s] = Test-RtpTest }
+        'gui'           { $results[$s] = Test-Gui -GuiScenario 'teleport' -TargetServer $TargetServer }
+        'gui-submenu'   { $results[$s] = Test-Gui -GuiScenario 'submenu' -TargetServer $TargetServer }
+        'gui-setup'     { $results[$s] = Test-Gui -GuiScenario 'setup' -TargetServer $TargetServer }
+        'rtpgui'        { $results[$s] = Test-Gui -GuiScenario 'teleport' -TargetServer $TargetServer }
+        'burst'         { $results[$s] = Test-BurstStress }
+        'stress'        { $results[$s] = Test-BurstStress }
+        'burst-stress'  { $results[$s] = Test-BurstStress }
+      }
     }
   } finally {
     Pop-Location
   }
 
-  if (Test-Path $gradlew) {
-    Push-Location $repoRoot
+  Write-Host ''
+  Write-Host '==== summary ====' -ForegroundColor Magenta
+  foreach ($kv in $results.GetEnumerator()) {
+    $verdict = if ($kv.Value) { 'PASS' } else { 'FAIL' }
+    $color = if ($kv.Value) { 'Green' } else { 'Red' }
+    Write-Host ("  {0,-16} {1}" -f $kv.Key, $verdict) -ForegroundColor $color
+  }
+  Write-Host "Evidence written to: $EvidenceLog" -ForegroundColor Cyan
+  Write-Host "Per-run log dir:    $RunLogDir" -ForegroundColor Cyan
+
+  if ($Coverage) {
+    Write-Host '[coverage] generating JaCoCo server coverage report...' -ForegroundColor Cyan
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $gradlew = if ($IsWindows -or ($env:OS -match 'Windows')) { Join-Path $repoRoot 'gradlew.bat' } else { Join-Path $repoRoot 'gradlew' }
+
+    # On Docker Desktop for Windows, bind-mount write-behind buffering (VirtioFS/9p) can cause
+    # host-side .exec files to lag or truncate while containers keep file descriptors open.
+    # Copying each .exec directly from the container via `docker compose cp` guarantees
+    # byte-for-byte complete execution data.
+    Push-Location $PSScriptRoot
     try {
-      & $gradlew :jacocoServerReport --quiet
-      Write-Host "[coverage] JaCoCo server report generated at: build/reports/jacoco/server/html/index.html" -ForegroundColor Green
+      foreach ($svc in @('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')) {
+        $null = Invoke-Native { docker compose cp "${svc}:/jacoco/${svc}.exec" "jacoco/${svc}.exec" }
+      }
     } finally {
       Pop-Location
     }
-  }
-}
 
-if ($TearDown) {
-  Write-Host '[teardown] -TearDown requested: stopping and closing containers...' -ForegroundColor Cyan
-  Invoke-ComposeDown -IncludeVolumes:$Purge
-  Stop-SpawnedLogWindows
+    if (Test-Path $gradlew) {
+      Push-Location $repoRoot
+      try {
+        & $gradlew :jacocoServerReport --quiet
+        Write-Host "[coverage] JaCoCo server report generated at: build/reports/jacoco/server/html/index.html" -ForegroundColor Green
+      } finally {
+        Pop-Location
+      }
+    }
+  }
+} finally {
+  if (-not $Keep) {
+    Write-Host '[teardown] stopping devstack containers (pass -Keep to leave them running)...' -ForegroundColor Cyan
+    Invoke-ComposeDown -IncludeVolumes:$Purge
+    Stop-SpawnedLogWindows
+  } else {
+    Write-Host '[teardown] -Keep set: leaving devstack containers running (run `.\run-acceptance.ps1 -Scenario down` to stop).' -ForegroundColor Yellow
+  }
 }
 
 if ($results.Values -contains $false) { exit 1 } else { exit 0 }

@@ -1,6 +1,6 @@
 # Metrics Settings Reference (`advanced/metrics.yml`)
 
-`advanced/metrics.yml` holds **reporting-only** knobs for the runtime-health metrics SPI (TPS / MSPT / heap / queue samples). Throttle and tuning knobs live in [`advanced/performance.yml`](PERFORMANCE.md).
+`advanced/metrics.yml` holds **reporting-only** knobs for the runtime-health metrics SPI (TPS / MSPT / heap / queue samples). Throttle and tuning knobs live in [`advanced/performance.yml`](PERFORMANCE.md), and cross-backend metric time-series publication (`metrics.networkTimeSeries.*`) lives in [`advanced/network.yml`](../proxies/CONFIGURATION.md#metrics-cross-backend-metric-time-series-publication).
 
 Most keys affect **Folia only**: single-region runtimes (Paper / Bukkit / Fabric / NeoForge) return an empty per-region list, so the Folia aggregation knobs have no effect there.
 

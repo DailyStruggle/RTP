@@ -68,7 +68,6 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Failure detection and responses | [`HAZARDS.md#failure-modes`](HAZARDS.md#failure-modes) |
 | External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) (ADR-026) |
 | Player archetypes, utility functions & valuation weights | [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) |
-| Discord `#support` Forum bot design (corpus retrieval, prompt-injection bottleneck, dual NMT, causal reasoning) | [`DISCORD_SUPPORT_BOT_DESIGN.md`](DISCORD_SUPPORT_BOT_DESIGN.md) |
 | How and why AI tooling is used in this repository | [`AI_USAGE.md`](AI_USAGE.md) |
 
 ## Normative (read before writing code)

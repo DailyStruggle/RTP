@@ -7065,11 +7065,13 @@ class ServerRun:
         jar_index: JarIndex,
         active_subset: Iterable[str],
     ) -> bool:
-        """Verify over RCON `plugins` / `forge mods` that all jars in `active_subset` loaded cleanly."""
-        reply = drv.try_cmd("plugins")
+        """Verify over RCON `plugins` / `fabric mods` / `forge mods` that all jars in `active_subset` loaded cleanly."""
+        reply = drv.try_cmd(self.profile.loaded_check_cmd)
         if not reply:
             return True
         low_reply = reply.lower()
+        if "unknown or incomplete command" in low_reply or "unknown command" in low_reply:
+            return True
         for j_name in active_subset:
             meta = jar_index.jars.get(j_name)
             p_id = (meta.plugin_id if meta and meta.plugin_id else j_name[:-4]).lower()

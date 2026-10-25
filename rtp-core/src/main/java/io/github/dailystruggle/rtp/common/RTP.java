@@ -1527,6 +1527,11 @@ public class RTP {
                 } catch (RuntimeException e) {
                     CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.metricsSnapshotSampler", e);
                 }
+                try {
+                    CoreMetrics.instance().flushTimeSeriesBuckets();
+                } catch (RuntimeException e) {
+                    RTP.log(Level.WARNING, "[RTP] flushTimeSeriesBuckets failed: " + e.getMessage(), e);
+                }
             },
             20L,
             20L));

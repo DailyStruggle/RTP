@@ -44,7 +44,7 @@ Section order (fixed; do not reorder per target):
   3. Zone 2: common setups, install, features summary   (how do I use it)
   4. Zone 3: performance, how it works summary, testing and quality gates   (why should I believe it)
   5. Why I made it
-  6. Reference after the story: paid-listing block (BuiltByBit only), commands and permissions, configuration files, block-list grammar, FAQ, support   (look things up)
+  6. Reference after the story: paid-listing block (BuiltByBit only), everyday commands and core permissions, configuration files, FAQ, support   (look things up)
 Rule: a section moves up only if the section above it answers a question the
 reader asks earlier. Install steps appear once, in Install; do not repeat
 them above the fold. Hero: a web editor screenshot (map, no jargon); the
@@ -65,17 +65,20 @@ Zone 1: Verified Outcomes & Universal Guarantees (Above the Fold)
     what it avoids belong in 'The short version'. No tagline or subtitle
     under the title, no download counts (the rename FAQ has that), and no
     "works with no setup" line after Install. Enforced by ZONE1_REJECTED.
-  - Enforced: build_front_pages.py fails if Zone 1 uses the terms in
-    ZONE1_JARGON (TP/s, MSPT, TPS, tick, main/server thread, off-tick, candidate,
-    pre-filter, shuffle, ACCUMULATE/REROLL, SPI, TTL, p95/p99). Those words
-    are defined in Performance; use them there. Link targets are exempt.
+  - Enforced: build_front_pages.py fails if Zone 1 or Listing metadata uses the
+    terms in ZONE1_JARGON (TP/s, MSPT, TPS, tick, main/server thread, off-tick,
+    candidate, pre-filter, shuffle, ACCUMULATE/REROLL, SPI, TTL, p95/p99,
+    space-filling, spiral, Hilbert, curve, L1/L2/L3, radix). Those words are
+    defined in Performance / How it works; use them there. Link targets are exempt.
 
 Zone 2: Operational On-Ramp & Zero-Friction Migration (Immediate Action)
   - Audience: Action-oriented server operators ready to deploy or switch.
-  - Scope: 6-step quick-start install, /rtp config import (zero-friction switch),
+  - Scope: 3-step quick-start install, /rtp config import (zero-friction switch),
     /rtp admin setup / web editor, common setups, player & admin features.
   - Rule: Maximize net utility by minimizing time-to-deployment. An admin should
     be able to get a safe, lag-free setup running without scrolling past this zone.
+    Enforced by check_zone2_onramp (no curve/spiral/Hilbert jargon, dotted CLI
+    config paths, or stress-harness commands in Zone 2).
 
 Zone 3: Architectural Proof & Technical Transparency (Deep Foundation)
   - Audience: Folia operators, network architects, skeptics, and engineers.
@@ -88,13 +91,13 @@ Zone 3: Architectural Proof & Technical Transparency (Deep Foundation)
     docs/site/features.md, how-it-works.md and quality-gates.md, and this page
     keeps a short summary plus a relative link to each. Edit the moved text in
     the docs page, not here. Benchmarks, caveats and the test findings stay on
-    this page. Commands/permissions sit in section 6 until docs/admin/COMMANDS.md
-    covers every command and permission in that block (it lacks several).
+    this page. Everyday commands/permissions sit in section 6 with a link to
+    docs/admin/COMMANDS.md for the full reference.
     Head-to-head competitor comparisons live strictly in the Performance section.
 
 Listing metadata (for the marketplace form fields, not emitted):
-  Paid BuiltByBit title:  "LeafRTP-Pro"   tagline: "Off-tick Random Teleportation engine"
-  Free title:             "LeafRTP"       tagline: "Off-tick random teleport engine with spatial memory"
+  Paid BuiltByBit title:  "LeafRTP-Pro"   tagline: "Fast Minecraft random teleport (/rtp & /wild) plugin and mod for Paper, Folia, Fabric, NeoForge & Velocity"
+  Free title:             "LeafRTP"       tagline: "Fast Minecraft random teleport (/rtp & /wild) plugin and mod for Paper, Folia, Fabric, NeoForge & Velocity"
   (Modrinth's short description still reads "Fast Random Teleportation for everyone,
    configurable and extensible" - replace it there with the free tagline above.)
 
@@ -132,7 +135,7 @@ Private / Author notes:
 
 ## What it is
 
-**{{name}} is a random teleport (RTP) plugin.** `/rtp` or `/wild` sends a player to a random safe spot inside a region you set. It finds and checks spots ahead of time, reading the world files on disk, and keeps a queue of checked spots ready.
+**{{name}} is a random teleport (RTP) plugin.** Drop the jar in and the default region works out of the box: `/rtp` or `/wild` sends a player to a random safe spot, and you can resize borders visually on a browser map (`/rtp editor`) or through the in-game setup wizard (`/rtp admin setup`). It finds and checks spots ahead of time, reading the world files on disk, and keeps a queue of checked spots ready.
 
 I've worked on it in my own time since 2021. The benchmarks and the test harness are in the repo, and every number on this page can be rerun from them.
 
@@ -196,21 +199,9 @@ More setups: [Features](../site/features.md#common-setups), [recipes](../admin/R
 
 **Requirements:** Paper or Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 or 1.21+, or NeoForge 1.21.1+, up to 26.3. Java 17+ (Minecraft itself needs Java 21 from 1.20.5 and Java 25 on 26.x).
 
-Nightly CI boots 1.21.11 and 26.3. I take bug reports from 1.21.11 to the latest release; older versions should run, but fixes there are best effort. Folia is the exception: it is experimental and only its current builds are maintained, so Folia older than 1.21.11 is not supported and can crash without RTP's involvement. Exact per-version status is in the [support matrix](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/SUPPORT_MATRIX.md).
-
-1. Drop `{{jar}}` into `plugins/` (or `mods/`).
-2. Type `/rtp`. With the bundled GUI addon, regular players see a picker listing only the regions they have permission to use, while the admin panel and map visualization links are gated behind `rtp.admin` (OP) and hidden from regular players. To make bare `/rtp` teleport straight away while keeping `/rtp gui` available, set `openOnBareRtp: false` in `addons/guimenu.yml` (or toggle it in `/rtp admin setup`).
-
-That's enough to run. When you're ready to configure regions and settings, pick either self-contained setup path:
-
-- **Browser map workspace (`/rtp editor`):** Opens your config and world map in the browser with no inbound port needed. Draw region borders on the map, edit settings with each key's docs beside it, and review a diff before applying ([web workspace guide](../admin/WEB_EDITOR_GUIDE.md)).
-- **In-game guided wizard (`/rtp admin setup`):** Walks through world layout, gameplay presets, region radius (via clickable presets or Anvil input), performance profile, and addon toggles (`openOnBareRtp`, claim checks, effects), then previews the diff before writing ([quick-start guide](../admin/QUICK_START.md)).
-
-After sizing your regions, run `/rtp scan start` to pre-check the terrain, and run a stress test if you expect heavy traffic.
-
-**Other ways to customize (optional):**
-- **One-line commands or YAML files:** `/rtp config regions default shape.radius=10km`, or edit `plugins/RTP/` directly (`radius: 10km`, `teleportCooldown: 30s`).
-- **Switching from another rtp plugin:** `/rtp config import` finds the old plugin's folder in `plugins/` on its own (or point it anywhere with `path=<dir>`), then previews the translated config and permissions; add `overwrite=true` to write them ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
+1. Drop `{{jar}}` into `plugins/` (Spigot, Paper, Folia, Velocity, BungeeCord) or `mods/` (Fabric, NeoForge) and start the server.
+2. Type `/rtp` (or `/wild`).
+3. **Optional - adjust borders or settings:** Run `/rtp editor` to drag region borders on a browser map ([web workspace guide](../admin/WEB_EDITOR_GUIDE.md)), `/rtp admin setup` for the 60-second in-game wizard (worlds, radius presets, gameplay profile, and whether bare `/rtp` opens the GUI picker or teleports immediately; [quick-start guide](../admin/QUICK_START.md)), or `/rtp config import` to migrate from BetterRTP, JustRTP, or EzRTP ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
 
 (Advanced database, network proxy, and cache tuning: see the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).)
 
@@ -310,7 +301,7 @@ Full benchmark tables, methodology, and per-run analyses: [`helpers/StressTestRT
 
 ![Cross-plugin destination scatter comparison](../assets/img/cross_plugin_destinations_scatter_chart.png)
 
-*Where each plugin landed 4,096 players in the Paper 26.2 run (`20261008-003310`), every one set to the same 1,024 to 16,384 block circle around 0,0. The green box under each panel is the LeafRTP region shape that gives the same distance-from-center spread, so any of these distributions is a config change in LeafRTP. Each config is replayed through LeafRTP's own shape code over the same terrain: LeafRTP and BetterRTP match CIRCLE, EzRTP and HuskHomes match CIRCLE_NORMAL, and JustRTP and JakesRTP match the spiral power curve.*
+*Where each plugin landed 4,096 players in the Paper 26.2 run (`20261008-003310`), every one set to the same 1,024 to 16,384 block circle around 0,0. Out of the box, LeafRTP uses a standard `CIRCLE` or `SQUARE` with an even spread (you only configure a block radius like `radius: 5000b`, never a curve). For benchmarking, the green box under each panel shows the optional LeafRTP preset that reproduces each plugin's distance-from-center spread over the same terrain: LeafRTP and BetterRTP match the default `CIRCLE`, EzRTP and HuskHomes match `CIRCLE_NORMAL`, and JustRTP and JakesRTP match a center-weighted `CIRCLE`.*
 
 
 <details>
@@ -375,7 +366,7 @@ I reproduce every finding from a recorded seed before counting it. The fuzzer me
 
 ## Why I made it
 
-I started this project for the challenge of solving a hard problem. Every time a player ran `/rtp`, people wrote "LAG" in chat. I thought "the problem is with pure rejection sampling. This seems solvable if I can figure out an efficient memory system". After watching 3Blue1Brown videos, I set out to prove mathematically that spatial memory could fix that, using a custom space-filling curve to spread candidates evenly without rerolling.
+I started this project for the challenge of solving a hard problem. Every time a player ran `/rtp`, people wrote "LAG" in chat. I thought "the problem is with pure rejection sampling. This seems solvable if I can figure out an efficient memory system". After watching 3Blue1Brown videos, I set out to prove mathematically that spatial memory could fix that, using an internal space-filling curve so the engine spreads candidates evenly without rerolling. All of that math runs automatically under the hood - as a server owner, you never configure curves or math parameters; you just keep the default `CIRCLE` or `SQUARE`, set a radius in blocks (like `5000b` or `10km`), or drag the border on the `/rtp editor` map.
 
 I built the rest in stages:
 - **v1:** Proved the math. Built the space-filling spiral to map 2D territory uniformly, so picks don't duplicate or clump and no player positions need tracking.
@@ -409,56 +400,29 @@ Switching between the free download and this one is a jar swap. Config, data fil
 <details>
 <summary><b>Commands, permissions, configuration files</b></summary>
 
-**Commands** (aliases: `/rtp`, `/wild`):
+**Everyday commands** (aliases: `/rtp`, `/wild`; see the [Full Command & Permission Reference](https://dailystruggle.github.io/RTP/admin/COMMANDS/)):
 
 | Command | Description | Permission |
 | --- | --- | --- |
 | `/rtp` / `/wild` | Random teleport to the default region for your current world (or the GUI picker, if that addon is installed) | `rtp.use` |
-| `/rtp region=<name>` | Teleport to a named region | `rtp.region` / `rtp.regions.*` |
-| `/rtp world=<world>` | Teleport within a specific world | `rtp.world` / `rtp.worlds.*` |
-| `/rtp player=<name>` | Teleport another player | `rtp.other` |
-| `/rtp biome=<biome>` | Teleport to a chosen biome | `rtp.biome` / `rtp.biome.*` |
-| `/rtp action <name> [player]` | Trigger a scripted action, arena, or matchmaking duel | `rtp.action` / `rtp.action.<name>` |
-| `/rtp action cancel [action]` | Leave a matchmaking queue or cancel an action entry | `rtp.action.cancel` |
 | `/rtp back` | Return to where you were before the last `/rtp` | `rtp.back` |
-| `/rtp centerx=<x> centerz=<z> radius=<r>` | One-off overrides for this call; units allowed (`radius=10km`) | `rtp.params` |
-| `/rtp menu` | Player book menu | `rtp.use` |
-| `/rtp gui` | Open the menu a GUI addon bound to `/rtp`; without one, a plain teleport | `rtp.gui` |
+| `/rtp editor [local\|trust\|untrust\|apply]` | Web editor link, offline copy, browser trust and revocation, token apply | `rtp.editor` |
+| `/rtp admin setup <world\|gameplay\|perf\|preview\|confirm>` | Guided first-time setup from preset configs | `rtp.admin.setup` |
 | `/rtp admin` | Operator book menu | `rtp.menu.admin` |
-| `/rtp editor [local\|trust\|untrust\|apply]` | Web editor link, offline copy, browser trust and revocation (`untrust key=<prefix\|all>`), token apply | `rtp.editor` |
-| `/rtp clear <cache\|cooldown\|queue\|limit\|invuln>` | Clear location caches, cooldowns, queues, use limits or invulnerability | `rtp.admin` |
+| `/rtp config import [source] [path=<dir>] [overwrite=true]` | Translate another rtp plugin's config (auto-detected, or any folder via `path=`); never overwrites without `overwrite=true` | `rtp.config` |
 | `/rtp info` | Operator diagnostics | `rtp.info` |
 | `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
-| `/rtp config <file> <key>=<value> [...]` | Set one or more keys in a file (dotted for nested keys, e.g. `/rtp config regions default shape.radius=10km`), save, then reload | `rtp.config` + `rtp.update` |
-| `/rtp config <file> view\|viewraw` | Open a config file as a book menu, or print its raw YAML to chat | `rtp.config` |
-| `/rtp config <regions\|worlds> add=<name>\|remove=<name>` | Create or delete a region or world file (`default` can't be removed) | `rtp.config` |
-| `/rtp config import [source] [path=<dir>] [overwrite=true]` | Translate another rtp plugin's config (auto-detected, or any folder via `path=`); never overwrites without `overwrite=true` | `rtp.config` |
-| `/rtp config import permissions [source] [apply=true]` | Dry-run the LuckPerms commands that copy BetterRTP, JustRTP or EzRTP nodes onto `rtp.*`; `apply=true` runs them | `rtp.config` |
-| `/rtp config language <locale>` | Switch config files and messages to a bundled locale, then reload | `rtp.config` |
-| `/rtp admin setup <world\|gameplay\|perf\|preview\|confirm>` | Guided first-time setup from preset configs | `rtp.admin.setup` |
-| `/rtp scan start\|pause\|resume\|reset\|cancel` | Offline spatial memory pregeneration (was `/rtp fill` in 2.x) | `rtp.scan` |
-| `/rtp visualization [held\|export <type>]` | Render live held map charts or export high-resolution PNG/BMP diagnostic images | `rtp.admin` |
 
-**Permissions** (full set in `plugin.yml`):
+**Core permissions** (full set in the [Full Command & Permission Reference](https://dailystruggle.github.io/RTP/admin/COMMANDS/#full-permission-reference) and `plugin.yml`):
 
 | Permission | Default | Grants |
 | --- | --- | --- |
 | `rtp.use` | `true` | Use `/rtp` and `/wild` |
-| `rtp.see` | `true` | Tab-complete `/rtp` |
 | `rtp.free` | `op` | Skip the Vault charge |
-| `rtp.params` | `op` | Per-call overrides (`centerx=`, `centerz=`, `radius=`) |
-| `rtp.personalqueue` | `false` | Reserve a per-player pre-warmed location |
-| `rtp.onevent.*` | `false` | Auto-RTP on join / firstjoin / respawn / changeworld / move / teleport |
 | `rtp.back` | `op` | `/rtp back` |
 | `rtp.editor` | `op` | `/rtp editor` and its subcommands |
-| `rtp.gui` | `op` | `/rtp gui` |
-| `rtp.action` | `op` | `/rtp action <name>`; each action also checks `rtp.action.<name>` (or the permission set in its file) |
-| `rtp.action.cancel` | `op` | `/rtp action cancel` for your own entries; `rtp.action.cancel.other` for other players and session IDs |
-| `rtp.update` | `op` | Setting keys with `/rtp config <file> <key>=<value>`; granted by `rtp.config` |
-| `rtp.servers.*` | `true` | Cross-server destinations in network mode (was `op` before 3.3.0) |
-| `rtp.admin` | `op` | `/rtp clear`, plus `rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info` and `rtp.menu.admin` |
 | `rtp.admin.setup` | `op` | `/rtp admin setup` wizard |
-| `rtp.*` | `op` | Everything |
+| `rtp.admin` | `op` | `/rtp clear`, plus `rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info` and `rtp.menu.admin` |
 
 **Configuration files** under `plugins/RTP/`. Every file reloads at runtime (`/rtp reload`) and accepts human units like `10km` or `30s`. Most servers only edit the core files:
 
@@ -471,25 +435,11 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `economy.yml` | Vault pricing and cancellation refunds | `price`, `refundOnCancel` |
 | `definitions/actions/<name>.yml` | Portals, party spacing, and arena bounds | `minSeparation`, `confinement.damage` |
 
+Block-list token grammar (`unsafeBlocks` and `airBlocks` in `advanced/blocks.yml`): see [Safety configuration - Block Filters](../admin/configuration/SAFETY.md#block-filters-advancedblocksyml) and [Features - Claims and safety](../site/features.md#claims-and-safety).
+
 (Advanced database, network proxy, custom biomes, and message templates come with working defaults. See the [full configuration guide](https://dailystruggle.github.io/RTP/admin/configuration/CONFIGURATION/) for details.)
 
 **Soft dependencies (all optional):** Vault (for the economy charge), PlaceholderAPI, and the claim, combat-tag and hologram plugins listed above. PaperLib is no longer needed.
-
-</details>
-
-<details>
-<summary><b>Block-list token grammar (advanced/blocks.yml)</b></summary>
-
-Six token shapes can be mixed freely in `unsafeBlocks` and `airBlocks` (`advanced/blocks.yml`):
-
-- **Plain material:** `LAVA`, `MAGMA_BLOCK`.
-- **Material + state predicate:** `OAK_SLAB[waterlogged=true]`. Multiple predicates AND together: `OAK_SLAB[waterlogged=true,type=top]`.
-- **Numeric range predicate:** `WATER[level>=5]`, `LIGHT[level<8]`. Fails open on a missing or non-numeric value.
-- **Vanilla block tag:** `#minecraft:leaves`, `#minecraft:fire`, `#minecraft:campfires`. Expanded from the server's live block-tag registry when the config loads; datapack and modded tags work too.
-- **Tag + state predicate:** `#minecraft:slabs[waterlogged=true]`.
-- **Wildcard + state predicate:** `*[waterlogged=true]`: one line instead of listing every waterloggable block.
-
-Unknown tags and properties fail open: a config written for a newer MC version still loads on an older one. Malformed tokens are never silent: `[WARNING] [advanced/blocks.yml] rejected unsafe-blocks token '<token>': <reason>`. Block states are only read when a token needs them, and plain-material configs cost nothing extra. On an older install, lists kept in `safety.yml` are moved into `advanced/blocks.yml` on load, and plain-material entries keep working unchanged.
 
 </details>
 
@@ -503,7 +453,7 @@ A: Rarely, and no player positions are tracked. In two Paper 26.2 runs of 4,096 
 A: Most `/rtp` calls are served from a queue of locations checked before anyone typed the command. The queue refills off the main thread: it skips ground it has already rejected and checks the rest against the region files before loading any chunk. Details are in [How it works](../site/how-it-works.md).
 
 **Q: Is it complicated to set up?**
-A: No. Pick either the browser map workspace (`/rtp editor`) or the in-game guided wizard (`/rtp admin setup`): both configure your worlds, region radii (by dragging the border on the map, clicking a preset, or typing a distance in an Anvil prompt), and presets with a diff preview before anything is written. You can also set a radius with one command (`/rtp config regions default shape.radius=10km`) or in the in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
+A: No. You never configure space-filling curves or math settings - the default region is a standard circle (`CIRCLE`) with a block radius. Pick either the browser map workspace (`/rtp editor`) or the in-game guided wizard (`/rtp admin setup`): both configure your worlds, region radii (by dragging the border on the map, clicking a preset, or typing a distance in an Anvil prompt), and presets with a diff preview before anything is written. You can also set a radius with one command (`/rtp config regions default shape.radius=10km`) or in the in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
 
 **Q: How is the web editor secured? Does it open ports on my server?**
 A: Not to the outside. The hosted editor needs no inbound port: it connects outbound over TLS to an ephemeral WebSocket relay. Local mode (`/rtp editor local`) binds a token-authenticated socket on `127.0.0.1` only, which nothing outside the machine can reach. All messages require RSA-2048 signatures with strictly increasing sequence counters and single-use, expiring trust nonces.
@@ -549,7 +499,7 @@ A: The free one works exactly the same. Pay if you want priority support and a f
 <!-- /only -->
 
 **Q: How do I report a bug?**
-A: Open a GitHub issue with your server version, LeafRTP version, platform, the relevant config files and the error from the log. The [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) has a full reproduction template. I take reports for Minecraft 1.21.11 through the latest release; on older versions it should still run, and I'll look when I can.
+A: Open a GitHub issue with your server version, LeafRTP version, platform, the relevant config files and the error from the log. The [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) has a full reproduction template. Nightly CI boots 1.21.11 and 26.3, and I take reports for Minecraft 1.21.11 through the latest release; on older versions it should still run, and I'll look when I can (exact per-version status is in the [support matrix](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/SUPPORT_MATRIX.md)).
 
 </details>
 
@@ -559,20 +509,20 @@ A: Open a GitHub issue with your server version, LeafRTP version, platform, the 
 <!-- not: bbb-pro -->
 Support is me, in my spare time, so it's best effort.
 
-- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`), or open a thread in the [**LeafCraft Plugin Support** Discord `#support` Forum](DISCORD_LAYOUT.md) where the doc and `[RTP bit]` bot answers common setup questions right away. I help with bugs and anything still unclear after that.
-- A bug report in GitHub Issues or the Discord `#support` Forum needs: `/version`, `/rtp version`, `/rtp test` output, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the server log uploaded to `mclo.gs`. If something's missing I'll ask for it.
+- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`) or check the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/). I help with bugs and anything still unclear after that.
+- A bug report in GitHub Issues needs: `/version`, `/rtp version`, `/rtp test` output, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the server log uploaded to `mclo.gs`. If something's missing I'll ask for it.
 - "It doesn't work" isn't something I can act on. Tell me what you did, what you expected, and what happened instead.
 - There's no guaranteed response time. Safety bugs (bad landings, chunk leaks, claim bypasses) get looked at first.
-- Feature requests go in GitHub Discussions or the Discord `#support` Forum first.
+- Feature requests go in GitHub Discussions first.
 <!-- /not -->
 <!-- only: bbb-pro -->
 <!-- kind: promo -->
 Support comes from me, the person who wrote the code.
 
-- Tickets from this listing and `@Pro Supporter` threads in the [**LeafCraft Plugin Support** Discord `#support` Forum](DISCORD_LAYOUT.md) (tagged `💎 Pro Priority` automatically) go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
+- Tickets from this listing go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
 - Response time: 24-72 h on weekdays. Safety bugs go first regardless.
-- Bug reports with `/version`, `/rtp version`, `/rtp test` output, configs and an `mclo.gs` log link get fixed fastest. Most setup questions are answered right away by the `#support` Forum bot or the admin guide.
-- Feature requests go in GitHub Discussions or the Discord `#support` Forum.
+- Bug reports with `/version`, `/rtp version`, `/rtp test` output, configs and an `mclo.gs` log link get fixed fastest. Most setup questions are answered right away in the [web workspace](../admin/WEB_EDITOR_GUIDE.md) (`/rtp editor`) or the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).
+- Feature requests go in GitHub Discussions.
 <!-- /kind -->
 <!-- /only -->
 
@@ -584,7 +534,6 @@ Support comes from me, the person who wrote the code.
 
 - [**Documentation site**](https://dailystruggle.github.io/RTP/): every doc in one searchable place
 - [**Admin and configuration guide**](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/): install, configure, command reference
-- [**Discord `#support` Forum**](DISCORD_LAYOUT.md): interactive setup help, `[RTP bit]` log triage, and community channels
 - [**Addon / API developer guide**](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/): `rtp-api` and examples
 - [**Changelog**](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md)
 - [**Source on GitHub**](https://github.com/dailystruggle/RTP): issues, contributions, the benchmark harness

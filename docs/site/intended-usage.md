@@ -9,11 +9,14 @@ LeafRTP is built around one idea: **a region is a pre-defined area with its own 
 
 ## The happy path
 
-1. **Install** and start the server once to write the default config.
-2. **Configure** a region's geometry (shape, size, center) - see [Regions](../admin/configuration/REGIONS.md).
-3. **Point each world at a region** in its config - see [Worlds](../admin/configuration/WORLDS.md).
-4. **Pre-scan for safety**: optionally run `/rtp scan start region=<name>` per reasonably-sized region to build the bad-location map ahead of time - see the [Quick start](../admin/QUICK_START.md) scan step.
-5. Players run a plain **`/rtp`**, which resolves to their world's region.
+1. **Install** and start the server once to write the default config (the `default` region works out of the box).
+2. **Configure** your regions and worlds using whichever tool fits your workflow:
+   - **Visual browser workspace (`/rtp editor`)**: drag region borders on a 2D map and edit settings with live docs ([Web Editor Guide](../admin/WEB_EDITOR_GUIDE.md)).
+   - **In-game setup wizard (`/rtp admin setup`)**: 60-second guided setup for worlds, radius presets, and gameplay profiles ([Quick start](../admin/QUICK_START.md)).
+   - **Migrate from another plugin (`/rtp config import`)**: automatically translate BetterRTP, JustRTP, or EzRTP configs ([Migration](../admin/MIGRATION.md)).
+   - **Edit YAML directly**: configure a region's geometry in `definitions/regions/*.yml` ([Regions](../admin/configuration/REGIONS.md)) and point each world at a region in `definitions/worlds/*.yml` ([Worlds](../admin/configuration/WORLDS.md)).
+3. **Pre-scan for safety (optional)**: run `/rtp scan start region=<name>` per reasonably-sized static region to build the bad-location map ahead of time.
+4. Players run a plain **`/rtp`** (or **`/wild`**), which resolves to their world's region.
 
 !!! tip "Plain `/rtp` is the supported path"
     The everyday command for players, signs, and portals is a bare `/rtp` (or `/rtp world=<name>` to target a specific world's region). Those resolve to a configured region, so they utilize the pre-generated location queue, safety caching, and persistent spatial memory. *Override* parameters (`shape=`, `radius=`, `centerX=`, ...) under `rtp.params` create temporary, uncached regions - see [the warning below](#teleport-parameters-are-for-testing).
@@ -22,21 +25,22 @@ LeafRTP is built around one idea: **a region is a pre-defined area with its own 
 
 ## A worked example
 
-**Goal:** players type `/rtp` and scatter safely within 10,000 blocks of overworld spawn, instantly.
+**Goal:** players type `/rtp` and scatter safely between 500 and 10,000 blocks of overworld spawn, instantly.
 
 ```yaml
-# in the overworld region's config (see the Regions page for the file)
+# definitions/regions/survival.yml (see the Regions page for all fields)
 shape:
   name: CIRCLE
-  radius: 625      # in CHUNKS: 625 * 16 = 10,000 blocks
-  centerX: 0       # center, in chunks
+  radius: 10000b       # or 10km (10,000 blocks from center)
+  centerRadius: 500b   # keep players at least 500 blocks outside spawn
+  centerX: 0
   centerZ: 0
 ```
 
-Then point the overworld at that region ([Worlds](../admin/configuration/WORLDS.md)), optionally pre-scan it with `/rtp scan start region=overworld` (watch `/rtp scan info`) to map known-bad spots in advance, and you are done. A player typing `/rtp` gets a pre-verified coordinate from the active queue.
+Then point the overworld at that region ([Worlds](../admin/configuration/WORLDS.md)), optionally pre-scan it with `/rtp scan start region=survival` to map known-bad spots in advance, and you are done. A player typing `/rtp` gets a pre-verified coordinate from the active queue.
 
-!!! note "`radius`, `centerX`, and `centerZ` units"
-    They live *inside* the `shape:` block (not at the top level). By default, raw numbers are in **chunks** (1 chunk = 16 blocks), so `radius: 625` reaches 10,000 blocks. You can also specify spatial unit suffixes directly (e.g. `10000b`, `10km`, `625c`, `20r`). See [Regions](../admin/configuration/REGIONS.md) for the full field and unit reference.
+!!! note "`radius`, `centerRadius`, `centerX`, and `centerZ` units"
+    They live *inside* the `shape:` block (not at the top level). Write distances with explicit unit suffixes (`10000b`, `10km`, `256c`, `4r`) in both YAML files and commands. Bare numbers without a suffix are read as chunks (1 chunk = 16 blocks) for backwards compatibility. See [Regions](../admin/configuration/REGIONS.md) for the full field and unit reference.
 
 !!! note "That is the whole loop"
     Configure a region -> point a world at it -> pre-scan safety -> players run plain `/rtp`. The rest of this page explains *why*.

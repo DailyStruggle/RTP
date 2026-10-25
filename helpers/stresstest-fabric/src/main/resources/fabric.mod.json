@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "stresstestrtp",
+  "version": "${version}",
+  "name": "StressTestRTP",
+  "description": "Platform-neutral stress-test driver and TPS/MSPT/heap/latency/leak/coverage harness for /rtp-style commands on Fabric.",
+  "authors": [
+    "dailyStruggle"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "io.github.dailystruggle.helpers.stresstestrtp.fabric.StressTestFabricMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0"
+  }
+}

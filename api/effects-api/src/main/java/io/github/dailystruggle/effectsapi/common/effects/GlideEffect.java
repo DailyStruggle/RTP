@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 import java.util.EnumMap;
@@ -65,10 +65,10 @@ public class GlideEffect extends Effect<GlideEffect.GlideKeys> {
         // Resolve a platform-neutral player handle for the target. Prefer a
         // direct player/entity target; otherwise recover the player standing at
         // the target location. The native player object stays inside the handle.
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
         if (ph == null) {
-            LocationHandle lh = HandleRegistry.wrapLocation(target);
-            if (lh != null) ph = HandleRegistry.playerAt(lh);
+            LocationHandle lh = EffectTarget.wrapLocation(target);
+            if (lh != null) ph = EffectTarget.playerAt(lh);
         }
         if (ph == null) return;
 

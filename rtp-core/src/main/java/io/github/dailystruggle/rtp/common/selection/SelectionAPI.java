@@ -360,8 +360,8 @@ public class SelectionAPI {
   public static void recordConsumption(@Nullable String region, @Nullable UUID playerId) {
     if (playerId == null) return;
     ComputeGovernor gov = ComputeGovernor.active();
-    double unitCost = (gov != null) ? gov.estimatedUnitCostNanos() : 0.0;
-    ConsumerLedger.active().recordConsumption(region, playerId, unitCost, System.nanoTime());
+    double unitCost = gov.estimatedUnitCostNanos();
+    gov.consumerLedger().recordConsumption(region, playerId, unitCost, System.nanoTime());
   }
 
   /**

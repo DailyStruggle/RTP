@@ -1,10 +1,9 @@
 # effects-api-ADR-005 — `effects.yml`: Group-Centric, Stage-Bound Effect Configuration
 
-**Status:** Proposed (2026-05-07; amended 2026-05-07 — directory layout, see *Amendment: Directory Layout & `MultiConfigParser` Fit*)
+**Status:** Accepted (2026-05-07; amended 2026-05-07 — directory layout, see *Amendment: Directory Layout & `MultiConfigParser` Fit*; consolidated under `definitions/effects/` per [`ADR-076`](../../../docs/adr/ADR-076-config-folder-consolidation.md) and implemented via `EffectsGroupKeys`, `EffectsResolver`, and `EffectsGroupValidator`)
 **Date:** 2026-05-07
 **Extends:** [`effects-api-ADR-003`](effects-api-ADR-003-platform-split-bukkit-fabric.md) (does not supersede)
-**Related:** [`effects-api-ADR-002`](effects-api-ADR-002-type-driven-reading-order.md), [`effects-api-ADR-004`](effects-api-ADR-004-value-coercer-spi.md)
-**Implementation checklist:** `docs/dev/scratch/CHECKLIST-effects-api-platform-split.md` step 11 (11a–11f)
+**Related:** [`effects-api-ADR-002`](effects-api-ADR-002-type-driven-reading-order.md), [`effects-api-ADR-004`](effects-api-ADR-004-value-coercer-spi.md), [`ADR-076`](../../../docs/adr/ADR-076-config-folder-consolidation.md), [`ADR-121`](../../../docs/adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)
 
 ## Amendment: Directory Layout & `MultiConfigParser` Fit
 
@@ -20,17 +19,18 @@ SnakeYAML parser sitting outside the project's standard config plumbing.
 ### Layout
 
 Effects ship as a **directory of declarative files** under
-`rtp-plugin/src/main/resources/effects/`, exactly like `regions/` and
-`worlds/`:
+`rtp-plugin/src/main/resources/definitions/effects/` (consolidated under `definitions/effects/` per [`ADR-076`](../../../docs/adr/ADR-076-config-folder-consolidation.md), originally `effects/`), exactly like `definitions/regions/` and
+`definitions/worlds/`:
 
 ```
 rtp-plugin/src/main/resources/
-├── effects/
-│   ├── default.yml          # hardcoded fallback (when: postteleport)
-│   ├── default-pre.yml      # convention: default-<stage> for other stages
-│   ├── default-cancel.yml
-│   └── <admin-group>.yml    # one file per admin-named group
-└── lang/<locale>/effects.lang.yml   # unchanged — maps fixed inner field keys
+├── definitions/
+│   └── effects/
+│       ├── default.yml          # hardcoded fallback (when: postteleport)
+│       ├── default-pre.yml      # convention: default-<stage> for other stages
+│       ├── default-cancel.yml
+│       └── <admin-group>.yml    # one file per admin-named group
+└── lang/<locale>/definitions/effects.lang.yml   # maps fixed inner field keys
 ```
 
 The filename (without `.yml`) **is** the group name. Each file holds the
@@ -54,11 +54,11 @@ public enum EffectsGroupKeys {
 }
 ```
 
-`EffectsConfig` (in `effectsapi.common`) wraps a
-`MultiConfigParser<EffectsGroupKeys>` rooted at `effects/`. Each YAML file in
+`EffectsGroupKeys` lives in `api/effects-api` (`io.github.dailystruggle.effectsapi.common.EffectsGroupKeys`), while runtime resolution lives in `EffectsResolver` (`rtp-core`, `io.github.dailystruggle.rtp.effects.EffectsResolver`) and PBIT validation lives in `EffectsGroupValidator` (`rtp-core`, `io.github.dailystruggle.rtp.common.bit.config.EffectsGroupValidator`), wrapping a
+`MultiConfigParser<EffectsGroupKeys>` rooted at `definitions/effects/` (per [`ADR-076`](../../../docs/adr/ADR-076-config-folder-consolidation.md)). Each YAML file in
 the directory becomes one `ConfigParser<EffectsGroupKeys>` keyed by filename;
-all five schema fields are pulled via the enum, preserving the per-locale
-`effects.lang.yml` field-name translation already shipped (the `lang/<l>/effects.lang.yml`
+all schema fields are pulled via the enum, preserving the per-locale
+`effects.lang.yml` field-name translation already shipped (the per-locale `.lang.yml`
 files map only the inner field keys, which are now the *only* admin-visible
 keys, so nothing changes there).
 
@@ -429,11 +429,10 @@ forward compatibility.
 - `effects-api-ADR-003` — platform-split that introduced the
   `Collection<String>` `EffectFactory` overload this ADR consumes.
 - `effects-api-ADR-004` — `ValueCoercer` SPI; `EffectsConfig.load`'s
-  dry-clone validation (step 2 above) requires the coercer to be bound
+  dry-clone validation requires the coercer to be bound
   first.
-- `docs/dev/scratch/CHECKLIST-effects-api-platform-split.md` step 11 —
-  implementation tracker.
+- [`ADR-076`](../../../docs/adr/ADR-076-config-folder-consolidation.md) — config folder consolidation moving `effects/` under `definitions/effects/`.
+- `EffectsGroupKeys` (`api/effects-api`), `EffectsResolver` (`rtp-core`), and `EffectsGroupValidator` (`rtp-core`) — shipped implementation.
 - `BukkitEffectsHandler` / `FabricEffectsHandler` — canonical stage
   attachment sites.
-- AGENTS.md *Stay-On-Task Policy* and *CHANGELOG Hygiene* — apply to the
-  implementation slice (11a–11f).
+- AGENTS.md *Stay-On-Task Policy* and *CHANGELOG Hygiene*.

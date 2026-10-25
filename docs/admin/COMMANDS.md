@@ -8,7 +8,7 @@ All RTP commands are subcommands of `/rtp`. Parameters are passed in `key=value`
 
 ## `/rtp` — Random Teleport
 
-Initiates a random teleportation sequence for the executing player (or a named target). Guards (permission, cooldown, duplicate-processing, reload-lock) run synchronously on the calling thread; the location search and teleport pipeline are dispatched asynchronously and never block the main server thread.
+Initiates a random teleportation sequence for the executing player (or a named target). Alias: `/wild`. Guards (permission, cooldown, duplicate-processing, reload-lock) run synchronously on the calling thread; the location search and teleport pipeline are dispatched asynchronously and never block the main server thread.
 
 **Syntax**
 ```
@@ -25,11 +25,11 @@ Initiates a random teleportation sequence for the executing player (or a named t
 
 | Parameter | Type | Required Permission | Description |
 |---|---|---|---|
-| *(none)* | — | `rtp.use` | Teleport the executing player using the default region for their current world. |
-| `player=<name>` | String (online player name) | `rtp.use` | Teleport a named online player instead of (or in addition to) yourself. Repeat for multiple targets: `player=Alice player=Bob`. |
-| `world=<name>` | String (loaded world name) | `rtp.use` | Derive the target region from this world's configuration rather than the sender's current world. Ignored when `region` is also supplied. |
-| `region=<name>` | String (region name) | `rtp.use` | Teleport into a specific, named region. Takes priority over `world`. Repeat for multiple values; one is chosen at random each time. |
-| `biome=<name>` | String (Minecraft biome key, upper-case) | `rtp.use` | Restrict the destination to locations inside the specified biome. Repeat to allow multiple biomes. Forces a fresh async search — pre-cached locations are not used. |
+| *(none)* | — | `rtp.use` | Teleport the executing player using the default region for their current world (or open the GUI picker when the GUI addon is installed and `openOnBareRtp` is enabled). |
+| `player=<name>` | String (online player name) | `rtp.other` | Teleport a named online player instead of (or in addition to) yourself. Repeat for multiple targets: `player=Alice player=Bob`. |
+| `world=<name>` | String (loaded world name) | `rtp.world` / `rtp.worlds.<name>` | Derive the target region from this world's configuration rather than the sender's current world. Ignored when `region` is also supplied. |
+| `region=<name>` | String (region name) | `rtp.region` / `rtp.regions.<name>` | Teleport into a specific, named region. Takes priority over `world`. Repeat for multiple values; one is chosen at random each time. |
+| `biome=<name>` | String (Minecraft biome key, upper-case) | `rtp.biome` / `rtp.biome.<name>` | Restrict the destination to locations inside the specified biome. Repeat to allow multiple biomes. Forces a fresh async search — pre-cached locations are not used. |
 | `shape=<name>` | String (factory key) | `rtp.params` | Override the region's default shape for this single teleport. The region is cloned; its permanent definition is not changed. Sub-keys for the chosen shape type (e.g. `radius`, `centerRadius`, `centerx`, `centerz`, `weight`) may follow immediately. Distance arguments accept spatial units (e.g. `radius=256c`, `radius=4096b`, `radius=4r`, `radius=5km`) or unitless numbers with automatic interpretation. |
 | `vert=<name>` | String (factory key) | `rtp.params` | Override the region's vertical adjustor for this single teleport. Sub-keys for the chosen vert type may follow. |
 | `worldBorderOverride=<bool>` | Boolean | `rtp.params` | When `true`, replaces the region shape with the server's current world-border shape for this teleport. Incurs the `paramsPrice` economy charge. |
@@ -94,15 +94,16 @@ Reloads configuration files from disk without restarting the server. Sets a relo
 
 Reads and writes individual keys in any loaded configuration file. One child sub-command is registered for every loaded `ConfigParser` and `MultiConfigParser` (file names with `.yml` stripped); tab-complete at position 1 enumerates the live set. Each successful write is **atomic** (temp + fsync + rename) and the affected parser is reloaded automatically — `/rtp reload` is only needed after hand-edits on disk.
 
-> ⚠️ **Hardening in `3.0.0-beta.3`.** This section describes the **target** behavior. Pre-beta.3 builds may still silently ignore unknown keys or skip validation; for production use on those builds, prefer hand-editing the YAML files followed by `/rtp reload`.
-
 **Syntax**
 ```
 /rtp config <file> <key>=<value> [<key>=<value> …] [--dry-run]
 /rtp config <file> <list-key> add=<value> [add=<value> …] [remove=<value> …] [--dry-run]
 /rtp config <multifile> <subfile> <key>=<value> [--dry-run]
-/rtp config <file> view
-/rtp config <file> view <key> [<key> …]
+/rtp config <regions|worlds> add=<name>|remove=<name>
+/rtp config <file> view|viewraw [<key> …]
+/rtp config import [source] [path=<dir>] [overwrite=true]
+/rtp config import permissions [source] [apply=true]
+/rtp config language <locale>
 ```
 
 One invocation targets **exactly one** file. Multiple `<key>=<value>` pairs (or `add=` / `remove=` operators on the same list key) within that file form one all-or-nothing transaction. The `--dry-run` token (default literal, configurable via `commands.config.dryRunFlag`) runs validation and renders the would-be diff without touching disk.
@@ -118,10 +119,14 @@ One invocation targets **exactly one** file. Multiple `<key>=<value>` pairs (or 
 
 | Form | Description |
 |---|---|
-| `/rtp config <file> <key>=<value>` | Set one or more scalar keys in the named config file. Validation is uniform; unknown keys, type mismatches, out-of-range values, and unknown region / world names are rejected with a `reasonCode` (see below) before any state mutates. |
+| `/rtp config <file> <key>=<value>` | Set one or more scalar keys in the named config file (dotted paths for nested keys, e.g. `/rtp config regions default shape.radius=10km`). Validation is uniform; unknown keys, type mismatches, out-of-range values, and unknown region / world names are rejected with a `reasonCode` (see below) before any state mutates. |
 | `/rtp config <file> <list-key> add=<value>` / `remove=<value>` | Append to / remove from a YAML list field. Duplicate `add=` and `remove=` of non-members are no-ops, not failures. |
-| `/rtp config <file> view` | Interactive read-only inspection of every key in the file. Each rendered entry carries hover-text (when YAML comments are available; this is a substrate-dependent best-effort) and a click-suggest action that pre-fills an update command. Degrades to plain text on consoles. |
+| `/rtp config <regions\|worlds> add=<name>\|remove=<name>` | Create or delete a region or world file (`default` cannot be removed). |
+| `/rtp config <file> view` / `viewraw` | Open a config file as an interactive book menu (`view`) or print its raw YAML to chat (`viewraw`). Each rendered entry in `view` carries hover-text and a click-suggest action that pre-fills an update command. Degrades to plain text on consoles. |
 | `/rtp config <file> view <key>` | As above, but for one key (or one list-key's members). |
+| `/rtp config import [source] [path=<dir>] [overwrite=true]` | Translate another RTP plugin's configuration (BetterRTP, JustRTP, or EzRTP; auto-detected in `plugins/`, or any folder via `path=<dir>`). Previews the translated config and never overwrites without `overwrite=true`. |
+| `/rtp config import permissions [source] [apply=true]` | Dry-run the LuckPerms commands that copy BetterRTP, JustRTP, or EzRTP permission nodes onto `rtp.*`; pass `apply=true` to execute them. |
+| `/rtp config language <locale>` | Switch configuration files and messages to a bundled locale, then reload every parser. |
 | trailing `--dry-run` | Validate and compute the diff, but do not commit. The audit record is emitted with `outcome = DRY_RUN_OK`. |
 
 **Audit & error reporting.** Every invocation — success or failure, live or dry-run — emits exactly one audit record at `INFO` (success) or `WARNING` (failure) in the server log, carrying the actor, command, target file, the per-mutation old/new value diff, the outcome, and (on failure) a `reasonCode`. Failure messages render from the `config.error.<reasonCode>` entries in `messages.yml`; the codes include `UNKNOWN_FILE`, `UNKNOWN_KEY`, `WRONG_TYPE`, `OUT_OF_RANGE`, `UNKNOWN_REGION`, `UNKNOWN_WORLD`, `SCHEMA_INVARIANT`, `NO_PERMISSION`, `RELOAD_IN_PROGRESS`, `PERSIST_IO`, and others.
@@ -341,18 +346,78 @@ Executes a declarative scripted action defined in `definitions/actions/<id>.yml`
 **Syntax**
 ```
 /rtp action <actionId> [player=<target>] [parameters...]
-/rtp action cancel [session_id]
+/rtp action cancel [action|session_id]
 ```
 
-**Required permissions:** `rtp.action` plus the action's specific permission (e.g. `rtp.action.nearplayer`).
+**Required permissions:** `rtp.action` plus the action's specific permission (e.g. `rtp.action.nearplayer`); `rtp.action.cancel` for `/rtp action cancel` (`rtp.action.cancel.other` to cancel another player's entry or session ID).
 
 | Form | Description |
 |---|---|
 | `/rtp action <actionId>` | Execute the named action for the calling player. |
 | `/rtp action <actionId> player=<target>` | Target or pair with another player (when supported by the action). |
-| `/rtp action cancel` | Cancel the caller's active confined action session, running its `onCancel` script. |
+| `/rtp action cancel [action\|session_id]` | Leave a matchmaking queue or cancel an active confined action session, running its `onCancel` script. |
 
 Actions with a configured `command:` block are also automatically registered as top-level standalone commands (e.g. `/challenge`, `/duel`, `/nearplayer`). See the dedicated [Action Engine guide](ACTIONS.md) for full configuration details.
+
+---
+
+## `/rtp back` — Return to Previous Location
+
+Returns the executing player to the location they were at immediately before their last `/rtp` teleport.
+
+**Syntax**
+```
+/rtp back
+```
+
+**Required permission:** `rtp.back`
+
+---
+
+## `/rtp menu`, `/rtp gui`, `/rtp admin`, and `/rtp admin setup` — Interactive Menus & Setup Wizard
+
+Opens the player or operator menus and guided setup flows.
+
+**Syntax**
+```
+/rtp menu
+/rtp gui
+/rtp admin
+/rtp admin setup [world|gameplay|perf|preview|confirm]
+```
+
+| Command | Required Permission | Description |
+|---|---|---|
+| `/rtp menu` | `rtp.use` | Open the interactive player book menu (or chat pages on Spigot) to teleport or choose a region, world, or biome. |
+| `/rtp gui` | `rtp.gui` | Open the chest destination menu registered by the bundled GUI addon (`LeafRTPGuiAddon`); without a GUI addon, performs a plain teleport. |
+| `/rtp admin` | `rtp.menu.admin` | Open the operator book menu for inspecting queues, editing config files, and reloading in game. |
+| `/rtp admin setup <world\|gameplay\|perf\|preview\|confirm>` | `rtp.admin.setup` | Run the guided first-time setup wizard (world layout, gameplay presets, region radius via presets or Anvil input, performance profile, addon toggles, and diff preview before writing). |
+
+---
+
+## `/rtp clear` — Clear Runtime State
+
+Clears cached locations, player cooldowns, queues, use limits, or post-teleport invulnerability windows.
+
+**Syntax**
+```
+/rtp clear <cache|cooldown|queue|limit|invuln> [region=<name>] [player=<name>]
+```
+
+**Required permission:** `rtp.admin`
+
+---
+
+## `/rtp visualization` — Map Charts & Diagnostic Exports
+
+Renders live region boundaries, biome layouts, and candidate heatmaps onto held in-game maps or exports high-resolution diagnostic images to disk.
+
+**Syntax**
+```
+/rtp visualization [held|export <type>] [region=<name>]
+```
+
+**Required permission:** `rtp.admin`
 
 ---
 
@@ -466,9 +531,13 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 
 | Permission | Default | Description |
 |---|---|---|
-| `rtp.use` | op | Use `/rtp` to teleport yourself |
-| `rtp.see` | op | See RTP related messages and `/rtp help` |
+| `rtp.use` | true | Use `/rtp`, `/wild`, and `/rtp menu` to teleport yourself |
+| `rtp.see` | true | Tab-complete `/rtp`, see RTP related messages and `/rtp help` |
 | `rtp.free` | op | Bypass all economy charges |
+| `rtp.back` | op | Use `/rtp back` to return to the location before your last `/rtp` |
+| `rtp.gui` | op | Use `/rtp gui` to open the chest destination picker |
+| `rtp.menu.admin` | op | Open the operator book menu (`/rtp admin`) |
+| `rtp.admin.setup` | op | Use the `/rtp admin setup` guided setup wizard |
 | `rtp.noCooldown` | op | Bypass teleport cooldown |
 | `rtp.noDelay` | op | Bypass teleport delay |
 | `rtp.noDelay.chunks` | op | Bypass chunk-load delay |
@@ -476,22 +545,24 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.other` | op | Teleport another player with `player=<name>` |
 | `rtp.notme` | op | Make yourself untargetable by `/rtp player=<name>` (causes `invalid command argument player:<name>` when targeting an OP player from console or in-game). Negate with `rtp.notme: false` in LuckPerms if operators should be targetable. |
 | `rtp.reload` | op | Use `/rtp reload` |
-| `rtp.config` | op | Legacy alias — grants `rtp.config.view` + `rtp.config.set`. Retained for back-compat; new deployments should grant the more specific nodes below. |
-| `rtp.config.view` | op | Use `/rtp config <file> view` (read-only inspection). |
+| `rtp.config` | op | Legacy alias — grants `rtp.config.view` + `rtp.config.set` + `rtp.update`, plus `/rtp config import` and `/rtp config language`. Retained for back-compat; new deployments can grant the more specific nodes below. |
+| `rtp.config.view` | op | Use `/rtp config <file> view` / `viewraw` (read-only inspection). |
 | `rtp.config.set` | op | Use `/rtp config <file> …` to write any config file (umbrella). |
 | `rtp.config.set.<section>` | op | Write only the named section (e.g. `rtp.config.set.regions`, `rtp.config.set.performance`). `set` implies `view` for the same section. |
 | `rtp.update` | op | Write individual config keys or list items (legacy node; subsumed by `rtp.config.set`). |
-| `rtp.editor` | op | Use `/rtp editor` and its subcommands (local, apply, trust, untrust). |
+| `rtp.editor` | op | Use `/rtp editor` and its subcommands (`local`, `apply`, `trust`, `untrust`). |
 | `rtp.info` | op | Use `/rtp info` |
-| `rtp.admin` | op | See DRM info in `/rtp info`; elevated admin access |
+| `rtp.admin` | op | Use `/rtp clear` and `/rtp visualization`, see DRM info in `/rtp info`, plus `rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info`, and `rtp.menu.admin` |
 | `rtp.support` | op | See DRM info in `/rtp info` |
 | `rtp.scan` | op | Use all `/rtp scan` sub-commands |
 | `rtp.test` | op | Use all `/rtp test` runtime-test sub-commands |
-| `rtp.params` | op | Override `shape`, `vert`, and `worldBorderOverride` parameters |
+| `rtp.params` | op | Override `shape`, `vert`, `centerx`, `centerz`, `radius`, and `worldBorderOverride` parameters |
 | `rtp.action` | op | Base permission to execute `/rtp action` commands |
 | `rtp.action.<id>` | op | Permission to execute a specific action (e.g. `rtp.action.nearplayer`, `rtp.action.challenge`) |
+| `rtp.action.cancel` | op | Use `/rtp action cancel` for your own entries (`rtp.action.cancel.other` for other players and session IDs) |
 | `rtp.unqueued` | op | Teleport without consuming a pre-generated cached location |
-| `rtp.personalqueue` | op | Use a personal (per-player) location queue |
+| `rtp.personalqueue` | false | Reserve a personal (per-player) pre-warmed location queue |
+| `rtp.servers.*` | true | Access cross-server destinations in network mode (`rtp.servers.<server>` for a single backend server) |
 | `rtp.world` | op | Use the `world` parameter |
 | `rtp.worlds.<name>` | op | Target a specific world by name |
 | `rtp.worlds.*` | op | Target any world |
@@ -502,12 +573,13 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.biome.<name>` | op | Restrict to a specific biome |
 | `rtp.biome.free` | op | Bypass extra economy cost for biome filtering |
 | `rtp.biome.*` | op | Use any biome |
-| `rtp.onevent.join` | false | Auto-RTP on first join |
-| `rtp.onevent.firstJoin` | false | Auto-RTP on every join |
+| `rtp.onevent.join` | false | Auto-RTP on every join |
+| `rtp.onevent.firstJoin` | false | Auto-RTP on first join |
 | `rtp.onevent.respawn` | false | Auto-RTP on death/respawn |
 | `rtp.onevent.changeWorld` | false | Auto-RTP on world change |
 | `rtp.onevent.move` | false | Auto-RTP on movement trigger |
 | `rtp.onevent.teleport` | false | Auto-RTP on teleport event |
 | `rtp.onevent.*` | false | All auto-RTP event triggers |
+| `rtp.*` | op | Grant all RTP permissions |
 
 > **Typical setup:** Grant `rtp.use` to your default player group. Grant `rtp.free` + `rtp.noCooldown` to your VIP/donor group. Grant the full `rtp.*` tree to server operators and administrators.

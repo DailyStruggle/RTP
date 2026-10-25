@@ -312,7 +312,8 @@ public final class WorkAttributionLedger<K> {
             return 0.0;
         }
         active.sort(Comparator.comparingDouble(AttributionEntry::costMsPerMin));
-        int idx = (int) Math.min(active.size() - 1, Math.max(0L, Math.ceil(0.99 * active.size()) - 1L));
+        long rank = (long) Math.ceil(0.99 * active.size()) - 1L;
+        int idx = (int) Math.min((long) active.size() - 1L, Math.max(0L, rank));
         return active.get(idx).costMsPerMin();
     }
 

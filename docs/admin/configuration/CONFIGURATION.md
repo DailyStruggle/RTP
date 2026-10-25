@@ -80,7 +80,7 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 
 | Key | Type | Description |
 |---|---|---|
-| `name` | String | Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `CIRCLE_OPTIMIZED_DUAL_LAYER`, `CIRCLE_DEPRECATED_PURE_SPIRAL`, `SQUARE`, `SQUARE_NORMAL`, `SQUARE_OPTIMIZED_DUAL_LAYER`, `SQUARE_DEPRECATED_PURE_SPIRAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`. |
+| `name` | String | Shape: `CIRCLE` (default), `SQUARE`, `RECTANGLE`, `ELLIPSE`, or `POLYGON`. |
 | `mode` | String | Selection logic. See table below. |
 | `centerX` | Integer | Chunk X coordinate of the region centre (default `0`). |
 | `centerZ` | Integer | Chunk Z coordinate of the region centre (default `0`). |
@@ -102,18 +102,6 @@ The `shape` block defines how horizontal coordinates are selected. The `name` ke
 | `radius` | Integer / Distance | `256` | Maximum distance from the centre in **chunks** (supports spatial suffixes, e.g. `4096b`, `256c`, `4r`, `5km`). |
 | `centerRadius` | Integer / Distance | `64` | Minimum distance from the centre (donut hole) in **chunks** (supports spatial suffixes, e.g. `1024b`, `64c`). Players won't land inside this radius. |
 | `weight` | Double | `1.0` | Distribution weight. `> 1.0` shifts landings toward the centre; `< 1.0` shifts toward the edge. |
-| `expand` | Boolean | `false` | If `true`, the radius grows automatically as locations are consumed. |
-
-#### `CIRCLE_NORMAL` and `SQUARE_NORMAL` — additional keys
-
-Normal-distribution variants replace `weight` with explicit statistical parameters.
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `radius` | Integer / Distance | `256` | Maximum distance from the centre in **chunks** (supports spatial suffixes, e.g. `4096b`, `256c`, `4r`, `5km`). |
-| `centerRadius` | Integer / Distance | `64` | Minimum distance from the centre in **chunks** (donut hole, supports spatial suffixes). |
-| `mean` | Double | — | Mean of the normal distribution (0.0 = centre, 1.0 = edge). |
-| `deviation` | Double | — | Standard deviation. Smaller = tighter cluster; larger = wider spread. |
 | `expand` | Boolean | `false` | If `true`, the radius grows automatically as locations are consumed. |
 
 #### `RECTANGLE` — additional keys
@@ -142,6 +130,17 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 | `weight` | Double | `1.0` | Distribution weight across the vertex bounding box. |
 
 `expand` is not part of the polygon surface and is ignored: the boundary is admin-authored, so growing it would push landings outside it.
+
+<details>
+<summary><b>Advanced / Legacy Benchmark Shape Aliases (Optional)</b></summary>
+
+Normal servers never need these aliases — standard `CIRCLE` and `SQUARE` already use the current engine by default. These names exist only for bell-curve customization, legacy config migration, or side-by-side benchmark tests:
+
+- `CIRCLE_NORMAL` and `SQUARE_NORMAL`: Gaussian bell-curve variants that replace `weight` with `mean` (`0.0` = centre, `1.0` = edge) and `deviation` (smaller = tighter cluster; larger = wider spread), alongside `radius`, `centerRadius`, and `expand`.
+- `CIRCLE_OPTIMIZED_DUAL_LAYER` and `SQUARE_OPTIMIZED_DUAL_LAYER`: Explicit aliases for the default `CIRCLE` and `SQUARE` engine (accepts the same keys as `CIRCLE` and `SQUARE`).
+- `CIRCLE_DEPRECATED_PURE_SPIRAL` and `SQUARE_DEPRECATED_PURE_SPIRAL`: Legacy v1/v2 shapes retained for backwards compatibility and regression testing.
+
+</details>
 
 ---
 

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
@@ -45,11 +45,11 @@ public class ParticleEffect extends Effect<ParticleEffect.ParticleKeys> {
         if (o instanceof Number) speed = ((Number) o).doubleValue();
 
         Object type = data.get(ParticleKeys.TYPE);
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
         if (ph != null) {
             ph.spawnParticle(type, count, dx, dy, dz, speed);
         } else {
-            LocationHandle lh = HandleRegistry.wrapLocation(target);
+            LocationHandle lh = EffectTarget.wrapLocation(target);
             if (lh != null) lh.spawnParticle(type, count, dx, dy, dz, speed);
         }
     }

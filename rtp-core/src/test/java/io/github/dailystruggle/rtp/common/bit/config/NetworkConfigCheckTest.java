@@ -36,6 +36,12 @@ class NetworkConfigCheckTest {
               dispatchMode: "direct-db"
             regionCollision:
               policy: "warn"
+            metrics:
+              networkTimeSeries:
+                publish: false
+                tier: "24h@1m"
+                retentionDays: 7
+                perPassWriteCap: 64
             version: 1.1
             """;
 

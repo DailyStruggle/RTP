@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
@@ -37,16 +37,16 @@ public class DeathEffect extends Effect<DeathEffect.DeathKeys> {
 
     @Override
     public void run() {
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
         LocationHandle respawnLoc = null;
-        if (target instanceof io.github.dailystruggle.effectsapi.common.spi.EffectTarget et) {
+        if (target instanceof EffectTarget et) {
             respawnLoc = et.destination() != null ? et.destination() : et.location();
         } else {
-            respawnLoc = HandleRegistry.wrapLocation(target);
+            respawnLoc = EffectTarget.wrapLocation(target);
         }
 
         if (ph == null && respawnLoc != null) {
-            ph = HandleRegistry.playerAt(respawnLoc);
+            ph = EffectTarget.playerAt(respawnLoc);
         }
         if (ph == null) return;
 

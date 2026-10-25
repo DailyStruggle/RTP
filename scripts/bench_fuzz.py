@@ -116,6 +116,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bench_overnight as bo  # noqa: E402  (RCON driver, restart, jar isolation)
 import bench_leakcheck as lc  # noqa: E402  (prepare_target, histogram parsing)
 
+PlatformProfile = bo.PlatformProfile
+PLATFORM_PROFILES = bo.PLATFORM_PROFILES
+get_platform_profile = bo.get_platform_profile
+parse_fabric_mod_list = bo.parse_fabric_mod_list
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SWARM_JS = os.path.join(REPO, "devstack", "clients", "bench-swarm.js")
 DIRECT = lc.DIRECT
@@ -1609,15 +1614,19 @@ def parse_lp_export(data: dict, group: str) -> dict[str, str] | None:
     return out
 
 
-def lp_export_reader(drv, server_dir: str | None, timeout_s: float = 60, poll_s: float = 1.0):
+def lp_export_reader(drv, server_dir: str | None, timeout_s: float = 60, poll_s: float = 1.0,
+                     profile: bo.PlatformProfile | None = None):
     """group -> global nodes (parse_lp_export) via `lp export`, or None.
     LuckPerms answers its commands asynchronously, so over RCON the reply is
-    empty; the export file in plugins/LuckPerms/ is readable from the share."""
+    empty; the export file in plugins/LuckPerms/ (or config/luckperms/ on Fabric)
+    is readable from the share."""
+    prof = profile or getattr(drv, "profile", None) or bo.get_platform_profile(server_dir=server_dir)
+
     def read(group: str) -> dict[str, str] | None:
         if not server_dir:
             return None
         name = f"fuzz-probe-{os.getpid()}-{int(time.time() * 1000)}"
-        path = os.path.join(server_dir, "plugins", "LuckPerms", name + ".json.gz")
+        path = os.path.join(prof.lp_export_dir(server_dir), name + ".json.gz")
         if drv.try_cmd(f"lp export {name} --without-users") is None:
             return None
         end = time.time() + timeout_s
@@ -1645,9 +1654,15 @@ class PermissionGrant:
     `permission check` returns nothing, and verifies the grant."""
 
     def __init__(self, drv, perms: list[str], group: str = "default", revert_path: str | None = None,
-                 read_nodes=None):
+                 read_nodes=None, profile: bo.PlatformProfile | str | None = None):
         self.drv, self.perms, self.group, self.revert_path = drv, perms, group, revert_path
         self.read_nodes = read_nodes
+        if isinstance(profile, str):
+            self.profile = bo.get_platform_profile(profile)
+        elif profile is not None:
+            self.profile = profile
+        else:
+            self.profile = getattr(drv, "profile", None) or bo.get_platform_profile()
         self.prior: list[tuple[str, str | None]] = []
         self.reverted = False
 
@@ -1676,8 +1691,11 @@ class PermissionGrant:
         for p in self.perms:
             state, val = self._state(p, nodes)
             if state == "unknown":
+                if self.profile.permission_strategy == "fabric":
+                    log(f"grant: fabric profile without LuckPerms export for '{p}'; skipping lp grant")
+                    continue
                 log(f"grant: cannot read LuckPerms state of '{p}' (no check reply, no readable "
-                    f"`lp export` in plugins/LuckPerms; LuckPerms missing or --server-dir not the "
+                    f"`lp export` in {self.profile.lp_data_rel}; LuckPerms missing or --server-dir not the "
                     f"server's?); not granting it")
                 continue
             if state == "set" and val == "true":
@@ -1763,6 +1781,7 @@ PLUGIN_PACKAGES = {
 # Server, JDK and library frames: never the key frame of a plugin's bug.
 PLATFORM_FRAME = re.compile(r"^(java|javax|jdk|sun|com\.sun|kotlin|org\.bukkit|org\.spigotmc|net\.minecraft|"
                             r"io\.papermc|com\.destroystokyo|net\.md_5|io\.netty|com\.mojang|co\.aikar|"
+                            r"net\.fabricmc|org\.spongepowered\.asm|net\.neoforged|cpw\.mods|"
                             r"org\.slf4j|org\.apache)\.")
 # A qualified throwable type (`java.lang.NullPointerException`), not a bare word.
 EXC_TYPE = re.compile(r"(?<![\w$.])((?:[a-z_$][\w$]*\.)+[A-Z][\w$]*(?:Exception|Error|Throwable))(?=$|[:\s])")
@@ -1827,19 +1846,22 @@ def key_frame(frames: list[str], packages: dict[str, str], plugin: str) -> str:
     return NUMBER.sub("#", pick)
 
 
-def attribute_plugin(text: str, fallback_target: str | None = None, packages: dict[str, str] | None = None) -> str:
-    """Plugin a log block belongs to: the plugin named by `Could not pass event`,
-    else the topmost frame in a known package, else a known package anywhere in
-    the text, else fallback_target or `unknown`. Oracles pass no fallback, so a
-    trace with no known frame is never blamed on the target."""
+def attribute_plugin(text: str, fallback_target: str | None = None, packages: dict[str, str] | None = None,
+                     profile: bo.PlatformProfile | str | None = None) -> str:
+    """Plugin a log block belongs to: the plugin named by `Could not pass event`
+    (on Bukkit profiles), else the topmost frame in a known package, else a known
+    package anywhere in the text, else fallback_target or `unknown`. Oracles pass
+    no fallback, so a trace with no known frame is never blamed on the target."""
     packages = packages if packages is not None else PLUGIN_PACKAGES
-    m = EVENT_ERROR.search(text)
-    if m:
-        name = m.group(2).rstrip("v0123456789.-_")
-        for v in packages.values():
-            if v.lower() == name.lower():
-                return v
-        return name
+    prof = bo.get_platform_profile(profile) if isinstance(profile, str) else profile
+    if prof is None or prof.event_error_oracle:
+        m = EVENT_ERROR.search(text)
+        if m:
+            name = m.group(2).rstrip("v0123456789.-_")
+            for v in packages.values():
+                if v.lower() == name.lower():
+                    return v
+            return name
     for f in trace_frames(text.splitlines()):
         owner = plugin_of_frame(f, packages)
         if owner:
@@ -1875,10 +1897,12 @@ class ServerLogOracle(FindingOracle):
     attributed to `Server` (one line cannot name the cause)."""
     name = "log"
 
-    def __init__(self, log_path: str | None, packages: dict[str, str] | None = None, target_names=()):
+    def __init__(self, log_path: str | None, packages: dict[str, str] | None = None, target_names=(),
+                 profile: bo.PlatformProfile | str | None = None):
         self.log_path = log_path
         self.packages = dict(packages if packages is not None else PLUGIN_PACKAGES)
         self.target_names = {n.lower() for n in target_names if n}
+        self.profile = bo.get_platform_profile(profile) if isinstance(profile, str) or profile is None else profile
         self.offset = 0
         self.ident = None
         self.start = 0
@@ -1932,7 +1956,7 @@ class ServerLogOracle(FindingOracle):
         i = 0
         while i < len(lines):
             line = lines[i]
-            ev = EVENT_ERROR.search(line)
+            ev = EVENT_ERROR.search(line) if self.profile.event_error_oracle else None
             if ev:
                 # The listener's exception follows: its type line, then the trace.
                 j = i + 1
@@ -1941,7 +1965,7 @@ class ServerLogOracle(FindingOracle):
                 while j < len(lines) and trace_continues(lines[j]):
                     j += 1
                 block = lines[i:j]
-                plugin = attribute_plugin("\n".join(block), packages=self.packages)
+                plugin = attribute_plugin("\n".join(block), packages=self.packages, profile=self.profile)
                 key = "|".join((plugin, ev.group(1), root_exception(block),
                                  key_frame(trace_frames(block), self.packages, plugin)))
                 findings.append(make_finding("EVENT_ERROR", "HIGH" if self.is_target(plugin, target_plugin) else "MEDIUM",
@@ -1957,7 +1981,7 @@ class ServerLogOracle(FindingOracle):
                 while j < len(lines) and trace_continues(lines[j]):
                     j += 1
                 block = lines[i:j]
-                plugin = attribute_plugin("\n".join(block), packages=self.packages)
+                plugin = attribute_plugin("\n".join(block), packages=self.packages, profile=self.profile)
                 key = "|".join((plugin, root_exception(block), key_frame(trace_frames(block), self.packages, plugin)))
                 findings.append(make_finding("UNCAUGHT_EXCEPTION", "CRITICAL" if "Server thread" in line else "HIGH",
                                              plugin, key, witness_program,
@@ -2346,9 +2370,11 @@ class TargetRun:
         self.coverage = {"episodes": 0, "planned": 0, "executed": 0, "explore_s": 0.0, "pairs": set(), "restarts": 0,
                          "seeds": [], "heap_stopped": False}
         log_path = os.path.join(a.server_dir, "logs", "latest.log") if getattr(a, "server_dir", None) else None
+        self.profile = getattr(drv, "profile", None) or bo.get_platform_profile(
+            getattr(a, "platform", None), getattr(a, "server_dir", None))
         self.target_names = target_aliases(a, target)
         self.log_oracle = ServerLogOracle(log_path, plugin_packages(getattr(a, "plugin_packages", None)),
-                                          self.target_names)
+                                          self.target_names, profile=self.profile)
         self.least_privilege_oracle = LeastPrivilegeOracle()
         self.oracles: list[FindingOracle] = [self.log_oracle, self.least_privilege_oracle]
         self.findings_path = os.path.join(tdir, "findings.jsonl")
@@ -3216,7 +3242,7 @@ class TargetRun:
         out = os.path.join(self.tdir, "owner.txt")
         cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "heap_owner.py"),
                "--mat", self.a.mat or "<ParseHeapDump.sh>", "--dump", final,
-               "--plugins-dir", os.path.join(self.a.server_dir, "plugins"), "--out", out]
+               "--plugins-dir", self.profile.jar_dir(self.a.server_dir), "--out", out]
         if baseline:
             cmd[cmd.index("--plugins-dir"):cmd.index("--plugins-dir")] = ["--baseline", baseline]
         if not self.a.mat:
@@ -3413,7 +3439,9 @@ def order_targets(targets: list[str]) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--server-dir", required=True, help="server root (RCON settings, plugins/, runs files)")
+    p.add_argument("--server-dir", required=True, help="server root (RCON settings, plugins/ or mods/, runs files)")
+    p.add_argument("--platform", choices=tuple(bo.PLATFORM_PROFILES), default=None,
+                   help="target-mode platform profile: bukkit, paper, folia, or fabric (default auto-detected)")
     p.add_argument("--host", default="127.0.0.1", help="RCON host (and game host unless --mc-host)")
     p.add_argument("--port", type=int, help="RCON port (default server.properties rcon.port)")
     p.add_argument("--password", default=os.environ.get("RCON_PASSWORD"))
@@ -3573,7 +3601,9 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
         return
     tdir = os.path.join(run_dir, target)
     os.makedirs(tdir, exist_ok=True)
-    reader = RunsReader(os.path.join(a.server_dir, "plugins", "StressTestRTP", a.output_subdir))
+    prof = getattr(drv, "profile", None) or bo.get_platform_profile(
+        getattr(a, "platform", None), getattr(a, "server_dir", None))
+    reader = RunsReader(prof.harness_runs_dir(a.server_dir, a.output_subdir))
     tr = TargetRun(a, drv, swarm, reader, target, stamp, tdir)
     log(f"{target}: command '/{tr.cmd}', settling {a.settle_s}s")
     time.sleep(a.settle_s)
@@ -3720,7 +3750,8 @@ def main(argv=None) -> int:
         return 2
 
     grant = PermissionGrant(drv, perms, a.lp_group, os.path.join(run_dir, "grant-revert.txt"),
-                            read_nodes=lp_export_reader(drv, a.server_dir))
+                            read_nodes=lp_export_reader(drv, a.server_dir, profile=drv.profile),
+                            profile=drv.profile)
     swarm = Swarm(swarm_argv(a, mc_port), os.path.join(run_dir, "swarm.log"))
     atexit.register(grant.revert)
     atexit.register(swarm.close)

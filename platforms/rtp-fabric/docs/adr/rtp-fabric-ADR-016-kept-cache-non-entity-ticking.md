@@ -1,6 +1,6 @@
 # rtp-fabric-ADR-016 - Kept-cache chunks pin at non-entity-ticking level (32), not ENTITY_TICKING (30)
 
-- **Status:** Accepted (experimental; pending devstack acceptance)
+- **Status:** Accepted (2026-06-02; verified on devstack 2026-10-15)
 - **Date:** 2026-06-02
 - **Supersedes:** the kept-cache ticket-level decision in `rtp-fabric-ADR-006` (the radius/distance-vs-level math and the non-persistent `TicketType` shape from ADR-006 are retained; only the target effective level changes).
 - **Scope:** `rtp-fabric-v1_21_R1`, `rtp-fabric-v1_21_R5`, `rtp-fabric-v1_21_R11`, `rtp-fabric-v26_1_R1`, `rtp-fabric-v26_2_R1`, and the ported `rtp-neoforge-v1_21_R1`. `rtp-fabric-v1_20_R1` already pins at this level (distance 1) per its 2026-05-08 entity-ticking-leak fix and is unchanged.

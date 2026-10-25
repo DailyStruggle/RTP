@@ -4,12 +4,12 @@ import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
 import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.HandleProvider;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
 import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -39,7 +39,7 @@ public final class NeoForgeHandles implements HandleProvider {
     private NeoForgeHandles() {}
 
     public static void register() {
-        HandleRegistry.setProvider(INSTANCE);
+        ServerAccessors.setEffectAccessor(INSTANCE);
     }
 
     @Override

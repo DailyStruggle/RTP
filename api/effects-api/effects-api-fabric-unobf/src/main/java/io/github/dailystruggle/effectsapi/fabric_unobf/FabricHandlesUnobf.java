@@ -2,9 +2,9 @@ package io.github.dailystruggle.effectsapi.fabric_unobf;
 
 import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
 import io.github.dailystruggle.effectsapi.common.spi.HandleProvider;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
@@ -39,7 +39,7 @@ import java.util.Map;
  * <p>This class is compiled by the unobf module's Loom plugin with <em>no</em>
  * {@code mappings} step, so its bytecode names Mojang names natively and links
  * cleanly on the deobf 26.x runtime. It is registered with
- * {@link HandleRegistry} by {@link FabricEffectsInitializer#registerAll()} in
+ * {@link ServerAccessors} by {@link FabricEffectsInitializer#registerAll()} in
  * place of the intermediary {@code FabricHandles}.
  */
 public final class FabricHandlesUnobf implements HandleProvider {
@@ -48,7 +48,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
     private FabricHandlesUnobf() {}
 
     public static void register() {
-        HandleRegistry.setProvider(INSTANCE);
+        ServerAccessors.setEffectAccessor(INSTANCE);
     }
 
     @Override
@@ -71,9 +71,14 @@ public final class FabricHandlesUnobf implements HandleProvider {
         cachedServer = server;
     }
 
+    static @Nullable net.minecraft.server.MinecraftServer server() {
+        net.minecraft.server.MinecraftServer s = FabricEffectRuntimeUnobf.server();
+        return s != null ? s : cachedServer;
+    }
+
     @Override
     public void dispatchConsoleCommand(@NotNull String command) {
-        net.minecraft.server.MinecraftServer server = cachedServer;
+        net.minecraft.server.MinecraftServer server = server();
         if (server != null) {
             server.execute(() -> server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command));
         }
@@ -435,7 +440,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
     }
 
     private static @Nullable ServerLevel resolveLevel(@Nullable String worldName) {
-        net.minecraft.server.MinecraftServer s = cachedServer;
+        net.minecraft.server.MinecraftServer s = server();
         if (s == null) return null;
         if (worldName != null && !worldName.isEmpty() && !"unknown".equals(worldName)) {
             for (ServerLevel sl : s.getAllLevels()) {
