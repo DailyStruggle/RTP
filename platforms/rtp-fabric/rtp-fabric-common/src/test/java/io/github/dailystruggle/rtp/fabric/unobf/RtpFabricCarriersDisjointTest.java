@@ -108,6 +108,35 @@ class RtpFabricCarriersDisjointTest {
         }
     }
 
+    @Test
+    @DisplayName("effects-api-ADR-007: FabricEffectsHandler and FabricEffectsHandlerUnobf AFTER_DEATH hooks gate on effectParsing and log errors at FINE")
+    void deathHooksGateOnEffectParsingAndLogErrors() throws IOException {
+        List<Path> handlers = List.of(
+                projectDir().resolve(
+                        "../rtp-fabric-common-unobf/src/main/java/io/github/dailystruggle/rtp/fabric/unobf/effects/FabricEffectsHandlerUnobf.java").normalize(),
+                projectDir().resolve(
+                        "../../../rtp-plugin/src/main/java/io/github/dailystruggle/rtp/fabric/effects/FabricEffectsHandler.java").normalize()
+        );
+        for (Path handlerFile : handlers) {
+            assertTrue(Files.isRegularFile(handlerFile), "Handler file not found: " + handlerFile);
+            String src = Files.readString(handlerFile);
+            int hookIdx = src.indexOf("private static void registerDeathHook(");
+            assertTrue(hookIdx >= 0, "registerDeathHook declaration not found in " + handlerFile);
+            int nextMethodIdx = src.indexOf("private static boolean effectParsingEnabled(", hookIdx);
+            assertTrue(nextMethodIdx > hookIdx, "effectParsingEnabled declaration not found after registerDeathHook in " + handlerFile);
+
+            assertTrue(src.contains("registerDeathHook(runtime, parser);"),
+                    "setupEffects must pass parser into registerDeathHook(runtime, parser) in " + handlerFile);
+            String hookBody = src.substring(hookIdx, nextMethodIdx);
+            assertTrue(hookBody.contains("effectParsingEnabled(parser)"),
+                    "registerDeathHook AFTER_DEATH proxy must gate on effectParsingEnabled(parser) in " + handlerFile);
+            assertTrue(!hookBody.contains("catch (Throwable ignored)"),
+                    "registerDeathHook AFTER_DEATH proxy must not silently swallow exceptions in " + handlerFile);
+            assertTrue(hookBody.contains("RTP.log(Level.FINE, \"[RTP][Fabric] death effect dispatch failed\", t)"),
+                    "registerDeathHook AFTER_DEATH proxy must log dispatch failures at Level.FINE in " + handlerFile);
+        }
+    }
+
     private static List<String> prefixed(String prefix, List<String> in) {
         List<String> out = new ArrayList<>(in.size());
         for (String s : in) out.add(prefix + "/" + s);

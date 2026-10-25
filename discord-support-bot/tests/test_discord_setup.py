@@ -5,7 +5,9 @@ from __future__ import annotations
 import copy
 import pathlib
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 BOT_DIR = pathlib.Path(__file__).resolve().parent.parent
 if str(BOT_DIR) not in sys.path:
@@ -24,6 +26,10 @@ from discord_setup import (
     default_legacy_guild_snapshot,
     load_spec,
     main,
+    reset_test_server,
+    resolve_discord_bot_token,
+    resolve_discord_guild_id,
+    resolve_discord_maintainer_id,
     validate_rule_d006_copy,
 )
 
@@ -240,6 +246,71 @@ class DiscordSetupTest(unittest.TestCase):
     def test_cli_dry_run_exits_zero(self) -> None:
         rc = main(["--dry-run"])
         self.assertEqual(0, rc)
+
+    def test_resolve_credentials_and_reset_test_server(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_home = pathlib.Path(tmp)
+            (tmp_home / ".DISCORD_BOT_TOKEN").write_text("test_bot_token_123\n", encoding="utf-8")
+            (tmp_home / ".DISCORD_TEST_SERVER_ID").write_text("222333444555666777\n", encoding="utf-8")
+            (tmp_home / ".DISCORD_MAINTAINER_ID").write_text("DISCORD_MAINTAINER_ID='888999000111222333'\n", encoding="utf-8")
+            state_file = tmp_home / "bot-state.json"
+            state_file.write_text("{}", encoding="utf-8")
+
+            with patch.dict("os.environ", {}, clear=True), patch(
+                "discord_setup.pathlib.Path.expanduser",
+                side_effect=lambda self_path=None: tmp_home / str(self_path).lstrip("~/") if self_path else tmp_home,
+            ):
+                # Test direct file reading via patched expanduser on Path instances
+                pass
+
+            with patch.dict("os.environ", {"HOME": str(tmp_home), "USERPROFILE": str(tmp_home)}, clear=True):
+                self.assertEqual("test_bot_token_123", resolve_discord_bot_token())
+                self.assertEqual("222333444555666777", resolve_discord_guild_id())
+                self.assertEqual("888999000111222333", resolve_discord_maintainer_id())
+
+            deleted_paths: list[str] = []
+            ref_title = self.spec["pinned_forum_threads"][0]["title"]
+
+            class _FakeResetClient:
+                def request(self, method: str, path: str, payload: object = None) -> object:
+                    if method == "GET" and path.endswith("/channels"):
+                        return [
+                            {"id": "ch_sup", "name": "support", "type": CHANNEL_TYPES["GUILD_FORUM"]},
+                            {"id": "ch_tri", "name": "bot-triage-queue", "type": CHANNEL_TYPES["GUILD_TEXT"]},
+                        ]
+                    if method == "GET" and path.endswith("/threads/active"):
+                        return {
+                            "threads": [
+                                {"id": "th_ref_1", "parent_id": "ch_sup", "name": ref_title, "flags": CHANNEL_FLAG_PINNED},
+                                {"id": "th_user_1", "parent_id": "ch_sup", "name": "User test thread 1", "flags": 0},
+                            ]
+                        }
+                    if method == "GET" and "/threads/archived/public" in path:
+                        return {
+                            "threads": [
+                                {"id": "th_user_2", "parent_id": "ch_sup", "name": "Archived user test thread", "flags": 0},
+                            ]
+                        }
+                    if method == "GET" and "/channels/ch_tri/messages" in path:
+                        return [{"id": "msg_tri_1"}]
+                    if method == "DELETE":
+                        deleted_paths.append(path)
+                        return {}
+                    return {}
+
+            summary = reset_test_server(
+                _FakeResetClient(),  # type: ignore[arg-type]
+                self.guild_id,
+                self.spec,
+                state_path=state_file,
+            )
+            self.assertEqual(2, summary["deleted_threads"])
+            self.assertEqual(1, summary["deleted_triage_messages"])
+            self.assertEqual(1, summary["removed_state_files"])
+            self.assertIn("/channels/th_user_1", deleted_paths)
+            self.assertIn("/channels/th_user_2", deleted_paths)
+            self.assertNotIn("/channels/th_ref_1", deleted_paths)
+            self.assertFalse(state_file.exists())
 
 
 if __name__ == "__main__":

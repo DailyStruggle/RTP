@@ -711,7 +711,7 @@ class DiscordRestClient:
         else:
             data = None
 
-        for attempt in range(3):
+        for attempt in range(6):
             req = urllib.request.Request(url, data=data, method=method, headers=headers)
             try:
                 with urllib.request.urlopen(req, timeout=15) as resp:
@@ -723,7 +723,71 @@ class DiscordRestClient:
                     raw_err = exc.read().decode("utf-8", errors="replace")
                 except OSError:
                     pass
-                if exc.code == 429 and attempt < 2:
+                if exc.code == 429 and attempt < 5:
+                    retry_after = 2.0
+                    try:
+                        err_body = json.loads(raw_err)
+                        retry_after = float(err_body.get("retry_after", 2.0))
+                    except (ValueError, KeyError, TypeError):
+                        pass
+                    time.sleep(min(max(retry_after, 0.5), 30.0))
+                    continue
+                if raw_err:
+                    exc.msg = f"{exc.msg} ({method} {path}: {raw_err})"
+                raise
+
+    def request_multipart(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any],
+        files: list[tuple[str, bytes, str]],
+    ) -> Any:
+        """Sends a `multipart/form-data` request with `payload_json` and `files[n]` attachments."""
+        boundary = f"----LeafRTPBoundary{int(time.time() * 1000000)}"
+        parts: list[bytes] = []
+        parts.append(
+            (
+                f"--{boundary}\r\n"
+                'Content-Disposition: form-data; name="payload_json"\r\n'
+                "Content-Type: application/json\r\n\r\n"
+            ).encode("utf-8")
+            + json.dumps(payload).encode("utf-8")
+            + b"\r\n"
+        )
+        for idx, (filename, file_bytes, content_type) in enumerate(files):
+            safe_name = filename.replace('"', "_")
+            parts.append(
+                (
+                    f"--{boundary}\r\n"
+                    f'Content-Disposition: form-data; name="files[{idx}]"; filename="{safe_name}"\r\n'
+                    f"Content-Type: {content_type}\r\n\r\n"
+                ).encode("utf-8")
+                + file_bytes
+                + b"\r\n"
+            )
+        parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+        body = b"".join(parts)
+
+        url = f"{self.api_base}/{path.lstrip('/')}"
+        headers = {
+            "Authorization": f"Bot {self.bot_token}",
+            "User-Agent": "LeafRTP-DiscordSetup/1.0 (+https://github.com/DailyStruggle/RTP)",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        }
+        for attempt in range(6):
+            req = urllib.request.Request(url, data=body, method=method, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=20) as resp:
+                    raw = resp.read().decode("utf-8")
+                    return json.loads(raw) if raw else None
+            except urllib.error.HTTPError as exc:
+                raw_err = ""
+                try:
+                    raw_err = exc.read().decode("utf-8", errors="replace")
+                except OSError:
+                    pass
+                if exc.code == 429 and attempt < 5:
                     retry_after = 2.0
                     try:
                         err_body = json.loads(raw_err)
@@ -852,6 +916,158 @@ def apply_provisioning_plan(
     return executed
 
 
+def _read_home_secret_file(filename: str) -> str:
+    """Reads a single-value credential file from `~/<filename>` without printing or logging its contents."""
+    path = pathlib.Path(f"~/{filename}").expanduser()
+    if not path.is_file():
+        return ""
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if "=" in s and re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*=", s):
+            _, s = s.split("=", 1)
+            s = s.strip()
+        if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+            s = s[1:-1].strip()
+        if s:
+            return s
+    return ""
+
+
+def resolve_discord_bot_token() -> str:
+    """Resolves `DISCORD_BOT_TOKEN` from environment or `~/.DISCORD_BOT_TOKEN`."""
+    env_val = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
+    if env_val:
+        return env_val
+    return _read_home_secret_file(".DISCORD_BOT_TOKEN")
+
+
+def resolve_discord_guild_id(default: str = "100000000000000000") -> str:
+    """Resolves `DISCORD_GUILD_ID` from environment or `~/.DISCORD_TEST_SERVER_ID` / `~/.DISCORD_GUILD_ID`."""
+    for env_key in ("DISCORD_GUILD_ID", "DISCORD_TEST_SERVER_ID"):
+        env_val = os.environ.get(env_key, "").strip()
+        if env_val and env_val != "100000000000000000":
+            return env_val
+    for fname in (".DISCORD_TEST_SERVER_ID", ".DISCORD_GUILD_ID"):
+        file_val = _read_home_secret_file(fname)
+        if file_val and file_val != "100000000000000000":
+            return file_val
+    return default
+
+
+def resolve_discord_maintainer_id(default: str = "999999999999999999") -> str:
+    """Resolves `DISCORD_MAINTAINER_ID` from environment or `~/.DISCORD_MAINTAINER_ID`."""
+    env_val = os.environ.get("DISCORD_MAINTAINER_ID", "").strip()
+    if env_val and env_val != "999999999999999999":
+        return env_val
+    file_val = _read_home_secret_file(".DISCORD_MAINTAINER_ID")
+    if file_val:
+        return file_val
+    return default
+
+
+def reset_test_server(
+    client: DiscordRestClient,
+    guild_id: str,
+    spec: dict[str, Any],
+    state_path: pathlib.Path | None = None,
+) -> dict[str, int]:
+    """
+    Clears user test threads in `#support` (preserving `pinned_forum_threads`
+    from `embeds.json`), removes bot triage digest messages in
+    `#bot-triage-queue`, and deletes local `bot-state.json` so live test runs
+    can be repeated cleanly.
+    """
+    pinned_titles = {
+        str(p.get("title", "")).strip()
+        for p in spec.get("pinned_forum_threads", [])
+        if isinstance(p, dict) and str(p.get("title", "")).strip()
+    }
+    channels = client.request("GET", f"/guilds/{guild_id}/channels") or []
+    support_ch_id = ""
+    triage_ch_id = ""
+    for ch in channels:
+        if not isinstance(ch, dict):
+            continue
+        ch_name = str(ch.get("name", "")).strip().lower()
+        ch_type = ch.get("type")
+        if ch_type == CHANNEL_TYPES["GUILD_FORUM"] and ch_name == "support":
+            support_ch_id = str(ch.get("id", ""))
+        elif ch_type == CHANNEL_TYPES["GUILD_TEXT"] and ch_name == "bot-triage-queue":
+            triage_ch_id = str(ch.get("id", ""))
+
+    deleted_threads = 0
+    if support_ch_id:
+        active_resp = client.request("GET", f"/guilds/{guild_id}/threads/active") or {}
+        all_threads: list[dict[str, Any]] = (
+            list(active_resp.get("threads", []))
+            if isinstance(active_resp, dict)
+            else []
+        )
+        try:
+            arch_resp = client.request("GET", f"/channels/{support_ch_id}/threads/archived/public") or {}
+            if isinstance(arch_resp, dict):
+                all_threads.extend(arch_resp.get("threads", []))
+        except OSError:
+            pass
+
+        seen_thread_ids: set[str] = set()
+        for th in all_threads:
+            if not isinstance(th, dict):
+                continue
+            th_id = str(th.get("id", "")).strip()
+            if not th_id or th_id in seen_thread_ids:
+                continue
+            seen_thread_ids.add(th_id)
+            if str(th.get("parent_id", "")) != support_ch_id:
+                continue
+            th_title = str(th.get("name", th.get("title", ""))).strip()
+            if th_title in pinned_titles or (int(th.get("flags", 0)) & CHANNEL_FLAG_PINNED):
+                continue
+            try:
+                client.request("DELETE", f"/channels/{th_id}")
+                deleted_threads += 1
+            except OSError:
+                pass
+
+    deleted_triage_msgs = 0
+    if triage_ch_id:
+        try:
+            msgs = client.request("GET", f"/channels/{triage_ch_id}/messages?limit=50") or []
+            for m in msgs:
+                if not isinstance(m, dict):
+                    continue
+                msg_id = str(m.get("id", "")).strip()
+                if msg_id:
+                    try:
+                        client.request("DELETE", f"/channels/{triage_ch_id}/messages/{msg_id}")
+                        deleted_triage_msgs += 1
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+
+    target_state = state_path or (BOT_DIR / "generated" / "bot-state.json")
+    removed_state = 0
+    if target_state.is_file():
+        try:
+            target_state.unlink()
+            removed_state = 1
+        except OSError:
+            pass
+
+    return {
+        "deleted_threads": deleted_threads,
+        "deleted_triage_messages": deleted_triage_msgs,
+        "removed_state_files": removed_state,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Provision and reorganize LeafCraft Plugin Support Discord server."
@@ -867,6 +1083,16 @@ def main(argv: list[str] | None = None) -> int:
         "--apply",
         action="store_true",
         help="Apply the provisioning plan against the live Discord REST API.",
+    )
+    mode.add_argument(
+        "--reset-test-server",
+        action="store_true",
+        help="Delete non-reference test threads in #support, clear #bot-triage-queue, and remove bot-state.json.",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Fetch current channels/roles/threads from the live Discord guild during --dry-run.",
     )
     parser.add_argument(
         "--spec",
@@ -889,10 +1115,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Rule D-006 violation: {v}", file=sys.stderr)
         return 1
 
-    guild_id = os.environ.get("DISCORD_GUILD_ID", "100000000000000000")
-    token = os.environ.get("DISCORD_BOT_TOKEN", "")
+    guild_id = resolve_discord_guild_id("100000000000000000")
+    token = resolve_discord_bot_token()
     client: DiscordRestClient | None = None
     published_embed_channels: set[str] = set()
+
+    if args.reset_test_server:
+        if not token or guild_id == "100000000000000000":
+            print(
+                "Error: --reset-test-server requires DISCORD_BOT_TOKEN and DISCORD_GUILD_ID (or ~/.DISCORD_* files).",
+                file=sys.stderr,
+            )
+            return 2
+        client = DiscordRestClient(token)
+        summary = reset_test_server(client, guild_id, spec)
+        print(
+            f"Test server reset complete: deleted {summary['deleted_threads']} test thread(s), "
+            f"{summary['deleted_triage_messages']} triage message(s), and "
+            f"{summary['removed_state_files']} local state file(s)."
+        )
+        return 0
 
     if args.snapshot:
         snap = json.loads(args.snapshot.read_text(encoding="utf-8"))
@@ -900,10 +1142,10 @@ def main(argv: list[str] | None = None) -> int:
         roles = snap.get("roles", [])
         threads = snap.get("threads", [])
         published_embed_channels = set(snap.get("published_embed_channels", []))
-    elif args.apply:
+    elif args.apply or args.live:
         if not token or guild_id == "100000000000000000":
             print(
-                "Error: --apply requires DISCORD_BOT_TOKEN and DISCORD_GUILD_ID environment variables.",
+                "Error: --apply / --live requires DISCORD_BOT_TOKEN and DISCORD_GUILD_ID environment variables (or ~/.DISCORD_* files).",
                 file=sys.stderr,
             )
             return 2

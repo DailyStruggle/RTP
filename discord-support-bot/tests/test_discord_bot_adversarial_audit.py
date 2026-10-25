@@ -966,6 +966,31 @@ class DiscordBotAdversarialAuditTest(unittest.TestCase):
         self.assertIn(TAG_NEEDS_INFO, d_ref.applied_tags)
         self.assertNotIn("Based on that additional context", d_ref.reply_text)
 
+        # False-positive guard: negations before "log in" or "configure" must NOT match DIAGNOSTIC_REFUSAL_RE
+        from discord_support_bot import DIAGNOSTIC_REFUSAL_RE
+
+        for non_refusal in (
+            "I can't log in to the server after teleporting",
+            "I cannot configure the shape in default.yml",
+            "it won't log anything to the console",
+            "I can't share loggers between plugins",
+        ):
+            self.assertIsNone(
+                DIAGNOSTIC_REFUSAL_RE.search(non_refusal),
+                f"Expected non-refusal phrase not to match DIAGNOSTIC_REFUSAL_RE: {non_refusal!r}",
+            )
+
+        for valid_refusal in (
+            "I refuse to share my private logs",
+            "I won't upload my server logs",
+            "I can't post the config",
+            "I will not send mclo.gs",
+        ):
+            self.assertIsNotNone(
+                DIAGNOSTIC_REFUSAL_RE.search(valid_refusal),
+                f"Expected refusal phrase to match DIAGNOSTIC_REFUSAL_RE: {valid_refusal!r}",
+            )
+
     def test_medium_08_unpinned_quick_fix_reference_threads_polled_when_maintainer_id_differs(self) -> None:
         """
         [MEDIUM] `DiscordForumPoller.poll_once` skips reference threads whose title
@@ -1148,6 +1173,36 @@ class DiscordBotAdversarialAuditTest(unittest.TestCase):
         self.assertEqual(1, len(bits))
         self.assertEqual("RTP_REGION_UNKNOWN_WORLD", bits[0]["key"])
         self.assertLess(elapsed_ms, 2000.0, f"1 MB log BIT scan took {elapsed_ms:.1f} ms")
+
+    def test_refusal_regex_requires_share_verb_and_word_boundary(self) -> None:
+        """
+        `DIAGNOSTIC_REFUSAL_RE` requires the share/upload/post verb and a trailing
+        word boundary on the target noun so phrases like `"I can't log in"` or
+        `"I cannot configure the shape"` are not misclassified as refusals.
+        """
+        from discord_support_bot import DIAGNOSTIC_REFUSAL_RE
+
+        for non_refusal in (
+            "I can't log in to the server after teleporting",
+            "I cannot configure the shape in default.yml",
+            "it won't log anything to the console",
+            "I can't share loggers between plugins",
+        ):
+            self.assertIsNone(
+                DIAGNOSTIC_REFUSAL_RE.search(non_refusal),
+                f"Expected non-refusal phrase not to match DIAGNOSTIC_REFUSAL_RE: {non_refusal!r}",
+            )
+
+        for valid_refusal in (
+            "I refuse to share my private logs",
+            "I won't upload my server logs",
+            "I can't post the config",
+            "I will not send mclo.gs",
+        ):
+            self.assertIsNotNone(
+                DIAGNOSTIC_REFUSAL_RE.search(valid_refusal),
+                f"Expected refusal phrase to match DIAGNOSTIC_REFUSAL_RE: {valid_refusal!r}",
+            )
 
 
 if __name__ == "__main__":
