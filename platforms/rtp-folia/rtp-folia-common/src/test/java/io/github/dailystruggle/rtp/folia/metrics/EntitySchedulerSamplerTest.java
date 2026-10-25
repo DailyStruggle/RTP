@@ -180,19 +180,32 @@ class EntitySchedulerSamplerTest {
         }
         assertTrue(sampler.isCellBreached(worldId, 8, 8), "A single > 100 ms gap must flag a breach");
 
-        // 4. Player retirement mid-window cleans up active probe immediately
+        // 4. Player retirement mid-window cleans up active probe immediately and completes the rotation
         scheduled.clear();
         currentOnline.clear();
         currentOnline.add(pRetiring);
         sampler.runRound();
         assertEquals(1, sampler.activeProbeCount());
         ScheduledProbe retiringProbe = scheduled.get(pRetiring);
-        retiringProbe.runCallback.run(); // run 1
+        retiringProbe.runCallback.run(); // run 1 (increments rotationCounts for cell (8,8))
         retiringProbe.retiredCallback.run();
         assertEquals(0, sampler.activeProbeCount(), "Retired player probe must be removed immediately");
         assertTrue(retiringProbe.cancelled.get());
+        assertEquals(1, sampler.sampledPopulation(worldId, 8, 8),
+                "Retiring the last probe in a rotation must publish rotationCounts");
 
-        // 5. Missed sample keeps reading for one round (2 s), then becomes STALE after > 2 rounds (> 4 s)
+        // 5. Next rotation must not inherit un-cleared rotationCounts from the retired probe
+        scheduled.clear();
+        sampler.runRound();
+        ScheduledProbe nextRotationProbe = scheduled.get(pRetiring);
+        for (int r = 1; r <= 10; r++) {
+            clock.addAndGet(50 * MS);
+            nextRotationProbe.runCallback.run();
+        }
+        assertEquals(1, sampler.sampledPopulation(worldId, 8, 8),
+                "Next rotation must report 1 player, not inflated by prior retired probe");
+
+        // 6. Missed sample keeps reading for one round (2 s), then becomes STALE after > 2 rounds (> 4 s)
         clock.addAndGet(EntitySchedulerSampler.ROUND_INTERVAL_NANOS);
         assertEquals(1, sampler.sampledPopulation(worldId, 8, 8), "Reading stays valid for one missed round");
         clock.addAndGet(EntitySchedulerSampler.ROUND_INTERVAL_NANOS * 2);
