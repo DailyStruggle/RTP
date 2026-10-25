@@ -1,14 +1,16 @@
 package io.github.dailystruggle.effectsapi.common;
 
-import io.github.dailystruggle.effectsapi.bukkit.BukkitValueCoercer;
+import io.github.dailystruggle.effectsapi.common.effects.FireworkEffect;
 import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
 import io.github.dailystruggle.effectsapi.common.effects.NoteEffect;
 import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
 import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
+import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
 import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
 import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
+import io.github.dailystruggle.effectsapi.common.spi.ValueCoercer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +25,7 @@ class EffectsCommonCoverageTest {
 
     @BeforeEach
     void setUp() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
     }
 
     private static LocationHandle createDummyLocation() {
@@ -77,7 +79,7 @@ class EffectsCommonCoverageTest {
 
     @Test
     void testEffectFactoryRegistry() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
         TitleEffect title = new TitleEffect();
         EffectFactory.addEffect("TITLE_TEST", title);
 
@@ -94,7 +96,7 @@ class EffectsCommonCoverageTest {
 
     @Test
     void testTitleEffectExecution() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
         List<String> titlesSent = new ArrayList<>();
         PlayerHandle playerHandle = new PlayerHandle() {
             @Override public UUID uuid() { return UUID.randomUUID(); }
@@ -125,7 +127,7 @@ class EffectsCommonCoverageTest {
 
     @Test
     void testNoteEffectExecution() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
         List<String> notesPlayed = new ArrayList<>();
         PlayerHandle playerHandle = new PlayerHandle() {
             @Override public UUID uuid() { return UUID.randomUUID(); }
@@ -143,19 +145,19 @@ class EffectsCommonCoverageTest {
         };
 
         LocationHandle loc = createDummyLocation();
-        NoteEffect effect = new NoteEffect(org.bukkit.Instrument.PIANO);
+        NoteEffect effect = new NoteEffect("PIANO");
         effect.setTarget(new EffectTarget(playerHandle, loc));
         effect.setData("PIANO", "5");
         effect.run();
 
         assertEquals(1, notesPlayed.size());
-        assertEquals(org.bukkit.Instrument.PIANO + ":5", notesPlayed.get(0));
+        assertEquals("PIANO:5", notesPlayed.get(0));
         assertNotNull(effect.toPermission());
     }
 
     @Test
     void testParticleEffectExecution() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
         AtomicBoolean particleSpawned = new AtomicBoolean(false);
         PlayerHandle playerHandle = new PlayerHandle() {
             @Override public UUID uuid() { return UUID.randomUUID(); }
@@ -206,7 +208,7 @@ class EffectsCommonCoverageTest {
 
     @Test
     void testPotionEffectExecution() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
         AtomicBoolean potionApplied = new AtomicBoolean(false);
         PlayerHandle playerHandle = new PlayerHandle() {
             @Override public UUID uuid() { return UUID.randomUUID(); }
@@ -235,7 +237,7 @@ class EffectsCommonCoverageTest {
 
     @Test
     void testGlideEffectExecution() {
-        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
         AtomicBoolean glideStarted = new AtomicBoolean(false);
         PlayerHandle playerHandle = new PlayerHandle() {
             @Override public UUID uuid() { return UUID.randomUUID(); }
@@ -260,5 +262,44 @@ class EffectsCommonCoverageTest {
 
         assertTrue(glideStarted.get());
         assertNotNull(effect.toPermission());
+    }
+
+    @Test
+    void testSoundAndFireworkEffectExecution() {
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
+        AtomicBoolean soundPlayed = new AtomicBoolean(false);
+        AtomicBoolean fireworkSpawned = new AtomicBoolean(false);
+        PlayerHandle playerHandle = new PlayerHandle() {
+            @Override public UUID uuid() { return UUID.randomUUID(); }
+            @Override public String name() { return "soundPlayer"; }
+            @Override public void playSound(Object type, float volume, float pitch, double dx, double dy, double dz) {
+                soundPlayed.set(true);
+            }
+            @Override public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {}
+            @Override public void applyPotionEffect(Object type, int duration, int amplifier, boolean ambient, boolean particles, boolean icon) {}
+            @Override public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {}
+            @Override public void playNote(Object instrument, int tone) {}
+            @Override public void setGliding(boolean gliding) {}
+            @Override public void spawnFirework(Map<String, Object> data) {
+                fireworkSpawned.set(true);
+            }
+            @Override public void startGlide(int relativeLift, int maxY, int landingTimeoutTicks, boolean allowFireworks, boolean placeOnShutdown, String platformMaterial) {}
+        };
+
+        LocationHandle loc = createDummyLocation();
+        SoundEffect sound = new SoundEffect("ENTITY_PLAYER_LEVELUP");
+        sound.setTarget(new EffectTarget(playerHandle, loc));
+        sound.setData("ENTITY_PLAYER_LEVELUP", "100", "100", "0.0", "0.0", "0.0");
+        sound.run();
+        assertTrue(soundPlayed.get());
+        assertNotNull(sound.toPermission());
+
+        FireworkEffect firework = new FireworkEffect("BALL", "WHITE");
+        firework.setTarget(new EffectTarget(playerHandle, loc));
+        firework.setData("BALL", "5000", "1", "RED", "YELLOW", "true", "true", "true", "0", "0", "0");
+        assertEquals(8, firework.getData().get(FireworkEffect.FireworkKeys.NUMBER));
+        firework.run();
+        assertTrue(fireworkSpawned.get());
+        assertNotNull(firework.toPermission());
     }
 }

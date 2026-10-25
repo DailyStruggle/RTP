@@ -1,29 +1,16 @@
-// effects-api-ADR-003 (amended 2026-10-15) — platform-neutral effects SPI.
+// effects-api-ADR-003 (amended 2026-10-24 by ADR-116) — platform-neutral effects SPI.
 //
-// This module hosts two subpackages:
-//   - effectsapi/common  : platform-neutral SPI + base types
-//   - effectsapi/bukkit  : Bukkit-backed runtime + concrete effects
-//
-// Minecraft-typed (Mojmap) effect code lives in the platform carriers that
-// already own a Minecraft classpath, behind the effectsapi/common SPI
-// (HandleProvider / ValueCoercer / EffectFactory):
+// This module hosts only the platform-neutral effectsapi/common package.
+// Platform-specific effect carriers live in their respective platform modules:
+//   - Bukkit   : :rtp-bukkit:rtp-bukkit-common (io.github.dailystruggle.effectsapi.bukkit)
 //   - Fabric   : :rtp-fabric:rtp-fabric-common (io.github.dailystruggle.rtp.fabric.effects)
 //   - NeoForge : :rtp-neoforge:rtp-neoforge-common (rtp.neoforge.effects.local)
-// No Loom here, so effects-api builds as a plain Java 17 library (ADR-113).
+// No Loom or platform jars here, so effects-api builds as a plain Java 17 library (ADR-113, ADR-116).
 
 dependencies {
     // --- neutral server accessor seam (ADR-116) ---
     api project(':server-api')
 
-    // --- bukkit/ subpackage ---
-    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-
     // --- pre-existing ---
     implementation 'org.jetbrains:annotations:24.1.0'
-
-    // effects-api no longer depends on rtp-api: the common/ SPI was decoupled
-    // from RTPPlayer/RTPLocation onto its own PlayerHandle/LocationHandle +
-    // HandleProvider/HandleRegistry handle SPI, so the module carries zero
-    // io.github.dailystruggle.rtp references and can be reused standalone.
 }

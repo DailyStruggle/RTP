@@ -89,7 +89,8 @@ path to a destination.
 `run-acceptance.ps1` drives the harness scenarios from the host:
 
 ```powershell
-.\run-acceptance.ps1                       # full sweep
+.\run-acceptance.ps1                       # full sweep (tears down automatically on exit)
+.\run-acceptance.ps1 -Keep                 # leave containers running after scenarios finish
 .\run-acceptance.ps1 -Scenario boot         # individual scenario
 .\run-acceptance.ps1 -Scenario heartbeat
 .\run-acceptance.ps1 -Scenario roundtrip
@@ -393,6 +394,10 @@ full world. The demo regions survive
 the runtime `plugins/RTP/` tree it wipes).
 
 ## Teardown
+
+By default, `run-acceptance.ps1` and `run-acceptance.sh` automatically tear down the devstack containers when a scenario run finishes or exits. Pass `-Keep` (or `--keep` in Bash) if you want to leave the containers running for interactive inspection or manual testing.
+
+To manually tear down a kept stack:
 
 ```powershell
 .\run-acceptance.ps1 -Scenario down            # selective: preserves the mc-image-cache named volume

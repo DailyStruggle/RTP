@@ -1,25 +1,7 @@
-// helpers/StressTestRTP — standalone Spigot/Paper/Folia helper plugin.
-//
-// Per the helpers/ contract (see helpers/PeriodicWorldSaver/README.md), this
-// module has no dependency on rtp-api / rtp-core. It is a black-box stress-
-// test driver that dispatches a configurable command (default: `rtp {player}`)
-// against a roster of online players, attributes PlayerTeleportEvent
-// completions back to dispatched attempts, and records ms-precision metrics
-// to CSV plus a summary aligned to the front-page comparison table:
-//   - Cold-start /rtp
-//   - Warm-queue /rtp
-//   - TPS under 10× burst
-//   - MSPT during eval
-//   - Memory footprint
-//
-// Folia is supported: scheduling is done through the Bukkit BukkitScheduler
-// for non-region-bound work (sampling, dispatch on global region) and through
-// PlayerTeleportEvent for attribution. We never touch chunks or perform
-// region-thread-pinned work; on Folia, dispatch happens via the Global
-// Region Scheduler reflectively to avoid a hard compile dep on Folia API.
+// helpers/StressTestRTP — umbrella Bukkit/Paper/Folia artifact packaging
+// stresstest-core + stresstest-bukkit (ADR-122 Decision 1 & 3).
 plugins {
     id 'java'
-    // Bundles org.jacoco.core for /rtpstress coverage (ADR-111 Stage 2).
     id 'com.gradleup.shadow'
 }
 
@@ -31,43 +13,41 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-repositories {
-    mavenCentral()
-    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
-    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
-}
-
 dependencies {
-    // Spigot API is sufficient for compilation. Folia features are accessed
-    // reflectively at runtime so the same JAR drops onto Spigot/Paper/Folia
-    // unchanged. This mirrors the helpers/ contract: one JAR, no platform fork.
-    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    implementation project(':helpers:stresstest-core')
+    implementation project(':helpers:stresstest-bukkit')
+    compileOnly 'org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT'
 
-    // ADR-111 Stage 2: the JaCoCo core reads execution data in-process; the
-    // agent runtime API (org.jacoco.agent.rt.RT) is provided by the -javaagent
-    // on the bench server, so it is compileOnly and never bundled.
-    implementation 'org.jacoco:org.jacoco.core:0.8.11'
-    compileOnly 'org.jacoco:org.jacoco.agent:0.8.11:runtime'
-
-    // Pure-logic unit tests (probe classifiers, CSV sentinels). No Bukkit
-    // runtime is exercised; the Spigot API is on the test classpath only so
-    // the classes under test link.
-    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation project(':helpers:stresstest-core')
+    testImplementation project(':helpers:stresstest-bukkit')
+    testImplementation 'org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
     testImplementation platform(rootProject.libs.junit.bom)
     testImplementation rootProject.libs.junit.jupiter
     testRuntimeOnly rootProject.libs.junit.platform.launcher
 }
 
 test {
+    dependsOn project(':helpers:stresstest-core').tasks.named('testClasses')
+    dependsOn project(':helpers:stresstest-bukkit').tasks.named('testClasses')
+    dependsOn project(':helpers:stresstest-bukkit').tasks.named('shadowJar')
+    testClassesDirs += project(':helpers:stresstest-core').sourceSets.test.output.classesDirs
+    testClassesDirs += project(':helpers:stresstest-bukkit').sourceSets.test.output.classesDirs
+    classpath += project(':helpers:stresstest-core').sourceSets.test.output
+    classpath += project(':helpers:stresstest-bukkit').sourceSets.test.output
     useJUnitPlatform()
 }
 
-// The shadow jar is the shippable plugin (JaCoCo core bundled, unrelocated so
-// org.jacoco.core keeps its published package names). The thin jar would emit
-// the same file name, so it is disabled to keep one producer for that path.
 shadowJar {
     archiveClassifier.set('')
+    // ADR-122 Decision 3: shade and relocate server-api so it never clashes with an installed LeafRTP jar.
+    relocate 'io.github.dailystruggle.server.api', 'io.github.dailystruggle.helpers.stresstestrtp.shaded.server.api'
 }
+
 jar {
     enabled = false
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
 }

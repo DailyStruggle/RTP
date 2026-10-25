@@ -53,6 +53,7 @@ public class MySQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
                         + "seed BIGINT"
                         + ");";
         statement.execute(schema);
+        ensureMetricBucketSchema(connection);
     } catch (SQLException e) {
       RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       close();
@@ -80,6 +81,31 @@ public class MySQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   @Override
   protected String getInsertStatement() {
     return "INSERT IGNORE INTO rtp_teleport_data (senderName, senderId, time, delay, selectedX, selectedY, selectedZ, selectedWorldName, selectedWorldId, originalX, originalY, originalZ, originalWorldName, originalWorldId, region, cost, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  }
+
+  @Override
+  public String getMetricBucketTableDdl() {
+    return "CREATE TABLE IF NOT EXISTS rtp_metric_bucket ("
+        + "backend_id VARCHAR(128) NOT NULL, "
+        + "metric_key VARCHAR(128) NOT NULL, "
+        + "window_start_epoch BIGINT NOT NULL, "
+        + "window_seconds INT NOT NULL, "
+        + "sample_count INT NOT NULL, "
+        + "mean DOUBLE NOT NULL, "
+        + "min DOUBLE NOT NULL, "
+        + "max DOUBLE NOT NULL, "
+        + "p95 DOUBLE, "
+        + "generation BIGINT NOT NULL, "
+        + "PRIMARY KEY (backend_id, metric_key, window_start_epoch), "
+        + "INDEX idx_rtp_metric_bucket_key_epoch (metric_key, window_start_epoch)"
+        + ");";
+  }
+
+  @Override
+  public String getMetricBucketInsertStatement() {
+    return "INSERT IGNORE INTO rtp_metric_bucket "
+        + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
   }
 
   @Override

@@ -1,8 +1,12 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
+import io.github.dailystruggle.rtp.api.metrics.MetricTimeSeriesPublisher;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.metrics.networkTimeSeries.NetworkMetricTimeSeriesPublisher;
+import io.github.dailystruggle.rtp.common.metrics.networkTimeSeries.NetworkTimeSeriesConfig;
+import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
@@ -35,11 +39,26 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
 
     /** Constructs a CoreMetrics instance with the NOOP binding. */
     public CoreMetrics() {
-        // Explicit public default constructor initialising default metrics components
+        this.snapshotRing.configurePublication(
+                NetworkMetricTimeSeriesPublisher::defaultBackendId,
+                () -> NetworkTimeSeriesConfig.resolve().tier(),
+                () -> {
+                    NetworkModeBootstrap live = NetworkModeBootstrap.LIVE;
+                    return (live != null) ? live.generation() : 1L;
+                },
+                row -> {
+                    MetricTimeSeriesPublisher pub = this.timeSeriesPublisher;
+                    if (pub != null) {
+                        pub.enqueue(row);
+                    }
+                });
+        MetricTimeSeriesPublisher.register(this.timeSeriesPublisher);
     }
 
     private final PipelineHistogram pipelineHistogram = new PipelineHistogram();
     private final MetricsSnapshotRing snapshotRing = new MetricsSnapshotRing();
+    private volatile NetworkMetricTimeSeriesPublisher timeSeriesPublisher =
+            new NetworkMetricTimeSeriesPublisher();
     private volatile io.github.dailystruggle.metrics.api.MetricsBinding binding =
             io.github.dailystruggle.metrics.api.MetricsBinding.NOOP;
 
@@ -196,6 +215,33 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
      */
     public MetricsSnapshotRing snapshotRing() {
         return snapshotRing;
+    }
+
+    /**
+     * Returns the ADR-040 cross-backend metric time-series publisher bound to this
+     * {@link CoreMetrics} instance.
+     */
+    public NetworkMetricTimeSeriesPublisher timeSeriesPublisher() {
+        return timeSeriesPublisher;
+    }
+
+    /**
+     * Replaces the cross-backend metric time-series publisher and registers it with
+     * {@link MetricTimeSeriesPublisher#register(MetricTimeSeriesPublisher)}.
+     */
+    public void setTimeSeriesPublisher(NetworkMetricTimeSeriesPublisher publisher) {
+        this.timeSeriesPublisher =
+                (publisher != null) ? publisher : new NetworkMetricTimeSeriesPublisher();
+        MetricTimeSeriesPublisher.register(this.timeSeriesPublisher);
+    }
+
+    /**
+     * Executes one periodic batch flush + retention sweep pass on the active
+     * {@link NetworkMetricTimeSeriesPublisher} (ADR-040, REQ-RTP-METTS-004, REQ-RTP-METTS-005).
+     */
+    public int flushTimeSeriesBuckets() {
+        NetworkMetricTimeSeriesPublisher pub = this.timeSeriesPublisher;
+        return (pub != null) ? pub.flush() : 0;
     }
 
     private static volatile java.util.function.IntSupplier memoryTrackerEntriesSupplier = () -> 0;

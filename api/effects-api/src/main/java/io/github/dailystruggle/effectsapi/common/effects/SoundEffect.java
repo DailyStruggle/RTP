@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
@@ -45,11 +45,11 @@ public class SoundEffect extends Effect<SoundEffect.SoundKeys> {
         if (o instanceof Number) dz = ((Number) o).doubleValue();
 
         Object type = data.get(SoundKeys.TYPE);
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
         if (ph != null) {
             ph.playSound(type, volume, pitch, dx, dy, dz);
         } else {
-            LocationHandle lh = HandleRegistry.wrapLocation(target);
+            LocationHandle lh = EffectTarget.wrapLocation(target);
             if (lh != null) lh.playSound(type, volume, pitch);
         }
     }

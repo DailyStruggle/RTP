@@ -1,12 +1,23 @@
 package io.github.dailystruggle.effectsapi.common.spi;
 
+import io.github.dailystruggle.server.api.ServerAccessor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.logging.Level;
+
 /**
- * SPI for creating platform-specific handles.
+ * Legacy SPI for creating platform-specific effect handles, folded into
+ * {@link ServerAccessor} per ADR-116 Decision 2.
+ *
+ * @deprecated Implement {@link ServerAccessor#wrapEffectPlayer(Object)},
+ *             {@link ServerAccessor#wrapEffectLocation(Object)},
+ *             {@link ServerAccessor#resolveEffectPlayerAt(Object)}, and
+ *             {@link ServerAccessor#dispatchConsoleCommand(String)} (or install via
+ *             {@link io.github.dailystruggle.server.api.ServerAccessors#setEffectAccessor(ServerAccessor)}).
  */
-public interface HandleProvider {
+@Deprecated
+public interface HandleProvider extends ServerAccessor {
     /**
      * Wrap a platform-specific player object.
      */
@@ -34,6 +45,7 @@ public interface HandleProvider {
      *
      * @param command command string to run
      */
+    @Override
     default void dispatchConsoleCommand(@NotNull String command) {}
 
     /**
@@ -45,4 +57,40 @@ public interface HandleProvider {
     default void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
         player.performCommand(command);
     }
+
+    @Override
+    default Object wrapEffectPlayer(Object player) {
+        return player == null ? null : wrapPlayer(player);
+    }
+
+    @Override
+    default Object wrapEffectLocation(Object location) {
+        return location == null ? null : wrapLocation(location);
+    }
+
+    @Override
+    default Object resolveEffectPlayerAt(Object location) {
+        return location instanceof LocationHandle lh ? playerAt(lh) : null;
+    }
+
+    @Override
+    default String getServerVersion() {
+        return "unknown";
+    }
+
+    @Override
+    default String getPlatform() {
+        return "unknown";
+    }
+
+    @Override
+    default Integer getServerIntVersion() {
+        return null;
+    }
+
+    @Override
+    default void log(Level level, String message) {}
+
+    @Override
+    default void log(Level level, String message, Throwable throwable) {}
 }

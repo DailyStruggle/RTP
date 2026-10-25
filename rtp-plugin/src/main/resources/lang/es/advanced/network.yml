@@ -315,4 +315,29 @@ editor:
     # @default: 0
     maxAgeDays: 0
 
+# Publicación de series temporales de métricas entre backends (ADR-040).
+metrics:
+  networkTimeSeries:
+    # Publicar cubos de métricas condensados en el almacén de red compartido.
+    # @type: boolean
+    # @default: false
+    publish: false
+
+    # Nivel condensado que se publica entre backends.
+    # @type: string
+    # @default: "24h@1m"
+    tier: "24h@1m"
+
+    # Días que se conservan los cubos de métricas publicados para este backend.
+    # @type: integer
+    # @range: [1, null]
+    # @default: 7
+    retentionDays: 7
+
+    # Máximo de filas de cubos de métricas escritas por pasada de vaciado periódico.
+    # @type: integer
+    # @range: [1, null]
+    # @default: 64
+    perPassWriteCap: 64
+
 version: 1.1

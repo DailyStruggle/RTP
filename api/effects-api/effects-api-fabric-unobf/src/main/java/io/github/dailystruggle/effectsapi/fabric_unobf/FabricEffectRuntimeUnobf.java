@@ -39,11 +39,13 @@ public final class FabricEffectRuntimeUnobf {
     /** Bind the MinecraftServer reference. Idempotent; called from SERVER_STARTED. */
     public static void bindServer(@NotNull MinecraftServer server) {
         SERVER.set(server);
+        FabricHandlesUnobf.setServer(server);
     }
 
     /** Drop the binding on SERVER_STOPPING / SERVER_STOPPED. */
     public static void unbindServer() {
         SERVER.set(null);
+        FabricHandlesUnobf.setServer(null);
     }
 
     /** @return the bound server, or {@code null} if not yet started or already stopped. */

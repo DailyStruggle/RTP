@@ -52,6 +52,7 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
                         + "seed BIGINT"
                         + ");";
         statement.execute(schema);
+        ensureMetricBucketSchema(connection);
     } catch (SQLException e) {
       RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       close();
@@ -85,6 +86,14 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     return "INSERT INTO rtp_teleport_data (senderName, senderId, time, delay, selectedX, selectedY, selectedZ, selectedWorldName, selectedWorldId, originalX, originalY, originalZ, originalWorldName, originalWorldId, region, cost, attempts) " +
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
         "ON CONFLICT (senderId) DO NOTHING";
+  }
+
+  @Override
+  public String getMetricBucketInsertStatement() {
+    return "INSERT INTO rtp_metric_bucket "
+        + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        + "ON CONFLICT (backend_id, metric_key, window_start_epoch) DO NOTHING";
   }
 
   @Override

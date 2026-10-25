@@ -20,12 +20,11 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
   private Connection connection;
 
   public H2DatabaseAccessor() {
-    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
-    File databaseDir = new File(pluginDir, "database");
-    if (!databaseDir.exists()) {
-      databaseDir.mkdirs();
-    }
-    this.url = "jdbc:h2:file:" + pluginDir.getAbsolutePath() + File.separator + "database" + File.separator + "rtp;MODE=MySQL;DB_CLOSE_DELAY=-1";
+    this(defaultJdbcUrl());
+  }
+
+  public H2DatabaseAccessor(String url) {
+    this.url = url;
     try {
       this.connection = DriverManager.getConnection(url);
       try (Statement statement = connection.createStatement()) {
@@ -64,10 +63,20 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
                         + "seed BIGINT"
                         + ");";
         statement.execute(schema);
+        ensureMetricBucketSchema(this.connection);
       }
     } catch (SQLException e) {
       RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
+  }
+
+  private static String defaultJdbcUrl() {
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+    File databaseDir = new File(pluginDir, "database");
+    if (!databaseDir.exists()) {
+      databaseDir.mkdirs();
+    }
+    return "jdbc:h2:file:" + pluginDir.getAbsolutePath() + File.separator + "database" + File.separator + "rtp;MODE=MySQL;DB_CLOSE_DELAY=-1";
   }
 
   @Override
@@ -103,6 +112,13 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
   @Override
   protected String getInsertStatement() {
     return "INSERT IGNORE INTO rtp_teleport_data (senderName, senderId, time, delay, selectedX, selectedY, selectedZ, selectedWorldName, selectedWorldId, originalX, originalY, originalZ, originalWorldName, originalWorldId, region, cost, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  }
+
+  @Override
+  public String getMetricBucketInsertStatement() {
+    return "INSERT IGNORE INTO rtp_metric_bucket "
+        + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
   }
 
   @Override

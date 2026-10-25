@@ -79,4 +79,30 @@ class TickTokenBucketTest {
         assertEquals(Long.MIN_VALUE, a.lastRefillNanos());
         assertEquals(5 * MS, a.refill(5 * MS, t0 + TICK));
     }
+
+    @Test
+    @DisplayName("Default constructor, initializeFull, tickNanos, and non-advancing clock branches")
+    void defaultConstructorInitializeFullAndClockBranches() {
+        TickTokenBucket def = new TickTokenBucket();
+        assertEquals(TICK, def.tickNanos());
+        def.initializeFull(4 * MS, 100L);
+        assertEquals(4 * MS, def.tokensNanos());
+        assertEquals(4 * MS, def.configuredCeilingNanos());
+        assertEquals(100L, def.lastRefillNanos());
+
+        // Non-advancing timestamp (dt <= 0) clamps tokens without earning
+        assertEquals(3 * MS, def.refill(3 * MS, 100L));
+        assertEquals(3 * MS, def.refill(3 * MS, 50L));
+
+        // Tiny dt where earned == 0
+        assertEquals(3 * MS, def.refill(3 * MS, 101L));
+
+        // Null clampToMin is a safe no-op
+        def.clampToMin(null);
+        assertEquals(3 * MS, def.tokensNanos());
+
+        // Constructor with prefillAtZero=false leaves lastRefillNanos at Long.MIN_VALUE
+        TickTokenBucket unprefilled = new TickTokenBucket(TICK, 2 * MS, false, 100L);
+        assertEquals(Long.MIN_VALUE, unprefilled.lastRefillNanos());
+    }
 }

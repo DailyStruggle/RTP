@@ -87,6 +87,13 @@ triggers:
   command: { enabled: true }
   join:    { enabled: false, regionKey: "default" }
   event:   { enabled: false }
+
+metrics:
+  networkTimeSeries:            # ADR-040 cross-backend metric time-series publication
+    publish: false
+    tier: "24h@1m"
+    retentionDays: 7
+    perPassWriteCap: 64
 ```
 
 ### Validation Rules
@@ -101,7 +108,7 @@ triggers:
 5. `secretEnv` names an environment variable. If unset while `enabled: true`, startup fails with a configurable message (D4, REQ-RTP-PROXY-007).
 6. `loadBalancer.curves.<metric>.k ∈ [0.1, 20]`, `p ∈ [0.1, 8]`, `threshold ∈ [0.0, 1.0]` (per ADR-036).
 7. Weights are non-negative; all-zero weight is allowed and degenerates to round-robin tied by `serverIdAsc`.
-8. Top-level keys outside `{network, transport, heartbeat, reservation, loadBalancer, messages, triggers}` fail validation; this prevents adapters from extending the schema (REQ-RTP-PROXY-COMMON-006).
+8. Top-level keys outside `{network, transport, heartbeat, reservation, loadBalancer, messages, triggers, routing, queue, regionCollision, servers, editor, metrics, version}` fail validation; this prevents adapters from extending the schema (REQ-RTP-PROXY-COMMON-006).
 
 ### Per-Host Difference Whitelist
 

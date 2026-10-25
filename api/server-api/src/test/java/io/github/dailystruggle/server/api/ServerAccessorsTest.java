@@ -34,11 +34,13 @@ class ServerAccessorsTest {
   @BeforeEach
   void clearInstalledAccessor() {
     ServerAccessors.set(null);
+    ServerAccessors.setEffectAccessor(null);
   }
 
   @AfterEach
   void clearAccessor() {
     ServerAccessors.set(null);
+    ServerAccessors.setEffectAccessor(null);
   }
 
   @Test
@@ -233,6 +235,56 @@ class ServerAccessorsTest {
     assertFalse(accessor.matchesPaletteIdentifier("   ", reconciled));
     assertTrue(accessor.matchesPaletteIdentifier("minecraft:stone", reconciled));
     assertFalse(accessor.matchesPaletteIdentifier("minecraft:lava", reconciled));
+
+    // Effect target & command dispatch defaults (ADR-116 Decision 2)
+    assertNull(accessor.wrapEffectPlayer(new Object()));
+    assertNull(accessor.wrapEffectLocation(new Object()));
+    assertNull(accessor.resolveEffectPlayerAt(new Object()));
+    accessor.dispatchConsoleCommand("say test");
+    accessor.dispatchConsoleCommand("");
+    accessor.dispatchConsoleCommand(null);
+  }
+
+  @Test
+  void effectAccessorBridgeRoutesThroughPrimaryOrExplicitOverride() {
+    assertFalse(ServerAccessors.hasEffectAccessor());
+    assertNull(ServerAccessors.effectAccessor());
+    assertNull(ServerAccessors.wrapEffectPlayer(null));
+    assertNull(ServerAccessors.wrapEffectLocation(null));
+    assertNull(ServerAccessors.resolveEffectPlayerAt(null));
+
+    List<String> consoleCommands = new ArrayList<>();
+    ServerAccessor effectDelegate =
+        new StubAccessor("paper", 21) {
+          @Override
+          public Object wrapEffectPlayer(Object player) {
+            return "wrappedPlayer:" + player;
+          }
+
+          @Override
+          public Object wrapEffectLocation(Object location) {
+            return "wrappedLoc:" + location;
+          }
+
+          @Override
+          public Object resolveEffectPlayerAt(Object location) {
+            return "playerAt:" + location;
+          }
+
+          @Override
+          public void dispatchConsoleCommand(String command) {
+            consoleCommands.add(command);
+          }
+        };
+
+    ServerAccessors.setEffectAccessor(effectDelegate);
+    assertTrue(ServerAccessors.hasEffectAccessor());
+    assertSame(effectDelegate, ServerAccessors.effectAccessor());
+    assertEquals("wrappedPlayer:p1", ServerAccessors.wrapEffectPlayer("p1"));
+    assertEquals("wrappedLoc:l1", ServerAccessors.wrapEffectLocation("l1"));
+    assertEquals("playerAt:l1", ServerAccessors.resolveEffectPlayerAt("l1"));
+    ServerAccessors.dispatchConsoleCommand("say hello");
+    assertEquals(List.of("say hello"), consoleCommands);
   }
 
   @Test

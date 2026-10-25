@@ -129,17 +129,16 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     if (intVersion == null) {
       // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getServerVersion() from unannotated context
       String v = getServerVersion();
-      if (v.contains("1_13")) intVersion = 13;
-      else if (v.contains("1_14")) intVersion = 14;
-      else if (v.contains("1_15")) intVersion = 15;
-      else if (v.contains("1_16")) intVersion = 16;
-      else if (v.contains("1_17")) intVersion = 17;
-      else if (v.contains("1_18")) intVersion = 18;
-      else if (v.contains("1_19")) intVersion = 19;
-      else if (v.contains("1_20")) intVersion = 20;
-      else if (v.contains("1_21")) intVersion = 21;
-      else if (v.contains("26_1")) intVersion = 26;
-      else if (v.contains("26_2")) intVersion = 26;
+      if (v.contains("1_13") || v.contains("1.13")) intVersion = 13;
+      else if (v.contains("1_14") || v.contains("1.14")) intVersion = 14;
+      else if (v.contains("1_15") || v.contains("1.15")) intVersion = 15;
+      else if (v.contains("1_16") || v.contains("1.16")) intVersion = 16;
+      else if (v.contains("1_17") || v.contains("1.17")) intVersion = 17;
+      else if (v.contains("1_18") || v.contains("1.18")) intVersion = 18;
+      else if (v.contains("1_19") || v.contains("1.19")) intVersion = 19;
+      else if (v.contains("1_20") || v.contains("1.20")) intVersion = 20;
+      else if (v.contains("1_21") || v.contains("1.21")) intVersion = 21;
+      else if (v.contains("26_") || v.contains("26.")) intVersion = 26;
       else intVersion = 13;
     }
     return intVersion;

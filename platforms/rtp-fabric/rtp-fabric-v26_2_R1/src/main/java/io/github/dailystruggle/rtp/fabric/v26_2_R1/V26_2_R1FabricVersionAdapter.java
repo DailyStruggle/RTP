@@ -72,7 +72,7 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
 
     @Override
     public String mcVersion() {
-        return "26.1.2";
+        return "26.2";
     }
 
 

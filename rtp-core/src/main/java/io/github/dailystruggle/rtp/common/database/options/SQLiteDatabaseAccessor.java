@@ -15,12 +15,21 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   private Connection connection;
 
   public SQLiteDatabaseAccessor(String url) {
-    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
-    File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");
-    if (!databaseFile.getParentFile().exists()) {
-      databaseFile.getParentFile().mkdirs();
+    if (RTPRuntime.serverAccessor() != null
+        && RTPRuntime.serverAccessor().getPluginDirectory() != null) {
+      File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+      File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");
+      if (!databaseFile.getParentFile().exists()) {
+        databaseFile.getParentFile().mkdirs();
+      }
+      this.sqliteUrl = "jdbc:sqlite:" + databaseFile.getAbsolutePath();
+    } else if (url != null && url.startsWith("jdbc:sqlite:")) {
+      this.sqliteUrl = url;
+    } else {
+      File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+      File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");
+      this.sqliteUrl = "jdbc:sqlite:" + databaseFile.getAbsolutePath();
     }
-    this.sqliteUrl = "jdbc:sqlite:" + databaseFile.getAbsolutePath();
     try {
       this.connection = DriverManager.getConnection(sqliteUrl);
       try (Statement statement = connection.createStatement()) {
@@ -61,6 +70,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
                         + "seed BIGINT"
                         + ");";
         statement.execute(schema);
+        ensureMetricBucketSchema(this.connection);
       }
     } catch (SQLException e) {
       RTPRuntime.log(Level.WARNING, e.getMessage(), e);
@@ -219,6 +229,13 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   @Override
   protected String getInsertStatement() {
     return "INSERT OR IGNORE INTO rtp_teleport_data (senderName, senderId, time, delay, selectedX, selectedY, selectedZ, selectedWorldName, selectedWorldId, originalX, originalY, originalZ, originalWorldName, originalWorldId, region, cost, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  }
+
+  @Override
+  public String getMetricBucketInsertStatement() {
+    return "INSERT OR IGNORE INTO rtp_metric_bucket "
+        + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
   }
 
   @Override

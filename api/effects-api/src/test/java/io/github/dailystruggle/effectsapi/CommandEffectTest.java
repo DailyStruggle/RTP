@@ -2,10 +2,11 @@ package io.github.dailystruggle.effectsapi;
 
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.effectsapi.common.effects.CommandEffect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleProvider;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
+import io.github.dailystruggle.effectsapi.common.spi.ValueCoercer;
+import io.github.dailystruggle.server.api.ServerAccessor;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,28 +48,29 @@ class CommandEffectTest {
         consoleCommandsRun.clear();
         playerCommandsRun.clear();
 
-        EffectFactory.setCoercer(new io.github.dailystruggle.effectsapi.bukkit.BukkitValueCoercer());
+        EffectFactory.setCoercer(ValueCoercer.DEFAULT);
 
-        HandleRegistry.setProvider(new HandleProvider() {
+        ServerAccessors.setEffectAccessor(new ServerAccessor() {
+            @Override public String getServerVersion() { return "test"; }
+            @Override public String getPlatform() { return "test"; }
+            @Override public Integer getServerIntVersion() { return 21; }
+            @Override public void log(Level level, String message) {}
+            @Override public void log(Level level, String message, Throwable throwable) {}
+
             @Override
-            public @Nullable PlayerHandle wrapPlayer(@NotNull Object player) {
+            public @Nullable Object wrapEffectPlayer(Object player) {
                 if (player instanceof PlayerHandle ph) return ph;
                 return null;
             }
 
             @Override
-            public @Nullable LocationHandle wrapLocation(@NotNull Object location) {
+            public @Nullable Object wrapEffectLocation(Object location) {
                 return null;
             }
 
             @Override
-            public void dispatchConsoleCommand(@NotNull String command) {
+            public void dispatchConsoleCommand(String command) {
                 consoleCommandsRun.add(command);
-            }
-
-            @Override
-            public void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
-                player.performCommand(command);
             }
         });
 
@@ -150,27 +153,28 @@ class CommandEffectTest {
             @Override public void playNote(Object instrument, int tone) {}
         };
 
-        HandleRegistry.setProvider(new HandleProvider() {
+        ServerAccessors.setEffectAccessor(new ServerAccessor() {
+            @Override public String getServerVersion() { return "test"; }
+            @Override public String getPlatform() { return "test"; }
+            @Override public Integer getServerIntVersion() { return 21; }
+            @Override public void log(Level level, String message) {}
+            @Override public void log(Level level, String message, Throwable throwable) {}
+
             @Override
-            public @Nullable PlayerHandle wrapPlayer(@NotNull Object player) {
+            public @Nullable Object wrapEffectPlayer(Object player) {
                 if (player instanceof PlayerHandle ph) return ph;
                 return null;
             }
 
             @Override
-            public @Nullable LocationHandle wrapLocation(@NotNull Object location) {
+            public @Nullable Object wrapEffectLocation(Object location) {
                 if (location instanceof LocationHandle lh) return lh;
                 return locHandle;
             }
 
             @Override
-            public void dispatchConsoleCommand(@NotNull String command) {
+            public void dispatchConsoleCommand(String command) {
                 consoleCommandsRun.add(command);
-            }
-
-            @Override
-            public void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
-                player.performCommand(command);
             }
         });
 

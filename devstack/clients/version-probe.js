@@ -43,6 +43,19 @@ let finished = false;
 let busyRetries = 0;
 
 const bot = mineflayer.createBot({ host, port, username, version, auth: 'offline' });
+// Minecraft 26.3+ ServerGamePacketListenerImpl.handleMovePlayer enforces
+// at most one position-bearing move packet per client tick, resetting
+// receivedPositionThisTick only on ServerboundClientTickEndPacket (tick_end).
+// Mineflayer 4.39.0 does not emit tick_end, so send one after each move packet.
+const origWrite = bot._client.write.bind(bot._client);
+const hasTickEnd = !!(require('minecraft-data')(version)?.protocol?.play?.toServer?.types?.packet_tick_end);
+bot._client.write = function (name, params) {
+  const res = origWrite(name, params);
+  if (hasTickEnd && bot._client.state === 'play' && (name === 'position' || name === 'position_look' || name === 'look' || name === 'flying')) {
+    origWrite('tick_end', {});
+  }
+  return res;
+};
 
 function finish(code, why) {
   if (finished) return;
@@ -113,7 +126,7 @@ bot.on('message', (m) => {
   const s = m.toString();
   if (!start) return;
   seen.chat.push(s);
-  if (!seen.landed && /\bbusy\b/i.test(s) && busyRetries < BUSY_RETRIES) {
+  if (!seen.landed && /\bbusy\b|could not find a safe location/i.test(s) && busyRetries < BUSY_RETRIES) {
     busyRetries++;
     setTimeout(() => { if (!seen.landed && !finished) bot.chat('/rtp region=default'); }, BUSY_RETRY_MS);
   }

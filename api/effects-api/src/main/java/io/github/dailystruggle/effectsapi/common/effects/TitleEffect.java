@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
 import java.util.EnumMap;
@@ -35,7 +35,7 @@ public class TitleEffect extends Effect<TitleEffect.TitleKeys> {
         o = data.get(TitleKeys.FADE_OUT);
         if (o instanceof Number) fadeOut = ((Number) o).intValue();
 
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
         if (ph != null) {
             ph.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
         }

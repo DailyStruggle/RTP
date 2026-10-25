@@ -1,5 +1,5 @@
-site_name: LeafRTP
-site_description: Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.
+site_name: LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+site_description: Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.
 site_author: DailyStruggle
 # Published location. Needed for canonical URLs, a correct sitemap.xml, and the
 # theme's social/share links; without it Material emits relative canonicals.

@@ -251,6 +251,25 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   /** See {@link #registerWorldObject(Object)}. */
   public void unregisterWorldObject(Object level) {
     if (level == null) return;
+    try {
+      for (String dimMethod : new String[] { "dimension", "method_27983" }) {
+        try {
+          Object dim = level.getClass().getMethod(dimMethod).invoke(level);
+          if (dim == null) continue;
+          for (String locMethod : new String[] { "identifier", "location", "method_29177" }) {
+            try {
+              Object loc = dim.getClass().getMethod(locMethod).invoke(dim);
+              if (loc != null) {
+                String name = loc.toString();
+                io.github.dailystruggle.rtp.api.world.RTPWorld<?> removed = worldsByName.remove(name);
+                if (removed != null) worldsById.remove(removed.id());
+                return;
+              }
+            } catch (NoSuchMethodException ignored) {}
+          }
+        } catch (NoSuchMethodException ignored) {}
+      }
+    } catch (Throwable ignored) {}
     Class<?> serverLevelCls;
     try {
       serverLevelCls = Class.forName("net.minecraft.server.level.ServerLevel");
@@ -2665,18 +2684,58 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     MinecraftServer s = this.server;
     if (s != null && rootCommand instanceof io.github.dailystruggle.commandsapi.common.CommandsAPICommand cmd) {
       try {
-        com.mojang.brigadier.CommandDispatcher dispatcher = s.getCommands().getDispatcher();
-        io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabric.register(dispatcher, cmd, bridgeCtx, aliases);
-        try {
-          Object playerList = s.getPlayerList();
-          java.lang.reflect.Method getPlayers = playerList.getClass().getMethod("getPlayers");
-          java.util.List<?> players = (java.util.List<?>) getPlayers.invoke(playerList);
-          java.lang.reflect.Method sendCommands = s.getCommands().getClass().getMethod("sendCommands", Class.forName("net.minecraft.server.level.ServerPlayer"));
-          for (Object p : players) {
-            sendCommands.invoke(s.getCommands(), p);
+        Object commands = null;
+        for (String mName : new String[] { "getCommands", "method_3734" }) {
+          try {
+            commands = s.getClass().getMethod(mName).invoke(s);
+            if (commands != null) break;
+          } catch (NoSuchMethodException ignored) {}
+        }
+        if (commands != null) {
+          com.mojang.brigadier.CommandDispatcher dispatcher = null;
+          for (String dName : new String[] { "getDispatcher", "method_9161" }) {
+            try {
+              Object d = commands.getClass().getMethod(dName).invoke(commands);
+              if (d instanceof com.mojang.brigadier.CommandDispatcher cd) {
+                dispatcher = cd;
+                break;
+              }
+            } catch (NoSuchMethodException ignored) {}
           }
-        } catch (Throwable ignored) {
-          // best-effort tree resync; online clients refresh on relog
+          if (dispatcher != null) {
+            io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabric.register(dispatcher, cmd, bridgeCtx, aliases);
+          }
+          try {
+            Object playerList = null;
+            for (String plName : new String[] { "getPlayerList", "method_3760" }) {
+              try {
+                playerList = s.getClass().getMethod(plName).invoke(s);
+                if (playerList != null) break;
+              } catch (NoSuchMethodException ignored) {}
+            }
+            if (playerList != null) {
+              java.util.List<?> players = null;
+              for (String gpName : new String[] { "getPlayers", "method_14571" }) {
+                try {
+                  players = (java.util.List<?>) playerList.getClass().getMethod(gpName).invoke(playerList);
+                  if (players != null) break;
+                } catch (NoSuchMethodException ignored) {}
+              }
+              if (players != null && !players.isEmpty()) {
+                for (java.lang.reflect.Method m : commands.getClass().getMethods()) {
+                  if (("sendCommands".equals(m.getName()) || "method_9164".equals(m.getName()))
+                      && m.getParameterCount() == 1) {
+                    for (Object p : players) {
+                      m.invoke(commands, p);
+                    }
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (Throwable ignored) {
+            // best-effort tree resync; online clients refresh on relog
+          }
         }
       } catch (Throwable t) {
         log(Level.WARNING, "[RTP][Fabric] Dynamic runtime command registration failed: " + t.getMessage());

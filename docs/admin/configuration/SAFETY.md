@@ -70,18 +70,22 @@ The `airBlocks` and `unsafeBlocks` lists use a specific grammar to match blocks 
 > **Editions.** The full grammar below, including block tags and block-state predicates, works identically in the free and Pro builds. Tags resolve against the server's live block-tag registry when the config loads.
 
 ### Grammar (Token Syntax)
-- `MATERIAL` — Plain material (e.g., `LAVA`).
-- `MATERIAL[prop=val,prop2=val2]` — Match only when block-state properties match (string equality).
-- `MATERIAL[prop>=n]` — Match only when a numeric block-state property satisfies a range comparison. Operators: `>=`, `<=`, `>`, `<`. The bound `n` must be a whole number (e.g., `LAVA[level<=3]` for near-source lava, `FIRE[age>=10]`).
-- `#namespace:tag` — Expands to every material in that block tag (e.g., `#minecraft:logs`).
-- `#namespace:tag[prop=val]` — Tag members only when properties match.
-- `*[prop=val]` — ANY material when properties match (wildcard, e.g., `*[waterlogged=true]`).
+
+Six token shapes can be mixed freely in `unsafeBlocks` and `airBlocks` (`advanced/blocks.yml`):
+
+- **Plain material (`MATERIAL`):** `LAVA`, `MAGMA_BLOCK`.
+- **Material + state predicate (`MATERIAL[prop=val,prop2=val2]`):** `OAK_SLAB[waterlogged=true]`. Multiple predicates AND together: `OAK_SLAB[waterlogged=true,type=top]`.
+- **Numeric range predicate (`MATERIAL[prop>=n]`):** `WATER[level>=5]`, `LIGHT[level<8]`, `LAVA[level<=3]`, `FIRE[age>=10]`. Operators: `>=`, `<=`, `>`, `<` (bound `n` must be a whole number). Fails open on a missing or non-numeric value.
+- **Vanilla or datapack block tag (`#namespace:tag`):** `#minecraft:leaves`, `#minecraft:fire`, `#minecraft:campfires`, `#minecraft:logs`. Expanded from the server's live block-tag registry when the config loads; datapack and modded tags work too.
+- **Tag + state predicate (`#namespace:tag[prop=val]`):** `#minecraft:slabs[waterlogged=true]`.
+- **Wildcard + state predicate (`*[prop=val]`):** `*[waterlogged=true]` - one line instead of listing every waterloggable block.
 
 #### Predicate notes
 - Multiple predicates inside one `[ ... ]` combine with logical **AND** (e.g., `WATER[falling=true,level>=5]`).
 - Two range bounds on the same key form an interval, e.g., `LAVA[level>=2,level<=5]`.
-- Equality (`=`) compares values as case-insensitive strings; the range operators parse both sides as integers. A live block whose property is absent or non-numeric is treated as a **miss** (fail-open) - it is never rejected by a predicate it cannot satisfy.
-- Malformed tokens (non-integer bound, empty value, duplicate `key`+operator, unbalanced brackets) are dropped at load with a single startup `WARNING` and never silently ignored.
+- Equality (`=`) compares values as case-insensitive strings; the range operators parse both sides as integers. Unknown tags and properties fail open: a config written for a newer MC version still loads on an older one, and a live block whose property is absent or non-numeric is treated as a **miss** (never rejected by a predicate it cannot satisfy).
+- Malformed tokens (non-integer bound, empty value, duplicate `key`+operator, unbalanced brackets) are never silent: they are dropped at load with `[WARNING] [advanced/blocks.yml] rejected unsafe-blocks token '<token>': <reason>`.
+- Block states are only read when a token needs them, so plain-material configs cost nothing extra. On an older install, lists kept in `safety.yml` are automatically moved into `advanced/blocks.yml` on load, and plain-material entries keep working unchanged.
 
 ### `airBlocks`
 Materials treated as walkable / non-blocking space above the landing.

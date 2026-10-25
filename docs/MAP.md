@@ -40,7 +40,6 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
 - [`dev/TESTING_GUIDE.md`](dev/TESTING_GUIDE.md) — test suites, test tiers, and verification guide.
 - [`dev/TRANSLATION_GUIDE.md`](dev/TRANSLATION_GUIDE.md) — localization, translations, and locale parity.
-- [`dev/DISCORD_SUPPORT_BOT_DESIGN.md`](dev/DISCORD_SUPPORT_BOT_DESIGN.md) — Discord `#support` Forum bot architecture: `fts5vocab` corpus indexing, dual NMT, orderless prompt-injection bottleneck, and causal reasoning.
 - [`dev/LICENSING.md`](dev/LICENSING.md) — dual licensing and dependency audit.
 
 ## Decisions (`adr/`)
@@ -81,7 +80,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - `ADR-037` Harden RTP config commands.
 - `ADR-038` `/rtpadmin` setup wizards (proposed).
 - `ADR-039` `/rtpadmin` diagnostic surfaces (proposed).
-- `ADR-040` Cross-backend metric time-series publication (proposed).
+- `ADR-040` Cross-backend metric time-series publication.
 - `ADR-041` `/rtp config` command and save implementation (proposed).
 - `ADR-042` YAML comment preservation (block-only).
 - `ADR-043` `rtp.personalqueue` permission semantics (supersedes ADR-007 operational details).

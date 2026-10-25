@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.bukkitplatform.tools;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.bukkit.entity.Player;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -77,5 +79,13 @@ class SendMessageFontTagTest {
       logger.removeHandler(handler);
       be.seeseemelk.mockbukkit.MockBukkit.unmock();
     }
+  }
+
+  @Test
+  @DisplayName("SendMessage.title, actionbar, and sendMessage(Player) safely no-op on null Player")
+  void nullPlayerGuardsDoNotThrow() {
+    assertDoesNotThrow(() -> SendMessage.title(null, "Title", "Sub", 10, 20, 10));
+    assertDoesNotThrow(() -> SendMessage.actionbar(null, "Action bar"));
+    assertDoesNotThrow(() -> SendMessage.sendMessage((Player) null, "Chat message"));
   }
 }

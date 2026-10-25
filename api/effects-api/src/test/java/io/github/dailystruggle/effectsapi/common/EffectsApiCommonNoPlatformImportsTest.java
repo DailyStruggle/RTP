@@ -94,6 +94,64 @@ class EffectsApiCommonNoPlatformImportsTest {
         }
     }
 
+    @Test
+    void entireEffectsApiModuleHasNoPlatformOrRtpImports() throws IOException {
+        Path moduleClassRoot = locateModuleClassRoot();
+        List<String> violations = new ArrayList<>();
+
+        try (Stream<Path> walk = Files.walk(moduleClassRoot)) {
+            walk.filter(p -> p.toString().endsWith(".class"))
+                .forEach(p -> {
+                    try {
+                        scanClassFile(p, moduleClassRoot, violations);
+                    } catch (IOException e) {
+                        fail("Failed to read " + p + ": " + e.getMessage());
+                    }
+                });
+        }
+
+        Path projectRoot = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        for (String relDir : List.of("src/main/java", "src/test/java")) {
+            Path srcDir = projectRoot.resolve(relDir);
+            if (!Files.isDirectory(srcDir)) continue;
+            try (Stream<Path> walk = Files.walk(srcDir)) {
+                walk.filter(p -> p.toString().endsWith(".java"))
+                    .forEach(p -> {
+                        try {
+                            for (String line : Files.readAllLines(p)) {
+                                String trimmed = line.trim();
+                                if (!trimmed.startsWith("import ")) continue;
+                                for (String forbidden : FORBIDDEN_IMPORT_PREFIXES) {
+                                    if (trimmed.contains(forbidden)) {
+                                        violations.add(projectRoot.relativize(p) + " -> " + trimmed);
+                                    }
+                                }
+                            }
+                        } catch (IOException e) {
+                            fail("Failed to read " + p + ": " + e.getMessage());
+                        }
+                    });
+            }
+        }
+
+        Path buildGradle = projectRoot.resolve("build.gradle");
+        assertTrue(Files.isRegularFile(buildGradle), "Could not locate api/effects-api/build.gradle");
+        String buildGradleText = Files.readString(buildGradle);
+        assertTrue(!buildGradleText.contains("org.spigotmc:spigot-api"),
+                "api/effects-api/build.gradle must not declare spigot-api (ADR-116 Decision 4)");
+
+        if (!violations.isEmpty()) {
+            fail("Platform or RTP imports leaked into :effects-api module (ADR-116 Decisions 2 & 4 violation):\n  - "
+                    + String.join("\n  - ", violations));
+        }
+    }
+
+    private static Path locateModuleClassRoot() {
+        Path commonRoot = locateCommonClassRoot();
+        // Walk up from ".../classes/java/main/io/github/dailystruggle/effectsapi/common" to ".../classes/java/main"
+        return commonRoot.getParent().getParent().getParent().getParent().getParent();
+    }
+
     private static Path locateCommonClassRoot() {
         // Find the Effect.class file via the classloader, then derive the package root.
         URL effectResource = EffectsApiCommonNoPlatformImportsTest.class

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi.common.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 
@@ -27,10 +27,10 @@ public class DropExpEffect extends Effect<DropExpEffect.DropExpKeys> {
 
     @Override
     public void run() {
-        PlayerHandle ph = HandleRegistry.wrapPlayer(target);
-        LocationHandle lh = HandleRegistry.wrapLocation(target);
+        PlayerHandle ph = EffectTarget.wrapPlayer(target);
+        LocationHandle lh = EffectTarget.wrapLocation(target);
         if (ph == null && lh != null) {
-            ph = HandleRegistry.playerAt(lh);
+            ph = EffectTarget.playerAt(lh);
         }
         if (ph == null) return;
 

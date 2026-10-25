@@ -708,6 +708,7 @@ Reviewed for implementer-sufficiency against `AGENTS.md`, `RULES.md`, and existi
 ## Cross-References
 
 - [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) — primary downstream consumer (telemetry publisher).
+- [ADR-040](../adr/ADR-040-cross-backend-metric-time-series-publication.md) — cross-backend metric time-series bucket publication (`rtp_metric_bucket`, configured under `advanced/network.yml > metrics.networkTimeSeries.*`).
 - [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) — Fabric tick-callback hook (`FabricScheduler`) is the basis for `FabricMetricsBinding`.
 - [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) — any platform-specific surprise from sampler implementation lands here.
 - [`AGENTS.md > Domain Analogies & Aliases`](../../.junie/AGENTS.md) — informal terms (`mspt`, `tps`, `the snapshot`) route here.

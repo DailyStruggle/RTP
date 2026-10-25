@@ -1,6 +1,6 @@
 # rtp-proxy-ADR-020 — Direct Database Cross-Server Dispatch Mode ("Direct DB Mode")
 
-**Status:** Proposed
+**Status:** Accepted (2026-10-02)
 **Date:** 2026-10-02
 **Refines:** [ADR-036](../../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md), [rtp-proxy-ADR-014](rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md), [rtp-proxy-ADR-016](rtp-proxy-ADR-016-plugin-message-default-transport.md)
 **Related:** [rtp-proxy-ADR-005](rtp-proxy-ADR-005-redis-binding.md), [rtp-proxy-ADR-011](rtp-proxy-ADR-011-sql-network-state-binding.md)

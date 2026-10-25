@@ -325,8 +325,14 @@ public final class RTPFabricMod implements ModInitializer {
                         RtpBitStartup.schedule();
                     });
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
-                    .SERVER_STOPPED.register(server ->
-                            io.github.dailystruggle.rtp.fabric.effects.FabricEffectRuntime.unbindServer());
+                    .SERVER_STOPPED.register(server -> {
+                        io.github.dailystruggle.rtp.fabric.effects.FabricEffectRuntime.unbindServer();
+                        try {
+                            Class.forName("io.github.dailystruggle.effectsapi.fabric_unobf.FabricEffectRuntimeUnobf")
+                                    .getMethod("unbindServer")
+                                    .invoke(null);
+                        } catch (Throwable ignored) {}
+                    });
 
             // ----------------------------------------------------------------
             // Stop the periodic databaseAccessor.processQueries drain BEFORE

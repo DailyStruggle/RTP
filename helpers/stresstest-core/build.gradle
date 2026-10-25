@@ -1,0 +1,23 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+dependencies {
+    // ADR-122 Decision 3: StressHost extends server-api's ServerAccessor for identity and logging.
+    api project(path: ':server-api')
+    // Decodes the JaCoCo agent's execution-data byte[] in CoverageProbe (ADR-111 section 2.6).
+    implementation 'org.jacoco:org.jacoco.core:0.8.12'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+}
+
+test {
+    useJUnitPlatform()
+}

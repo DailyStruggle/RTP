@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    alias(libs.plugins.shadow)
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+dependencies {
+    implementation project(':helpers:stresstest-core')
+    compileOnly 'org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT'
+    testImplementation 'org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT'
+}
+
+tasks.named('jar') {
+    archiveClassifier.set('thin')
+}
+
+tasks.named('shadowJar') {
+    archiveClassifier.set('')
+    // ADR-122 Decision 3: shade and relocate server-api so it never clashes with an installed LeafRTP jar.
+    relocate 'io.github.dailystruggle.server.api', 'io.github.dailystruggle.helpers.stresstestrtp.shaded.server.api'
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}
+
+test {
+    dependsOn tasks.named('shadowJar')
+    useJUnitPlatform()
+}

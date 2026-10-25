@@ -315,4 +315,29 @@ editor:
     # @default: 0
     maxAgeDays: 0
 
+# Cross-backend metric time-series publication (ADR-040).
+metrics:
+  networkTimeSeries:
+    # Publish condensed metric buckets to the shared network store.
+    # @type: boolean
+    # @default: false
+    publish: false
+
+    # Condensed tier to publish cross-backend.
+    # @type: string
+    # @default: "24h@1m"
+    tier: "24h@1m"
+
+    # Days to retain published metric buckets for this backend.
+    # @type: integer
+    # @range: [1, null]
+    # @default: 7
+    retentionDays: 7
+
+    # Maximum metric bucket rows written per periodic flush pass.
+    # @type: integer
+    # @range: [1, null]
+    # @default: 64
+    perPassWriteCap: 64
+
 version: 1.1

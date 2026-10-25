@@ -1,0 +1,588 @@
+[
+  {
+    "id": "hist_abstain_01_server_lags",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "how come server lags",
+    "body": "how i make it not lag",
+    "expected_any_substrings": ["/rtp info", "/rtp version", "/rtp test", "mclo.gs", "rtp.unqueued"],
+    "forbidden_substrings": ["syncLoading=true", "viewDistanceSelect=2", "maxMSPT=60"]
+  },
+  {
+    "id": "hist_abstain_02_random_interval_freeze",
+    "source_channel": "issues",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "RTP is currently lagging out my server at random intervals",
+    "body": "It wil completly freeze up the server and drop tps to 0 for about 5-10 seconds at a time and then slowly tick back from. Any clue whats causing",
+    "expected_any_substrings": ["/rtp info", "/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true", "viewDistanceSelect=2"]
+  },
+  {
+    "id": "hist_abstain_03_null_response_no_log",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "when we run /rtp on the server we get null as a response",
+    "body": "err so question. when we run /rtp on the server we get null as a response, it throws up a null error",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_04_already_teleporting_15m",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "hey, my friend cant do /rtp",
+    "body": "says youre already teleporting and we are waiting like 15 minutes",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_05_midair_high_up",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "sometimes you can rtp and get put very high up",
+    "body": "hey, i found another bug, sometimes you can rtp and get put very high up like midair, is there a known fix?",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_06_rtp_use_not_working",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "what is the basic permission for just working /rtp",
+    "body": "No specials just getting teleported with /rtp? rtp.use is noct wotking",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs", "rtp.use"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_07_unresponsive_after_5m",
+    "source_channel": "general",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "after 5 minutes of server startup server becomes unresponsive",
+    "body": "tried restarting my server. played for 5 mins, server becomes unresponsive. no console error is thrown during 5-10 mins test",
+    "expected_any_substrings": ["/rtp info", "/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_direct_01_world_nether_overworld",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "/rtp world:world_nether teleports me to overworld",
+    "body": "When I execute the /rtp world:world_nether command, it just teleports me to the Overworld instead of the nether",
+    "expected_any_substrings": ["nether", "definitions/regions/", "definitions/worlds/", "FAQ"]
+  },
+  {
+    "id": "hist_direct_02_radius_chunk_vs_block",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Im attempting to set the radius because players keep dying in my worldborder",
+    "body": "How do I change the teleport radius so players stay inside my 5000 block worldborder?",
+    "expected_any_substrings": ["shape.radius", "/rtp editor", "definitions/regions/default.yml"]
+  },
+  {
+    "id": "hist_direct_03_caves_require_skylight",
+    "source_channel": "general",
+    "category": "DIRECT_ANSWER",
+    "title": "Where can I change the teleport radius and prevent spawning in caves?",
+    "body": "sometimes it teleports the player into a cave underground so is there a way i can fix that?",
+    "expected_any_substrings": ["vert.requireSkyLight", "shape.radius"]
+  },
+  {
+    "id": "hist_direct_04_rectangle_width_height",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "How can i set a proper rectangle region?",
+    "body": "I see that RTP can use a rectangle region in definitions/regions/default.yml, how do I configure width and height?",
+    "expected_any_substrings": ["RECTANGLE", "shape.width", "shape.height", "REGIONS"]
+  },
+  {
+    "id": "hist_direct_05_console_player_op_notme",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "invalid command argument player:Badministrator from console",
+    "body": "im trying to send from console and get this: [!] invalid command argument player:Badministrator for /rtp player:<name> when the player is op",
+    "expected_any_substrings": ["rtp.notme", "operator", "FAQ", "COMMANDS"]
+  },
+  {
+    "id": "hist_direct_06_heap_usage_maxheappercent",
+    "source_channel": "issues",
+    "category": "DIRECT_ANSWER",
+    "title": "anyone getting console spam about Heap usage?",
+    "body": "[RTP] Heap usage 86.1% of max exceeds maxHeapPercent threshold 85.0%; pausing background cache generation until memory is reclaimed. how can I fix this?",
+    "expected_any_substrings": ["maxHeapPercent", "advanced/performance.yml"]
+  },
+  {
+    "id": "hist_direct_07_ocean_biome_filter",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Players keep landing in the ocean",
+    "body": "how do I stop players from teleporting into OCEAN and DEEP_OCEAN water biomes?",
+    "expected_any_substrings": ["biomeWhitelist", "advanced/biomes.yml"]
+  },
+  {
+    "id": "hist_direct_08_smooth_stone_platform",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Is it normal that the plugin places a stone block below players?",
+    "body": "how do I change platformRadius or platformMaterial in safety.yml?",
+    "expected_any_substrings": ["platformRadius", "platformMaterial", "safety.yml"]
+  },
+  {
+    "id": "hist_direct_09_disable_gui_and_countdown",
+    "source_channel": "general",
+    "category": "DIRECT_ANSWER",
+    "title": "How do I disable the /rtp GUI menu and countdown?",
+    "body": "Running a paper 1.21.11 server, how do I turn off openOnBareRtp in guimenu.yml and delayCountdown?",
+    "expected_any_substrings": ["openOnBareRtp", "addons/guimenu.yml", "delayCountdown"]
+  },
+  {
+    "id": "hist_direct_10_queue_speed_up",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "where can i make rtp faster",
+    "body": "it says queued when players run /rtp",
+    "expected_any_substrings": ["period", "postTeleportQueueing", "advanced/performance.yml"]
+  },
+  {
+    "id": "hist_delight_01_crumb_lock_units_and_adr",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "lockAfterResetSeconds duration unit and ADR-068 cross-server limits",
+    "body": "I have:\nlockAfterUses: 10\nlockAfterResetSeconds: 10800\nI think the duration unit is broken? https://mclo.gs/AbCdEf1\nAlso is ADR-068 cross-server persisted teleport limits active for %rtp_remainingLockUses%?",
+    "expected_signal_categories": ["shop_talk", "empirical_repro"]
+  },
+  {
+    "id": "hist_delight_02_ddddn_velocity_proxy_redis",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Velocity proxy receives RTP request but shows candidates=0",
+    "body": "I put the RTP proxy plugin on the Velocity server and enabled network.enabled: true in its network.yml. It shows candidates=0 and no qualifying backend. Tab completion works for world1:nether, but cross-server /rtp region=world1:nether fails.",
+    "expected_signal_categories": ["shop_talk", "empirical_repro"]
+  },
+  {
+    "id": "hist_delight_03_wanttoplay_queue_architecture",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Btw i wanted to ask, how does the queue work?",
+    "body": "How does the queue work architecturally with the cache cycle and background chunk loading under the hood?",
+    "expected_signal_categories": ["shop_talk"]
+  },
+  {
+    "id": "hist_delight_04_rhmpzw_op_isolation_repro",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Is there something stopping operators from being affected by RTP commands from console?",
+    "body": "Say Steve is an op. I run rtp world:farm player:Steve, RTP tells me [11:25:36 INFO]: [RTP] invalid command argument player:Steve. Alex is a player, I run rtp world:farm player:Alex, it works as normal. When deopping Steve, it works for him again.",
+    "expected_signal_categories": ["empirical_repro"]
+  },
+  {
+    "id": "hist_delight_05_echolalia_github_source_trace",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Migrating from BetterRTP on Paper - exception in delayed init task",
+    "body": "I read the wiki and FAQs first. On startup: [17:40:29 INFO]: Running delayed init tasks. Looking up those methods on the GitHub, it seems like the plugin is reading a configuration value after updating Paper and Java 21.",
+    "expected_signal_categories": ["empirical_repro"]
+  },
+  {
+    "id": "hist_delight_06_effector_respawn_api_plugin",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "how to random-teleport using code?",
+    "body": "Im developing my server plugin using rtp-api. I want if player respawn, make random-tp player only if respawn isnt anchor-respawn or bed-respawn and not in cooldown.",
+    "expected_signal_categories": ["builder_api"]
+  },
+  {
+    "id": "hist_delight_07_george_pipelined_benchmarks",
+    "source_channel": "general",
+    "category": "WORTH_A_LOOK",
+    "title": "does leafrtp support parallel location searching?",
+    "body": "How does pipelined parallel location searching compare in benchmarks on heap space and tickrate degradation at 20 teleports per second on Paper and Folia?",
+    "expected_signal_categories": ["shop_talk"]
+  },
+  {
+    "id": "conv_01_dying_nether_roof_y128",
+    "source_channel": "support",
+    "category": "MULTITURN_CONVERGENCE",
+    "title": "players die when they rtp",
+    "body": "every time players use /rtp they die right away",
+    "followup_turns": ["in the nether on the roof at y=128"],
+    "expected_any_substrings": ["vert.maxY", "definitions/regions/default.yml"],
+    "forbidden_substrings": ["mclo.gs", "syncLoading=true"]
+  },
+  {
+    "id": "conv_02_dying_bedrock_top",
+    "source_channel": "support",
+    "category": "MULTITURN_CONVERGENCE",
+    "title": "players keep dying when they rtp",
+    "body": "players keep dying when they rtp",
+    "followup_turns": ["in the nether on top of bedrock"],
+    "expected_any_substrings": ["vert.maxY", "definitions/regions/default.yml"],
+    "forbidden_substrings": ["mclo.gs", "syncLoading=true"]
+  },
+  {
+    "id": "conv_03_teleport_cancelled_walking",
+    "source_channel": "support",
+    "category": "MULTITURN_CONVERGENCE",
+    "title": "rtp keeps failing when players move",
+    "body": "it says broken when players try to teleport",
+    "followup_turns": ["when they walk 1 block during teleportDelay it cancels the teleport"],
+    "expected_any_substrings": ["cancelDistance", "teleportDelay"],
+    "forbidden_substrings": ["mclo.gs", "syncLoading=true"]
+  },
+  {
+    "id": "conv_04_spawning_underground_caves",
+    "source_channel": "support",
+    "category": "MULTITURN_CONVERGENCE",
+    "title": "players suffocate in dark when they rtp",
+    "body": "players suffocate when using /rtp",
+    "followup_turns": ["it spawns them underground in caves without sky light, how do I require sky light?"],
+    "expected_any_substrings": ["vert.requireSkyLight", "definitions/regions/default.yml"],
+    "forbidden_substrings": ["mclo.gs", "syncLoading=true"]
+  },
+  {
+    "id": "conv_05_landing_in_ocean_water",
+    "source_channel": "support",
+    "category": "MULTITURN_CONVERGENCE",
+    "title": "players die after teleporting",
+    "body": "players keep dying when they use /rtp",
+    "followup_turns": ["they keep landing in OCEAN and DEEP_OCEAN water biomes"],
+    "expected_any_substrings": ["biomeWhitelist", "advanced/biomes.yml"],
+    "forbidden_substrings": ["mclo.gs", "syncLoading=true"]
+  },
+  {
+    "id": "conv_06_gui_menu_instead_of_tp",
+    "source_channel": "support",
+    "category": "MULTITURN_CONVERGENCE",
+    "title": "/rtp is not working as expected",
+    "body": "when players type /rtp it does not teleport them",
+    "followup_turns": ["it opens the book GUI menu instead of teleporting, how do I turn off openOnBareRtp?"],
+    "expected_any_substrings": ["openOnBareRtp", "addons/guimenu.yml"],
+    "forbidden_substrings": ["mclo.gs", "syncLoading=true"]
+  },
+  {
+    "id": "conv_07_queue_slow_refill_period",
+    "source_channel": "support",
+    "category": "MULTITURN_CONVERGENCE",
+    "title": "rtp is broken and slow",
+    "body": "players wait a long time",
+    "followup_turns": ["where can i make rtp faster when it says queued?"],
+    "expected_any_substrings": ["period", "postTeleportQueueing", "advanced/performance.yml"],
+    "forbidden_substrings": ["mclo.gs", "syncLoading=true"]
+  },
+  {
+    "id": "conf_01_betterrtp_maxradius_minradius",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Where is MaxRadius and MinRadius from BetterRTP?",
+    "body": "I used BetterRTP before, where do I set MaxRadius and MinRadius or import my BetterRTP config?",
+    "expected_any_substrings": ["MIGRATION", "/rtp config import", "shape.radius"]
+  },
+  {
+    "id": "conf_02_spanish_retraso_teletransporte",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Como configurar retrasoTeletransporte?",
+    "body": "Quiero cambiar retrasoTeletransporte en config.yml",
+    "expected_any_substrings": ["teleportDelay", "config.yml"]
+  },
+  {
+    "id": "conf_03_chinese_teleport_delay",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "如何修改 传送延迟?",
+    "body": "请问在配置文件里怎么设置 传送延迟?",
+    "expected_any_substrings": ["teleportDelay", "config.yml"]
+  },
+  {
+    "id": "conf_04_russian_teleport_delay",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Как изменить отсрочкаТелепорта?",
+    "body": "Где настроить отсрочкаТелепорта в config.yml?",
+    "expected_any_substrings": ["teleportDelay", "config.yml"]
+  },
+  {
+    "id": "conf_05_ezrtp_justrtp_migration",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Switching from EzRTP and JustRTP",
+    "body": "How do I migrate my EzRTP and JustRTP configs into LeafRTP?",
+    "expected_any_substrings": ["MIGRATION", "/rtp config import"]
+  },
+  {
+    "id": "conf_06_zero_context_vague_broken",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "rtp broken",
+    "body": "it doesnt work pls help",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "conf_07_zero_context_error_during_tp",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "error message during random teleport",
+    "body": "players get an error message during random teleport, what do i do",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "refuse_01_private_logs_mclogs",
+    "source_channel": "support",
+    "category": "OBSTINATE_REFUSAL",
+    "title": "server lags when players teleport",
+    "body": "server lags badly on rtp",
+    "followup_turns": [
+      "I'm not uploading private logs to mclo.gs, stop asking",
+      "still waiting for you to just tell me"
+    ],
+    "expected_any_substrings": ["what-not-to-do", "intended-usage", "wait quietly"],
+    "forbidden_substrings": ["full `logs/latest.log` uploaded to", "syncLoading=true"]
+  },
+  {
+    "id": "refuse_02_on_my_phone_away",
+    "source_channel": "support",
+    "category": "OBSTINATE_REFUSAL",
+    "title": "when we run /rtp we get null error",
+    "body": "throws up a null error when running /rtp",
+    "followup_turns": [
+      "I'm on my phone away from console right now",
+      "hello"
+    ],
+    "expected_any_substrings": ["what-not-to-do", "intended-usage", "wait quietly"],
+    "forbidden_substrings": ["full `logs/latest.log` uploaded to", "syncLoading=true"]
+  },
+  {
+    "id": "refuse_03_not_doing_all_that",
+    "source_channel": "support",
+    "category": "OBSTINATE_REFUSAL",
+    "title": "server freezes for 5 seconds on rtp",
+    "body": "it freezes the server and drops tps",
+    "followup_turns": [
+      "not doing all that just tell me the fix",
+      "seriously?"
+    ],
+    "expected_any_substrings": ["what-not-to-do", "intended-usage", "wait quietly"],
+    "forbidden_substrings": ["full `logs/latest.log` uploaded to", "syncLoading=true"]
+  },
+  {
+    "id": "refuse_04_zero_delta_repeat",
+    "source_channel": "support",
+    "category": "OBSTINATE_REFUSAL",
+    "title": "already teleporting stuck for 10 minutes",
+    "body": "says already teleporting and never finishes",
+    "followup_turns": [
+      "still happening",
+      "anyone there"
+    ],
+    "expected_any_substrings": ["what-not-to-do", "intended-usage", "wait quietly"],
+    "forbidden_substrings": ["full `logs/latest.log` uploaded to", "syncLoading=true"]
+  },
+  {
+    "id": "refuse_05_confidential_console",
+    "source_channel": "support",
+    "category": "OBSTINATE_REFUSAL",
+    "title": "players suffocate when teleporting",
+    "body": "players suffocate when using rtp",
+    "followup_turns": [
+      "logs are private and confidential, cannot share logs",
+      "any update"
+    ],
+    "expected_any_substrings": ["what-not-to-do", "intended-usage", "wait quietly"],
+    "forbidden_substrings": ["full `logs/latest.log` uploaded to", "syncLoading=true"]
+  },
+  {
+    "id": "refuse_06_away_from_pc_lag",
+    "source_channel": "support",
+    "category": "OBSTINATE_REFUSAL",
+    "title": "tps drops when players rtp",
+    "body": "tps drops every time someone teleports",
+    "followup_turns": [
+      "away from my pc right now, stop asking for console logs",
+      "bump"
+    ],
+    "expected_any_substrings": ["what-not-to-do", "intended-usage", "wait quietly"],
+    "forbidden_substrings": ["full `logs/latest.log` uploaded to", "syncLoading=true"]
+  },
+  {
+    "id": "hostile_01_garbage_plugin_adr",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "This garbage plugin is useless! ADR-068 broken",
+    "body": "This garbage plugin is useless! ADR-068 and %rtp_remainingCooldown% are broken, fix your plugin now!",
+    "expected_any_substrings": ["remainingCooldown", "COMMANDS", "MESSAGES", "reply with"],
+    "forbidden_substrings": ["WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "hostile_02_lazy_dev_shop_talk",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "dev is lazy and incompetent",
+    "body": "The dev is lazy! How does the queue work architecturally with the cache cycle and archimedean spiral?",
+    "expected_any_substrings": ["period", "how-it-works", "PERFORMANCE", "queue"],
+    "forbidden_substrings": ["WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "hostile_03_one_star_review_api",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "Leaving a 1-star review! rtp-api broken",
+    "body": "Leaving a 1-star review! I am developing my server plugin using rtp-api and addShape for custom shape hexagon and this trash plugin fails!",
+    "expected_any_substrings": ["shape.name", "POLYGON", "ADDON_QUICKSTART", "REGIONS"],
+    "forbidden_substrings": ["WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "hostile_04_rage_caps_repro",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "FIX YOUR BROKEN PLUGIN RIGHT NOW",
+    "body": "FIX YOUR BROKEN PLUGIN RIGHT NOW! Say Steve is an op and rtp player:Steve gives invalid command argument player:Steve, works as normal when deopping Steve!",
+    "expected_any_substrings": ["rtp.notme", "FAQ", "COMMANDS"],
+    "forbidden_substrings": ["WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "hostile_05_profanity_velocity_proxy",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "bullshit velocity proxy candidates=0",
+    "body": "What a piece of shit plugin, network.enabled: true shows candidates=0 and no qualifying backend on Velocity proxy, bullshit!",
+    "expected_any_substrings": ["network", "reply with", "share"],
+    "forbidden_substrings": ["WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "hostile_06_ping_spam_hello_questions",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "HELLO???? answer me now!",
+    "body": "HELLO???? @everyone answer me now! How do I change shape.radius in ADR-073?",
+    "expected_any_substrings": ["shape.radius", "definitions/regions/default.yml"],
+    "forbidden_substrings": ["@everyone", "WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "hostile_07_refund_scam_threat",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "Demanding a refund total scam",
+    "body": "Demanding a refund, total scam! Looking up those methods on the GitHub source code and openOnBareRtp in guimenu.yml still opens the menu!",
+    "expected_any_substrings": ["openOnBareRtp", "addons/guimenu.yml"],
+    "forbidden_substrings": ["WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "entitled_01_immediate_need_help_click_no_info",
+    "source_channel": "support",
+    "category": "ENTITLED_BUTTON_SPAM",
+    "title": "server lags when teleporting",
+    "body": "rtp lags my server",
+    "click_need_help": true,
+    "expected_any_substrings": ["/rtp info", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["notified the maintainer", "syncLoading=true"]
+  },
+  {
+    "id": "entitled_02_pro_hostile_no_ping",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "author_roles": ["Pro Supporter"],
+    "title": "fix your trash plugin right now",
+    "body": "fix your trash plugin right now idiot, server lags when players teleport",
+    "expected_any_substrings": ["/rtp info", "performance.yml", "reply with", "share"],
+    "forbidden_substrings": ["PRO PRIORITY", "WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "entitled_03_wake_up_dev_spam",
+    "source_channel": "support",
+    "category": "HOSTILE_STUFFED_SIGNAL",
+    "title": "wake up dev respond now",
+    "body": "wake up dev respond now @here why is rtp not working",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["@here", "WORTH A LOOK", "syncLoading=true"]
+  },
+  {
+    "id": "entitled_04_immediate_need_help_null_error",
+    "source_channel": "support",
+    "category": "ENTITLED_BUTTON_SPAM",
+    "title": "null error on rtp",
+    "body": "throws up a null error",
+    "click_need_help": true,
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["notified the maintainer", "syncLoading=true"]
+  },
+  {
+    "id": "footgun_01_chatgpt_syncloading_true",
+    "source_channel": "support",
+    "category": "BYSTANDER_FOOTGUN",
+    "title": "ChatGPT told me to set syncLoading: true",
+    "body": "My server lags on /rtp so ChatGPT told me to set syncLoading: true and viewDistanceSelect: 4 in performance.yml",
+    "expected_any_substrings": ["Configuration safety note", "syncLoading", "what-not-to-do"],
+    "forbidden_substrings": ["syncLoading=true", "viewDistanceSelect=2"]
+  },
+  {
+    "id": "footgun_02_bystander_mintps_and_maxmspt",
+    "source_channel": "support",
+    "category": "BYSTANDER_FOOTGUN",
+    "title": "How to stop rtp lag?",
+    "body": "where can i make rtp faster when it says queued",
+    "bystander_messages": ["Bro just set minTPS: 10 and maxMSPT: 80 in performance.yml!"],
+    "expected_any_substrings": ["Configuration safety note", "minTPS", "19.0", "what-not-to-do"],
+    "forbidden_substrings": ["minTPS=10", "maxMSPT=60"]
+  },
+  {
+    "id": "footgun_03_rtp_config_set_syntax",
+    "source_channel": "support",
+    "category": "BYSTANDER_FOOTGUN",
+    "title": "/rtp config set shape.radius 5000 not working",
+    "body": "I ran /rtp config set shape.radius 5000 in console and it failed, how do I set shape.radius?",
+    "expected_any_substrings": ["Configuration safety note", "invalid syntax", "shape.radius"],
+    "forbidden_substrings": ["/rtp config set"]
+  },
+  {
+    "id": "footgun_04_bystander_cachecap_zero",
+    "source_channel": "support",
+    "category": "BYSTANDER_FOOTGUN",
+    "title": "Memory usage question",
+    "body": "How do I configure maxHeapPercent in performance.yml?",
+    "bystander_messages": ["Set cacheCap: 0 and syncLoading=true so it uses zero RAM!"],
+    "expected_any_substrings": ["Configuration safety note", "cacheCap", "syncLoading"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "footgun_05_all_footguns_combined",
+    "source_channel": "support",
+    "category": "BYSTANDER_FOOTGUN",
+    "title": "Is this optimization guide good?",
+    "body": "Someone told me to run /rtp config set performance and set syncLoading: true, minTPS: 12, maxMSPT: 90, cacheCap: 0, viewDistanceSelect: 3",
+    "expected_any_substrings": ["Configuration safety note", "what-not-to-do"],
+    "forbidden_substrings": ["syncLoading=true", "minTPS=10", "/rtp config set"]
+  },
+  {
+    "id": "docgap_01_code_bridge_comparative_cost_governor",
+    "source_channel": "support",
+    "category": "DOC_GAP",
+    "title": "ComparativeCostGovernor in rtp-core",
+    "body": "How does ComparativeCostGovernor interact with syncAllottedTime when tuning pipeline tasks?",
+    "expected_any_substrings": ["DOC GAP", "ComparativeCostGovernor.java", "syncAllottedTime"]
+  },
+  {
+    "id": "docgap_02_code_bridge_setup_recipe",
+    "source_channel": "support",
+    "category": "DOC_GAP",
+    "title": "SetupRecipe validation in code",
+    "body": "How does SetupRecipe validate region shape parameters when running setup?",
+    "expected_any_substrings": ["DOC GAP", "SetupRecipe.java"]
+  },
+  {
+    "id": "docgap_03_tentative_npc_questline",
+    "source_channel": "support",
+    "category": "DOC_GAP",
+    "title": "Hooking LeafRTP into custom questline NPC dialog",
+    "body": "Can I hook LeafRTP into my custom questline NPC dialog on Paper?",
+    "expected_any_substrings": ["DOC GAP"]
+  },
+  {
+    "id": "docgap_04_code_bridge_teleport_pipeline_task",
+    "source_channel": "support",
+    "category": "DOC_GAP",
+    "title": "TeleportPipelineTask activeChunks behavior",
+    "body": "How does TeleportPipelineTask manage activeChunks during chunk ticket acquisition?",
+    "expected_any_substrings": ["DOC GAP", "TeleportPipelineTask.java"]
+  }
+]

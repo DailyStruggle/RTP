@@ -14,7 +14,7 @@ class TitleEffectArgsTest {
     @Test
     @DisplayName("RTP-78: String-typed effect args survive fixData (TITLE.<title>.<subtitle> is not reset to empty)")
     void dottedTokenFillsTitleAndSubtitle() {
-        EffectFactory.setCoercer(new io.github.dailystruggle.effectsapi.bukkit.BukkitValueCoercer());
+        EffectFactory.setCoercer(io.github.dailystruggle.effectsapi.common.spi.ValueCoercer.DEFAULT);
         EffectFactory.addEffect("TITLE", new TitleEffect());
         List<Effect<?>> built = EffectFactory.buildEffects("rtp.effect.postteleport",
                 List.of("rtp.effect.postteleport.TITLE.LiveCheck.Arrived"));

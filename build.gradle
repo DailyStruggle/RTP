@@ -112,7 +112,7 @@ subprojects {
     def java17Modules = [
             ':rtp-api', ':server-api', ':rtp-core', ':anvil-api', ':bit-api', ':yaml-api', ':units-api', ':commands-api',
             ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
-            ':predict-api', ':config-bit-api', ':menu-api',
+            ':predict-api', ':config-bit-api', ':menu-api', ':tags-api',
             ':rtp-proxy:rtp-proxy-common',
             ':rtp-bukkit:rtp-bukkit-common', ':rtp-bukkit:rtp-bukkit-v1_20_R1',
             ':rtp-paper:rtp-paper-common', ':rtp-paper:rtp-paper-v1_20_R1',
@@ -348,17 +348,21 @@ subprojects {
             ':metrics-api': [instruction: 0.95, branch: 0.85],
             // bstats-api: new module; floor set at the Stage A strict gate.
             ':bstats-api': [instruction: 0.90, branch: 0.80],
-            // yaml-api measured via jacocoTestReport (2026-10-24): 69.9% instruction /
-            // 63.8% branch overall (96.4% / 88.8% on configuration.yaml). ConfigParser,
-            // MultiConfigParser, and FactoryValue integration tests against RTPTestSetup
-            // and rtp-plugin locale resources remain in rtp-core.
+            // yaml-api measured via jacocoTestReport (2026-10-24): 89.0% instruction /
+            // 79.3% branch overall (96.4% / 88.8% on configuration.yaml).
             ':yaml-api': [
-                    instruction: 0.68,
-                    branch: 0.62,
+                    instruction: 0.85,
+                    branch: 0.75,
                     packages: [
                             'io.github.dailystruggle.rtp.common.configuration.yaml': [instruction: 0.92, branch: 0.80]
                     ]
             ],
+            // config-bit-api measured via jacocoTestReport (2026-10-24): 96.1% instruction /
+            // 81.2% branch.
+            ':config-bit-api': [instruction: 0.90, branch: 0.78],
+            // predict-api measured via jacocoTestReport (2026-10-24): 94.3% instruction /
+            // 79.5% branch.
+            ':predict-api': [instruction: 0.90, branch: 0.76],
             // units-api measured via jacocoTestReport (2026-10-22): 86.3% instruction /
             // 67.9% branch. CacheMemoryCost's RTP-dependent tests remain in rtp-core.
             ':units-api': [instruction: 0.85, branch: 0.66],
@@ -627,12 +631,16 @@ apiModulesForBinaryCheck.each { modulePath ->
             ignoreMissingClasses = true
             // Platform/internal adapter implementation packages are not public API.
             // effectsapi.fabric moved to rtp-fabric-common (effects-api-ADR-003
-            // amendment 2026-10-15); kept excluded so the baseline diff stays quiet.
+            // amendment 2026-10-15) and effectsapi.bukkit / EffectsAPI moved to
+            // rtp-bukkit-common (ADR-116 Decision 4); kept excluded so the baseline diff stays quiet.
             packageExcludes = [
-                    'io.github.dailystruggle.effectsapi.fabric'
+                    'io.github.dailystruggle.effectsapi.fabric',
+                    'io.github.dailystruggle.effectsapi.bukkit'
             ]
             classExcludes = [
-                    'io.github.dailystruggle.effectsapi.fabric.*'
+                    'io.github.dailystruggle.effectsapi.fabric.*',
+                    'io.github.dailystruggle.effectsapi.bukkit.*',
+                    'io.github.dailystruggle.effectsapi.EffectsAPI'
             ]
             txtOutputFile = txtReportFile.get().asFile
             richReport {
@@ -1165,10 +1173,6 @@ subprojects {
             if (isPlatformOrAddon) {
                 property 'sonar.coverage.exclusions', '**/*'
                 property 'sonar.cpd.exclusions', '**/*'
-            }
-
-            if (project.path == ':effects-api') {
-                property 'sonar.coverage.exclusions', '**/effectsapi/bukkit/**'
             }
 
             def isVersionAdapterOrCarrier = project.name.matches('v[0-9]+.*') ||

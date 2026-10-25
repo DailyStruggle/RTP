@@ -253,8 +253,8 @@ public final class NeoForgeEffectsHandler {
                 }
                 target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
                         NeoForgeHandles.wrap(handle),
-                        io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
-                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destHandle) : null);
+                        io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(explicitLocation),
+                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(destHandle) : null);
             } else {
                 target = handle;
             }

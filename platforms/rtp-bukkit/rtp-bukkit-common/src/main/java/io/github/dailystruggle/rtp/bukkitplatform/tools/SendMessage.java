@@ -149,7 +149,7 @@ public class SendMessage {
   }
 
   public static void sendMessage(Player player, String message) {
-    if (message == null || message.isEmpty()) return;
+    if (player == null || message == null || message.isEmpty()) return;
     intercept(message);
     if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
       BaseComponent[] components = toComponents(player, message);
@@ -606,6 +606,7 @@ public class SendMessage {
 
   public static void title(
       Player player, String title, String subtitle, int in, int stay, int out) {
+    if (player == null) return;
     boolean noTitle = title == null || title.isEmpty();
     boolean noSubtitle = subtitle == null || subtitle.isEmpty();
 
@@ -637,7 +638,7 @@ public class SendMessage {
   }
 
   public static void actionbar(Player player, String bar) {
-    if (bar == null || bar.isEmpty()) return;
+    if (player == null || bar == null || bar.isEmpty()) return;
     // Route through the MiniMessage-aware renderer so action-bar text honors
     // <tag> markup (e.g. <rainbow>) on Paper/Folia, while &/hex legacy configs
     // keep rendering via the legacy fallback inside toComponents.

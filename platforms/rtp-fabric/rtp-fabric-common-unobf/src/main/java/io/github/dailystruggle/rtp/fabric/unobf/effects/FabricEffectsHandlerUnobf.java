@@ -138,6 +138,40 @@ public final class FabricEffectsHandlerUnobf {
             if (!effectParsingEnabled(parser) || uuid == null) return;
             dispatchByUuid("rtp.effect.queuepop", uuid, runtime);
         });
+
+        registerDeathHook(runtime);
+    }
+
+    private static void registerDeathHook(FabricEffectRuntimeUnobf runtime) {
+        try {
+            Class<?> sleeCls = Class.forName("net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents");
+            Class<?> eventCls = Class.forName("net.fabricmc.fabric.api.event.Event");
+            java.lang.reflect.Method register = eventCls.getMethod("register", Object.class);
+
+            Class<?> afterDeathCallback = Class.forName(
+                    "net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AfterDeath");
+            Object afterDeathEvent = sleeCls.getField("AFTER_DEATH").get(null);
+
+            Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                    afterDeathCallback.getClassLoader(),
+                    new Class<?>[]{afterDeathCallback},
+                    (p, method, args) -> {
+                        if (args != null && args.length >= 1 && args[0] instanceof ServerPlayer sp) {
+                            try {
+                                if (RTPRuntime.serverAccessor() != null) {
+                                    RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(sp.getUUID());
+                                    if (rp != null) {
+                                        dispatch("rtp.effect.death", rp, runtime);
+                                    }
+                                }
+                            } catch (Throwable ignored) {}
+                        }
+                        return null;
+                    });
+            register.invoke(afterDeathEvent, proxy);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE, "[RTP][Fabric] ServerLivingEntityEvents.AFTER_DEATH not available for effects");
+        }
     }
 
     private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> parser) {
@@ -259,8 +293,8 @@ public final class FabricEffectsHandlerUnobf {
                 }
                 target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
                         io.github.dailystruggle.effectsapi.fabric_unobf.FabricHandlesUnobf.wrap(handle),
-                        io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
-                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destHandle) : null);
+                        io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(explicitLocation),
+                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(destHandle) : null);
             } else {
                 target = handle;
             }

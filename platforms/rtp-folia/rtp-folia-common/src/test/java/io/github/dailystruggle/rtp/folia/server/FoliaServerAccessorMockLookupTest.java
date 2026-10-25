@@ -101,4 +101,18 @@ class FoliaServerAccessorMockLookupTest {
     assertNotSame(mock, sender);
     assertFalse(sender instanceof RuntimeMockRTPPlayer);
   }
+
+  @Test
+  @DisplayName("REQ-RTP-S-006 - Folia 26.x version strings (26.1 through 26.4 snapshots) resolve to intVersion 26")
+  void folia26xServerIntVersionResolution() {
+    for (String ver : java.util.List.of("26_1", "26_2", "26_3", "26_4", "26.1.2-6-main (MC: 26.1.2)", "26.3-6-main (MC: 26.3)", "26.4-snapshot-1")) {
+      AbstractFoliaServerAccessor custom = new AbstractFoliaServerAccessor() {
+        @Override
+        public String getServerVersion() {
+          return ver;
+        }
+      };
+      assertEquals(26, custom.getServerIntVersion(), "Expected intVersion 26 for " + ver);
+    }
+  }
 }

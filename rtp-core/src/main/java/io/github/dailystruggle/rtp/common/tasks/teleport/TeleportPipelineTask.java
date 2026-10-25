@@ -724,8 +724,8 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         computeDistance();
         if (player.uuid() != null) {
           ComputeGovernor gov = ComputeGovernor.active();
-          double unitCostNanos = (gov != null) ? gov.estimatedUnitCostNanos() : 0.0;
-          ConsumerLedger.active().recordConsumption(
+          double unitCostNanos = gov.estimatedUnitCostNanos();
+          gov.consumerLedger().recordConsumption(
               region != null ? region.name : null, player.uuid(), unitCostNanos, System.nanoTime());
         }
         success = true;

@@ -7032,5 +7032,126 @@ class DeclarativeBitAndSurvivalRampTest(unittest.TestCase):
             self.assertIn("CROSS-COMPETITOR DECLARATIVE BIT & SURVIVAL COMPARISON", comp_txt)
 
 
+class PlatformProfileTest(unittest.TestCase):
+    """ADR-122 Decision 6: platform profiles (bukkit/paper/folia vs fabric) in bench_overnight.py and bench_fuzz.py."""
+
+    def test_profile_definitions_and_server_dir_autodetect(self) -> None:
+        for name in ("bukkit", "paper", "folia"):
+            prof = bf.get_platform_profile(name)
+            self.assertEqual(prof.name, name)
+            self.assertEqual(prof.family, "bukkit")
+            self.assertEqual(prof.jar_subdir, "plugins")
+            self.assertEqual(prof.loaded_check_cmd, "plugins")
+            self.assertTrue(prof.event_error_oracle)
+            self.assertEqual(prof.permission_strategy, "luckperms")
+
+        fabric = bf.get_platform_profile("fabric")
+        self.assertEqual(fabric.name, "fabric")
+        self.assertEqual(fabric.family, "fabric")
+        self.assertEqual(fabric.jar_subdir, "mods")
+        self.assertEqual(fabric.loaded_check_cmd, "fabric mods")
+        self.assertFalse(fabric.event_error_oracle)
+        self.assertEqual(fabric.permission_strategy, "fabric")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "mods"))
+            os.makedirs(os.path.join(tmp, "config", "StressTestRTP", "runs"))
+            detected = bf.get_platform_profile(None, tmp)
+            self.assertEqual(detected.name, "fabric")
+            self.assertEqual(detected.jar_dir(tmp), os.path.join(tmp, "mods"))
+            self.assertEqual(
+                detected.harness_runs_dir(tmp, "runs"),
+                os.path.join(tmp, "config", "StressTestRTP", "runs"),
+            )
+
+    def test_driver_jar_isolation_and_loaded_target_check_on_fabric_and_bukkit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            mods_dir = os.path.join(tmp, "mods")
+            os.makedirs(mods_dir)
+            for fname in ("LeafRTP-Fabric-3.3.0.jar", "BetterRTP-Fabric-1.0.jar", "fabric-api-0.100.0.jar"):
+                with open(os.path.join(mods_dir, fname), "wb") as fh:
+                    fh.write(b"jar")
+
+            ns = argparse.Namespace(
+                server_dir=tmp,
+                platform="fabric",
+                isolate=True,
+                jars=bf.bo.DEFAULT_JARS,
+                names=bf.bo.DEFAULT_NAMES,
+                dry_run=False,
+            )
+            drv = bf.FuzzDriver(ns, "127.0.0.1", 25575, "secret")
+            self.assertEqual(drv.plugins_dir(), mods_dir)
+            drv.set_jars("rtp")
+            self.assertTrue(os.path.exists(os.path.join(mods_dir, "LeafRTP-Fabric-3.3.0.jar")))
+            self.assertTrue(os.path.exists(os.path.join(mods_dir, "BetterRTP-Fabric-1.0.jar.off")))
+            self.assertTrue(os.path.exists(os.path.join(mods_dir, "fabric-api-0.100.0.jar")))
+
+            # 1) RCON `fabric mods` bullet list reply
+            drv.try_cmd = lambda cmd: "- fabric-api 0.100.0\n- leafrtp 3.3.0\n- stresstestrtp 1.0\n" if cmd == "fabric mods" else None
+            ok, loaded = drv.jar_set_ok("rtp")
+            self.assertTrue(ok)
+            self.assertEqual(loaded, "leafrtp")
+            ok_other, _ = drv.jar_set_ok("betterrtp")
+            self.assertFalse(ok_other)
+
+            # 2) Fallback when `fabric mods` is unknown on vanilla Fabric RCON
+            drv.try_cmd = lambda cmd: "Unknown or incomplete command"
+            ok_fb, loaded_fb = drv.jar_set_ok("rtp")
+            self.assertTrue(ok_fb)
+            self.assertEqual(loaded_fb, "leafrtp")
+
+    def test_permission_grant_skips_cleanly_on_fabric_without_luckperms(self) -> None:
+        cmds: list[str] = []
+
+        class StubDrv:
+            profile = bf.get_platform_profile("fabric")
+
+            def try_cmd(self, cmd: str):
+                cmds.append(cmd)
+                return "Unknown or incomplete command"
+
+        grant = bf.PermissionGrant(StubDrv(), ["rtp.use", "betterrtp.use"], profile="fabric")
+        granted = grant.apply()
+        self.assertEqual(granted, [])
+        grant.revert()
+
+    def test_log_oracle_scopes_event_error_to_bukkit_and_keeps_stack_trace_packages_on_all(self) -> None:
+        event_log = (
+            "[12:00:00 ERROR]: Could not pass event PlayerTeleportEvent to BetterRTP v3.6.13\n"
+            "java.lang.NullPointerException: boom\n"
+            "\tat me.SuperRonanCraft.BetterRTP.player.rtp.RTP.start(RTP.java:42)\n"
+            "\tat net.fabricmc.loader.impl.FabricLoaderImpl.Init(FabricLoaderImpl.java:10)\n"
+        )
+        uncaught_log = (
+            "[12:00:01 ERROR]: [Server thread] Unhandled exception in tick\n"
+            "java.lang.IllegalStateException: fabric failure\n"
+            "\tat net.fabricmc.fabric.api.event.EventFactory.invoke(EventFactory.java:20)\n"
+            "\tat custom.fabric.rtpmod.TeleportHandler.tick(TeleportHandler.java:88)\n"
+            "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:900)\n"
+        )
+        pkgs = bf.plugin_packages("custom.fabric.rtpmod=FabricRTP")
+
+        bukkit_oracle = bf.ServerLogOracle(None, packages=pkgs, target_names={"betterrtp", "fabricrtp"}, profile="paper")
+        fabric_oracle = bf.ServerLogOracle(None, packages=pkgs, target_names={"betterrtp", "fabricrtp"}, profile="fabric")
+
+        bukkit_findings = bukkit_oracle.analyze_text(event_log, [{"a": "rtp"}], "betterrtp")
+        self.assertEqual(len(bukkit_findings), 1)
+        self.assertEqual(bukkit_findings[0]["class"], "EVENT_ERROR")
+        self.assertEqual(bukkit_findings[0]["attributed_plugin"], "BetterRTP")
+
+        # On Fabric, `Could not pass event` is not matched as EVENT_ERROR; stack trace still attributes via packages
+        fabric_event_findings = fabric_oracle.analyze_text(event_log, [{"a": "rtp"}], "betterrtp")
+        self.assertTrue(all(f["class"] != "EVENT_ERROR" for f in fabric_event_findings))
+
+        # Stack-trace `--plugin-packages` attribution is active on both Bukkit and Fabric profiles
+        for oracle in (bukkit_oracle, fabric_oracle):
+            u_findings = oracle.analyze_text(uncaught_log, [{"a": "rtp"}], "fabricrtp")
+            self.assertEqual(len(u_findings), 1)
+            self.assertEqual(u_findings[0]["class"], "UNCAUGHT_EXCEPTION")
+            self.assertEqual(u_findings[0]["attributed_plugin"], "FabricRTP")
+            self.assertIn("custom.fabric.rtpmod.TeleportHandler.tick", u_findings[0]["key"])
+
+
 if __name__ == "__main__":
     unittest.main()

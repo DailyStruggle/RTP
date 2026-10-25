@@ -41,7 +41,7 @@ You can create and update regions through:
 
 > **Inheritance (`@config`).** Most of the keys above accept the token `@config` instead of a literal value, in which case they inherit the matching global default from the `defaults:` block of `config.yml`. The type-bearing `shape`/`vert` keys inherit as a whole named block; type-free scalars (`requirePermission`, `cacheCap`, `backlogCacheCap`, `activeChunkCap`, `spatialResolution`, `cooldown`, `delay`) inherit individually; `price` may reference `@economy`. See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
 
-> **"Zone"/"arena" synonym.** Other plugins call a bounded random-teleport area a "zone" or "arena"; in RTP that concept *is* a region - there is no separate object to configure. A region controls *where a player lands*, not *whether they can walk back out*. To keep a teleported player confined to the area, either pair the region with a WorldGuard region whose `exit` flag is `deny` (Bukkit family only), or use the cross-platform tether addon (LeafRTPTetherAddon), which enforces confinement on RTP's own geometry with no WorldGuard dependency.
+> **"Zone"/"arena" synonym.** Other plugins call a bounded random-teleport area a "zone" or "arena"; in RTP that concept *is* a region - there is no separate object to configure. A region controls *where a player lands*, not *whether they can walk back out*. To keep a teleported player confined to the area, either pair the region with a WorldGuard region whose `exit` flag is `deny` (Bukkit family only), or use the bundled action addon (`LeafRTPActionAddon`), which enforces confinement (`confinement:` in `definitions/actions/<name>.yml`) on RTP's own geometry with no WorldGuard dependency.
 
 ---
 
@@ -92,21 +92,21 @@ The `shape` block defines the horizontal area where players can land.
 
 ### Region Size: `radius` and `centerRadius`
 
-**By default, numeric distances in the `shape` block are measured in chunks (1 chunk = 16 blocks).**
-However, RTP supports **spatial unit suffixes** on any distance parameter, as well as automatic interpretation of ambiguous numbers and world-border overflow checking.
+**Write distances with explicit block or metric unit suffixes (`radius: 4096b`, `radius: 10km`, `centerRadius: 1024b`) in both YAML files and commands.**
+Bare unitless numbers without a suffix default to **chunks** (`1 chunk = 16 blocks`) for backwards compatibility, with automatic overflow/underflow checks against the world border.
 
 #### Spatial Unit Suffixes
 
 You can explicitly specify distance units in config files or command parameters:
 
 - **Minecraft Native Units:**
+  - `b`, `block`, `blocks`: Minecraft blocks (1 block = 1 meter). E.g. `radius: 4096b`, `centerRadius: 1024b` (256 and 64 chunks).
   - `c`, `chunk`, `chunks`: Chunks (1 chunk = 16 blocks). E.g. `radius: 256c` (4,096 blocks).
-  - `b`, `block`, `blocks`: Minecraft blocks (1 block = 1 meter). E.g. `radius: 4096b` (256 chunks).
   - `nb`, `netherblock`, `netherblocks`: Nether coordinate blocks (8 Overworld blocks). E.g. `radius: 500nb` (4,000 blocks).
   - `r`, `region`, `regions`: Region files (1 region = 32 chunks = 512 blocks). E.g. `radius: 4r` (128 chunks = 2,048 blocks).
 - **Metric Units (1 block = 1 meter):**
+  - `km`, `k`, `kilo`, `kilos`, `kilometer`, `kilometers`, `kilometre`, `kilometres`: Kilometers. E.g. `radius: 10km` (10,000 blocks = 625 chunks).
   - `m`, `meter`, `meters`, `metre`, `metres`: Meters (1 meter = 1 block). E.g. `radius: 5000m`.
-  - `km`, `k`, `kilo`, `kilos`, `kilometer`, `kilometers`, `kilometre`, `kilometres`: Kilometers. E.g. `radius: 5km` (5,000 blocks = 312.5 chunks).
 - **Imperial & Survey Units:**
   - `mi`, `mile`, `miles`: Statute miles (1,609.344 blocks). E.g. `radius: 3mi`.
   - `yd`, `yard`, `yards`: Yards (0.9144 blocks).
@@ -229,36 +229,21 @@ For comparison, picking a random spot and retrying has no ceiling. Each retry fa
 
 #### `CIRCLE` / `SQUARE`
 Standard shapes with uniform or weighted distribution.
-- `radius`: Outer radius in **chunks**. For `CIRCLE` it is the disk radius; for `SQUARE` it is the half-extent, so the square spans `2 x radius` chunks per side.
-- `centerRadius`: Inner radius (donut hole) in **chunks**. Must be less than `radius`. `CIRCLE` becomes a ring, `SQUARE` becomes a square frame.
+- `radius`: Outer radius in **chunks** (or with a spatial unit suffix like `5000b` or `10km`). For `CIRCLE` it is the disk radius; for `SQUARE` it is the half-extent, so the square spans `2 x radius` chunks per side.
+- `centerRadius`: Inner radius (donut hole) in **chunks** (or with a spatial unit suffix like `1000b`). Must be less than `radius`. `CIRCLE` becomes a ring, `SQUARE` becomes a square frame.
 - `weight`: `> 1.0` pulls landings toward center; `< 1.0` pushes toward edges. Applies within the `centerRadius`-to-`radius` band; it does not move the bounds themselves.
 - `expand`: If true, radius grows as locations are used.
 
-#### `CIRCLE_OPTIMIZED_DUAL_LAYER` / `SQUARE_OPTIMIZED_DUAL_LAYER`
-Variants of `CIRCLE` and `SQUARE` that use less memory at one-chunk precision and pick locations faster (2x-11x in my benchmarks under `ACCUMULATE` mode).
-- Accepts the exact same parameters as `CIRCLE` and `SQUARE` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
-
-#### `CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL`
-Legacy pure 1D Archimedean spiral mapping shapes.
-- Preserved for backwards compatibility, regression testing, and side-by-side benchmarks against the newer shapes.
-- Accepts identical parameters to `CIRCLE` and `SQUARE`.
-
-#### `CIRCLE_NORMAL` / `SQUARE_NORMAL`
-Gaussian distribution variants.
-- `radius` / `centerRadius`: Same as above - still chunks, still the hard outer and inner bounds.
-- `mean`: Center of the bell curve, expressed as a fraction of the band (0.0 = at `centerRadius`, 1.0 = at `radius`).
-- `deviation`: Spread of the bell curve. Smaller = tighter clustering around `mean`.
-
 #### `ELLIPSE`
 A circle with independent X and Z semi-axes, so it can cover a non-square world border without wasting a corner.
-- `radius` / `radius2`: The two outer semi-axes in **chunks**. The wider of the two sets the bounding circle the spiral mapping walks; the ellipse predicate rejects everything outside the true ellipse.
+- `radius` / `radius2`: The two outer semi-axes in **chunks** (supports spatial suffixes). The wider of the two sets the bounding circle the spiral mapping walks; the ellipse predicate rejects everything outside the true ellipse.
 - `centerRadius` / `centerRadius2`: The two semi-axes of the inner exclusion ellipse, also in **chunks**. Both default to `0` (no hole).
 - `rotation`: Rotation of both the outer and inner ellipse in degrees around `centerX` / `centerZ`.
 - `weight`, `uniquePlacements`, `expand`, `mode`, `centerX`, `centerZ`: Same meaning as `CIRCLE`.
 
 #### `RECTANGLE`
 Uses explicit side lengths instead of a radius.
-- `width` / `height`: Full X-axis and Z-axis extent in **chunks**, centred on `centerX` / `centerZ` (so `width: 256` reaches 128 chunks / 2,048 blocks either side). There is no `centerRadius` hole for this shape.
+- `width` / `height`: Full X-axis and Z-axis extent in **chunks** (supports spatial suffixes), centred on `centerX` / `centerZ` (so `width: 4096b` or `256c` reaches 128 chunks / 2,048 blocks either side). There is no `centerRadius` hole for this shape.
 - `rotation`: Rotation in degrees around the center.
 
 #### `POLYGON`
@@ -281,6 +266,20 @@ An arbitrary closed boundary (such as a triangle, pentagon, hexagon, octagon, or
 - `centerX` / `centerZ`: Optional. Defaults to the center of the vertex bounding box.
 - `weight`, `uniquePlacements`, `mode`: Same meaning as `SQUARE`.
 - `expand` is not supported here and is ignored (with a warning if set) - the boundary is yours, and expanding it would push selections outside the polygon you authored.
+
+<details>
+<summary><b>Advanced / Legacy Benchmark Shape Aliases (Optional)</b></summary>
+
+Normal server setups only need `CIRCLE`, `SQUARE`, `RECTANGLE`, `ELLIPSE`, or `POLYGON`. The variants below exist for bell-curve customization, legacy config migration, or side-by-side benchmark runs:
+
+- **`CIRCLE_NORMAL` / `SQUARE_NORMAL`**: Gaussian distribution variants.
+  - `radius` / `centerRadius`: Same as `CIRCLE` / `SQUARE` (hard outer and inner bounds).
+  - `mean`: Center of the bell curve, expressed as a fraction of the band (`0.0` = at `centerRadius`, `1.0` = at `radius`).
+  - `deviation`: Spread of the bell curve. Smaller = tighter clustering around `mean`.
+- **`CIRCLE_OPTIMIZED_DUAL_LAYER` / `SQUARE_OPTIMIZED_DUAL_LAYER`**: Explicit aliases for the default `CIRCLE` and `SQUARE` dual-layer engine. Accepts the exact same parameters as `CIRCLE` and `SQUARE` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
+- **`CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL`**: Legacy v1/v2 pure 1D Archimedean spiral mapping shapes, preserved for backwards compatibility, regression testing, and side-by-side benchmarks. Accepts identical parameters to `CIRCLE` and `SQUARE`.
+
+</details>
 
 ---
 
