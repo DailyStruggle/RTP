@@ -19,10 +19,12 @@ Tables generated in `discord-support-bot/generated/doc-index.sqlite`:
 from __future__ import annotations
 
 import argparse
+import atexit
 import math
 import pathlib
 import re
 import sqlite3
+import threading
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -44,9 +46,31 @@ PROJECT_TAG_MAP: dict[str, str] = {
 _MANIFEST_CACHE: dict[str, dict[str, Any]] = {}
 
 
+def _strip_inline_yaml_comment(raw: str) -> str:
+    """Strips an unquoted inline `#` comment while preserving `#` inside single or double quotes."""
+    in_single = False
+    in_double = False
+    escaped = False
+    for idx, ch in enumerate(raw):
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\" and in_double:
+            escaped = True
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        elif ch == "#" and not in_single and not in_double:
+            if idx == 0 or raw[idx - 1].isspace():
+                return raw[:idx].rstrip()
+    return raw.strip()
+
+
 def _parse_yaml_scalar(raw: str) -> Any:
     """Parses a YAML scalar (quoted string with escapes, bool, number, inline list, or unquoted string)."""
-    val = raw.strip()
+    val = _strip_inline_yaml_comment(raw)
     if not val:
         return ""
     if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
@@ -99,22 +123,60 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
         first_indent, first_line = cleaned_lines[idx]
         if first_indent < min_indent:
             return {}, idx
-        if first_line.startswith("- "):
+        if first_line.startswith("- ") or first_line == "-":
             seq: list[Any] = []
             while idx < len(cleaned_lines):
                 ind, line = cleaned_lines[idx]
-                if ind < first_indent or not line.startswith("- "):
+                if ind < first_indent:
                     break
                 if ind > first_indent:
+                    idx += 1
+                    continue
+                if not (line.startswith("- ") or line == "-"):
                     break
-                seq.append(_parse_yaml_scalar(line[2:]))
+                item_rest = _strip_inline_yaml_comment(line[1:].lstrip())
                 idx += 1
+                has_nested = idx < len(cleaned_lines) and cleaned_lines[idx][0] > first_indent
+                if not item_rest:
+                    if has_nested:
+                        child_val, idx = _parse_block(idx, cleaned_lines[idx][0])
+                        seq.append(child_val)
+                    else:
+                        seq.append("")
+                    continue
+                if (
+                    ":" in item_rest
+                    and not item_rest.startswith(('"', "'", "["))
+                ):
+                    k_part, v_part = item_rest.split(":", 1)
+                    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", k_part.strip()):
+                        item_map: dict[str, Any] = {}
+                        k_name = str(_parse_yaml_scalar(k_part))
+                        v_clean = _strip_inline_yaml_comment(v_part)
+                        if v_clean:
+                            item_map[k_name] = _parse_yaml_scalar(v_clean)
+                        elif has_nested:
+                            nested_val, idx = _parse_block(idx, cleaned_lines[idx][0])
+                            item_map[k_name] = nested_val
+                            has_nested = idx < len(cleaned_lines) and cleaned_lines[idx][0] > first_indent
+                        else:
+                            item_map[k_name] = {}
+                        if has_nested:
+                            more_map, idx = _parse_block(idx, cleaned_lines[idx][0])
+                            if isinstance(more_map, dict):
+                                item_map.update(more_map)
+                        seq.append(item_map)
+                        continue
+                scalar_val = _parse_yaml_scalar(item_rest)
+                if has_nested:
+                    _, idx = _parse_block(idx, cleaned_lines[idx][0])
+                seq.append(scalar_val)
             return seq, idx
 
         mapping: dict[str, Any] = {}
         while idx < len(cleaned_lines):
             ind, line = cleaned_lines[idx]
-            if ind < first_indent or line.startswith("- "):
+            if ind < first_indent or line.startswith("- ") or line == "-":
                 break
             if ind > first_indent:
                 idx += 1
@@ -124,7 +186,7 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
                 continue
             key_part, val_part = line.split(":", 1)
             key = str(_parse_yaml_scalar(key_part))
-            val_str = val_part.strip()
+            val_str = _strip_inline_yaml_comment(val_part)
             idx += 1
             if val_str:
                 mapping[key] = _parse_yaml_scalar(val_str)
@@ -193,6 +255,18 @@ COSMETIC_GUI_KEY_PREFIXES = (
 # `fts5(..., tokenize='porter unicode61')` + `fts5vocab` virtual tables.
 _PORTER_STEM_CACHE: dict[str, str] = {}
 _STEMMER_CONN: sqlite3.Connection | None = None
+_STEMMER_LOCK = threading.Lock()
+
+
+def _close_stemmer_conn() -> None:
+    global _STEMMER_CONN
+    with _STEMMER_LOCK:
+        if _STEMMER_CONN is not None:
+            try:
+                _STEMMER_CONN.close()
+            except sqlite3.Error:
+                pass
+            _STEMMER_CONN = None
 
 
 def _get_stemmer_conn() -> sqlite3.Connection:
@@ -203,24 +277,29 @@ def _get_stemmer_conn() -> sqlite3.Connection:
         conn.execute("CREATE VIRTUAL TABLE stem_input USING fts5(x, tokenize='porter unicode61')")
         conn.execute("CREATE VIRTUAL TABLE stem_vocab USING fts5vocab(stem_input, row)")
         _STEMMER_CONN = conn
+        atexit.register(_close_stemmer_conn)
     return _STEMMER_CONN
 
 
 def porter_stem_word(word: str) -> str:
-    """Computes the SQLite `porter unicode61` stem of a single word with O(1) caching."""
+    """Computes the SQLite `porter unicode61` stem of a single word with thread-safe O(1) caching."""
     clean = re.sub(r"[^a-z0-9]", "", word.lower())
-    if not clean:
-        return word.lower().strip()
+    if not clean or len(clean) > 128:
+        return word.lower().strip()[:128]
     cached = _PORTER_STEM_CACHE.get(clean)
     if cached is not None:
         return cached
-    s_conn = _get_stemmer_conn()
-    s_conn.execute("DELETE FROM stem_input")
-    s_conn.execute("INSERT INTO stem_input VALUES (?)", (clean,))
-    row = s_conn.execute("SELECT term FROM stem_vocab LIMIT 1").fetchone()
-    stem = str(row[0]) if row and row[0] else clean
-    _PORTER_STEM_CACHE[clean] = stem
-    return stem
+    with _STEMMER_LOCK:
+        cached = _PORTER_STEM_CACHE.get(clean)
+        if cached is not None:
+            return cached
+        s_conn = _get_stemmer_conn()
+        s_conn.execute("DELETE FROM stem_input")
+        s_conn.execute("INSERT INTO stem_input VALUES (?)", (clean,))
+        row = s_conn.execute("SELECT term FROM stem_vocab LIMIT 1").fetchone()
+        stem = str(row[0]) if row and row[0] else clean
+        _PORTER_STEM_CACHE[clean] = stem
+        return stem
 
 
 def porter_stem_text(text: str) -> set[str]:
@@ -2090,7 +2169,7 @@ def _tokenize_query(
     tokens: list[str] = []
     for tok in raw_tokens:
         low = tok.lower().strip(".-_")
-        if not low or (len(low) < 2 and not low.isdigit()) or low in ("http", "https", "www"):
+        if not low or len(low) > 128 or (len(low) < 2 and not low.isdigit()) or low in ("http", "https", "www"):
             continue
         if "." not in low and not low.isdigit() and conn is not None:
             if is_ubiquitous_corpus_token(conn, low, project=project):
@@ -2112,7 +2191,7 @@ def extract_specific_tokens(
     seen_stems: set[str] = set()
     for tok in raw_tokens:
         low = tok.lower().strip(".-_")
-        if not low or len(low) < 2 or low.isdigit() or low in ("http", "https", "www"):
+        if not low or len(low) < 2 or len(low) > 128 or low.isdigit() or low in ("http", "https", "www"):
             continue
         if is_ubiquitous_corpus_token(conn, low, project=project):
             continue
@@ -2378,39 +2457,41 @@ def search_config_keys(
     wants_network = any(tok in ("proxy", "velocity", "bungee", "bungeecord", "redis", "network") for tok in specific_tokens)
 
     proj_filter = project.strip().lower() if project else None
-    if proj_filter:
-        exact_rows = conn.execute(
-            """
-            SELECT file_path, key_path, default_value, directives, description, project
-            FROM config_keys
-            WHERE lower(project) = ?
-              AND (lower(key_path) = lower(?) OR lower(key_path) LIKE lower(?))
-            ORDER BY CASE
-                WHEN file_path = 'definitions/regions/default.yml' THEN 0
-                WHEN file_path = 'addons/guimenu.yml' THEN 1
-                WHEN file_path = 'config.yml' THEN 2
-                ELSE 3
-            END
-            LIMIT ?
-            """,
-            (proj_filter, q_strip, f"%.{q_strip}", limit),
-        ).fetchall()
-    else:
-        exact_rows = conn.execute(
-            """
-            SELECT file_path, key_path, default_value, directives, description, project
-            FROM config_keys
-            WHERE lower(key_path) = lower(?) OR lower(key_path) LIKE lower(?)
-            ORDER BY CASE
-                WHEN file_path = 'definitions/regions/default.yml' THEN 0
-                WHEN file_path = 'addons/guimenu.yml' THEN 1
-                WHEN file_path = 'config.yml' THEN 2
-                ELSE 3
-            END
-            LIMIT ?
-            """,
-            (q_strip, f"%.{q_strip}", limit),
-        ).fetchall()
+    exact_rows: list[sqlite3.Row] = []
+    if len(q_strip) <= 256 and "\n" not in q_strip:
+        if proj_filter:
+            exact_rows = conn.execute(
+                """
+                SELECT file_path, key_path, default_value, directives, description, project
+                FROM config_keys
+                WHERE lower(project) = ?
+                  AND (lower(key_path) = lower(?) OR lower(key_path) LIKE lower(?))
+                ORDER BY CASE
+                    WHEN file_path = 'definitions/regions/default.yml' THEN 0
+                    WHEN file_path = 'addons/guimenu.yml' THEN 1
+                    WHEN file_path = 'config.yml' THEN 2
+                    ELSE 3
+                END
+                LIMIT ?
+                """,
+                (proj_filter, q_strip, f"%.{q_strip}", limit),
+            ).fetchall()
+        else:
+            exact_rows = conn.execute(
+                """
+                SELECT file_path, key_path, default_value, directives, description, project
+                FROM config_keys
+                WHERE lower(key_path) = lower(?) OR lower(key_path) LIKE lower(?)
+                ORDER BY CASE
+                    WHEN file_path = 'definitions/regions/default.yml' THEN 0
+                    WHEN file_path = 'addons/guimenu.yml' THEN 1
+                    WHEN file_path = 'config.yml' THEN 2
+                    ELSE 3
+                END
+                LIMIT ?
+                """,
+                (q_strip, f"%.{q_strip}", limit),
+            ).fetchall()
 
     results: list[dict[str, str]] = []
     for r in exact_rows:
@@ -3469,7 +3550,7 @@ def is_schema_or_heading_facet(
     `doc_sections.path`, or `bit_codes` for `project`.
     """
     clean = re.sub(r"[^a-z0-9_.-]", "", token.lower())
-    if not clean or len(clean) < 2 or clean.isdigit():
+    if not clean or len(clean) < 2 or len(clean) > 128 or clean.isdigit():
         return False
     proj = project.strip().lower() or DEFAULT_PROJECT
     cache_key = (id(conn), proj, clean)
@@ -3614,6 +3695,16 @@ def extract_non_default_yaml_overrides(
     seen_overrides: set[str] = set()
     kept_lines: list[str] = []
 
+    flat_sibling_keys = {
+        p[1].lower()
+        for p in parsed_lines
+        if p is not None and p[3] and "." not in p[2]
+    }
+    vert_indicator_keys = {"miny", "maxy", "requireskylight", "maxslope", "sloperadius", "maxhillangle", "checkradius", "maxsolid", "minliquid"}
+    shape_indicator_keys = {"radius", "centerradius", "centerx", "centerz", "mode", "width", "height", "scale", "weight", "expand", "uniqueplacements", "vertices"}
+    has_vert_siblings = bool(flat_sibling_keys & vert_indicator_keys)
+    has_shape_siblings = bool(flat_sibling_keys & shape_indicator_keys)
+
     for line, parsed in zip(lines, parsed_lines):
         if parsed is None:
             kept_lines.append(line)
@@ -3623,8 +3714,18 @@ def extract_non_default_yaml_overrides(
             continue
         k_low = key_raw.lower()
         d_low = dotted_key.lower()
-        if k_low == "version":
+        if k_low == "version" or len(k_low) > 128 or len(d_low) > 128:
             continue
+        if d_low == "name":
+            v_clean_low = val_raw.strip().strip("'\"").lower()
+            if has_vert_siblings and not has_shape_siblings:
+                d_low = "vert.name"
+            elif has_shape_siblings and not has_vert_siblings:
+                d_low = "shape.name"
+            elif v_clean_low in ("linear", "jump", "fixed"):
+                d_low = "vert.name"
+            elif v_clean_low in ("circle", "square", "rectangle", "ellipse", "polygon"):
+                d_low = "shape.name"
         try:
             rows = conn.execute(
                 """
@@ -3633,16 +3734,17 @@ def extract_non_default_yaml_overrides(
                 WHERE lower(project) = ?
                   AND NOT file_path LIKE 'advanced/messages/%'
                   AND NOT file_path LIKE 'messages/%'
-                  AND (lower(key_path) = ? OR lower(key_path) = ? OR lower(key_path) LIKE ?)
+                  AND (lower(key_path) = ? OR lower(key_path) = ? OR lower(key_path) LIKE ? OR lower(key_path) LIKE ?)
                 ORDER BY CASE
                     WHEN lower(key_path) = ? THEN 0
-                    WHEN lower(key_path) = ? THEN 1
-                    WHEN file_path IN ('config.yml', 'definitions/regions/default.yml', 'advanced/performance.yml', 'safety.yml', 'addons/guimenu.yml') THEN 2
-                    ELSE 3
+                    WHEN lower(key_path) LIKE ? THEN 1
+                    WHEN lower(key_path) = ? THEN 2
+                    WHEN file_path IN ('config.yml', 'definitions/regions/default.yml', 'advanced/performance.yml', 'safety.yml', 'addons/guimenu.yml') THEN 3
+                    ELSE 4
                 END
                 LIMIT 4
                 """,
-                (proj, d_low, k_low, f"%.{k_low}", d_low, k_low),
+                (proj, d_low, k_low, f"%.{d_low}", f"%.{k_low}", d_low, f"%.{d_low}", k_low),
             ).fetchall()
         except sqlite3.OperationalError:
             rows = []
@@ -3651,12 +3753,15 @@ def extract_non_default_yaml_overrides(
             kept_lines.append(line)
             continue
 
-        if any(_yaml_values_equivalent(val_raw, str(r["default_value"] or "")) for r in rows):
-            # Untouched default line in a multi-line config paste -> drop from query text
-            continue
-
         best_row = rows[0]
         canon_kp = str(best_row["key_path"]).replace("defaults.", "")
+        matching_rows = [
+            r for r in rows
+            if str(r["key_path"]).replace("defaults.", "").lower() == canon_kp.lower()
+        ] or [best_row]
+        if any(_yaml_values_equivalent(val_raw, str(r["default_value"] or "")) for r in matching_rows):
+            # Untouched default line in a multi-line config paste -> drop from query text
+            continue
         if canon_kp.lower() not in seen_overrides:
             seen_overrides.add(canon_kp.lower())
             overrides.append(
