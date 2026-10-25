@@ -116,15 +116,18 @@ TAG_PRO_PRIORITY = "💎 Pro Priority"
 BUTTON_SOLVED_ID = "rtp_solved"
 BUTTON_NEED_HELP_ID = "rtp_need_help"
 
-MCLOGS_URL_RE = re.compile(r"https?://(?:www\.)?mclo\.gs/([A-Za-z0-9]{5,32})")
-ANY_URL_RE = re.compile(r"https?://[^\s<>)\]]+")
+MCLOGS_URL_RE = re.compile(r"(?i)https?://(?:www\.)?mclo\.gs/([A-Za-z0-9]{5,32})")
+ANY_URL_RE = re.compile(r"(?i)https?://[^\s<>)\]]+")
 ROLE_OR_EVERYONE_MENTION_RE = re.compile(r"@(?:everyone|here)|<@&\d+>")
 
 SECRET_PATTERNS = (
-    re.compile(r"(?i)\b(?:password|passwd|redis_password|db_password)\s*[:=]\s*['\"]?([^\s'\"]{4,})['\"]?"),
-    re.compile(r"(?i)\b(?:secret|net_secret|jwt_secret|token)\s*[:=]\s*['\"]?(?!RTP_NET_SECRET\b)([^\s'\"]{6,})['\"]?"),
+    re.compile(
+        r"(?i)(?:^|[\s'\"_.-])(?:password|passwd|secret|token|api_key|apikey|access_key|private_key)"
+        r"\s*[:=]\s*['\"]?(?!RTP_NET_SECRET\b|true\b|false\b|null\b|none\b|<|\$\{)([^\s'\"]{4,})['\"]?"
+    ),
     re.compile(r"(?i)\bRTP_NET_SECRET\s*=\s*['\"]?([^\s'\"]{4,})['\"]?"),
-    re.compile(r"rediss?://[^/\s:@]*:([^@\s]{4,})@"),
+    re.compile(r"(?i)(?:jdbc:)?(?:rediss?|mysql|postgresql|postgres|mariadb|mongodb(?:\+srv)?)://[^/\s:@]*:([^@\s]{4,})@"),
+    re.compile(r"\b([MN][A-Za-z\d]{23,28}\.[\w-]{6}\.[\w-]{20,40})\b"),
 )
 
 BUG_REPORT_KEYWORDS = re.compile(
@@ -155,9 +158,9 @@ FOLLOWUP_INVESTIGATE_RE = re.compile(
 DIAGNOSTIC_REFUSAL_RE = re.compile(
     r"(?i)(?:"
     r"\b(?:can'?t|cannot|won'?t|will\s+not|not\s+going\s+to|refuse\s+to|don'?t\s+want\s+to)\s+"
-    r"(?:share|upload|post|send|give|provide|paste)\s+(?:my\s+|the\s+|any\s+|private\s+)?(?:logs?|console|config|files?|mclo\.gs)|"
+    r"(?:(?:to\s+)?(?:share|upload|post|send|give|provide|paste)\s+)?(?:(?:my|the|any|private|server|full|latest|console|confidential|sensitive)\s+)*(?:logs?|console|config|files?|mclo\.gs)|"
     r"\blogs?\s+(?:are|is)\s+(?:private|confidential|sensitive)|"
-    r"\b(?:not\s+uploading|not\s+sharing)\s+(?:private\s+|my\s+)?logs?|"
+    r"\b(?:not\s+uploading|not\s+sharing)\s+(?:(?:private|my|the|any|server|full|latest|console)\s+)*logs?|"
     r"\b(?:on\s+my\s+phone|away\s+from\s+(?:the\s+|my\s+)?(?:console|pc|computer|server)|not\s+at\s+(?:my\s+)?(?:pc|computer|console))|"
     r"\b(?:stop\s+asking|quit\s+asking|don'?t\s+ask\s+for\s+logs?)|"
     r"\b(?:just\s+tell\s+me\s+(?:the\s+fix|how\s+to\s+fix|what\s+to\s+change|the\s+answer)|just\s+answer\s+the\s+question)|"
@@ -202,6 +205,22 @@ def is_staff_or_maintainer(
     return False
 
 
+_NEGATION_PREFIX_RE = re.compile(
+    r"(?i)\b(?:not|never|don'?t|do\s+not|avoid|instead\s+of|without|warn(?:ing)?\s+against)\b"
+)
+
+
+def _has_unnegated_dangerous_match(text: str, pattern: str) -> bool:
+    """Returns True if `pattern` matches in `text` without a preceding negation in the same clause."""
+    for m in re.finditer(pattern, text):
+        line_start = text.rfind("\n", 0, m.start()) + 1
+        prefix = text[line_start:m.start()]
+        clause_prefix = re.split(r"[,;!?]|\bbut\b", prefix, flags=re.IGNORECASE)[-1]
+        if not _NEGATION_PREFIX_RE.search(clause_prefix):
+            return True
+    return False
+
+
 def build_dangerous_advice_warning(text: str) -> str:
     """
     Scans `text` (author post, follow-up, or non-staff bystander reply) for known
@@ -212,32 +231,32 @@ def build_dangerous_advice_warning(text: str) -> str:
     if not text or not DANGEROUS_ADVICE_RE.search(text):
         return ""
     notes: list[str] = []
-    if re.search(r"(?i)\bsyncLoading\s*[:=]\s*true\b", text):
+    if _has_unnegated_dangerous_match(text, r"(?i)\bsyncLoading\s*[:=]\s*true\b"):
         notes.append(
             "- Keep `syncLoading` set to `false` in `advanced/performance.yml`: enabling synchronous chunk loading "
             "forces main-thread chunk I/O (`S-005`) and stalls server ticks."
         )
-    if re.search(r"(?i)\bviewDistanceSelect\s*[:=]\s*[1-9]\d*\b", text):
+    if _has_unnegated_dangerous_match(text, r"(?i)\bviewDistanceSelect\s*[:=]\s*[1-9]\d*\b"):
         notes.append(
             "- Keep `viewDistanceSelect` set to `0` in `advanced/performance.yml`: positive values load surrounding "
             "view-distance chunks on every candidate check and multiply chunk I/O."
         )
-    if re.search(r"(?i)\bmaxMSPT\s*[:=]\s*(?:[5-9]\d|\d{3,})(?:\.\d+)?\b", text):
+    if _has_unnegated_dangerous_match(text, r"(?i)\bmaxMSPT\s*[:=]\s*(?:[5-9]\d|\d{3,})(?:\.\d+)?\b"):
         notes.append(
             "- Keep `maxMSPT` at or below `45.0` ms (`@range: [0.0, 50.0]` in `advanced/performance.yml`, or lower toward "
             "`35.0`-`40.0` ms when reducing lag): values at or above `50.0` ms allow background refills to run during overloaded ticks."
         )
-    if re.search(r"(?i)\bminTPS\s*[:=]\s*(?:1[0-8]|[0-9])(?:\.\d+)?\b", text):
+    if _has_unnegated_dangerous_match(text, r"(?i)\bminTPS\s*[:=]\s*(?:1[0-8]|[0-9])(?:\.\d+)?\b"):
         notes.append(
             "- Keep `minTPS` at `19.0` or higher in `advanced/performance.yml`: lowering `minTPS` below `19.0` "
             "masks tick degradation instead of pausing background work when the server is struggling."
         )
-    if re.search(r"(?i)\bcacheCap\s*[:=]\s*0\b", text):
+    if _has_unnegated_dangerous_match(text, r"(?i)\bcacheCap\s*[:=]\s*0\b"):
         notes.append(
             "- Keep `cacheCap` above `0` (default `10`) in `advanced/performance.yml`: a zero cache cap disables "
             "pre-generated location buffering and forces live on-demand searches."
         )
-    if re.search(r"(?i)/rtp\s+config\s+(?:set|get|edit)\b", text):
+    if _has_unnegated_dangerous_match(text, r"(?i)/rtp\s+config\s+(?:set|get|edit)\b"):
         notes.append(
             "- Note on command syntax: `set` is not a `/rtp config` subcommand (invalid syntax) - use "
             "`/rtp config <file_alias> <key>=<value>` (for example `/rtp config performance period=10`) or `/rtp editor`."
@@ -324,13 +343,118 @@ def build_resolution_buttons() -> list[dict[str, Any]]:
     ]
 
 
-def sanitize_bot_output(text: str) -> str:
+def _trim_section_bullets(section: str, max_bullets: int) -> str:
+    """
+    Trims a multi-bullet section to at most `max_bullets` bullets while keeping its
+    header/footer lines and preserving at least one documentation URL bullet when
+    both config-key bullets and doc-section bullets are present.
+    """
+    lines = section.splitlines()
+    bullet_indices = [i for i, ln in enumerate(lines) if ln.lstrip().startswith("- ")]
+    if len(bullet_indices) <= max_bullets:
+        return section
+    doc_bullets = [i for i in bullet_indices if "<http" in lines[i].lower() and " -> `" not in lines[i]]
+    cfg_bullets = [i for i in bullet_indices if i not in doc_bullets]
+    if doc_bullets and cfg_bullets and max_bullets >= 2:
+        keep_indices = set(cfg_bullets[: max_bullets - 1] + doc_bullets[:1])
+    elif doc_bullets and max_bullets == 1:
+        keep_indices = set(doc_bullets[:1])
+    else:
+        keep_indices = set(bullet_indices[:max_bullets])
+    drop_set = set(bullet_indices) - keep_indices
+    kept = [ln for i, ln in enumerate(lines) if i not in drop_set]
+    return "\n".join(kept)
+
+
+def _priority_trim_reply_to_budget(text: str, max_chars: int = 1950) -> str:
+    """
+    Enforces Discord's `<= 2,000`-character limit (`max_chars = 1950`) by
+    priority-trimming lower-priority middle bullets (config/doc hits, then extra
+    safety/BIT bullets) first so the top security warning and bottom diagnostic
+    intake / resolution footer are always preserved intact.
+    """
+    if len(text) <= max_chars:
+        return text
+    blocks = [b for b in text.split("\n\n") if b.strip()]
+
+    def _is_doc_or_cfg_block(blk: str) -> bool:
+        return blk.startswith((
+            "Here is what I found",
+            "Here are the documentation",
+            "Here is the developer API",
+            "Here is the architectural overview",
+            "Here is the setting and documentation",
+            "I am not 100% sure the standard docs",
+            "Based on that additional context",
+            "One related setting to check",
+            "- **",
+        ))
+
+    # Pass 1: Trim bullets in config/doc blocks down to 2, then 1, then drop if deterministic BIT/safety blocks exist
+    for target_bullets in (2, 1, 0):
+        for idx, blk in enumerate(blocks):
+            if len("\n\n".join(blocks)) <= max_chars:
+                break
+            if _is_doc_or_cfg_block(blk):
+                if target_bullets == 0 and any(
+                    b.startswith(("**Configuration safety note:**", "I matched the following `[RTP bit]`"))
+                    for b in blocks
+                ):
+                    blocks[idx] = ""
+                elif target_bullets > 0:
+                    blocks[idx] = _trim_section_bullets(blk, target_bullets)
+        blocks = [b for b in blocks if b.strip()]
+        if len("\n\n".join(blocks)) <= max_chars:
+            return "\n\n".join(blocks)
+
+    # Pass 2: Trim extra bullets in Configuration safety note and [RTP bit] blocks (keep top 2, then 1)
+    for target_bullets in (2, 1):
+        for idx, blk in enumerate(blocks):
+            if len("\n\n".join(blocks)) <= max_chars:
+                break
+            if blk.startswith(("**Configuration safety note:**", "I matched the following `[RTP bit]`")):
+                blocks[idx] = _trim_section_bullets(blk, target_bullets)
+        if len("\n\n".join(blocks)) <= max_chars:
+            return "\n\n".join(blocks)
+
+    # Pass 3: Hard line-boundary backstop while preserving the final block (diagnostic prompt / reaction footer)
+    joined = "\n\n".join(blocks)
+    if len(joined) <= max_chars:
+        return joined
+    if len(blocks) >= 2 and len(blocks[-1]) < max_chars - 200:
+        footer = blocks[-1]
+        head_budget = max_chars - len(footer) - 2
+        head_text = "\n\n".join(blocks[:-1])
+        head_lines: list[str] = []
+        used = 0
+        for ln in head_text.splitlines():
+            add_len = len(ln) + (1 if head_lines else 0)
+            if used + add_len > head_budget:
+                break
+            head_lines.append(ln)
+            used += add_len
+        if head_lines:
+            return "\n".join(head_lines).rstrip() + "\n\n" + footer
+    out_lines: list[str] = []
+    used_len = 0
+    for ln in joined.splitlines():
+        add_len = len(ln) + (1 if out_lines else 0)
+        if used_len + add_len > max_chars:
+            break
+        out_lines.append(ln)
+        used_len += add_len
+    return "\n".join(out_lines) if out_lines else joined[:max_chars]
+
+
+def sanitize_bot_output(text: str, max_chars: int = 1950) -> str:
     """
     Enforces prompt-injection, non-negative tone, and output safety guardrails:
       1. Strips `@everyone`, `@here`, and `<@&role>` mentions.
       2. Strips any URL whose domain is outside `ALLOWED_DOMAINS`.
       3. Normalizes any accidental `.md` suffix on `dailystruggle.github.io` doc URLs.
       4. Replaces em/en dashes with ASCII `-` per Rule D-006 and normalizes lecturing/AI phrases.
+      5. Priority-trims multi-section replies to `<= max_chars` (`1,950` chars) so Discord
+         REST API v10 never rejects a message with `HTTP 400 (code 50035: > 2000 chars)`.
     """
     cleaned = ROLE_OR_EVERYONE_MENTION_RE.sub("[mention-removed]", text)
     cleaned = cleaned.replace("\u2014", "-").replace("\u2013", "-")
@@ -356,7 +480,8 @@ def sanitize_bot_output(text: str) -> str:
             return raw_url + trailing
         return "[external-link-removed]" + trailing
 
-    return ANY_URL_RE.sub(check_url, cleaned)
+    sanitized = ANY_URL_RE.sub(check_url, cleaned)
+    return _priority_trim_reply_to_budget(sanitized, max_chars=max_chars)
 
 
 def detect_and_redact_secrets(text: str) -> tuple[bool, str]:
@@ -644,6 +769,9 @@ def ocr_image_source(
     return ""
 
 
+_PASTE_PROVIDER_TEMPLATES: dict[str, str] = {}
+
+
 def extract_mclogs_ids(
     text: str,
     max_pastes: int = MAX_MCLOGS_PASTES_PER_POST,
@@ -656,22 +784,64 @@ def extract_mclogs_ids(
     ids: list[str] = []
     cfg = load_support_bot_manifest(manifest)
     providers = (cfg.get("security") or {}).get("log_paste_providers")
-    patterns: list[re.Pattern[str]] = [MCLOGS_URL_RE]
+    pattern_entries: list[tuple[re.Pattern[str], str]] = [
+        (MCLOGS_URL_RE, "https://api.mclo.gs/1/raw/{id}")
+    ]
     if isinstance(providers, dict):
         for p_cfg in providers.values():
             if isinstance(p_cfg, dict) and p_cfg.get("url_pattern"):
+                raw_tpl = str(p_cfg.get("raw_url_template") or "https://api.mclo.gs/1/raw/{id}")
                 try:
-                    patterns.append(re.compile(str(p_cfg["url_pattern"])))
+                    pattern_entries.append((re.compile(str(p_cfg["url_pattern"])), raw_tpl))
                 except re.error:
                     pass
-    for pat in patterns:
+    for pat, raw_tpl in pattern_entries:
         for m in pat.finditer(text):
             paste_id = m.group(1) if m.lastindex else m.group(0)
+            _PASTE_PROVIDER_TEMPLATES[paste_id] = raw_tpl
             if paste_id not in ids:
                 ids.append(paste_id)
                 if len(ids) >= max_pastes:
                     return ids
     return ids
+
+
+def resolve_log_paste_raw_url(
+    paste_id: str,
+    manifest: pathlib.Path | str | dict[str, Any] | None = None,
+) -> str:
+    """
+    Resolves the raw fetch URL for `paste_id` using the provider matched during
+    `extract_mclogs_ids` or by matching `paste_id` against `security.log_paste_providers`.
+    """
+    default_tpl = "https://api.mclo.gs/1/raw/{id}"
+    cfg = load_support_bot_manifest(manifest)
+    providers = (cfg.get("security") or {}).get("log_paste_providers")
+    if isinstance(providers, dict) and providers:
+        allowed_tpls = {
+            str(p_cfg["raw_url_template"])
+            for p_cfg in providers.values()
+            if isinstance(p_cfg, dict) and p_cfg.get("raw_url_template")
+        }
+        cached_tpl = _PASTE_PROVIDER_TEMPLATES.get(paste_id)
+        if cached_tpl and cached_tpl in allowed_tpls:
+            return cached_tpl.replace("{id}", paste_id)
+        for p_cfg in providers.values():
+            if not isinstance(p_cfg, dict) or not p_cfg.get("raw_url_template"):
+                continue
+            raw_tpl = str(p_cfg["raw_url_template"])
+            url_pat = str(p_cfg.get("url_pattern") or "")
+            grp_m = re.search(r"\((?!\?)([^()]+)\)", url_pat)
+            if grp_m:
+                try:
+                    if re.fullmatch(grp_m.group(1), paste_id):
+                        return raw_tpl.replace("{id}", paste_id)
+                except re.error:
+                    pass
+        first_tpl = next(iter(allowed_tpls), default_tpl)
+        return first_tpl.replace("{id}", paste_id)
+    cached_tpl = _PASTE_PROVIDER_TEMPLATES.get(paste_id, default_tpl)
+    return cached_tpl.replace("{id}", paste_id)
 
 
 def fetch_mclogs_raw(
@@ -686,15 +856,7 @@ def fetch_mclogs_raw(
     """
     if not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", paste_id):
         return ""
-    cfg = load_support_bot_manifest(manifest)
-    providers = (cfg.get("security") or {}).get("log_paste_providers")
-    raw_template = "https://api.mclo.gs/1/raw/{id}"
-    if isinstance(providers, dict):
-        for p_cfg in providers.values():
-            if isinstance(p_cfg, dict) and p_cfg.get("raw_url_template"):
-                raw_template = str(p_cfg["raw_url_template"])
-                break
-    url = raw_template.replace("{id}", paste_id)
+    url = resolve_log_paste_raw_url(paste_id, manifest=manifest)
     req = urllib.request.Request(
         url,
         method="GET",
@@ -708,7 +870,7 @@ def fetch_mclogs_raw(
 
 
 PROTECTED_TECH_SPAN_RE = re.compile(
-    r"(`[^`\n]{1,120}`|https?://[^\s<>)\]]+|/[A-Za-z0-9_.-]+(?:\s+[A-Za-z0-9_.=-]+)*|\b[A-Za-z0-9_-]+\.(?:yml|yaml|json|md|jar|sqlite)\b|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_.]*\b)"
+    r"(?i)(`[^`\n]{1,120}`|https?://[^\s<>)\]]+|/[A-Za-z0-9_.-]+(?:\s+[A-Za-z0-9_.=-]+)*|\b[A-Za-z0-9_-]+\.(?:yml|yaml|json|md|jar|sqlite)\b|\b[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_.]*\b)"
 )
 
 
@@ -717,14 +879,34 @@ def _mask_protected_tech_spans(
     max_chars: int = 900,
 ) -> tuple[str, str, list[str]]:
     """
-    Redacts secrets and masks technical spans (`PROTECTED_TECH_SPAN_RE`) with
+    Redacts secrets, strips comment/log/fenced-code noise when input exceeds
+    `max_chars`, and masks technical spans (`PROTECTED_TECH_SPAN_RE`) with
     `__RTP_SPAN_0__`..`__RTP_SPAN_n__` placeholders before calling external
     translation services.
     """
     cleaned = (text or "").strip()
     if not cleaned:
         return "", "", []
-    _, safe_text = detect_and_redact_secrets(cleaned[:max_chars])
+    candidate = cleaned
+    if len(candidate) > max_chars:
+        # Strip fenced code blocks, YAML comment lines, and timestamped log lines first
+        # so foreign-language questions written below a config/log paste are not truncated.
+        stripped_blocks = re.sub(r"(?s)```.*?```", " ", candidate)
+        kept_lines = [
+            ln
+            for ln in stripped_blocks.splitlines()
+            if ln.strip()
+            and not ln.lstrip().startswith("#")
+            and not re.match(r"^\[?\d{2}:\d{2}:\d{2}\s+(?:INFO|WARN|ERROR)", ln.lstrip())
+        ]
+        compact = "\n".join(kept_lines).strip()
+        if compact:
+            candidate = compact
+        if len(candidate) > max_chars:
+            # Keep both the leading and trailing prose segments around the question
+            half = max_chars // 2
+            candidate = f"{candidate[:half]}\n{candidate[-half:]}"
+    _, safe_text = detect_and_redact_secrets(candidate[:max_chars])
     placeholders: list[str] = []
 
     def _mask_span(match: re.Match[str]) -> str:
@@ -1359,8 +1541,7 @@ HOSTILE_POST_RE = re.compile(
     r"fuck(?:ing|ed|er)?|bullshit|dogshit|horseshit|piece\s+of\s+shit|wtf\s+is\s+this|stfu|dumbass|asshole|idiot(?:s|ic)?|moron(?:s|ic)?|incompetent|scam(?:mer|med)?|"
     r"answer\s+me\s+(?:now|already|immediately)|respond\s+(?:to\s+me\s+)?now|reply\s+(?:to\s+me\s+)?now|wake\s+up\s+dev|stop\s+ignoring\s+me|any\s+staff\s+alive"
     r")\b|"
-    r"(?:\bhello+\s*\?{3,}|\?{4,}|!{4,})|"
-    r"(?-i:\b(?!CIRCLE\b|SQUARE\b|RECTANGLE\b|ELLIPSE\b|POLYGON\b|ACTION\b|HEATMAP\b)[A-Z]{3,}(?:\s+[A-Z]{2,}){3,}\b)"
+    r"(?:\bhello+\s*\?{3,}|\?{4,}|!{4,})"
 )
 
 
@@ -1461,7 +1642,7 @@ def has_corpus_config_target(
     for tok in raw_tokens:
         t_clean = tok.strip(".-_")
         t_low = t_clean.lower()
-        if len(t_low) < 4 or t_low in GENERIC_SECTION_AND_SYMPTOM_TOKENS:
+        if len(t_low) < 4 or len(t_low) > 128 or t_low in GENERIC_SECTION_AND_SYMPTOM_TOKENS:
             continue
         try:
             row = conn.execute(
@@ -1843,7 +2024,13 @@ def is_safe_llm_endpoint(url: str) -> bool:
         return True
     try:
         ip = ipaddress.ip_address(host)
-        return bool(ip.is_loopback or ip.is_private)
+        return bool(
+            (ip.is_loopback or ip.is_private)
+            and not ip.is_link_local
+            and not ip.is_unspecified
+            and not ip.is_multicast
+            and not ip.is_reserved
+        )
     except ValueError:
         return False
 
@@ -2113,13 +2300,22 @@ def verify_llm_draft_against_schema(
                 return False, f"hallucinated config key: {token} (only valid in addons/guimenu.yml)"
 
     # Verify numeric recommendations against schema `@range: [min, max]` directives
-    for kv_match in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_.]*)\s*[=:]\s*(-?\d+(?:\.\d+)?)(?![A-Za-z])", cleaned):
-        k_name = kv_match.group(1).strip().lower()
+    prose_numeric_labels = {
+        "candidates", "queue", "activechunks", "hot_queue",
+        "y", "x", "z", "tps", "mspt", "step", "steps", "tier", "tiers",
+        "java", "mc", "chunk", "chunks", "block", "blocks", "tick", "ticks",
+        "player", "players", "count", "phase", "layer", "stage", "line",
+        "id", "min", "max", "code", "port", "gb", "mb", "ms", "sec", "seconds",
+    }
+    for kv_match in re.finditer(r"(`?)\b([A-Za-z_][A-Za-z0-9_.]*)`?\s*[=:]\s*`?(-?\d+(?:\.\d+)?)(?![A-Za-z])`?", cleaned):
+        has_leading_bt = bool(kv_match.group(1))
+        raw_k = kv_match.group(2).strip()
+        k_name = raw_k.lower()
         try:
-            val_num = float(kv_match.group(2))
+            val_num = float(kv_match.group(3))
         except ValueError:
             continue
-        if k_name not in ("http", "https") and not k_name.isdigit():
+        if k_name not in ("http", "https") and not k_name.isdigit() and len(k_name) <= 128:
             exists_row = conn.execute(
                 """
                 SELECT 1 FROM config_keys
@@ -2129,10 +2325,10 @@ def verify_llm_draft_against_schema(
                 """,
                 (proj_lower, k_name, f"%.{k_name}"),
             ).fetchone()
-            if exists_row is None and k_name not in ("candidates", "queue", "activechunks", "hot_queue"):
-                return False, f"hallucinated config key: {kv_match.group(1).strip()}"
+            if exists_row is None and (has_leading_bt or "." in k_name or k_name not in prose_numeric_labels):
+                return False, f"hallucinated config key: {raw_k}"
         if k_name == "mintps" and 0.0 < val_num < 19.0:
-            return False, f"hallucinated config key: {kv_match.group(1).strip()}={val_num} (below 19.0 default TPS lag floor)"
+            return False, f"hallucinated config key: {raw_k}={val_num} (below 19.0 default TPS lag floor)"
         cfg_row = conn.execute(
             """
             SELECT directives FROM config_keys
@@ -2153,10 +2349,10 @@ def verify_llm_draft_against_schema(
                     return False, f"value {k_name}={val_num} exceeds @range maximum {max_s}"
 
     # Verify string enum assignments against schema `@options: [...]` directives
-    for opt_match in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_.]*)\s*[=:]\s*['\"]?([A-Za-z_][A-Za-z0-9_-]{1,32})['\"]?", cleaned):
+    for opt_match in re.finditer(r"`?\b([A-Za-z_][A-Za-z0-9_.]*)`?\s*[=:]\s*[`'\"]?([A-Za-z_][A-Za-z0-9_-]{1,32})[`'\"]?", cleaned):
         k_name = opt_match.group(1).strip().lower()
         val_str = opt_match.group(2).strip()
-        if val_str.lower() in ("true", "false", "value", "name", "default", "config", "auto", "off", "none"):
+        if len(k_name) > 128 or val_str.lower() in ("true", "false", "value", "name", "default", "config", "auto", "off", "none"):
             continue
         opt_row = conn.execute(
             """
@@ -2536,7 +2732,7 @@ class LocalLlmSynthesizer:
             content = re.sub(r"\[REFRAIN(?:\s*:\s*[^\]]+)?\]\s*", "", content, flags=re.IGNORECASE).strip()
 
         # Convert `[Label](https://...)` markdown links into Discord `<https://...>` angle-bracket links
-        content = re.sub(r"\[[^\]]+\]\((https?://[^\s)]+)\)", r"<\1>", content)
+        content = re.sub(r"\[[^\]]+\]\((https?://[^\s)]+)\)", r"<\1>", content, flags=re.IGNORECASE)
         # Keep only the bullet list lines (plus any indented YAML block or single-line lead-in)
         filtered_lines: list[str] = []
         seen_bullet = False
@@ -2565,8 +2761,7 @@ class LocalLlmSynthesizer:
                 if ok_q:
                     self.last_clarifying_questions = sanitize_bot_output(content)
                 else:
-                    # Salvage valid clarifying lines if angle-bracket URLs or formatting triggered a check
-                    self.last_clarifying_questions = sanitize_bot_output(content)
+                    self.last_clarifying_questions = None
             return None
 
         ok, _ = verify_llm_draft_against_schema(
@@ -2649,6 +2844,7 @@ class SupportBotEngine:
         self.thread_last_facets: dict[str, frozenset[str]] = {}
         self.thread_last_diag: dict[str, frozenset[str]] = {}
         self.refusal_grace_threads: set[str] = set()
+        self.thread_bot_reply_counts: dict[str, int] = {}
         self.user_last_action: dict[str, float] = {}
 
     def _extract_corpus_facets(self, text: str, project: str) -> frozenset[str]:
@@ -2657,7 +2853,10 @@ class SupportBotEngine:
             "waiting", "wait", "still", "tell", "asking", "ask", "please", "pls",
             "help", "thanks", "anyone", "there", "update", "bump", "hello",
             "seriously", "useless", "bot", "private", "logs", "log", "phone",
-            "away", "console", "time", "work", "happening",
+            "away", "console", "time", "work", "happening", "share", "sharing",
+            "upload", "uploading", "post", "posting", "send", "sending", "give",
+            "provide", "paste", "refuse", "refusing", "want", "cant", "cannot",
+            "wont", "dont", "stop", "quit", "files", "file",
         }
         tokens = extract_specific_tokens(text, conn=self.conn, project=project)
         return frozenset(
@@ -3246,7 +3445,9 @@ class SupportBotEngine:
             # Allow console/chat screenshots with concrete diagnostic output to count alongside logs
             fetched_logs = ocr_text
 
-        has_secret, _ = detect_and_redact_secrets(f"{combined_user_text}\n{fetched_logs}")
+        has_secret_u, combined_user_text = detect_and_redact_secrets(combined_user_text)
+        has_secret_l, fetched_logs = detect_and_redact_secrets(fetched_logs)
+        has_secret = has_secret_u or has_secret_l
         secret_notice = ""
         if has_secret:
             secret_notice = (
@@ -3752,10 +3953,18 @@ class SupportBotEngine:
         )
         if followup_ocr and not followup_logs:
             followup_logs = followup_ocr
-        has_secret, _ = detect_and_redact_secrets(f"{effective_message_body}\n{followup_logs}")
+        has_secret_b, effective_message_body = detect_and_redact_secrets(effective_message_body)
+        has_secret_l, followup_logs = detect_and_redact_secrets(followup_logs)
+        has_secret = has_secret_b or has_secret_l
         bit_matches = extract_bit_codes(self.conn, f"{effective_message_body}\n{followup_logs}", project=project, manifest=self.manifest)
+        f_yaml_overrides, diffed_followup_body = extract_non_default_yaml_overrides(
+            self.conn, effective_message_body, project=project
+        )
         normalized_initial = self._prepare_multilingual_text(f"{post.title}\n{post.body}", project=project)
-        normalized_followup = self._prepare_multilingual_text(effective_message_body, project=project)
+        normalized_followup = self._prepare_multilingual_text(diffed_followup_body, project=project)
+        if f_yaml_overrides:
+            f_ov_keys = " ".join(ov["key_path"].replace("defaults.", "") for ov in f_yaml_overrides)
+            normalized_followup = f"{normalized_followup}\n{f_ov_keys}".strip()
         prior_turns = list(self.thread_turns.get(post.thread_id) or [normalized_initial])
         needs_followup_investigation = bool(
             FOLLOWUP_INVESTIGATE_RE.search(normalized_followup)
@@ -4099,9 +4308,49 @@ class SupportBotEngine:
             )
         )
         is_diag_bundle = bool((diag.get("rtp_version") and diag.get("server_version")) or followup_mclogs or all_bit_matches)
+        added_facets = followup_corpus_facets - prev_facets
+        top_hit_blobs = " ".join(
+            f"{h.get('key_path', '')} {h.get('file_path', '')} {h.get('description', '')} {h.get('matched_facets', '')}"
+            for h in (cum_cfg[:3] + cum_docs[:3])
+            if h.get("confidence") == "high"
+        ).lower()
+        new_facets_match_high_hit = bool(
+            added_facets
+            and any(
+                af in top_hit_blobs or porter_stem_word(af) in top_hit_blobs
+                for af in added_facets
+            )
+        )
+        initial_abstained = should_abstain_for_missing_info(
+            normalized_text=normalized_initial,
+            raw_text=f"{post.title}\n{post.body}",
+            fetched_logs="",
+            diag={},
+            bit_matches=[],
+            conn=self.conn,
+            project=project,
+        )
+        cum_still_abstains = should_abstain_for_missing_info(
+            normalized_text=cumulative_turns_text,
+            raw_text=combined,
+            fetched_logs=followup_logs,
+            diag=diag,
+            bit_matches=all_bit_matches,
+            conn=self.conn,
+            project=project,
+        )
+        convergence_passes_abstention = (
+            not initial_abstained
+            or not cum_still_abstains
+            or new_facets_match_high_hit
+            or bool(HOWTO_KEYWORDS.search(normalized_followup))
+            or "?" in normalized_followup
+            or "？" in normalized_followup
+        )
         if (
             not is_explicit_refusal
             and (has_new_facets or post.thread_id in self.model_refrained_threads)
+            and convergence_passes_abstention
             and (
                 has_high_cum
                 or (
@@ -4285,7 +4534,7 @@ class SupportBotEngine:
         if not ready_to_escalate:
             tags.append(TAG_NEEDS_INFO)
             # Check if the follow-up introduced a new specific config key that wasn't in the initial post
-            followup_cfg = search_config_keys(self.conn, effective_message_body, limit=1, project=project)
+            followup_cfg = search_config_keys(self.conn, normalized_followup, limit=1, project=project)
             if followup_cfg and followup_cfg[0].get("confidence") == "high":
                 ch = followup_cfg[0]
                 if ch["key_path"].lower() not in post.body.lower():
@@ -4296,11 +4545,16 @@ class SupportBotEngine:
 
             present = present_diagnostic_items(diag, project=project)
             ack = f"Thanks - I recorded your {', '.join(present)}. " if present else "Thanks for the follow-up. "
-            missing_bullets = "\n".join(f"- {item}" for item in missing_diag)
-            sections.append(
-                f"{ack}To finish narrowing this down before I ping the maintainer, please also share:\n"
-                f"{missing_bullets}"
-            )
+            if missing_diag:
+                missing_bullets = "\n".join(f"- {item}" for item in missing_diag)
+                sections.append(
+                    f"{ack}To finish narrowing this down before I ping the maintainer, please also share:\n"
+                    f"{missing_bullets}"
+                )
+            else:
+                sections.append(
+                    f"{ack}I have recorded your diagnostic details for this thread."
+                )
             refrained_status = self._format_refrain_status(
                 post=ForumPostContext(
                     thread_id=post.thread_id,
@@ -4500,11 +4754,13 @@ class SupportBotEngine:
 
 
 SOLVED_TEXT_RE = re.compile(
-    r"(?im)^\s*(?:!?\s*solved|!?\s*fixed|issue\s+solved|issue\s+fixed|problem\s+solved|all\s+fixed|that\s+fixed\s+it)\b"
+    r"(?is)^\s*(?:!?\s*solved|!?\s*fixed|issue\s+(?:is\s+)?(?:solved|fixed)|problem\s+(?:is\s+)?(?:solved|fixed)|all\s+fixed|that\s+fixed\s+it|it'?s\s+(?:solved|fixed)|fixed\s+now|solved\s+now)"
+    r"(?:[,!.\s]+(?:thanks(?:\s+a\s+lot|\s+so\s+much)?|thank\s+you(?:\s+so\s+much)?|ty|thx|appreciate\s+it|cheers))?[.!?\s]*$"
 )
 NEED_HELP_TEXT_RE = re.compile(
     r"(?im)^\s*(?:!?\s*need\s+help|!?\s*still\s+need\s+help|!?\s*escalate)\b"
 )
+PROGRESS_PLACEHOLDER_PREFIX = "⏳ Scanning documentation"
 
 
 def parse_discord_timestamp(iso_str: str | None, fallback: float = 0.0) -> float:
@@ -4561,8 +4817,24 @@ class DiscordForumPoller:
         self.role_id_to_name: dict[str, str] = {}
         self.member_roles_cache: dict[str, tuple[str, ...]] = {}
         self.handled_reactions: set[str] = set()
+        self.reference_thread_titles: set[str] = self._load_reference_thread_titles()
 
         self._load_state()
+
+    @staticmethod
+    def _load_reference_thread_titles() -> set[str]:
+        spec_path = BOT_DIR / "embeds.json"
+        if not spec_path.is_file():
+            return set()
+        try:
+            spec_data = json.loads(spec_path.read_text(encoding="utf-8"))
+            return {
+                str(item.get("title", "")).strip()
+                for item in spec_data.get("pinned_forum_threads", [])
+                if isinstance(item, dict) and str(item.get("title", "")).strip()
+            }
+        except (OSError, ValueError):
+            return set()
 
     def _load_state(self) -> None:
         if not self.state_path.is_file():
@@ -4575,6 +4847,32 @@ class DiscordForumPoller:
                 self.engine.investigative_threads.add(str(tid))
             for tid in data.get("followup_answered_threads", []):
                 self.engine.followup_answered_threads.add(str(tid))
+            for tid in data.get("refusal_grace_threads", []):
+                self.engine.refusal_grace_threads.add(str(tid))
+            for tid in data.get("model_refrained_threads", []):
+                self.engine.model_refrained_threads.add(str(tid))
+            raw_turns = data.get("thread_turns", {})
+            if isinstance(raw_turns, dict):
+                for tid, turns in raw_turns.items():
+                    if isinstance(turns, list):
+                        self.engine.thread_turns[str(tid)] = [str(t) for t in turns]
+            raw_facets = data.get("thread_last_facets", {})
+            if isinstance(raw_facets, dict):
+                for tid, f_list in raw_facets.items():
+                    if isinstance(f_list, list):
+                        self.engine.thread_last_facets[str(tid)] = frozenset(str(f) for f in f_list)
+            raw_diag = data.get("thread_last_diag", {})
+            if isinstance(raw_diag, dict):
+                for tid, d_list in raw_diag.items():
+                    if isinstance(d_list, list):
+                        self.engine.thread_last_diag[str(tid)] = frozenset(str(d) for d in d_list)
+            raw_counts = data.get("thread_bot_reply_counts", {})
+            if isinstance(raw_counts, dict):
+                for tid, cnt in raw_counts.items():
+                    try:
+                        self.engine.thread_bot_reply_counts[str(tid)] = int(cnt)
+                    except (ValueError, TypeError):
+                        pass
             for rk in data.get("handled_reactions", []):
                 self.handled_reactions.add(str(rk))
         except (OSError, ValueError):
@@ -4587,6 +4885,12 @@ class DiscordForumPoller:
                 "escalated_threads": sorted(self.engine.escalated_threads),
                 "investigative_threads": sorted(self.engine.investigative_threads),
                 "followup_answered_threads": sorted(self.engine.followup_answered_threads),
+                "refusal_grace_threads": sorted(self.engine.refusal_grace_threads),
+                "model_refrained_threads": sorted(self.engine.model_refrained_threads),
+                "thread_turns": {k: list(v) for k, v in sorted(self.engine.thread_turns.items())},
+                "thread_last_facets": {k: sorted(v) for k, v in sorted(self.engine.thread_last_facets.items())},
+                "thread_last_diag": {k: sorted(v) for k, v in sorted(self.engine.thread_last_diag.items())},
+                "thread_bot_reply_counts": dict(sorted(self.engine.thread_bot_reply_counts.items())),
                 "handled_reactions": sorted(self.handled_reactions),
             }
             self.state_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -4740,12 +5044,14 @@ class DiscordForumPoller:
             patch_payload["archived"] = True
             patch_payload["locked"] = True
 
-        msg_text = decision.reply_text.strip()
+        msg_text = sanitize_bot_output(decision.reply_text.strip())
         if msg_text and decision.should_reply:
             if not self.include_buttons and decision.components:
-                msg_text = msg_text.replace(
-                    "click **[✅ Solved]** below. If you still need help or want to report a bug, click **[❓ Still need help]**.",
-                    "react with ✅ (or reply `solved`) to close this thread, or react with ❓ (or reply with the diagnostics) if you still need help.",
+                msg_text = sanitize_bot_output(
+                    msg_text.replace(
+                        "click **[✅ Solved]** below. If you still need help or want to report a bug, click **[❓ Still need help]**.",
+                        "react with ✅ (or reply `solved`) to close this thread, or react with ❓ (or reply with the diagnostics) if you still need help.",
+                    )
                 )
 
             msg_payload: dict[str, Any] = {
@@ -4765,10 +5071,16 @@ class DiscordForumPoller:
                     )
                 except OSError:
                     sent_msg = None
-                if sent_msg is None:
-                    sent_msg = {"id": progress_message_id}
             else:
                 sent_msg = self.client.request("POST", f"/channels/{thread_id}/messages", msg_payload)
+
+            if sent_msg is not None:
+                self.engine.thread_bot_reply_counts[thread_id] = (
+                    self.engine.thread_bot_reply_counts.get(thread_id, 0) + 1
+                )
+            elif progress_message_id and decision.allowed_mentions.users:
+                for uid in decision.allowed_mentions.users:
+                    self.engine.user_last_action.pop(uid, None)
 
             if (
                 seed_reactions
@@ -4874,309 +5186,383 @@ class DiscordForumPoller:
         now = self.now_fn()
 
         for th in support_threads:
-            thread_id = str(th["id"])
-            title = str(th.get("name", th.get("title", "Support Thread")))
-            owner_id = str(th.get("owner_id", ""))
-            raw_tag_ids = [str(t) for t in th.get("applied_tags", [])]
-            tag_names = self._tags_to_names(raw_tag_ids)
+            try:
+                thread_id = str(th["id"])
+                title = str(th.get("name", th.get("title", "Support Thread"))).strip()
+                owner_id = str(th.get("owner_id", ""))
+                raw_tag_ids = [str(t) for t in th.get("applied_tags", [])]
+                tag_names = self._tags_to_names(raw_tag_ids)
 
-            if TAG_SOLVED in tag_names:
-                continue
-
-            raw_messages = self.client.request("GET", f"/channels/{thread_id}/messages?limit=50") or []
-            if not raw_messages:
-                continue
-
-            # Sort messages chronologically (oldest first)
-            messages = sorted(
-                raw_messages,
-                key=lambda m: (
-                    parse_discord_timestamp(m.get("timestamp"), 0.0),
-                    str(m.get("id", "")),
-                ),
-            )
-
-            if not owner_id:
-                owner_id = str((messages[0].get("author") or {}).get("id", "unknown"))
-            author_name = str((messages[0].get("author") or {}).get("username", "user"))
-
-            # Skip threads created by the maintainer or by the bot itself (e.g. reference guides)
-            if owner_id in (self.engine.maintainer_id, self.bot_user_id):
-                continue
-
-            # Check settle window on the newest non-bot message so back-to-back posts coalesce
-            non_bot_msgs = [
-                m for m in messages if str((m.get("author") or {}).get("id", "")) != self.bot_user_id
-            ]
-            if non_bot_msgs and self.settle_seconds > 0:
-                newest_ts = parse_discord_timestamp(non_bot_msgs[-1].get("timestamp"), now)
-                if (now - newest_ts) < self.settle_seconds:
+                if TAG_SOLVED in tag_names or title in self.reference_thread_titles:
                     continue
 
-            bot_indices = [
-                idx
-                for idx, m in enumerate(messages)
-                if str((m.get("author") or {}).get("id", "")) == self.bot_user_id
-            ]
-
-            author_roles = self._resolve_author_roles(owner_id)
-
-            # Case 1: Bot has not replied in this thread yet -> coalesce all author messages
-            if not bot_indices:
-                # Staff-Only Backoff: only stay silent if the maintainer or a staff member
-                # already replied before the bot polled (never let a random bystander silence the bot).
-                staff_repliers = [
-                    m
-                    for m in messages
-                    if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
-                    and self._is_staff_replier(str((m.get("author") or {}).get("id", "")))
-                ]
-                if staff_repliers:
+                raw_messages = self.client.request("GET", f"/channels/{thread_id}/messages?limit=50") or []
+                if not raw_messages:
                     continue
 
-                bystander_msgs = [
-                    str(m.get("content", "")).strip()
-                    for m in messages
-                    if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
-                    and str(m.get("content", "")).strip()
+                # Sort messages chronologically (oldest first)
+                messages = sorted(
+                    raw_messages,
+                    key=lambda m: (
+                        parse_discord_timestamp(m.get("timestamp"), 0.0),
+                        str(m.get("id", "")),
+                    ),
+                )
+
+                if not owner_id:
+                    owner_id = str((messages[0].get("author") or {}).get("id", "unknown"))
+                author_name = str((messages[0].get("author") or {}).get("username", "user"))
+
+                # Skip threads created by the maintainer, staff, or the bot itself (e.g. reference guides)
+                if owner_id in (self.engine.maintainer_id, self.bot_user_id) or self._is_staff_replier(owner_id):
+                    continue
+
+                # Check settle window on the newest non-bot message so back-to-back posts coalesce
+                non_bot_msgs = [
+                    m for m in messages if str((m.get("author") or {}).get("id", "")) != self.bot_user_id
                 ]
-                author_msgs = [
+                if non_bot_msgs and self.settle_seconds > 0:
+                    newest_ts = parse_discord_timestamp(non_bot_msgs[-1].get("timestamp"), now)
+                    if (now - newest_ts) < self.settle_seconds:
+                        continue
+
+                placeholder_indices = [
+                    idx
+                    for idx, m in enumerate(messages)
+                    if str((m.get("author") or {}).get("id", "")) == self.bot_user_id
+                    and str(m.get("content", "")).strip().startswith(PROGRESS_PLACEHOLDER_PREFIX)
+                ]
+                bot_indices = [
+                    idx
+                    for idx, m in enumerate(messages)
+                    if str((m.get("author") or {}).get("id", "")) == self.bot_user_id
+                    and idx not in placeholder_indices
+                ]
+                existing_placeholder_id: str | None = None
+                if placeholder_indices and (not bot_indices or placeholder_indices[-1] > bot_indices[-1]):
+                    existing_placeholder_id = str(messages[placeholder_indices[-1]].get("id", "")) or None
+
+                persisted_bot_replies = self.engine.thread_bot_reply_counts.get(thread_id, 0)
+                effective_bot_replies = max(len(bot_indices), persisted_bot_replies)
+                window_evicted_history = len(raw_messages) >= 50 and not any(
+                    str(m.get("id", "")) in (thread_id, "1", "m_1", "1000") or idx == 0 and len(raw_messages) < 50
+                    for idx, m in enumerate(messages)
+                )
+                if len(bot_indices) > persisted_bot_replies:
+                    self.engine.thread_bot_reply_counts[thread_id] = len(bot_indices)
+
+                author_roles = self._resolve_author_roles(owner_id)
+
+                # Case 1: Bot has not replied in this thread yet -> coalesce all author messages
+                if not bot_indices and effective_bot_replies == 0 and not window_evicted_history:
+                    # Staff-Only Backoff: only stay silent if the maintainer or a staff member
+                    # already replied before the bot polled (never let a random bystander silence the bot).
+                    staff_repliers = [
+                        m
+                        for m in messages
+                        if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
+                        and self._is_staff_replier(str((m.get("author") or {}).get("id", "")))
+                    ]
+                    if staff_repliers:
+                        continue
+
+                    bystander_msgs = [
+                        str(m.get("content", "")).strip()
+                        for m in messages
+                        if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
+                        and str(m.get("content", "")).strip()
+                    ]
+                    author_msgs = [
+                        m
+                        for m in messages
+                        if str((m.get("author") or {}).get("id", "")) == owner_id
+                    ]
+                    coalesced_body = "\n\n".join(
+                        str(m.get("content", "")).strip()
+                        for m in author_msgs
+                        if str(m.get("content", "")).strip()
+                    )
+                    coalesced_attachments = tuple(
+                        extract_image_attachment_urls(author_msgs, inline_text=coalesced_body)
+                    )
+                    post = ForumPostContext(
+                        thread_id=thread_id,
+                        author_id=owner_id,
+                        author_name=author_name,
+                        title=title,
+                        body=coalesced_body,
+                        author_roles=author_roles,
+                        applied_tags=tag_names,
+                        timestamp=now,
+                        attachments=coalesced_attachments,
+                        bystander_messages=tuple(bystander_msgs),
+                    )
+                    if self.engine.will_run_deep_search(post):
+                        progress_msg_id = existing_placeholder_id or self._post_progress_message(thread_id)
+                        deferred_deep_tasks.append(
+                            {
+                                "kind": "new",
+                                "thread_id": thread_id,
+                                "raw_tag_ids": raw_tag_ids,
+                                "post": post,
+                                "progress_msg_id": progress_msg_id,
+                            }
+                        )
+                    else:
+                        decision = self.engine.handle_new_thread(post)
+                        if decision.rate_limited:
+                            # Defer cooldown-limited thread to next poll cycle instead of stranding it with a dummy reply
+                            continue
+                        if decision.should_reply:
+                            actions.append(
+                                self._apply_decision(
+                                    thread_id,
+                                    raw_tag_ids,
+                                    decision,
+                                    progress_message_id=existing_placeholder_id,
+                                )
+                            )
+                    continue
+
+                # Case 2: Bot has already replied (or 50+ message window evicted earlier bot replies)
+                if bot_indices:
+                    last_bot_idx = bot_indices[-1]
+                    last_bot_msg = messages[last_bot_idx]
+                    last_bot_msg_id = str(last_bot_msg["id"])
+                    prior_slice = messages[:last_bot_idx]
+                    after_slice = messages[last_bot_idx + 1 :]
+                else:
+                    last_bot_idx = -1
+                    last_bot_msg = {}
+                    last_bot_msg_id = ""
+                    prior_slice = []
+                    after_slice = messages
+
+                prior_author_msgs = [
                     m
-                    for m in messages
+                    for m in prior_slice
                     if str((m.get("author") or {}).get("id", "")) == owner_id
                 ]
-                coalesced_body = "\n\n".join(
+                prior_author_body = "\n\n".join(
                     str(m.get("content", "")).strip()
-                    for m in author_msgs
+                    for m in prior_author_msgs
                     if str(m.get("content", "")).strip()
                 )
-                coalesced_attachments = tuple(
-                    extract_image_attachment_urls(author_msgs, inline_text=coalesced_body)
+                if not prior_author_body and thread_id in self.engine.thread_turns and self.engine.thread_turns[thread_id]:
+                    prior_author_body = self.engine.thread_turns[thread_id][0]
+                prior_attachments = tuple(
+                    extract_image_attachment_urls(prior_author_msgs, inline_text=prior_author_body)
                 )
                 post = ForumPostContext(
                     thread_id=thread_id,
                     author_id=owner_id,
                     author_name=author_name,
                     title=title,
-                    body=coalesced_body,
+                    body=prior_author_body,
                     author_roles=author_roles,
                     applied_tags=tag_names,
                     timestamp=now,
-                    attachments=coalesced_attachments,
-                    bystander_messages=tuple(bystander_msgs),
+                    attachments=prior_attachments,
                 )
-                if self.engine.will_run_deep_search(post):
-                    progress_msg_id = self._post_progress_message(thread_id)
-                    deferred_deep_tasks.append(
-                        {
-                            "kind": "new",
-                            "thread_id": thread_id,
-                            "raw_tag_ids": raw_tag_ids,
-                            "post": post,
-                            "progress_msg_id": progress_msg_id,
-                        }
-                    )
-                else:
-                    decision = self.engine.handle_new_thread(post)
-                    if decision.should_reply:
-                        actions.append(
-                            self._apply_decision(
-                                thread_id,
-                                raw_tag_ids,
-                                decision,
-                                progress_message_id=None,
-                            )
+
+                if last_bot_msg_id:
+                    # 2a. Check if the author or maintainer clicked ✅ reaction on the bot's reply
+                    solved_rk = f"{thread_id}:{last_bot_msg_id}:solved"
+                    solved_actor = (
+                        self._find_reaction_actor(
+                            thread_id,
+                            last_bot_msg,
+                            "✅",
+                            (owner_id, self.engine.maintainer_id),
                         )
-                continue
+                        if solved_rk not in self.handled_reactions
+                        else None
+                    )
+                    if solved_actor is not None:
+                        self.handled_reactions.add(solved_rk)
+                        decision = self.engine.handle_button_interaction(post, BUTTON_SOLVED_ID, actor_id=solved_actor)
+                        actions.append(self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=False))
+                        continue
 
-            # Case 2: Bot has already replied -> check reactions or coalesced follow-up messages
-            last_bot_idx = bot_indices[-1]
-            last_bot_msg = messages[last_bot_idx]
-            last_bot_msg_id = str(last_bot_msg["id"])
+                    # 2b. Check if the author clicked ❓ reaction on the bot's reply
+                    help_rk = f"{thread_id}:{last_bot_msg_id}:help"
+                    if help_rk not in self.handled_reactions and self._has_author_reaction(
+                        thread_id, last_bot_msg, "❓", owner_id
+                    ):
+                        self.handled_reactions.add(help_rk)
+                        decision = self.engine.handle_button_interaction(post, BUTTON_NEED_HELP_ID, actor_id=owner_id)
+                        actions.append(self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=False))
+                        continue
 
-            prior_author_msgs = [
-                m
-                for m in messages[:last_bot_idx]
-                if str((m.get("author") or {}).get("id", "")) == owner_id
-            ]
-            prior_author_body = "\n\n".join(
-                str(m.get("content", "")).strip()
-                for m in prior_author_msgs
-                if str(m.get("content", "")).strip()
-            )
-            prior_attachments = tuple(
-                extract_image_attachment_urls(prior_author_msgs, inline_text=prior_author_body)
-            )
-            post = ForumPostContext(
-                thread_id=thread_id,
-                author_id=owner_id,
-                author_name=author_name,
-                title=title,
-                body=prior_author_body,
-                author_roles=author_roles,
-                applied_tags=tag_names,
-                timestamp=now,
-                attachments=prior_attachments,
-            )
+                # 2c. Coalesce all author messages posted after the bot's last reply
+                # Staff-Only Backoff: only stay out of the conversation if the maintainer
+                # or a staff member stepped in after the bot's last message.
+                staff_replies_after_bot = [
+                    m
+                    for m in after_slice
+                    if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
+                    and self._is_staff_replier(str((m.get("author") or {}).get("id", "")))
+                ]
+                if staff_replies_after_bot:
+                    continue
 
-            # 2a. Check if the author or maintainer clicked ✅ reaction on the bot's reply
-            solved_rk = f"{thread_id}:{last_bot_msg_id}:solved"
-            solved_actor = (
-                self._find_reaction_actor(
-                    thread_id,
-                    last_bot_msg,
-                    "✅",
-                    (owner_id, self.engine.maintainer_id),
+                after_bystander_msgs = [
+                    str(m.get("content", "")).strip()
+                    for m in after_slice
+                    if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
+                    and str(m.get("content", "")).strip()
+                ]
+                bystander_after_text = "\n\n".join(after_bystander_msgs)
+                has_bystander_danger = bool(bystander_after_text and build_dangerous_advice_warning(bystander_after_text))
+
+                after_author_msg_objs = [
+                    m
+                    for m in after_slice
+                    if str((m.get("author") or {}).get("id", "")) == owner_id
+                ]
+                after_author_msgs = [
+                    str(m.get("content", "")).strip()
+                    for m in after_author_msg_objs
+                    if str(m.get("content", "")).strip()
+                ]
+                followup_attachments = tuple(
+                    extract_image_attachment_urls(
+                        after_author_msg_objs,
+                        inline_text="\n".join(after_author_msgs),
+                    )
                 )
-                if solved_rk not in self.handled_reactions
-                else None
-            )
-            if solved_actor is not None:
-                self.handled_reactions.add(solved_rk)
-                decision = self.engine.handle_button_interaction(post, BUTTON_SOLVED_ID, actor_id=solved_actor)
-                actions.append(self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=False))
-                continue
+                if not after_author_msgs and not followup_attachments and not has_bystander_danger:
+                    continue
 
-            # 2b. Check if the author clicked ❓ reaction on the bot's reply
-            help_rk = f"{thread_id}:{last_bot_msg_id}:help"
-            if help_rk not in self.handled_reactions and self._has_author_reaction(
-                thread_id, last_bot_msg, "❓", owner_id
-            ):
-                self.handled_reactions.add(help_rk)
-                decision = self.engine.handle_button_interaction(post, BUTTON_NEED_HELP_ID, actor_id=owner_id)
-                actions.append(self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=False))
-                continue
+                coalesced_followup = "\n\n".join(after_author_msgs)
+                latest_author_msg = after_author_msgs[-1].strip() if after_author_msgs else ""
 
-            # 2c. Coalesce all author messages posted after the bot's last reply
-            # Staff-Only Backoff: only stay out of the conversation if the maintainer
-            # or a staff member stepped in after the bot's last message.
-            staff_replies_after_bot = [
-                m
-                for m in messages[last_bot_idx + 1 :]
-                if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
-                and self._is_staff_replier(str((m.get("author") or {}).get("id", "")))
-            ]
-            if staff_replies_after_bot:
-                continue
-
-            after_bystander_msgs = [
-                str(m.get("content", "")).strip()
-                for m in messages[last_bot_idx + 1 :]
-                if str((m.get("author") or {}).get("id", "")) not in ("", owner_id, self.bot_user_id)
-                and str(m.get("content", "")).strip()
-            ]
-            bystander_after_text = "\n\n".join(after_bystander_msgs)
-            has_bystander_danger = bool(bystander_after_text and DANGEROUS_ADVICE_RE.search(bystander_after_text))
-
-            after_author_msg_objs = [
-                m
-                for m in messages[last_bot_idx + 1 :]
-                if str((m.get("author") or {}).get("id", "")) == owner_id
-            ]
-            after_author_msgs = [
-                str(m.get("content", "")).strip()
-                for m in after_author_msg_objs
-                if str(m.get("content", "")).strip()
-            ]
-            followup_attachments = tuple(
-                extract_image_attachment_urls(
-                    after_author_msg_objs,
-                    inline_text="\n".join(after_author_msgs),
-                )
-            )
-            if not after_author_msgs and not followup_attachments and not has_bystander_danger:
-                continue
-
-            coalesced_followup = "\n\n".join(after_author_msgs)
-
-            if coalesced_followup and SOLVED_TEXT_RE.search(coalesced_followup):
-                decision = self.engine.handle_button_interaction(post, BUTTON_SOLVED_ID, actor_id=owner_id)
-                actions.append(self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=False))
-                continue
-
-            if coalesced_followup and NEED_HELP_TEXT_RE.search(coalesced_followup) and TAG_NEEDS_INFO not in tag_names:
-                decision = self.engine.handle_button_interaction(post, BUTTON_NEED_HELP_ID, actor_id=owner_id)
-                actions.append(
-                    self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=not decision.archived)
-                )
-                continue
-
-            # Cap total automated bot replies per thread so a single thread cannot loop indefinitely
-            if len(bot_indices) >= MAX_BOT_REPLIES_PER_THREAD:
-                continue
-
-            if TAG_NEEDS_INFO in tag_names or thread_id not in self.engine.escalated_threads or has_bystander_danger:
-                if coalesced_followup and self.engine.will_run_deep_search(
-                    post,
-                    followup_text=coalesced_followup,
-                    followup_attachments=followup_attachments,
+                if (
+                    latest_author_msg
+                    and len(latest_author_msg) <= 80
+                    and SOLVED_TEXT_RE.match(latest_author_msg)
                 ):
-                    progress_msg_id = self._post_progress_message(thread_id)
-                    deferred_deep_tasks.append(
-                        {
-                            "kind": "followup",
-                            "thread_id": thread_id,
-                            "raw_tag_ids": raw_tag_ids,
-                            "post": post,
-                            "coalesced_followup": coalesced_followup,
-                            "followup_attachments": followup_attachments,
-                            "bystander_text": bystander_after_text,
-                            "progress_msg_id": progress_msg_id,
-                        }
+                    decision = self.engine.handle_button_interaction(post, BUTTON_SOLVED_ID, actor_id=owner_id)
+                    actions.append(self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=False))
+                    continue
+
+                if coalesced_followup and NEED_HELP_TEXT_RE.search(coalesced_followup) and TAG_NEEDS_INFO not in tag_names:
+                    decision = self.engine.handle_button_interaction(post, BUTTON_NEED_HELP_ID, actor_id=owner_id)
+                    actions.append(
+                        self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=not decision.archived)
                     )
-                else:
-                    decision = self.engine.handle_followup_message(
-                        post,
-                        coalesced_followup,
-                        followup_attachments=followup_attachments,
-                        bystander_text=bystander_after_text,
-                    )
-                    if decision.should_reply:
-                        actions.append(
-                            self._apply_decision(
-                                thread_id,
-                                raw_tag_ids,
-                                decision,
-                                seed_reactions=not decision.archived,
-                                progress_message_id=None,
-                            )
+                    continue
+
+                # Cap total automated bot replies per thread (`MAX_BOT_REPLIES_PER_THREAD = 3`);
+                # after 3 replies (or 50+ message eviction), stop conversational replies and
+                # only allow a one-time terminal escalation handoff if required diagnostics arrive.
+                if effective_bot_replies >= MAX_BOT_REPLIES_PER_THREAD or window_evicted_history:
+                    if (
+                        thread_id not in self.engine.escalated_threads
+                        and TAG_NEEDS_INFO in tag_names
+                        and coalesced_followup
+                    ):
+                        decision = self.engine.handle_followup_message(
+                            post,
+                            coalesced_followup,
+                            followup_attachments=followup_attachments,
+                            bystander_text=bystander_after_text,
                         )
+                        if decision.ping_maintainer and decision.should_reply:
+                            actions.append(
+                                self._apply_decision(
+                                    thread_id,
+                                    raw_tag_ids,
+                                    decision,
+                                    seed_reactions=not decision.archived,
+                                    progress_message_id=existing_placeholder_id,
+                                )
+                            )
+                    continue
+
+                if TAG_NEEDS_INFO in tag_names or thread_id not in self.engine.escalated_threads or has_bystander_danger:
+                    if coalesced_followup and self.engine.will_run_deep_search(
+                        post,
+                        followup_text=coalesced_followup,
+                        followup_attachments=followup_attachments,
+                    ):
+                        progress_msg_id = existing_placeholder_id or self._post_progress_message(thread_id)
+                        deferred_deep_tasks.append(
+                            {
+                                "kind": "followup",
+                                "thread_id": thread_id,
+                                "raw_tag_ids": raw_tag_ids,
+                                "post": post,
+                                "coalesced_followup": coalesced_followup,
+                                "followup_attachments": followup_attachments,
+                                "bystander_text": bystander_after_text,
+                                "progress_msg_id": progress_msg_id,
+                            }
+                        )
+                    else:
+                        decision = self.engine.handle_followup_message(
+                            post,
+                            coalesced_followup,
+                            followup_attachments=followup_attachments,
+                            bystander_text=bystander_after_text,
+                        )
+                        if decision.rate_limited:
+                            continue
+                        if decision.should_reply:
+                            actions.append(
+                                self._apply_decision(
+                                    thread_id,
+                                    raw_tag_ids,
+                                    decision,
+                                    seed_reactions=not decision.archived,
+                                    progress_message_id=existing_placeholder_id,
+                                )
+                            )
+            except (OSError, sqlite3.Error):
+                continue
 
         # Phase 2: Execute deferred slow LLM synthesis tasks after all fast replies
         # and "⏳ Scanning..." placeholders have already been posted to Discord.
         for task in deferred_deep_tasks:
-            t_id = str(task["thread_id"])
-            t_raw_tags: list[str] = list(task["raw_tag_ids"])
-            t_post: ForumPostContext = task["post"]
-            t_prog_id: str | None = task["progress_msg_id"]
-            if task["kind"] == "new":
-                decision = self.engine.handle_new_thread(t_post)
-                if decision.should_reply or t_prog_id:
-                    actions.append(
-                        self._apply_decision(
+            try:
+                t_id = str(task["thread_id"])
+                t_raw_tags: list[str] = list(task["raw_tag_ids"])
+                t_post: ForumPostContext = task["post"]
+                t_prog_id: str | None = task["progress_msg_id"]
+                if task["kind"] == "new":
+                    decision = self.engine.handle_new_thread(t_post)
+                    if decision.rate_limited:
+                        continue
+                    if decision.should_reply or t_prog_id:
+                        applied = self._apply_decision(
                             t_id,
                             t_raw_tags,
                             decision,
                             progress_message_id=t_prog_id,
                         )
+                        if not t_prog_id or (t_id in self.engine.thread_bot_reply_counts):
+                            actions.append(applied)
+                else:
+                    decision = self.engine.handle_followup_message(
+                        t_post,
+                        str(task["coalesced_followup"]),
+                        followup_attachments=tuple(task["followup_attachments"]),
+                        bystander_text=str(task["bystander_text"]),
                     )
-            else:
-                decision = self.engine.handle_followup_message(
-                    t_post,
-                    str(task["coalesced_followup"]),
-                    followup_attachments=tuple(task["followup_attachments"]),
-                    bystander_text=str(task.get("bystander_text", "")),
-                )
-                if decision.should_reply or t_prog_id:
-                    actions.append(
-                        self._apply_decision(
+                    if decision.rate_limited:
+                        continue
+                    if decision.should_reply or t_prog_id:
+                        applied = self._apply_decision(
                             t_id,
                             t_raw_tags,
                             decision,
                             seed_reactions=not decision.archived,
                             progress_message_id=t_prog_id,
                         )
-                    )
+                        if not t_prog_id or (t_id in self.engine.thread_bot_reply_counts):
+                            actions.append(applied)
+            except (OSError, sqlite3.Error):
+                continue
 
         return actions
 
@@ -5358,7 +5744,7 @@ def main(argv: list[str] | None = None) -> int:
                 except KeyboardInterrupt:
                     print("\nStopping Discord support bot poller.")
                     break
-                except OSError as exc:
+                except (OSError, sqlite3.Error) as exc:
                     print(f"[poll] transient network/API error: {exc}", file=sys.stderr)
                 time.sleep(max(args.interval, 2.0))
             return 0

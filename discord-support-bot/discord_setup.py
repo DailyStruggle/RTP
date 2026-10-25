@@ -298,6 +298,36 @@ def default_legacy_guild_snapshot(guild_id: str = "100000000000000000") -> list[
     ]
 
 
+def enrich_threads_with_starter_bodies(
+    client: Any,
+    threads: list[dict[str, Any]],
+    spec: dict[str, Any],
+) -> None:
+    """
+    Populates `th['body']` via `GET /channels/{th_id}/messages/{th_id}` for
+    existing Forum reference threads whose title matches `pinned_forum_threads`
+    when Discord's `/threads/active` or `/threads/archived/public` response omits
+    the starter message body.
+    """
+    pinned_titles = {
+        str(p.get("title", "")).strip()
+        for p in spec.get("pinned_forum_threads", [])
+        if isinstance(p, dict) and str(p.get("title", "")).strip()
+    }
+    for th in threads:
+        if not isinstance(th, dict):
+            continue
+        th_title = str(th.get("name", th.get("title", ""))).strip()
+        th_id = str(th.get("id", "")).strip()
+        if th_title in pinned_titles and th_id and "body" not in th and "message" not in th:
+            try:
+                starter_msg = client.request("GET", f"/channels/{th_id}/messages/{th_id}") or {}
+                if isinstance(starter_msg, dict) and "content" in starter_msg:
+                    th["body"] = str(starter_msg.get("content") or "")
+            except OSError:
+                pass
+
+
 def compute_provisioning_plan(
     current_channels: list[dict[str, Any]],
     current_roles: list[dict[str, Any]],
@@ -904,6 +934,8 @@ def main(argv: list[str] | None = None) -> int:
                         threads.extend(arch.get("threads", []))
                 except OSError:
                     pass
+
+        enrich_threads_with_starter_bodies(client, threads, spec)
     else:
         channels = default_legacy_guild_snapshot(guild_id)
         roles = []
