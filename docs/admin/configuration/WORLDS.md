@@ -14,10 +14,11 @@ If a world has no config file yet, RTP creates one based on `definitions/worlds/
 
 ## Updating Settings
 
-You can update world mappings through:
-1. **In-game admin menu**: Run `/rtp admin` or `/rtp menu` -> click **Worlds**.
-2. **Command line**: Use `/rtp config world <worldname> <key>=<value>` (e.g. `/rtp config world world region=custom_region`).
-3. **Direct editing**: Edit `definitions/worlds/<world>.yml` on disk and run `/rtp reload`.
+When `/rtp` or `/rtp world=<worldname>` teleports players to the overworld instead of `<worldname>`, it is because unconfigured worlds fall back to `region: "default"` (which targets the overworld). Rather than changing `default.yml` to always send players to another dimension, create a region for that world in `definitions/regions/<region>.yml` (with its own `world`, `shape`, and `vert` settings) and map `definitions/worlds/<worldname>.yml` to it through:
+1. **Browser map workspace (`/rtp editor`)**: Open `/rtp editor`, create or select the region for that world, and set the world's `region` mapping ([Web Editor Guide](../WEB_EDITOR_GUIDE.md)).
+2. **Guided setup or admin menu (`/rtp admin setup` / `/rtp admin`)**: Run `/rtp admin setup` (choose `multi` worlds), or `/rtp admin` -> click **Worlds**.
+3. **Command line**: Use `/rtp config worlds <worldname> region=<region>` (e.g. `/rtp config worlds world_nether region=nether`).
+4. **Direct editing**: Edit `definitions/worlds/<world>.yml` and `definitions/regions/<region>.yml` on disk and run `/rtp reload`.
 
 > 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full menu and command navigation details.
 

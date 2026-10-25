@@ -1,6 +1,6 @@
 # ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
 
-**Status:** Proposed
+**Status:** Accepted (extended by ADR-053)
 **Date:** 2026-05-05
 
 ## Context

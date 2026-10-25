@@ -24,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -47,11 +48,13 @@ import org.junit.jupiter.api.Test;
  * the L2/L3 pre-compute does (one region file per probe drain). Region edge and corner chunks get
  * a partial square; directions and plane points outside the file are left out, never guessed.
  */
+@Tag("slow")
 public class LandingTerrainCheckMeasurementTest {
 
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$");
   private static final Path REGION_DIR = Path.of(System.getProperty("rtp.elevation.regionDir",
-      "/home/johngoldsmith/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
+      System.getProperty("user.home", "")
+          + "/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
           + "/world/dimensions/minecraft/overworld/region"));
   private static final int PER_REGION = Integer.getInteger("rtp.landing.perRegion", 10);
   private static final int MAX_LANDINGS = Integer.getInteger("rtp.landing.max", 5000);

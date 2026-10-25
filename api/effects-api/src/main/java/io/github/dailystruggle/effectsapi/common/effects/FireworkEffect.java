@@ -40,6 +40,10 @@ public class FireworkEffect extends Effect<FireworkEffect.FireworkKeys> {
         SAFE
     }
 
+    public FireworkEffect() {
+        this("BALL", "WHITE");
+    }
+
     /**
      * @param defaultType  platform firework-shape default (e.g. Bukkit
      *                     {@code FireworkEffect.Type.BALL}).

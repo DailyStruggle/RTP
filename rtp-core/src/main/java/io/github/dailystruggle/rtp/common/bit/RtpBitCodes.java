@@ -41,6 +41,7 @@ public final class RtpBitCodes {
             ActionCbitCounters.class,
             io.github.dailystruggle.rtp.common.action.ActionEngineSelfTest.class,
             ConfigPbit.class,
+            CoreFallbackCbitCounters.class,
             DirectiveConfigCheck.class,
             GovernorBitComponent.class,
             PipelineCbitCounters.class,

@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
@@ -473,18 +474,28 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
       if (online != null) {
         // Probe sendWorldBorder and resetWorldBorder both with synthetic ID and any online player
         UUID testPlayerId = UUID.randomUUID();
-        RTPRuntime.serverAccessor().sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0);
-        RTPRuntime.serverAccessor().sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0, 50.0, 5L);
-        RTPRuntime.serverAccessor().resetWorldBorder(testPlayerId);
-
-        for (RTPPlayer p : online) {
-          if (p != null && p.uuid() != null) {
-            RTPRuntime.serverAccessor().sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0);
-            RTPRuntime.serverAccessor().sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0, 50.0, 5L);
-            RTPRuntime.serverAccessor().resetWorldBorder(p.uuid());
+        try {
+          RTPRuntime.serverAccessor().sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0);
+          RTPRuntime.serverAccessor().sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0, 50.0, 5L);
+          for (RTPPlayer p : online) {
+            if (p != null && p.uuid() != null) {
+              RTPRuntime.serverAccessor().sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0);
+              RTPRuntime.serverAccessor().sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0, 50.0, 5L);
+            }
+          }
+          r.worldBorderValid = true;
+        } finally {
+          try {
+            RTPRuntime.serverAccessor().resetWorldBorder(testPlayerId);
+            for (RTPPlayer p : online) {
+              if (p != null && p.uuid() != null) {
+                RTPRuntime.serverAccessor().resetWorldBorder(p.uuid());
+              }
+            }
+          } catch (Throwable t) {
+            CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("accessor.resetWorldBorder", t);
           }
         }
-        r.worldBorderValid = true;
       } else {
         r.pass = false;
         r.details.add("getOnlinePlayers() returned null");

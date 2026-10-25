@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.commands.SenderTimings;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec;
@@ -200,8 +201,10 @@ public final class FabricRTPPlayer
         } catch (LinkageError ignored) {
             // perms-api jar absent at runtime (lite/stripped dist or just
             // not declared as a dep). Fall through to op-level check.
-        } catch (Throwable ignored) {
-            // Defensive: never let a perms lookup crash the pipeline.
+        } catch (RuntimeException e) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#hasPermission:" + permission,
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         // SECONDARY: consult the plugin.yml default table. perms-api returned
         // DEFAULT (no implementer) or its jar is absent; mirror Bukkit's
@@ -272,7 +275,10 @@ public final class FabricRTPPlayer
                     }
                 }
             }
-        } catch (Throwable t) {
+        } catch (java.io.IOException | RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#opsJsonScan:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] hasPermission op-check via ops.json scan failed for "
                             + name + " (" + t.getClass().getSimpleName() + "): " + t.getMessage());
@@ -322,8 +328,9 @@ public final class FabricRTPPlayer
             if (p.connection != null) {
                 p.connection.send(new ClientboundSystemChatPacket(component, false));
             }
-        } catch (Throwable t) {
-            // Best-effort: never let a chat send escalate into a pipeline crash.
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#sendComponent:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Failed to deliver system message to " + name + ": " + t.getMessage());
         }
@@ -385,7 +392,9 @@ public final class FabricRTPPlayer
                 p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket(
                         FabricLegacyText.parse(title)));
             }
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#sendTitle:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Failed to deliver title to " + name + ": " + t.getMessage());
         }
@@ -406,7 +415,9 @@ public final class FabricRTPPlayer
             if (p.connection == null) return;
             p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket(
                     FabricLegacyText.parse(message)));
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#sendActionbar:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Failed to deliver actionbar to " + name + ": " + t.getMessage());
         }
@@ -730,7 +741,9 @@ public final class FabricRTPPlayer
             }
             RTP.log(java.util.logging.Level.WARNING,
                 "[RTP] setRespawnOnTeleport: no setRespawnPosition method on this MC version");
-        } catch (Throwable t) {
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#anchorRespawn", t);
             RTP.log(java.util.logging.Level.WARNING, "[RTP] Fabric setRespawnPosition failed", t);
         }
     }
@@ -752,8 +765,10 @@ public final class FabricRTPPlayer
                 }
                 if (ok) return c.newInstance(args);
             }
-        } catch (Throwable ignored) {
-            // fall through; caller logs the overall failure
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#buildRespawnConfig",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         return null;
     }
@@ -809,7 +824,10 @@ public final class FabricRTPPlayer
             net.minecraft.world.level.block.state.BlockState state =
                     level.getBlockState(new net.minecraft.core.BlockPos(x, y, z));
             return net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#getClientBlock",
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.FINE,
                     "[RTP][Fabric] getClientBlock failed at (" + x + "," + y + "," + z + "): " + t);
             return null;
@@ -833,7 +851,9 @@ public final class FabricRTPPlayer
         try {
             p.connection.send(new net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket(
                     new net.minecraft.core.BlockPos(x, y, z), state));
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#sendClientBlockChange:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP][Fabric] sendClientBlockChange failed for " + name + ": " + t.getMessage());
         }
@@ -853,7 +873,10 @@ public final class FabricRTPPlayer
             return net.minecraft.commands.arguments.blocks.BlockStateParser
                     .parseForBlock(lookup, blockData, false)
                     .blockState();
-        } catch (Throwable e) {
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException | RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "FabricRTPPlayer#parseBlockData:" + blockData,
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP][Fabric] ignoring malformed client block-data string: " + blockData
                             + " (" + e.getClass().getSimpleName() + ")");

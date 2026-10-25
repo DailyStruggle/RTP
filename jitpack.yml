@@ -23,15 +23,20 @@ jdk:
 
 install:
   - ./gradlew --no-daemon -PexcludeJdk25
-      :bit-api:publishToMavenLocal
-      :commands-api:publishToMavenLocal
-      :effects-api:publishToMavenLocal
-      :yaml-api:publishToMavenLocal
-      :units-api:publishToMavenLocal
-      :metrics-api:publishToMavenLocal
-      :bstats-api:publishToMavenLocal
-      :maps-api:publishToMavenLocal
-      :rtp-proxy:rtp-proxy-common:publishToMavenLocal
       :server-api:publishToMavenLocal
+      :anvil-api:publishToMavenLocal
+      :bit-api:publishToMavenLocal
+      :bstats-api:publishToMavenLocal
+      :commands-api:publishToMavenLocal
+      :config-bit-api:publishToMavenLocal
+      :effects-api:publishToMavenLocal
+      :maps-api:publishToMavenLocal
+      :menu-api:publishToMavenLocal
+      :metrics-api:publishToMavenLocal
+      :predict-api:publishToMavenLocal
+      :tags-api:publishToMavenLocal
+      :units-api:publishToMavenLocal
+      :yaml-api:publishToMavenLocal
+      :rtp-proxy:rtp-proxy-common:publishToMavenLocal
       :rtp-api:publishToMavenLocal
       :rtp-core:publishToMavenLocal

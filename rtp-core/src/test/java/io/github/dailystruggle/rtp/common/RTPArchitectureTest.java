@@ -479,7 +479,7 @@ public class RTPArchitectureTest {
                     .because("ADR-087 Invariant I8: ComputeGovernor and ComputeBudget must not create threads or acquire locks on actuation paths.");
 
     /**
-     * Rule 22 - Governor Package Is Tier 2 Below Selection, Tasks, and Tools (ADR-115, ADR-087).
+     * Rule 22 - Governor Package Is Tier 2 Below Selection, Tasks, Tools, Configuration, and BIT (ADR-115, ADR-087).
      */
     @ArchTest
     static final ArchRule governor_package_must_not_depend_on_selection_tasks_or_tools =
@@ -490,7 +490,165 @@ public class RTPArchitectureTest {
                             "io.github.dailystruggle.rtp.common.selection..",
                             "io.github.dailystruggle.rtp.common.tasks..",
                             "io.github.dailystruggle.rtp.common.tools..",
+                            "io.github.dailystruggle.rtp.common.configuration..",
+                            "io.github.dailystruggle.rtp.common.bit.."
+                    )
+                    .because("ADR-115: common.governor is consumed by selection, tasks, tools, configuration, and bit, so it must not depend back on them.");
+
+    /**
+     * Rule 23 - Region Classes Do Not Depend on Claim Subpackage (ADR-115, RTP-67).
+     *
+     * <p>{@code selection.region.claim.ClaimAnchoredRegionTracker} extends {@code RegionClaimTracker}
+     * in {@code selection.region}, so top-level {@code selection.region} classes must not depend back
+     * on {@code selection.region.claim}.
+     */
+    @ArchTest
+    static final ArchRule region_classes_must_not_depend_on_claim_subpackage =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.region")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region.claim..")
+                    .because("ADR-115 Seam 1: selection.region.claim depends on selection.region, so selection.region must not depend back on claim.");
+
+    /**
+     * Rule 24 - Region Package Tree Does Not Depend on Database (ADR-115, RTP-67).
+     *
+     * <p>{@code Region} and {@code RegionQueueManager} persist and hydrate cached locations through
+     * the {@code RegionLocationStore} port in {@code selection.region}, wired by {@code ActiveDatabase}.
+     */
+    @ArchTest
+    static final ArchRule regions_must_not_depend_on_database =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.region..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.database..")
+                    .because("ADR-115 Seam 1: database depends on selection.region via RegionLocationStore, so selection.region must not depend back on database.");
+
+    /**
+     * Rule 25 - Cache Stage Package Stays Below Region Classes (ADR-115, RTP-67).
+     *
+     * <p>{@code RingCacheStage} wraps buffer storage through {@code RingBufferDelegate} in
+     * {@code selection.region.cache}, keeping the cache stage package free of reverse dependencies
+     * on {@code selection.region}.
+     */
+    @ArchTest
+    static final ArchRule region_cache_must_not_depend_on_region_classes =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.region.cache..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region")
+                    .because("ADR-115 Seam 1: selection.region depends on selection.region.cache, so cache must not depend back on selection.region.");
+
+    /**
+     * Rule 26 - Predict and Governor Stay Below Placeholders and Commands (ADR-115, ADR-123).
+     *
+     * <p>{@code common.predict} (in {@code api/predict-api}) and {@code common.governor} are Tier 1/Tier 2
+     * control-plane packages and must never depend upward on {@code common.placeholders} or {@code common.commands}.
+     */
+    @ArchTest
+    static final ArchRule predict_and_governor_must_not_depend_on_placeholders_or_commands =
+            noClasses()
+                    .that().resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.predict..",
+                            "io.github.dailystruggle.rtp.common.governor.."
+                    )
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.placeholders..",
+                            "io.github.dailystruggle.rtp.common.commands.."
+                    )
+                    .because("ADR-115 / ADR-123: predict and governor control-plane packages must never depend upward on placeholders or commands.");
+
+    /**
+     * Rule 27 - Search Does Not Depend on Commands (ADR-115).
+     *
+     * <p>{@code common.search} parses thesaurus JSON via {@code common.text.JsonText} (Tier 1) and must never
+     * depend upward on {@code common.commands}.
+     */
+    @ArchTest
+    static final ArchRule search_must_not_depend_on_commands =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.search..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.commands..")
+                    .because("ADR-115: search is consumed by commands, menu, importer, and permission, so search must not depend back on commands.");
+
+    /**
+     * Rule 28 - Selection Does Not Depend on Commands (ADR-115).
+     *
+     * <p>{@code common.selection} shapes declare distance sub-parameters through
+     * {@code selection.region.util.BaseDistanceParameter} and {@code DistanceParser}, and must never
+     * depend upward on {@code common.commands}.
+     */
+    @ArchTest
+    static final ArchRule selection_must_not_depend_on_commands =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.commands..")
+                    .because("ADR-115: commands depend downward on selection, so selection must never depend back on commands.");
+
+    /**
+     * Rule 29 - Tools Do Not Depend on Selection (ADR-115).
+     *
+     * <p>{@code common.tools} stays below {@code common.selection}; {@code ChunkyRTPShape} lives in
+     * {@code selection.region.selectors.shapes} and {@code ChunkyChecker} registers shapes via a callback port.
+     */
+    @ArchTest
+    static final ArchRule tools_must_not_depend_on_selection =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.tools..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection..")
+                    .because("ADR-115: selection depends on tools, so tools must not depend back on selection.");
+
+    /**
+     * Rule 30 - Configuration Does Not Depend on Database (ADR-115).
+     *
+     * <p>{@code common.configuration} uses {@code YamlFileCache} in {@code api/yaml-api} for its
+     * modification-time-cached directory map, severing the {@code configuration <-> database} cycle.
+     */
+    @ArchTest
+    static final ArchRule configuration_must_not_depend_on_database =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.configuration..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.database..")
+                    .because("ADR-115: database depends on configuration, so configuration must never depend back on database.");
+
+    /**
+     * Rule 31 - Configuration Does Not Depend on Selection Region Utilities (ADR-115).
+     *
+     * <p>Core {@code common.configuration} classes stay below {@code selection.region.util..};
+     * unit/duration/data-size parsing is handled by {@code ConfigParser} in {@code api/yaml-api}
+     * via {@code api/units-api}, severing the {@code selection <-> configuration} cycle in {@code rtp-core}.
+     */
+    @ArchTest
+    static final ArchRule configuration_must_not_depend_on_selection_region_util =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.configuration..")
+                    .and().doNotHaveSimpleName("ConfigParser")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region.util..")
+                    .because("ADR-115: selection depends on configuration in rtp-core, so core configuration must not depend back on selection.region.util.");
+
+    /**
+     * Rule 32 - Factory Does Not Depend on Selection or Configuration (ADR-115).
+     *
+     * <p>{@code Factory} and {@code FactoryValue} live in {@code api/yaml-api}, and core
+     * {@code common.factory} classes ({@code FactoryNames}, {@code FactoryRegistry}) have zero
+     * upward dependencies on {@code selection..} or {@code configuration..}, severing both the
+     * {@code selection <-> factory} and {@code configuration <-> factory} cycles in {@code rtp-core}.
+     */
+    @ArchTest
+    static final ArchRule factory_must_not_depend_on_selection_or_configuration =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.factory..")
+                    .and().doNotHaveSimpleName("FactoryValue")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.selection..",
                             "io.github.dailystruggle.rtp.common.configuration.."
                     )
-                    .because("ADR-115: common.governor is consumed by selection, tasks, and tools, so it must not depend back on them.");
+                    .because("ADR-115: selection and configuration depend on factory, so factory in rtp-core must never depend back on selection or configuration.");
 }

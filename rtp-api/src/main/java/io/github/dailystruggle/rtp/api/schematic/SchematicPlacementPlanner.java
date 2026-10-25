@@ -1,20 +1,39 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
 import io.github.dailystruggle.rtp.api.block.BlockStateString;
+import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Platform-neutral planner that turns a decoded {@link LoadedSchematic} plus an arrival
- * {@link RTPLocation} and {@link PasteOptions} into a flat list of absolute
- * {@link BlockPlacement}s (ADR-058 Amendment 1).
+ * Platform-neutral planner that turns a decoded {@link LoadedSchematic} plus an arrival coordinate
+ * or {@link RTPLocation} and {@link PasteOptions} into a flat list of absolute {@link
+ * BlockPlacement}s or {@link BlockDelta}s (ADR-058 Amendment 1).
  */
 public final class SchematicPlacementPlanner {
 
-  private SchematicPlacementPlanner() {
+  @FunctionalInterface
+  private interface CellFactory<T> {
+    T create(int x, int y, int z, String blockState);
+  }
+
+  private SchematicPlacementPlanner() {}
+
+  /**
+   * Plans the absolute block writes for a paste at explicit world coordinates.
+   *
+   * @param schematic the decoded schematic; never {@code null}
+   * @param anchorX arrival world X coordinate
+   * @param anchorY arrival world Y coordinate
+   * @param anchorZ arrival world Z coordinate
+   * @param options the paste tuning; never {@code null}
+   * @return an ordered list of placements (air-skipped per {@code options})
+   */
+  public static List<BlockPlacement> plan(
+      LoadedSchematic schematic, int anchorX, int anchorY, int anchorZ, PasteOptions options) {
+    return planCells(schematic, anchorX, anchorY, anchorZ, options, BlockPlacement::new);
   }
 
   /**
@@ -25,10 +44,49 @@ public final class SchematicPlacementPlanner {
    * @param options   the paste tuning; never {@code null}
    * @return an ordered, immutable list of placements (air-skipped per {@code options})
    */
-  public static List<BlockPlacement> plan(LoadedSchematic schematic, RTPLocation at,
-                                          PasteOptions options) {
-    Objects.requireNonNull(schematic, "schematic");
+  public static List<BlockPlacement> plan(
+      LoadedSchematic schematic, RTPLocation at, PasteOptions options) {
     Objects.requireNonNull(at, "at");
+    return plan(schematic, at.x(), at.y(), at.z(), options);
+  }
+
+  /**
+   * Plans the absolute block writes directly as {@link BlockDelta}s at explicit world coordinates.
+   *
+   * @param schematic the decoded schematic; never {@code null}
+   * @param anchorX arrival world X coordinate
+   * @param anchorY arrival world Y coordinate
+   * @param anchorZ arrival world Z coordinate
+   * @param options the paste tuning; never {@code null}
+   * @return an ordered list of block deltas (air-skipped per {@code options})
+   */
+  public static List<BlockDelta> planDeltas(
+      LoadedSchematic schematic, int anchorX, int anchorY, int anchorZ, PasteOptions options) {
+    return planCells(schematic, anchorX, anchorY, anchorZ, options, BlockDelta::new);
+  }
+
+  /**
+   * Plans the absolute block writes directly as {@link BlockDelta}s for an arrival location.
+   *
+   * @param schematic the decoded schematic; never {@code null}
+   * @param at the arrival location; never {@code null}
+   * @param options the paste tuning; never {@code null}
+   * @return an ordered list of block deltas (air-skipped per {@code options})
+   */
+  public static List<BlockDelta> planDeltas(
+      LoadedSchematic schematic, RTPLocation at, PasteOptions options) {
+    Objects.requireNonNull(at, "at");
+    return planDeltas(schematic, at.x(), at.y(), at.z(), options);
+  }
+
+  private static <T> List<T> planCells(
+      LoadedSchematic schematic,
+      int anchorX,
+      int anchorY,
+      int anchorZ,
+      PasteOptions options,
+      CellFactory<T> factory) {
+    Objects.requireNonNull(schematic, "schematic");
     Objects.requireNonNull(options, "options");
 
     int width = schematic.width();
@@ -36,12 +94,12 @@ public final class SchematicPlacementPlanner {
     int length = schematic.length();
     List<String> palette = schematic.palette();
 
-    int[] base = anchorBase(schematic, at, options);
+    int[] base = anchorBase(schematic, anchorX, anchorY, anchorZ, options);
     int baseX = base[0];
     int baseY = base[1];
     int baseZ = base[2];
 
-    List<BlockPlacement> out = new ArrayList<>();
+    List<T> out = new ArrayList<>();
     for (int y = 0; y < height; y++) {
       for (int z = 0; z < length; z++) {
         for (int x = 0; x < width; x++) {
@@ -56,9 +114,37 @@ public final class SchematicPlacementPlanner {
           if (!options.pasteAir() && isAir(state)) {
             continue;
           }
-          out.add(new BlockPlacement(baseX + x, baseY + y, baseZ + z, state));
+          out.add(factory.create(baseX + x, baseY + y, baseZ + z, state));
         }
       }
+    }
+    return out;
+  }
+
+  /**
+   * Computes absolute world positions for decoded {@link BlockEntityData} using anchor math at
+   * explicit world coordinates.
+   *
+   * @param schematic decoded schematic; never {@code null}
+   * @param anchorX arrival world X coordinate
+   * @param anchorY arrival world Y coordinate
+   * @param anchorZ arrival world Z coordinate
+   * @param options paste tuning; never {@code null}
+   * @return placed block entities list (empty when none)
+   */
+  public static List<PlacedBlockEntity> planBlockEntities(
+      LoadedSchematic schematic, int anchorX, int anchorY, int anchorZ, PasteOptions options) {
+    Objects.requireNonNull(schematic, "schematic");
+    Objects.requireNonNull(options, "options");
+
+    List<BlockEntityData> entities = schematic.blockEntities();
+    if (entities.isEmpty()) {
+      return java.util.Collections.emptyList();
+    }
+    int[] base = anchorBase(schematic, anchorX, anchorY, anchorZ, options);
+    List<PlacedBlockEntity> out = new ArrayList<>(entities.size());
+    for (BlockEntityData be : entities) {
+      out.add(new PlacedBlockEntity(base[0] + be.x(), base[1] + be.y(), base[2] + be.z(), be));
     }
     return out;
   }
@@ -71,31 +157,18 @@ public final class SchematicPlacementPlanner {
    * @param options paste tuning; never null
    * @return placed block entities list (empty when none)
    */
-  public static List<PlacedBlockEntity> planBlockEntities(LoadedSchematic schematic,
-                                                          RTPLocation at, PasteOptions options) {
-    Objects.requireNonNull(schematic, "schematic");
+  public static List<PlacedBlockEntity> planBlockEntities(
+      LoadedSchematic schematic, RTPLocation at, PasteOptions options) {
     Objects.requireNonNull(at, "at");
-    Objects.requireNonNull(options, "options");
-
-    List<BlockEntityData> entities = schematic.blockEntities();
-    if (entities.isEmpty()) {
-      return java.util.Collections.emptyList();
-    }
-    int[] base = anchorBase(schematic, at, options);
-    List<PlacedBlockEntity> out = new ArrayList<>(entities.size());
-    for (BlockEntityData be : entities) {
-      out.add(new PlacedBlockEntity(
-          base[0] + be.x(), base[1] + be.y(), base[2] + be.z(), be));
-    }
-    return out;
+    return planBlockEntities(schematic, at.x(), at.y(), at.z(), options);
   }
 
   /**
    * @return the {@code {baseX, baseY, baseZ}} world offset of the schematic's local origin
    *     (cell {@code 0,0,0}) under the given anchor.
    */
-  private static int[] anchorBase(LoadedSchematic schematic, RTPLocation at,
-                                  PasteOptions options) {
+  private static int[] anchorBase(
+      LoadedSchematic schematic, int anchorX, int anchorY, int anchorZ, PasteOptions options) {
     int width = schematic.width();
     int height = schematic.height();
     int length = schematic.length();
@@ -103,25 +176,27 @@ public final class SchematicPlacementPlanner {
     int centerZ = (length - 1) / 2;
     switch (options.anchor()) {
       case CENTER:
-        return new int[] {at.x() - centerX, at.y() - (height - 1) / 2, at.z() - centerZ};
-      case SURFACE_CENTER: {
-        // Shift the schematic down so the player lands on a standable floor in its center
-        // column: the lowest solid cell that has at least two air/empty cells above it
-        // (feet + head clearance). This is the surface the safety check would accept, so no
-        // iterative re-paste is needed. Using the lowest such floor (rather than the topmost
-        // solid block) keeps the player *inside* roofed structures instead of on the roof.
-        int floorY = standableFloorYInColumn(schematic, centerX, centerZ);
-        int baseY = (floorY >= 0) ? at.y() - floorY - 1 : at.y();
-        return new int[] {at.x() - centerX, baseY, at.z() - centerZ};
-      }
+        return new int[] {anchorX - centerX, anchorY - (height - 1) / 2, anchorZ - centerZ};
+      case SURFACE_CENTER:
+        {
+          // Shift the schematic down so the player lands on a standable floor in its center
+          // column: the lowest solid cell that has at least two air/empty cells above it
+          // (feet + head clearance). This is the surface the safety check would accept, so no
+          // iterative re-paste is needed. Using the lowest such floor (rather than the topmost
+          // solid block) keeps the player *inside* roofed structures instead of on the roof.
+          int floorY = standableFloorYInColumn(schematic, centerX, centerZ);
+          int baseY = (floorY >= 0) ? anchorY - floorY - 1 : anchorY;
+          return new int[] {anchorX - centerX, baseY, anchorZ - centerZ};
+        }
       case ORIGIN:
         return new int[] {
-            at.x() + schematic.offsetX(),
-            at.y() + schematic.offsetY(),
-            at.z() + schematic.offsetZ()};
+          anchorX + schematic.offsetX(),
+          anchorY + schematic.offsetY(),
+          anchorZ + schematic.offsetZ()
+        };
       case BOTTOM_CENTER:
       default:
-        return new int[] {at.x() - centerX, at.y(), at.z() - centerZ};
+        return new int[] {anchorX - centerX, anchorY, anchorZ - centerZ};
     }
   }
 

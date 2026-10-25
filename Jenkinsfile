@@ -8,12 +8,17 @@ pipeline {
   }
 
   environment {
-    // Addon-facing API closure published for out-of-repo addon authors.
+    // Addon-facing and standalone SDK API closure published for out-of-repo consumers.
     // Keep in sync with `publishedModulePaths` in the root build.gradle and the
     // `install:` block in jitpack.yml.
-    PUBLISH_TASKS = ':commands-api:publishToMavenLocal :yaml-api:publishToMavenLocal ' +
-                    ':metrics-api:publishToMavenLocal :maps-api:publishToMavenLocal ' +
-                    ':effects-api:publishToMavenLocal :rtp-proxy:rtp-proxy-common:publishToMavenLocal ' +
+    PUBLISH_TASKS = ':server-api:publishToMavenLocal :anvil-api:publishToMavenLocal ' +
+                    ':bit-api:publishToMavenLocal :bstats-api:publishToMavenLocal ' +
+                    ':commands-api:publishToMavenLocal :config-bit-api:publishToMavenLocal ' +
+                    ':effects-api:publishToMavenLocal :maps-api:publishToMavenLocal ' +
+                    ':menu-api:publishToMavenLocal :metrics-api:publishToMavenLocal ' +
+                    ':predict-api:publishToMavenLocal :tags-api:publishToMavenLocal ' +
+                    ':units-api:publishToMavenLocal :yaml-api:publishToMavenLocal ' +
+                    ':rtp-proxy:rtp-proxy-common:publishToMavenLocal ' +
                     ':rtp-api:publishToMavenLocal :rtp-core:publishToMavenLocal'
   }
 

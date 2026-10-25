@@ -41,7 +41,8 @@ public record ComputeBudget(
         Map<String, GovernorReason> regionHotCapReasons,
         Map<String, Double> regionPlannedRates,
         Map<String, Double> regionCredits,
-        Map<String, Double> regionCreditCaps
+        Map<String, Double> regionCreditCaps,
+        RegionShareAllocator.AllocationSnapshot foliaRegionAllocation
 ) {
 
     public static final double DEFAULT_PREFILTER_KNEE_MS = 35.0;
@@ -52,6 +53,7 @@ public record ComputeBudget(
         if (periodReason == null) periodReason = GovernorReason.CONFIGURED;
         if (promotionsReason == null) promotionsReason = GovernorReason.CONFIGURED;
         if (generationReason == null) generationReason = GovernorReason.CONFIGURED;
+        if (foliaRegionAllocation == null) foliaRegionAllocation = RegionShareAllocator.AllocationSnapshot.EMPTY;
         regionUnitsPerTurn = copyMap(regionUnitsPerTurn);
         regionHotCaps = copyMap(regionHotCaps);
         regionConfiguredHotCaps = copyMap(regionConfiguredHotCaps);
@@ -59,6 +61,67 @@ public record ComputeBudget(
         regionPlannedRates = copyMap(regionPlannedRates);
         regionCredits = copyMap(regionCredits);
         regionCreditCaps = copyMap(regionCreditCaps);
+    }
+
+    public ComputeBudget(
+            boolean autoTune,
+            boolean observeOnly,
+            long configuredAsyncNanos,
+            long effectiveAsyncNanos,
+            GovernorReason asyncReason,
+            long configuredSyncNanos,
+            long effectiveSyncNanos,
+            GovernorReason syncReason,
+            long configuredPeriodTicks,
+            long effectivePeriodTicks,
+            GovernorReason periodReason,
+            int configuredPromotionsPerTurn,
+            int effectivePromotionsPerTurn,
+            GovernorReason promotionsReason,
+            int configuredGenerationCap,
+            int effectiveGenerationCap,
+            GovernorReason generationReason,
+            double softCpuTargetMs,
+            double cpuHeadroomMs,
+            double targetUnitRate,
+            Map<String, Integer> regionUnitsPerTurn,
+            Map<String, Integer> regionHotCaps,
+            Map<String, Integer> regionConfiguredHotCaps,
+            Map<String, GovernorReason> regionHotCapReasons,
+            Map<String, Double> regionPlannedRates,
+            Map<String, Double> regionCredits,
+            Map<String, Double> regionCreditCaps
+    ) {
+        this(
+                autoTune,
+                observeOnly,
+                configuredAsyncNanos,
+                effectiveAsyncNanos,
+                asyncReason,
+                configuredSyncNanos,
+                effectiveSyncNanos,
+                syncReason,
+                configuredPeriodTicks,
+                effectivePeriodTicks,
+                periodReason,
+                configuredPromotionsPerTurn,
+                effectivePromotionsPerTurn,
+                promotionsReason,
+                configuredGenerationCap,
+                effectiveGenerationCap,
+                generationReason,
+                softCpuTargetMs,
+                cpuHeadroomMs,
+                targetUnitRate,
+                regionUnitsPerTurn,
+                regionHotCaps,
+                regionConfiguredHotCaps,
+                regionHotCapReasons,
+                regionPlannedRates,
+                regionCredits,
+                regionCreditCaps,
+                RegionShareAllocator.AllocationSnapshot.EMPTY
+        );
     }
 
     private static <K, V> Map<K, V> copyMap(Map<K, V> map) {
@@ -237,5 +300,54 @@ public record ComputeBudget(
     public double creditCap(String region) {
         if (region == null) return 1.0;
         return regionCreditCaps.getOrDefault(region, 1.0);
+    }
+
+    /**
+     * Returns a copy of this budget carrying an updated Folia {@link RegionShareAllocator.AllocationSnapshot}
+     * (ADR-123 Sections 6-8).
+     */
+    public ComputeBudget withFoliaRegionAllocation(RegionShareAllocator.AllocationSnapshot allocation) {
+        return new ComputeBudget(
+                autoTune,
+                observeOnly,
+                configuredAsyncNanos,
+                effectiveAsyncNanos,
+                asyncReason,
+                configuredSyncNanos,
+                effectiveSyncNanos,
+                syncReason,
+                configuredPeriodTicks,
+                effectivePeriodTicks,
+                periodReason,
+                configuredPromotionsPerTurn,
+                effectivePromotionsPerTurn,
+                promotionsReason,
+                configuredGenerationCap,
+                effectiveGenerationCap,
+                generationReason,
+                softCpuTargetMs,
+                cpuHeadroomMs,
+                targetUnitRate,
+                regionUnitsPerTurn,
+                regionHotCaps,
+                regionConfiguredHotCaps,
+                regionHotCapReasons,
+                regionPlannedRates,
+                regionCredits,
+                regionCreditCaps,
+                allocation
+        );
+    }
+
+    /**
+     * Returns the steering weight {@code (w_k, w'_k, max_j w'_j)} for {@code groupId}
+     * (ADR-123 Section 7 & 11). When not actuating, returns a weight of {@code 1.0} so no
+     * candidate is deferred.
+     */
+    public RegionShareAllocator.RegionSteeringWeight regionWeight(String groupId, boolean permitsSaturated) {
+        if (!isActuating() || foliaRegionAllocation == null || foliaRegionAllocation.groups().isEmpty()) {
+            return new RegionShareAllocator.RegionSteeringWeight(1.0, 1.0, 1.0);
+        }
+        return foliaRegionAllocation.steeringWeightForGroup(groupId, permitsSaturated);
     }
 }

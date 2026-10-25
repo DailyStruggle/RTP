@@ -12,6 +12,12 @@ strictConfig: false
 # 게이트의 항상 통과 또는 항상 실패를 판정하기 위한 최소 평가 횟수입니다.
 gateOutcomeSamples: 200
 
+# 틱 +2에서 비동기로 실행되는 시작 BIT 스위프입니다.
+startupSweep: pbit
+
+# RtpBit.RUNNER에 주입되는 실시간 진단 커버리지 제공자입니다.
+coverage: auto
+
 # 등록된 BIT 코드의 심각도이며 strictActions 프리셋보다 우선합니다.
 # 허용 값: ERROR, WARNING, INFO, DEBUG, TRACE, OFF. OFF는 진단을 억제합니다.
 # 알 수 없는 코드와 레벨은 무시되고 로그에 기록됩니다.

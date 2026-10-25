@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.server.api.ServerAccessor;
@@ -50,6 +51,7 @@ class BootstrapLogBufferTest {
         RTP.flushPendingLogs();
         RTPRuntime.setServerAccessor(previousAccessor);
         ServerAccessors.set(previousCommonAccessor);
+        ServerAccessors.setLogSink(RTPRuntime::log);
         resetBufferState();
     }
 
@@ -133,6 +135,30 @@ class BootstrapLogBufferTest {
             assertEquals(1, accessor.logMessages.size(),
                     "Post-flush sub-INFO must pass through directly.");
             assertTrue(accessor.logMessages.get(0).contains("after-flush"));
+        }
+    }
+
+    @Test
+    @DisplayName("ServerAccessors.log and LanguageBootstrap.resolve buffer sub-INFO records before flush and replay on flush")
+    void serverAccessorsAndLanguageBootstrapBufferSubInfo_andReplayOnFlush() {
+        ActiveConfigs.set(null);
+
+        ServerAccessors.log(Level.FINE, "yaml-api-fine-1");
+        String locale = LanguageBootstrap.resolve(accessor.getPluginDirectory());
+        assertEquals(LanguageBootstrap.DEFAULT_LOCALE, locale);
+
+        assertTrue(accessor.logMessages.isEmpty(),
+                "Sub-INFO records from ServerAccessors.log and LanguageBootstrap must be buffered before flush. Got: "
+                        + accessor.logMessages);
+
+        RTP.flushPendingLogs();
+
+        synchronized (accessor.logMessages) {
+            List<String> msgs = accessor.logMessages;
+            assertTrue(msgs.size() >= 2,
+                    "Buffered ServerAccessors and LanguageBootstrap records must be replayed on flush. Got: " + msgs);
+            assertTrue(msgs.get(0).contains("yaml-api-fine-1"), msgs.toString());
+            assertTrue(msgs.stream().anyMatch(m -> m.contains("LanguageBootstrap")), msgs.toString());
         }
     }
 

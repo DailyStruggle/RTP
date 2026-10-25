@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.RandomAccessFile;
@@ -14,6 +15,7 @@ import java.util.zip.Inflater;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Tag("slow")
 public class LazyMcaProbingBenchmarkTest {
 
   @Test

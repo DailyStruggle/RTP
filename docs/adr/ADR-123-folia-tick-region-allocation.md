@@ -1,6 +1,6 @@
 # ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
 
-**Status:** Proposed. Builds on [ADR-087](ADR-087-adaptive-compute-governor.md) (governor, `ComputeBudget` snapshot, AIMD limiter, observe-only mode) and [ADR-112](ADR-112-per-region-work-division-on-folia.md). Split out of ADR-087 (former section 4.5) on 2026-10-23. Work placement (section 2, rollout step 1) does not depend on the governor and may land first. Shares and steering are gated on go/no-go 1 and 2, lending on go/no-go 3 and the Folia differential benchmark (section 12). Nothing is implemented.
+**Status:** Accepted (2026-10-24). Builds on [ADR-087](ADR-087-adaptive-compute-governor.md) (governor, `ComputeBudget` snapshot, AIMD limiter, observe-only mode) and [ADR-112](ADR-112-per-region-work-division-on-folia.md). Split out of ADR-087 (former section 4.5) on 2026-10-23. Work placement (section 2, rollout step 1) does not depend on the governor and may land first. Shares and steering are gated on go/no-go 1 and 2, lending on go/no-go 3 and the Folia differential benchmark (section 12).
 **Date:** 2026-10-23
 
 ## Context

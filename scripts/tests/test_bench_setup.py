@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -82,6 +83,111 @@ class BenchSetupTest(unittest.TestCase):
 
             with self.assertRaises(FileExistsError):
                 setup.prepare_server(source, destination)
+
+    def test_prepare_server_strips_perf_disable_shared_mem_and_connection_throttle(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            destination = root / "bench"
+            (source / "plugins").mkdir(parents=True)
+            (source / "server.properties").write_text("server-port=25565\n", encoding="utf-8")
+            (source / "spigot.yml").write_text("settings:\n  restart-script: ./start.sh\n", encoding="utf-8")
+            (source / "bukkit.yml").write_text("settings:\n  connection-throttle: 4000\n", encoding="utf-8")
+            (source / "start.sh").write_text(
+                "java -Xms16G -Xmx16G -XX:+PerfDisableSharedMem -XX:+UseG1GC -jar paper.jar --nogui\n",
+                encoding="utf-8",
+            )
+
+            setup.prepare_server(source, destination, heap="12G")
+
+            start_text = (destination / "start.sh").read_text(encoding="utf-8")
+            self.assertNotIn("-XX:+PerfDisableSharedMem", start_text)
+            self.assertIn("-Xms12G -Xmx12G", start_text)
+            bukkit_text = (destination / "bukkit.yml").read_text(encoding="utf-8")
+            self.assertIn("connection-throttle: -1", bukkit_text)
+
+    @unittest.skipUnless(shutil.which("javac"), "javac required to build FuzzFixturePaper.jar")
+    def test_smp_sample_preset_excludes_leafrtp_and_builds_fuzz_fixture_and_betterrtp_cache_config(self):
+        import zipfile
+        import bench_fuzz_server as bfs
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            destination = root / "bench"
+            local_jars = root / "downloads"
+            plugins = source / "plugins"
+            plugins.mkdir(parents=True)
+            local_jars.mkdir(parents=True)
+            (source / "server.properties").write_text("server-port=25565\n", encoding="utf-8")
+            (source / "spigot.yml").write_text("settings:\n  restart-script: ./start.sh\n", encoding="utf-8")
+            (source / "start.sh").write_text("java -Xms8G -Xmx8G -jar paper.jar\n", encoding="utf-8")
+            (plugins / "LeafRTP" / "lang").mkdir(parents=True)
+            (plugins / "LeafRTP" / "config.yml").write_text("old", encoding="utf-8")
+
+            for name in ("ViaVersion-5.12.1.jar", "ViaBackwards-5.12.1.jar", "LuckPerms-Bukkit-5.5.57.jar", "LeafRTP-Pro.jar"):
+                with zipfile.ZipFile(plugins / name, "w") as zf:
+                    zf.writestr("plugin.yml", f"name: {name.split('-')[0]}\nversion: 1.0\n")
+
+            for name in (
+                "EssentialsX-2.22.0.jar",
+                "GriefPrevention-16.18.7.jar",
+                "CoreProtect-CE-24.1.jar",
+                "BetterRTP-3.6.13.jar",
+            ):
+                with zipfile.ZipFile(local_jars / name, "w") as zf:
+                    zf.writestr("plugin.yml", f"name: {name.split('-')[0]}\nversion: 1.0\n")
+
+            setup.prepare_server(source, destination, port=25568, rcon_port=25578, keep=setup.SMP_SAMPLE_KEEP)
+            installed = setup.install_smp_sample_plugins(
+                destination / "plugins",
+                game_version="26.2",
+                local_search_dirs=(local_jars,),
+            )
+
+            installed_names = {p.name for p in installed}
+            self.assertIn("LuckPerms-Bukkit-5.5.57.jar", installed_names)
+            self.assertIn("EssentialsX-2.22.0.jar", installed_names)
+            self.assertIn("GriefPrevention-16.18.7.jar", installed_names)
+            self.assertIn("CoreProtect-CE-24.1.jar", installed_names)
+            self.assertIn("BetterRTP-3.6.13.jar", installed_names)
+            self.assertIn("FuzzFixturePaper.jar", installed_names)
+
+            # LeafRTP must be excluded from active plugins and moved to plugins-disabled
+            self.assertFalse((destination / "plugins" / "LeafRTP-Pro.jar").exists())
+            self.assertTrue((destination / "plugins-disabled" / "LeafRTP-Pro.jar").exists())
+            self.assertFalse((destination / "plugins" / "LeafRTP").exists())
+
+            # BetterRTP config has Queue (location cache) enabled and 2s warmup delay
+            brtp_cfg = (destination / "plugins" / "BetterRTP" / "config.yml").read_text(encoding="utf-8")
+            self.assertIn("Queue:\n    Enabled: true", brtp_cfg)
+            self.assertIn("Delay:\n    Enabled: true\n    Time: 2", brtp_cfg)
+            self.assertIn("Cooldown:\n    Enabled: false", brtp_cfg)
+
+            perms_cfg = (destination / "permissions.yml").read_text(encoding="utf-8")
+            self.assertIn("betterrtp.world.*: true", perms_cfg)
+            self.assertIn("ff.scan: true", perms_cfg)
+            self.assertIn("ff.queue: true", perms_cfg)
+
+            # Verify FuzzFixturePaper.jar only packages FuzzFixturePlugin classes (not Bukkit/Brigadier stubs)
+            fixture_path = destination / "plugins" / "FuzzFixturePaper.jar"
+            with zipfile.ZipFile(fixture_path, "r") as zf:
+                entries = set(zf.namelist())
+            self.assertIn("plugin.yml", entries)
+            self.assertIn("io/github/dailystruggle/fuzzfixture/FuzzFixturePlugin.class", entries)
+            self.assertIn("io/github/dailystruggle/fuzzfixture/FuzzFixturePlugin$QueueTicket.class", entries)
+            self.assertFalse(any(e.startswith("org/bukkit/") or e.startswith("com/mojang/") for e in entries))
+
+            # JarIndex maps FuzzFixturePlugin and QueueTicket directly to FuzzFixturePaper.jar
+            jidx = bfs.JarIndex.from_server_dir(str(destination), profile="paper")
+            self.assertEqual(
+                jidx.owner_of_class("io.github.dailystruggle.fuzzfixture.FuzzFixturePlugin"),
+                "FuzzFixturePaper.jar",
+            )
+            self.assertEqual(
+                jidx.owner_of_class("io.github.dailystruggle.fuzzfixture.FuzzFixturePlugin$QueueTicket"),
+                "FuzzFixturePaper.jar",
+            )
 
 
 if __name__ == "__main__":

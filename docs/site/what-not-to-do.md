@@ -34,12 +34,21 @@ These mistakes prevent teleportation from working correctly.
     region. Removing them leaves the plugin with nothing to build from, and it will not
     behave correctly. See [Intended usage](intended-usage.md).
 
+!!! warning "Don't change `definitions/regions/default.yml` to `world_nether` just to teleport in the Nether"
+    Changing `world: "world_nether"` on the `default` region redirects **all** unconfigured worlds (including your main overworld) into the Nether. Instead, create a dedicated region file (`definitions/regions/nether.yml` with `world: "world_nether"`, `vert.maxY: 120`, and `vert.requireSkyLight: false`) and map `definitions/worlds/world_nether.yml` to `region: "nether"` via `/rtp editor`, `/rtp admin setup`, or `/rtp config worlds world_nether region=nether`.
+
+!!! warning "Don't rely on `worldBorderOverride: true` when `shape.radius` with unit suffixes will do"
+    `worldBorderOverride: true` is generally not recommended because it replaces your entire `shape:` block with a plain square and discards your `shape.name`, `shape.radius`, and inner spawn-exclusion hole (`shape.centerRadius`). Instead, set `shape.radius` in `/rtp editor` or `definitions/regions/<region>.yml` using an explicit distance unit suffix (such as `2500b` or `5km`).
+
 ---
 
 ## Why is this running slowly?
 
 These setups work, but they make teleports expensive - either lagging the player who
 teleports or stalling the whole server.
+
+!!! warning "Don't grant `rtp.unqueued` (or wildcard `rtp.*`) to regular players"
+    Out of the box, LeafRTP pre-generates and verifies safe locations asynchronously in the background (`cacheCap` in `definitions/regions/default.yml`), so `/rtp` pops a ready spot without main-thread or chunk-generation lag. Granting `rtp.unqueued` (or `rtp.*`) to default players forces every `/rtp` to bypass the pre-generated cache and run live on-demand chunk selection and loading, which causes server lag spikes when multiple players teleport. Keep default players on `rtp.use` only.
 
 !!! warning "Don't pass dynamic parameter overrides to regular players"
     Passing dynamic override parameters (`shape=`, `radius=`, `centerX=`, `centerZ=`, etc. under the `rtp.params` permission) constructs an ephemeral, throwaway region on the fly. Because temporary regions are uncached and have no persistent spatial memory, every invocation forces on-demand chunk loading and real-time safety verification. Keep dynamic parameters restricted to staff testing, and configure permanent named regions for everyday player use.
@@ -51,6 +60,9 @@ teleports or stalling the whole server.
     bake them into a real named region and point players at a plain `/rtp`. (Targeting an
     existing region with `world=<name>` or `region=<name>` is fine - those stay cached.)
     See [Intended usage](intended-usage.md).
+
+!!! warning "Don't enable `syncLoading: true` or raise `viewDistanceSelect` in `advanced/performance.yml`"
+    Setting `syncLoading: true` forces chunk loading onto the main server thread (keep `syncLoading: false`), and setting `viewDistanceSelect` above `0` loads surrounding chunks on every candidate check during search (keep `viewDistanceSelect: 0`). Because `autoTune: true` scales background compute relative to your configured baselines rather than overriding them, these settings compose together: tightening `syncAllottedTime` (e.g. `2`-`5` ms) or `maxMSPT` (`35.0`-`40.0` ms) with `autoTune: true` tightens the backend tick budget (invisible to players while the `hot` queue stays populated), while `viewDistanceSelect: 0` (surrounding chunks load after arrival) and raising `pregeneratedPreference` toward `0.8`-`1.0` (biasing toward already-generated terrain on disk) reduce per-candidate I/O work.
 
 !!! warning "Don't over-restrict biomes"
     Blacklisting most biomes (or whitelisting only a few) leaves so few valid landing

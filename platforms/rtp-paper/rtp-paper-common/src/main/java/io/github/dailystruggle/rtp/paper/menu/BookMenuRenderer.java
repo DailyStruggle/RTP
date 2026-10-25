@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import net.kyori.adventure.inventory.Book;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -172,10 +173,10 @@ public final class BookMenuRenderer implements MenuRenderer {
         String formatted;
         try {
             formatted = SendMessage.format(viewer, raw);
-        } catch (Throwable t) {
-            // Defensive: in unit-test contexts where Bukkit.getServer() is not
-            // wired up, SendMessage.format may NPE on placeholder lookups. Fall
-            // back to the raw legacy-ampersand string so colors still render.
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordMessageFormatDegraded(
+                    "BookMenuRenderer#toComponent",
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             formatted = raw;
         }
         // `SendMessage.format` converts '&' to 'section '; on the test-bypass path
@@ -191,7 +192,10 @@ public final class BookMenuRenderer implements MenuRenderer {
     private static @Nullable OfflinePlayer resolveViewer(UUID playerId) {
         try {
             return Bukkit.getOfflinePlayer(playerId);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "BookMenuRenderer#resolveViewer",
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return null;
         }
     }

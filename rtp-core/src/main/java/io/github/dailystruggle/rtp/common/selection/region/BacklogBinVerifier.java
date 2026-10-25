@@ -192,11 +192,14 @@ final class BacklogBinVerifier {
         Consumer<BacklogLocationBuffer.BacklogEntry> sink = e.ownerOnReject();
         if (sink == null) sink = onReject;
         if (sink != null) sink.accept(e);
+        e.setOwnerOnReject(null);
       } else if (d == Decision.ACCEPT) {
         e.setValidity(BacklogLocationBuffer.Validity.VALIDATED);
+        e.setOwnerOnReject(null);
       } else {
         // UNKNOWN, missing or failed: no disk data, the cold fill's live check decides (S-004).
         e.setValidity(BacklogLocationBuffer.Validity.UNKNOWN);
+        e.setOwnerOnReject(null);
       }
     }
   }

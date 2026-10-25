@@ -1,6 +1,6 @@
 # ADR-099 — Zero-Overhead Visual Region Creation via Ecosystem Selection Bridges and Cartography Models
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-09-30
 
 **Extends:** [ADR-034](ADR-034-memory-shape-catalog.md) (Memory Shape Catalog and Polygon Shape), [ADR-046](ADR-046-maps-api-module.md) (`maps-api` Module for Runtime Cartography Chart Generation), [ADR-086](ADR-086-external-web-map-integration.md) (External Web Map Integration)

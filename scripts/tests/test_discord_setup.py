@@ -51,7 +51,16 @@ class DiscordSetupTest(unittest.TestCase):
 
     def test_forum_tags_cover_project_platform_and_status(self) -> None:
         tags = build_forum_available_tags(self.spec["forum_tags"])
-        tag_names = {t["name"] for t in tags}
+        rendered_labels = {
+            f"{t['emoji_name']} {t['name']}" if t.get("emoji_name") else t["name"]
+            for t in tags
+        }
+        for t in tags:
+            if t.get("emoji_name"):
+                self.assertFalse(
+                    t["name"].startswith(t["emoji_name"]),
+                    f"Tag name {t['name']!r} duplicates emoji_name {t['emoji_name']!r}",
+                )
         for expected in (
             "🌿 LeafRTP",
             "💤 OnePlayerSleep",
@@ -68,7 +77,7 @@ class DiscordSetupTest(unittest.TestCase):
             "🐛 Confirmed Bug",
             "💎 Pro Priority",
         ):
-            self.assertIn(expected, tag_names)
+            self.assertIn(expected, rendered_labels)
 
     def test_dry_run_diff_against_legacy_leafcraft_guild(self) -> None:
         legacy_channels = default_legacy_guild_snapshot(self.guild_id)
@@ -128,9 +137,13 @@ class DiscordSetupTest(unittest.TestCase):
         self.assertIn("start-here", created_targets)
         self.assertIn("benchmarks", created_targets)
 
-        # 5. Creates all 5 pinned Forum threads
+        # 5. Creates all 5 Forum reference threads, pinning only the primary "Read First" guide
+        # (Discord GUILD_FORUM channels enforce a 1-pinned-post limit per forum channel).
         pinned_actions = [a for a in plan.actions if a.op == "CREATE_PINNED_THREAD"]
         self.assertEqual(5, len(pinned_actions))
+        self.assertEqual(CHANNEL_FLAG_PINNED, pinned_actions[0].payload["flags"])
+        for action in pinned_actions[1:]:
+            self.assertEqual(0, action.payload["flags"])
 
     def test_idempotency_on_already_provisioned_guild(self) -> None:
         # Construct an already-provisioned guild state matching the spec
@@ -203,8 +216,7 @@ class DiscordSetupTest(unittest.TestCase):
             {
                 "id": f"th_{i}",
                 "name": p["title"],
-                "body": p["body"],
-                "flags": CHANNEL_FLAG_PINNED,
+                "flags": CHANNEL_FLAG_PINNED if i == 0 else 0,
             }
             for i, p in enumerate(self.spec["pinned_forum_threads"])
         ]

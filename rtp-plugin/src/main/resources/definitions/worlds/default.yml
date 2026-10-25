@@ -1,11 +1,14 @@
 # --- RTP World Configuration ---
 # Documentation: docs/admin/configuration/WORLDS.md
 
-# Region used for this world: /rtp in this world answers with this region, and the region
-# owns the destination - target world, distance (radius), shape, vertical range, price.
-# Point several worlds at one region to share its settings, or at their own regions to
-# tune them separately. This file is routing only; it holds no distance of its own.
-# See docs/admin/configuration/REGIONS.md
+# Region used when a player runs /rtp in this world (or `/rtp world=<world>`).
+# Out of the box, unconfigured worlds (like world_nether or world_the_end) fall back to "default"
+# (which targets the overworld). To make `/rtp` or `/rtp world=world_nether` stay in the Nether,
+# create a nether region (`definitions/regions/nether.yml` with `world: "world_nether"`,
+# `vert.maxY: 120`, `vert.requireSkyLight: false`) and map `definitions/worlds/world_nether.yml`
+# to `region: "nether"` via `/rtp editor`, `/rtp admin setup`, or `/rtp config worlds world_nether region=nether`.
+# The region owns the destination world, distance (shape.radius), shape, vertical range (vert), and price.
+# See docs/admin/configuration/WORLDS.md and docs/admin/configuration/REGIONS.md
 # @type: enum
 # @source: region
 region: "default"

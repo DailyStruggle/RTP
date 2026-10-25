@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends;
 
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.PlaceholderAPIPlugin;
 import org.bukkit.Bukkit;
@@ -15,11 +16,17 @@ public class PAPIChecker {
 
   /** getPAPI - function to if PAPI exists and scan the above object reference accordingly */
   private static void getPAPI() {
-    Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("PlaceholderAPI");
+    try {
+      Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("PlaceholderAPI");
 
-    if (plugin instanceof PlaceholderAPIPlugin && plugin.isEnabled()) {
-      placeholderAPIPlugin = (PlaceholderAPIPlugin) plugin;
-    } else placeholderAPIPlugin = null;
+      if (plugin instanceof PlaceholderAPIPlugin && plugin.isEnabled()) {
+        placeholderAPIPlugin = (PlaceholderAPIPlugin) plugin;
+      } else placeholderAPIPlugin = null;
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordMessageFormatDegraded(
+          "PAPIChecker#getPAPI", e.getClass().getSimpleName() + ": " + e.getMessage());
+      placeholderAPIPlugin = null;
+    }
   }
 
   /**
@@ -36,6 +43,11 @@ public class PAPIChecker {
     }
     if (placeholderAPIPlugin == null) return input;
 
-    return PlaceholderAPI.setPlaceholders(player, input);
+    try {
+      return PlaceholderAPI.setPlaceholders(player, input);
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordMessageFormatDegraded("PlaceholderAPI#setPlaceholders", e);
+      return input;
+    }
   }
 }

@@ -34,8 +34,8 @@ public class NeoForgeTitleEffect extends Effect<NeoForgeTitleKeys> {
 
     @Override
     public void run() {
-        if (!(target instanceof ServerPlayer)) return;
-        ServerPlayer player = (ServerPlayer) target;
+        ServerPlayer player = NeoForgeHandles.unwrapPlayer(target);
+        if (player == null) return;
 
         String titleStr = String.valueOf(data.getOrDefault(NeoForgeTitleKeys.TITLE, ""));
         String subStr   = String.valueOf(data.getOrDefault(NeoForgeTitleKeys.SUBTITLE, ""));
@@ -43,19 +43,38 @@ public class NeoForgeTitleEffect extends Effect<NeoForgeTitleKeys> {
         int stay    = numAsInt(data.get(NeoForgeTitleKeys.STAY),     70);
         int fadeOut = numAsInt(data.get(NeoForgeTitleKeys.FADE_OUT), 20);
 
+        sendToPlayer(player, titleStr, subStr, fadeIn, stay, fadeOut);
+    }
+
+    /**
+     * Sends title/subtitle/animation packets to {@code player} via {@link NeoForgeConnection}.
+     * Shared by {@link NeoForgeTitleEffect} and {@link NeoForgeHandles} (ADR-116).
+     */
+    public static boolean sendToPlayer(ServerPlayer player, String titleStr, String subStr,
+                                       int fadeIn, int stay, int fadeOut) {
+        if (player == null) return false;
+        String safeTitle = titleStr == null ? "" : titleStr;
+        String safeSub = subStr == null ? "" : subStr;
+
         boolean sent = NeoForgeConnection.send(player,
                 new ClientboundSetTitlesAnimationPacket(fadeIn, stay, fadeOut));
-        if (!titleStr.isEmpty()) {
+        if (!safeTitle.isEmpty()) {
             sent &= NeoForgeConnection.send(player,
-                    new ClientboundSetTitleTextPacket(Component.literal(titleStr)));
+                    new ClientboundSetTitleTextPacket(Component.literal(safeTitle)));
         }
-        if (!subStr.isEmpty()) {
+        if (!safeSub.isEmpty()) {
             sent &= NeoForgeConnection.send(player,
-                    new ClientboundSetSubtitleTextPacket(Component.literal(subStr)));
+                    new ClientboundSetSubtitleTextPacket(Component.literal(safeSub)));
         }
         // S-004: surface a connection-resolution miss once instead of dropping
         // the title silently (cosmetic only; teleport already completed).
-        if (!sent) warnOnce(NeoForgeConnection.failureReason());
+        if (!sent) {
+            String reason = NeoForgeConnection.failureReason();
+            warnOnce(reason);
+            io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                    "NeoForge", "TITLE", reason == null ? "player connection unavailable" : reason);
+        }
+        return sent;
     }
 
     private static volatile boolean WARNED;

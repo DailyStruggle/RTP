@@ -126,6 +126,25 @@ class WorldBlockSchematicPasterTest {
         // restoreBlockEntities succeeds
         world.throwOnRestore = false;
         assertEquals(PasteResult.PASTED, paster.paste(withEntities, at, PasteOptions.defaults()));
+
+        // null source() and null exception message branches
+        LoadedSchematic nullSourceWithEntities = new LoadedSchematic() {
+            @Override public SchematicSource source() { return null; }
+            @Override public int width() { return 1; }
+            @Override public int height() { return 1; }
+            @Override public int length() { return 1; }
+            @Override public List<String> palette() { return List.of("minecraft:chest"); }
+            @Override public int paletteIndexAt(int x, int y, int z) { return 0; }
+            @Override public List<BlockEntityData> blockEntities() {
+                return List.of(new BlockEntityData(0, 0, 0, "minecraft:chest", java.util.Map.of()));
+            }
+        };
+        world.nullExceptionMessage = true;
+        world.throwOnSetBlocks = true;
+        assertEquals(PasteResult.PASTE_ERROR, paster.paste(nullSourceWithEntities, at, PasteOptions.defaults()));
+        world.throwOnSetBlocks = false;
+        world.throwOnRestore = true;
+        assertEquals(PasteResult.PASTED, paster.paste(nullSourceWithEntities, at, PasteOptions.defaults()));
     }
 
     /** Minimal {@link RTPWorld} double capturing the blocks handed to {@link #setBlocks}. */
@@ -135,12 +154,17 @@ class WorldBlockSchematicPasterTest {
         boolean placeNothing = false;
         boolean throwOnSetBlocks = false;
         boolean throwOnRestore = false;
+        boolean nullExceptionMessage = false;
 
         RecordingWorld() { super(new Object()); }
 
         @Override
         public int setBlocks(List<BlockDelta> blocks) {
-            if (throwOnSetBlocks) throw new RuntimeException("native write simulated error");
+            if (throwOnSetBlocks) {
+                throw nullExceptionMessage
+                    ? new RuntimeException()
+                    : new RuntimeException("native write simulated error");
+            }
             offered = blocks.size();
             if (placeNothing) return 0;
             written.addAll(blocks);
@@ -149,7 +173,11 @@ class WorldBlockSchematicPasterTest {
 
         @Override
         public int restoreBlockEntities(List<PlacedBlockEntity> entities) {
-            if (throwOnRestore) throw new RuntimeException("native restore simulated error");
+            if (throwOnRestore) {
+                throw nullExceptionMessage
+                    ? new RuntimeException()
+                    : new RuntimeException("native restore simulated error");
+            }
             return entities.size();
         }
 

@@ -44,6 +44,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
     private final AtomicBoolean released = new AtomicBoolean(false);
     private final AtomicBoolean generationSlotReleased = new AtomicBoolean(false);
     private volatile GenerationBudget.Reservation generationSlot;
+    private volatile Object deadlineHandle;
 
     /**
      * Fill deadline in ticks (30 s); matches the per-player chunk-set failsafe. Releases the slot
@@ -229,8 +230,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
     }
 
     private void scheduleDeadline() {
-        if (RTPRuntime.scheduler() == null) return;
-        RTPRuntime.scheduler().runTaskLater(() -> {
+        this.deadlineHandle = scheduleAsyncDelayed(() -> {
             if (released.get()) return;
             RTPRuntime.log(playerId != null ? Level.WARNING : Level.FINE,
                     "[Region:" + region.name + "] cache fill"
@@ -239,6 +239,42 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
             // Charge at least the nominal deadline: tick length varies, the cost to refill does not.
             releaseInFlight(FILL_DEADLINE_TICKS * 50_000_000L);
         }, FILL_DEADLINE_TICKS);
+    }
+
+    /**
+     * Schedules a placement-free one-shot delayed action on the async scheduler so future-only
+     * deadlines and failsafes never serialize on Folia's global region thread (ADR-123 Section 2 & 11).
+     */
+    static Object scheduleAsyncDelayed(Runnable action, long delayTicks) {
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler = RTPRuntime.scheduler();
+        if (scheduler == null) return null;
+        final java.util.concurrent.atomic.AtomicBoolean fired = new java.util.concurrent.atomic.AtomicBoolean(false);
+        final java.util.concurrent.atomic.AtomicReference<Object> handleRef =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        long safeDelay = Math.max(1L, delayTicks);
+        Object handle = scheduler.runTaskTimerAsynchronously(() -> {
+            try {
+                if (fired.compareAndSet(false, true)) {
+                    action.run();
+                }
+            } finally {
+                Object h = handleRef.get();
+                if (h != null) {
+                    try {
+                        scheduler.cancelTask(h);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+        }, safeDelay, safeDelay);
+        handleRef.set(handle);
+        if (fired.get() && handle != null) {
+            try {
+                scheduler.cancelTask(handle);
+            } catch (Throwable ignored) {
+            }
+        }
+        return handle;
     }
 
     private void processResult(GenerationResult res) {
@@ -276,7 +312,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                     if (chunkSet == null && reservation == null) {
                         // ADR-110: unpinned result - no ring preload (it would unload before use).
                         try {
-                            region.queueManager.enqueuePlayerLocation(playerId,
+                            region.queueManager.enqueuePlayerLocationIfOpen(playerId,
                                     new RTPLocation(coords, res.attempts(), null));
                         } finally {
                             releaseInFlight();
@@ -303,7 +339,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                         chunkSet = new ChunkSet(world, cx, cz, chunks, new CompletableFuture<>());
 
                         final ChunkSet finalSet = chunkSet;
-                        RTPRuntime.scheduler().runTaskLater(() -> {
+                        scheduleAsyncDelayed(() -> {
                             if (finalSet.complete() != null && !finalSet.complete().isDone()) {
                                 finalSet.complete().complete(false);
                             }
@@ -324,7 +360,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                                 return;
                             }
                             RTPLocation finalPair = new RTPLocation(coords, res.attempts(), reservation);
-                            region.queueManager.enqueuePlayerLocation(playerId, finalPair);
+                            region.queueManager.enqueuePlayerLocationIfOpen(playerId, finalPair);
                         } finally {
                             PerformanceTracker.totalNanosecondsConsumed.add(elapsed);
                             releaseInFlight();
@@ -394,6 +430,14 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
 
     private void releaseInFlight(long minChargeNanos) {
         if (released.compareAndSet(false, true)) {
+            Object dh = this.deadlineHandle;
+            this.deadlineHandle = null;
+            if (dh != null && RTPRuntime.scheduler() != null) {
+                try {
+                    RTPRuntime.scheduler().cancelTask(dh);
+                } catch (Throwable ignored) {
+                }
+            }
             releaseGenerationSlot();
             region.inFlightCalculations.decrementAndGet();
             BudgetPacer p = pacer;

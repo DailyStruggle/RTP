@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
@@ -587,7 +588,10 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
         if (p != null) return p.hasPermission(node);
         org.bukkit.OfflinePlayer off = Bukkit.getOfflinePlayer(player);
         return off != null && off.isOp();
-      } catch (Throwable t) {
+      } catch (RuntimeException | LinkageError t) {
+        PlatformHookBitComponent.recordWorldHookDegraded(
+            "AbstractFoliaServerAccessor#menuPermissionProbe",
+            t.getClass().getSimpleName() + ": " + t.getMessage());
         return false;
       }
     };
@@ -603,7 +607,10 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
           .filter(pai -> pai.getValue())
           .map(pai -> pai.getPermission())
           .collect(Collectors.toUnmodifiableSet());
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#menuEffectivePermissions",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return Collections.emptySet();
     }
   }
@@ -616,7 +623,10 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       if (p == null) return "en_us";
       String loc = p.getLocale();
       return loc.isEmpty() ? "en_us" : loc;
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#menuLocale",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return "en_us";
     }
   }
@@ -629,7 +639,10 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       if (p == null) return "";
       World w = p.getWorld();
       return w.getName();
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#menuRegionDescriptor",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return "";
     }
   }
@@ -806,7 +819,10 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       Set<String> tags = player.getScoreboardTags();
       if (tags.isEmpty()) return Collections.emptySet();
       return Collections.unmodifiableSet(new HashSet<>(tags));
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#getScoreboardTags",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return Collections.emptySet();
     }
   }
@@ -842,8 +858,9 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     try {
       org.bukkit.Material material = org.bukkit.Material.matchMaterial(raw);
       if (material != null) return material.name();
-    } catch (Exception ignored) {
-      // Material lookup threw; fall back to normalizer
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          raw, e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
@@ -861,7 +878,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       RTP.log(Level.FINE,
           "[RTP] setupMapBinding installed " + binding.getClass().getSimpleName()
               + " via MapDispatch");
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded("FoliaMapBinding#setupMapBinding", t);
       RTP.log(Level.WARNING,
           "[RTP] setupMapBinding failed; MapDispatch will fall back to NoopMapBinding", t);
     }

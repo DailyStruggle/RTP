@@ -1,6 +1,6 @@
 # ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-14
 **Target release:** `3.0.0-beta.3`
 **Companion documents:** [ADR-037](ADR-037-harden-rtp-config-commands.md) (decision / eight contracts), [`docs/dev/CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md) (target-state normative spec).

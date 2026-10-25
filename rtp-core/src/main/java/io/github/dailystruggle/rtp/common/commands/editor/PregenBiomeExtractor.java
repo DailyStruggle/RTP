@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.anvil.RegionFileReader;
 import io.github.dailystruggle.rtp.anvil.RegionFileResolver;
 import io.github.dailystruggle.rtp.anvil.RegionFormatRegistry;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -53,7 +54,9 @@ public final class PregenBiomeExtractor {
                 if (rtpWorld != null) {
                     worldName = rtpWorld.name();
                 }
-            } catch (Exception ignored) {}
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordPregenExtractorDegraded("PregenBiomeExtractor.resolveWorldName", e);
+            }
             if ((worldName == null || worldName.isEmpty())
                     && region.configuredWorldName != null && !region.configuredWorldName.isEmpty()) {
                 worldName = region.configuredWorldName;
@@ -115,7 +118,9 @@ public final class PregenBiomeExtractor {
                         } catch (ReflectiveOperationException ignored) {}
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordPregenExtractorDegraded("PregenBiomeExtractor.resolveRegionFolder", e);
+            }
         }
 
         // 2. Search configured world directory (e.g. ./<worldName>/region, ./<worldName>/dimensions/minecraft/overworld/region)
@@ -282,7 +287,8 @@ public final class PregenBiomeExtractor {
                 boolean isGen;
                 try {
                     isGen = reader.isChunkGenerated(bytes, length, lx, lz);
-                } catch (Exception e) {
+                } catch (RuntimeException e) {
+                    CoreFallbackCbitCounters.recordPregenExtractorDegraded("PregenBiomeExtractor.isChunkGenerated", e);
                     isGen = false;
                 }
                 if (!isGen) continue;
@@ -295,7 +301,9 @@ public final class PregenBiomeExtractor {
                     if (probe != null && probe.hasHeightmap()) {
                         biomeName = probe.biomeAt(probe.heightmapTopY());
                     }
-                } catch (Exception ignored) {}
+                } catch (java.io.IOException | RuntimeException e) {
+                    CoreFallbackCbitCounters.recordPregenExtractorDegraded("PregenBiomeExtractor.readColumnProbe", e);
+                }
 
                 // Fallback to MemoryShape biome cache if column probe failed
                 if (biomeName == null && fallback != null) {

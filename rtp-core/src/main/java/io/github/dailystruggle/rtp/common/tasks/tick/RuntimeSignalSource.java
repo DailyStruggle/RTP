@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.metrics.api.MetricsBinding;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -22,6 +23,7 @@ import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -51,6 +53,11 @@ public final class RuntimeSignalSource implements SignalSource {
     private final AtomicLong accumulatedRtpBgCpuNanos = new AtomicLong(0L);
     private final AtomicLong lastSampledRtpBgCpuNanos = new AtomicLong(0L);
     private final AtomicLong lastSampledProcessCpuNanos = new AtomicLong(-1L);
+    private final AtomicBoolean processCpuLoadDegraded = new AtomicBoolean(false);
+    private final AtomicBoolean processCpuTimeDegraded = new AtomicBoolean(false);
+    private final AtomicBoolean threadCpuTimeDegraded = new AtomicBoolean(false);
+    private final AtomicBoolean configLookupDegraded = new AtomicBoolean(false);
+    private final AtomicBoolean metricsBindingDegraded = new AtomicBoolean(false);
 
     private final AtomicLong lastMsptBits = new AtomicLong(Double.doubleToRawLongBits(Double.NaN));
     private final AtomicLong lastMsptSampleNanos = new AtomicLong(Long.MIN_VALUE);
@@ -85,7 +92,11 @@ public final class RuntimeSignalSource implements SignalSource {
         if (THREAD_BEAN == null) return -1L;
         try {
             return THREAD_BEAN.isCurrentThreadCpuTimeSupported() ? THREAD_BEAN.getCurrentThreadCpuTime() : -1L;
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            if (INSTANCE.threadCpuTimeDegraded.compareAndSet(false, true)) {
+                CoreFallbackCbitCounters.recordLifecycleCleanupDegraded(
+                        "RuntimeSignalSource.currentThreadCpuTimeNanos", e);
+            }
             return -1L;
         }
     }
@@ -119,13 +130,21 @@ public final class RuntimeSignalSource implements SignalSource {
                     viewDistanceSelect = Math.max(0, perf.getNumber(PerformanceKeys.viewDistanceSelect, 0).intValue());
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            if (configLookupDegraded.compareAndSet(false, true)) {
+                CoreFallbackCbitCounters.recordConfigLookupDegraded(
+                        "RuntimeSignalSource.sample.performanceConfig", e);
+            }
         }
 
         MetricsBinding metrics = null;
         try {
             metrics = CoreMetrics.instance().getBinding();
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            if (metricsBindingDegraded.compareAndSet(false, true)) {
+                CoreFallbackCbitCounters.recordLifecycleCleanupDegraded(
+                        "RuntimeSignalSource.sample.metricsBinding", e);
+            }
         }
 
         boolean regionalTicking = metrics != null && metrics.regionalTicking();
@@ -248,28 +267,40 @@ public final class RuntimeSignalSource implements SignalSource {
     }
 
     private ComputeSignals.SampledSignal sampleProcessCpuLoad() {
-        if (PROCESS_CPU_LOAD_METHOD == null) {
+        return sampleProcessCpuLoad(PROCESS_CPU_LOAD_METHOD, OS_BEAN);
+    }
+
+    public ComputeSignals.SampledSignal sampleProcessCpuLoad(Method loadMethod, Object osBean) {
+        if (loadMethod == null || osBean == null) {
             return ComputeSignals.SampledSignal.neverSampled();
         }
         try {
-            Object res = PROCESS_CPU_LOAD_METHOD.invoke(OS_BEAN);
+            Object res = loadMethod.invoke(osBean);
             if (res instanceof Number n) {
                 double load = n.doubleValue();
                 if (!Double.isNaN(load) && load >= 0.0 && load <= 1.0) {
                     return ComputeSignals.SampledSignal.fresh(load, PROCESS_CPU_LAG_NANOS);
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            if (processCpuLoadDegraded.compareAndSet(false, true)) {
+                CoreFallbackCbitCounters.recordLifecycleCleanupDegraded(
+                        "RuntimeSignalSource.sampleProcessCpuLoad", unwrapInvocationError(e));
+            }
         }
         return ComputeSignals.SampledSignal.neverSampled();
     }
 
     private ComputeSignals.SampledSignal sampleRtpAsyncCpuShare() {
-        if (PROCESS_CPU_TIME_METHOD == null) {
+        return sampleRtpAsyncCpuShare(PROCESS_CPU_TIME_METHOD, OS_BEAN);
+    }
+
+    public ComputeSignals.SampledSignal sampleRtpAsyncCpuShare(Method timeMethod, Object osBean) {
+        if (timeMethod == null || osBean == null) {
             return ComputeSignals.SampledSignal.neverSampled();
         }
         try {
-            Object res = PROCESS_CPU_TIME_METHOD.invoke(OS_BEAN);
+            Object res = timeMethod.invoke(osBean);
             if (res instanceof Number n) {
                 long procNanos = n.longValue();
                 if (procNanos > 0L) {
@@ -283,8 +314,28 @@ public final class RuntimeSignalSource implements SignalSource {
                     }
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable e) {
+            if (processCpuTimeDegraded.compareAndSet(false, true)) {
+                CoreFallbackCbitCounters.recordLifecycleCleanupDegraded(
+                        "RuntimeSignalSource.sampleRtpAsyncCpuShare", unwrapInvocationError(e));
+            }
         }
         return ComputeSignals.SampledSignal.neverSampled();
+    }
+
+    /** Clears once-per-session CBIT latches for unit test isolation. */
+    public void resetDegradedLatches() {
+        processCpuLoadDegraded.set(false);
+        processCpuTimeDegraded.set(false);
+        threadCpuTimeDegraded.set(false);
+        configLookupDegraded.set(false);
+        metricsBindingDegraded.set(false);
+    }
+
+    private static Throwable unwrapInvocationError(Throwable error) {
+        if (error instanceof java.lang.reflect.InvocationTargetException ite && ite.getCause() != null) {
+            return ite.getCause();
+        }
+        return error;
     }
 }

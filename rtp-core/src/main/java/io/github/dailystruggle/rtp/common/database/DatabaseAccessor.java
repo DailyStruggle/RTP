@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionLocationStore;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -25,8 +26,9 @@ import org.jetbrains.annotations.Nullable;
  * Abstract class for database accessors
  *
  * @param <D> the type of the database connection or context
+ * @governedBy ADR-115 (Package DAG Disentanglement and Finite Decision-Preservation Hypergraph)
  */
-public abstract class DatabaseAccessor<D> {
+public abstract class DatabaseAccessor<D> implements RegionLocationStore {
   /** Atomic boolean to signal the database accessor to stop processing */
   public final AtomicBoolean stop = new AtomicBoolean(false);
 
@@ -77,7 +79,7 @@ public abstract class DatabaseAccessor<D> {
   }
 
   /** Container describing a stored cached location */
-  public static final class StoredLocation {
+  public static final class StoredLocation implements RegionLocationStore.StoredEntry {
     private final String id;
     private final String regionName;
     private final String worldName;

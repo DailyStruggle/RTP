@@ -266,7 +266,9 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
           RTPRuntime.scheduler().runTaskLater(
               fakeWorld, center.x() >> 4, center.z() >> 4, sendFakes, 1L);
           scheduled = true;
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+              "RiftEffect#sendFakesSchedule", t);
           RTP.log(Level.WARNING,
               "[LeafRTPRiftAddon] RIFT fake-block scheduling failed; sending immediately", t);
         }
@@ -334,7 +336,9 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
       try {
         RTPRuntime.scheduler().runTaskLater(world, center.x() >> 4, center.z() >> 4, restore, seconds * 20L);
         return;
-      } catch (Throwable t) {
+      } catch (RuntimeException | LinkageError t) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+            "RiftEffect#restoreSchedule", t);
         RTP.log(Level.WARNING,
             "[LeafRTPRiftAddon] RIFT restore scheduling failed; restoring immediately", t);
       }
@@ -455,7 +459,10 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
       RTPCommandSender sender =
           (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getSender(uuid) : null;
       return (sender != null) ? sender.delay() : 0L;
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+          "RiftEffect#resolveTeleportDelayMillis",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[LeafRTPRiftAddon] RIFT delay resolution failed: " + t.getMessage());
       return 0L;
     }
@@ -499,7 +506,9 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
       int durationTicks = seconds * 20 + 40;
       fx.setData("DARKNESS", Integer.toString(durationTicks), "0", "false", "false", "false");
       fx.run();
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+          "RiftEffect#castDarkness", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE,
           "[LeafRTPRiftAddon] darkness veil skipped: " + t.getMessage());
     }
@@ -519,7 +528,9 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
       // (legacy percent encoding), so coordinate/speed tokens are the real value times 100.
       fx.setData(type, Integer.toString(count), token(dx), token(dy), token(dz), token(speed));
       fx.run();
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+          "RiftEffect#spawnBurst:" + type, t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE,
           "[LeafRTPRiftAddon] dark '" + type + "' particle burst skipped: " + t.getMessage());
     }

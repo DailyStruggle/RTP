@@ -262,6 +262,16 @@ public class MockRTPScheduler implements RTPScheduler {
      */
     private void dispatchMain(Runnable task) {
         if (!threaded || CURRENT_LANE.get() == Lane.MAIN) {
+            Deque<Runnable> suspended = asyncTrampoline.get();
+            if (!threaded && suspended != null) {
+                asyncTrampoline.remove();
+                try {
+                    task.run();
+                } finally {
+                    asyncTrampoline.set(suspended);
+                }
+                return;
+            }
             task.run();
             return;
         }

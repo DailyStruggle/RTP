@@ -1546,10 +1546,10 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
 
     @Override
     public int getMaxHeight() {
-        // LevelHeightAccessor#getMaxY() on MC 26.1.2 - inclusive max build Y
-        // (renamed from getMaxBuildHeight in earlier mojmap mappings).
+        // LevelHeightAccessor#getMaxY() on MC 26.1.2 returns the inclusive max
+        // build Y; RTPWorld#getMaxHeight() is the exclusive upper bound (getMaxY() + 1).
         try {
-            return world.getMaxY();
+            return world.getMaxY() + 1;
         } catch (Throwable t) {
             return 320; // 1.18+ overworld default
         }

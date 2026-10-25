@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.bit;
 
 import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitCodes;
 import io.github.dailystruggle.bit.BitComponent;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitReport;
@@ -65,6 +66,7 @@ public final class PipelineCbitCounters {
             COMPONENT_TIMEOUT_MILLIS,
             PipelineCbitCounters::report);
 
+    private static final CbitCounter CANDIDATE_EVALUATIONS = new CbitCounter();
     private static final CbitCounter STALE_CHUNK_TRIPS = new CbitCounter();
     private static final CbitCounter TICKET_HIGH_WATER_EVENTS = new CbitCounter();
 
@@ -77,10 +79,37 @@ public final class PipelineCbitCounters {
 
     private PipelineCbitCounters() {}
 
+    /** Records an evaluated candidate location sample on the selection pipeline. */
+    public static void recordCandidateEvaluated() {
+        CANDIDATE_EVALUATIONS.observe();
+    }
+
+    /** Records multiple evaluated candidate location samples on the selection pipeline. */
+    public static void recordCandidateEvaluated(long samples) {
+        CANDIDATE_EVALUATIONS.observe(samples);
+    }
+
+    public static long candidateEvaluations() {
+        return CANDIDATE_EVALUATIONS.observations();
+    }
+
+    public static long observations() {
+        long events = STALE_CHUNK_TRIPS.observations()
+                + TICKET_HIGH_WATER_EVENTS.observations()
+                + AnvilPrefilterMetrics.unsupportedCompressions.get()
+                + AnvilPrefilterMetrics.unparseableSections.get();
+        return Math.max(CANDIDATE_EVALUATIONS.observations(), CANDIDATE_EVALUATIONS.observations() + events);
+    }
+
+    public static boolean isObserved() {
+        return observations() > 0L;
+    }
+
     /**
      * Records an unrecognized compression scheme encountered by the Anvil prefilter.
      */
     public static void recordUnsupportedCompression(Path regionPath, int cx, int cz, String detail) {
+        CANDIDATE_EVALUATIONS.observe();
         AnvilPrefilterMetrics.recordUnsupportedCompression(regionPath, cx, cz, detail);
     }
 
@@ -88,6 +117,7 @@ public final class PipelineCbitCounters {
      * Records an unparseable chunk section or corrupt entry encountered by the Anvil prefilter.
      */
     public static void recordUnparseableSection(Path regionPath, int cx, int cz, String reason) {
+        CANDIDATE_EVALUATIONS.observe();
         AnvilPrefilterMetrics.recordUnparseableSection(regionPath, cx, cz, reason);
     }
 
@@ -174,12 +204,23 @@ public final class PipelineCbitCounters {
                     "active chunk tickets within expected cap");
         }
 
+        if (findings.isEmpty() && !isObserved()) {
+            addFinding(
+                    findings,
+                    BitCodes.CBIT_UNOBSERVED,
+                    "pipeline-cbit",
+                    "pipeline.observations",
+                    "No pipeline candidate evaluations or continuous events have been observed yet.",
+                    "at least 1 observed candidate evaluation");
+        }
+
         return BitReport.of(findings);
     }
 
     /** Clears all pipeline and prefilter CBIT counters for test isolation. */
     public static void reset() {
         AnvilPrefilterMetrics.resetBailouts();
+        CANDIDATE_EVALUATIONS.reset();
         STALE_CHUNK_TRIPS.reset();
         TICKET_HIGH_WATER_EVENTS.reset();
         lastStaleChunkWorld = "";

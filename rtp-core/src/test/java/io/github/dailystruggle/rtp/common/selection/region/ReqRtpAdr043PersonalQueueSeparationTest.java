@@ -147,6 +147,57 @@ class ReqRtpAdr043PersonalQueueSeparationTest {
         assertFalse(qm.playerQueue.contains(uuid));
     }
 
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    @DisplayName("ADR-043 / REQ-RTP-S-002: late personal fill arriving after closePersonalQueue demotes to unkept and does not re-open bucket")
+    void latePersonalFillAfterClose_demotesToUnkeptWithoutReopeningBucket() {
+        RegionSettings settings = mock(RegionSettings.class);
+        when(settings.cacheCap()).thenReturn(1024L);
+        when(settings.activeChunkCap()).thenReturn(64);
+        Region region = mock(Region.class);
+        when(region.getSettings()).thenReturn(settings);
+        RegionQueueManager qm = new RegionQueueManager(region);
+        region.queueManager = qm;
+        region.inFlightCalculations = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        RTPCoords coords = new RTPCoords("world", 300, 64, 300);
+        ChunkReservation reservation = mock(ChunkReservation.class);
+        io.github.dailystruggle.rtp.api.world.ChunkSet chunkSet = mock(io.github.dailystruggle.rtp.api.world.ChunkSet.class);
+        when(chunkSet.complete()).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(true));
+        io.github.dailystruggle.rtp.api.selection.GenerationResult result =
+                new io.github.dailystruggle.rtp.api.selection.GenerationResult(coords, 1L, chunkSet, reservation);
+
+        io.github.dailystruggle.rtp.api.selection.ILocationGenerator gen =
+                mock(io.github.dailystruggle.rtp.api.selection.ILocationGenerator.class);
+        when(gen.getLocation(org.mockito.ArgumentMatchers.eq(region), org.mockito.ArgumentMatchers.<java.util.Set<String>>isNull()))
+                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(result));
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor)
+                io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor()).setLocationGenerator(gen);
+
+        UUID uuid = UUID.randomUUID();
+        // Player joins (bucket opened) and immediately quits (bucket closed) before fill runs.
+        qm.perPlayerLocationQueue.putIfAbsent(
+                uuid, new java.util.concurrent.ConcurrentLinkedQueue<>());
+        qm.perPlayerStage.open(uuid, 1);
+        qm.perPlayerInFlight.add(uuid);
+        qm.closePersonalQueue(uuid);
+
+        assertFalse(qm.perPlayerLocationQueue.containsKey(uuid));
+        assertEquals(0, qm.perPlayerStage.partitionCount());
+
+        long unkeptBefore = qm.unkeptLocations.size();
+        // Now the already-scheduled personal RegionCacheTask executes and completes.
+        new RegionCacheTask(region, uuid, 0L).run();
+
+        assertFalse(qm.perPlayerLocationQueue.containsKey(uuid),
+                "late personal fill must NOT re-open perPlayerLocationQueue for an offline player");
+        assertEquals(0, qm.perPlayerStage.partitionCount(),
+                "late personal fill must NOT re-open PartitionCacheStage for an offline player");
+        assertEquals(unkeptBefore + 1, qm.unkeptLocations.size(),
+                "late personal fill must demote its coordinate to unkeptLocations");
+        org.mockito.Mockito.verify(reservation).close();
+    }
+
     /** Mock {@link Region} with the minimum {@link RegionSettings} fields {@code RegionQueueManager} reads. */
     private static Region buildMockRegion() {
         RegionSettings settings = mock(RegionSettings.class);

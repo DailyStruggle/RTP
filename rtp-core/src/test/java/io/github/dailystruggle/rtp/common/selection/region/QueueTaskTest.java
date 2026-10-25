@@ -150,12 +150,27 @@ class QueueTaskTest {
         RTPLocation keptLoc = new RTPLocation(new RTPCoords("queue_world", (cx << 4) + 4, 64, (cz << 4) + 4), 1, reservation);
         region.queueManager.keptLocations.offer(keptLoc);
 
+        io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache.clear();
+        LocationGenerator.lastUpdate.set(0L);
+        accessor.logMessages.clear();
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys> blocksParser =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys>)
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.class);
+        if (blocksParser != null) {
+            blocksParser.set(io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.unsafeBlocks,
+                    java.util.List.of("LAVA", "#invalid_queue_tag:bad!"));
+        }
+
         QueueTask task = new QueueTask(region, player, player, null, result);
         task.start();
 
         GenerationResult gen = result.get(10, TimeUnit.SECONDS);
         assertNotNull(gen);
         assertNotNull(gen.coords());
+        assertTrue(accessor.logMessages.stream().anyMatch(
+                msg -> msg.contains("[advanced/blocks.yml] rejected unsafe-blocks token '#invalid_queue_tag:bad!'")),
+                "QueueTask rejected unsafe-blocks token warning must name [advanced/blocks.yml]; logs=" + accessor.logMessages);
     }
 
     @Test

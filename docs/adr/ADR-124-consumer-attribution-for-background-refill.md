@@ -1,6 +1,6 @@
 # ADR-124 - Consumer Attribution for Constrained Background Refill
 
-**Status:** Proposed. Builds on [ADR-087](ADR-087-adaptive-compute-governor.md) (per-region plan and quota, constrained allocation, observe-only mode). Split out of ADR-087 (former section 4.6) on 2026-10-23. Gated on go/no-go 1 (section 7): it ships only if constrained refill is common enough to matter. Nothing is implemented.
+**Status:** Accepted (2026-10-24). Builds on [ADR-087](ADR-087-adaptive-compute-governor.md) (per-region plan and quota, constrained allocation, observe-only mode). Split out of ADR-087 (former section 4.6) on 2026-10-23. Gated on go/no-go 1 (section 7): it ships only if constrained refill is common enough to matter.
 **Date:** 2026-10-23
 
 ## Context

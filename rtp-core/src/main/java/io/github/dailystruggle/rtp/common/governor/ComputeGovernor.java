@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.common.governor;
 
 import io.github.dailystruggle.rtp.common.predict.AimdLimiter;
+import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
+import io.github.dailystruggle.rtp.common.predict.EwmaLinearFit;
+import io.github.dailystruggle.rtp.common.predict.WaterFillingAllocator;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 
 import java.util.ArrayList;
@@ -10,7 +13,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -89,16 +91,14 @@ public final class ComputeGovernor {
             AimdLimiter hotLimiter
     ) {}
 
-    private record MemorySample(long timestampNanos, int tickets, double postGcBytes) {}
-
     private volatile SignalSource signalSource;
     private volatile ComputeBudget currentBudget = ComputeBudget.configuredDefault();
     private volatile ComputeSignals lastSignals;
-    private volatile boolean useConsumerAttribution;
+    private volatile Boolean useConsumerAttributionOverride = null;
+    private final ConsumerLedger consumerLedger = new ConsumerLedger();
 
     private final AtomicLong lastEvalNanos = new AtomicLong(Long.MIN_VALUE);
     private final AtomicLong lastCreditUpdateNanos = new AtomicLong(Long.MIN_VALUE);
-    private final AtomicLong lastContractionNanos = new AtomicLong(Long.MIN_VALUE);
     private final AtomicLong lastEvalFailureLogNanos = new AtomicLong(Long.MIN_VALUE);
     private final AtomicLong evaluationFailures = new AtomicLong(0L);
     private final AtomicReference<String> lastFailureMessage = new AtomicReference<>("");
@@ -108,14 +108,14 @@ public final class ComputeGovernor {
     private final AtomicLong syncDebtNanos = new AtomicLong(0L);
 
     // Measured unit costs & pulse remainders (EWMA alpha = 0.1, window = 19)
-    private final AtomicLong deltaTAsyncBits = new AtomicLong(Double.doubleToRawLongBits(Double.NaN));
-    private final AtomicLong deltaTTickBits = new AtomicLong(Double.doubleToRawLongBits(0.0));
-    private final AtomicLong deltaTPromBits = new AtomicLong(Double.doubleToRawLongBits(Double.NaN));
-    private final AtomicLong bgAsyncRemainderBits = new AtomicLong(Double.doubleToRawLongBits(Double.NaN));
-    private final AtomicLong rtpBgTickMsBits = new AtomicLong(Double.doubleToRawLongBits(0.0));
-    private final AtomicLong chunksPerEntryBits = new AtomicLong(Double.doubleToRawLongBits(1.0));
-    private final AtomicLong chunkMemoryBytesBits = new AtomicLong(Double.doubleToRawLongBits(DEFAULT_CHUNK_MEMORY_PRIOR_BYTES));
+    private final EwmaEstimator deltaTAsync = EwmaEstimator.ofAlpha(0.1);
+    private final EwmaEstimator deltaTTick = EwmaEstimator.ofAlpha(0.1, 0.0);
+    private final EwmaEstimator deltaTProm = EwmaEstimator.ofAlpha(0.1);
+    private final EwmaEstimator bgAsyncRemainder = EwmaEstimator.ofAlpha(0.1);
+    private final EwmaEstimator rtpBgTickMs = EwmaEstimator.ofAlpha(0.1, 0.0);
+    private final EwmaEstimator chunksPerEntry = EwmaEstimator.ofAlpha(0.1, 1.0);
     private final double chunkMemoryPriorBytes;
+    private final EwmaLinearFit.WindowedOlsSlope chunkMemorySlope;
 
     // Limiters (ADR-087 Section 4.4)
     private final AimdLimiter asyncLimiter;
@@ -130,7 +130,6 @@ public final class ComputeGovernor {
     private final AtomicLong publishedAsyncNanos = new AtomicLong(ComputeSignals.DEFAULT_ASYNC_NANOS);
     private final ConcurrentHashMap<String, RegionState> regionStates = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicLong> turnAsyncCarryNanos = new ConcurrentHashMap<>();
-    private final ConcurrentLinkedDeque<MemorySample> memoryWindow = new ConcurrentLinkedDeque<>();
     private final ConcurrentHashMap<String, GovernorReason> lastLoggedReason = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> lastLogTimeNanos = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> breachCountsBySignal = new ConcurrentHashMap<>();
@@ -153,7 +152,15 @@ public final class ComputeGovernor {
     public ComputeGovernor(SignalSource signalSource, double chunkMemoryPriorBytes) {
         this.signalSource = signalSource;
         this.chunkMemoryPriorBytes = Math.max(1024.0, chunkMemoryPriorBytes);
-        this.chunkMemoryBytesBits.set(Double.doubleToRawLongBits(this.chunkMemoryPriorBytes));
+        this.chunkMemorySlope = new EwmaLinearFit.WindowedOlsSlope(
+                MEMORY_FIT_WINDOW_NANOS,
+                CONTRACTION_EXCLUSION_NANOS,
+                20,
+                0.25,
+                this.chunkMemoryPriorBytes,
+                this.chunkMemoryPriorBytes,
+                4.0 * this.chunkMemoryPriorBytes
+        );
         this.asyncLimiter = new AimdLimiter(ONE_MS_NANOS, ComputeSignals.DEFAULT_ASYNC_NANOS);
         this.syncLimiter = new AimdLimiter(ONE_MS_NANOS, ComputeSignals.DEFAULT_SYNC_NANOS);
         this.generationLimiter = new AimdLimiter(1.0, ComputeSignals.DEFAULT_GENERATION_CAP);
@@ -169,11 +176,31 @@ public final class ComputeGovernor {
     }
 
     public void setUseConsumerAttribution(boolean enabled) {
-        this.useConsumerAttribution = enabled;
+        this.useConsumerAttributionOverride = enabled;
     }
 
     public boolean useConsumerAttribution() {
-        return useConsumerAttribution;
+        Boolean override = this.useConsumerAttributionOverride;
+        if (override != null) {
+            return override;
+        }
+        ComputeSignals s = this.lastSignals;
+        return s == null || (s.autoTune() && !s.observeOnly());
+    }
+
+    public ConsumerLedger consumerLedger() {
+        return consumerLedger;
+    }
+
+    /**
+     * Returns the current measured or fallback unit refill cost ({@code DeltaT_async + DeltaT_tick})
+     * in nanoseconds for {@link ConsumerLedger#recordConsumption} (ADR-124 Section 1).
+     */
+    public double estimatedUnitCostNanos() {
+        ComputeBudget b = this.currentBudget;
+        long aCfg = (b != null) ? b.configuredAsyncNanos() : ComputeSignals.DEFAULT_ASYNC_NANOS;
+        int promCfg = (b != null) ? b.configuredPromotionsPerTurn() : ComputeSignals.DEFAULT_PROMOTIONS_PER_TURN;
+        return resolveDeltaTAsyncNanos(aCfg, promCfg) + resolveDeltaTTickNanos();
     }
 
     public ComputeBudget budget() {
@@ -243,8 +270,13 @@ public final class ComputeGovernor {
         int regInflightCap = (s != null && s.configuredGenerationCap() > 0)
                 ? s.configuredGenerationCap()
                 : b.configuredGenerationCap();
-        double bgMs = Double.longBitsToDouble(rtpBgTickMsBits.get());
+        double bgMs = rtpBgTickMs.mean();
         if (Double.isNaN(bgMs) || bgMs < 0.0) bgMs = 0.0;
+        long snapNanos = lastEvalNanos.get();
+        if (snapNanos == Long.MIN_VALUE) {
+            snapNanos = System.nanoTime();
+        }
+        Map<String, Double> refillShares = ConsumerLedger.computeRegionRefillShares(b.regionPlannedRates());
         return new GovernorSnapshot(
                 b.autoTune(),
                 b.observeOnly(),
@@ -277,7 +309,10 @@ public final class ComputeGovernor {
                 constrainedEvaluationsTotal.get(),
                 maxConsumerSkewRatio(),
                 lastDistinctConsumers,
-                lastWouldBeAttributedRates
+                lastWouldBeAttributedRates,
+                consumerLedger.costP99MsPerMin(snapNanos),
+                refillShares,
+                consumerLedger.topConsumers(5, snapNanos)
         );
     }
 
@@ -518,12 +553,14 @@ public final class ComputeGovernor {
         int maxConsumersWithDemand = 0;
         long smoothingH = Math.max(DEFICIT_SMOOTHING_MIN_TICKS, periodCfg);
 
+        boolean effectiveAttribution = useConsumerAttribution();
+
         for (ComputeSignals.RegionDemand rd : signals.regions().values()) {
             double dBar = Math.min(rd.consumptionRatePerTick() + ((double) rd.deficit() / (double) periodCfg), (double) uMax);
             if (Double.isNaN(dBar) || dBar < 0.0) dBar = 0.0;
             deliverableDemands.put(rd.region(), dBar);
             sumDeliverableDemand += dBar;
-            int nR = Math.max(1, rd.distinctConsumers());
+            int nR = Math.max(Math.max(1, rd.distinctConsumers()), consumerLedger.distinctConsumers(rd.region(), nowNanos));
             distinctConsumersMap.put(rd.region(), nR);
             consumerWeights.put(rd.region(), (double) nR);
             if (dBar > 0.0) {
@@ -531,7 +568,7 @@ public final class ComputeGovernor {
                 minConsumersWithDemand = Math.min(minConsumersWithDemand, nR);
                 maxConsumersWithDemand = Math.max(maxConsumersWithDemand, nR);
             }
-            double w = useConsumerAttribution
+            double w = effectiveAttribution
                     ? (double) nR
                     : (rd.consumptionRatePerTick() + ((double) rd.deficit() / (double) smoothingH));
             weights.put(rd.region(), Math.max(0.0, w));
@@ -569,7 +606,7 @@ public final class ComputeGovernor {
         Map<String, Double> attributedPlans = computeWaterFilling(deliverableDemands, consumerWeights, rStar);
         this.lastWouldBeAttributedRates = Collections.unmodifiableMap(attributedPlans);
 
-        Map<String, Double> plannedRates = useConsumerAttribution
+        Map<String, Double> plannedRates = effectiveAttribution
                 ? attributedPlans
                 : computeWaterFilling(deliverableDemands, weights, rStar);
         Map<String, Integer> unitsPerTurn = new LinkedHashMap<>();
@@ -671,7 +708,8 @@ public final class ComputeGovernor {
         Map<String, Integer> regionHotCaps = new LinkedHashMap<>();
         Map<String, Integer> regionConfiguredHotCaps = new LinkedHashMap<>();
         Map<String, GovernorReason> regionHotReasons = new LinkedHashMap<>();
-        computeHotCaps(signals, tHeapFrac, heapBreach, nowNanos, regionHotCaps, regionConfiguredHotCaps, regionHotReasons);
+        computeHotCaps(signals, tHeapFrac, heapBreach, nowNanos, effectiveAttribution, attributedPlans,
+                distinctConsumersMap, regionHotCaps, regionConfiguredHotCaps, regionHotReasons);
 
         // 10. Generation concurrency g_eff (Section 4.3 item 7)
         boolean genBreach = chunkLatencyBreach || processCpuBreach || tickBreach || tickStall;
@@ -745,7 +783,7 @@ public final class ComputeGovernor {
         if (mspt.isNeverSampled()) {
             return Double.NaN;
         }
-        double rtpBgMs = Double.longBitsToDouble(rtpBgTickMsBits.get());
+        double rtpBgMs = rtpBgTickMs.mean();
         if (Double.isNaN(rtpBgMs) || rtpBgMs < 0.0) rtpBgMs = 0.0;
         double rawVal = mspt.value();
         double computed = Double.isNaN(rawVal)
@@ -768,6 +806,9 @@ public final class ComputeGovernor {
             double tHeapFrac,
             boolean heapBreach,
             long nowNanos,
+            boolean effectiveAttribution,
+            Map<String, Double> attributedPlans,
+            Map<String, Integer> distinctConsumersMap,
             Map<String, Integer> regionHotCaps,
             Map<String, Integer> regionConfiguredHotCaps,
             Map<String, GovernorReason> regionHotReasons
@@ -797,8 +838,8 @@ public final class ComputeGovernor {
         }
 
         double nChunks = Math.max((2.0 * maxVdSelect + 1.0) * (2.0 * maxVdSelect + 1.0),
-                Double.longBitsToDouble(chunksPerEntryBits.get()));
-        double mChunk = Double.longBitsToDouble(chunkMemoryBytesBits.get());
+                chunksPerEntry.mean());
+        double mChunk = chunkMemorySlope.estimate();
         double deltaMUnit = Math.max(1024.0, nChunks * mChunk);
 
         double headroomBytes = Math.max(0.0, (tHeapFrac * signals.maxHeapBytes()) - postGc.value());
@@ -812,6 +853,7 @@ public final class ComputeGovernor {
         Map<String, Integer> ceilings = new LinkedHashMap<>();
         Map<String, Integer> floors = new LinkedHashMap<>();
         Map<String, Double> weights = new LinkedHashMap<>();
+        Map<String, Double> extraHeadrooms = new LinkedHashMap<>();
         int sumFloors = 0;
 
         for (ComputeSignals.RegionDemand rd : signals.regions().values()) {
@@ -822,14 +864,25 @@ public final class ComputeGovernor {
                     : cfgCap;
             floors.put(rd.region(), floor);
             ceilings.put(rd.region(), ceiling);
+            extraHeadrooms.put(rd.region(), (double) Math.max(0, ceiling - floor));
             sumFloors += floor;
-            double w = useConsumerAttribution
-                    ? (double) rd.distinctConsumers()
-                    : (rd.consumptionRatePerTick() + ((double) rd.deficit() / 600.0));
+            double w;
+            if (effectiveAttribution) {
+                double cappedPlan = (attributedPlans != null) ? attributedPlans.getOrDefault(rd.region(), 0.0) : 0.0;
+                int nR = (distinctConsumersMap != null)
+                        ? distinctConsumersMap.getOrDefault(rd.region(), rd.distinctConsumers())
+                        : rd.distinctConsumers();
+                w = (cappedPlan > 0.0) ? cappedPlan : (double) Math.max(1, nR);
+            } else {
+                w = rd.consumptionRatePerTick() + ((double) rd.deficit() / 600.0);
+            }
             weights.put(rd.region(), Math.max(0.0, w));
         }
 
         int remaining = Math.max(0, effectiveTotal - sumFloors);
+        Map<String, Double> waterFilledExtras = effectiveAttribution
+                ? computeWaterFilling(extraHeadrooms, weights, (double) remaining)
+                : Collections.emptyMap();
         double totalWeight = 0.0;
         for (double w : weights.values()) totalWeight += w;
 
@@ -844,6 +897,9 @@ public final class ComputeGovernor {
                 target = 0;
             } else if (effectiveTotal <= sumFloors) {
                 target = floor;
+            } else if (effectiveAttribution) {
+                int extra = (int) Math.floor(waterFilledExtras.getOrDefault(rName, 0.0) + 1e-9);
+                target = Math.min(ceiling, floor + extra);
             } else if (totalWeight > 0.0) {
                 int extra = (int) Math.floor(remaining * (weights.get(rName) / totalWeight));
                 target = Math.min(ceiling, floor + extra);
@@ -883,7 +939,7 @@ public final class ComputeGovernor {
         }
 
         if (anyContracted) {
-            lastContractionNanos.set(nowNanos);
+            chunkMemorySlope.recordExclusionEvent(nowNanos);
         }
     }
 
@@ -896,102 +952,7 @@ public final class ComputeGovernor {
             Map<String, Double> weights,
             double rStar
     ) {
-        Map<String, Double> out = new LinkedHashMap<>();
-        if (deliverableDemands == null || deliverableDemands.isEmpty()) {
-            return out;
-        }
-        double sumDemands = 0.0;
-        for (Map.Entry<String, Double> e : deliverableDemands.entrySet()) {
-            double d = Math.max(0.0, e.getValue() == null ? 0.0 : e.getValue());
-            out.put(e.getKey(), 0.0);
-            sumDemands += d;
-        }
-        if (rStar <= 0.0 || sumDemands <= 0.0) {
-            return out;
-        }
-        if (rStar >= sumDemands - 1e-12) {
-            for (Map.Entry<String, Double> e : deliverableDemands.entrySet()) {
-                out.put(e.getKey(), Math.max(0.0, e.getValue()));
-            }
-            return out;
-        }
-
-        // Exact iterative water-filling over active (unsatisfied) regions
-        List<String> keys = new ArrayList<>(deliverableDemands.keySet());
-        boolean[] capped = new boolean[keys.size()];
-        double remainingRate = rStar;
-
-        while (remainingRate > 1e-12) {
-            double activeWeightSum = 0.0;
-            int activeCount = 0;
-            for (int i = 0; i < keys.size(); i++) {
-                if (capped[i]) continue;
-                String k = keys.get(i);
-                double d = Math.max(0.0, deliverableDemands.getOrDefault(k, 0.0));
-                if (d <= 0.0) {
-                    capped[i] = true;
-                    continue;
-                }
-                double w = weights != null ? Math.max(0.0, weights.getOrDefault(k, 0.0)) : 0.0;
-                activeWeightSum += w;
-                activeCount++;
-            }
-            if (activeCount == 0) {
-                break;
-            }
-
-            if (activeWeightSum <= 0.0) {
-                // Equal water-filling fallback when all remaining weights are 0
-                double share = remainingRate / activeCount;
-                boolean anyCappedThisRound = false;
-                for (int i = 0; i < keys.size(); i++) {
-                    if (capped[i]) continue;
-                    String k = keys.get(i);
-                    double d = Math.max(0.0, deliverableDemands.getOrDefault(k, 0.0));
-                    if (d <= share + 1e-12) {
-                        out.put(k, d);
-                        remainingRate -= d;
-                        capped[i] = true;
-                        anyCappedThisRound = true;
-                    }
-                }
-                if (!anyCappedThisRound) {
-                    for (int i = 0; i < keys.size(); i++) {
-                        if (!capped[i]) {
-                            out.put(keys.get(i), share);
-                        }
-                    }
-                    break;
-                }
-                continue;
-            }
-
-            double theta = remainingRate / activeWeightSum;
-            boolean anyCappedThisRound = false;
-            for (int i = 0; i < keys.size(); i++) {
-                if (capped[i]) continue;
-                String k = keys.get(i);
-                double d = Math.max(0.0, deliverableDemands.getOrDefault(k, 0.0));
-                double w = Math.max(0.0, weights.getOrDefault(k, 0.0));
-                if (theta * w >= d - 1e-12) {
-                    out.put(k, d);
-                    remainingRate = Math.max(0.0, remainingRate - d);
-                    capped[i] = true;
-                    anyCappedThisRound = true;
-                }
-            }
-            if (!anyCappedThisRound) {
-                for (int i = 0; i < keys.size(); i++) {
-                    if (capped[i]) continue;
-                    String k = keys.get(i);
-                    double d = Math.max(0.0, deliverableDemands.getOrDefault(k, 0.0));
-                    double w = Math.max(0.0, weights.getOrDefault(k, 0.0));
-                    out.put(k, Math.min(d, theta * w));
-                }
-                break;
-            }
-        }
-        return out;
+        return WaterFillingAllocator.allocate(deliverableDemands, weights, rStar);
     }
 
     private void accrueCredits(double dtTicks) {
@@ -1080,7 +1041,7 @@ public final class ComputeGovernor {
      */
     public long beginBackgroundAsyncPhase(long remainderOfConfiguredNanos) {
         double sample = Math.max(0.0, (double) remainderOfConfiguredNanos);
-        updateEwmaBits(bgAsyncRemainderBits, sample, 0.1);
+        bgAsyncRemainder.recordSample(sample);
         ComputeBudget b = this.currentBudget;
         long aEff = b.backgroundAsyncNanos();
         long capped = Math.min(aEff, Math.max(0L, remainderOfConfiguredNanos));
@@ -1153,7 +1114,7 @@ public final class ComputeGovernor {
         long bgSpend = Math.max(0L, bgSyncSpendNanos);
         long totalSpend = Math.max(bgSpend, totalTickSpendNanos);
         long sCfg = Math.max(1L, configuredSyncNanos);
-        updateEwmaBits(rtpBgTickMsBits, bgSpend / 1_000_000.0, 0.1);
+        rtpBgTickMs.recordSample(bgSpend / 1_000_000.0);
         return syncDebtNanos.updateAndGet(prev -> Math.max(0L, prev + totalSpend - sCfg));
     }
 
@@ -1198,11 +1159,11 @@ public final class ComputeGovernor {
         long carried = (carrySlot != null) ? carrySlot.getAndSet(0L) : 0L;
         long totalAsyncNanos = Math.max(0L, asyncDurationNanos + Math.max(0L, carried));
         double perUnitAsync = Math.max(1_000.0, (double) totalAsyncNanos / (double) completedUnits);
-        updateEwmaBits(deltaTAsyncBits, perUnitAsync, 0.1);
-        double promCost = Double.longBitsToDouble(deltaTPromBits.get());
+        deltaTAsync.recordSample(perUnitAsync);
+        double promCost = deltaTProm.mean();
         if (!Double.isNaN(promCost) && promCost > 0.0) {
             double promShare = Math.min(1.0, (double) Math.max(0, promotionsStarted) / (double) completedUnits);
-            updateEwmaBits(deltaTTickBits, promShare * promCost, 0.1);
+            deltaTTick.recordSample(promShare * promCost);
         }
     }
 
@@ -1213,12 +1174,12 @@ public final class ComputeGovernor {
      */
     public void recordPromotionTickCost(long tickDurationNanos) {
         if (tickDurationNanos < 0L) return;
-        updateEwmaBits(deltaTPromBits, (double) tickDurationNanos, 0.1);
-        double curTick = Double.longBitsToDouble(deltaTTickBits.get());
+        deltaTProm.recordSample((double) tickDurationNanos);
+        double curTick = deltaTTick.mean();
         if (Double.isNaN(curTick) || curTick <= 0.0) {
-            updateEwmaBits(deltaTTickBits, (double) tickDurationNanos, 0.1);
+            deltaTTick.recordSample((double) tickDurationNanos);
         } else {
-            updateEwmaBits(deltaTTickBits, 0.5 * (double) tickDurationNanos, 0.1);
+            deltaTTick.recordSample(0.5 * (double) tickDurationNanos);
         }
     }
 
@@ -1226,9 +1187,9 @@ public final class ComputeGovernor {
      * Directly sets measured unit costs in nanoseconds (for deterministic unit/property tests).
      */
     public void setUnitCostsForTesting(double deltaTAsyncNanos, double deltaTTickNanos, double deltaTPromNanos) {
-        deltaTAsyncBits.set(Double.doubleToRawLongBits(Math.max(1_000.0, deltaTAsyncNanos)));
-        deltaTTickBits.set(Double.doubleToRawLongBits(Math.max(0.0, deltaTTickNanos)));
-        deltaTPromBits.set(Double.doubleToRawLongBits(Math.max(1_000.0, deltaTPromNanos)));
+        deltaTAsync.setMean(Math.max(1_000.0, deltaTAsyncNanos));
+        deltaTTick.setMean(Math.max(0.0, deltaTTickNanos));
+        deltaTProm.setMean(Math.max(1_000.0, deltaTPromNanos));
     }
 
     /**
@@ -1236,7 +1197,7 @@ public final class ComputeGovernor {
      * within the next 60 s are excluded from the per-chunk memory slope fit (ADR-087 Section 4.2).
      */
     public void recordHotCapContraction(long nowNanos) {
-        lastContractionNanos.set(nowNanos);
+        chunkMemorySlope.recordExclusionEvent(nowNanos);
     }
 
     /**
@@ -1251,66 +1212,10 @@ public final class ComputeGovernor {
      * </ul>
      */
     public double recordPostGcMemorySample(int heldTickets, double postGcTenuredBytes, long nowNanos) {
-        if (Double.isNaN(postGcTenuredBytes) || Double.isInfinite(postGcTenuredBytes) || postGcTenuredBytes < 0.0 || heldTickets < 0) {
+        if (heldTickets < 0) {
             return chunkMemoryEstimateBytes();
         }
-        long lastContraction = lastContractionNanos.get();
-        if (lastContraction != Long.MIN_VALUE && nowNanos >= lastContraction
-                && (nowNanos - lastContraction) <= CONTRACTION_EXCLUSION_NANOS) {
-            return chunkMemoryEstimateBytes();
-        }
-
-        memoryWindow.addLast(new MemorySample(nowNanos, heldTickets, postGcTenuredBytes));
-        while (!memoryWindow.isEmpty()) {
-            MemorySample head = memoryWindow.peekFirst();
-            if (head == null || nowNanos - head.timestampNanos() <= MEMORY_FIT_WINDOW_NANOS) {
-                break;
-            }
-            memoryWindow.pollFirst();
-        }
-
-        List<MemorySample> samples = new ArrayList<>(memoryWindow);
-        if (samples.size() < 20) {
-            chunkMemoryBytesBits.set(Double.doubleToRawLongBits(chunkMemoryPriorBytes));
-            return chunkMemoryPriorBytes;
-        }
-
-        double sumX = 0.0;
-        double sumY = 0.0;
-        int minTickets = Integer.MAX_VALUE;
-        int maxTickets = Integer.MIN_VALUE;
-        for (MemorySample s : samples) {
-            sumX += s.tickets();
-            sumY += s.postGcBytes();
-            minTickets = Math.min(minTickets, s.tickets());
-            maxTickets = Math.max(maxTickets, s.tickets());
-        }
-        int n = samples.size();
-        double meanX = sumX / n;
-        double meanY = sumY / n;
-
-        if (meanX <= 0.0 || (maxTickets - minTickets) < 0.25 * meanX) {
-            chunkMemoryBytesBits.set(Double.doubleToRawLongBits(chunkMemoryPriorBytes));
-            return chunkMemoryPriorBytes;
-        }
-
-        double sxx = 0.0;
-        double sxy = 0.0;
-        for (MemorySample s : samples) {
-            double dx = s.tickets() - meanX;
-            double dy = s.postGcBytes() - meanY;
-            sxx += dx * dx;
-            sxy += dx * dy;
-        }
-        if (sxx <= 1e-9) {
-            chunkMemoryBytesBits.set(Double.doubleToRawLongBits(chunkMemoryPriorBytes));
-            return chunkMemoryPriorBytes;
-        }
-
-        double slope = sxy / sxx;
-        double clamped = clamp(slope, chunkMemoryPriorBytes, 4.0 * chunkMemoryPriorBytes);
-        chunkMemoryBytesBits.set(Double.doubleToRawLongBits(clamped));
-        return clamped;
+        return chunkMemorySlope.recordSample(heldTickets, postGcTenuredBytes, nowNanos);
     }
 
     private void updateChunkMemoryEstimate(ComputeSignals signals, long nowNanos) {
@@ -1320,7 +1225,7 @@ public final class ComputeGovernor {
     }
 
     public double chunkMemoryEstimateBytes() {
-        return Double.longBitsToDouble(chunkMemoryBytesBits.get());
+        return chunkMemorySlope.estimate();
     }
 
     public double chunkMemoryPriorBytes() {
@@ -1369,26 +1274,24 @@ public final class ComputeGovernor {
         hotScaleLimiter.reset();
         lastEvalNanos.set(Long.MIN_VALUE);
         lastCreditUpdateNanos.set(Long.MIN_VALUE);
-        lastContractionNanos.set(Long.MIN_VALUE);
         lastEvalFailureLogNanos.set(Long.MIN_VALUE);
         evaluationFailures.set(0L);
         lastFailureMessage.set("");
         asyncDebtNanos.set(0L);
         syncDebtNanos.set(0L);
-        deltaTAsyncBits.set(Double.doubleToRawLongBits(Double.NaN));
-        deltaTTickBits.set(Double.doubleToRawLongBits(0.0));
-        deltaTPromBits.set(Double.doubleToRawLongBits(Double.NaN));
-        bgAsyncRemainderBits.set(Double.doubleToRawLongBits(Double.NaN));
-        rtpBgTickMsBits.set(Double.doubleToRawLongBits(0.0));
-        chunksPerEntryBits.set(Double.doubleToRawLongBits(1.0));
-        chunkMemoryBytesBits.set(Double.doubleToRawLongBits(chunkMemoryPriorBytes));
+        deltaTAsync.reset();
+        deltaTTick.reset();
+        deltaTProm.reset();
+        bgAsyncRemainder.reset();
+        rtpBgTickMs.reset();
+        chunksPerEntry.reset();
+        chunkMemorySlope.reset();
         lastBCpuBits.set(Double.doubleToRawLongBits(Double.NaN));
         consecutiveProcCpuHigh.set(0);
         asyncWasIdle.set(false);
         publishedAsyncNanos.set(ComputeSignals.DEFAULT_ASYNC_NANOS);
         regionStates.clear();
         turnAsyncCarryNanos.clear();
-        memoryWindow.clear();
         lastLoggedReason.clear();
         lastLogTimeNanos.clear();
         breachCountsBySignal.clear();
@@ -1397,6 +1300,8 @@ public final class ComputeGovernor {
         maxConsumerSkewBits.set(Double.doubleToRawLongBits(1.0));
         lastDistinctConsumers = Collections.emptyMap();
         lastWouldBeAttributedRates = Collections.emptyMap();
+        consumerLedger.reset();
+        useConsumerAttributionOverride = null;
         currentBudget = ComputeBudget.configuredDefault();
         lastSignals = null;
     }
@@ -1448,7 +1353,7 @@ public final class ComputeGovernor {
     }
 
     private double resolveDeltaTAsyncNanos(long aCfg, int promCfg) {
-        double v = Double.longBitsToDouble(deltaTAsyncBits.get());
+        double v = deltaTAsync.mean();
         if (Double.isNaN(v) || v <= 0.0) {
             return Math.max(1_000.0, (double) aCfg / (double) Math.max(1, promCfg));
         }
@@ -1456,12 +1361,12 @@ public final class ComputeGovernor {
     }
 
     private double resolveDeltaTTickNanos() {
-        double v = Double.longBitsToDouble(deltaTTickBits.get());
+        double v = deltaTTick.mean();
         return (Double.isNaN(v) || v < 0.0) ? 0.0 : v;
     }
 
     private double resolveDeltaTPromNanos(long sCfg, int promCfg) {
-        double v = Double.longBitsToDouble(deltaTPromBits.get());
+        double v = deltaTProm.mean();
         if (Double.isNaN(v) || v <= 0.0) {
             return Math.max(1_000.0, (double) sCfg / (double) Math.max(1, promCfg));
         }
@@ -1469,23 +1374,11 @@ public final class ComputeGovernor {
     }
 
     private double resolveEstimatedBgAsyncNanos(long aCfg) {
-        double v = Double.longBitsToDouble(bgAsyncRemainderBits.get());
+        double v = bgAsyncRemainder.mean();
         if (Double.isNaN(v) || v < 0.0) {
             return (double) aCfg;
         }
         return Math.min((double) aCfg, v);
-    }
-
-    private static void updateEwmaBits(AtomicLong slot, double sample, double alpha) {
-        if (Double.isNaN(sample) || Double.isInfinite(sample)) return;
-        while (true) {
-            long curBits = slot.get();
-            double cur = Double.longBitsToDouble(curBits);
-            double next = Double.isNaN(cur) ? sample : (cur + alpha * (sample - cur));
-            if (slot.compareAndSet(curBits, Double.doubleToRawLongBits(next))) {
-                return;
-            }
-        }
     }
 
     private static double clamp(double v, double min, double max) {

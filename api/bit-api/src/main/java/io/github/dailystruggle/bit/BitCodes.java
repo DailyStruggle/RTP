@@ -28,12 +28,20 @@ public final class BitCodes {
     public static final BitCode NAMESPACE_CONFLICT = new BitCode(9, "BIT_NAMESPACE_CONFLICT", Level.ERROR,
             BitTier.PBIT, "bit", "",
             "Two plugins reserved the same BIT code prefix; change one plugin's prefix or remove one of them.");
+    public static final BitCode COVERAGE_AGENT_UNAVAILABLE = new BitCode(10, "BIT_COVERAGE_AGENT_UNAVAILABLE", Level.WARNING,
+            BitTier.PBIT, "bit", "",
+            "Attach -javaagent:jacocoagent.jar at JVM startup or set coverage: surface in advanced/bit.yml.");
+    public static final BitCode CBIT_UNOBSERVED = new BitCode(11, "BIT_CBIT_UNOBSERVED", Level.INFO,
+            BitTier.CBIT, "bit", "",
+            "Exercise the subsystem or run /rtp test to populate continuous test observations.");
+    public static final BitCode BIT_COVERAGE_AGENT_UNAVAILABLE = COVERAGE_AGENT_UNAVAILABLE;
+    public static final BitCode BIT_CBIT_UNOBSERVED = CBIT_UNOBSERVED;
 
     private BitCodes() {}
 
     public static List<BitCode> all() {
         return List.of(PBIT_FAILED, PBIT_THROWN, HEALTH_FAILED, HEALTH_DEGRADED,
                 COMPONENT_TIMEOUT, COMPONENT_THROWN, COMPONENT_UNKNOWN, OPTIONAL_UNAVAILABLE,
-                NAMESPACE_CONFLICT);
+                NAMESPACE_CONFLICT, COVERAGE_AGENT_UNAVAILABLE, CBIT_UNOBSERVED);
     }
 }

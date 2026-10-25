@@ -136,7 +136,7 @@ com.example.myrtpaddon.MyRtpAddon
 ## 3. Register a custom shape in ~20 lines
 
 Register your shape from `onLoad()` (runs once, after `rtp-core` is up). A genuine custom
-shape changes the geometry *in code*, not just a re-configured clone. Below, `DiamondShape`
+shape changes the geometry *in code* (such as a rotated diamond, hexagon, octagon, or custom spiral), not just a re-configured clone. Below, `DiamondShape`
 subclasses `Square` and overrides `select()` to rotate each pick 45 degrees into a diamond -
 a bounded transform, no reroll ([ADR-001](adr/ADR-001-archimedean-spiral-1d-mapping.md)).
 

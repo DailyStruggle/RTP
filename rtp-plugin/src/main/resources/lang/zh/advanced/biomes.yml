@@ -3,13 +3,13 @@
 
 # Split out of safety.yml so the common safety knobs stay uncluttered.
 #
-# If true, the biomes list is a whitelist (only these biomes are
-# allowed). If false, it is a blacklist (these biomes are excluded).
+# 若为 true，下方生物群系列表为白名单（仅允许这些群系）。
+# 若为 false，则为黑名单（默认排除海洋、海里、水、河流与洞穴，防止掉进海里淹死）。
 # @type: boolean
 # @default: false
 生物群系白名单: false
 
-# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# 按生物群系白名单或黑名单处理的群系列表（默认排除海洋、水、河流、洞穴）。
 # @type: list<biome>
 # @source: biome
 生物群系:

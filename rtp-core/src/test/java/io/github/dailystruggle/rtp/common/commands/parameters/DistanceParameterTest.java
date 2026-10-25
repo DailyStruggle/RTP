@@ -202,56 +202,57 @@ public class DistanceParameterTest {
   @Test
   @DisplayName("All memory shapes replace dimension and coordinate parameters with DistanceParameter")
   void testShapesUseDistanceParameter() {
+    Class<?> expectedType = io.github.dailystruggle.rtp.common.selection.region.util.BaseDistanceParameter.class;
     // 1. Square
     Square square = new Square();
     Map<String, CommandParameter> sqParams = square.getParameters();
-    assertInstanceOf(DistanceParameter.class, sqParams.get("radius"));
-    assertInstanceOf(DistanceParameter.class, sqParams.get("centerradius"));
-    assertInstanceOf(DistanceParameter.class, sqParams.get("centerx"));
-    assertInstanceOf(DistanceParameter.class, sqParams.get("centerz"));
+    assertInstanceOf(expectedType, sqParams.get("radius"));
+    assertInstanceOf(expectedType, sqParams.get("centerradius"));
+    assertInstanceOf(expectedType, sqParams.get("centerx"));
+    assertInstanceOf(expectedType, sqParams.get("centerz"));
 
     // 2. Circle
     Circle circle = new Circle();
     Map<String, CommandParameter> cParams = circle.getParameters();
-    assertInstanceOf(DistanceParameter.class, cParams.get("radius"));
-    assertInstanceOf(DistanceParameter.class, cParams.get("centerradius"));
-    assertInstanceOf(DistanceParameter.class, cParams.get("centerx"));
-    assertInstanceOf(DistanceParameter.class, cParams.get("centerz"));
+    assertInstanceOf(expectedType, cParams.get("radius"));
+    assertInstanceOf(expectedType, cParams.get("centerradius"));
+    assertInstanceOf(expectedType, cParams.get("centerx"));
+    assertInstanceOf(expectedType, cParams.get("centerz"));
 
     // 3. Square_Normal
     Square_Normal sqNorm = new Square_Normal();
     Map<String, CommandParameter> sqnParams = sqNorm.getParameters();
-    assertInstanceOf(DistanceParameter.class, sqnParams.get("radius"));
-    assertInstanceOf(DistanceParameter.class, sqnParams.get("centerradius"));
-    assertInstanceOf(DistanceParameter.class, sqnParams.get("centerx"));
-    assertInstanceOf(DistanceParameter.class, sqnParams.get("centerz"));
+    assertInstanceOf(expectedType, sqnParams.get("radius"));
+    assertInstanceOf(expectedType, sqnParams.get("centerradius"));
+    assertInstanceOf(expectedType, sqnParams.get("centerx"));
+    assertInstanceOf(expectedType, sqnParams.get("centerz"));
 
     // 4. Circle_Normal
     Circle_Normal cNorm = new Circle_Normal();
     Map<String, CommandParameter> cnParams = cNorm.getParameters();
-    assertInstanceOf(DistanceParameter.class, cnParams.get("radius"));
-    assertInstanceOf(DistanceParameter.class, cnParams.get("centerradius"));
-    assertInstanceOf(DistanceParameter.class, cnParams.get("centerx"));
-    assertInstanceOf(DistanceParameter.class, cnParams.get("centerz"));
+    assertInstanceOf(expectedType, cnParams.get("radius"));
+    assertInstanceOf(expectedType, cnParams.get("centerradius"));
+    assertInstanceOf(expectedType, cnParams.get("centerx"));
+    assertInstanceOf(expectedType, cnParams.get("centerz"));
 
     // 5. Ellipse
     Ellipse ellipse = new Ellipse();
     Map<String, CommandParameter> elParams = ellipse.getParameters();
-    assertInstanceOf(DistanceParameter.class, elParams.get("radius"));
-    assertInstanceOf(DistanceParameter.class, elParams.get("radius2"));
-    assertInstanceOf(DistanceParameter.class, elParams.get("centerradius"));
-    assertInstanceOf(DistanceParameter.class, elParams.get("centerradius2"));
-    assertInstanceOf(DistanceParameter.class, elParams.get("centerx"));
-    assertInstanceOf(DistanceParameter.class, elParams.get("centerz"));
+    assertInstanceOf(expectedType, elParams.get("radius"));
+    assertInstanceOf(expectedType, elParams.get("radius2"));
+    assertInstanceOf(expectedType, elParams.get("centerradius"));
+    assertInstanceOf(expectedType, elParams.get("centerradius2"));
+    assertInstanceOf(expectedType, elParams.get("centerx"));
+    assertInstanceOf(expectedType, elParams.get("centerz"));
 
     // 6. Rectangle
     Rectangle rect = new Rectangle();
     Map<String, CommandParameter> rectParams = rect.getParameters();
-    assertInstanceOf(DistanceParameter.class, rectParams.get("width"));
-    assertInstanceOf(DistanceParameter.class, rectParams.get("height"));
-    assertInstanceOf(DistanceParameter.class, rectParams.get("length"));
-    assertInstanceOf(DistanceParameter.class, rectParams.get("centerx"));
-    assertInstanceOf(DistanceParameter.class, rectParams.get("centerz"));
+    assertInstanceOf(expectedType, rectParams.get("width"));
+    assertInstanceOf(expectedType, rectParams.get("height"));
+    assertInstanceOf(expectedType, rectParams.get("length"));
+    assertInstanceOf(expectedType, rectParams.get("centerx"));
+    assertInstanceOf(expectedType, rectParams.get("centerz"));
   }
 
   // ──────────────────────────────────────────────────────────────────────────

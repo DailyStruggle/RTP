@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabDiskIO;
@@ -101,6 +102,7 @@ public final class SetupHandlerSupport {
             renderer.render(callerId, model);
             return true;
         } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordSetupWizardDegraded("SetupHandlerSupport.renderCurrentStage", e);
             RTPRuntime.log(Level.WARNING, "Failed to render setup book menu for " + callerId + ": " + e.getMessage(), e);
             List<String> lines = SetupConsoleFormatter.formatStatus(session, null);
             for (String line : lines) {
@@ -121,6 +123,7 @@ public final class SetupHandlerSupport {
             var result = SetupRecipe.applyPipeline(baseline, recipe, worldNames);
             return result.perFileDiff();
         } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordSetupWizardDegraded("SetupHandlerSupport.computeDiffPreview", e);
             RTPRuntime.log(Level.WARNING, "Failed to compute setup diff preview: " + e.getMessage(), e);
             return Map.of();
         }
@@ -180,7 +183,8 @@ public final class SetupHandlerSupport {
                         worldNames.add(w.name());
                     }
                 }
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordSetupWizardDegraded("SetupHandlerSupport.collectWorldNames", e);
             }
         }
         return worldNames;

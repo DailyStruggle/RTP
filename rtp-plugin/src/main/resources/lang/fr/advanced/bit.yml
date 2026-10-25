@@ -12,6 +12,12 @@ strictConfig: false
 # Nombre minimal d'échantillons avant de classer une condition comme toujours ou jamais satisfaite.
 gateOutcomeSamples: 200
 
+# Balayage BIT de démarrage planifié exécuté de manière asynchrone au tick +2.
+startupSweep: pbit
+
+# Fournisseur de couverture diagnostique en direct injecté dans RtpBit.RUNNER.
+coverage: auto
+
 # Niveaux pour les codes BIT enregistrés ; ils prévalent sur strictActions.
 # Valeurs admises : ERROR, WARNING, INFO, DEBUG, TRACE et OFF. OFF masque le constat.
 # Les codes et niveaux inconnus sont ignorés et consignés.

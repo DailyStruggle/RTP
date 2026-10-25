@@ -3,8 +3,6 @@ package io.github.dailystruggle.rtp.api.schematic;
 import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
@@ -24,17 +22,13 @@ public final class WorldBlockSchematicPaster extends AbstractFileSchematicPaster
       return PasteResult.SKIPPED_UNSUPPORTED;
     }
 
-    List<BlockPlacement> placements = SchematicPlacementPlanner.plan(schematic, at, options);
+    List<BlockDelta> blocks =
+        SchematicPlacementPlanner.planDeltas(schematic, at.x(), at.y(), at.z(), options);
     String name = schematic.source() != null ? schematic.source().name() : "?";
-    if (placements.isEmpty()) {
+    if (blocks.isEmpty()) {
       logIfPossible(Level.WARNING, "[RTP] schematic '" + name + "' produced no placeable blocks "
           + "(empty or all-air plan); nothing was pasted (S-004).");
       return PasteResult.PASTE_ERROR;
-    }
-
-    List<BlockDelta> blocks = new ArrayList<>(placements.size());
-    for (BlockPlacement p : placements) {
-      blocks.add(new BlockDelta(p.x(), p.y(), p.z(), p.blockState()));
     }
 
     int placed;
@@ -51,7 +45,7 @@ public final class WorldBlockSchematicPaster extends AbstractFileSchematicPaster
     }
 
     logIfPossible(Level.FINE, "[RTP] schematic '" + name + "' native paste placed " + placed
-        + " of " + placements.size() + " planned block(s) at (" + at.x() + "," + at.y() + ","
+        + " of " + blocks.size() + " planned block(s) at (" + at.x() + "," + at.y() + ","
         + at.z() + ") world=" + world.name() + " anchor=" + options.anchor() + ".");
 
     // Second half of the symmetric primitive: restore block-entity payloads (container contents,
@@ -59,7 +53,7 @@ public final class WorldBlockSchematicPaster extends AbstractFileSchematicPaster
     // RTPWorld#restoreBlockEntities a no-op; the block states are still pasted. S-004: any throw
     // from the native restore is downgraded to an audited warning and never aborts the teleport.
     List<PlacedBlockEntity> blockEntities =
-        SchematicPlacementPlanner.planBlockEntities(schematic, at, options);
+        SchematicPlacementPlanner.planBlockEntities(schematic, at.x(), at.y(), at.z(), options);
     if (!blockEntities.isEmpty()) {
       try {
         int restored = world.restoreBlockEntities(blockEntities);
@@ -73,13 +67,5 @@ public final class WorldBlockSchematicPaster extends AbstractFileSchematicPaster
       }
     }
     return placed > 0 ? PasteResult.PASTED : PasteResult.PASTE_ERROR;
-  }
-
-  private static void logIfPossible(Level level, String message) {
-    io.github.dailystruggle.rtp.api.server.RTPServerAccessor accessor =
-        io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor;
-    if (accessor != null) {
-      accessor.log(level, message);
-    }
   }
 }

@@ -12,6 +12,12 @@ strictConfig: false
 # Minimalna liczba próbek przed uznaniem bramki za zawsze lub nigdy spełnioną.
 gateOutcomeSamples: 200
 
+# Zaplanowany startowy przegląd BIT wykonywany asynchronicznie w ticku +2.
+startupSweep: pbit
+
+# Dostawca pokrycia diagnostycznego na żywo wstrzykiwany do RtpBit.RUNNER.
+coverage: auto
+
 # Poziomy ważności zarejestrowanych kodów BIT; mają pierwszeństwo przed strictActions.
 # Dozwolone: ERROR, WARNING, INFO, DEBUG, TRACE i OFF. OFF ukrywa problem.
 # Nieznane kody i poziomy są ignorowane i zapisywane w dzienniku.

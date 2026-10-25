@@ -1,13 +1,8 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.factory.FactoryNames;
-import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.function.Consumer;
 import org.popcraft.chunky.Chunky;
 import org.popcraft.chunky.ChunkyProvider;
 import org.popcraft.chunky.shape.ShapeType;
@@ -17,8 +12,16 @@ public class ChunkyChecker {
   // stored object reference to skip plugin getting sometimes
   private static Chunky chunky = null;
 
+  /** Shape registration hook installed by the composition root (ADR-115). */
+  private static volatile Consumer<String> shapeRegistrar = s -> {};
+
   /** Default constructor for ChunkyChecker */
   private ChunkyChecker() {}
+
+  /** Installs the shape registration callback used by {@link #loadChunky()}. */
+  public static void setShapeRegistrar(Consumer<String> registrar) {
+    if (registrar != null) shapeRegistrar = registrar;
+  }
 
   /** getPAPI - function to if PAPI exists and scan the above object reference accordingly */
   private static void getChunky() {
@@ -30,7 +33,6 @@ public class ChunkyChecker {
   }
 
   /** Load Chunky integration and register its shapes */
-  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void loadChunky() {
     // if I don't have a correct object reference, try to get one.
     getChunky();
@@ -46,14 +48,7 @@ public class ChunkyChecker {
           }
 
           s = "chunky_" + s;
-
-          Factory<Shape<?>> factory =
-              (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
-          Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get(s);
-          if (shape == null) {
-            shape = new ChunkyRTPShape(s);
-            RTP.addShape(shape);
-          }
+          shapeRegistrar.accept(s);
         }
       }
     }

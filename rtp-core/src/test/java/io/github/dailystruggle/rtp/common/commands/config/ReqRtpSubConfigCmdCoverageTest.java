@@ -36,7 +36,7 @@ public class ReqRtpSubConfigCmdCoverageTest {
     private File pluginDir;
     private ConfigParser<PerformanceKeys> performanceConfig;
     private EnumMap<PerformanceKeys, Object> performanceData;
-    private io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase mockDb;
+    private io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -45,8 +45,8 @@ public class ReqRtpSubConfigCmdCoverageTest {
         RTPTestSetup.install(pluginDir);
         ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
 
-        mockDb = mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class.getDeclaredField("cachedLookup");
+        mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
+        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));
 

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
@@ -656,7 +657,8 @@ public final class EditorSessionManager {
         if (RTPRuntime.serverAccessor() != null) {
             try {
                 pluginVersion = RTPRuntime.serverAccessor().getServerVersion();
-            } catch (Exception ignored) {
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordEditorSessionDegraded("EditorSessionManager.getServerVersion", e);
             }
         }
 
@@ -1067,7 +1069,8 @@ public final class EditorSessionManager {
                 onlinePlayers = (players != null) ? players.size() : 0;
                 Object fam = RTPRuntime.serverAccessor().getPlatformFamily();
                 platform = (fam != null) ? fam.toString() : "JVM";
-            } catch (Exception ignored) {
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordEditorSessionDegraded("EditorSessionManager.telemetry.serverAccessor", e);
             }
         }
 
@@ -1100,7 +1103,8 @@ public final class EditorSessionManager {
                         slowPipelineCount = (int) rtpExt.slowPipelineCount;
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordEditorSessionDegraded("EditorSessionManager.telemetry.snapshot", e);
             }
 
             try {
@@ -1119,7 +1123,8 @@ public final class EditorSessionManager {
                     latSamples = perc.sampleCount;
                     latTotal = hist.totalRecorded();
                 }
-            } catch (Exception ignored) {
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordEditorSessionDegraded("EditorSessionManager.telemetry.histogram", e);
             }
         }
 
@@ -1521,7 +1526,8 @@ public final class EditorSessionManager {
                             RtpYamlConfig parsedYaml = RtpYamlConfig.load(target.toFile());
                             lookup.put(baseName, parsedYaml);
                             lookup.put(target.getFileName().toString(), parsedYaml);
-                        } catch (Exception e) {
+                        } catch (IOException | RuntimeException e) {
+                            CoreFallbackCbitCounters.recordEditorSessionDegraded("EditorSessionManager.refreshCachedLookup:" + relPath, e);
                             // The reload below re-reads the file; the cached copy stays stale until then
                             RTPRuntime.log(Level.WARNING, "[editor] cached copy of " + relPath + " not refreshed after apply: "
                                     + e.getMessage(), e);

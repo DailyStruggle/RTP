@@ -270,6 +270,13 @@ class CommandEffectTest {
             assertTrue(effects.isEmpty());
             assertEquals(1, warnings.size(), "should warn once for unknown effect type");
             assertTrue(warnings.get(0).contains("NON_EXISTENT_EFFECT"));
+
+            EffectFactory.buildEffects("rtp.effect.postteleport", nodes);
+            assertEquals(1, warnings.size(), "repeated unknown effect type remains deduplicated before clear");
+
+            EffectFactory.clearWarnedUnknownTypes();
+            EffectFactory.buildEffects("rtp.effect.postteleport", nodes);
+            assertEquals(2, warnings.size(), "clearWarnedUnknownTypes() re-enables warning on reload");
         } finally {
             io.github.dailystruggle.effectsapi.common.Effect.setDefaultWarn(null);
         }

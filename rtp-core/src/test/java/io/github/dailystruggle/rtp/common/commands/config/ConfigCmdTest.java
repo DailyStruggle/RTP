@@ -46,13 +46,13 @@ public class ConfigCmdTest {
         performanceConfig.language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         performanceConfig.reverse_language_mapping = new java.util.concurrent.ConcurrentHashMap<>();
         performanceConfig.name = "performance";
-        io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase mockDb = mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
+        io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
         try {
             java.lang.reflect.Field myClassField = io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("myClass");
             myClassField.setAccessible(true);
             myClassField.set(performanceConfig, io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
 
-            java.lang.reflect.Field cachedLookupField = io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class.getDeclaredField("cachedLookup");
+            java.lang.reflect.Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
             cachedLookupField.setAccessible(true);
             cachedLookupField.set(mockDb, new java.util.concurrent.atomic.AtomicReference<>(new java.util.concurrent.ConcurrentHashMap<>()));
 

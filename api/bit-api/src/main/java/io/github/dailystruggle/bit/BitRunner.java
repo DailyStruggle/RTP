@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -17,6 +18,38 @@ import java.util.concurrent.TimeoutException;
 public final class BitRunner {
     private final Map<String, BitComponent> components = new ConcurrentHashMap<>();
     private final Map<String, BitResult> lastResults = new ConcurrentHashMap<>();
+    private final Set<String> executedComponents = ConcurrentHashMap.newKeySet();
+    private volatile BitCoverageProvider coverageProvider;
+
+    public BitRunner() {
+        this(BitCoverageDiscovery.discover("auto"));
+    }
+
+    public BitRunner(BitCoverageProvider coverageProvider) {
+        this.coverageProvider = coverageProvider == null ? BitCoverageDiscovery.off() : coverageProvider;
+    }
+
+    public BitCoverageProvider coverageProvider() {
+        return coverageProvider;
+    }
+
+    public void setCoverageProvider(BitCoverageProvider coverageProvider) {
+        this.coverageProvider = coverageProvider == null ? BitCoverageDiscovery.off() : coverageProvider;
+    }
+
+    public BitCoverageSnapshot coverageSnapshot() {
+        return coverageProvider.snapshot(this);
+    }
+
+    /** Returns true if the component with the given id has been executed on this runner. */
+    public boolean hasExecuted(String id) {
+        return id != null && executedComponents.contains(normalize(id));
+    }
+
+    /** Returns an immutable snapshot of normalized component ids executed on this runner. */
+    public Set<String> executedComponentIds() {
+        return Set.copyOf(executedComponents);
+    }
 
     /** Registers a component unless its normalized id is already in use. */
     public boolean register(BitComponent component) {
@@ -30,6 +63,7 @@ public final class BitRunner {
         String key = normalize(id);
         boolean removed = components.remove(key) != null;
         lastResults.remove(key);
+        executedComponents.remove(key);
         return removed;
     }
 
@@ -66,7 +100,9 @@ public final class BitRunner {
         }
         long durationMillis = TimeUnit.NANOSECONDS.toMillis(Math.max(0L, System.nanoTime() - startedNanos));
         BitResult result = new BitResult(resultComponent, report, durationMillis, System.currentTimeMillis());
-        lastResults.put(component.id(), result);
+        String key = normalize(component.id());
+        lastResults.put(key, result);
+        executedComponents.add(key);
         return result;
     }
 

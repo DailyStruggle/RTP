@@ -1036,6 +1036,12 @@ class RidgeTest(unittest.TestCase):
         self.assertFalse(any(f["feature"] == "quit_lt250" for f in bf.flag_features(target, leaky)))
         self.assertFalse(bf.flag_features(target, target))
 
+    def test_flag_ignores_negative_slopes(self):
+        # A shrinking count (negative slope, e.g. ring buffer / cache drain) is not a leak flag.
+        shrinking = bf.fit_counts(self.planted(-2.0), ["threads_live"])
+        clean = bf.fit_counts(self.planted(0.0), ["threads_live"])
+        self.assertEqual(bf.flag_features(shrinking, clean), [])
+
 
 class ScoreTest(unittest.TestCase):
     def test_net_leak_subtracts_control_and_is_per_minute(self):
@@ -1607,6 +1613,26 @@ class LadderLoopTest(unittest.TestCase):
         self.assertIn("6 episodes", rep)
         self.assertIn("=== rtp: NOT RUN", rep)
         self.assertIn("leak rate per generation", rep)
+
+    def test_run_rung_does_not_inflate_heap_net_from_negative_control_slope(self):
+        # Negative control-heap feature slopes (noisy GC timing on 2..8 bots) must not
+        # extrapolate to -1,000+ MB on 48-bot ladder rungs and fabricate a huge heap_net_mb.
+        self.tr.control_heap = {
+            bf.HEAP: {
+                "intercept": 0.0,
+                "noise": 20.0,
+                "coef": {k: (-40.0 if k == "quit_no_rtp" else 0.0) for k in bf.FEATURES},
+            }
+        }
+        self.swarm.leak_quit = False
+        c = self.cand("clean_quit", [{"a": "quit"}])
+        res = self.tr.run_rung(c, 2, 8, 3, True)
+        self.assertLessEqual(res["confirm"]["heap_net_mb"], 10.0)
+        self.assertFalse(res["confirm"]["heap_ok"])
+
+    def test_default_shrink_matches_ladder_candidates(self):
+        a = bf.build_parser().parse_args(["--server-dir", self.dir])
+        self.assertEqual(a.shrink, a.ladder_candidates)
 
 
 def _poisson(rng, lam):
@@ -4130,7 +4156,15 @@ class JarIndexAndLeakScreenTest(unittest.TestCase):
 
             # 6 leak episodes out of 12 is only 1-in-924 by chance, above the Bonferroni level for this many
             # (class, feature) cells: the screen must report insufficient evidence, not a leak.
-            small = bfs.screen_server_leaks(records=records[:12], baseline_records=baseline_records)
+            small_records = [dict(r, deltas=dict(r["deltas"])) for r in records[:12]]
+            for ep, r in enumerate(small_records):
+                leak = ep % 2 == 0
+                r["node"] = "queue" if leak else "help"
+                r["follow_up"] = "quit_lt1s" if leak else "repeat"
+                r["departures"] = 1 if leak else 0
+                r["deltas"]["cls:com.example.queue.RetainedSession"] = 200.0 if leak else 0.0
+            small = bfs.screen_server_leaks(records=small_records, baseline_records=baseline_records)
+            self.assertGreaterEqual(small["features_tested"], 4)
             self.assertEqual(small["correlations"], [])
 
             # Negative assertions:
@@ -5399,6 +5433,1603 @@ setTimeout(() => process.exit(1), 15000);
                 srv_proc.stdout.close()
             if srv_proc.stderr:
                 srv_proc.stderr.close()
+
+
+class BoundaryLadderAndSchemaGenTest(unittest.TestCase):
+    """Unit tests for Brigadier numeric ladder and schema-driven argument sampling (ADR-125 2.3)."""
+
+    def _build_sample_tree(self) -> bfs.CommandTree:
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1, 3, 5, 7, 9, 11, 13, 14]},
+                {"index": 1, "kind": "literal", "name": "scan", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "radius",
+                    "parser": "brigadier:integer",
+                    "properties": {"min": 1, "max": 2147483647},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 3, "kind": "literal", "name": "ratio", "executable": False, "children": [4]},
+                {
+                    "index": 4,
+                    "kind": "argument",
+                    "name": "factor",
+                    "parser": "brigadier:double",
+                    "properties": {"min": -2.5, "max": 100.0},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 5, "kind": "literal", "name": "toggle", "executable": False, "children": [6]},
+                {
+                    "index": 6,
+                    "kind": "argument",
+                    "name": "enabled",
+                    "parser": "brigadier:bool",
+                    "properties": {},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 7, "kind": "literal", "name": "greet", "executable": False, "children": [8]},
+                {
+                    "index": 8,
+                    "kind": "argument",
+                    "name": "target",
+                    "parser": "minecraft:entity",
+                    "properties": {"amount": "single"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 9, "kind": "literal", "name": "spot", "executable": False, "children": [10]},
+                {
+                    "index": 10,
+                    "kind": "argument",
+                    "name": "pos",
+                    "parser": "minecraft:block_pos",
+                    "properties": {},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 11, "kind": "literal", "name": "rtp", "executable": True, "children": [12]},
+                {
+                    "index": 12,
+                    "kind": "argument",
+                    "name": "world",
+                    "parser": "brigadier:string",
+                    "properties": {"type": "word"},
+                    "executable": True,
+                    "children": [],
+                },
+                {"index": 13, "kind": "literal", "name": "stop", "executable": True, "children": []},
+                {"index": 14, "kind": "literal", "name": "kill", "executable": True, "children": [15]},
+                {
+                    "index": 15,
+                    "kind": "argument",
+                    "name": "victim",
+                    "parser": "minecraft:entity",
+                    "properties": {},
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        return bfs.merge_command_trees({"default": pkt})
+
+    def test_numeric_ladder_boundaries_and_clamping(self):
+        ladder = bfs.numeric_ladder(1, 2147483647, is_float=False, cap=4096)
+        self.assertEqual(ladder, [1, 16, 64, 256, 1024, 4096, 2147483647])
+
+        signed_ladder = bfs.numeric_ladder(-100, 100, is_float=False, cap=4096)
+        self.assertEqual(signed_ladder, [-100, -1, 0, 1, 16, 64, 100])
+
+        float_ladder = bfs.numeric_ladder(-2.5, 100.0, is_float=True, cap=50.0)
+        self.assertEqual(float_ladder, [-2.5, -1.0, 0.0, 1.0, 16.0, 50.0, 64.0, 100.0])
+
+    def test_gen_args_samples_parsers_completions_and_enforces_denylist(self):
+        tree = self._build_sample_tree()
+        rng = random.Random(42)
+
+        # Integer argument samples both ladder points and uniform values within bounds
+        scan_vals = set()
+        for _ in range(40):
+            cmd = bfs.gen_args(tree.nodes["scan <radius>"], tree, rng)
+            self.assertTrue(cmd.startswith("scan "))
+            val = int(cmd.split()[1])
+            self.assertGreaterEqual(val, 1)
+            self.assertLessEqual(val, 2147483647)
+            scan_vals.add(val)
+        self.assertTrue(scan_vals & {1, 16, 64, 256, 1024, 4096}, "ladder anchors must be sampled")
+
+        # Float/double argument stays within bounds
+        for _ in range(10):
+            f_cmd = bfs.gen_args(tree.nodes["ratio <factor>"], tree, rng)
+            f_val = float(f_cmd.split()[1])
+            self.assertGreaterEqual(f_val, -2.5)
+            self.assertLessEqual(f_val, 100.0)
+
+        # Boolean argument
+        bool_cmds = {bfs.gen_args(tree.nodes["toggle <enabled>"], tree, rng) for _ in range(16)}
+        self.assertEqual(bool_cmds, {"toggle true", "toggle false"})
+
+        # Entity selector resolves to {self} or peer bot name, never @a/@e
+        entity_cmds = {
+            bfs.gen_args(tree.nodes["greet <target>"], tree, rng, bot_names=["fz_0", "fz_1"])
+            for _ in range(20)
+        }
+        self.assertTrue(entity_cmds <= {"greet {self}", "greet fz_0", "greet fz_1"})
+
+        # Block position produces 3 relative ~ coordinates
+        pos_cmd = bfs.gen_args(tree.nodes["spot <pos>"], tree, rng)
+        parts = pos_cmd.split()
+        self.assertEqual(parts[0], "spot")
+        self.assertEqual(len(parts), 4)
+        self.assertTrue(all(p.startswith("~") for p in parts[1:]))
+
+        # Cached completions override generic string sampling
+        comp_cmd = bfs.gen_args(
+            tree.nodes["rtp <world>"],
+            tree,
+            rng,
+            completions={"rtp <world>": ["world_nether", "world_the_end"]},
+        )
+        self.assertIn(comp_cmd, ("rtp world_nether", "rtp world_the_end"))
+
+        # Bare `kill` is allowed, but `stop` and `kill <victim>` (matching `kill <entity>`) are rejected
+        self.assertEqual(bfs.gen_args(tree.nodes["kill"], tree, rng), "kill")
+        with self.assertRaisesRegex(ValueError, "denied"):
+            bfs.gen_args(tree.nodes["stop"], tree, rng)
+        with self.assertRaisesRegex(ValueError, "denied"):
+            bfs.gen_args(tree.nodes["kill <victim>"], tree, rng)
+
+
+class TierStratifiedBanditTest(unittest.TestCase):
+    """Unit tests for tier-stratified UCB1 scheduling and reward updates in NodeBandit (ADR-125 2.3)."""
+
+    def _build_two_tier_tree(self, n_default: int = 5, n_op_only: int = 50) -> bfs.CommandTree:
+        default_nodes = [{"index": 0, "kind": "root", "name": "", "children": list(range(1, n_default + 1))}]
+        for i in range(1, n_default + 1):
+            default_nodes.append(
+                {"index": i, "kind": "literal", "name": f"player_cmd_{i}", "executable": True, "children": []}
+            )
+
+        op_children = list(range(1, n_default + n_op_only + 1))
+        op_nodes = [{"index": 0, "kind": "root", "name": "", "children": op_children}]
+        for i in range(1, n_default + 1):
+            op_nodes.append(
+                {"index": i, "kind": "literal", "name": f"player_cmd_{i}", "executable": True, "children": []}
+            )
+        for j in range(1, n_op_only + 1):
+            idx = n_default + j
+            op_nodes.append(
+                {"index": idx, "kind": "literal", "name": f"admin_cmd_{j}", "executable": True, "children": []}
+            )
+
+        return bfs.merge_command_trees(
+            {
+                "default": {"rootIndex": 0, "nodes": default_nodes},
+                "op": {"rootIndex": 0, "nodes": op_nodes},
+            }
+        )
+
+    def test_tier_stratification_preserves_default_share_against_large_op_tree(self):
+        tree = self._build_two_tier_tree(n_default=5, n_op_only=50)
+
+        # With both tiers active and default_budget_share=0.75, the 5 default nodes receive ~75% of pulls
+        # despite 50 op-only nodes being present.
+        bandit_both = bfs.NodeBandit(
+            tree,
+            tiers=("default", "op"),
+            default_budget_share=0.75,
+            rng=random.Random(7),
+        )
+        default_pulls = 0
+        total_pulls = 400
+        for _ in range(total_pulls):
+            node_id, shape = bandit_both.select_arm()
+            bandit_both.update(node_id, shape, reward=0.0)
+            if tree.nodes[node_id].min_tier == "default":
+                default_pulls += 1
+
+        share = default_pulls / total_pulls
+        self.assertGreaterEqual(share, 0.68)
+        self.assertLessEqual(share, 0.82)
+
+        # With tiers=("default",), 100% of pulls go to default-visible nodes
+        bandit_default = bfs.NodeBandit(
+            tree,
+            tiers=("default",),
+            default_budget_share=0.75,
+            rng=random.Random(7),
+        )
+        self.assertEqual(len(bandit_default.op_arms), 0)
+        for _ in range(50):
+            node_id, _ = bandit_default.select_arm()
+            self.assertEqual(tree.nodes[node_id].min_tier, "default")
+
+    def test_ucb1_concentrates_pulls_on_high_reward_arm(self):
+        tree = self._build_two_tier_tree(n_default=4, n_op_only=0)
+        bandit = bfs.NodeBandit(tree, tiers=("default",), rng=random.Random(11))
+        target_arm = ("player_cmd_2", "quit_lt1s")
+
+        for _ in range(120):
+            node_id, shape = bandit.select_arm()
+            if (node_id, shape) == target_arm:
+                bandit.update(node_id, shape, novelty=1.0, class_growth=200.0)
+            else:
+                bandit.update(node_id, shape, reward=0.0)
+
+        target_pulls = bandit.arms[target_arm].pulls
+        other_max = max(st.pulls for k, st in bandit.arms.items() if k != target_arm)
+        self.assertGreater(target_pulls, other_max * 3)
+
+
+class NumericBisectAndJarDdminTest(unittest.TestCase):
+    """Unit tests for callback-driven numeric threshold bisection and dependency-closed jar ddmin (ADR-125 2.4)."""
+
+    def _build_scan_tree(self, extra_deny: list[str] | None = None) -> bfs.CommandTree:
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "scan", "executable": False, "children": [2]},
+                {
+                    "index": 2,
+                    "kind": "argument",
+                    "name": "radius",
+                    "parser": "brigadier:integer",
+                    "properties": {"min": 1, "max": 256},
+                    "executable": True,
+                    "children": [],
+                },
+            ],
+        }
+        return bfs.merge_command_trees({"default": pkt}, denylist=bfs.Denylist(extra_deny))
+
+    def test_bisect_numeric_arg_finds_exact_threshold_and_respects_denylist(self):
+        tree = self._build_scan_tree(extra_deny=["scan 65"])
+        node = tree.nodes["scan <radius>"]
+        program = [{"a": "cmd", "cmd": "scan 256", "node": "scan <radius>"}, {"a": "wait", "ms": 200}]
+
+        probed_cmds: list[str] = []
+
+        def predicate(cand_prog: list[dict]) -> bool:
+            cmd_str = cand_prog[0]["cmd"]
+            probed_cmds.append(cmd_str)
+            radius = int(cmd_str.split()[1])
+            return radius >= 49
+
+        minimized_prog, bound = bfs.bisect_numeric_arg(
+            program,
+            node,
+            predicate,
+            denylist=bfs.Denylist(["scan 65"]),
+            tree=tree,
+        )
+        self.assertEqual(minimized_prog[0]["cmd"], "scan 49")
+        self.assertEqual(bound, "radius >= 49")
+        self.assertNotIn("scan 65", probed_cmds, "denied command must never be passed to predicate_fn")
+        self.assertLessEqual(len(probed_cmds), 12)
+
+        # Also works when program is structured as a bot list [{"name": ..., "program": [...]}]
+        bot_prog = [{"name": "fz_0", "program": [{"a": "cmd", "cmd": "scan 256"}]}]
+        min_bots, bot_bound = bfs.bisect_numeric_arg(
+            bot_prog,
+            node,
+            lambda bots: int(bots[0]["program"][0]["cmd"].split()[1]) >= 49,
+            tree=tree,
+        )
+        self.assertEqual(min_bots[0]["program"][0]["cmd"], "scan 49")
+        self.assertEqual(bot_bound, "radius >= 49")
+
+    def test_pre_ddmin_probes_guard_non_reproducible_and_prerequisites_only_server_findings(self):
+        cands = ["PluginA.jar", "PluginB.jar", "PluginC.jar"]
+
+        # Case 1: Full set fails to reach finding_k -> not_reproducible_after_restart, no second probe
+        calls_non_repro: list[list[str]] = []
+
+        def probe_non_repro(active: list[str]) -> tuple[int, bool]:
+            calls_non_repro.append(list(active))
+            return (1, True)
+
+        res_non_repro = bfs.ddmin_jars(cands, None, probe_non_repro, finding_k=3, finding_n=3)
+        self.assertEqual(res_non_repro["status"], "not_reproducible_after_restart")
+        self.assertEqual(res_non_repro["verdict"], "INCONCLUSIVE")
+        self.assertEqual(res_non_repro["blamed_jars"], [])
+        self.assertEqual(len(calls_non_repro), 1)
+
+        # Case 2: Prerequisites only ([]) reproduces -> labelled 'server', no jar blamed, no ddmin split
+        calls_server: list[list[str]] = []
+
+        def probe_server(active: list[str]) -> tuple[int, bool]:
+            calls_server.append(list(active))
+            return (3, True)
+
+        res_server = bfs.ddmin_jars(
+            cands, None, probe_server, finding_k=3, finding_n=3, first_suspect="PluginA.jar"
+        )
+        self.assertEqual(res_server["status"], "server")
+        self.assertEqual(res_server["attribution_status"], "server")
+        self.assertEqual(res_server["blamed_jars"], [])
+        self.assertEqual(res_server["first_suspect"], "server")
+        self.assertEqual(len(calls_server), 2)
+
+    def test_ddmin_jars_single_culprit_two_jar_interaction_dependency_closure_and_budget_cap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plugins_dir = os.path.join(tmp, "plugins")
+            os.makedirs(plugins_dir, exist_ok=True)
+
+            # Create 8 candidate jars; PluginB depends on PluginA
+            jar_specs = [
+                ("PluginA.jar", "PluginA", []),
+                ("PluginB.jar", "PluginB", ["PluginA"]),
+                ("PluginC.jar", "PluginC", []),
+                ("PluginD.jar", "PluginD", []),
+                ("PluginE.jar", "PluginE", []),
+                ("PluginF.jar", "PluginF", []),
+                ("PluginG.jar", "PluginG", []),
+                ("PluginH.jar", "PluginH", []),
+            ]
+            for j_name, p_id, deps in jar_specs:
+                j_path = os.path.join(plugins_dir, j_name)
+                with zipfile.ZipFile(j_path, "w") as zf:
+                    dep_line = f"depend: [{', '.join(deps)}]\n" if deps else ""
+                    zf.writestr("plugin.yml", f"name: {p_id}\nversion: 1.0\n{dep_line}")
+                    zf.writestr(f"com/example/{p_id.lower()}/Main.class", b"\xca\xfe\xba\xbe")
+
+            jar_index = bfs.JarIndex(plugins_dir)
+            cands = [j[0] for j in jar_specs]
+
+            # 1. Single culprit (PluginB.jar) that requires PluginA.jar to load
+            probes_single: list[list[str]] = []
+
+            def probe_b_needs_a(active: list[str]) -> tuple[int, bool]:
+                probes_single.append(list(active))
+                if "PluginB.jar" in active and "PluginA.jar" not in active:
+                    return (3, False)  # Unloaded dependency -> must not count as reproducing
+                if "PluginB.jar" in active and "PluginA.jar" in active:
+                    return (3, True)
+                return (0, True)
+
+            res_single = bfs.ddmin_jars(
+                cands, jar_index, probe_b_needs_a, finding_k=3, finding_n=3, first_suspect="PluginB.jar"
+            )
+            self.assertEqual(res_single["attribution_status"], "confirmed")
+            self.assertEqual(res_single["verdict"], "FAIL")
+            self.assertEqual(res_single["blamed_jars"], ["PluginB.jar"])
+            self.assertEqual(res_single["dependency_closed_jars"], ["PluginA.jar", "PluginB.jar"])
+            self.assertLessEqual(res_single["probes_run"], 12)
+
+            # Verify that an explicit unloaded subset (all_loaded=False) is treated as non-reproducing
+            res_unloaded = bfs.ddmin_jars(
+                ["PluginC.jar", "PluginD.jar"],
+                jar_index,
+                lambda active: (3, len(active) == 2),
+                finding_k=3,
+                finding_n=3,
+            )
+            self.assertEqual(res_unloaded["blamed_jars"], ["PluginC.jar", "PluginD.jar"])
+
+            # 2. Two-jar interaction (PluginD.jar + PluginG.jar both required)
+            def probe_two_jar(active: list[str]) -> tuple[int, bool]:
+                return (3, True) if ("PluginD.jar" in active and "PluginG.jar" in active) else (0, True)
+
+            res_pair = bfs.ddmin_jars(cands, jar_index, probe_two_jar, finding_k=3, finding_n=3)
+            self.assertEqual(res_pair["attribution_status"], "confirmed")
+            self.assertEqual(res_pair["blamed_jars"], ["PluginD.jar", "PluginG.jar"])
+
+            # 3. Budget exhaustion (max_probes=3) falls back to INCONCLUSIVE / unconfirmed with first_suspect
+            res_budget = bfs.ddmin_jars(
+                cands,
+                jar_index,
+                probe_two_jar,
+                finding_k=3,
+                finding_n=3,
+                max_probes=3,
+                first_suspect="PluginD.jar",
+            )
+            self.assertEqual(res_budget["attribution_status"], "unconfirmed")
+            self.assertEqual(res_budget["verdict"], "INCONCLUSIVE")
+            self.assertEqual(res_budget["blamed_jars"], [])
+            self.assertEqual(res_budget["first_suspect"], "PluginD.jar")
+            self.assertTrue(res_budget["budget_exhausted"])
+
+
+class OfflineTraceEvaluationTest(unittest.TestCase):
+    """End-to-end unit tests for offline trace evaluation and structured verdict formatting (ADR-125 2.4)."""
+
+    def test_evaluate_server_trace_screens_leak_and_stall_bisects_and_isolates_jars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plugins_dir = os.path.join(tmp, "plugins")
+            os.makedirs(plugins_dir, exist_ok=True)
+
+            # Create prerequisite ViaVersion + candidate jars CoreLib, QueuePlugin (depends on CoreLib), ScanPlugin
+            jars_spec = [
+                ("ViaVersion-5.0.0.jar", "ViaVersion", [], ["com/viaversion/Via.class"]),
+                ("CoreLib.jar", "CoreLib", [], ["com/example/core/CoreService.class"]),
+                (
+                    "QueuePlugin.jar",
+                    "QueuePlugin",
+                    ["CoreLib"],
+                    ["com/example/queue/RetainedSession.class"],
+                ),
+                (
+                    "ScanPlugin.jar",
+                    "ScanPlugin",
+                    [],
+                    ["com/example/scan/RadiusScanner.class"],
+                ),
+            ]
+            for j_name, p_id, deps, classes in jars_spec:
+                with zipfile.ZipFile(os.path.join(plugins_dir, j_name), "w") as zf:
+                    dep_str = f"depend: [{', '.join(deps)}]\n" if deps else ""
+                    zf.writestr("plugin.yml", f"name: {p_id}\nversion: 1.0\n{dep_str}")
+                    for cls_entry in classes:
+                        zf.writestr(cls_entry, b"\xca\xfe\xba\xbe")
+
+            jar_index = bfs.JarIndex(plugins_dir)
+
+            # Build merged command tree with folded aliases (`queue` <-> `ff:queue`, `scan` <-> `ff:scan`)
+            default_pkt = {
+                "rootIndex": 0,
+                "nodes": [
+                    {"index": 0, "kind": "root", "name": "", "children": [1, 2, 3]},
+                    {"index": 1, "kind": "literal", "name": "queue", "executable": True, "children": []},
+                    {"index": 2, "kind": "literal", "name": "ff:queue", "executable": True, "children": []},
+                    {"index": 3, "kind": "literal", "name": "help", "executable": True, "children": []},
+                ],
+            }
+            op_pkt = {
+                "rootIndex": 0,
+                "nodes": [
+                    {"index": 0, "kind": "root", "name": "", "children": [1, 2, 3, 4, 6]},
+                    {"index": 1, "kind": "literal", "name": "queue", "executable": True, "children": []},
+                    {"index": 2, "kind": "literal", "name": "ff:queue", "executable": True, "children": []},
+                    {"index": 3, "kind": "literal", "name": "help", "executable": True, "children": []},
+                    {"index": 4, "kind": "literal", "name": "scan", "executable": False, "children": [5]},
+                    {
+                        "index": 5,
+                        "kind": "argument",
+                        "name": "radius",
+                        "parser": "brigadier:integer",
+                        "properties": {"min": 1, "max": 256},
+                        "executable": True,
+                        "children": [],
+                    },
+                    {"index": 6, "kind": "literal", "name": "ff:scan", "executable": False, "children": [7]},
+                    {
+                        "index": 7,
+                        "kind": "argument",
+                        "name": "radius",
+                        "parser": "brigadier:integer",
+                        "properties": {"min": 1, "max": 256},
+                        "executable": True,
+                        "children": [],
+                    },
+                ],
+            }
+            tree = bfs.merge_command_trees({"default": default_pkt, "op": op_pkt})
+
+            baseline_records = [
+                {
+                    "ep": ep,
+                    "node": "help",
+                    "follow_up": "repeat",
+                    "departures": 0,
+                    "deltas": {"cls:net.minecraft.server.ChunkHolder": 5.0},
+                    "tick_gaps": [{"ms": 1000, "at": 2000 + ep * 1000}],
+                }
+                for ep in range(12)
+            ]
+
+            records = []
+            for ep in range(36):
+                is_leak = ep % 3 == 0
+                is_stall = ep == 5
+                node_name = "queue" if is_leak else ("scan <radius>" if is_stall else "help")
+                follow_up = "quit_lt1s" if is_leak else "repeat"
+                rec = {
+                    "ep": ep,
+                    "node": node_name,
+                    "follow_up": follow_up,
+                    "departures": 1 if is_leak else 0,
+                    "deltas": {
+                        "cls:com.example.queue.RetainedSession": 180.0 if is_leak else 0.0,
+                        "cls:net.minecraft.server.ChunkHolder": 5.0,
+                    },
+                    "tick_gaps": [{"ms": 4200 if is_stall else 1000, "at": 50000 + ep * 5000}],
+                    "thread_dumps": (
+                        [
+                            '"Server thread" #1 prio=5 os_prio=0 tid=0x01 nid=0x01 runnable\n'
+                            "   java.lang.Thread.State: RUNNABLE\n"
+                            "\tat com.example.scan.RadiusScanner.busyLoop(RadiusScanner.java:42)\n"
+                            "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n"
+                        ]
+                        if is_stall
+                        else []
+                    ),
+                    "bots": [
+                        {
+                            "name": "fz_0",
+                            "program": [
+                                {
+                                    "a": "cmd",
+                                    "cmd": "queue" if is_leak else ("scan 256" if is_stall else "help"),
+                                    "node": node_name,
+                                },
+                                {"a": "wait", "ms": 300},
+                            ],
+                        }
+                    ],
+                }
+                records.append(rec)
+
+            def bisect_cb(cand_prog: list[dict], finding_ctx: dict) -> bool:
+                if finding_ctx["oracle"] != "stall":
+                    return True
+                cmd_str = cand_prog[0]["program"][0]["cmd"]
+                toks = cmd_str.split()
+                return len(toks) >= 2 and int(toks[1]) >= 49
+
+            def jar_probe_cb(active_jars: list[str], finding_ctx: dict) -> tuple[int, bool]:
+                if finding_ctx["oracle"] == "leak":
+                    if "QueuePlugin.jar" in active_jars and "CoreLib.jar" not in active_jars:
+                        return (3, False)
+                    return (3, True) if ("QueuePlugin.jar" in active_jars and "CoreLib.jar" in active_jars) else (0, True)
+                if finding_ctx["oracle"] == "stall":
+                    return (3, True) if "ScanPlugin.jar" in active_jars else (0, True)
+                return (0, True)
+
+            verdict = bfs.evaluate_server_trace(
+                records,
+                baseline_records,
+                tree=tree,
+                jar_index=jar_index,
+                profile="paper",
+                bisect_predicate_fn=bisect_cb,
+                probe_fn=jar_probe_cb,
+                server_dir=tmp,
+            )
+
+            self.assertEqual(verdict["verdict"], "FAIL")
+            self.assertEqual(verdict["confirmed_culprits"], ["QueuePlugin.jar", "ScanPlugin.jar"])
+            self.assertEqual(len(verdict["findings"]), 2)
+
+            # Findings are ranked with default-tier (player-reachable) first, op-tier second
+            f_leak, f_stall = verdict["findings"][0], verdict["findings"][1]
+            self.assertEqual(f_leak["oracle"], "leak")
+            self.assertEqual(f_leak["operator_mitigation"]["canonical_node"], "queue")
+            self.assertIn("ff:queue", f_leak["operator_mitigation"]["aliases"])
+            self.assertEqual(f_leak["operator_mitigation"]["min_tier"], "default")
+            self.assertEqual(f_leak["author_reproducer"]["blamed_jars"], ["QueuePlugin.jar"])
+
+            self.assertEqual(f_stall["oracle"], "stall")
+            self.assertEqual(f_stall["operator_mitigation"]["canonical_node"], "scan")
+            self.assertIn("ff:scan", f_stall["operator_mitigation"]["aliases"])
+            self.assertEqual(f_stall["operator_mitigation"]["min_tier"], "op")
+            self.assertEqual(f_stall["operator_mitigation"]["bisected_bound"], "radius >= 49")
+            self.assertEqual(f_stall["author_reproducer"]["blamed_jars"], ["ScanPlugin.jar"])
+            self.assertEqual(
+                f_stall["author_reproducer"]["shrunk_program"][0]["program"][0]["cmd"],
+                "scan 49",
+            )
+            self.assertIn("radius >= 49", verdict["report_text"])
+            self.assertIn("QueuePlugin.jar", verdict["report_text"])
+            self.assertIn("ScanPlugin.jar", verdict["report_text"])
+
+    def test_evaluate_server_trace_prerequisites_only_and_shrink_callback(self):
+        records = [
+            {
+                "ep": 0,
+                "node": "scan <radius>",
+                "follow_up": "repeat",
+                "tick_gaps": [{"ms": 4000, "at": 10000}],
+                "bots": [
+                    {
+                        "name": "fz_0",
+                        "program": [
+                            {"a": "wait", "ms": 100},
+                            {"a": "cmd", "cmd": "scan 128", "node": "scan <radius>"},
+                            {"a": "wait", "ms": 100},
+                        ],
+                    }
+                ],
+            }
+        ]
+        verdict = bfs.evaluate_server_trace(
+            records,
+            [],
+            shrink_probe_fn=lambda bots: (
+                3 if any(a.get("a") == "cmd" for b in bots for a in b.get("program", [])) else 0,
+                3,
+                any(a.get("a") == "cmd" for b in bots for a in b.get("program", [])),
+            ),
+            probe_fn=lambda active: (3, True),
+        )
+        self.assertEqual(verdict["verdict"], "PASS")
+        self.assertEqual(verdict["confirmed_culprits"], [])
+        self.assertEqual(len(verdict["findings"]), 1)
+        f0 = verdict["findings"][0]
+        self.assertEqual(f0["attribution_status"], "server")
+        self.assertEqual(f0["blamed_jars"], [])
+        self.assertEqual(len(f0["author_reproducer"]["shrunk_program"][0]["program"]), 1)
+
+
+class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
+    """Tests for player-taxonomy bot shapes, anti-abuse gates, --ssh JcmdObserver, and live active ServerRun."""
+
+    def test_player_taxonomy_shapes_build_valid_programs(self):
+        pkt = {
+            "rootIndex": 0,
+            "nodes": [
+                {"index": 0, "kind": "root", "name": "", "children": [1]},
+                {"index": 1, "kind": "literal", "name": "rtp", "executable": True, "children": []},
+            ],
+        }
+        tree = bfs.merge_command_trees({"default": pkt})
+        rng = random.Random(19)
+
+        for shape in ("homesteader_reroll", "explorer_wander", "coop_group", "window_click"):
+            self.assertIn(shape, bfs.SCENARIO_SHAPES)
+            bots = bfs.build_arm_program("rtp", shape, tree, rng, bot_names=["fz_0", "fz_1"])
+            self.assertTrue(len(bots) >= 1)
+            actions = [a["a"] for b in bots for a in b["program"]]
+            self.assertIn("cmd", actions)
+            if shape in ("homesteader_reroll", "explorer_wander", "coop_group"):
+                self.assertIn("move", actions)
+            if shape == "coop_group":
+                self.assertEqual(len(bots), 2)
+            if shape == "window_click":
+                self.assertIn("click", actions)
+                self.assertIn("close_window", actions)
+
+    def test_anti_abuse_host_and_ownership_validation_in_active_mode(self):
+        # Allowed bench hosts: loopback, RFC1918 LAN, Tailscale CGNAT, leaf26, bamboo, *.local / *.lan
+        for allowed in (
+            "127.0.0.1",
+            "localhost",
+            "::1",
+            "10.0.0.5",
+            "192.168.1.50",
+            "172.16.4.2",
+            "100.111.32.47",
+            "leaf26",
+            "bamboo",
+            "bamboo.local",
+            "leaf26.lan",
+        ):
+            ok, reason = bfs.is_allowed_bench_host(allowed)
+            self.assertTrue(ok, f"expected {allowed!r} to be allowed, got: {reason}")
+
+        # Rejected public WAN IPs and external domains
+        for public_target in ("8.8.8.8", "1.1.1.1", "203.0.113.10", "play.example.com", "mc.hypixel.net"):
+            ok, reason = bfs.is_allowed_bench_host(public_target)
+            self.assertFalse(ok, f"expected {public_target!r} to be rejected")
+            self.assertIn("refusing public", reason)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "plugins"), exist_ok=True)
+            with open(os.path.join(tmp, "bench-loop.sh"), "w", encoding="utf-8") as fh:
+                fh.write("#!/bin/sh\n")
+            # Missing rcon.password must fail proof-of-ownership gate in --active mode
+            with open(os.path.join(tmp, "server.properties"), "w", encoding="utf-8") as fh:
+                fh.write("server-port=25565\nonline-mode=false\n")
+            parser = bf.build_parser()
+            argv = ["--mode", "server", "--active", "--profile", "paper", "--server-dir", tmp, "--host", "bamboo"]
+            args = parser.parse_args(argv)
+            with self.assertRaisesRegex(SystemExit, "2"):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    bfs.validate_server_mode_args(args, parser=parser, argv=argv)
+
+            # With rcon.password present, bamboo + --tiers default,op + --episodes 8 is accepted
+            with open(os.path.join(tmp, "server.properties"), "w", encoding="utf-8") as fh:
+                fh.write("server-port=25565\nrcon.port=25575\nrcon.password=secret\nonline-mode=false\n")
+            argv_ok = [
+                "--mode", "server", "--active", "--profile", "paper",
+                "--server-dir", tmp, "--host", "bamboo", "--ssh", "bamboo",
+                "--tiers", "default,op", "--episodes", "8",
+            ]
+            args_ok = parser.parse_args(argv_ok)
+            prof, deny = bfs.validate_server_mode_args(args_ok, parser=parser, argv=argv_ok)
+            self.assertEqual(prof.name, "paper")
+            self.assertIn("stop", deny.entries)
+
+            # Public WAN IP is rejected even when rcon.password is present
+            argv_wan = [
+                "--mode", "server", "--active", "--profile", "paper",
+                "--server-dir", tmp, "--host", "8.8.8.8",
+            ]
+            args_wan = parser.parse_args(argv_wan)
+            with self.assertRaisesRegex(SystemExit, "2"):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    bfs.validate_server_mode_args(args_wan, parser=parser, argv=argv_wan)
+
+    def test_ssh_jcmd_observer_resolves_remote_pid_and_collects_histogram(self):
+        calls: list[list[str]] = []
+        histo_out = (
+            " num     #instances         #bytes  class name (module)\n"
+            "-------------------------------------------------------\n"
+            "   1:            50           4000  com.example.scan.RadiusScanner\n"
+            "Total            50           4000\n"
+        )
+
+        def fake_runner(cmd, timeout_s):
+            calls.append(cmd)
+            if cmd[-1] == "-l":
+                return subprocess.CompletedProcess(cmd, 0, stdout="7788 /srv/bamboo/paper.jar\n", stderr="")
+            if cmd[-1] == "GC.class_histogram":
+                return subprocess.CompletedProcess(cmd, 0, stdout=histo_out, stderr="")
+            raise AssertionError(f"unexpected ssh jcmd: {cmd}")
+
+        obs = bfs.JcmdObserver(
+            ssh="bamboo",
+            remote_server_dir="/srv/bamboo",
+            runner=fake_runner,
+        )
+        self.assertEqual(obs.resolve_pid(), 7788)
+        histo = obs.class_histogram()
+        self.assertEqual(histo["com.example.scan.RadiusScanner"], (50, 4000))
+        self.assertEqual(calls[0][:4], ["ssh", "-o", "BatchMode=yes", "bamboo"])
+        self.assertEqual(calls[1], ["ssh", "-o", "BatchMode=yes", "bamboo", "jcmd", "7788", "GC.class_histogram"])
+
+    def test_active_server_run_discovers_tiers_runs_bandit_and_isolates_culprit_jar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plugins_dir = os.path.join(tmp, "plugins")
+            os.makedirs(plugins_dir, exist_ok=True)
+            with open(os.path.join(tmp, "bench-loop.sh"), "w", encoding="utf-8") as fh:
+                fh.write("#!/bin/sh\n")
+            with open(os.path.join(tmp, "server.properties"), "w", encoding="utf-8") as fh:
+                fh.write("server-port=25565\nrcon.port=25575\nrcon.password=secret\nonline-mode=false\n")
+
+            for j_name, p_id, cls_entry in (
+                ("ViaVersion-5.0.0.jar", "ViaVersion", "com/viaversion/Via.class"),
+                ("ScanPlugin.jar", "ScanPlugin", "com/example/scan/RadiusScanner.class"),
+            ):
+                with zipfile.ZipFile(os.path.join(plugins_dir, j_name), "w") as zf:
+                    zf.writestr("plugin.yml", f"name: {p_id}\nversion: 1.0\n")
+                    zf.writestr(cls_entry, b"\xca\xfe\xba\xbe")
+
+            rcon_cmds: list[str] = []
+
+            class FakeDriver:
+                def try_cmd(self, cmd: str) -> str:
+                    rcon_cmds.append(cmd)
+                    if cmd == "list":
+                        return "There are 0 of a max of 64 players online:"
+                    if cmd == "plugins":
+                        enabled = [
+                            f[:-4]
+                            for f in os.listdir(plugins_dir)
+                            if f.endswith(".jar")
+                        ]
+                        return "Plugins: " + ", ".join(enabled)
+                    return "ok"
+
+                def restart_once(self) -> bool:
+                    rcon_cmds.append("__restart__")
+                    return True
+
+            class FakeActiveSwarm:
+                def discover(self, did, tier="default", bot=None, max_ms=15000, timeout_s=None):
+                    nodes = [
+                        {"index": 0, "kind": "root", "name": "", "children": [1]},
+                        {"index": 1, "kind": "literal", "name": "scan", "executable": False, "children": [2]},
+                        {
+                            "index": 2,
+                            "kind": "argument",
+                            "name": "radius",
+                            "parser": "brigadier:integer",
+                            "properties": {"min": 1, "max": 64},
+                            "executable": True,
+                            "children": [],
+                        },
+                    ]
+                    return (
+                        {"ev": "commands", "id": did, "tier": tier, "captured": True, "rootIndex": 0, "nodes": nodes},
+                        {"ev": "done", "id": did, "reason": "complete"},
+                    )
+
+                def run_episode(self, eid, cmd, bots, max_ms, timeout_s, telemetry=False):
+                    scan_enabled = os.path.exists(os.path.join(plugins_dir, "ScanPlugin.jar"))
+                    sent_cmds = [
+                        a.get("cmd", "")
+                        for b in bots
+                        for a in (b.get("program") or ())
+                        if isinstance(a, dict) and a.get("a") == "cmd"
+                    ]
+                    stalled = False
+                    for c_line in sent_cmds:
+                        parts = c_line.split()
+                        if scan_enabled and len(parts) >= 2 and parts[0] == "scan" and int(parts[1]) >= 16:
+                            stalled = True
+                    gap_ms = 4200 if stalled else 1000
+                    events = [
+                        {"ev": "spawn", "bot": bots[0]["name"]},
+                        {"ev": "tick_gap", "bot": bots[0]["name"], "ms": gap_ms, "at": 100000},
+                    ]
+                    return events, {"ev": "done", "id": eid, "ms": 500, "reason": "complete"}
+
+            histo_out = (
+                " num     #instances         #bytes  class name (module)\n"
+                "-------------------------------------------------------\n"
+                "   1:            10            800  com.example.scan.RadiusScanner\n"
+                "Total            10            800\n"
+            )
+            tdump_out = (
+                '"Server thread" #1 prio=5 os_prio=0 tid=0x01 nid=0x01 runnable\n'
+                "   java.lang.Thread.State: RUNNABLE\n"
+                "\tat com.example.scan.RadiusScanner.busyLoop(RadiusScanner.java:42)\n"
+                "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n"
+            )
+
+            obs = bfs.JcmdObserver(
+                ssh="bamboo",
+                remote_server_dir=tmp,
+                clock_ms=lambda: 1000,
+                runner=lambda cmd, timeout_s: subprocess.CompletedProcess(
+                    cmd,
+                    0,
+                    stdout=(
+                        f"9001 {tmp}/paper.jar\n"
+                        if cmd[-1] == "-l"
+                        else (histo_out if cmd[-1] == "GC.class_histogram" else tdump_out)
+                    ),
+                    stderr="",
+                ),
+            )
+
+            argv = [
+                "--mode", "server",
+                "--active",
+                "--profile", "paper",
+                "--server-dir", tmp,
+                "--host", "bamboo",
+                "--ssh", "bamboo",
+                "--tiers", "default,op",
+                "--episodes", "6",
+                "--baseline-episodes", "2",
+                "--finding-n", "2",
+                "--finding-k", "2",
+                "--out-dir", tmp,
+            ]
+            args = bf.build_parser().parse_args(argv)
+            run_dir = os.path.join(tmp, "active-run")
+            runner = bfs.ServerRun(
+                args,
+                run_dir,
+                swarm=FakeActiveSwarm(),
+                observer=obs,
+                driver=FakeDriver(),
+            )
+            verdict = runner.run()
+
+            self.assertEqual(verdict["status"], "active_completed")
+            self.assertEqual(verdict["verdict"], "FAIL")
+            self.assertEqual(verdict["confirmed_culprits"], ["ScanPlugin.jar"])
+            self.assertEqual(verdict["findings"][0]["operator_mitigation"]["bisected_bound"], "radius >= 16")
+            self.assertTrue(any(c.startswith("op ") for c in rcon_cmds))
+            self.assertTrue(any(c.startswith("deop ") for c in rcon_cmds))
+            # All candidate jars restored to enabled state after ddmin
+            self.assertTrue(os.path.exists(os.path.join(plugins_dir, "ScanPlugin.jar")))
+
+    @unittest.skipUnless(
+        NODE and MINEFLAYER and shutil.which("javac") and shutil.which("java") and shutil.which("jcmd"),
+        "node, mineflayer, javac, java, or jcmd missing",
+    )
+    def test_live_constructed_server_cli_with_real_swarm_rcon_and_jvm(self):
+        import socket
+        import struct
+        import threading
+
+        with tempfile.TemporaryDirectory() as tmp:
+            plugins_dir = os.path.join(tmp, "plugins")
+            src_dir = os.path.join(tmp, "javasrc")
+            classes_dir = os.path.join(tmp, "javaclasses")
+            os.makedirs(plugins_dir, exist_ok=True)
+            os.makedirs(src_dir, exist_ok=True)
+            os.makedirs(classes_dir, exist_ok=True)
+
+            with open(os.path.join(tmp, "bench-loop.sh"), "w", encoding="utf-8") as fh:
+                fh.write("#!/bin/sh\n")
+
+            # 1. Compile real Java classes for paper.jar, ScanPlugin.jar, SafeUtility.jar, ViaVersion-5.0.0.jar
+            scanner_java = os.path.join(src_dir, "RadiusScanner.java")
+            with open(scanner_java, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "package com.example.scan;\n"
+                    "public class RadiusScanner {\n"
+                    "    public static volatile long sink = 0;\n"
+                    "    public static void busyLoop(long untilMs) {\n"
+                    "        while (System.currentTimeMillis() < untilMs) {\n"
+                    "            sink += 1;\n"
+                    "            try { Thread.sleep(5); } catch (InterruptedException ignored) {}\n"
+                    "        }\n"
+                    "    }\n"
+                    "}\n"
+                )
+            safe_java = os.path.join(src_dir, "SafeHelper.java")
+            with open(safe_java, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "package com.example.safe;\n"
+                    "public class SafeHelper {\n"
+                    "    public static String ping() { return \"ok\"; }\n"
+                    "}\n"
+                )
+            via_java = os.path.join(src_dir, "Via.java")
+            with open(via_java, "w", encoding="utf-8") as fh:
+                fh.write("package com.viaversion;\npublic class Via {}\n")
+            mc_srv_java = os.path.join(src_dir, "MinecraftServer.java")
+            with open(mc_srv_java, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "package net.minecraft.server;\n"
+                    "import java.io.*;\n"
+                    "import java.nio.file.*;\n"
+                    "import com.example.scan.RadiusScanner;\n"
+                    "public class MinecraftServer {\n"
+                    "    public static void main(String[] args) throws Exception {\n"
+                    "        Thread.currentThread().setName(\"Server thread\");\n"
+                    "        Path stallPath = Paths.get(args[0]);\n"
+                    "        Path readyPath = Paths.get(args[1]);\n"
+                    "        Files.writeString(readyPath, Long.toString(ProcessHandle.current().pid()));\n"
+                    "        while (true) {\n"
+                    "            tickServer(stallPath);\n"
+                    "            Thread.sleep(15);\n"
+                    "        }\n"
+                    "    }\n"
+                    "    public static void tickServer(Path stallPath) {\n"
+                    "        try {\n"
+                    "            if (Files.exists(stallPath)) {\n"
+                    "                String raw = Files.readString(stallPath).trim();\n"
+                    "                if (!raw.isEmpty()) {\n"
+                    "                    long until = Long.parseLong(raw);\n"
+                    "                    if (System.currentTimeMillis() < until) {\n"
+                    "                        RadiusScanner.busyLoop(until);\n"
+                    "                    }\n"
+                    "                }\n"
+                    "            }\n"
+                    "        } catch (Exception ignored) {}\n"
+                    "    }\n"
+                    "}\n"
+                )
+
+            subprocess.run(
+                ["javac", "-d", classes_dir, scanner_java, safe_java, via_java, mc_srv_java],
+                check=True,
+                timeout=30,
+            )
+
+            with zipfile.ZipFile(os.path.join(plugins_dir, "ViaVersion-5.0.0.jar"), "w") as zf:
+                zf.writestr("plugin.yml", "name: ViaVersion\nversion: 5.0.0\n")
+                zf.write(
+                    os.path.join(classes_dir, "com", "viaversion", "Via.class"),
+                    "com/viaversion/Via.class",
+                )
+            with zipfile.ZipFile(os.path.join(plugins_dir, "SafeUtility.jar"), "w") as zf:
+                zf.writestr("plugin.yml", "name: SafeUtility\nversion: 1.0\n")
+                zf.write(
+                    os.path.join(classes_dir, "com", "example", "safe", "SafeHelper.class"),
+                    "com/example/safe/SafeHelper.class",
+                )
+            with zipfile.ZipFile(os.path.join(plugins_dir, "ScanPlugin.jar"), "w") as zf:
+                zf.writestr("plugin.yml", "name: ScanPlugin\nversion: 1.0\n")
+                zf.write(
+                    os.path.join(classes_dir, "com", "example", "scan", "RadiusScanner.class"),
+                    "com/example/scan/RadiusScanner.class",
+                )
+            paper_jar = os.path.join(tmp, "paper.jar")
+            with zipfile.ZipFile(paper_jar, "w") as zf:
+                zf.write(
+                    os.path.join(classes_dir, "net", "minecraft", "server", "MinecraftServer.class"),
+                    "net/minecraft/server/MinecraftServer.class",
+                )
+                zf.write(
+                    os.path.join(classes_dir, "com", "example", "scan", "RadiusScanner.class"),
+                    "com/example/scan/RadiusScanner.class",
+                )
+
+            stall_file = os.path.join(tmp, "stall_until.txt")
+            pid_file = os.path.join(tmp, "server.pid")
+
+            # 2. Start real TCP Source-RCON server on an ephemeral port (127.0.0.1:0)
+            rcon_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            rcon_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            rcon_sock.bind(("127.0.0.1", 0))
+            rcon_sock.listen(16)
+            rcon_port = rcon_sock.getsockname()[1]
+            rcon_state = {"down_until": 0.0, "stop": False, "restarts": 0, "ops": set()}
+
+            def _rcon_send(conn: socket.socket, req_id: int, ptype: int, body: str) -> None:
+                payload = struct.pack("<ii", req_id, ptype) + body.encode("utf-8") + b"\x00\x00"
+                conn.sendall(struct.pack("<i", len(payload)) + payload)
+
+            def _rcon_client(conn: socket.socket) -> None:
+                with conn:
+                    conn.settimeout(2.0)
+                    try:
+                        while not rcon_state["stop"]:
+                            hdr = conn.recv(4)
+                            if len(hdr) < 4:
+                                break
+                            (length,) = struct.unpack("<i", hdr)
+                            buf = b""
+                            while len(buf) < length:
+                                ch = conn.recv(length - len(buf))
+                                if not ch:
+                                    return
+                                buf += ch
+                            req_id, ptype = struct.unpack("<ii", buf[:8])
+                            body = buf[8:-2].decode("utf-8", errors="replace").strip()
+                            if time.time() < rcon_state["down_until"]:
+                                return
+                            if ptype == 3:
+                                if body == "secret":
+                                    _rcon_send(conn, req_id, 2, "")
+                                else:
+                                    _rcon_send(conn, -1, 2, "")
+                                    return
+                            elif ptype == 2:
+                                if body == "list":
+                                    _rcon_send(conn, req_id, 0, "There are 0 of a max of 64 players online:")
+                                elif body == "plugins":
+                                    enabled = []
+                                    for fn in sorted(os.listdir(plugins_dir)):
+                                        if fn.endswith(".jar"):
+                                            enabled.append(fn[:-4])
+                                    _rcon_send(conn, req_id, 0, "Plugins: " + ", ".join(enabled))
+                                elif body.startswith("op "):
+                                    rcon_state["ops"].add(body[3:].strip())
+                                    _rcon_send(conn, req_id, 0, "Opped")
+                                elif body.startswith("deop "):
+                                    rcon_state["ops"].discard(body[5:].strip())
+                                    _rcon_send(conn, req_id, 0, "De-opped")
+                                elif body == "restart":
+                                    rcon_state["restarts"] += 1
+                                    rcon_state["down_until"] = time.time() + 0.45
+                                    _rcon_send(conn, req_id, 0, "Restarting...")
+                                    return
+                                else:
+                                    _rcon_send(conn, req_id, 0, "ok")
+                            else:
+                                _rcon_send(conn, req_id, 0, "")
+                    except OSError:
+                        pass
+
+            def _rcon_accept_loop() -> None:
+                rcon_sock.settimeout(0.25)
+                while not rcon_state["stop"]:
+                    try:
+                        conn, _ = rcon_sock.accept()
+                    except socket.timeout:
+                        continue
+                    except OSError:
+                        break
+                    threading.Thread(target=_rcon_client, args=(conn,), daemon=True).start()
+
+            rcon_thread = threading.Thread(target=_rcon_accept_loop, daemon=True)
+            rcon_thread.start()
+
+            # 3. Start real Node.js minecraft-protocol 1.20.1 server on an ephemeral port
+            server_js = r"""
+const fs = require('fs');
+const path = require('path');
+const nm = path.join(path.dirname(process.argv[1]), 'node_modules');
+const mc = require(path.join(nm, 'minecraft-protocol'));
+const mcData = require(path.join(nm, 'minecraft-data'))('1.20.1');
+const pluginsDir = process.argv[2];
+const stallFile = process.argv[3];
+
+let stallUntil = 0;
+const clients = new Set();
+
+const srv = mc.createServer({ 'online-mode': false, host: '127.0.0.1', port: 0, version: '1.20.1' });
+
+setInterval(() => {
+  const now = Date.now();
+  if (now < stallUntil) return;
+  for (const c of clients) {
+    try { c.write('update_time', { age: [0, 100], time: [0, 100] }); } catch (e) {}
+  }
+}, 200).unref();
+
+srv.on('login', (client) => {
+  clients.add(client);
+  client.on('end', () => clients.delete(client));
+  client.on('error', () => clients.delete(client));
+
+  client.write('login', {
+    ...mcData.loginPacket,
+    entityId: 1,
+    isHardcore: false,
+    gameMode: 0,
+    previousGameMode: -1,
+    hashedSeed: [0, 0],
+    maxPlayers: 64,
+    viewDistance: 2,
+    simulationDistance: 2,
+    reducedDebugInfo: false,
+    enableRespawnScreen: true,
+    isDebug: false,
+    isFlat: true
+  });
+  client.write('declare_commands', {
+    rootIndex: 0,
+    nodes: [
+      {
+        flags: { command_node_type: 0, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [1, 3]
+      },
+      {
+        flags: { command_node_type: 1, has_command: 0, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [2],
+        extraNodeData: { name: 'scan' }
+      },
+      {
+        flags: { command_node_type: 2, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: {
+          name: 'radius',
+          parser: 'brigadier:integer',
+          properties: { flags: { min_present: 1, max_present: 1 }, min: 1, max: 64 }
+        }
+      },
+      {
+        flags: { command_node_type: 1, has_command: 1, has_redirect_node: 0, has_custom_suggestions: 0 },
+        children: [],
+        extraNodeData: { name: 'stop' }
+      }
+    ]
+  });
+  client.write('position', { x: 0, y: 64, z: 0, yaw: 0, pitch: 0, flags: 0, teleportId: 1 });
+  client.write('update_health', { health: 20, food: 20, foodSaturation: 5 });
+  client.write('update_time', { age: [0, 100], time: [0, 100] });
+
+  function handleCommand(rawCmd) {
+    const clean = String(rawCmd || '').replace(/^\//, '').trim();
+    const parts = clean.split(/\s+/);
+    if (parts[0] === 'scan' && parts.length >= 2) {
+      const r = parseInt(parts[1], 10);
+      const scanJar = path.join(pluginsDir, 'ScanPlugin.jar');
+      if (fs.existsSync(scanJar) && Number.isFinite(r) && r >= 16) {
+        const until = Date.now() + 1150;
+        stallUntil = until;
+        try { fs.writeFileSync(stallFile, String(until)); } catch (e) {}
+      }
+    }
+  }
+
+  client.on('packet', (data, meta) => {
+    if (meta.name === 'chat_command' && data && data.command) {
+      handleCommand(data.command);
+    } else if ((meta.name === 'chat' || meta.name === 'chat_message') && data && data.message) {
+      handleCommand(data.message);
+    }
+  });
+});
+
+srv.on('listening', () => {
+  console.log(JSON.stringify({ port: srv.socketServer.address().port }));
+});
+"""
+            jvm_proc = subprocess.Popen(
+                ["java", "-Xmx128m", "-cp", paper_jar, "net.minecraft.server.MinecraftServer", stall_file, pid_file],
+                cwd=tmp,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            mc_proc = subprocess.Popen(
+                [NODE, "-e", server_js, bf.SWARM_JS, plugins_dir, stall_file],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                deadline = time.time() + 10.0
+                while time.time() < deadline and not os.path.exists(pid_file):
+                    time.sleep(0.05)
+                self.assertTrue(os.path.exists(pid_file), "constructed HotSpot JVM did not write server.pid")
+
+                line = mc_proc.stdout.readline()
+                self.assertTrue(line, "constructed MC protocol server did not report port")
+                mc_port = int(json.loads(line)["port"])
+
+                with open(os.path.join(tmp, "server.properties"), "w", encoding="utf-8") as fh:
+                    fh.write(
+                        f"server-port={mc_port}\n"
+                        f"rcon.port={rcon_port}\n"
+                        "rcon.password=secret\n"
+                        "online-mode=false\n"
+                    )
+
+                out_dir = os.path.join(tmp, "live-out")
+                rc = bf.main([
+                    "--mode", "server",
+                    "--active",
+                    "--profile", "paper",
+                    "--server-dir", tmp,
+                    "--host", "127.0.0.1",
+                    "--port", str(rcon_port),
+                    "--mc-port", str(mc_port),
+                    "--mc-version", "1.20.1",
+                    "--pid-file", pid_file,
+                    "--tiers", "default,op",
+                    "--episodes", "2",
+                    "--baseline-episodes", "1",
+                    "--stall-ms", "700",
+                    "--finding-n", "1",
+                    "--finding-k", "1",
+                    "--join-delay-ms", "0",
+                    "--episode-max-s", "6",
+                    "--out-dir", out_dir,
+                ])
+                self.assertEqual(rc, 0)
+
+                runs_root = os.path.join(out_dir, "runs")
+                run_dirs = [os.path.join(runs_root, d) for d in os.listdir(runs_root)]
+                self.assertEqual(len(run_dirs), 1)
+                with open(os.path.join(run_dirs[0], "verdict.json"), "r", encoding="utf-8") as fh:
+                    verdict = json.load(fh)
+                with open(os.path.join(run_dirs[0], "episodes.jsonl"), "r", encoding="utf-8") as fh:
+                    ep_lines = [json.loads(line) for line in fh if line.strip()]
+
+                self.assertEqual(verdict["status"], "active_completed")
+                self.assertEqual(
+                    verdict["verdict"],
+                    "FAIL",
+                    f"verdict={json.dumps(verdict, indent=2)}\nepisodes={json.dumps(ep_lines, indent=2)}",
+                )
+                self.assertEqual(verdict["confirmed_culprits"], ["ScanPlugin.jar"])
+                self.assertEqual(verdict["findings"][0]["oracle"], "stall")
+                self.assertEqual(verdict["findings"][0]["operator_mitigation"]["bisected_bound"], "radius >= 16")
+                self.assertIn(
+                    "com.example.scan.RadiusScanner.busyLoop",
+                    verdict["findings"][0]["author_reproducer"]["evidence"],
+                )
+                self.assertGreaterEqual(rcon_state["restarts"], 2)
+                self.assertTrue(os.path.exists(os.path.join(plugins_dir, "ScanPlugin.jar")))
+                self.assertTrue(os.path.exists(os.path.join(plugins_dir, "SafeUtility.jar")))
+            finally:
+                rcon_state["stop"] = True
+                try:
+                    rcon_sock.close()
+                except OSError:
+                    pass
+                for p in (mc_proc, jvm_proc):
+                    if p.poll() is None:
+                        p.terminate()
+                        try:
+                            p.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            p.kill()
+                            p.wait(timeout=5)
+                    if p.stdout:
+                        p.stdout.close()
+                    if p.stderr:
+                        p.stderr.close()
+
+
+class DeclarativeBitAndSurvivalRampTest(unittest.TestCase):
+    def test_survival_ramp_rungs_and_100_player_wave_generation(self):
+        self.assertEqual(bfs.build_survival_ramp_rungs(100), [10, 25, 50, 75, 100])
+        self.assertEqual(bfs.build_survival_ramp_rungs(50), [10, 25, 50])
+        self.assertEqual(bfs.build_survival_ramp_rungs(explicit_rungs="10, 40, 100"), [10, 40, 100])
+
+        a = bf.build_parser().parse_args(["--server-dir", ".", "--target-players", "100"])
+        self.assertEqual(bf.swarm_bot_cap(a), 100)
+
+        tree = bfs.CommandTree(
+            tiers=["default"],
+            nodes={
+                "rtp": bfs.CommandNode(
+                    node_id="rtp",
+                    name="rtp",
+                    kind="literal",
+                    executable=True,
+                    min_tier="default",
+                    aliases=["rtp"],
+                ),
+                "claim": bfs.CommandNode(
+                    node_id="claim",
+                    name="claim",
+                    kind="literal",
+                    executable=True,
+                    min_tier="default",
+                    aliases=["claim"],
+                ),
+            },
+            root_children=["rtp", "claim"],
+            alias_map={},
+            denylist_entries=[],
+        )
+        wave = bfs.build_ramp_wave_program(100, tree, random.Random(42), bot_prefix="fzr100")
+        self.assertEqual(len(wave), 100)
+        self.assertEqual(len({b["name"] for b in wave}), 100)
+        self.assertTrue(all(len(b["name"]) <= 16 for b in wave))
+        all_actions = [a.get("a") for b in wave for a in b["program"]]
+        self.assertIn("move", all_actions)
+        self.assertIn("cmd", all_actions)
+        self.assertIn("quit", all_actions)
+
+    def test_declarative_counterfactuals_bit_report_and_aligned_csv(self):
+        import csv
+
+        with tempfile.TemporaryDirectory() as tmp:
+            plugins_dir = os.path.join(tmp, "plugins")
+            os.makedirs(plugins_dir, exist_ok=True)
+            for j_name, p_id, cls_entry, cmd_name in (
+                ("ViaVersion-5.0.0.jar", "ViaVersion", "com/viaversion/Via.class", "viaversion"),
+                ("FuzzFixturePaper.jar", "FuzzFixture", "io/github/dailystruggle/fuzzfixture/FuzzFixturePlugin.class", "scan"),
+                ("BetterRTP-3.6.13.jar", "BetterRTP", "me/SuperRonanCraft/BetterRTP/player/PlayerInfo.class", "rtp"),
+            ):
+                with zipfile.ZipFile(os.path.join(plugins_dir, j_name), "w") as zf:
+                    zf.writestr("plugin.yml", f"name: {p_id}\nversion: 1.0\ncommands:\n  {cmd_name}:\n")
+                    zf.writestr(cls_entry, b"\xca\xfe\xba\xbe")
+
+            jar_index = bfs.JarIndex.from_server_dir(tmp, "paper")
+            tree = bfs.CommandTree(
+                tiers=["default", "op"],
+                nodes={
+                    "rtp": bfs.CommandNode(
+                        node_id="rtp",
+                        name="rtp",
+                        kind="literal",
+                        executable=True,
+                        min_tier="default",
+                        aliases=["rtp", "betterrtp:rtp"],
+                    ),
+                    "scan": bfs.CommandNode(
+                        node_id="scan",
+                        name="scan",
+                        kind="literal",
+                        executable=False,
+                        min_tier="default",
+                        aliases=["scan", "ff:scan"],
+                        children=["scan <radius>"],
+                    ),
+                    "scan <radius>": bfs.CommandNode(
+                        node_id="scan <radius>",
+                        name="radius",
+                        kind="argument",
+                        parser="brigadier:integer",
+                        properties={"min": 1, "max": 128},
+                        executable=True,
+                        min_tier="default",
+                        aliases=["scan <radius>"],
+                        _root_id="scan",
+                    ),
+                },
+                root_children=["rtp", "scan"],
+                alias_map={"betterrtp:rtp": "rtp", "ff:scan": "scan"},
+                denylist_entries=[],
+            )
+
+            baseline_records = [
+                {
+                    "ep": f"base-{i}",
+                    "follow_up": "idle",
+                    "tick_gaps": [{"ms": 1000.0, "at": 10000 + i * 2000}],
+                    "deltas": {},
+                }
+                for i in range(4)
+            ]
+            ramp_records = [
+                {
+                    "players": 25,
+                    "tick_gaps": [{"ms": 1020.0, "at": 20000}],
+                    "disconnects": 0,
+                    "deltas": {},
+                },
+                {
+                    "players": 50,
+                    "tick_gaps": [{"ms": 1080.0, "at": 25000}],
+                    "disconnects": 0,
+                    "deltas": {},
+                },
+                {
+                    "players": 75,
+                    "tick_gaps": [{"ms": 3751.0, "at": 30000}],
+                    "disconnects": 0,
+                    "deltas": {"cls:me.SuperRonanCraft.BetterRTP.player.PlayerInfo": 4.0},
+                },
+            ]
+            records = []
+            for ep in range(24):
+                is_leak = ep % 3 == 0
+                is_stall = ep == 5
+                node_name = "rtp" if is_leak else "scan <radius>"
+                records.append(
+                    {
+                        "ep": ep,
+                        "node": node_name,
+                        "follow_up": "quit_lt1s" if is_leak else "repeat",
+                        "departures": 1 if is_leak else 0,
+                        "deltas": {
+                            "cls:me.SuperRonanCraft.BetterRTP.player.PlayerInfo": 180.0 if is_leak else 0.0,
+                        },
+                        "tick_gaps": [{"ms": 3751.0 if is_stall else 1010.0, "at": 40000 + ep * 2000}],
+                        "thread_dumps": (
+                            [
+                                '"Server thread" #1 prio=5 os_prio=0 tid=0x01 nid=0x01 runnable\n'
+                                "   java.lang.Thread.State: RUNNABLE\n"
+                                "\tat io.github.dailystruggle.fuzzfixture.FuzzFixturePlugin.runMainThreadScan(FuzzFixturePlugin.java:88)\n"
+                                "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n"
+                            ]
+                            if is_stall
+                            else []
+                        ),
+                        "bots": [
+                            {
+                                "name": "fz_0",
+                                "program": [
+                                    {
+                                        "a": "cmd",
+                                        "cmd": "rtp" if is_leak else "scan 128",
+                                        "node": node_name,
+                                    },
+                                    {"a": "quit"} if is_leak else {"a": "wait", "ms": 200},
+                                ],
+                            }
+                        ],
+                    }
+                )
+
+            verdict = bfs.evaluate_server_trace(
+                records,
+                baseline_records,
+                tree=tree,
+                jar_index=jar_index,
+                profile="paper",
+                stall_ms=1500.0,
+                bisect_predicate_fn=lambda prog, ctx: (
+                    True
+                    if ctx["oracle"] != "stall"
+                    else int(prog[0]["program"][0]["cmd"].split()[1]) >= 49
+                ),
+                probe_fn=lambda active, ctx: (
+                    (3, True)
+                    if (
+                        (ctx["oracle"] == "leak" and "BetterRTP-3.6.13.jar" in active)
+                        or (ctx["oracle"] == "stall" and "FuzzFixturePaper.jar" in active)
+                    )
+                    else (0, True)
+                ),
+                server_dir=tmp,
+                ramp_records=ramp_records,
+                target_players=100,
+            )
+
+            # 1. Survival envelope
+            env = verdict["survival_envelope"]
+            self.assertEqual(env["target_players"], 100)
+            self.assertEqual(env["max_surviving_players"], 50)
+            self.assertEqual(env["first_failing_players"], 75)
+            self.assertFalse(env["survived_target"])
+
+            # 2. Declarative counterfactuals
+            cfs = verdict["counterfactuals"]
+            self.assertEqual(len(cfs), 2)
+            cf_stall = next(c for c in cfs if c["oracle"] == "stall")
+            self.assertEqual(cf_stall["parameter_boundary"]["argument"], "radius")
+            self.assertEqual(cf_stall["parameter_boundary"]["pass_domain"], "[1, 48]")
+            self.assertEqual(cf_stall["parameter_boundary"]["fail_domain"], "[49, 128]")
+            self.assertEqual(cf_stall["jar_isolation"]["blamed_jars"], ["FuzzFixturePaper.jar"])
+            self.assertEqual(cf_stall["jar_isolation"]["with_jar_present"]["status"], "FAIL")
+            self.assertEqual(cf_stall["jar_isolation"]["with_jar_disabled"]["status"], "PASS")
+
+            # 3. Main-thread frame accounting & command impact table
+            mt = verdict["main_thread_attribution"]
+            self.assertEqual(len(mt), 1)
+            self.assertEqual(mt[0]["owner_jar"], "FuzzFixturePaper.jar")
+            self.assertEqual(mt[0]["share_pct"], 100.0)
+
+            impact = verdict["command_impact_table"]
+            self.assertEqual(len(impact), 2)
+            self.assertTrue(impact[0]["status"].startswith("FAIL"))
+
+            # 4. BitReport JSON & BitTable aligned CSV
+            bit_rep = verdict["bit_report"]
+            self.assertEqual(bit_rep["schema"], 1)
+            self.assertEqual(bit_rep["health"], "FAILED")
+            codes = {f["code"] for f in bit_rep["findings"]}
+            self.assertIn("BENCH_SURVIVAL_RAMP_PASS", codes)
+            self.assertIn("BENCH_SURVIVAL_RAMP_FAIL", codes)
+            self.assertIn("BENCH_STALL_ACUTE", codes)
+            self.assertIn("BENCH_LEAK_POST_GC", codes)
+            self.assertIn("BENCH_MAIN_THREAD_FRAME", codes)
+            self.assertIn("BENCH_CMD_IMPACT", codes)
+
+            parsed_rows = list(csv.DictReader(io.StringIO(verdict["bit_table_csv"]), skipinitialspace=True))
+            self.assertGreaterEqual(len(parsed_rows), 6)
+            self.assertEqual(
+                list(parsed_rows[0].keys()),
+                list(bfs.BIT_TABLE_COLUMNS),
+            )
+            components_seen = {r["component"] for r in parsed_rows}
+            self.assertEqual(
+                components_seen,
+                {"bench.ramp", "bench.attribution", "bench.frames", "bench.surface"},
+            )
+
+    def test_competitor_package_attribution_and_isolated_targets_comparison(self) -> None:
+        import csv
+        import io
+        expected_pkgs = {
+            "me.SuperRonanCraft.BetterRTP.references.rtpinfo.RandomLocation": "BetterRTP",
+            "biz.donvi.jakesRTP.JakesRtpPlugin": "JakesRTP",
+            "com.skyblockexp.ezrtp.EzRtpPlugin": "EzRTP",
+            "me.nik.ezrtp.storage.Database": "EzRTP",
+            "eu.kotori.justRTP.JustRTP": "JustRTP",
+            "com.ervan27.advancedrtp.AdvancedRTP": "AdvancedRTP",
+            "asygames.asyrtp.AsyRtpPlugin": "AsyRTP",
+            "net.chumbucket.sorekillrtp.SorekillRTPPlugin": "SorekillRTP",
+        }
+        for frame_cls, want_plugin in expected_pkgs.items():
+            trace = (
+                "java.lang.IllegalStateException: test\n"
+                f"\tat {frame_cls}.run(Test.java:10)\n"
+                "\tat net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:100)\n"
+            )
+            self.assertEqual(bf.attribute_plugin(trace), want_plugin)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            plugins_dir = os.path.join(tmp, "plugins")
+            os.makedirs(plugins_dir, exist_ok=True)
+            for fname in (
+                "LeafRTP-Pro-3.3.1.jar",
+                "justRTP-3.7.0.jar",
+                "EzRTP-3.4.3.jar.off",
+                "JakesRTP-0.14.9.jar",
+                "BetterRTP-3.6.13.jar",
+                "FuzzFixturePaper.jar",
+                "EssentialsX-2.22.1.jar",
+                "GriefPrevention.jar",
+            ):
+                with open(os.path.join(plugins_dir, fname), "wb") as fh:
+                    fh.write(b"x")
+
+            roster = bfs._parse_roster_jar_prefixes()
+            enabled_ez = bfs._isolate_single_roster_jar(plugins_dir, roster, "ezrtp")
+            self.assertEqual(enabled_ez, ["EzRTP-3.4.3.jar"])
+            active_jars = sorted(f for f in os.listdir(plugins_dir) if f.endswith(".jar"))
+            self.assertEqual(
+                active_jars,
+                ["EssentialsX-2.22.1.jar", "EzRTP-3.4.3.jar", "GriefPrevention.jar"],
+            )
+
+            comp_csv, comp_txt = bfs.format_isolated_targets_comparison(
+                {
+                    "rtp": {
+                        "focused_jar": "LeafRTP-Pro-3.3.1.jar",
+                        "verdict": "PASS",
+                        "bit_report": {"health": "HEALTHY"},
+                        "survival_envelope": {"max_surviving_players": 100, "first_failing_players": None, "rungs": []},
+                        "findings": [],
+                        "command_impact_table": [{"p95_gap_ms": 1008.0, "max_gap_ms": 1024.0}],
+                        "report_text": "verdict: PASS\n",
+                    },
+                    "ezrtp": {
+                        "focused_jar": "EzRTP-3.4.3.jar",
+                        "verdict": "FAIL",
+                        "bit_report": {"health": "FAILED"},
+                        "survival_envelope": {"max_surviving_players": 25, "first_failing_players": 50, "rungs": []},
+                        "findings": [{"oracle": "stall", "reproduced": True}],
+                        "confirmed_culprits": ["EzRTP-3.4.3.jar"],
+                        "command_impact_table": [{"p95_gap_ms": 2100.0, "max_gap_ms": 3800.0}],
+                        "report_text": "verdict: FAIL\n",
+                    },
+                }
+            )
+            rows = list(csv.DictReader(io.StringIO(comp_csv), skipinitialspace=True))
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0]["target"], "rtp")
+            self.assertEqual(rows[0]["verdict"], "PASS")
+            self.assertEqual(rows[0]["max_surviving_players"], "100")
+            self.assertEqual(rows[1]["target"], "ezrtp")
+            self.assertEqual(rows[1]["verdict"], "FAIL")
+            self.assertEqual(rows[1]["stalls"], "1")
+            self.assertIn("CROSS-COMPETITOR DECLARATIVE BIT & SURVIVAL COMPARISON", comp_txt)
 
 
 if __name__ == "__main__":

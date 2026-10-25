@@ -1,12 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric_unobf;
 
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
 import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
-import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
-import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
-import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
-import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.effect.MobEffects;
@@ -62,16 +57,13 @@ public final class FabricEffectsInitializer {
         // ADR-004: per-platform leaf operations live in FabricValueCoercer.
         EffectFactory.setCoercer(new FabricValueCoercer());
 
-        EffectFactory.addEffect("SOUND",    new SoundEffect(SoundEvents.PLAYER_LEVELUP));
-        EffectFactory.addEffect("PARTICLE", new ParticleEffect(ParticleTypes.EXPLOSION));
-        EffectFactory.addEffect("TITLE",    new TitleEffect());
-        EffectFactory.addEffect("POTION",   new PotionEffect(MobEffects.BLINDNESS.value()));
-        EffectFactory.addEffect("GLIDE",    new GlideEffect());
-        EffectFactory.addEffect("COMMAND",  new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
-        EffectFactory.addEffect("DROP_INVENTORY", new io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect());
-        EffectFactory.addEffect("DROP_EXP", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
-        EffectFactory.addEffect("DROP_EXPERIENCE", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
-        EffectFactory.addEffect("DEATH", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
-        EffectFactory.addEffect("KILL", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
+        // ADR-116: register the canonical built-in effect set once via EffectFactory.
+        EffectFactory.registerBuiltInEffects(
+                SoundEvents.PLAYER_LEVELUP,
+                ParticleTypes.EXPLOSION,
+                MobEffects.BLINDNESS.value(),
+                "BALL",
+                "WHITE",
+                "PIANO");
     }
 }

@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -885,7 +886,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         // Offline / unresolved: fall back to op-status on the OfflinePlayer.
         OfflinePlayer off = Bukkit.getOfflinePlayer(player);
         return off != null && off.isOp();
-      } catch (Throwable t) {
+      } catch (RuntimeException | LinkageError t) {
+        PlatformHookBitComponent.recordWorldHookDegraded(
+            "AbstractServerAccessor#menuPermissionProbe",
+            t.getClass().getSimpleName() + ": " + t.getMessage());
         return false;
       }
     };
@@ -901,7 +905,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
           .filter(pai -> pai.getValue())
           .map(pai -> pai.getPermission())
           .collect(Collectors.toUnmodifiableSet());
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#menuEffectivePermissions",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return Collections.emptySet();
     }
   }
@@ -914,7 +921,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (p == null) return "en_us";
       String loc = p.getLocale();
       return loc.isEmpty() ? "en_us" : loc;
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#menuLocale",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return "en_us";
     }
   }
@@ -927,7 +937,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (p == null) return "";
       World w = p.getWorld();
       return w.getName();
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#menuRegionDescriptor",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return "";
     }
   }
@@ -944,7 +957,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         if (rp != null) list.add(rp);
       }
       return Collections.unmodifiableList(list);
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#getOnlinePlayers",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return Collections.emptyList();
     }
   }
@@ -1266,7 +1282,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       Set<String> tags = player.getScoreboardTags();
       if (tags.isEmpty()) return Collections.emptySet();
       return Collections.unmodifiableSet(new java.util.HashSet<>(tags));
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#getScoreboardTags",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return Collections.emptySet();
     }
   }
@@ -1278,7 +1297,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       Player player = Bukkit.getPlayer(playerId);
       if (player == null) return false;
       return player.addScoreboardTag(tag);
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#addScoreboardTag:" + tag,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return false;
     }
   }
@@ -1290,7 +1312,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       Player player = Bukkit.getPlayer(playerId);
       if (player == null) return false;
       return player.removeScoreboardTag(tag);
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#removeScoreboardTag:" + tag,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return false;
     }
   }
@@ -1306,8 +1331,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         String crit = (criteria != null && !criteria.isBlank()) ? criteria : "dummy";
         board.registerNewObjective(objective, crit, objective);
       }
-    } catch (Throwable ignored) {
-      // Scoreboard objective registration failure ignored on legacy or mocked Bukkit implementations.
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#ensureScoreboardObjective:" + objective,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
     }
   }
 
@@ -1325,8 +1352,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       Player player = Bukkit.getPlayer(playerId);
       String entry = (player != null) ? player.getName() : playerId.toString();
       obj.getScore(entry).setScore(score);
-    } catch (Throwable ignored) {
-      // Scoreboard score update failure ignored on legacy or mocked Bukkit implementations.
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#setScoreboardScore:" + objective,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
     }
   }
 
@@ -1347,8 +1376,10 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       } else {
         board.resetScores(entry);
       }
-    } catch (Throwable ignored) {
-      // Scoreboard score reset failure ignored on legacy or mocked Bukkit implementations.
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractServerAccessor#resetScoreboardScore",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
     }
   }
 

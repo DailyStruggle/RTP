@@ -52,7 +52,7 @@
  *   --fuzz-control <port>    [BENCH_FUZZ_CONTROL]  fuzz mode (below); 0 picks a free port
  *   --fuzz-spawn-timeout-ms <ms>  default 30000 (connect-to-spawn limit per join)
  *   --fuzz-episode-max-ms <ms>    default 180000 (episode deadline unless max_ms is sent)
- *   --fuzz-max-bots <n>           default 64
+ *   --fuzz-max-bots <n>           default 128
  *
  * Fuzz mode (--fuzz-control): no roster, no workers, no reconnects. Listens on
  * 127.0.0.1:<port> for newline-delimited JSON, one episode at a time:
@@ -158,7 +158,7 @@ const fuzzControlRaw = getArg('--fuzz-control', 'BENCH_FUZZ_CONTROL', '');
 const fuzzMode = fuzzControlRaw !== '';
 const fuzzSpawnTimeoutMs = Math.max(1000, intArg('--fuzz-spawn-timeout-ms', null, 30000));
 const fuzzEpisodeMaxMs = Math.max(1000, intArg('--fuzz-episode-max-ms', null, 180000));
-const fuzzMaxBots = Math.max(1, intArg('--fuzz-max-bots', null, 64));
+const fuzzMaxBots = Math.max(1, intArg('--fuzz-max-bots', null, 128));
 // Kick reason sent by StressTestRTP LeakProbe#churn.
 const CHURN_MARKER = 'StressTestRTP churn';
 const isWorker = process.env.BENCH_WORKER === '1';
@@ -647,7 +647,7 @@ async function runBots() {
 // Fuzz-control mode
 // ---------------------------------------------------------------------------
 
-const FUZZ_ACTIONS = new Set(['rtp', 'rtp2', 'wait', 'move', 'quit', 'rejoin', 'die', 'cmd']);
+const FUZZ_ACTIONS = new Set(['rtp', 'rtp2', 'wait', 'move', 'quit', 'rejoin', 'die', 'cmd', 'click', 'close_window']);
 const DENIED_ACTIONS = new Set([
   'op', 'deop', 'stop', 'restart', 'reload', 'lp', 'luckperms',
   'bukkit:reload', 'minecraft:op', 'rtp reload', 'rtp admin',
@@ -694,6 +694,15 @@ function parseAction(raw, where) {
       if (o.rename !== undefined && typeof o.rename !== 'boolean') fail(`${where}.rename must be a boolean`);
       return { a: 'rejoin', rename: o.rename === true };
     case 'cmd': return { a: 'cmd', cmd: cleanText(o.cmd, 256, `${where}.cmd`) };
+    case 'click':
+      return {
+        a: 'click',
+        slot: Math.round(num(o.slot, -999, 512, 0, `${where}.slot`)),
+        button: Math.round(num(o.button, 0, 10, 0, `${where}.button`)),
+        mode: Math.round(num(o.mode, 0, 6, 0, `${where}.mode`))
+      };
+    case 'close_window':
+      return { a: 'close_window' };
     default: return { a: o.a };
   }
 }
@@ -925,6 +934,25 @@ function attachProtocolTelemetry(ep, conn, bot, onCommands) {
       }
     });
   }
+  client.on('open_window', (pkt) => {
+    const w = parseWindowPacket(conn.username, pkt, bot.version || activeVersion);
+    if (!w) return;
+    conn.openWindow = { windowId: w.window_id, windowType: w.window_type, slots: w.slots, title: w.title, stateId: 0 };
+    if (ep && ep.telemetry) ep.emit(w);
+  });
+  client.on('window_items', (pkt) => {
+    if (pkt && conn.openWindow && pkt.windowId === conn.openWindow.windowId && Number.isInteger(pkt.stateId)) {
+      conn.openWindow.stateId = pkt.stateId;
+    }
+  });
+  client.on('set_slot', (pkt) => {
+    if (pkt && conn.openWindow && pkt.windowId === conn.openWindow.windowId && Number.isInteger(pkt.stateId)) {
+      conn.openWindow.stateId = pkt.stateId;
+    }
+  });
+  client.on('close_window', () => {
+    conn.openWindow = null;
+  });
   if (!ep || !ep.telemetry) return;
   client.on('keep_alive', () => {
     const now = Date.now();
@@ -939,12 +967,6 @@ function attachProtocolTelemetry(ep, conn, bot, onCommands) {
       ep.emit({ ev: 'tick_gap', bot: conn.username, ms: gapMs, at: now, keepalive_ms: conn.keepAliveMs });
     }
     conn.lastUpdateTimeAt = now;
-  });
-  client.on('open_window', (pkt) => {
-    const w = parseWindowPacket(conn.username, pkt, bot.version || activeVersion);
-    if (!w) return;
-    conn.openWindow = { windowId: w.window_id, windowType: w.window_type, slots: w.slots, title: w.title };
-    ep.emit(w);
   });
 }
 
@@ -996,6 +1018,13 @@ function finishConn(ep, bs, conn, text, forced) {
   conn.ended = true;
   if (conn.spawnTimer) clearTimeout(conn.spawnTimer);
   if (bs.conn === conn) bs.conn = null;
+  if (ep && ep.telemetry && conn.spawned && conn.lastUpdateTimeAt > 0) {
+    const now = Date.now();
+    const tailGap = now - conn.lastUpdateTimeAt;
+    if (tailGap >= 500) {
+      ep.emit({ ev: 'tick_gap', bot: conn.username, ms: tailGap, at: now, keepalive_ms: conn.keepAliveMs });
+    }
+  }
   ep.emit({ ev: 'end', bot: conn.username, text: String(text).slice(0, 256), ...(forced ? { forced: true } : {}) });
   for (const w of conn.waiters.splice(0)) w('end');
 }
@@ -1032,6 +1061,7 @@ async function fuzzConnect(ep, bs) {
     attachProtocolTelemetry(ep, conn, bot, bs.onCommands);
     if (!keepWorld) bot.once('login', () => { for (const p of WORLD_PACKETS) bot._client.removeAllListeners(p); });
     bot.on('spawn', () => {
+      if (!conn.lastUpdateTimeAt) conn.lastUpdateTimeAt = Date.now();
       ep.emit({ ev: 'spawn', bot: conn.username, pos: posOf(bot) });
       if (!conn.spawned) {
         conn.spawned = true;
@@ -1118,6 +1148,8 @@ async function fuzzMove(ep, bs, act) {
 }
 
 async function runFuzzProgram(ep, bs) {
+  if (bs.joinDelayMs > 0) await epSleep(ep, bs.joinDelayMs);
+  if (ep.aborted) return;
   const first = await fuzzConnect(ep, bs);
   const program = bs.program;
   let i = 0;
@@ -1148,6 +1180,34 @@ async function runFuzzProgram(ep, bs) {
           const line = rawCmd.startsWith('/') ? rawCmd : '/' + rawCmd;
           bs.lastCmd = rawCmd.toLowerCase().trim();
           try { bot.chat(line); } catch (e) { ep.emit({ ev: 'bot_error', bot: bs.username, text: String(e.message) }); }
+          break;
+        }
+        case 'click': {
+          const w = bs.conn && bs.conn.openWindow;
+          const winId = w && Number.isInteger(w.windowId) ? w.windowId : 0;
+          const stateId = w && Number.isInteger(w.stateId) ? w.stateId : 0;
+          const maxSlot = w && Number.isInteger(w.slots) && w.slots > 0 ? w.slots - 1 : 53;
+          const slot = Math.max(-999, Math.min(maxSlot, Number.isInteger(act.slot) ? act.slot : 0));
+          bs.actionId = (bs.actionId || 0) + 1;
+          try {
+            bot._client.write('window_click', {
+              windowId: winId,
+              stateId,
+              slot,
+              mouseButton: act.button || 0,
+              action: bs.actionId,
+              mode: act.mode || 0,
+              changedSlots: [],
+              cursorItem: { present: false }
+            });
+          } catch (e) { /* protocol variation across MC versions */ }
+          break;
+        }
+        case 'close_window': {
+          const w = bs.conn && bs.conn.openWindow;
+          const winId = w && Number.isInteger(w.windowId) ? w.windowId : 0;
+          try { bot._client.write('close_window', { windowId: winId }); } catch (e) { /* ignore */ }
+          if (bs.conn) bs.conn.openWindow = null;
           break;
         }
         case 'wait': await epSleep(ep, act.ms); break;
@@ -1185,7 +1245,8 @@ async function runFuzzEpisode(sock, spec) {
   fuzzSend(sock, { ev: 'accepted', id: spec.id, bots: spec.bots.length });
   console.log(`[fuzz] episode ${spec.id}: ${spec.bots.length} bot(s), cmd=/${spec.cmd}, max ${spec.maxMs} ms`);
   const deadline = setTimeout(() => abortEpisode(ep, 'timeout'), spec.maxMs);
-  const states = spec.bots.map((b) => ({ baseName: b.name, username: b.name, program: b.program, generation: 0,
+  const states = spec.bots.map((b, idx) => ({ baseName: b.name, username: b.name, program: b.program, generation: 0,
+    joinDelayMs: spec.bots.length > 4 ? idx * 25 : 0,
     conn: null, kicked: false, joins: 0, spawns: 0, ran: 0, skipped: 0, lastCmd: null }));
   ep.states = states;
   try {

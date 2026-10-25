@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.predict.BernoulliEstimator;
 import io.github.dailystruggle.rtp.common.predict.ComparativeCostGovernor;
 import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
 import io.github.dailystruggle.rtp.common.predict.EwmaLinearFit;
@@ -72,7 +73,6 @@ public final class ProbeFirstGovernor {
     public static final long NO_BIN = Long.MIN_VALUE;
     /** Minimum variance of {@code 1/g} before the open term is fitted. */
     static final double MIN_X_VAR = 1e-3;
-    private static final double ALPHA = 2.0 / (WINDOW + 1);
 
     private static final ConcurrentHashMap<String, ProbeFirstGovernor> REGISTRY = new ConcurrentHashMap<>();
 
@@ -120,7 +120,7 @@ public final class ProbeFirstGovernor {
     private final EwmaLinearFit probeFit = EwmaLinearFit.ofCoalescedCost(WINDOW, MIN_SAMPLES, MIN_X_VAR);
     /** {@code 1/g} of probes recorded while probing is the default; frozen in SKIP. */
     private final EwmaEstimator defaultInvG = EwmaEstimator.ofWindow(WINDOW);
-    private final EwmaEstimator reject = EwmaEstimator.ofWindow(WINDOW);
+    private final BernoulliEstimator reject = BernoulliEstimator.ofWindow(WINDOW);
     private final EwmaEstimator loadAfterProbe = EwmaEstimator.ofWindow(WINDOW);
     private final EwmaEstimator loadDirect = EwmaEstimator.ofWindow(WINDOW);
     private final ComparativeCostGovernor<Mode> comparativeGovernor =
@@ -128,8 +128,7 @@ public final class ProbeFirstGovernor {
                     Mode.PROBE, Mode.SKIP, Z_SWITCH, SUSTAIN, WINDOW, MIN_EXPLORE, MAX_EXPLORE));
     private final ComparativeCostGovernor.CoalescedTrialAccrual trialAccrual =
             new ComparativeCostGovernor.CoalescedTrialAccrual(NO_BIN, TRIAL_RUN, TRIAL_WINDOW);
-    private final AtomicLong skipCount = new AtomicLong();
-    private final AtomicLong skipMeanBits = new AtomicLong(Double.doubleToRawLongBits(Double.NaN));
+    private final BernoulliEstimator skip = BernoulliEstimator.ofWindow(WINDOW);
     private final AtomicLong decisions = new AtomicLong();
     private final AtomicLong probeSamples = new AtomicLong();
     private final AtomicLong directSamples = new AtomicLong();
@@ -177,23 +176,11 @@ public final class ProbeFirstGovernor {
     }
 
     private void recordSkip(boolean skipped) {
-        double x = skipped ? 1.0 : 0.0;
-        long n = skipCount.incrementAndGet();
-        if (n == 1) {
-            skipMeanBits.set(Double.doubleToRawLongBits(x));
-            return;
-        }
-        double a = Math.max(1.0 / n, ALPHA);
-        skipMeanBits.getAndUpdate(prevBits -> {
-            double prev = Double.longBitsToDouble(prevBits);
-            if (Double.isNaN(prev)) return Double.doubleToRawLongBits(x);
-            double next = prev + a * (x - prev);
-            return Double.doubleToRawLongBits(next);
-        });
+        skip.recordOutcome(skipped);
     }
 
     private double skipMean() {
-        return Double.longBitsToDouble(skipMeanBits.get());
+        return skip.mean();
     }
 
     /** One finished, uncoalesced probe: wall time from dispatch to verdict, and whether it rejected. */
@@ -215,7 +202,7 @@ public final class ProbeFirstGovernor {
             probeSamples.set(probe.sampleCount());
             probeFit.record(invG, nanos);
             if (decisionState.mode() == Mode.PROBE) defaultInvG.recordSample(invG);
-            reject.recordSample(rejected ? 1.0 : 0.0);
+            reject.recordOutcome(rejected);
             log = evaluate();
         } finally {
             updateLock.unlock();

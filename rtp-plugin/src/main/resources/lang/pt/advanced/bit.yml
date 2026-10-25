@@ -12,6 +12,12 @@ strictConfig: false
 # Número mínimo de amostras antes de classificar uma condição como sempre ou nunca aprovada.
 gateOutcomeSamples: 200
 
+# Varredura BIT inicial agendada executada de forma assíncrona no tick +2.
+startupSweep: pbit
+
+# Provedor de cobertura de diagnóstico ao vivo injetado em RtpBit.RUNNER.
+coverage: auto
+
 # Níveis para códigos BIT registados; prevalecem sobre strictActions.
 # Permitidos: ERROR, WARNING, INFO, DEBUG, TRACE e OFF. OFF suprime o problema.
 # Códigos e níveis desconhecidos são ignorados e registados.

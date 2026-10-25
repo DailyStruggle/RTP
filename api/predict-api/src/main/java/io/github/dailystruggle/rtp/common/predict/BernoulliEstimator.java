@@ -13,14 +13,18 @@ package io.github.dailystruggle.rtp.common.predict;
  */
 public final class BernoulliEstimator {
 
+    private final int windowSize;
     private final double alpha;
+    private final double initialRate;
     private final boolean unbiasEarlySamples;
     private double rate;
     private long count = 0;
 
     private BernoulliEstimator(int windowSize, double initialRate, boolean unbiasEarlySamples) {
         if (windowSize < 1) throw new IllegalArgumentException("windowSize must be >= 1, got " + windowSize);
+        this.windowSize = windowSize;
         this.alpha = 2.0 / (windowSize + 1.0);
+        this.initialRate = initialRate;
         this.rate = initialRate;
         this.unbiasEarlySamples = unbiasEarlySamples;
     }
@@ -78,11 +82,48 @@ public final class BernoulliEstimator {
     }
 
     /**
+     * Returns the raw running mean estimate in [0.0, 1.0], or {@code Double.NaN} if uninitialized
+     * and no outcomes have been recorded yet.
+     *
+     * @return estimated mean, or {@code Double.NaN} when unsampled without a prior
+     */
+    public synchronized double mean() {
+        return rate;
+    }
+
+    /**
      * Returns the total number of binary trials recorded.
      *
      * @return sample count
      */
     public synchronized long sampleCount() {
         return count;
+    }
+
+    /**
+     * Returns the effective sample size {@code min(sampleCount, windowSize)} for standard error calculations.
+     *
+     * @return effective sample count in [0, windowSize]
+     */
+    public synchronized double effectiveSampleCount() {
+        return Math.min(count, windowSize);
+    }
+
+    /**
+     * Returns the configured window size.
+     *
+     * @return window size
+     */
+    public int windowSize() {
+        return windowSize;
+    }
+
+    /**
+     * Resets the estimator to its initial prior rate (or {@code Double.NaN} if uninitialized)
+     * and clears the sample count.
+     */
+    public synchronized void reset() {
+        this.rate = initialRate;
+        this.count = 0L;
     }
 }

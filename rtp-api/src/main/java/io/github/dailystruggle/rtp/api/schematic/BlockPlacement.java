@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
+import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import java.util.Objects;
 
 /**
@@ -46,6 +47,16 @@ public final class BlockPlacement {
   /** @return the canonical block-state string for the platform parser. */
   public String blockState() {
     return blockState;
+  }
+
+  /**
+   * Converts this placement to a {@link BlockDelta} carrying the same world coordinates and
+   * block-state string.
+   *
+   * @return equivalent {@link BlockDelta}
+   */
+  public BlockDelta toBlockDelta() {
+    return new BlockDelta(x, y, z, blockState);
   }
 
   @Override

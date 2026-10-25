@@ -1,11 +1,6 @@
 package io.github.dailystruggle.rtp.fabric.effects;
 
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
-import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
-import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
-import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
-import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
 import io.github.dailystruggle.effectsapi.common.effects.GlideKeepAlive;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -58,16 +53,13 @@ public final class FabricEffectsInitializer {
         // Defaults resolve by id, not ResourceLocation#withDefaultNamespace (1.21+) or the
         // MobEffects constants (MobEffect on 1.20.1, Holder<MobEffect> on 1.21+), so this
         // common code links on the 1.20.1 carrier too (ADR-113).
-        EffectFactory.addEffect("SOUND",    new SoundEffect(FabricRegistryCompat.resolve(BuiltInRegistries.SOUND_EVENT, ResourceLocation.tryParse("minecraft:entity.player.levelup"))));
-        EffectFactory.addEffect("PARTICLE", new ParticleEffect(ParticleTypes.EXPLOSION));
-        EffectFactory.addEffect("TITLE",    new TitleEffect());
-        EffectFactory.addEffect("POTION",   new PotionEffect(FabricRegistryCompat.resolve(BuiltInRegistries.MOB_EFFECT, ResourceLocation.tryParse("minecraft:blindness"))));
-        EffectFactory.addEffect("GLIDE",    new GlideEffect());
-        EffectFactory.addEffect("COMMAND",  new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
-        EffectFactory.addEffect("DROP_INVENTORY", new io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect());
-        EffectFactory.addEffect("DROP_EXP", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
-        EffectFactory.addEffect("DROP_EXPERIENCE", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
-        EffectFactory.addEffect("DEATH", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
-        EffectFactory.addEffect("KILL", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
+        // ADR-116: register the canonical built-in effect set once via EffectFactory.
+        EffectFactory.registerBuiltInEffects(
+                FabricRegistryCompat.resolve(BuiltInRegistries.SOUND_EVENT, ResourceLocation.tryParse("minecraft:entity.player.levelup")),
+                ParticleTypes.EXPLOSION,
+                FabricRegistryCompat.resolve(BuiltInRegistries.MOB_EFFECT, ResourceLocation.tryParse("minecraft:blindness")),
+                "BALL",
+                "WHITE",
+                "PIANO");
     }
 }

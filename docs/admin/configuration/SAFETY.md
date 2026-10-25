@@ -25,7 +25,7 @@ Keys marked **Integer / Duration** below accept a plain number of seconds or a d
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `invulnerabilityTime` | Integer / Duration | `5` | Seconds of invulnerability granted after teleporting. Prevents fall, fire, or drowning damage on arrival. `0` disables. |
+| `invulnerabilityTime` | Integer / Duration | `5` | Seconds of invulnerability granted after teleporting. Prevents **fall**, fire, or **drowning** damage on arrival. `0` **disables**. |
 | `safetyRadius` | Integer | `0` | Block radius around the landing point to check for hazards. `0` = check only the landing block. |
 | `staleChunkRetryLimit` | Integer | `2` | Bounded retry budget for the stale-chunk guard. Prevents race conditions where a chunk unloads before evaluation. |
 | `anvilPrefilterEnabled` | Boolean | `true` | Off-thread region prefilter: screens candidate destinations by reading region files (`.mca` Anvil format, plus any format an addon registers) from disk, dropping known-unsafe ones before they cost a chunk load. A chunk it cannot read (e.g. not yet generated, or stored in an unregistered format such as `.linear`) is not rejected - it passes through to the normal live-load safety check. |

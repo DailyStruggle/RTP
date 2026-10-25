@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.region.cache.RingBufferDelegate;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
@@ -12,8 +13,10 @@ import java.util.logging.Level;
  * This implementation uses atomic operations to manage head and tail pointers,
  * avoiding locks for high-concurrency performance. It is optimized for a
  * single producer and a single consumer.
+ *
+ * @governedBy ADR-115 (Package DAG Disentanglement and Finite Decision-Preservation Hypergraph)
  */
-public class LockFreeLocationBuffer {
+public class LockFreeLocationBuffer implements RingBufferDelegate {
     private final AtomicReferenceArray<RTPLocation> buffer;
     private final int mask;
     private final AtomicLong head = new AtomicLong(0);
@@ -44,6 +47,34 @@ public class LockFreeLocationBuffer {
     public void setCallbacks(Consumer<RTPLocation> onAdd, Consumer<RTPLocation> onRemove) {
         this.onAdd = onAdd;
         this.onRemove = onRemove;
+    }
+
+    @Override
+    public void setRawCallbacks(Consumer<Object> onAdd, Consumer<Object> onRemove) {
+        setCallbacks(
+                onAdd != null ? onAdd::accept : null,
+                onRemove != null ? onRemove::accept : null
+        );
+    }
+
+    @Override
+    public boolean offerItem(Object item) {
+        return (item instanceof RTPLocation loc) && offer(loc);
+    }
+
+    @Override
+    public boolean offerItemSilently(Object item) {
+        return (item instanceof RTPLocation loc) && offerSilently(loc);
+    }
+
+    @Override
+    public Object pollItem() {
+        return poll();
+    }
+
+    @Override
+    public Object pollItemSilently() {
+        return pollSilently();
     }
 
     /**

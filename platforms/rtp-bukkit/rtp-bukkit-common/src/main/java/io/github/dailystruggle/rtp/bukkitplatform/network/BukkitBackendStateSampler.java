@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkitplatform.network;
 
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.network.BackendStateSampler;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
@@ -98,7 +99,10 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
             softCap = s == null ? 0 : s.softCap;
             heapUsed = s == null ? 0L : s.heapUsedBytes;
             heapMax = s == null ? 0L : s.heapMaxBytes;
-        } catch (Throwable ignored) {
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordSamplerDegraded(
+                    "BukkitBackendStateSampler#metricsSnapshot",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             mspt = 0.0;
             playerCount = 0;
             softCap = 0;
@@ -112,8 +116,10 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
             for (World w : Bukkit.getWorlds()) {
                 worlds.add(w.getName());
             }
-        } catch (Throwable ignored) {
-            // Defensive: tests may run without a Bukkit server in scope.
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordSamplerDegraded(
+                    "BukkitBackendStateSampler#worlds",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
 
         // Queue depth: best-effort from the RTP region queue manager.
@@ -124,8 +130,10 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
             if (r != null) {
                 queueDepth = TeleportSessions.current().processingPlayers.size();
             }
-        } catch (Throwable ignored) {
-            // Defensive.
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordSamplerDegraded(
+                    "BukkitBackendStateSampler#queueDepth",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
 
         // Regions available: lift the region keys from the loaded RTP config.
@@ -182,8 +190,10 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
                                     per += region.queueManager.networkKeptLocations.size();
                                 }
                             }
-                        } catch (Throwable ignored) {
-                            // Defensive: a region mid-shutdown may NPE on its buffers.
+                        } catch (RuntimeException | LinkageError e) {
+                            PlatformHookBitComponent.recordSamplerDegraded(
+                                    "BukkitBackendStateSampler#regionKeptCounts:" + region.name,
+                                    e.getClass().getSimpleName() + ": " + e.getMessage());
                         }
                         regionKeptCounts.put(region.name, per);
                         keptCountTotal += per;
@@ -200,9 +210,10 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
                                     regionMetadata.put(region.name + ".block", block);
                                 }
                             }
-                        } catch (Throwable ignored) {
-                            // Defensive: env enrichment is best-effort and must
-                            // never break the heartbeat sample.
+                        } catch (RuntimeException | LinkageError e) {
+                            PlatformHookBitComponent.recordSamplerDegraded(
+                                    "BukkitBackendStateSampler#regionEnvironment:" + region.name,
+                                    e.getClass().getSimpleName() + ": " + e.getMessage());
                         }
                         try {
                             // Advertise the operator-configured cosmetic display
@@ -216,8 +227,10 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
                                     && !label.equals(region.name)) {
                                 regionMetadata.put(region.name + ".label", label);
                             }
-                        } catch (Throwable ignored) {
-                            // Defensive: label enrichment is best-effort.
+                        } catch (RuntimeException | LinkageError e) {
+                            PlatformHookBitComponent.recordSamplerDegraded(
+                                    "BukkitBackendStateSampler#regionDisplayName:" + region.name,
+                                    e.getClass().getSimpleName() + ": " + e.getMessage());
                         }
                         try {
                             // Advertise whether this region is permission-gated
@@ -228,13 +241,17 @@ public final class BukkitBackendStateSampler implements BackendStateSampler {
                             if (region.getSettings().requirePermission()) {
                                 regionMetadata.put(region.name + ".perm", "true");
                             }
-                        } catch (Throwable ignored) {
-                            // Defensive: settings read must not break the sample.
+                        } catch (RuntimeException | LinkageError e) {
+                            PlatformHookBitComponent.recordSamplerDegraded(
+                                    "BukkitBackendStateSampler#regionPermission:" + region.name,
+                                    e.getClass().getSimpleName() + ": " + e.getMessage());
                         }
                     }
                 }
-            } catch (Throwable ignored) {
-                // Defensive.
+            } catch (RuntimeException | LinkageError e) {
+                PlatformHookBitComponent.recordSamplerDegraded(
+                        "BukkitBackendStateSampler#regions",
+                        e.getClass().getSimpleName() + ": " + e.getMessage());
             }
         }
 

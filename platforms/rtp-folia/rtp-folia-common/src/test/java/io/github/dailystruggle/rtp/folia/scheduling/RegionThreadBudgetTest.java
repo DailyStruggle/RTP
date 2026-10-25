@@ -4,7 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -87,5 +91,91 @@ class RegionThreadBudgetTest {
     assertFalse(budget.hasBudget());
     budget.release();
     assertEquals(BUDGET, budget.remaining(), "a released thread re-initialises with one full budget");
+  }
+
+  @Test
+  @DisplayName("ADR-123: Cell-group resolution, split detection, round-robin merge probing, and global span")
+  void cellGroupResolutionSplitMergeAndGlobalSpan() {
+    UUID worldId = UUID.randomUUID();
+    AtomicBoolean autoTune = new AtomicBoolean(true);
+    Map<String, Long> shares = new ConcurrentHashMap<>();
+    Map<String, Long> loans = new ConcurrentHashMap<>();
+
+    RegionThreadBudget governed = new RegionThreadBudget(
+        clock::get,
+        () -> BUDGET,
+        autoTune::get,
+        g -> shares.getOrDefault(g, -1L),
+        g -> loans.getOrDefault(g, 0L),
+        null);
+
+    // 1. Two distant cells (0,0) and (80,80) start in separate tick regions -> 2 live groups
+    String g1 = governed.beginSliceGroup(worldId, 0, 0, (cx, cz) -> cx < 32);
+    governed.endSliceGroup();
+    String g2 = governed.beginSliceGroup(worldId, 80, 80, (cx, cz) -> cx >= 32);
+    governed.endSliceGroup();
+    assertEquals(2, governed.liveGroupCount());
+
+    // 2. Nearby cell (8,0) in same region joins g1
+    String g1Near = governed.beginSliceGroup(worldId, 8, 0, (cx, cz) -> cx < 32);
+    governed.endSliceGroup();
+    assertEquals(g1, g1Near);
+    assertEquals(2, governed.liveGroupCount());
+
+    // 3. Folia merges the two regions so both representatives now return true on isOwnedByCurrentRegion
+    //    Round-robin merge probe detects the merge on the next slice and collapses to 1 live group
+    String merged = governed.beginSliceGroup(worldId, 0, 0, (cx, cz) -> true);
+    governed.endSliceGroup();
+    assertEquals(1, governed.liveGroupCount(), "Merge probe must collapse merged groups into one");
+    assertEquals(merged, governed.groupForCell(worldId, 80, 80));
+
+    // 4. Global region span charges k = "global"
+    long gSpan = governed.beginGlobal();
+    clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(2));
+    governed.endGlobal(gSpan);
+    assertEquals(TimeUnit.MILLISECONDS.toNanos(2), governed.globalChargedNanos());
+  }
+
+  @Test
+  @DisplayName("ADR-123 Invariant I1: Group bucket inside thread bucket caps shared threads at S_cfg and allows exclusive loan up to min(2*S_cfg, 25ms)")
+  void invariantI1GroupAndExclusiveThreadLoanEnforcement() {
+    UUID worldId = UUID.randomUUID();
+    Map<String, Long> shares = new ConcurrentHashMap<>();
+    Map<String, Long> loans = new ConcurrentHashMap<>();
+
+    RegionThreadBudget governed = new RegionThreadBudget(
+        clock::get,
+        () -> BUDGET, // S_cfg = 5 ms
+        () -> true,
+        g -> shares.getOrDefault(g, BUDGET),
+        g -> loans.getOrDefault(g, 0L),
+        null);
+
+    String gBorrower = governed.beginSliceGroup(worldId, 0, 0, (cx, cz) -> cx == 0 && cz == 0);
+    shares.put(gBorrower, BUDGET);     // S_k = 5 ms
+    loans.put(gBorrower, BUDGET);      // e_k = 5 ms -> S_k + e_k = 10 ms
+
+    // On an exclusive thread (only gBorrower has run on this thread in the last 1 s),
+    // outer thread ceiling rises to min(2 * 5 ms, 25 ms) = 10 ms
+    governed.charge(gBorrower, TimeUnit.MILLISECONDS.toNanos(7), false);
+    assertTrue(governed.hasBudget(gBorrower),
+        "Exclusive borrower thread with 5 ms share + 5 ms loan must still have budget after 7 ms");
+    governed.charge(gBorrower, TimeUnit.MILLISECONDS.toNanos(3), false);
+    assertFalse(governed.hasBudget(gBorrower),
+        "10 ms exhausts the 5 ms share + 5 ms loan on the exclusive borrower thread");
+    governed.endSliceGroup();
+
+    // Advance 1 tick (50 ms) and run a second group on the SAME thread within 1 s:
+    // thread is no longer exclusive to gBorrower -> outer ceiling drops immediately to S_cfg = 5 ms!
+    clock.addAndGet(TICK);
+    String gOther = governed.beginSliceGroup(worldId, 160, 160, (cx, cz) -> cx == 160 && cz == 160);
+    governed.charge(gOther, TimeUnit.MILLISECONDS.toNanos(1), false);
+    governed.endSliceGroup();
+
+    governed.beginSliceGroup(worldId, 0, 0, (cx, cz) -> cx == 0 && cz == 0);
+    governed.charge(gBorrower, TimeUnit.MILLISECONDS.toNanos(4), false);
+    assertFalse(governed.hasBudget(gBorrower),
+        "Once a thread ticks a second group within 1 s, its outer thread bucket ceiling must drop to S_cfg (5 ms)");
+    governed.endSliceGroup();
   }
 }

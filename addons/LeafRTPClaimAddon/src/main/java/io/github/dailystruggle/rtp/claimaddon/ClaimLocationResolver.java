@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.claimaddon;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -34,8 +35,10 @@ public final class ClaimLocationResolver {
           return new Location(bw, coords.x(), coords.y(), coords.z());
         }
       }
-    } catch (Throwable ignored) {
-      // Ignored: proceed to fallback resolver when server accessor is unavailable
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordAddonHookDegraded(
+          "ClaimLocationResolver#serverAccessor",
+          e.getClass().getSimpleName() + ": " + e.getMessage());
     }
 
     // 2. Fallback to Bukkit server if present and initialized
@@ -44,8 +47,10 @@ public final class ClaimLocationResolver {
       if (bw != null) {
         return new Location(bw, coords.x(), coords.y(), coords.z());
       }
-    } catch (Throwable ignored) {
-      // Ignored: Bukkit server may be null, mock or uninitialized during testing
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordAddonHookDegraded(
+          "ClaimLocationResolver#bukkitGetWorld",
+          e.getClass().getSimpleName() + ": " + e.getMessage());
     }
 
     return null;

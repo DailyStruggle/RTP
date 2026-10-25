@@ -1,6 +1,6 @@
 # ADR-039 — `/rtpadmin` Diagnostic Surfaces (Biome Map, Bad-Selection Heatmap, Metrics Readouts)
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-13
 **Target release:** `3.0.0-beta.4` (read-only surfaces only, including cross-backend aggregation via ADR-036's shared store and in-memory time-series charts sampled by a repurposed `MemoryTracker`; deeper visualizations may slip to beta.5)
 **Supersedes:** —

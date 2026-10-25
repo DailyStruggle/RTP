@@ -108,12 +108,24 @@ class BitApiContractTest {
     @Test
     void countersAndSimulationUtilitiesTrackTheirContracts() {
         CbitCounter counter = new CbitCounter();
+        assertFalse(counter.isObserved());
+        assertEquals(0, counter.observations());
+        counter.observe();
+        counter.observe(4);
+        assertTrue(counter.isObserved());
+        assertEquals(0, counter.count());
+        assertEquals(5, counter.observations());
         counter.increment();
         counter.add(2);
         assertEquals(3, counter.count());
+        assertEquals(8, counter.observations());
+        assertTrue(counter.observations() >= counter.count());
         counter.reset();
         assertEquals(0, counter.count());
+        assertEquals(0, counter.observations());
+        assertFalse(counter.isObserved());
         assertThrows(IllegalArgumentException.class, () -> counter.add(-1));
+        assertThrows(IllegalArgumentException.class, () -> counter.observe(-1));
 
         GateOutcomeCounter outcomes = new GateOutcomeCounter();
         outcomes.recordOutcome(false);

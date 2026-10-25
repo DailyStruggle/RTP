@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
+import io.github.dailystruggle.rtp.common.predict.DistributionSampler;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 
 import java.util.EnumMap;
@@ -46,34 +47,10 @@ public abstract class NormalMemoryShape extends MemoryShape<NormalDistributionPa
     // ensure mean 0.0-1.0 and deviation > 0
     double mean = Math.abs(getNumber(NormalDistributionParams.mean, 0.5).doubleValue()) % 1.0;
     double deviation = Math.abs(getNumber(NormalDistributionParams.deviation, 1.0).doubleValue());
+    double exponent = DistributionSampler.radialAreaExponent(cr, radius);
 
-    // get a valid number between 0 and 1
-    // apply corrective deviation, apply requested deviation, shift over to mean
-    // todo: find a way to approximate this without rejection sampling
-    double gaussian;
-    do {
-      // approximately -4 to 4
-      gaussian = rng().nextGaussian();
-
-      // correct to -0.5 to 0.5
-      gaussian = gaussian / 8;
-
-      // apply requested deviation
-      gaussian = gaussian * deviation;
-
-      // shift over to requested mean
-      gaussian = gaussian + mean;
-
-      if (mean < 0.05 && gaussian < 0) gaussian = -gaussian;
-      else if (mean > 0.95 && gaussian > 1) gaussian = 1 - gaussian;
-    } while (gaussian < 0 || gaussian > 1); // reject values outside distribution
-
-    // an approximation of the necessary exponent for 1d to 2d mapping
-    // 0.5-1.0 depending on cr, so it shouldn't escape bounds
-    double exponent = (1 + ((double) cr) / ((double) radius)) * 0.5;
-    gaussian = Math.pow(gaussian, 1.0 / exponent);
-
-    // expand to fit
-    return range * gaussian;
+    return range
+        * DistributionSampler.sampleTruncatedNormal(
+            mean, deviation, exponent, rng()::nextGaussian, rng()::nextDouble);
   }
 }

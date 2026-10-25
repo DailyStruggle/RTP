@@ -175,7 +175,15 @@ public final class FabricHandlesUnobf implements HandleProvider {
 
         @Override
         public void playNote(Object instrument, int tone) {
-            // Fabric note playing logic is typically handled via sound packets if no block exists.
+            SoundEvent sound = resolveNoteSound(instrument);
+            if (sound == null) {
+                io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                        "Fabric-26.x", "NOTE", "unknown note instrument: " + instrument);
+                return;
+            }
+            int clamped = Math.max(0, Math.min(24, tone));
+            float pitch = (float) Math.pow(2.0D, (clamped - 12) / 12.0D);
+            playSound(sound, 3.0f, pitch, 0.0, 0.0, 0.0);
         }
 
         @Override
@@ -278,7 +286,16 @@ public final class FabricHandlesUnobf implements HandleProvider {
 
         @Override
         public void spawnFirework(Map<String, Object> data) {
-            // Firework implementation for Fabric.
+            try {
+                ServerLevel level = (ServerLevel) player.level();
+                if (!spawnFireworkAt(level, player.getX(), player.getY(), player.getZ(), data)) {
+                    io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                            "Fabric-26.x", "FIREWORK", "firework spawn unavailable on active Fabric 26.x runtime");
+                }
+            } catch (Throwable t) {
+                io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                        "Fabric-26.x", "FIREWORK", t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
         }
 
         @Override
@@ -368,27 +385,138 @@ public final class FabricHandlesUnobf implements HandleProvider {
 
         @Override
         public void playSound(Object type, float volume, float pitch) {
-            // Need a way to get the level from worldName.
+            ServerLevel level = resolveLevel(worldName);
+            if (level == null || !(type instanceof SoundEvent sound)) {
+                io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                        "Fabric-26.x", "SOUND", "location sound playback unavailable for world=" + worldName);
+                return;
+            }
+            level.playSound(null, location.x, location.y, location.z, sound, SoundSource.PLAYERS, volume, pitch);
         }
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
-            // Need a way to get the level from worldName.
+            ServerLevel level = resolveLevel(worldName);
+            if (level == null || !(type instanceof ParticleOptions opts)) {
+                io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                        "Fabric-26.x", "PARTICLE", "location particle spawn unavailable for world=" + worldName);
+                return;
+            }
+            int clampedCount = Math.max(1, Math.min(256, count));
+            level.sendParticles(opts, location.x, location.y, location.z, clampedCount, dx, dy, dz, speed);
         }
 
         @Override
         public void spawnFirework(Map<String, Object> data) {
-            // No-op fallback; firework spawning handled via version adapters or player handles
+            ServerLevel level = resolveLevel(worldName);
+            if (!spawnFireworkAt(level, location.x, location.y, location.z, data)) {
+                io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                        "Fabric-26.x", "FIREWORK", "location firework spawn unavailable for world=" + worldName);
+            }
         }
 
         @Override
         public void playNote(Object instrument, int tone) {
-            // No-op fallback; note block instrument playback handled via version adapters or player handles
+            SoundEvent sound = resolveNoteSound(instrument);
+            if (sound == null) {
+                io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
+                        "Fabric-26.x", "NOTE", "unknown note instrument: " + instrument);
+                return;
+            }
+            int clamped = Math.max(0, Math.min(24, tone));
+            float pitch = (float) Math.pow(2.0D, (clamped - 12) / 12.0D);
+            playSound(sound, 3.0f, pitch);
         }
 
         @Override
         public String toString() {
             return "FabricLocationHandle{world=" + worldName + ", x=" + x() + ", y=" + y() + ", z=" + z() + "}";
+        }
+    }
+
+    private static @Nullable ServerLevel resolveLevel(@Nullable String worldName) {
+        net.minecraft.server.MinecraftServer s = cachedServer;
+        if (s == null) return null;
+        if (worldName != null && !worldName.isEmpty() && !"unknown".equals(worldName)) {
+            for (ServerLevel sl : s.getAllLevels()) {
+                if (worldName.equals(sl.dimension().identifier().toString())) {
+                    return sl;
+                }
+            }
+        }
+        return s.overworld();
+    }
+
+    private static @Nullable SoundEvent resolveNoteSound(@Nullable Object instrument) {
+        if (instrument instanceof SoundEvent se) return se;
+        String raw = instrument == null ? "harp" : instrument.toString().trim().toLowerCase(java.util.Locale.ROOT);
+        String id = switch (raw) {
+            case "piano", "harp" -> "minecraft:block.note_block.harp";
+            case "bass_drum", "basedrum" -> "minecraft:block.note_block.basedrum";
+            case "snare_drum", "snare" -> "minecraft:block.note_block.snare";
+            case "sticks", "hat" -> "minecraft:block.note_block.hat";
+            case "bass_guitar", "bass" -> "minecraft:block.note_block.bass";
+            case "flute" -> "minecraft:block.note_block.flute";
+            case "bell" -> "minecraft:block.note_block.bell";
+            case "guitar" -> "minecraft:block.note_block.guitar";
+            case "chime" -> "minecraft:block.note_block.chime";
+            case "xylophone" -> "minecraft:block.note_block.xylophone";
+            case "iron_xylophone" -> "minecraft:block.note_block.iron_xylophone";
+            case "cow_bell" -> "minecraft:block.note_block.cow_bell";
+            case "didgeridoo" -> "minecraft:block.note_block.didgeridoo";
+            case "bit" -> "minecraft:block.note_block.bit";
+            case "banjo" -> "minecraft:block.note_block.banjo";
+            case "pling" -> "minecraft:block.note_block.pling";
+            default -> raw.indexOf(':') >= 0 ? raw : "minecraft:block.note_block." + raw;
+        };
+        try {
+            return FabricRegistryCompat.resolve(
+                    net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT,
+                    net.minecraft.resources.Identifier.tryParse(id));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean spawnFireworkAt(@Nullable ServerLevel level, double x, double y, double z,
+                                           @Nullable Map<String, Object> data) {
+        if (level == null) return false;
+        int numFireworks = 1;
+        int power = 0;
+        double dx = 0.0, dy = 1.0, dz = 0.0;
+        if (data != null) {
+            Object o = data.get("NUMBER");
+            if (o instanceof Number n) numFireworks = Math.max(1, Math.min(8, n.intValue()));
+            o = data.get("POWER");
+            if (o instanceof Number n) power = Math.max(0, Math.min(3, n.intValue()));
+            o = data.get("DX");
+            if (o instanceof Number n) dx = n.doubleValue();
+            o = data.get("DY");
+            if (o instanceof Number n) dy = n.doubleValue();
+            o = data.get("DZ");
+            if (o instanceof Number n) dz = n.doubleValue();
+        }
+        try {
+            net.minecraft.world.item.ItemStack stack =
+                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.FIREWORK_ROCKET);
+            boolean anyAdded = false;
+            for (int i = 0; i < numFireworks; i++) {
+                net.minecraft.world.entity.projectile.FireworkRocketEntity rocket =
+                        new net.minecraft.world.entity.projectile.FireworkRocketEntity(level, x, y + 1.0, z, stack.copy());
+                if (dx != 0.0 || dy != 1.0 || dz != 0.0) {
+                    rocket.setDeltaMovement(dx, dy, dz);
+                }
+                if (level.addFreshEntity(rocket)) {
+                    anyAdded = true;
+                }
+                if (power <= 0) {
+                    level.broadcastEntityEvent(rocket, (byte) 17);
+                    rocket.discard();
+                }
+            }
+            return anyAdded;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 }

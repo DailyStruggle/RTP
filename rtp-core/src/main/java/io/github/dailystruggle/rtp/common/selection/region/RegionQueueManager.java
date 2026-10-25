@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.cache.CacheStage;
@@ -264,13 +263,15 @@ public class RegionQueueManager {
      */
     public void installDatabaseCallbacks() {
         java.util.function.Consumer<RTPLocation> saveCallback = location -> {
-            if (ActiveDatabase.accessor() != null) {
-                ActiveDatabase.accessor().saveCachedLocation(region.name, location, null);
+            RegionLocationStore store = Region.getLocationStore();
+            if (store != null) {
+                store.saveCachedLocation(region.name, location, null);
             }
         };
         java.util.function.Consumer<RTPLocation> deleteCallback = location -> {
-            if (ActiveDatabase.accessor() != null) {
-                ActiveDatabase.accessor().deleteCachedLocation(region.name, location);
+            RegionLocationStore store = Region.getLocationStore();
+            if (store != null) {
+                store.deleteCachedLocation(region.name, location);
             }
         };
         this.keptLocations.setCallbacks(saveCallback, deleteCallback);
@@ -590,8 +591,9 @@ public class RegionQueueManager {
                 // so aborts the very teleport this poll is serving. The shared
                 // keptLocations branch below likewise just returns the location and
                 // lets the pipeline carry it through to completion.
-                if (ActiveDatabase.accessor() != null) {
-                    ActiveDatabase.accessor().deleteCachedLocation(region.name, loc);
+                RegionLocationStore store = Region.getLocationStore();
+                if (store != null) {
+                    store.deleteCachedLocation(region.name, loc);
                 }
                 region.recordLocationConsumed(uuid);
                 return CompletableFuture.completedFuture(loc);
@@ -747,9 +749,51 @@ public class RegionQueueManager {
         }
 
         queue.add(location);
-        if (ActiveDatabase.accessor() != null) {
-            ActiveDatabase.accessor().saveCachedLocation(region.name, location, uuid);
+        RegionLocationStore store = Region.getLocationStore();
+        if (store != null) {
+            store.saveCachedLocation(region.name, location, uuid);
         }
+    }
+
+    /**
+     * Delivers an async personal-fill result only if {@code uuid}'s personal bucket is still open
+     * (ADR-043, REQ-RTP-S-002). If the player disconnected while {@link RegionCacheTask} was in
+     * flight, {@link #closePersonalQueue(UUID)} already removed the bucket; demote the coordinate
+     * to {@link #unkeptLocations} (closing its reservation) instead of re-opening a phantom bucket
+     * and {@code PartitionCacheStage} for an offline UUID.
+     *
+     * @param uuid     player uuid
+     * @param location generated location (may hold a chunk reservation)
+     * @return {@code true} if banked in the open personal bucket; {@code false} if demoted to unkept
+     */
+    boolean enqueuePlayerLocationIfOpen(UUID uuid, RTPLocation location) {
+        if (uuid == null || location == null) {
+            demoteToUnkept(location);
+            return false;
+        }
+        ConcurrentLinkedQueue<RTPLocation> queue = perPlayerLocationQueue.get(uuid);
+        if (queue == null) {
+            demoteToUnkept(location);
+            return false;
+        }
+        RTPLocation excess;
+        while ((excess = queue.poll()) != null) {
+            demoteToUnkept(excess);
+        }
+        queue.add(location);
+        if (perPlayerLocationQueue.get(uuid) != queue) {
+            // Concurrent closePersonalQueue(uuid) raced with queue.add: drain any stranded item.
+            RTPLocation stranded;
+            while ((stranded = queue.poll()) != null) {
+                demoteToUnkept(stranded);
+            }
+            return false;
+        }
+        RegionLocationStore store = Region.getLocationStore();
+        if (store != null) {
+            store.saveCachedLocation(region.name, location, uuid);
+        }
+        return true;
     }
 
     /**
@@ -1021,10 +1065,10 @@ public class RegionQueueManager {
                                 "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                     }
                 }
+                RegionLocationStore store = Region.getLocationStore();
                 if (TeleportSessions.current() != null
-                        && ActiveDatabase.accessor() != null) {
-                    ActiveDatabase.accessor()
-                            .deleteCachedLocation(region.name, loc);
+                        && store != null) {
+                    store.deleteCachedLocation(region.name, loc);
                 }
             }
         }
@@ -1051,10 +1095,10 @@ public class RegionQueueManager {
                                 "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                     }
                 }
+                RegionLocationStore store = Region.getLocationStore();
                 if (TeleportSessions.current() != null
-                        && ActiveDatabase.accessor() != null) {
-                    ActiveDatabase.accessor()
-                            .deleteCachedLocation(region.name, loc);
+                        && store != null) {
+                    store.deleteCachedLocation(region.name, loc);
                 }
             }
         }
@@ -1079,10 +1123,10 @@ public class RegionQueueManager {
                                     "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                         }
                     }
+                    RegionLocationStore store = Region.getLocationStore();
                     if (TeleportSessions.current() != null
-                            && ActiveDatabase.accessor() != null) {
-                        ActiveDatabase.accessor()
-                                .deleteCachedLocation(region.name, loc);
+                            && store != null) {
+                        store.deleteCachedLocation(region.name, loc);
                     }
                 }
             }

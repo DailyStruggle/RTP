@@ -38,6 +38,34 @@ final class QueueTask {
     private final UUID playerId;
     private final boolean custom;
 
+    private static final java.util.concurrent.atomic.AtomicLong inlineFallbackCount =
+            new java.util.concurrent.atomic.AtomicLong(0L);
+
+    static long inlineFallbackCount() {
+        return inlineFallbackCount.get();
+    }
+
+    static void resetInlineFallbackCount() {
+        inlineFallbackCount.set(0L);
+    }
+
+    /**
+     * Completes {@link #result} off the calling region thread via the async scheduler so
+     * placement-free dependent stages never run inline on a tick region thread (ADR-123 Section 2 & 11).
+     */
+    private void completeOffRegion(@Nullable GenerationResult value) {
+        try {
+            if (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getScheduler() != null) {
+                RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(() -> result.complete(value));
+                return;
+            }
+        } catch (Throwable t) {
+            inlineFallbackCount.incrementAndGet();
+            RTPRuntime.log(Level.FINE, "[RTP] QueueTask off-region completion rejected; falling back inline: " + t);
+        }
+        result.complete(value);
+    }
+
     QueueTask(
             Region region,
             RTPCommandSender sender,
@@ -383,7 +411,7 @@ final class QueueTask {
                         rejection ->
                                 RTPRuntime.log(
                                         Level.WARNING,
-                                        "[safety.yml] rejected unsafe-blocks token '"
+                                        "[advanced/blocks.yml] rejected unsafe-blocks token '"
                                                 + rejection.rawToken()
                                                 + "': "
                                                 + rejection.reason()));
@@ -570,7 +598,7 @@ final class QueueTask {
                         }
                         transferred = new ChunkSet(world, ccx, ccz, vd, new CompletableFuture<>());
                     }
-                    result.complete(new GenerationResult(left, fpair.attempts(), transferred, reservation));
+                    completeOffRegion(new GenerationResult(left, fpair.attempts(), transferred, reservation));
                 });
     }
 

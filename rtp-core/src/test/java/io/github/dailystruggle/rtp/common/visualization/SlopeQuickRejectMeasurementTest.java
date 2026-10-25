@@ -14,6 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -25,11 +26,13 @@ import org.junit.jupiter.api.Test;
  * are excluded (the unsafe-block check rejects them anyway). Quick-reject classifiers only see what
  * a memory table would hold: one centre floor Y per chunk, or one per-chunk relief value.
  */
+@Tag("slow")
 public class SlopeQuickRejectMeasurementTest {
 
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$");
   private static final Path REGION_DIR = Path.of(System.getProperty("rtp.elevation.regionDir",
-      "/home/johngoldsmith/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
+      System.getProperty("user.home", "")
+          + "/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
           + "/world/dimensions/minecraft/overworld/region"));
 
   private static final int MIN_Y = -64;

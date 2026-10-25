@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider;
 import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
 import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
@@ -116,7 +117,8 @@ public final class ClaimIntegrations {
         if (parent != null && !parent.exists()) parent.mkdirs();
         java.nio.file.Files.move(legacy.toPath(), moved.toPath());
       }
-    } catch (Exception e) {
+    } catch (java.io.IOException | RuntimeException e) {
+      PlatformHookBitComponent.recordAddonHookDegraded("ClaimIntegrations#migrateLegacyRoot", e);
       RTP.log(java.util.logging.Level.WARNING,
           "[RTP] failed to migrate legacy " + fileName + " into addons/", e);
     }
@@ -194,10 +196,11 @@ public final class ClaimIntegrations {
       ClaimCheck check = checkSupplier.get();
       verifiers.register(checkerClass, loc -> !check.isInClaim(loc));
       integrationStatuses.put(key, new IntegrationStatus(pluginName, key, true, Outcome.REGISTERED, ""));
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
       String message = t.getMessage() == null || t.getMessage().isBlank()
           ? t.getClass().getName() : t.getMessage();
       integrationStatuses.put(key, new IntegrationStatus(pluginName, key, true, Outcome.FAILED, message));
+      PlatformHookBitComponent.recordAddonHookDegraded(pluginName, t);
       RTP.log(
           java.util.logging.Level.WARNING,
           "[RTP] claim integration for "
@@ -227,6 +230,8 @@ public final class ClaimIntegrations {
       try {
         handle.close();
       } catch (Exception e) {
+        PlatformHookBitComponent.recordAddonHookDegraded(
+            handle.getClass().getSimpleName() + "#close", e);
         RTP.log(
             java.util.logging.Level.WARNING,
             "[RTP] failed to close claim boundary provider handle " + handle.getClass().getName(),
@@ -276,7 +281,8 @@ public final class ClaimIntegrations {
       if (handle != null) {
         registeredProviders.add(handle);
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordAddonHookDegraded(pluginName + "#boundary", t);
       RTP.log(
           java.util.logging.Level.WARNING,
           "[RTP] claim boundary provider for "

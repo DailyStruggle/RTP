@@ -43,30 +43,60 @@ public class NeoForgeSoundEffect extends Effect<NeoForgeSoundKeys> {
 
     @Override
     public void run() {
-        if (!(target instanceof ServerPlayer)) return;
-        ServerPlayer player = (ServerPlayer) target;
+        ServerPlayer player = NeoForgeHandles.unwrapPlayer(target);
+        if (player == null) return;
 
         Object typeObj = data.get(NeoForgeSoundKeys.TYPE);
-        if (!(typeObj instanceof SoundEvent)) return;
-        SoundEvent sound = (SoundEvent) typeObj;
-
         float volume = numAsFloat(data.get(NeoForgeSoundKeys.VOLUME), 100) / 100f;
         float pitch  = numAsFloat(data.get(NeoForgeSoundKeys.PITCH), 100) / 100f;
         double dx = numAsDouble(data.get(NeoForgeSoundKeys.DX), 0.0);
         double dy = numAsDouble(data.get(NeoForgeSoundKeys.DY), 0.0);
         double dz = numAsDouble(data.get(NeoForgeSoundKeys.DZ), 0.0);
 
+        playForPlayer(player, typeObj, volume, pitch, dx, dy, dz);
+    }
+
+    static SoundEvent resolveSoundEvent(Object typeObj) {
+        if (typeObj instanceof SoundEvent se) return se;
+        if (typeObj instanceof Holder<?> h && h.value() instanceof SoundEvent se) return se;
+        if (typeObj != null) {
+            try {
+                return NeoForgeRegistryResolver.resolve(BuiltInRegistries.SOUND_EVENT, typeObj.toString());
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public static boolean playForPlayer(ServerPlayer player, Object typeObj,
+                                        float volume, float pitch,
+                                        double dx, double dy, double dz) {
+        if (player == null) return false;
+        SoundEvent sound = resolveSoundEvent(typeObj);
+        if (sound == null) return false;
+
         // Preferred: direct-to-connection so the packet bypasses the chunk
         // tracker (broadcast packets are dropped right after a long teleport).
-        if (invokePlayNotifySound(player, sound, SoundSource.MASTER, volume, pitch)) return;
+        if (invokePlayNotifySound(player, sound, SoundSource.MASTER, volume, pitch)) return true;
         if (sendSoundPacket(player, sound, SoundSource.MASTER,
-                player.getX() + dx, player.getY() + dy, player.getZ() + dz, volume, pitch)) return;
+                player.getX() + dx, player.getY() + dy, player.getZ() + dz, volume, pitch)) return true;
         // Last resort: level broadcast. Resolve the level via the
         // mapping-agnostic NeoForge resolver (Entity#level() drifts on 1.21.11).
         ServerLevel level = NeoForgeRTPPlayer.resolveServerLevel(player);
-        if (level == null) return;
+        if (level == null) return false;
         invokePlaySound(level, player.getX() + dx, player.getY() + dy, player.getZ() + dz,
                 sound, SoundSource.MASTER, volume, pitch);
+        return PLAY_SOUND != null;
+    }
+
+    public static boolean playAtLevel(ServerLevel level, double x, double y, double z,
+                                      Object typeObj, float volume, float pitch) {
+        if (level == null) return false;
+        SoundEvent sound = resolveSoundEvent(typeObj);
+        if (sound == null) return false;
+        invokePlaySound(level, x, y, z, sound, SoundSource.MASTER, volume, pitch);
+        return PLAY_SOUND != null;
     }
 
     // ---- direct-to-connection ClientboundSoundPacket fallback -------------

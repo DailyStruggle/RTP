@@ -1,12 +1,12 @@
 # --- RTP Biome Filter (advanced) ---
 # Documentation: docs/admin/configuration/SAFETY.md
 
-# true = only land in the listed biomes. false = never land in them.
+# true = only land in the listed biomes (whitelist). false = never land in them (blacklist excluding ocean, sea, water, river, drown, and cave biomes).
 # @type: boolean
 # @default: false
 biomeWhitelist: false
 
-# The biomes the list above uses.
+# The biomes the list above skips or allows (default blacklist excludes ocean, sea, water, river, and cave biomes).
 # @type: list<biome>
 # @source: biome
 biomes:

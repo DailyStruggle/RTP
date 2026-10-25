@@ -57,4 +57,43 @@ class NeoForgeServerAccessorMockLookupTest {
         assertNull(accessor.getPlayer(MOCK_NAME));
         assertNull(accessor.getSender(mockId));
     }
+
+    @Test
+    @DisplayName("RTP-96: NeoForgeServerAccessor.log strips ANSI and section color codes from Log4j output")
+    void logStripsAnsiEscapeSequences() throws Exception {
+        NeoForgeServerAccessor accessor = new NeoForgeServerAccessor();
+        String[] samples = new String[] {
+                "<rainbow>[RTP]</rainbow> &a[RTP bit] csv,row,#ff8800value",
+                "&eWarn message with \u00A7ccolor",
+                "&cSevere #112233hex <red>tag</red>"
+        };
+        for (String sample : samples) {
+            String stripped = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeAnsiText.stripColor(sample);
+            assertFalse(stripped.contains("\u001b["),
+                    "RTP-96: log output must not contain ANSI escape sequences, got: " + stripped);
+            assertFalse(stripped.contains("\u00A7"),
+                    "RTP-96: log output must not contain section color codes, got: " + stripped);
+
+            String formattedNoColor = accessor.formatNoColor(null, sample);
+            assertFalse(formattedNoColor.contains("\u001b["),
+                    "RTP-96: formatNoColor must not contain ANSI escape sequences, got: " + formattedNoColor);
+            assertFalse(formattedNoColor.contains("\u00A7"),
+                    "RTP-96: formatNoColor must not contain section color codes, got: " + formattedNoColor);
+        }
+
+        // Verify compiled NeoForgeServerAccessor and NeoForgeConsoleSender bytecode routes
+        // log output through stripColor rather than toAnsiString (RTP-96).
+        String resource = NeoForgeServerAccessor.class.getName().replace('.', '/') + ".class";
+        java.net.URL url = NeoForgeServerAccessor.class.getClassLoader().getResource(resource);
+        if (url != null && "file".equals(url.getProtocol())) {
+            java.nio.file.Path classFile = java.nio.file.Paths.get(url.toURI());
+            String classBytes = new String(
+                    java.nio.file.Files.readAllBytes(classFile),
+                    java.nio.charset.StandardCharsets.ISO_8859_1);
+            assertTrue(classBytes.contains("stripColor"),
+                    "NeoForgeServerAccessor must strip color codes before logging");
+            assertFalse(classBytes.contains("toAnsiString"),
+                    "RTP-96: NeoForgeServerAccessor must not convert log lines to raw ANSI escapes");
+        }
+    }
 }

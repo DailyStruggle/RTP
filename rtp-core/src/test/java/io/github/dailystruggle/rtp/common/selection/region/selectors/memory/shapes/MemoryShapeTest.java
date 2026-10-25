@@ -764,4 +764,43 @@ public class MemoryShapeTest {
         assertEquals(10L, absorbedSnap.keys[0]);
         assertEquals(2L, absorbedSnap.sums[0]);
     }
+
+    @Test
+    public void testRebuildScratchShrinksAfterBurst() throws Exception {
+        TestShape shape = new TestShape();
+        // 1. Trigger a large burst rebuild (> 8,000 non-coalescing runs)
+        int burstRuns = 8192;
+        for (int i = 0; i < burstRuns; i++) {
+            shape.addBadLocation(i * 16L);
+            shape.addBiomeLocation(i * 16L, 1L, "PLAINS");
+        }
+        shape.flushAndRebuild(1L);
+
+        java.lang.reflect.Field scratchField = MemoryShape.class.getDeclaredField("scratch");
+        scratchField.setAccessible(true);
+        Object scratchObj = scratchField.get(shape);
+        java.lang.reflect.Field mergedKeysField = scratchObj.getClass().getDeclaredField("mergedKeys");
+        java.lang.reflect.Field unionKeysField = scratchObj.getClass().getDeclaredField("unionKeys");
+        mergedKeysField.setAccessible(true);
+        unionKeysField.setAccessible(true);
+
+        int burstMergedLen = ((long[]) mergedKeysField.get(scratchObj)).length;
+        int burstUnionLen = ((long[]) unionKeysField.get(scratchObj)).length;
+        assertTrue(burstMergedLen >= burstRuns, "Burst must grow mergedKeys to at least burstRuns");
+        assertTrue(burstUnionLen >= burstRuns, "Burst must grow unionKeys to at least burstRuns");
+
+        // 2. Clear and run small steady-state rebuilds so recentPeak decays
+        shape.clear();
+        for (int pass = 0; pass < 40; pass++) {
+            shape.addBadLocation(pass * 16L);
+            shape.flushAndRebuild(1L);
+        }
+
+        int shrunkMergedLen = ((long[]) mergedKeysField.get(scratchObj)).length;
+        int shrunkUnionLen = ((long[]) unionKeysField.get(scratchObj)).length;
+        assertTrue(shrunkMergedLen <= 1024,
+                "mergedKeys should shrink back to steady-state floor (<= 1024), was " + shrunkMergedLen);
+        assertTrue(shrunkUnionLen <= 1024,
+                "unionKeys should shrink back to steady-state floor (<= 1024), was " + shrunkUnionLen);
+    }
 }

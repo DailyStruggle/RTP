@@ -14,14 +14,14 @@
 #   advanced/     - tuning you usually do not need (performance, database, logging, metrics, network, biomes, blocks)
 #   addons/       - config for optional add-ons (countdown, GUI menu, claim integrations)
 
-# Seconds to wait before teleporting. 0 = right away. Supports duration units (e.g. 2s, 40t, 1500ms).
+# Warmup seconds to wait (stand still) before teleporting. 0 = instant / right away. Skipped by rtp.nodelay. Supports duration units (e.g. 2s, 40t, 1500ms).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
 # @default: 2
 teleportDelay: 2
 
-# How far you can move before the teleport cancels.
+# How far (blocks) you can move or walk during teleportDelay before the teleport cancels or aborts.
 # @type: integer
 # @range: [0, null]
 # @unit: blocks
@@ -48,7 +48,7 @@ lockAfterUses: 0
 # @default: 0
 lockAfterResetSeconds: 0
 
-# true = set your spawn point where you land.
+# true = set your respawn / bed spawn point where you land.
 # @type: boolean
 # @default: false
 setRespawnOnTeleport: false
@@ -71,18 +71,22 @@ menu:
   renderer:
     - "book"
 
-# Shared defaults. A region/world value of "@config" copies the matching entry below,
-# so you change a setting once here instead of in every region file.
+# Starter fallback defaults. A region/world value of "@config" inherits the matching entry below.
+# Recommended: use `/rtp editor` (browser map workspace), `/rtp admin setup`, or edit
+# `definitions/regions/<region>.yml` directly to configure per-region `shape` and `vert` settings.
 defaults:
-  # Default area shape and size, used by every region whose shape is "@config".
-  # Sizes default to chunks (1 chunk = 16 blocks), e.g. 256 chunks = 4,096 blocks.
-  # Suffixes: b (blocks), c (chunks), r (regions), km (kilometers). See REGIONS.md.
+  # Starter fallback area shape and size, inherited by any region whose shape is still "@config".
+  # Prefer configuring per-region `shape` in `/rtp editor` or `definitions/regions/<region>.yml`.
+  # Sizes default to chunks (1 chunk = 16 blocks), or use explicit unit suffixes:
+  # b (blocks), c (chunks), r (regions), km (kilometers), e.g. `radius: 4096b` or `5km`. See REGIONS.md.
   # radius: outer bound. centerRadius: inner donut hole. centerRadius must stay below radius.
   shape:
     # Landing area shape algorithm.
     # @type: enum
     # @source: shape
     name: "CIRCLE"
+
+    # How known-bad chunks are skipped: REROLL (draw again), ACCUMULATE (draw only open chunks), NEAREST, or NONE.
     mode: "REROLL"
 
     # Outer edge, in blocks (4096 blocks = 256 chunks).
@@ -100,6 +104,8 @@ defaults:
 
     # Keep spots from being reused. "auto" = view-distance radius (default), 0 = off, 1 = the landing chunk, N = bigger square.
     uniquePlacements: "auto"
+
+    # Grow the outer radius automatically to replace chunks cleared by uniquePlacements.
     expand: false
 
   # Default high/low landing window.
@@ -108,11 +114,17 @@ defaults:
     # @type: enum
     # @source: vert
     name: "LINEAR"
+
+    # Lowest Y-level players can land at (lower for deep caves, e.g. -50).
     minY: 32
+
+    # Highest Y-level players can land at (set to 120 in the Nether to stay under / below the Y=128 bedrock roof).
     maxY: 255
 
     # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
     direction: 2
+
+    # true = surface only (requires sky light / sunlight, prevents underground caves). Set false for Nether or underground regions.
     requireSkyLight: true
 
     # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.

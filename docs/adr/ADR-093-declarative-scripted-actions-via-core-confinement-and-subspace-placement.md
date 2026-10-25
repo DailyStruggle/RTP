@@ -1,6 +1,6 @@
 # ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-09-09
 **Target:** the release after the current spatial-memory line. The in-flight version is scoped to spatial updates (ADR-085, ADR-088, ADR-092); no part of this record - including the MVP in sections 1 through 8 - is implemented in that version.
 

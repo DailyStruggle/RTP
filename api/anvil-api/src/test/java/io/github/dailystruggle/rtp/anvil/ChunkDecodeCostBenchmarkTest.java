@@ -21,7 +21,8 @@ import org.junit.jupiter.api.Test;
 class ChunkDecodeCostBenchmarkTest {
 
   private static final String REGION_DIR = System.getProperty("rtp.elevation.regionDir",
-      "/home/johngoldsmith/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
+      System.getProperty("user.home", "")
+          + "/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
           + "/world/dimensions/minecraft/overworld/region");
   private static final int CHUNKS = Integer.getInteger("rtp.decodeBench.chunks", 3000);
   private static final int WARMUP = 1000;

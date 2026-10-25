@@ -53,6 +53,9 @@ public final class PaperBookMenuRendererProvider implements MenuRendererProvider
                     PaperBookMenuRendererProvider.class.getClassLoader());
             return true;
         } catch (ClassNotFoundException | LinkageError ex) {
+            io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordMenuRendererDegraded(
+                    "PaperBookMenuRendererProvider",
+                    ex.getClass().getSimpleName() + ": " + ex.getMessage());
             return false;
         }
     }

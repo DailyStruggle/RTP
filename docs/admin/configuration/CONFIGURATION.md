@@ -6,13 +6,14 @@ One jar covers every platform. Configuration is generated on first server start 
 
 ## How to Update Configuration
 
-RTP provides multiple ways to view and update settings:
+RTP provides multiple ways to view and update settings (starting with the visual web workspace and region definitions):
 
-1. **Interactive Admin Menu (`/rtp admin` or `/rtp menu`)**: The recommended in-game interface for inspecting, editing, and validating settings, worlds, and regions.
-2. **Command Line (`/rtp config <section> <key>=<value>`)**: Quick runtime updates from console or chat with immediate atomic persistence.
-3. **Direct File Editing (`plugins/RTP/...`)**: Edit YAML files directly and run `/rtp reload` to apply changes.
+1. **Browser Map Workspace (`/rtp editor`)**: The recommended first thing to try - visually drag region borders (`shape.radius`, `centerRadius`, `POLYGON` vertices) on a 2D map, configure `definitions/regions/*.yml` (`shape` and `vert` settings) and `definitions/worlds/*.yml` mappings with inline docs, and preview diffs before applying ([WEB_EDITOR_GUIDE.md](../WEB_EDITOR_GUIDE.md)).
+2. **Guided Setup & Admin Menu (`/rtp admin setup` / `/rtp admin`)**: Run `/rtp admin setup` for the guided multi-world and radius wizard, or `/rtp admin` for the in-game book editor ([IN_GAME_CONFIG.md](IN_GAME_CONFIG.md)).
+3. **Command Line (`/rtp config <section> <key>=<value>`)**: Quick runtime updates from console or chat with immediate atomic persistence (e.g. `/rtp config regions default shape.radius=5000b`).
+4. **Direct File Editing (`plugins/RTP/definitions/regions/...`)**: Edit YAML files directly and run `/rtp reload` to apply changes.
 
-> 📎 **Detailed Admin Guide:** See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full instructions on navigating the `/rtp admin` menu and using `/rtp config` subcommands.
+> 📎 **Detailed Admin Guides:** See [WEB_EDITOR_GUIDE.md](../WEB_EDITOR_GUIDE.md) and [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full instructions on `/rtp editor`, `/rtp admin setup`, and `/rtp config`.
 
 > **Folder layout:** the everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) sit at the top level. The named definitions you author (`regions/`, `worlds/`, `effects/`, plus the shared `shape/` and `vert/` catalogs) live under `definitions/`. The rarely-hand-edited tuning and text files (`performance.yml`, `logging.yml`, `metrics.yml`, `ttl.yml`, `network.yml`, `database.yml`, `biomes.yml`, `blocks.yml`, the `messages/` tree, and the `schematics/` folder) live under `advanced/`. The per-locale translation mirror stays at `lang/`. Each rename map is a co-located hidden dotfile (`.<name>.lang.yml`) beside the file it describes. On upgrade from an older layout, RTP relocates your authored files automatically and archives the old folders as `<name>.migrated`.
 
@@ -56,8 +57,8 @@ Each file in the `definitions/regions/` folder defines one teleport region. The 
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `world` | String | `"[0]"` | Target world name. `[0]` = main world, `[1]` = the_nether, `[2]` = the_end, or a literal world name. |
-| `worldBorderOverride` | Boolean | `false` | If `true`, uses the vanilla `/worldborder` radius instead of the shape radius. |
+| `world` | String | `"[0]"` | Target world name. `[0]` = main world, `[1]` = the_nether, `[2]` = the_end, or a literal world name. Create a dedicated region per world in `definitions/regions/` and map it in `definitions/worlds/`. |
+| `worldBorderOverride` | Boolean | `false` | **Not generally recommended.** If `true`, replaces the entire `shape` block (ignoring `radius` and `centerRadius`) with a square matching the vanilla `/worldborder`. Prefer setting `shape.radius` with a unit suffix (e.g. `2500b` or `5km`) in `definitions/regions/<name>.yml` or `/rtp editor`. |
 | `requirePermission` | Boolean | `false` | If `true`, players need `rtp.regions.<regionName>` to use this region. |
 | `override` | String | `"default"` | Region to redirect to if a player lacks permission for this region. |
 | `cacheCap` | Integer | `50` | Maximum pre-generated safe locations to hold in the queue. Set to `0` to disable background caching. |

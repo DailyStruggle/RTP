@@ -1,6 +1,6 @@
 # ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-20
 **Extends:** [ADR-016](ADR-016-anvil-subsystem.md) (live/probe acceptance parity). **Relates to:** [ADR-059](ADR-059-relative-ground-distance-safety-predicate.md), [ADR-062](ADR-062-biome-probability-weighting.md), [ADR-081](ADR-081-unified-blocked-biome-run-table.md), [ADR-085](ADR-085-spiral-addressed-hilbert-key-space.md), [ADR-092](ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table.md).
 

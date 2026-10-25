@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.commands.SenderTimings;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.menu.NeoForgeBookSpec;
@@ -178,7 +179,10 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                     }
                 }
             }
-        } catch (Throwable t) {
+        } catch (java.io.IOException | RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#opsJsonScan:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] hasPermission op-check via ops.json scan failed for "
                             + name + " (" + t.getClass().getSimpleName() + "): " + t.getMessage());
@@ -215,7 +219,9 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
             if (p.connection != null) {
                 p.connection.send(new ClientboundSystemChatPacket(component, false));
             }
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#sendComponent:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Failed to deliver system message to " + name + ": " + t.getMessage());
         }
@@ -238,7 +244,9 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                 p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket(
                         NeoForgeLegacyText.parse(title)));
             }
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#sendTitle:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Failed to deliver title to " + name + ": " + t.getMessage());
         }
@@ -253,7 +261,9 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
             if (p.connection == null) return;
             p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket(
                     NeoForgeLegacyText.parse(message)));
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#sendActionbar:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Failed to deliver actionbar to " + name + ": " + t.getMessage());
         }
@@ -421,7 +431,9 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
             }
             RTP.log(java.util.logging.Level.WARNING,
                 "[RTP][NeoForge] no setRespawnPosition method on this MC version");
-        } catch (Throwable t) {
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#anchorRespawn", t);
             RTP.log(java.util.logging.Level.WARNING,
                 "[RTP][NeoForge] setRespawnPosition failed", t);
         }
@@ -443,8 +455,10 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                 }
                 if (ok) return c.newInstance(args);
             }
-        } catch (Throwable ignored) {
-            // fall through; caller logs the overall failure
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#buildRespawnConfig",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         return null;
     }
@@ -660,7 +674,10 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
             net.minecraft.world.level.block.state.BlockState state =
                     level.getBlockState(new net.minecraft.core.BlockPos(x, y, z));
             return net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#getClientBlock",
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.FINE,
                     "[RTP][NeoForge] getClientBlock failed at (" + x + "," + y + "," + z + "): " + t);
             return null;
@@ -684,7 +701,9 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         try {
             p.connection.send(new net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket(
                     new net.minecraft.core.BlockPos(x, y, z), state));
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#sendClientBlockChange:" + name, t);
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP][NeoForge] sendClientBlockChange failed for " + name + ": " + t.getMessage());
         }
@@ -704,7 +723,10 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
             return net.minecraft.commands.arguments.blocks.BlockStateParser
                     .parseForBlock(lookup, blockData, false)
                     .blockState();
-        } catch (Throwable e) {
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException | RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordPlayerHookDegraded(
+                    "NeoForgeRTPPlayer#parseBlockData:" + blockData,
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP][NeoForge] ignoring malformed client block-data string: " + blockData
                             + " (" + e.getClass().getSimpleName() + ")");

@@ -382,6 +382,19 @@ class ConfigParserCoverageTest {
     @Test
     @DisplayName("corrupt yaml file is quarantined and clean default re-extracted")
     void testCorruptYamlQuarantine() throws IOException {
+        java.util.List<String> warnings = new java.util.ArrayList<>();
+        RTPServerAccessor loggingAccessor = mock(RTPServerAccessor.class);
+        when(loggingAccessor.getPluginDirectory()).thenReturn(pluginDir);
+        org.mockito.Mockito.doAnswer(inv -> {
+            java.util.logging.Level level = inv.getArgument(0);
+            String msg = inv.getArgument(1);
+            if (level == java.util.logging.Level.WARNING && msg != null) {
+                warnings.add(msg);
+            }
+            return null;
+        }).when(loggingAccessor).log(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString());
+        RTPRuntime.setServerAccessor(loggingAccessor);
+
         File corruptFile = new File(pluginDir, "corrupt.yml");
         Files.writeString(corruptFile.toPath(), ":\n  - invalid: [unclosed yaml\n");
 
@@ -403,6 +416,9 @@ class ConfigParserCoverageTest {
         File[] files = pluginDir.listFiles((dir, name) -> name.startsWith("corrupt.yml.corrupt-"));
         assertNotNull(files);
         assertTrue(files.length > 0, "Corrupt file should have been renamed with .corrupt- prefix");
+        assertTrue(
+                warnings.stream().anyMatch(w -> w.contains("could not be parsed (") && w.contains("line")),
+                "Quarantine warning log should include the YAML parse error reason and line: " + warnings);
     }
 
     @Test

@@ -118,6 +118,23 @@ public final class BacklogLocationBuffer {
     public java.util.function.Consumer<BacklogEntry> ownerOnReject() {
       return ownerOnReject;
     }
+
+    /**
+     * Detaches this entry from the shared world-bin list and clears {@link #ownerOnReject} so a
+     * shared bin list pinned by another region (or a replaced region after reload) cannot retain
+     * the previous {@code Region} instance through {@code this::onBacklogReject}.
+     */
+    @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized bin list removal for atomicity
+    void detach() {
+      this.ownerOnReject = null;
+      Object bin = this.pinnedBinList;
+      this.pinnedBinList = null;
+      if (bin instanceof List<?> list) {
+        synchronized (list) {
+          list.remove(this);
+        }
+      }
+    }
   }
 
   private final int capacity;
@@ -244,6 +261,9 @@ public final class BacklogLocationBuffer {
       }
 
       if (state.compareAndSet(curr, next)) {
+        for (BacklogEntry e : out) {
+          if (e != null) e.detach();
+        }
         return out;
       }
     }
@@ -292,6 +312,10 @@ public final class BacklogLocationBuffer {
       System.arraycopy(curr, headIdx, next, 0, remLen);
 
       if (state.compareAndSet(curr, next)) {
+        for (int i = 0; i < headIdx; i++) {
+          BacklogEntry removed = curr[i];
+          if (removed != null) removed.detach();
+        }
         return out;
       }
     }
@@ -317,7 +341,11 @@ public final class BacklogLocationBuffer {
       if (idx < 0) return null;
       BacklogEntry[] next = curr.clone();
       next[idx] = null;
-      if (state.compareAndSet(curr, next)) return curr[idx];
+      if (state.compareAndSet(curr, next)) {
+        BacklogEntry polled = curr[idx];
+        if (polled != null) polled.detach();
+        return polled;
+      }
     }
     return null;
   }
@@ -449,6 +477,11 @@ public final class BacklogLocationBuffer {
       }
 
       if (state.compareAndSet(curr, next)) {
+        for (BacklogEntry e : curr) {
+          if (e != null && e.validity() == Validity.INVALIDATED) {
+            e.detach();
+          }
+        }
         return invalidCount;
       }
     }
@@ -485,6 +518,11 @@ public final class BacklogLocationBuffer {
       }
 
       if (state.compareAndSet(curr, next)) {
+        for (BacklogEntry e : curr) {
+          if (e != null && e.validity() == Validity.INVALIDATED) {
+            e.detach();
+          }
+        }
         return invalidCount;
       }
     }
@@ -500,8 +538,11 @@ public final class BacklogLocationBuffer {
     return state.get().length == 0;
   }
 
-  /** Removes all entries. Validity tags on already-issued entries are unaffected. */
+  /** Removes all entries and detaches them from the world bin index. Validity tags on already-issued entries are unaffected. */
   public void clear() {
-    state.set(EMPTY);
+    BacklogEntry[] prev = state.getAndSet(EMPTY);
+    for (BacklogEntry e : prev) {
+      if (e != null) e.detach();
+    }
   }
 }

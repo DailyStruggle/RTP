@@ -1,0 +1,201 @@
+[
+  {
+    "id": "hist_abstain_01_server_lags",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "how come server lags",
+    "body": "how i make it not lag",
+    "expected_any_substrings": ["/rtp info", "/rtp version", "/rtp test", "mclo.gs", "rtp.unqueued"],
+    "forbidden_substrings": ["syncLoading=true", "viewDistanceSelect=2", "maxMSPT=60"]
+  },
+  {
+    "id": "hist_abstain_02_random_interval_freeze",
+    "source_channel": "issues",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "RTP is currently lagging out my server at random intervals",
+    "body": "It wil completly freeze up the server and drop tps to 0 for about 5-10 seconds at a time and then slowly tick back from. Any clue whats causing",
+    "expected_any_substrings": ["/rtp info", "/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true", "viewDistanceSelect=2"]
+  },
+  {
+    "id": "hist_abstain_03_null_response_no_log",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "when we run /rtp on the server we get null as a response",
+    "body": "err so question. when we run /rtp on the server we get null as a response, it throws up a null error",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_04_already_teleporting_15m",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "hey, my friend cant do /rtp",
+    "body": "says youre already teleporting and we are waiting like 15 minutes",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_05_midair_high_up",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "sometimes you can rtp and get put very high up",
+    "body": "hey, i found another bug, sometimes you can rtp and get put very high up like midair, is there a known fix?",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_06_rtp_use_not_working",
+    "source_channel": "support",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "what is the basic permission for just working /rtp",
+    "body": "No specials just getting teleported with /rtp? rtp.use is noct wotking",
+    "expected_any_substrings": ["/rtp version", "/rtp test", "mclo.gs", "rtp.use"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_abstain_07_unresponsive_after_5m",
+    "source_channel": "general",
+    "category": "ABSTAIN_NEEDS_INFO",
+    "title": "after 5 minutes of server startup server becomes unresponsive",
+    "body": "tried restarting my server. played for 5 mins, server becomes unresponsive. no console error is thrown during 5-10 mins test",
+    "expected_any_substrings": ["/rtp info", "/rtp version", "/rtp test", "mclo.gs"],
+    "forbidden_substrings": ["syncLoading=true"]
+  },
+  {
+    "id": "hist_direct_01_world_nether_overworld",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "/rtp world:world_nether teleports me to overworld",
+    "body": "When I execute the /rtp world:world_nether command, it just teleports me to the Overworld instead of the nether",
+    "expected_any_substrings": ["nether", "definitions/regions/", "definitions/worlds/", "FAQ"]
+  },
+  {
+    "id": "hist_direct_02_radius_chunk_vs_block",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Im attempting to set the radius because players keep dying in my worldborder",
+    "body": "How do I change the teleport radius so players stay inside my 5000 block worldborder?",
+    "expected_any_substrings": ["shape.radius", "/rtp editor", "definitions/regions/default.yml"]
+  },
+  {
+    "id": "hist_direct_03_caves_require_skylight",
+    "source_channel": "general",
+    "category": "DIRECT_ANSWER",
+    "title": "Where can I change the teleport radius and prevent spawning in caves?",
+    "body": "sometimes it teleports the player into a cave underground so is there a way i can fix that?",
+    "expected_any_substrings": ["vert.requireSkyLight", "shape.radius"]
+  },
+  {
+    "id": "hist_direct_04_rectangle_width_height",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "How can i set a proper rectangle region?",
+    "body": "I see that RTP can use a rectangle region in definitions/regions/default.yml, how do I configure width and height?",
+    "expected_any_substrings": ["RECTANGLE", "shape.width", "shape.height", "REGIONS"]
+  },
+  {
+    "id": "hist_direct_05_console_player_op_notme",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "invalid command argument player:Badministrator from console",
+    "body": "im trying to send from console and get this: [!] invalid command argument player:Badministrator for /rtp player:<name> when the player is op",
+    "expected_any_substrings": ["rtp.notme", "operator", "FAQ", "COMMANDS"]
+  },
+  {
+    "id": "hist_direct_06_heap_usage_maxheappercent",
+    "source_channel": "issues",
+    "category": "DIRECT_ANSWER",
+    "title": "anyone getting console spam about Heap usage?",
+    "body": "[RTP] Heap usage 86.1% of max exceeds maxHeapPercent threshold 85.0%; pausing background cache generation until memory is reclaimed. how can I fix this?",
+    "expected_any_substrings": ["maxHeapPercent", "advanced/performance.yml"]
+  },
+  {
+    "id": "hist_direct_07_ocean_biome_filter",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Players keep landing in the ocean",
+    "body": "how do I stop players from teleporting into OCEAN and DEEP_OCEAN water biomes?",
+    "expected_any_substrings": ["biomeWhitelist", "advanced/biomes.yml"]
+  },
+  {
+    "id": "hist_direct_08_smooth_stone_platform",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "Is it normal that the plugin places a stone block below players?",
+    "body": "how do I change platformRadius or platformMaterial in safety.yml?",
+    "expected_any_substrings": ["platformRadius", "platformMaterial", "safety.yml"]
+  },
+  {
+    "id": "hist_direct_09_disable_gui_and_countdown",
+    "source_channel": "general",
+    "category": "DIRECT_ANSWER",
+    "title": "How do I disable the /rtp GUI menu and countdown?",
+    "body": "Running a paper 1.21.11 server, how do I turn off openOnBareRtp in guimenu.yml and delayCountdown?",
+    "expected_any_substrings": ["openOnBareRtp", "addons/guimenu.yml", "delayCountdown"]
+  },
+  {
+    "id": "hist_direct_10_queue_speed_up",
+    "source_channel": "support",
+    "category": "DIRECT_ANSWER",
+    "title": "where can i make rtp faster",
+    "body": "it says queued when players run /rtp",
+    "expected_any_substrings": ["period", "postTeleportQueueing", "advanced/performance.yml"]
+  },
+  {
+    "id": "hist_delight_01_crumb_lock_units_and_adr",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "lockAfterResetSeconds duration unit and ADR-068 cross-server limits",
+    "body": "I have:\nlockAfterUses: 10\nlockAfterResetSeconds: 10800\nI think the duration unit is broken? https://mclo.gs/AbCdEf1\nAlso is ADR-068 cross-server persisted teleport limits active for %rtp_remainingLockUses%?",
+    "expected_signal_categories": ["shop_talk", "empirical_repro"]
+  },
+  {
+    "id": "hist_delight_02_ddddn_velocity_proxy_redis",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Velocity proxy receives RTP request but shows candidates=0",
+    "body": "I put the RTP proxy plugin on the Velocity server and enabled network.enabled: true in its network.yml. It shows candidates=0 and no qualifying backend. Tab completion works for world1:nether, but cross-server /rtp region=world1:nether fails.",
+    "expected_signal_categories": ["shop_talk", "empirical_repro"]
+  },
+  {
+    "id": "hist_delight_03_wanttoplay_queue_architecture",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Btw i wanted to ask, how does the queue work?",
+    "body": "How does the queue work architecturally with the cache cycle and background chunk loading under the hood?",
+    "expected_signal_categories": ["shop_talk"]
+  },
+  {
+    "id": "hist_delight_04_rhmpzw_op_isolation_repro",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Is there something stopping operators from being affected by RTP commands from console?",
+    "body": "Say Steve is an op. I run rtp world:farm player:Steve, RTP tells me [11:25:36 INFO]: [RTP] invalid command argument player:Steve. Alex is a player, I run rtp world:farm player:Alex, it works as normal. When deopping Steve, it works for him again.",
+    "expected_signal_categories": ["empirical_repro"]
+  },
+  {
+    "id": "hist_delight_05_echolalia_github_source_trace",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "Migrating from BetterRTP on Paper - exception in delayed init task",
+    "body": "I read the wiki and FAQs first. On startup: [17:40:29 INFO]: Running delayed init tasks. Looking up those methods on the GitHub, it seems like the plugin is reading a configuration value after updating Paper and Java 21.",
+    "expected_signal_categories": ["empirical_repro"]
+  },
+  {
+    "id": "hist_delight_06_effector_respawn_api_plugin",
+    "source_channel": "support",
+    "category": "WORTH_A_LOOK",
+    "title": "how to random-teleport using code?",
+    "body": "Im developing my server plugin using rtp-api. I want if player respawn, make random-tp player only if respawn isnt anchor-respawn or bed-respawn and not in cooldown.",
+    "expected_signal_categories": ["builder_api"]
+  },
+  {
+    "id": "hist_delight_07_george_pipelined_benchmarks",
+    "source_channel": "general",
+    "category": "WORTH_A_LOOK",
+    "title": "does leafrtp support parallel location searching?",
+    "body": "How does pipelined parallel location searching compare in benchmarks on heap space and tickrate degradation at 20 teleports per second on Paper and Folia?",
+    "expected_signal_categories": ["shop_talk"]
+  }
+]

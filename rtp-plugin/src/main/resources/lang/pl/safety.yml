@@ -1,8 +1,8 @@
 # --- RTP Safety Configuration ---
 # Documentation: docs/admin/configuration/SAFETY.md
 
-# Seconds of invulnerability granted after a teleport completes.
-# 0 disables the post-teleport invulnerability window.
+# Sekundy nieśmiertelności po zakończeniu teleportacji (chroni przed obrażeniami od upadku / obrazenia od upadku, ogniem i wodą).
+# 0 wyłącza okno nieśmiertelności po teleportacji.
 # Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [0, null]
@@ -10,16 +10,16 @@
 # @default: 5
 invulnerabilityTime: 5
 
-# Block radius around the landing spot scanned for hazards.
-# 0 checks only the landing block + immediate vertical.
+# Promień w blokach wokół miejsca lądowania skanowany pod kątem zagrożeń.
+# 0 sprawdza tylko blok lądowania i pionową przestrzeń.
 # @type: integer
 # @range: [0, null]
 # @unit: blocks
 # @default: 0
 safetyRadius: 0
 
-# Radius of the emergency landing platform built at the destination.
-# -1 disables the platform entirely.
+# Promień awaryjnej platformy lądowania budowanej w miejscu docelowym (chroni przed upadkiem i wodą).
+# -1 całkowicie wyłącza platformę.
 # @type: integer
 # @range: [-1, null]
 # @unit: blocks

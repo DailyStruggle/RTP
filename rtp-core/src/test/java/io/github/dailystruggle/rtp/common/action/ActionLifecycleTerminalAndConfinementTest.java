@@ -39,11 +39,14 @@ class ActionLifecycleTerminalAndConfinementTest {
   File tempDir;
 
   private MockRTPServerAccessor serverAccessor;
+  private io.github.dailystruggle.rtp.common.mock.MockRTPScheduler mockScheduler;
   private ActionManager actionManager;
 
   @BeforeEach
   void setUp() {
     serverAccessor = RTPTestSetup.install(tempDir);
+    mockScheduler = serverAccessor.getMockScheduler();
+    RTPRuntime.setScheduler(mockScheduler);
     actionManager = new ActionManager();
     ActionServices.setActionManager(actionManager);
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = actionManager;
@@ -120,7 +123,7 @@ class ActionLifecycleTerminalAndConfinementTest {
     assertFalse(session.isActive(), "Session must be disarmed after triggerExpire");
 
     // The delayed task was scheduled via MockRTPScheduler.runTaskLater. Run pending tasks:
-    for (Object task : ((io.github.dailystruggle.rtp.common.mock.MockRTPScheduler) RTPRuntime.scheduler()).getScheduledTasks()) {
+    for (Object task : mockScheduler.getScheduledTasks()) {
       if (task != null) {
         try {
           java.lang.reflect.Field rf = task.getClass().getDeclaredField("runnable");
@@ -203,7 +206,7 @@ class ActionLifecycleTerminalAndConfinementTest {
     session.triggerExpire();
 
     // Run scheduled tasks
-    for (Object task : ((io.github.dailystruggle.rtp.common.mock.MockRTPScheduler) RTPRuntime.scheduler()).getScheduledTasks()) {
+    for (Object task : mockScheduler.getScheduledTasks()) {
       if (task != null) {
         try {
           java.lang.reflect.Field rf = task.getClass().getDeclaredField("runnable");

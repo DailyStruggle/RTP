@@ -114,9 +114,17 @@ Candidate checks and chunk loading run off the main thread. The main-thread work
 2. Lower `viewDistanceSelect` in `performance.yml` (default `0` is fine, as higher values pre-load more surrounding chunks).
 3. Increase `cacheCap` so fewer on-demand generations happen during peak play.
 
+### Console logs `Heap usage ... exceeds maxHeapPercent threshold 85.0%; pausing background cache generation`. How do I fix it?
+
+`maxHeapPercent: 85.0` in `plugins/RTP/advanced/performance.yml` pauses background cache filling whenever JVM heap usage passes `85.0%` so chunk pre-loading does not trigger an out-of-memory stall. If your JVM normally runs above 85% heap between GC cycles (or during early chunk generation), either lower `cacheCap` / `activeChunkCap` in your region files, raise the server's `-Xmx` heap allocation, or adjust `maxHeapPercent` in `advanced/performance.yml` (`/rtp config performance maxHeapPercent=90.0`, or `0` to disable the check).
+
 ---
 
 ## Economy & Permissions
+
+### Why does `/rtp player=<name>` say `invalid command argument player:<name>` when targeting an operator?
+
+By default, the `rtp.notme` permission node is granted to server operators (`op`) so one operator or command block cannot forcibly random-teleport another operator against their will. Because your OP account inherits `rtp.notme: true`, targeting an OP player with `player=<name>` (from console or in-game) is rejected. Test `player=<name>` on a non-operator player, or negate the node (`rtp.notme: false` in LuckPerms) for accounts that should be targetable.
 
 ### I have Vault installed but economy isn't working.
 
@@ -134,11 +142,14 @@ Set `requirePermission: true` in the region's config, then grant `rtp.regions.<r
 
 ## Configuration
 
-### Why does `/rtp` always send me to the overworld, even when I'm in the nether or the end?
+### Why does `/rtp` (or `/rtp world=world_nether`) always send me to the overworld, even when I'm in the nether or the end?
 
-This is the most common first-run confusion. RTP ships with a single region (`default`) that targets the overworld (`world: "[0]"`). **There is no nether or end region out of the box**, so you have to create them.
+This is the most common first-run confusion. RTP ships with a single region (`default` in `definitions/regions/default.yml`) that targets the overworld (`world: "[0]"`), and `definitions/worlds/default.yml` routes every unconfigured world to `region: "default"`. **Do not change `default.yml` to `world_nether`** (that would send overworld players into the nether); instead, **create a region for that world and map the world to it** using `/rtp editor` (the browser map workspace), `/rtp admin setup`, `/rtp config`, or YAML files:
 
-Here's the full setup for a nether region:
+**Option A — Visual Web Editor (`/rtp editor`) or Guided Setup (`/rtp admin setup`):**
+- Run `/rtp editor` to create a `nether` region with `world: "world_nether"`, `vert.maxY: 120`, and `vert.requireSkyLight: false`, and point `definitions/worlds/world_nether.yml` at `region: "nether"`, or run `/rtp admin setup` and choose `multi` worlds.
+
+**Option B — Config files (`definitions/regions/` + `definitions/worlds/`):**
 
 **Step 1 — Create the region file** `plugins/RTP/definitions/regions/nether.yml`:
 ```yaml
@@ -156,35 +167,35 @@ vert:
   requireSkyLight: false
 ```
 
-**Step 2 — Map the nether world to that region** in `plugins/RTP/definitions/worlds/world_nether.yml`:
+**Step 2 — Map the nether world to that region** in `plugins/RTP/definitions/worlds/world_nether.yml` (or run `/rtp config worlds world_nether region=nether`):
 ```yaml
 region: "nether"
 ```
 
 **Step 3** — Run `/rtp reload`.
 
-Now players who run `/rtp` while standing in the nether will land in the nether. Without Step 2, every world falls back to the `default` region (overworld).
+Now players who run `/rtp` while standing in the nether (or run `/rtp world=world_nether` / `/rtp region=nether`) will land in the nether. Without Step 2, every world falls back to the `default` region (overworld).
 
 > **Why isn't this automatic?** RTP cannot know your world names, nether height limits, or whether you even want nether teleportation enabled. Explicit configuration prevents accidental teleports into void or bedrock.
 
 ### Can I have different regions for different worlds?
 
-Yes. Create a file in `plugins/RTP/definitions/worlds/<worldName>.yml` and set:
+Yes. Create a region in `plugins/RTP/definitions/regions/<regionName>.yml` (or via `/rtp editor`) and map the world to it in `plugins/RTP/definitions/worlds/<worldName>.yml`:
 
 ```yaml
 region: "myRegionName"
 ```
 
-That world will now use `myRegionName` as its default region when players run `/rtp` there.
+That world will now use `myRegionName` as its default region when players run `/rtp` there (or `/rtp world=<worldName>`).
 
 ### How do I change the teleport radius for one world? There is no `radius` in `worlds/<world>.yml`.
 
-Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers `/rtp` there; the **region** owns the destination, including distance, shape, vertical range, and price. So you change the region, not the world:
+Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers `/rtp` there; the **region** (`definitions/regions/<region>.yml`) owns the destination, including distance (`shape.radius` / `shape.centerRadius`), shape, vertical range (`vert.minY` / `vert.maxY` / `vert.requireSkyLight`), and price. So you change the region, not the world:
 
-1. **Edit the region that world points at.** Read the name out of `plugins/RTP/definitions/worlds/<world>.yml` (`region:`), then either run `/rtp config regions <region> shape.radius=10km` or edit the `shape:` block in `plugins/RTP/definitions/regions/<region>.yml`. Add `--dry-run` to the command to preview it.
-2. **If that region is shared** by other worlds and you only want this one to change, create a new region file and point the world at it instead.
+1. **Use the Web Editor (`/rtp editor`) or edit the region in `definitions/regions/<region>.yml`:** Run `/rtp editor` to drag the region boundary on the map, or run `/rtp config regions <region> shape.radius=5000b` (add `--dry-run` to preview), or edit the `shape:` block in `plugins/RTP/definitions/regions/<region>.yml` with explicit unit suffixes (`5000b`, `5km`, `256c`).
+2. **If that region is shared** by other worlds and you only want this one to change, create a new region file in `definitions/regions/` and point `definitions/worlds/<world>.yml` at it (`region: "<newRegion>"`).
 
-On a fresh install the region ships `shape: "@config"`, which inherits the whole `defaults.shape` block from `config.yml`. That is why a new setup has only one `radius` on disk: editing `defaults.shape.radius` moves every region that still inherits, which is what a single-world server wants. To give one world its own distance, replace `"@config"` with an inline `shape:` block in that region. Full walkthrough: [Where to set the radius](configuration/REGIONS.md#where-to-set-the-radius).
+> **Note on `config.yml` vs `definitions/regions/`:** On a fresh install `definitions/regions/default.yml` sets `shape: "@config"` and `vert: "@config"` as a starter fallback to `config.yml`, but in general you should configure regions via `/rtp editor` and `definitions/regions/<region>.yml` (`shape` and `vert` settings) rather than treating `config.yml` as the primary place for region geometry. Also prefer setting `shape.radius` with a unit suffix (e.g. `2500b` or `5km`) over enabling `worldBorderOverride: true` (which is generally not recommended because it replaces your entire `shape` block and discards `centerRadius`). Full walkthrough: [Where to set the radius](configuration/REGIONS.md#where-to-set-the-radius).
 
 The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship `wild` at `radius: 10km` and `wild_far` at `radius: 50km`, gate the second with `requirePermission: true`, and players who have it use `/rtp region=wild_far`. A radius attached to the world could not do that.
 

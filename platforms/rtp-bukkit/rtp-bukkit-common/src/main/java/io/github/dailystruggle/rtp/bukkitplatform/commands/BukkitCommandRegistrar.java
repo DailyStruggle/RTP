@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkitplatform.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
@@ -84,8 +85,9 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
         if (cmd != null && cmd.getPlugin() == plugin) {
           return cmd;
         }
-      } catch (Throwable ignored) {
-        // best-effort: fall through to server-wide lookup
+      } catch (RuntimeException | LinkageError e) {
+        PlatformHookBitComponent.recordCommandRegistrarDegraded(
+            "JavaPlugin#getCommand:" + name, e.getClass().getSimpleName() + ": " + e.getMessage());
       }
     }
 
@@ -94,8 +96,9 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
       if (cmd != null && (plugin == null || cmd.getPlugin() == plugin)) {
         return cmd;
       }
-    } catch (Throwable ignored) {
-      // best-effort: fall through to namespaced lookup
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordCommandRegistrarDegraded(
+          "Bukkit#getPluginCommand:" + name, e.getClass().getSimpleName() + ": " + e.getMessage());
     }
 
     if (plugin != null) {
@@ -105,8 +108,10 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
         if (cmd != null && cmd.getPlugin() == plugin) {
           return cmd;
         }
-      } catch (Throwable ignored) {
-        // best-effort: caller falls back to dynamic registration
+      } catch (RuntimeException | LinkageError e) {
+        PlatformHookBitComponent.recordCommandRegistrarDegraded(
+            "Bukkit#getPluginCommandNamespaced:" + name,
+            e.getClass().getSimpleName() + ": " + e.getMessage());
       }
     }
 
@@ -118,16 +123,18 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
       Method m = Bukkit.getServer().getClass().getMethod("getCommandMap");
       Object map = m.invoke(Bukkit.getServer());
       if (map instanceof CommandMap cm) return cm;
-    } catch (Throwable ignored) {
-      // getCommandMap absent on this server; try plugin-manager field
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordCommandRegistrarDegraded(
+          "Server#getCommandMap", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     try {
       Field f = Bukkit.getServer().getPluginManager().getClass().getDeclaredField("commandMap");
       f.setAccessible(true);
       Object map = f.get(Bukkit.getServer().getPluginManager());
       if (map instanceof CommandMap cm) return cm;
-    } catch (Throwable ignored) {
-      // reflection blocked or field missing; no dynamic registration
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordCommandRegistrarDegraded(
+          "PluginManager#commandMap", e);
     }
     return null;
   }
@@ -136,8 +143,9 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
     try {
       Method sync = Bukkit.getServer().getClass().getMethod("syncCommands");
       sync.invoke(Bukkit.getServer());
-    } catch (Throwable ignored) {
-      // syncCommands is Paper/CraftBukkit-only; clients refresh on relog
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordCommandRegistrarDegraded(
+          "Server#syncCommands", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
   }
 
@@ -152,8 +160,9 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
       if (sender.getName().equals(console.getName())) {
         return CommandsAPI.serverId;
       }
-    } catch (Exception ignored) {
-      // Console sender lookup may fail during early bootstrap; fall through
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordCommandRegistrarDegraded(
+          "Bukkit#getConsoleSender", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     return null;
   }

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.search;
 
-import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.text.JsonText;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -64,7 +64,7 @@ public final class ThesaurusIndex {
             }
 
             String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            Object root = EditorLoopbackJson.parse(content);
+            Object root = JsonText.parse(content);
             Map<?, ?> synonymsSection = null;
 
             if (root instanceof Map<?, ?> m) {

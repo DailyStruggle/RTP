@@ -739,7 +739,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
             RTPRuntime.scheduler().runTaskAsynchronously(self);
           }
         };
-        RTPRuntime.scheduler().runTask(dispatch);
+        RTPRuntime.scheduler().runTaskAsynchronously(dispatch);
         // Fallback fires via the platform async scheduler (Bukkit/Folia/
         // Paper/Fabric) so the next batch starts even when the main thread
         // is jammed. The fallback is a self-cancelling repeating-async
@@ -1592,7 +1592,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                         // the same column and vert.adjust fails identically.
                         shape.addBadChunk(pos);
                         fullLoadOutcomeVertAdjust.incrementAndGet();
-                        res.complete(false);
+                        completeOffRegion(res, false);
                         return;
                       }
 
@@ -1612,7 +1612,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                         // same chunk is guaranteed to fail.
                         shape.addBadChunk(pos);
                         fullLoadOutcomePhysBiome.incrementAndGet();
-                        res.complete(false);
+                        completeOffRegion(res, false);
                         return;
                       }
 
@@ -1623,7 +1623,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                         // the same column and the same picked Y > maxY.
                         shape.addBadChunk(pos);
                         fullLoadOutcomeYOverflow.incrementAndGet();
-                        res.complete(false);
+                        completeOffRegion(res, false);
                         return;
                       }
 
@@ -1646,7 +1646,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                       }
 
                       if (isCancelled() || pause.get()) {
-                        res.complete(false);
+                        completeOffRegion(res, false);
                         return;
                       }
 
@@ -1656,7 +1656,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                           (ok, verResult) -> { try {
                       if (ok) {
                         fullLoadOutcomeAccept.incrementAndGet();
-                        res.complete(true);
+                        completeOffRegion(res, true);
                       } else {
                         boolean claimEncapsulated = false;
                         if (verResult != null && !verResult.passed()) {
@@ -1710,13 +1710,13 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                           shape.addBadChunk(pos);
                         }
                         fullLoadOutcomeSafetyScan.incrementAndGet();
-                        res.complete(false);
+                        completeOffRegion(res, false);
                       }
                       } catch (Throwable t) {
                         RTPRuntime.log(Level.SEVERE, "[ScanTask] Verifier verdict crashed at location " + pos, t);
                         shape.addBadChunk(pos);
                         fullLoadOutcomeCrashed.incrementAndGet();
-                        res.complete(false);
+                        completeOffRegion(res, false);
                       } };
 
                       if (!pass) {
@@ -1734,7 +1734,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                           RTPRuntime.log(Level.SEVERE, "[ScanTask] Claim verifier failed at location " + pos, ex);
                           shape.addBadChunk(pos);
                           fullLoadOutcomeCrashed.incrementAndGet();
-                          res.complete(false);
+                          completeOffRegion(res, false);
                           return;
                         }
                         finish.accept(vr != null && vr.passed(), vr);
@@ -1746,7 +1746,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                       // would crash the same way.
                       shape.addBadChunk(pos);
                       fullLoadOutcomeCrashed.incrementAndGet();
-                      res.complete(false);
+                      completeOffRegion(res, false);
                     }
                   });
                 } catch (Throwable t) {
@@ -1964,6 +1964,34 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         PENDING_TEARDOWNS.remove(region.name, gate);
       }
     });
+  }
+
+  private static final java.util.concurrent.atomic.AtomicLong inlineFallbackCount =
+      new java.util.concurrent.atomic.AtomicLong(0L);
+
+  public static long inlineFallbackCount() {
+    return inlineFallbackCount.get();
+  }
+
+  public static void resetInlineFallbackCount() {
+    inlineFallbackCount.set(0L);
+  }
+
+  /**
+   * Completes {@code target} off the calling region thread via the async scheduler so
+   * placement-free dependent stages never run inline on a tick region thread (ADR-123 Section 2 & 11).
+   */
+  private static void completeOffRegion(CompletableFuture<Boolean> target, boolean value) {
+    try {
+      if (RTPRuntime.scheduler() != null) {
+        RTPRuntime.scheduler().runTaskAsynchronously(() -> target.complete(value));
+        return;
+      }
+    } catch (Throwable t) {
+      inlineFallbackCount.incrementAndGet();
+      RTPRuntime.log(Level.FINE, "[ScanTask] off-region completion rejected; falling back inline: " + t);
+    }
+    target.complete(value);
   }
 
   private static void reportTeardown(java.util.function.Consumer<Throwable> onDone, Throwable failure) {

@@ -51,12 +51,16 @@ on:
       - 'api/anvil-api/**'
       - 'api/bit-api/**'
       - 'api/commands-api/**'
+      - 'api/config-bit-api/**'
       - 'api/effects-api/**'
       - 'api/yaml-api/**'
       - 'api/units-api/**'
       - 'api/metrics-api/**'
       - 'api/bstats-api/**'
       - 'api/maps-api/**'
+      - 'api/menu-api/**'
+      - 'api/predict-api/**'
+      - 'api/tags-api/**'
       - 'platforms/rtp-proxy/rtp-proxy-common/**'
       - 'build.gradle'
       - 'settings.gradle'
@@ -134,11 +138,15 @@ jobs:
           :bit-api:publishMavenJavaPublicationToCentralStagingRepository
           :anvil-api:publishMavenJavaPublicationToCentralStagingRepository
           :commands-api:publishMavenJavaPublicationToCentralStagingRepository
+          :config-bit-api:publishMavenJavaPublicationToCentralStagingRepository
           :yaml-api:publishMavenJavaPublicationToCentralStagingRepository
           :units-api:publishMavenJavaPublicationToCentralStagingRepository
           :metrics-api:publishMavenJavaPublicationToCentralStagingRepository
           :bstats-api:publishMavenJavaPublicationToCentralStagingRepository
           :maps-api:publishMavenJavaPublicationToCentralStagingRepository
+          :menu-api:publishMavenJavaPublicationToCentralStagingRepository
+          :predict-api:publishMavenJavaPublicationToCentralStagingRepository
+          :tags-api:publishMavenJavaPublicationToCentralStagingRepository
           :effects-api:publishMavenJavaPublicationToCentralStagingRepository
           :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository
           :rtp-api:publishMavenJavaPublicationToCentralStagingRepository

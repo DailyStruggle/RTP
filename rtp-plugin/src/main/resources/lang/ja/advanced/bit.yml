@@ -12,6 +12,12 @@ strictConfig: false
 # ゲートを常に成功または常に失敗と判定するまでに必要な最小評価回数。
 gateOutcomeSamples: 200
 
+# ティック +2 で非同期に実行される起動時 BIT スイープ。
+startupSweep: pbit
+
+# RtpBit.RUNNER に注入されるライブ診断カバレッジプロバイダー。
+coverage: auto
+
 # 登録済み BIT コードの重大度。strictActions のプリセットより優先されます。
 # 使用可能な値: ERROR、WARNING、INFO、DEBUG、TRACE、OFF。OFF は検出結果を抑制します。
 # 未登録のコードやレベルは無視され、ログに記録されます。

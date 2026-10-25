@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
 import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
+import io.github.dailystruggle.rtp.common.governor.ConsumerLedger;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -344,6 +345,26 @@ public class SelectionAPI {
   }
 
   /**
+   * Charges interactive selection work to {@code playerId} in {@link ConsumerLedger#active()}
+   * (ADR-124 Section 1 & 6).
+   */
+  public static void chargePlayer(@Nullable UUID playerId, long costNanos) {
+    if (playerId == null || costNanos < 0L) return;
+    ConsumerLedger.active().recordPlayerCharge(playerId, costNanos, System.nanoTime());
+  }
+
+  /**
+   * Records that {@code playerId} consumed a cached location in {@code region}, charging the
+   * active governor's measured unit cost to {@link ConsumerLedger#active()} (ADR-124 Section 1 & 6).
+   */
+  public static void recordConsumption(@Nullable String region, @Nullable UUID playerId) {
+    if (playerId == null) return;
+    ComputeGovernor gov = ComputeGovernor.active();
+    double unitCost = (gov != null) ? gov.estimatedUnitCostNanos() : 0.0;
+    ConsumerLedger.active().recordConsumption(region, playerId, unitCost, System.nanoTime());
+  }
+
+  /**
    * Creates a temporary, one-time-use region with custom parameters, based on an
    * existing region's settings.
    *
@@ -488,6 +509,16 @@ public class SelectionAPI {
   @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys/RegionKeys class guarantees the parser's E
   public Region getRegion(RTPPlayer player) {
     if (player == null) return getRegionOrDefault("default");
+    long startNanos = System.nanoTime();
+    try {
+      return resolvePlayerRegion(player);
+    } finally {
+      chargePlayer(player.uuid(), Math.max(0L, System.nanoTime() - startNanos));
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private Region resolvePlayerRegion(RTPPlayer player) {
     Set<String> worldsAttempted = new HashSet<>();
     io.github.dailystruggle.rtp.api.world.RTPLocation loc = player.getLocation();
     if (loc == null || loc.world() == null) return getRegionOrDefault("default");

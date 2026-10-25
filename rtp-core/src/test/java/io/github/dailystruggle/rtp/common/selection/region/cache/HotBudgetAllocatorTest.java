@@ -209,4 +209,38 @@ class HotBudgetAllocatorTest {
         assertEquals(2, donor.stage().size(), "donor entries must be restored if ineligible");
         assertEquals(0, leasedRecipient.stage().size());
     }
+
+    @Test
+    @DisplayName("ADR-124: computeWaterFilledQuotas honors floors, caps, and n_r consumer weights")
+    void computeWaterFilledQuotasWithConsumerAttribution() {
+        HotBudgetAllocator allocator = new HotBudgetAllocator();
+        CacheStage<String> cold = cold();
+        TestHotSink popular = new TestHotSink("popular", 32, cold, e -> true, null);
+        TestHotSink spammer = new TestHotSink("spammer", 32, cold, e -> true, null);
+
+        Map<String, HotBudgetAllocator.SinkConfig> configs = Map.of(
+                "popular", new HotBudgetAllocator.SinkConfig(1, 20),
+                "spammer", new HotBudgetAllocator.SinkConfig(1, 20)
+        );
+        Map<String, Double> consumerWeights = Map.of(
+                "popular", 9.0,
+                "spammer", 1.0
+        );
+
+        // Total budget = 12 chunks. Floors take 1 + 1 = 2 chunks. Remaining 10 chunks split 9:1 -> +9 and +1.
+        Map<String, Integer> quotas = allocator.computeWaterFilledQuotas(
+                List.of(popular, spammer), configs, consumerWeights, 12);
+        assertEquals(10, quotas.get("popular"));
+        assertEquals(2, quotas.get("spammer"));
+
+        // When popular hits its maxCap (6), surplus spills over to spammer via water-filling
+        Map<String, HotBudgetAllocator.SinkConfig> cappedConfigs = Map.of(
+                "popular", new HotBudgetAllocator.SinkConfig(1, 6),
+                "spammer", new HotBudgetAllocator.SinkConfig(1, 20)
+        );
+        Map<String, Integer> spilloverQuotas = allocator.computeWaterFilledQuotas(
+                List.of(popular, spammer), cappedConfigs, consumerWeights, 12);
+        assertEquals(6, spilloverQuotas.get("popular"));
+        assertEquals(6, spilloverQuotas.get("spammer"));
+    }
 }

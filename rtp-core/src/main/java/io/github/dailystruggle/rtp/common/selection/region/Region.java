@@ -15,14 +15,13 @@ import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
-import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
 import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
+import io.github.dailystruggle.rtp.common.governor.RegionShareAllocator;
 import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
@@ -70,6 +69,17 @@ public class Region extends FactoryValue<RegionKeys> {
     return taskDispatcher;
   }
 
+  /** Persistence store for cached locations; installed by ActiveDatabase (ADR-115). */
+  private static volatile RegionLocationStore locationStore;
+
+  public static void setLocationStore(RegionLocationStore store) {
+    locationStore = store;
+  }
+
+  public static RegionLocationStore getLocationStore() {
+    return locationStore;
+  }
+
   private final AtomicBoolean isScanningCache = new AtomicBoolean(false);
 
   // Constructed in the Region(...) constructor body, after this.settings is
@@ -106,6 +116,95 @@ public class Region extends FactoryValue<RegionKeys> {
   private final AtomicLong lastConsumptionEventNanos = new AtomicLong(System.nanoTime());
   private final AtomicLong consumptionRatePerTickBits = new AtomicLong(Double.doubleToRawLongBits(0.0));
   private final ConcurrentHashMap<UUID, Long> recentConsumers = new ConcurrentHashMap<>();
+
+  /**
+   * Per-candidate steering deferral and aging state (ADR-123 Section 7, Invariant I9).
+   */
+  public record CandidateDeferralState(
+      int deferralCount,
+      long unpausedDeferredNanos,
+      long lastCheckedNanos,
+      boolean aged
+  ) {}
+
+  private final ConcurrentHashMap<Long, CandidateDeferralState> candidateDeferrals =
+      new ConcurrentHashMap<>();
+
+  public static long chunkCoordKey(int cx, int cz) {
+    return (((long) cx) << 32) | (cz & 0xffffffffL);
+  }
+
+  /**
+   * Evaluates whether a background candidate at chunk {@code (cx, cz)} should be deferred by
+   * regional steering or processed now (including when aged after 60 s of unpaused time or
+   * 8 deferrals — ADR-123 Section 7, Invariant I9).
+   *
+   * <p>Time spent while {@code pausedOrZeroQuota} is {@code true} does not advance aging
+   * (Invariant I9). Aged candidates are never deferred and are taken first in the region's
+   * next turn within quota {@code u_r}.
+   *
+   * @return {@code true} if the candidate is deferred for this turn; {@code false} if it should
+   *         be processed now
+   */
+  public boolean shouldDeferBackgroundCandidate(
+      int cx,
+      int cz,
+      RegionShareAllocator.RegionSteeringWeight weight,
+      boolean pausedOrZeroQuota,
+      long nowNanos
+  ) {
+    long key = chunkCoordKey(cx, cz);
+    CandidateDeferralState prev = candidateDeferrals.get(key);
+    if (pausedOrZeroQuota) {
+      if (prev != null) {
+        candidateDeferrals.put(key, new CandidateDeferralState(
+            prev.deferralCount(), prev.unpausedDeferredNanos(), nowNanos, prev.aged()));
+      }
+      return true;
+    }
+    if (prev != null && prev.aged()) {
+      return false;
+    }
+    long elapsedUnpaused = (prev != null && nowNanos > prev.lastCheckedNanos())
+        ? (nowNanos - prev.lastCheckedNanos())
+        : 0L;
+    long totalUnpaused = (prev != null ? prev.unpausedDeferredNanos() : 0L) + elapsedUnpaused;
+    int prevCount = (prev != null) ? prev.deferralCount() : 0;
+
+    if (prev != null && RegionShareAllocator.isCandidateAged(prevCount, totalUnpaused)) {
+      candidateDeferrals.put(key, new CandidateDeferralState(prevCount, totalUnpaused, nowNanos, true));
+      return false;
+    }
+    if (weight == null || weight.shouldProcessNow()) {
+      candidateDeferrals.remove(key);
+      return false;
+    }
+    int nextCount = prevCount + 1;
+    boolean nowAged = RegionShareAllocator.isCandidateAged(nextCount, totalUnpaused);
+    candidateDeferrals.put(key, new CandidateDeferralState(nextCount, totalUnpaused, nowNanos, nowAged));
+    return true;
+  }
+
+  /**
+   * Returns {@code true} if the candidate at chunk {@code (cx, cz)} has reached the Invariant I9
+   * aging threshold (60 s unpaused time or 8 deferrals).
+   */
+  public boolean isCandidateAged(int cx, int cz, long nowNanos) {
+    CandidateDeferralState st = candidateDeferrals.get(chunkCoordKey(cx, cz));
+    if (st == null) return false;
+    if (st.aged()) return true;
+    long elapsed = Math.max(0L, nowNanos - st.lastCheckedNanos());
+    return RegionShareAllocator.isCandidateAged(st.deferralCount(), st.unpausedDeferredNanos() + elapsed);
+  }
+
+  /** Clears deferral tracking once a candidate is promoted/consumed. */
+  public void clearCandidateDeferral(int cx, int cz) {
+    candidateDeferrals.remove(chunkCoordKey(cx, cz));
+  }
+
+  public CandidateDeferralState candidateDeferralState(int cx, int cz) {
+    return candidateDeferrals.get(chunkCoordKey(cx, cz));
+  }
 
   private RegionSettings settings;
   public Shape<?> shape;
@@ -277,9 +376,10 @@ public class Region extends FactoryValue<RegionKeys> {
    * local queues.
    */
   private void hydrateFromDatabaseIfAvailable() {
-    if (ActiveDatabase.accessor() == null) return;
-    List<DatabaseAccessor.StoredLocation> storedLocations =
-        ActiveDatabase.accessor().loadCachedLocations(name);
+    RegionLocationStore store = locationStore;
+    if (store == null) return;
+    List<? extends RegionLocationStore.StoredEntry> storedLocations =
+        store.loadCachedLocations(name);
     if (storedLocations.isEmpty()) return;
     hydrateCacheFromDatabase(storedLocations);
     String msg = ActiveConfigs.get().getConfigValue(SystemMessages.locationLoaded, "").toString();
@@ -442,7 +542,7 @@ public class Region extends FactoryValue<RegionKeys> {
     return RegionCacheKey.cacheKeyLong(world, this.shape, getVert());
   }
 
-  public void hydrateCacheFromDatabase(List<DatabaseAccessor.StoredLocation> storedLocations) {
+  public void hydrateCacheFromDatabase(List<? extends RegionLocationStore.StoredEntry> storedLocations) {
     long currentCacheKey = cacheKeyLong();
     if (storedLocations.size() > 1) {
       java.util.Collections.shuffle(storedLocations);
@@ -451,8 +551,8 @@ public class Region extends FactoryValue<RegionKeys> {
     this.queueManager.keptLocations.setCallbacks(null, null);
     this.queueManager.unkeptLocations.setCallbacks(null, null);
     try {
-      DatabaseAccessor db = ActiveDatabase.accessor();
-      for (DatabaseAccessor.StoredLocation stored : storedLocations) {
+      RegionLocationStore db = locationStore;
+      for (RegionLocationStore.StoredEntry stored : storedLocations) {
         if ((stored.getSeed() != 0L && stored.getSeed() != currentCacheKey)
             || (getShape() != null && !getShape().contains(stored.getX() >> 4, stored.getZ() >> 4))) {
           if (db != null) db.removeCachedLocation(stored.getId());
@@ -1519,9 +1619,9 @@ public class Region extends FactoryValue<RegionKeys> {
       // single hoisted invocation cannot over-delete a private row from the public branch.
       // Cache the accessor in a local to avoid a second RTP.getInstance() and the TOCTOU
       // null-window between the null check and the deleteCachedLocation call.
-      DatabaseAccessor databaseAccessor = ActiveDatabase.accessor();
-      if (databaseAccessor != null) {
-        databaseAccessor.deleteCachedLocation(name, pair);
+      RegionLocationStore store = locationStore;
+      if (store != null) {
+        store.deleteCachedLocation(name, pair);
       }
       queueManager.playerQueue.poll();
 

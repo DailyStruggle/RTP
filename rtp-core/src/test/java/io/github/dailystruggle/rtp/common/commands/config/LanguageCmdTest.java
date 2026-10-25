@@ -130,10 +130,9 @@ public class LanguageCmdTest {
     @Test
     void languageCmd_localeParameter_includesBundledLocales() {
         Set<String> values = cmd.getParameterLookup().get("locale").values();
-        assertTrue(values.contains("en"));
-        assertTrue(values.contains("es"));
-        assertTrue(values.contains("de"));
-        assertTrue(values.contains("fr"));
-        assertTrue(values.contains("nl"));
+        for (String expected : Arrays.asList("en", "de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "zh")) {
+            assertTrue(values.contains(expected), "Bundled locales must include " + expected);
+        }
+        assertEquals(12, values.size());
     }
 }

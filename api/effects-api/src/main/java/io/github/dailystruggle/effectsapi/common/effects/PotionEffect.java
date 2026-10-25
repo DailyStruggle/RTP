@@ -22,6 +22,10 @@ import java.util.EnumMap;
 public class PotionEffect extends Effect<PotionEffect.PotionKeys> {
     public enum PotionKeys { TYPE, DURATION, AMPLIFIER, AMBIENT, PARTICLES, ICON }
 
+    public PotionEffect() {
+        this("BLINDNESS");
+    }
+
     public PotionEffect(Object defaultPotion) {
         super(new EnumMap<>(PotionKeys.class));
         data.put(PotionKeys.TYPE, defaultPotion);

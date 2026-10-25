@@ -5,6 +5,9 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.governor.ComputeBudget;
+import io.github.dailystruggle.rtp.common.governor.ComputeGovernor;
+import io.github.dailystruggle.rtp.common.governor.RegionShareAllocator;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.tasks.tick.TickBudget;
 import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
@@ -155,7 +158,27 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   public FoliaSchedulerImpl(Plugin plugin, RegionScheduler rs, AsyncScheduler as, GlobalRegionScheduler gs,
                             int maxRegionalInflight, long defaultInteractiveTimeoutMs) {
     this(plugin, rs, as, gs, maxRegionalInflight, defaultInteractiveTimeoutMs,
-        new RegionThreadBudget(System::nanoTime, TickBudget::syncNanos), FoliaSchedulerImpl::gateUnhealthy);
+        new RegionThreadBudget(
+            System::nanoTime,
+            TickBudget::syncNanos,
+            () -> {
+              ComputeBudget b = ComputeGovernor.currentBudget();
+              return b != null && b.isActuating();
+            },
+            groupId -> {
+              ComputeBudget b = ComputeGovernor.currentBudget();
+              if (b == null || b.foliaRegionAllocation() == null) return -1L;
+              RegionShareAllocator.GroupAllocation g = b.foliaRegionAllocation().groups().get(groupId);
+              return (g != null) ? g.shareNanos() : -1L;
+            },
+            groupId -> {
+              ComputeBudget b = ComputeGovernor.currentBudget();
+              if (b == null || b.foliaRegionAllocation() == null) return 0L;
+              RegionShareAllocator.GroupAllocation g = b.foliaRegionAllocation().groups().get(groupId);
+              return (g != null) ? g.loanNanos() : 0L;
+            },
+            new RegionShareAllocator()),
+        FoliaSchedulerImpl::gateUnhealthy);
   }
 
   FoliaSchedulerImpl(Plugin plugin, RegionScheduler rs, AsyncScheduler as, GlobalRegionScheduler gs,
@@ -209,6 +232,23 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   /** Cells with queued or running background work. */
   public int getActiveCellCount() {
     return cells.size();
+  }
+
+  RegionThreadBudget budget() {
+    return budget;
+  }
+
+  /**
+   * Executes a global-region task inside a {@link RegionThreadBudget} span charged to
+   * {@code k = "global"} (ADR-123 Section 2 & 11).
+   */
+  private void runGlobalMeasured(Runnable task) {
+    long span = budget.beginGlobal();
+    try {
+      task.run();
+    } finally {
+      budget.endGlobal(span);
+    }
   }
 
   /**
@@ -459,12 +499,24 @@ public class FoliaSchedulerImpl implements RTPScheduler {
    */
   private void runSlice(CellQueue q, Lease lease, long submittedNanos, CellTask anchor) {
     World world = q.key.world();
+    boolean sliceGroupOpened = false;
     try {
       boolean late = budget.now() - submittedNanos > DISPATCH_LAG_NANOS;
       boolean yielding = late || health.unhealthy(world, anchor.cx(), anchor.cz());
       q.yielding = yielding;
       // Off a region thread (tests) ownership is unknowable; on one, strays are re-routed.
       boolean onAnchor = Bukkit.isOwnedByCurrentRegion(world, anchor.cx(), anchor.cz());
+      ComputeBudget curBudget = ComputeGovernor.currentBudget();
+      if (world != null
+          && ((curBudget != null && (curBudget.autoTune() || curBudget.observeOnly()))
+              || ComputeGovernor.isObservePropertyEnabled())) {
+        budget.beginSliceGroup(
+            world.getUID(),
+            anchor.cx(),
+            anchor.cz(),
+            (probeCx, probeCz) -> Bukkit.isOwnedByCurrentRegion(world, probeCx, probeCz));
+        sliceGroupOpened = true;
+      }
       int ran = 0;
       for (;;) {
         CellTask t = q.tasks.peek();
@@ -483,6 +535,9 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     } catch (Throwable t) {
       RTP.log(Level.WARNING, "[RTP] Regional slice failed at chunk (" + anchor.cx() + "," + anchor.cz() + ")", t);
     } finally {
+      if (sliceGroupOpened) {
+        budget.endSliceGroup();
+      }
       lease.cell = null;
       lease.release();
       finishSlice(q);
@@ -583,10 +638,10 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   @Override
   public void runTask(Runnable task) {
     if (Bukkit.isGlobalTickThread()) {
-      task.run();
+      runGlobalMeasured(task);
     } else {
       if (!plugin.isEnabled()) return;
-      globalScheduler.run(plugin, scheduledTask -> task.run());
+      globalScheduler.run(plugin, scheduledTask -> runGlobalMeasured(task));
     }
   }
 
@@ -656,7 +711,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   @Override
   public void runTaskLater(Runnable task, long delay) {
     if (!plugin.isEnabled()) return;
-    globalScheduler.runDelayed(plugin, scheduledTask -> task.run(), Math.max(1, delay));
+    globalScheduler.runDelayed(plugin, scheduledTask -> runGlobalMeasured(task), Math.max(1, delay));
   }
 
   @Override
@@ -668,7 +723,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     if (!plugin.isEnabled()) return null;
     return globalScheduler.runAtFixedRate(
             plugin,
-            scheduledTask -> runnable.run(),
+            scheduledTask -> runGlobalMeasured(runnable),
             safeDelay,
             safePeriod
     );

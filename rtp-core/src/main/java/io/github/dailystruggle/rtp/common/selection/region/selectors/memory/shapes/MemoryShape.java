@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.anvil.StorageLatencyProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
+import io.github.dailystruggle.rtp.common.predict.DistributionSampler;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency.StrideGroupResidencyManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
@@ -987,7 +988,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    *
    * @return {@code true} if bin swapping should be used instead of a full table
    */
-  private static volatile java.util.function.BooleanSupplier heapPressureSupplier = () -> false;
+  private static volatile java.util.function.BooleanSupplier heapPressureSupplier =
+      io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor::underPressure;
 
   /**
    * Installs the heap pressure supplier, decoupling {@link MemoryShape} from {@code tools.HeapPressureMonitor}.
@@ -2974,6 +2976,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * reader ever sees these arrays. Capacity only grows, so the tables' own growth amortizes it.
    */
   private static final class RebuildScratch {
+    private int recentPeak = 0;
+    private int currentMaxNeed = 0;
     private long[] biomeKeys = new long[0];
     private long[] biomeLengths = new long[0];
     private long[] biomeCutKeys = new long[0];
@@ -2989,45 +2993,82 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     private long[] mergedLengths = new long[0];
     private byte[] mergedCauses = new byte[0];
     private long[] mergedExpiries = new long[0];
+
+    private void trimToRecentPeak() {
+      biomeKeys = trimScratch(biomeKeys, recentPeak);
+      biomeLengths = trimScratch(biomeLengths, recentPeak);
+      biomeCutKeys = trimScratch(biomeCutKeys, recentPeak);
+      biomeCutLengths = trimScratch(biomeCutLengths, recentPeak);
+      unionKeys = trimScratch(unionKeys, recentPeak);
+      unionLengths = trimScratch(unionLengths, recentPeak);
+      unionIds = trimScratch(unionIds, recentPeak);
+      existingKeys = trimScratch(existingKeys, recentPeak);
+      existingLengths = trimScratch(existingLengths, recentPeak);
+      existingCauses = trimScratch(existingCauses, recentPeak);
+      existingExpiries = trimScratch(existingExpiries, recentPeak);
+      mergedKeys = trimScratch(mergedKeys, recentPeak);
+      mergedLengths = trimScratch(mergedLengths, recentPeak);
+      mergedCauses = trimScratch(mergedCauses, recentPeak);
+      mergedExpiries = trimScratch(mergedExpiries, recentPeak);
+    }
   }
 
   /** Never published, never read concurrently - see {@link RebuildScratch}. */
   private transient RebuildScratch scratch = new RebuildScratch();
 
+  private static long[] trimScratch(long[] array, int recentPeak) {
+    if (array.length <= Math.max(1024, recentPeak * 4)) return array;
+    return recentPeak == 0 ? new long[0] : new long[Math.max(1024, recentPeak * 2)];
+  }
+
+  private static byte[] trimScratch(byte[] array, int recentPeak) {
+    if (array.length <= Math.max(1024, recentPeak * 4)) return array;
+    return recentPeak == 0 ? new byte[0] : new byte[Math.max(1024, recentPeak * 2)];
+  }
+
+  private static short[] trimScratch(short[] array, int recentPeak) {
+    if (array.length <= Math.max(1024, recentPeak * 4)) return array;
+    return recentPeak == 0 ? new short[0] : new short[Math.max(1024, recentPeak * 2)];
+  }
+
   /**
-   * Grow-only capacity check. Doubles rather than exact-fits so a steadily growing table does not
-   * reallocate on every rebuild.
+   * Grow-only capacity check within a single rebuild pass. Doubles rather than exact-fits so a
+   * steadily growing table does not reallocate on every rebuild; tracks {@code currentMaxNeed} so
+   * end-of-rebuild decay can shrink buffers after one-off bursts.
    *
    * @param array the current buffer
    * @param capacity required length
    * @return a buffer of at least {@code capacity}; contents beyond the caller's own write index
    *     are undefined
    */
-  private static long[] ensureCapacity(long[] array, int capacity) {
+  private long[] ensureCapacity(long[] array, int capacity) {
+    if (capacity > scratch.currentMaxNeed) scratch.currentMaxNeed = capacity;
     if (array.length >= capacity) return array;
     return new long[Math.max(capacity, array.length << 1)];
   }
 
   /**
-   * Grow-only capacity check for the cause column.
+   * Capacity check for the cause column.
    *
    * @param array the current buffer
    * @param capacity required length
    * @return a buffer of at least {@code capacity}
    */
-  private static byte[] ensureCapacity(byte[] array, int capacity) {
+  private byte[] ensureCapacity(byte[] array, int capacity) {
+    if (capacity > scratch.currentMaxNeed) scratch.currentMaxNeed = capacity;
     if (array.length >= capacity) return array;
     return new byte[Math.max(capacity, array.length << 1)];
   }
 
   /**
-   * Grow-only capacity check for the union's biome-id column.
+   * Capacity check for the union's biome-id column.
    *
    * @param array the current buffer
    * @param capacity required length
    * @return a buffer of at least {@code capacity}
    */
-  private static short[] ensureCapacity(short[] array, int capacity) {
+  private short[] ensureCapacity(short[] array, int capacity) {
+    if (capacity > scratch.currentMaxNeed) scratch.currentMaxNeed = capacity;
     if (array.length >= capacity) return array;
     return new short[Math.max(capacity, array.length << 1)];
   }
@@ -3655,6 +3696,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         totalBiomeCount.set(currentBiomeSum);
 
         rebuildHazardMirror();
+
+        scratch.recentPeak =
+            Math.max(scratch.currentMaxNeed, scratch.recentPeak - (scratch.recentPeak >>> 3));
+        scratch.currentMaxNeed = 0;
+        scratch.trimToRecentPeak();
       } finally {
         isRebuilding.set(false);
       }
@@ -3884,7 +3930,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected double sample(double range) {
     E weightKey = knobs().weight;
     double weight = (weightKey == null) ? 1.0 : getNumber(weightKey, 1.0).doubleValue();
-    return range * Math.pow(rng().nextDouble(), weight);
+    return range * DistributionSampler.samplePowerLaw(rng().nextDouble(), weight);
   }
 
   /**

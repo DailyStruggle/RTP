@@ -37,36 +37,64 @@ public class NeoForgeParticleEffect extends Effect<NeoForgeParticleKeys> {
 
     @Override
     public void run() {
-        if (!(target instanceof ServerPlayer)) return;
-        ServerPlayer player = (ServerPlayer) target;
+        ServerPlayer player = NeoForgeHandles.unwrapPlayer(target);
+        if (player == null) return;
 
         Object typeObj = data.get(NeoForgeParticleKeys.TYPE);
-        ParticleOptions opts;
-        if (typeObj instanceof ParticleOptions) {
-            opts = (ParticleOptions) typeObj;
-        } else if (typeObj instanceof SimpleParticleType) {
-            opts = (SimpleParticleType) typeObj;
-        } else if (typeObj instanceof ParticleType<?>) {
-            opts = ParticleTypes.HAPPY_VILLAGER; // non-simple type with no config -> safe default
-        } else {
-            return;
-        }
-
         int count = numAsInt(data.get(NeoForgeParticleKeys.COUNT), 32);
         double dx = numAsDouble(data.get(NeoForgeParticleKeys.DX), 1.0);
         double dy = numAsDouble(data.get(NeoForgeParticleKeys.DY), 1.0);
         double dz = numAsDouble(data.get(NeoForgeParticleKeys.DZ), 1.0);
         double speed = numAsDouble(data.get(NeoForgeParticleKeys.SPEED), 0.0);
 
+        spawnForPlayer(player, typeObj, count, dx, dy, dz, speed);
+    }
+
+    static ParticleOptions resolveParticleOptions(Object typeObj) {
+        if (typeObj instanceof ParticleOptions opts) return opts;
+        if (typeObj instanceof SimpleParticleType spt) return spt;
+        if (typeObj instanceof ParticleType<?>) return ParticleTypes.HAPPY_VILLAGER;
+        if (typeObj != null) {
+            try {
+                ParticleType<?> resolved = NeoForgeRegistryResolver.resolve(
+                        net.minecraft.core.registries.BuiltInRegistries.PARTICLE_TYPE, typeObj.toString());
+                if (resolved instanceof ParticleOptions opts) return opts;
+                if (resolved != null) return ParticleTypes.HAPPY_VILLAGER;
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public static boolean spawnForPlayer(ServerPlayer player, Object typeObj, int count,
+                                         double dx, double dy, double dz, double speed) {
+        if (player == null) return false;
+        ParticleOptions opts = resolveParticleOptions(typeObj);
+        if (opts == null) return false;
+
+        int clampedCount = Math.max(1, Math.min(256, count));
         double px = player.getX();
         double py = player.getY() + 1.0;
         double pz = player.getZ();
 
         ServerLevel level = NeoForgeRTPPlayer.resolveServerLevel(player);
-        if (level == null) return;
-        if (!invokeSendParticlesTargeted(level, player, opts, px, py, pz, count, dx, dy, dz, speed)) {
-            invokeSendParticles(level, opts, px, py, pz, count, dx, dy, dz, speed);
+        if (level == null) return false;
+        if (!invokeSendParticlesTargeted(level, player, opts, px, py, pz, clampedCount, dx, dy, dz, speed)) {
+            invokeSendParticles(level, opts, px, py, pz, clampedCount, dx, dy, dz, speed);
         }
+        return SEND_PARTICLES_TARGETED != null || SEND_PARTICLES != null;
+    }
+
+    public static boolean spawnAtLevel(ServerLevel level, double x, double y, double z,
+                                       Object typeObj, int count,
+                                       double dx, double dy, double dz, double speed) {
+        if (level == null) return false;
+        ParticleOptions opts = resolveParticleOptions(typeObj);
+        if (opts == null) return false;
+        int clampedCount = Math.max(1, Math.min(256, count));
+        invokeSendParticles(level, opts, x, y, z, clampedCount, dx, dy, dz, speed);
+        return SEND_PARTICLES != null;
     }
 
     // ---- targeted (recipient) overload ------------------------------------

@@ -30,11 +30,6 @@ public final class HeapPressureMonitor {
   private static volatile boolean cachedUnderPressure = false;
   private static volatile double cachedUsedPercent = 0.0;
 
-  static {
-    io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape
-        .setHeapPressureSupplier(HeapPressureMonitor::underPressure);
-  }
-
   private HeapPressureMonitor() {}
 
   /**

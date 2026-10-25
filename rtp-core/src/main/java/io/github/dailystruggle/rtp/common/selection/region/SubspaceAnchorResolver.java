@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.api.group.AnchorSource;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
-import io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTracker;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.Collections;
@@ -18,11 +17,11 @@ import java.util.logging.Level;
  */
 public final class SubspaceAnchorResolver {
 
-  private static final ClaimAnchoredRegionTracker CLAIM_TRACKER = new ClaimAnchoredRegionTracker();
+  private static final RegionClaimTracker CLAIM_TRACKER = new RegionClaimTracker();
 
   private SubspaceAnchorResolver() {}
 
-  public static ClaimAnchoredRegionTracker getClaimTracker() {
+  public static RegionClaimTracker getClaimTracker() {
     return CLAIM_TRACKER;
   }
 
@@ -100,7 +99,7 @@ public final class SubspaceAnchorResolver {
 
       // Ingest known hazard memory from region into region's memory shape within boundary if applicable
       if (region.getShape() instanceof MemoryShape<?> memShape) {
-        ClaimAnchoredRegionTracker.ingestMemoryFromRegion(region, memShape, boundary);
+        RegionClaimTracker.ingestMemoryFromRegion(region, memShape, boundary);
       }
       return CompletableFuture.completedFuture(new GenerationResult(coords, 1, null));
     }
