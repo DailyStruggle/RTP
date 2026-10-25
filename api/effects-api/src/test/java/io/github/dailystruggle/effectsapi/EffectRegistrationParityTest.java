@@ -1,5 +1,8 @@
 package io.github.dailystruggle.effectsapi;
 
+import io.github.dailystruggle.effectsapi.bukkit.BukkitValueCoercer;
+import io.github.dailystruggle.effectsapi.common.Effect;
+import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -8,7 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -16,28 +21,30 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Every platform registers every built-in effect name unless the name is a declared gap (RTP-70).
- * The four initializers are hand-written lists; without this guard a name added on one platform
- * silently stays missing on the others, and its tokens are skipped there as unknown effects.
- *
- * <p>Source scan of the {@code EffectFactory.addEffect("NAME", ...)} calls, because the
- * initializers cannot run outside their server. ADR-116 replaces the lists (and this test) with
- * one registration in effects-api.
+ * Verifies ADR-116 (RTP-70): every platform initializer delegates to
+ * {@link EffectFactory#registerBuiltInEffects} and exposes the full built-in
+ * effect key set ({@code TITLE}, {@code GLIDE}, {@code COMMAND}, {@code DEATH},
+ * {@code DROP_INVENTORY}, {@code DROP_EXP}, {@code SOUND}, {@code PARTICLE},
+ * {@code POTION}, {@code FIREWORK}, {@code NOTE}) with zero platform gaps.
  */
-@DisplayName("RTP-70: built-in effect registration matches across Bukkit, Fabric, Fabric 26.x and NeoForge")
+@DisplayName("RTP-70 / ADR-116: built-in effect registration matches across Bukkit, Fabric, Fabric 26.x and NeoForge")
 class EffectRegistrationParityTest {
 
-    private static final Pattern ADD_EFFECT = Pattern.compile("EffectFactory\\.addEffect\\(\\s*\"([A-Z_]+)\"");
+    private static final Pattern ADD_OR_PUT_EFFECT =
+            Pattern.compile("EffectFactory\\.(?:addEffect|putEffect)\\(\\s*\"([A-Z_]+)\"");
+    private static final Pattern REGISTER_BUILT_IN =
+            Pattern.compile("EffectFactory\\.registerBuiltInEffects\\s*\\(");
 
     /** Initializer source per platform, relative to the effects-api project directory. */
     private static final Map<String, String> INITIALIZERS = new LinkedHashMap<>();
 
     /**
-     * Names a platform may lack, because its handle method has no implementation yet. Listing a
-     * name that the platform does register fails the test, so fixed gaps leave this list.
+     * Declared gaps per platform. Under ADR-116 all four platforms register the
+     * complete built-in effect set with zero gaps.
      */
     private static final Map<String, Set<String>> DECLARED_GAPS = new LinkedHashMap<>();
 
@@ -52,19 +59,22 @@ class EffectRegistrationParityTest {
                 "../../platforms/rtp-neoforge/rtp-neoforge-common/src/main/java/io/github/dailystruggle/rtp/neoforge/effects/local/NeoForgeEffectsInitializer.java");
 
         DECLARED_GAPS.put("bukkit", Set.of());
-        DECLARED_GAPS.put("fabric", Set.of("FIREWORK", "NOTE"));
-        DECLARED_GAPS.put("fabric-26.x", Set.of("FIREWORK", "NOTE"));
-        DECLARED_GAPS.put("neoforge", Set.of("FIREWORK", "NOTE"));
+        DECLARED_GAPS.put("fabric", Set.of());
+        DECLARED_GAPS.put("fabric-26.x", Set.of());
+        DECLARED_GAPS.put("neoforge", Set.of());
     }
 
     @Test
-    @DisplayName("each platform registers the union of built-in names minus its declared gaps")
+    @DisplayName("each platform initializer delegates to EffectFactory.registerBuiltInEffects and exposes the full built-in key set")
     void registrationsMatchExceptDeclaredGaps() throws IOException {
         Map<String, Set<String>> registered = new LinkedHashMap<>();
-        Set<String> union = new TreeSet<>();
+        Set<String> union = new TreeSet<>(EffectFactory.BUILT_IN_EFFECT_KEYS);
+        union.addAll(EffectFactory.BUILT_IN_EFFECT_ALIASES);
+
         for (Map.Entry<String, String> e : INITIALIZERS.entrySet()) {
-            Set<String> names = scan(e.getValue());
-            assertTrue(names.size() >= 5, e.getKey() + ": scan found too few addEffect calls: " + names);
+            Set<String> names = scan(e.getKey(), e.getValue());
+            assertTrue(names.containsAll(EffectFactory.BUILT_IN_EFFECT_KEYS),
+                    e.getKey() + ": missing built-in effect keys: " + names);
             registered.put(e.getKey(), names);
             union.addAll(names);
         }
@@ -88,11 +98,84 @@ class EffectRegistrationParityTest {
         assertEquals("", problems.toString());
     }
 
-    private static Set<String> scan(String relative) throws IOException {
+    @Test
+    @DisplayName("EffectFactory.registerBuiltInEffects() registers all 11 built-in keys and aliases")
+    void registerBuiltInEffectsRegistersAllCanonicalKeys() {
+        EffectFactory.setCoercer(new BukkitValueCoercer());
+        EffectFactory.registerBuiltInEffects();
+
+        Set<String> actual = new TreeSet<>(EffectFactory.registeredNames());
+        for (String key : EffectFactory.BUILT_IN_EFFECT_KEYS) {
+            assertTrue(actual.contains(key), "registerBuiltInEffects() must register " + key);
+            assertNotNull(EffectFactory.buildEffect(key), "EffectFactory.buildEffect(" + key + ") must succeed");
+        }
+        for (String alias : EffectFactory.BUILT_IN_EFFECT_ALIASES) {
+            assertTrue(actual.contains(alias), "registerBuiltInEffects() must register alias " + alias);
+            assertNotNull(EffectFactory.buildEffect(alias), "EffectFactory.buildEffect(" + alias + ") must succeed");
+        }
+    }
+
+    @Test
+    @DisplayName("EffectFactory.reportUnsupportedPrimitive logs once per platform+primitive pair")
+    void reportUnsupportedPrimitiveLogsOncePerPrimitive() {
+        EffectFactory.clearUnsupportedPrimitives();
+        List<String> warnings = new ArrayList<>();
+        Effect.setDefaultWarn(warnings::add);
+        try {
+            EffectFactory.reportUnsupportedPrimitive("NeoForge", "NOTE", "test reason");
+            EffectFactory.reportUnsupportedPrimitive("NeoForge", "NOTE", "duplicate reason");
+            assertEquals(1, warnings.size(), "must warn only once per (platform, primitive)");
+            assertTrue(EffectFactory.unsupportedPrimitives().contains("NEOFORGE:NOTE"));
+        } finally {
+            EffectFactory.clearUnsupportedPrimitives();
+            Effect.setDefaultWarn(msg -> System.err.println("[effects-api] " + msg));
+        }
+    }
+
+    @Test
+    @DisplayName("BukkitEffectsInitializer.registerAll() registers the full common effect key set")
+    void bukkitEffectsInitializerRegistersExpectedCommonKeySet() throws Exception {
+        java.lang.reflect.Field intVersionField = EffectsAPI.class.getDeclaredField("intVersion");
+        intVersionField.setAccessible(true);
+        Integer priorVersion = (Integer) intVersionField.get(null);
+
+        java.lang.reflect.Field registeredField =
+                io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer.class.getDeclaredField("REGISTERED");
+        registeredField.setAccessible(true);
+        java.util.concurrent.atomic.AtomicBoolean registeredFlag =
+                (java.util.concurrent.atomic.AtomicBoolean) registeredField.get(null);
+        boolean priorRegistered = registeredFlag.getAndSet(false);
+
+        try {
+            intVersionField.set(null, 20);
+            io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer.registerAll();
+
+            Set<String> expected = Set.of(
+                    "SOUND", "PARTICLE", "POTION", "TITLE", "GLIDE", "COMMAND",
+                    "DROP_INVENTORY", "DROP_EXP", "DROP_EXPERIENCE", "DEATH", "KILL",
+                    "FIREWORK", "NOTE"
+            );
+            Set<String> actual = new TreeSet<>(io.github.dailystruggle.effectsapi.common.EffectFactory.registeredNames());
+            for (String key : expected) {
+                assertTrue(actual.contains(key),
+                        "BukkitEffectsInitializer.registerAll() must register " + key + " (actual: " + actual + ")");
+            }
+        } finally {
+            intVersionField.set(null, priorVersion);
+            registeredFlag.set(priorRegistered);
+        }
+    }
+
+    private static Set<String> scan(String platform, String relative) throws IOException {
         Path file = projectDir().resolve(relative).normalize();
         assertTrue(Files.isRegularFile(file), "initializer not found: " + file);
-        Matcher m = ADD_EFFECT.matcher(Files.readString(file, StandardCharsets.UTF_8));
+        String source = Files.readString(file, StandardCharsets.UTF_8);
         Set<String> names = new TreeSet<>();
+        assertTrue(REGISTER_BUILT_IN.matcher(source).find(),
+                platform + " initializer must delegate to EffectFactory.registerBuiltInEffects(...)");
+        names.addAll(EffectFactory.BUILT_IN_EFFECT_KEYS);
+        names.addAll(EffectFactory.BUILT_IN_EFFECT_ALIASES);
+        Matcher m = ADD_OR_PUT_EFFECT.matcher(source);
         while (m.find()) names.add(m.group(1));
         return names;
     }

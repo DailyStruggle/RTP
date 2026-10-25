@@ -1,6 +1,6 @@
 # ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-09-06
 

@@ -192,7 +192,8 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   @Override
   @SuppressWarnings("unchecked") // o is class-checked to getClass() above, so the E-parameterized casts are safe
   public boolean equals(Object o) {
-    if (!o.getClass().equals(getClass()) || !((VerticalAdjustor<?>) o).myClass.equals(myClass))
+    if (this == o) return true;
+    if (o == null || !o.getClass().equals(getClass()) || !((VerticalAdjustor<?>) o).myClass.equals(myClass))
       return false;
     EnumMap<E, Object> data1 = getData();
     EnumMap<E, Object> data2 = ((VerticalAdjustor<E>) o).getData();
@@ -208,7 +209,12 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
           return false;
         }
       } catch (IllegalArgumentException ignored) {
-        if (!value.toString().equalsIgnoreCase(data2.get(key).toString())) return false;
+        Object otherVal = data2.get(key);
+        if (value == null) {
+          if (otherVal != null) return false;
+        } else if (otherVal == null || !value.toString().equalsIgnoreCase(otherVal.toString())) {
+          return false;
+        }
       }
     }
     return true;
@@ -216,7 +222,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
 
   @Override
   public int hashCode() {
-    int result = java.util.Objects.hash(super.hashCode(), name);
+    int result = java.util.Objects.hash(getClass(), myClass);
     for (Map.Entry<E, Object> entry : getData().entrySet()) {
       E key = entry.getKey();
       try {

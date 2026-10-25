@@ -17,14 +17,17 @@ import fnmatch
 import functools
 import glob
 import io
+import ipaddress
 import json
 import math
 import os
+import random
 import re
 import statistics
 from statistics import NormalDist
 import subprocess
 import sys
+import threading
 import time
 from typing import Any, Callable, Iterable
 import zipfile
@@ -775,13 +778,16 @@ def _resolve_raw_tier_graph(packet: dict[str, Any], max_depth: int = 16) -> dict
 
     # Memoize acyclic resolved subtrees by `(idx, height)` to bound DAG-shaped command graphs.
     acyclic_memo: dict[int, tuple[_ResolvedSubtree, int]] = {}
+    root_visits: list[int] = [0]
+    max_visits_per_root = 256
 
     def build_node(idx: int, path_indices: frozenset[int], depth: int) -> tuple[_ResolvedSubtree | None, bool, int]:
-        if idx not in by_idx or depth > max_depth:
+        if idx not in by_idx or depth > max_depth or root_visits[0] >= max_visits_per_root:
             return None, True, 0
         cached = acyclic_memo.get(idx)
         if cached is not None and depth + cached[1] <= max_depth:
             return cached[0], False, cached[1]
+        root_visits[0] += 1
 
         raw, eff_children, eff_exec, redir_name, redir_cycle, has_own = resolve_effective(idx, path_indices)
         kind = str(raw.get("kind") or "literal")
@@ -835,6 +841,7 @@ def _resolve_raw_tier_graph(packet: dict[str, Any], max_depth: int = 16) -> dict
     for c_idx in root_raw.get("children") or []:
         if not isinstance(c_idx, int) or c_idx not in by_idx:
             continue
+        root_visits[0] = 0
         sub, _, _ = build_node(c_idx, frozenset({root_idx, c_idx}), 1)
         if sub is not None and sub.name:
             roots[sub.name] = sub
@@ -1143,6 +1150,694 @@ def merge_command_trees(
     return tree
 
 
+# --- Brigadier schema value sampling & tier-stratified NodeBandit (ADR-125 2.3) ---
+
+SCENARIO_SHAPES: tuple[str, ...] = (
+    "repeat",
+    "homesteader_reroll",
+    "quit_lt1s",
+    "concurrent",
+    "explorer_wander",
+    "coop_group",
+    "quit_delay",
+    "rejoin",
+    "window_click",
+)
+PLAYER_TAXONOMY_SHAPES: tuple[str, ...] = (
+    "homesteader_reroll",
+    "explorer_wander",
+    "coop_group",
+)
+FOLLOW_UP_SHAPES: tuple[str, ...] = SCENARIO_SHAPES
+
+_INT32_MIN = -2147483648
+_INT32_MAX = 2147483647
+_BASE_LADDER_POINTS: tuple[int, ...] = (-1, 0, 1, 16, 64, 256, 1024)
+
+
+def numeric_ladder(
+    lo: int | float | None = None,
+    hi: int | float | None = None,
+    *,
+    is_float: bool = False,
+    cap: int | float = 4096,
+) -> list[int | float]:
+    """Return deduplicated sorted boundary/magnitude ladder values within `[lo, hi]`.
+
+    Includes `lo`, `-1`, `0`, `1`, `16`, `64`, `256`, `1024`, `min(hi, cap)`, and `hi`
+    clamped to `[lo, hi]` (ADR-125 section 2.3).
+    """
+    eff_lo: float = float(_INT32_MIN if not is_float else -float(cap)) if lo is None else float(lo)
+    eff_hi: float = float(_INT32_MAX if not is_float else float(cap)) if hi is None else float(hi)
+    if eff_lo > eff_hi:
+        eff_lo, eff_hi = eff_hi, eff_lo
+
+    cap_val = float(cap)
+    clamped_cap = min(eff_hi, max(eff_lo, cap_val))
+    raw_points: list[float] = [eff_lo, *[float(p) for p in _BASE_LADDER_POINTS], clamped_cap, eff_hi]
+
+    if is_float:
+        seen_f: set[float] = set()
+        out_f: list[float] = []
+        for val in sorted(raw_points):
+            if eff_lo - 1e-9 <= val <= eff_hi + 1e-9:
+                clamped = min(eff_hi, max(eff_lo, round(float(val), 6)))
+                if clamped not in seen_f:
+                    seen_f.add(clamped)
+                    out_f.append(clamped)
+        return out_f
+
+    lo_i = int(math.ceil(eff_lo)) if eff_lo != int(eff_lo) else int(eff_lo)
+    hi_i = int(math.floor(eff_hi)) if eff_hi != int(eff_hi) else int(eff_hi)
+    if lo_i > hi_i:
+        lo_i = int(round(eff_lo))
+        hi_i = lo_i
+    clamped_cap_i = min(hi_i, max(lo_i, int(round(cap_val))))
+    int_candidates = [lo_i, *_BASE_LADDER_POINTS, clamped_cap_i, hi_i]
+    seen_i: set[int] = set()
+    out_i: list[int | float] = []
+    for v in sorted(int_candidates):
+        if lo_i <= v <= hi_i and v not in seen_i:
+            seen_i.add(v)
+            out_i.append(int(v))
+    return out_i
+
+
+def _resolve_node_chain(node: CommandNode | str, tree: CommandTree | None) -> list[CommandNode]:
+    """Return the ordered list of `CommandNode`s from root to `node`."""
+    if isinstance(node, str):
+        if tree is None or node not in tree.nodes:
+            raise KeyError(f"command node {node!r} not found in CommandTree")
+        target = tree.nodes[node]
+    else:
+        target = node
+
+    if tree is None:
+        if not target._steps:
+            return [target]
+        root_name = target._root_id or target.node_id.partition(" ")[0]
+        synth: list[CommandNode] = [
+            CommandNode(node_id=root_name, name=root_name, kind="literal", _root_id=root_name)
+        ]
+        cur_id = root_name
+        for idx, (skind, sname, sparser) in enumerate(target._steps):
+            tok = f"<{sname}>" if skind == "argument" else sname
+            cur_id = f"{cur_id} {tok}"
+            if idx == len(target._steps) - 1:
+                synth.append(target)
+            else:
+                synth.append(
+                    CommandNode(
+                        node_id=cur_id,
+                        name=sname,
+                        kind=skind,
+                        parser=sparser,
+                        _steps=target._steps[: idx + 1],
+                        _root_id=root_name,
+                    )
+                )
+        return synth
+
+    tree._ensure_steps()
+    parent_of: dict[str, str] = {}
+    for pid, pnode in tree.nodes.items():
+        for cid in pnode.children:
+            if cid not in parent_of:
+                parent_of[cid] = pid
+
+    chain: list[CommandNode] = []
+    cur: str | None = target.node_id
+    seen: set[str] = set()
+    while cur and cur in tree.nodes and cur not in seen:
+        seen.add(cur)
+        chain.append(tree.nodes[cur])
+        cur = parent_of.get(cur)
+    if not chain:
+        return [target]
+    chain.reverse()
+    if len(chain) == 1 and target._steps:
+        root_name = target._root_id or target.node_id.partition(" ")[0]
+        prefix_nodes: list[CommandNode] = []
+        root_node = tree.nodes.get(root_name) or CommandNode(
+            node_id=root_name, name=root_name, kind="literal", _root_id=root_name
+        )
+        prefix_nodes.append(root_node)
+        cur_id = root_name
+        for idx, (skind, sname, sparser) in enumerate(target._steps):
+            tok = f"<{sname}>" if skind == "argument" else sname
+            cur_id = f"{cur_id} {tok}"
+            if idx == len(target._steps) - 1:
+                prefix_nodes.append(target)
+            elif cur_id in tree.nodes:
+                prefix_nodes.append(tree.nodes[cur_id])
+            else:
+                prefix_nodes.append(
+                    CommandNode(
+                        node_id=cur_id,
+                        name=sname,
+                        kind=skind,
+                        parser=sparser,
+                        _steps=target._steps[: idx + 1],
+                        _root_id=root_name,
+                    )
+                )
+        return prefix_nodes
+    return chain
+
+
+def _sample_argument_token(
+    arg_node: CommandNode,
+    rng: Any,
+    *,
+    completions: dict[str, list[str]] | None = None,
+    bot_names: list[str] | None = None,
+    cap: int | float = 4096,
+) -> str:
+    """Sample one concrete argument token for `arg_node` according to its Brigadier parser."""
+    comp_list: list[str] = []
+    if completions:
+        for key in (arg_node.node_id, arg_node.name, f"<{arg_node.name}>"):
+            if key in completions and completions[key]:
+                comp_list = [str(c).strip() for c in completions[key] if str(c).strip()]
+                if comp_list:
+                    break
+    if not comp_list and arg_node.completions:
+        comp_list = [str(c).strip() for c in arg_node.completions if str(c).strip()]
+
+    p_kind = normalize_parser_kind(arg_node.parser)
+    props = arg_node.properties or {}
+
+    if comp_list and p_kind not in ("integer", "long", "int", "float", "double"):
+        return str(rng.choice(comp_list))
+    if comp_list and rng.random() < 0.25:
+        return str(rng.choice(comp_list))
+
+    if p_kind in ("integer", "long", "int"):
+        lo_raw = props.get("min", _INT32_MIN)
+        hi_raw = props.get("max", _INT32_MAX)
+        lo_i = int(lo_raw) if lo_raw is not None else _INT32_MIN
+        hi_i = int(hi_raw) if hi_raw is not None else _INT32_MAX
+        if lo_i > hi_i:
+            lo_i, hi_i = hi_i, lo_i
+        cap_i = max(1, int(round(float(cap))))
+        ladder = numeric_ladder(lo_i, hi_i, is_float=False, cap=cap)
+        if cap_i < hi_i:
+            capped_ladder = [v for v in ladder if -cap_i <= int(v) <= cap_i]
+            if capped_ladder:
+                ladder = capped_ladder
+        if ladder and rng.random() < 0.75:
+            return str(int(rng.choice(ladder)))
+        u_lo = max(lo_i, -cap_i)
+        u_hi = min(hi_i, cap_i)
+        if u_lo > u_hi:
+            u_lo, u_hi = lo_i, hi_i
+        return str(int(rng.randint(u_lo, u_hi)))
+
+    if p_kind in ("float", "double"):
+        cap_f = float(cap)
+        lo_raw = props.get("min", -cap_f)
+        hi_raw = props.get("max", cap_f)
+        lo_f = float(lo_raw) if lo_raw is not None else -cap_f
+        hi_f = float(hi_raw) if hi_raw is not None else cap_f
+        if lo_f > hi_f:
+            lo_f, hi_f = hi_f, lo_f
+        ladder_f = numeric_ladder(lo_f, hi_f, is_float=True, cap=cap_f)
+        if cap_f < hi_f:
+            capped_f = [v for v in ladder_f if -cap_f <= float(v) <= cap_f]
+            if capped_f:
+                ladder_f = capped_f
+        if ladder_f and rng.random() < 0.75:
+            val_f = float(rng.choice(ladder_f))
+        else:
+            u_lo_f = max(lo_f, -cap_f)
+            u_hi_f = min(hi_f, cap_f)
+            if u_lo_f > u_hi_f:
+                u_lo_f, u_hi_f = lo_f, hi_f
+            val_f = round(float(rng.uniform(u_lo_f, u_hi_f)), 2)
+        if val_f.is_integer():
+            return f"{val_f:.1f}"
+        return f"{val_f:g}"
+
+    if p_kind in ("bool", "boolean"):
+        return str(rng.choice(["true", "false"]))
+
+    if p_kind in ("entity", "game_profile", "score_holder"):
+        candidates = ["{self}"]
+        for b in bot_names or ():
+            b_str = str(b).strip()
+            if b_str and b_str not in candidates:
+                candidates.append(b_str)
+        return str(rng.choice(candidates))
+
+    if p_kind in ("vec2", "column_pos"):
+        offsets = (-16, -1, 0, 1, 16)
+        dx = rng.choice(offsets)
+        dz = rng.choice(offsets)
+        return f"~{dx if dx != 0 else ''} ~{dz if dz != 0 else ''}".strip()
+
+    if p_kind in ("block_pos", "vec3", "rotation"):
+        if p_kind == "rotation":
+            return f"{rng.choice([-90, 0, 90, 180])} {rng.choice([-45, 0, 45])}"
+        offsets = (-16, -1, 0, 1, 16)
+        dx = rng.choice(offsets)
+        dy = rng.choice((-1, 0, 1))
+        dz = rng.choice(offsets)
+        tx = f"~{dx}" if dx != 0 else "~"
+        ty = f"~{dy}" if dy != 0 else "~"
+        tz = f"~{dz}" if dz != 0 else "~"
+        return f"{tx} {ty} {tz}"
+
+    if p_kind in ("dimension", "resource_location"):
+        return str(rng.choice(["minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"]))
+
+    str_type = str(props.get("type") or props.get("mode") or "word").strip().lower()
+    if str_type in ("phrase", "quotable_phrase", "1"):
+        return str(rng.choice(['"alpha"', '"beta_test"', "default", "alpha"]))
+    if str_type in ("greedy", "greedy_phrase", "2"):
+        return str(rng.choice(["alpha", "alpha beta", "default"]))
+    return str(rng.choice(["alpha", "beta", "default", "1"]))
+
+
+def gen_args(
+    node: CommandNode | str,
+    tree: CommandTree | None,
+    rng: Any = None,
+    *,
+    denylist: Denylist | Iterable[str] | None = None,
+    completions: dict[str, list[str]] | None = None,
+    bot_names: list[str] | None = None,
+    cap: int | float = 4096,
+) -> str:
+    """Generate a concrete command string for `node` in `tree` using `rng`, enforcing `Denylist`."""
+    rng_obj = rng if rng is not None else random.Random(1)
+    chain = _resolve_node_chain(node, tree)
+    target = chain[-1]
+
+    active_deny: Denylist
+    if isinstance(denylist, Denylist):
+        active_deny = denylist
+    elif denylist is not None:
+        active_deny = Denylist(denylist)
+    elif tree is not None and tree.denylist_entries:
+        active_deny = Denylist(tree.denylist_entries)
+    else:
+        active_deny = Denylist()
+
+    if target.denied:
+        raise ValueError(f"command node {target.node_id!r} is denied by {target.denied_by!r}")
+
+    root_node = chain[0]
+    root_names = tuple(root_node.aliases) if root_node.aliases else (root_node.name or target._root_id,)
+    steps: list[SequenceStep] = [
+        (n.kind, n.name, n.parser if n.kind == "argument" else None)
+        for n in chain[1:]
+    ]
+    matched_rule = active_deny.match_node(root_names, steps)
+    if matched_rule is not None:
+        raise ValueError(f"command node {target.node_id!r} matches denylist rule {matched_rule!r}")
+
+    for attempt in range(8):
+        _ = attempt
+        tokens: list[str] = []
+        for idx, step_node in enumerate(chain):
+            if idx == 0 or step_node.kind != "argument":
+                tokens.append(step_node.name)
+            else:
+                tok = _sample_argument_token(
+                    step_node,
+                    rng_obj,
+                    completions=completions,
+                    bot_names=bot_names,
+                    cap=cap,
+                )
+                tokens.append(tok)
+        cmd_line = " ".join(t for t in tokens if t)
+        deny_hit = active_deny.match_command_line(cmd_line, tree)
+        if deny_hit is None:
+            return cmd_line
+    raise ValueError(f"generated command for {target.node_id!r} is denied by {deny_hit!r}")
+
+
+format_node_command = gen_args
+
+
+def build_arm_program(
+    node: CommandNode | str,
+    shape: str,
+    tree: CommandTree | None,
+    rng: Any = None,
+    *,
+    denylist: Denylist | Iterable[str] | None = None,
+    completions: dict[str, list[str]] | None = None,
+    bot_names: list[str] | None = None,
+    cap: int | float = 4096,
+) -> list[dict[str, Any]]:
+    """Build a bot episode program `[{"name": ..., "program": [...]}]` for `(node, shape)`."""
+    rng_obj = rng if rng is not None else random.Random(1)
+    names = [str(b) for b in (bot_names or ["fz_0", "fz_1"]) if str(b).strip()] or ["fz_0"]
+    primary_bot = names[0]
+    peer_bot = names[1] if len(names) > 1 else f"{primary_bot}_peer"
+    cmd_line = gen_args(
+        node,
+        tree,
+        rng_obj,
+        denylist=denylist,
+        completions=completions,
+        bot_names=names,
+        cap=cap,
+    )
+    target_id = node if isinstance(node, str) else node.node_id
+    cmd_act = {"a": "cmd", "cmd": cmd_line, "node": target_id}
+    norm_shape = (shape or "repeat").strip().lower()
+
+    if norm_shape == "quit_lt1s":
+        return [
+            {
+                "name": primary_bot,
+                "program": [
+                    dict(cmd_act),
+                    {"a": "wait", "ms": int(rng_obj.choice([200, 400, 750]))},
+                    {"a": "quit"},
+                ],
+            }
+        ]
+    if norm_shape == "quit_delay":
+        return [
+            {
+                "name": primary_bot,
+                "program": [
+                    dict(cmd_act),
+                    {"a": "wait", "ms": int(rng_obj.choice([1200, 1800, 2500]))},
+                    {"a": "quit"},
+                ],
+            }
+        ]
+    if norm_shape == "rejoin":
+        return [
+            {
+                "name": primary_bot,
+                "program": [
+                    dict(cmd_act),
+                    {"a": "wait", "ms": 300},
+                    {"a": "rejoin", "rename": False},
+                    dict(cmd_act),
+                ],
+            }
+        ]
+    if norm_shape == "concurrent":
+        peer_cmd = gen_args(
+            node,
+            tree,
+            rng_obj,
+            denylist=denylist,
+            completions=completions,
+            bot_names=[peer_bot, primary_bot],
+            cap=cap,
+        )
+        return [
+            {
+                "name": primary_bot,
+                "program": [dict(cmd_act), {"a": "wait", "ms": 200}, dict(cmd_act)],
+            },
+            {
+                "name": peer_bot,
+                "program": [{"a": "cmd", "cmd": peer_cmd, "node": target_id}, {"a": "wait", "ms": 200}],
+            },
+        ]
+    if norm_shape == "window_click":
+        return [
+            {
+                "name": primary_bot,
+                "program": [
+                    dict(cmd_act),
+                    {"a": "wait", "ms": 250},
+                    {"a": "click", "slot": int(rng_obj.choice([0, 1, 4, 8])), "button": 0, "mode": 0},
+                    {"a": "wait", "ms": 150},
+                    {"a": "close_window"},
+                ],
+            }
+        ]
+    if norm_shape == "homesteader_reroll":
+        reroll_cmd_1 = gen_args(
+            node,
+            tree,
+            rng_obj,
+            denylist=denylist,
+            completions=completions,
+            bot_names=names,
+            cap=cap,
+        )
+        reroll_cmd_2 = gen_args(
+            node,
+            tree,
+            rng_obj,
+            denylist=denylist,
+            completions=completions,
+            bot_names=names,
+            cap=cap,
+        )
+        return [
+            {
+                "name": primary_bot,
+                "program": [
+                    dict(cmd_act),
+                    {"a": "wait", "ms": 300},
+                    {"a": "move", "dx": int(rng_obj.choice([-8, 8])), "dz": int(rng_obj.choice([-8, 8])), "ms": 400},
+                    {"a": "cmd", "cmd": reroll_cmd_1, "node": target_id},
+                    {"a": "wait", "ms": 250},
+                    {"a": "cmd", "cmd": reroll_cmd_2, "node": target_id},
+                    {"a": "wait", "ms": 350},
+                    {"a": "move", "dx": 4, "dz": -4, "ms": 300},
+                ],
+            }
+        ]
+    if norm_shape == "explorer_wander":
+        follow_cmd = gen_args(
+            node,
+            tree,
+            rng_obj,
+            denylist=denylist,
+            completions=completions,
+            bot_names=names,
+            cap=cap,
+        )
+        return [
+            {
+                "name": primary_bot,
+                "program": [
+                    dict(cmd_act),
+                    {"a": "wait", "ms": 250},
+                    {"a": "move", "dx": int(rng_obj.choice([-24, 24])), "dz": int(rng_obj.choice([-16, 16])), "ms": 600},
+                    {"a": "cmd", "cmd": follow_cmd, "node": target_id},
+                    {"a": "move", "dx": int(rng_obj.choice([-32, 32])), "dz": int(rng_obj.choice([-24, 24])), "ms": 700},
+                    {"a": "wait", "ms": 200},
+                ],
+            }
+        ]
+    if norm_shape == "coop_group":
+        peer_cmd = gen_args(
+            node,
+            tree,
+            rng_obj,
+            denylist=denylist,
+            completions=completions,
+            bot_names=[peer_bot, primary_bot],
+            cap=cap,
+        )
+        return [
+            {
+                "name": primary_bot,
+                "program": [
+                    dict(cmd_act),
+                    {"a": "wait", "ms": 250},
+                    {"a": "move", "dx": 8, "dz": 8, "ms": 400},
+                    dict(cmd_act),
+                ],
+            },
+            {
+                "name": peer_bot,
+                "program": [
+                    {"a": "wait", "ms": 150},
+                    {"a": "cmd", "cmd": peer_cmd, "node": target_id},
+                    {"a": "move", "dx": -8, "dz": 8, "ms": 400},
+                    {"a": "wait", "ms": 200},
+                ],
+            },
+        ]
+    return [
+        {
+            "name": primary_bot,
+            "program": [
+                dict(cmd_act),
+                {"a": "wait", "ms": 150},
+                dict(cmd_act),
+                {"a": "wait", "ms": 150},
+                dict(cmd_act),
+            ],
+        }
+    ]
+
+
+@dataclass
+class BanditArmStats:
+    node_id: str
+    shape: str
+    min_tier: str
+    pulls: int = 0
+    total_reward: float = 0.0
+    novelty_hits: int = 0
+    harm_total: float = 0.0
+    usage_errors: int = 0
+
+    @property
+    def mean_reward(self) -> float:
+        return self.total_reward / self.pulls if self.pulls > 0 else 0.0
+
+
+class NodeBandit:
+    """Tier-stratified UCB1 scheduler over `(node_id, scenario_shape)` pairs (ADR-125 section 2.3).
+
+    Stratifies selection budget so `default`-visible (player-reachable) command nodes
+    receive `default_budget_share` (default 0.75) of pulls when both `default` and `op`
+    tiers are active, preventing a large `op` command tree from starving the player surface.
+    """
+
+    def __init__(
+        self,
+        tree: CommandTree,
+        *,
+        tiers: Iterable[str] = ("default",),
+        default_budget_share: float = 0.75,
+        c: float = 1.414,
+        rng: Any = None,
+        shapes: Iterable[str] = SCENARIO_SHAPES,
+    ):
+        self.tree = tree
+        self.tiers = sort_tiers(tiers) or ["default"]
+        self.default_budget_share = min(1.0, max(0.0, float(default_budget_share)))
+        self.c = float(c)
+        self.rng = rng if rng is not None else random.Random(1)
+        self.shapes: tuple[str, ...] = tuple(str(s) for s in shapes if str(s)) or SCENARIO_SHAPES
+
+        allowed_nodes = self.tree.allowed_executable_nodes(self.tiers)
+        self.arms: dict[tuple[str, str], BanditArmStats] = {}
+        self.default_arms: list[tuple[str, str]] = []
+        self.op_arms: list[tuple[str, str]] = []
+
+        for node in allowed_nodes:
+            m_tier = "default" if ("default" in node.tiers or node.min_tier == "default") else "op"
+            for sh in self.shapes:
+                key = (node.node_id, sh)
+                self.arms[key] = BanditArmStats(node_id=node.node_id, shape=sh, min_tier=m_tier)
+                if m_tier == "default":
+                    self.default_arms.append(key)
+                else:
+                    self.op_arms.append(key)
+
+        self.total_pulls: int = 0
+        self.stratum_pulls: dict[str, int] = {"default": 0, "op": 0}
+        self.node_branch_hints: dict[str, int] = {}
+
+    def _choose_stratum(self) -> tuple[str, list[tuple[str, str]]]:
+        if self.default_arms and self.op_arms:
+            if self.rng.random() < self.default_budget_share:
+                return "default", self.default_arms
+            return "op", self.op_arms
+        if self.default_arms:
+            return "default", self.default_arms
+        if self.op_arms:
+            return "op", self.op_arms
+        raise ValueError("NodeBandit has no allowed executable command arms for the active tiers")
+
+    def _ucb_score(self, stats: BanditArmStats, stratum_total: int) -> float:
+        log_term = math.log(max(2.0, float(stratum_total) + 2.0))
+        if stats.pulls <= 0:
+            return self.c * math.sqrt(log_term)
+        return stats.mean_reward + self.c * math.sqrt(log_term / float(stats.pulls))
+
+    def select_arm(self) -> tuple[str, str]:
+        """Select the next `(node_id, shape)` arm via tier-stratified UCB1 and record the pull."""
+        stratum, pool = self._choose_stratum()
+        stratum_total = self.stratum_pulls.get(stratum, 0)
+
+        best_score = -float("inf")
+        best_candidates: list[tuple[str, str]] = []
+        for arm_key in pool:
+            st = self.arms[arm_key]
+            sc = self._ucb_score(st, stratum_total)
+            if sc > best_score + 1e-12:
+                best_score = sc
+                best_candidates = [arm_key]
+            elif abs(sc - best_score) <= 1e-12:
+                best_candidates.append(arm_key)
+
+        chosen = best_candidates[0] if len(best_candidates) == 1 else self.rng.choice(best_candidates)
+        self.arms[chosen].pulls += 1
+        self.total_pulls += 1
+        self.stratum_pulls[stratum] = stratum_total + 1
+        return chosen
+
+    pick_arm = select_arm
+    next_arm = select_arm
+
+    def update(
+        self,
+        node_id: str,
+        shape: str,
+        reward: float | None = None,
+        *,
+        novelty: int | float = 0.0,
+        class_growth: float = 0.0,
+        tick_gap_excess_ms: float = 0.0,
+        kicks: int = 0,
+        usage_error: bool = False,
+    ) -> float:
+        """Update arm statistics with novelty and telemetry harm deltas."""
+        key = (node_id, shape)
+        if key not in self.arms:
+            node = self.tree.nodes.get(node_id)
+            m_tier = "default" if (node and ("default" in node.tiers or node.min_tier == "default")) else "op"
+            self.arms[key] = BanditArmStats(node_id=node_id, shape=shape, min_tier=m_tier)
+            if m_tier == "default":
+                self.default_arms.append(key)
+            else:
+                self.op_arms.append(key)
+
+        stats = self.arms[key]
+        if stats.pulls == 0:
+            stats.pulls = 1
+            self.total_pulls += 1
+            self.stratum_pulls[stats.min_tier] = self.stratum_pulls.get(stats.min_tier, 0) + 1
+
+        harm_component = (
+            max(0.0, float(class_growth)) / 50.0
+            + max(0.0, float(tick_gap_excess_ms)) / 500.0
+            + 0.5 * max(0, int(kicks))
+        )
+        computed = (0.0 if reward is None else float(reward)) + float(novelty) + harm_component
+        if usage_error:
+            computed -= 0.25
+            stats.usage_errors += 1
+            self.node_branch_hints[node_id] = self.node_branch_hints.get(node_id, 0) + 1
+        if novelty > 0:
+            stats.novelty_hits += int(max(1, round(float(novelty))))
+        stats.harm_total += harm_component
+        stats.total_reward += computed
+        return computed
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "tiers": list(self.tiers),
+            "default_budget_share": self.default_budget_share,
+            "total_pulls": self.total_pulls,
+            "default_pulls": self.stratum_pulls.get("default", 0),
+            "op_pulls": self.stratum_pulls.get("op", 0),
+            "arm_count": len(self.arms),
+            "default_arm_count": len(self.default_arms),
+            "op_arm_count": len(self.op_arms),
+        }
+
+
 # --- Platform profiles (ADR-125 section 2.6) ---------------------------------
 
 COMMON_JDK_AND_SERVER_PREFIXES: tuple[str, ...] = (
@@ -1196,7 +1891,7 @@ PLATFORM_PROFILES: dict[str, PlatformProfile] = {
     "paper": PlatformProfile(
         name="paper",
         jar_subdir="plugins",
-        prereq_prefixes=("viaversion", "viabackwards", "viarewind"),
+        prereq_prefixes=("viaversion", "viabackwards", "viarewind", "luckperms", "vault"),
         server_frame_prefixes=COMMON_JDK_AND_SERVER_PREFIXES
         + (
             "org.bukkit.",
@@ -1363,10 +2058,13 @@ class JcmdObserver:
         pid_file: str | None = None,
         container: str | None = None,
         container_user: str | None = None,
+        ssh: str | None = None,
+        remote_server_dir: str | None = None,
         server_dir: str | None = None,
         jar_pattern: str | None = None,
         jcmd_bin: str = "jcmd",
         docker_bin: str = "docker",
+        ssh_bin: str = "ssh",
         timeout_s: float = 60.0,
         post_grace_ms: int = 250,
         check_local_pid: bool = True,
@@ -1379,10 +2077,15 @@ class JcmdObserver:
         self.pid_file = pid_file
         self.container = container.strip() if isinstance(container, str) and container.strip() else None
         self.container_user = container_user.strip() if isinstance(container_user, str) and container_user.strip() else None
+        self.ssh = ssh.strip() if isinstance(ssh, str) and ssh.strip() else None
+        self.remote_server_dir = (
+            remote_server_dir.strip() if isinstance(remote_server_dir, str) and remote_server_dir.strip() else None
+        )
         self.server_dir = server_dir
         self.jar_pattern = jar_pattern
         self.jcmd_bin = jcmd_bin
         self.docker_bin = docker_bin
+        self.ssh_bin = ssh_bin
         self.timeout_s = float(timeout_s)
         self.post_grace_ms = max(0, int(post_grace_ms))
         self.check_local_pid = bool(check_local_pid)
@@ -1397,6 +2100,8 @@ class JcmdObserver:
             raise JcmdError(f"invalid container name {self.container!r}; pass a container name or ID to --container")
         if self.container_user is not None and self.container_user.startswith("-"):
             raise JcmdError(f"invalid container user {self.container_user!r}; pass a user name or UID")
+        if self.ssh is not None and self.ssh.startswith("-"):
+            raise JcmdError(f"invalid ssh target {self.ssh!r}; pass [user@]host to --ssh")
 
     @staticmethod
     def _default_runner(cmd: list[str], timeout_s: float) -> subprocess.CompletedProcess[str]:
@@ -1418,6 +2123,10 @@ class JcmdObserver:
         prefix.append(self.container)
         return prefix
 
+    def _ssh_exec_prefix(self) -> list[str]:
+        assert self.ssh is not None
+        return [self.ssh_bin, "-o", "BatchMode=yes", self.ssh]
+
     def record_window(self, start_ms: int, end_ms: int, kind: str = "external") -> ExclusionWindow:
         w = ExclusionWindow(start_ms=int(min(start_ms, end_ms)), end_ms=int(max(start_ms, end_ms)), kind=str(kind))
         self.exclusion_windows.append(w)
@@ -1429,7 +2138,7 @@ class JcmdObserver:
     def _verify_local_pid(self, pid: int, source_desc: str) -> int:
         if pid <= 0:
             raise JcmdError(f"invalid PID {pid} from {source_desc}; expected a positive integer")
-        if self.container is not None or not self.check_local_pid:
+        if self.container is not None or self.ssh is not None or not self.check_local_pid:
             return pid
 
         # Never call os.kill(pid, 0) on Windows: signal 0 == CTRL_C_EVENT and sends Ctrl+C.
@@ -1598,6 +2307,59 @@ class JcmdObserver:
                 "Hint: pass explicit `pid` or `jar_pattern` to disambiguate."
             )
 
+        if self.ssh is not None:
+            list_cmd = self._ssh_exec_prefix() + [self.jcmd_bin, "-l"]
+            try:
+                proc = self._runner(list_cmd, self.timeout_s)
+            except FileNotFoundError as exc:
+                raise JcmdError(
+                    f"executable `{list_cmd[0]}` not found while running {' '.join(list_cmd)}. "
+                    "Hint: ensure `ssh` is installed and on PATH."
+                ) from exc
+            except subprocess.TimeoutExpired as exc:
+                raise JcmdError(f"`{' '.join(list_cmd)}` timed out after {self.timeout_s:g}s.") from exc
+
+            combined = f"{proc.stdout or ''}\n{proc.stderr or ''}".strip()
+            if proc.returncode != 0:
+                raise JcmdError(
+                    f"`{' '.join(list_cmd)}` failed (exit {proc.returncode}): {combined}. "
+                    "Hint: verify non-interactive SSH access (`ssh -o BatchMode=yes`) and JDK `jcmd` on the remote host."
+                )
+            candidates = self._parse_jcmd_list(proc.stdout or "")
+            if not candidates:
+                raise JcmdError(
+                    f"`{' '.join(list_cmd)}` listed no target JVMs on {self.ssh!r}. "
+                    "Hint: verify the server is running under the SSH user on the remote host."
+                )
+            saved_dir = self.server_dir
+            try:
+                if self.remote_server_dir:
+                    self.server_dir = self.remote_server_dir
+                matched = self._match_jcmd_candidates(
+                    candidates,
+                    check_cwd=False,
+                    use_server_dir=bool(self.remote_server_dir),
+                )
+            finally:
+                self.server_dir = saved_dir
+            if len(matched) == 1:
+                self._resolved_pid = matched[0][0]
+                return self._resolved_pid
+            if not matched and len(candidates) == 1 and not self.jar_pattern:
+                self._resolved_pid = candidates[0][0]
+                return self._resolved_pid
+            cand_summary = ", ".join(f"{p} ({d or '<no main class>'})" for p, d in candidates)
+            if not matched:
+                raise JcmdError(
+                    f"`{' '.join(list_cmd)}` found no JVM matching jar_pattern={self.jar_pattern!r} / "
+                    f"remote_server_dir={self.remote_server_dir!r}; remote JVMs: [{cand_summary}]."
+                )
+            match_summary = ", ".join(f"{p} ({d})" for p, d in matched)
+            raise JcmdError(
+                f"`{' '.join(list_cmd)}` matched multiple remote JVMs on {self.ssh!r}: [{match_summary}]. "
+                "Hint: pass --pid, --pid-file, or --remote-server-dir to disambiguate."
+            )
+
         # Discover via `jcmd -l` on the host.
         try:
             proc = self._runner([self.jcmd_bin, "-l"], self.timeout_s)
@@ -1649,14 +2411,16 @@ class JcmdObserver:
                 f"disallowed jcmd operation {op!r}; JcmdObserver only permits read-only {sorted(ALLOWED_JCMD_OPS)}"
             )
         target_pid = self.resolve_pid()
-        if self.container is None and self.check_local_pid:
+        if self.container is None and self.ssh is None and self.check_local_pid:
             # Re-check liveness and ownership before every jcmd call to guard against PID recycling.
             target_pid = self._verify_local_pid(target_pid, "re-check before jcmd")
         if self.container is not None:
             return self._docker_exec_prefix() + [self.jcmd_bin, str(target_pid), op]
+        if self.ssh is not None:
+            return self._ssh_exec_prefix() + [self.jcmd_bin, str(target_pid), op]
         return [self.jcmd_bin, str(target_pid), op]
 
-    def _run_jcmd_op(self, op: str) -> tuple[str, ExclusionWindow]:
+    def _run_jcmd_op(self, op: str, *, record_window: bool = True) -> tuple[str, ExclusionWindow]:
         cmd = self._build_command(op)
         t0 = self._clock_ms()
         proc: subprocess.CompletedProcess[str] | None = None
@@ -1672,7 +2436,11 @@ class JcmdObserver:
             raise JcmdError(f"`{' '.join(cmd)}` timed out after {self.timeout_s:g}s.") from exc
         finally:
             t1 = self._clock_ms()
-            win = self.record_window(t0, max(t0, t1) + self.post_grace_ms, kind=op)
+            end_ms = max(t0, t1) + self.post_grace_ms
+            if record_window:
+                win = self.record_window(t0, end_ms, kind=op)
+            else:
+                win = ExclusionWindow(start_ms=t0, end_ms=end_ms, kind=op)
 
         out = proc.stdout or ""
         err = proc.stderr or ""
@@ -1725,9 +2493,9 @@ class JcmdObserver:
         histo = self.class_histogram()
         return {cls: pair[0] for cls, pair in histo.items()}
 
-    def thread_print(self) -> str:
-        """Collect a `Thread.print` stack dump and record its observation window."""
-        out, _ = self._run_jcmd_op("Thread.print")
+    def thread_print(self, *, record_window: bool = True) -> str:
+        """Collect a `Thread.print` stack dump and optionally record its observation window."""
+        out, _ = self._run_jcmd_op("Thread.print", record_window=record_window)
         if not out or ('"' not in out and "Thread" not in out and "\tat " not in out and "   at " not in out):
             raise JcmdError(
                 "jcmd Thread.print returned no recognizable thread stacks. "
@@ -2059,6 +2827,76 @@ def parse_neoforge_toml_metadata(text: str) -> tuple[str | None, list[str], list
     return primary_id, hard_deps, soft_deps, provides
 
 
+def parse_plugin_yml_commands(text: str) -> tuple[list[str], dict[str, str]]:
+    """Parse `(canonical_commands, alias_to_canonical)` from Bukkit `plugin.yml` `commands:` block."""
+    canonical_cmds: list[str] = []
+    alias_map: dict[str, str] = {}
+    in_commands = False
+    commands_indent = -1
+    cur_cmd: str | None = None
+    cur_cmd_indent = -1
+    in_aliases = False
+    aliases_indent = -1
+
+    for raw_line in (text or "").splitlines():
+        line = _strip_yaml_comment(raw_line).rstrip()
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        stripped = line.strip()
+
+        if in_aliases:
+            if indent >= aliases_indent and stripped.startswith("-"):
+                al = _unquote_scalar(stripped[1:]).lower()
+                if al and cur_cmd and al != cur_cmd:
+                    alias_map[al] = cur_cmd
+                continue
+            if indent <= aliases_indent and not stripped.startswith("-"):
+                in_aliases = False
+
+        if indent == 0 and ":" in stripped:
+            key, _, _ = stripped.partition(":")
+            in_commands = key.strip().lower() == "commands"
+            commands_indent = indent if in_commands else -1
+            cur_cmd = None
+            cur_cmd_indent = -1
+            in_aliases = False
+            continue
+
+        if in_commands:
+            if indent <= commands_indent:
+                in_commands = False
+                cur_cmd = None
+                continue
+            if (cur_cmd is None or indent <= cur_cmd_indent) and ":" in stripped and not stripped.startswith("-"):
+                ckey, _, _ = stripped.partition(":")
+                cmd_name = _unquote_scalar(ckey).lower()
+                if cmd_name:
+                    cur_cmd = cmd_name
+                    cur_cmd_indent = indent
+                    if cmd_name not in canonical_cmds:
+                        canonical_cmds.append(cmd_name)
+                continue
+            if cur_cmd is not None and indent > cur_cmd_indent and ":" in stripped:
+                akey, _, arest = stripped.partition(":")
+                if akey.strip().lower() == "aliases":
+                    arest_s = arest.strip()
+                    if arest_s.startswith("["):
+                        for item in _parse_inline_yaml_list(arest_s):
+                            al = item.lower()
+                            if al and al != cur_cmd:
+                                alias_map[al] = cur_cmd
+                    elif arest_s:
+                        al = _unquote_scalar(arest_s).lower()
+                        if al and al != cur_cmd:
+                            alias_map[al] = cur_cmd
+                    else:
+                        in_aliases = True
+                        aliases_indent = indent
+
+    return canonical_cmds, alias_map
+
+
 @dataclass
 class JarMetadata:
     jar_name: str
@@ -2068,6 +2906,8 @@ class JarMetadata:
     hard_depends: list[str] = field(default_factory=list)
     soft_depends: list[str] = field(default_factory=list)
     class_count: int = 0
+    commands: list[str] = field(default_factory=list)
+    command_aliases: dict[str, str] = field(default_factory=dict)
 
 
 class JarIndex:
@@ -2184,8 +3024,13 @@ class JarIndex:
             hard_deps: list[str] = []
             soft_deps: list[str] = []
             provides: list[str] = []
+            jar_cmds: list[str] = []
+            jar_aliases: dict[str, str] = {}
             try:
                 with zipfile.ZipFile(jar_path, "r") as zf:
+                    if "plugin.yml" in set(zf.namelist()):
+                        yml_text = zf.read("plugin.yml").decode("utf-8", errors="replace")
+                        jar_cmds, jar_aliases = parse_plugin_yml_commands(yml_text)
                     plugin_id = self._scan_zip_archive(
                         zf,
                         outer_jar_name=jar_name,
@@ -2212,6 +3057,8 @@ class JarIndex:
                 hard_depends=hard_deps,
                 soft_depends=soft_deps,
                 class_count=len(cls_seen),
+                commands=jar_cmds,
+                command_aliases=jar_aliases,
             )
             self.jars[jar_name] = meta
             self.id_to_jar[resolved_id.lower()] = jar_name
@@ -2452,16 +3299,16 @@ class _LeakDesign:
         self.row_feats = [extract_server_episode_features(r) for r in records]
         self.row_deltas = [_extract_record_class_deltas(r) for r in records]
         self.min_act = max(2, int(min_feature_episodes))
-        self.classes: set[str] = set()
-        self.features: set[str] = set()
+        raw_classes: set[str] = set()
+        raw_features: set[str] = set()
         for d in self.row_deltas:
-            self.classes.update(d.keys())
+            raw_classes.update(d.keys())
         for f in self.row_feats:
-            self.features.update(k for k, v in f.items() if v > 0)
+            raw_features.update(k for k, v in f.items() if v > 0)
         self.cols: dict[str, list[float]] = {}
         self.act: dict[str, list[int]] = {}
         self.flags: list[list[str]] = [[] for _ in range(self.n)]
-        for feat in sorted(self.features):
+        for feat in sorted(raw_features):
             col = [rf.get(feat, 0.0) for rf in self.row_feats]
             act = [i for i, v in enumerate(col) if v > 0.0]
             if len(act) >= self.n:
@@ -2473,6 +3320,17 @@ class _LeakDesign:
             self.act[feat] = act
             for i in act:
                 self.flags[i].append(feat)
+        if len(raw_classes) > 32:
+            self.classes = {
+                cls
+                for cls in raw_classes
+                if sum(d.get(cls, 0.0) for d in self.row_deltas) > 0.0
+                and sum(1 for d in self.row_deltas if d.get(cls, 0.0) > 0.0) >= self.min_act
+            }
+            self.features = set(self.cols.keys())
+        else:
+            self.classes = raw_classes
+            self.features = raw_features
 
     def scan(self, p_crit: float) -> dict[tuple[str, str], float]:
         """Return `{(class, feature): adjusted_p}` for cells at or below `p_crit`."""
@@ -2661,11 +3519,12 @@ def screen_server_leaks(
             }
         )
 
-    # Sort by smallest p-value first; prefer specific `arm:` features over aggregate `node:`/`departures` on ties
-    def _sort_key(item: dict[str, Any]) -> tuple[float, int, str, str]:
+    # Sort by smallest p-value first; prefer specific `arm:` features and concrete jar suspects on ties
+    def _sort_key(item: dict[str, Any]) -> tuple[float, int, int, str, str]:
         f_str = str(item["feature"])
         specificity = 0 if f_str.startswith("arm:") else (1 if f_str.startswith("node:") else 2)
-        return (float(item["p_value"]), specificity, str(item["cls"]), f_str)
+        has_jar = 0 if str(item.get("first_suspect") or "server") not in ("server", "ambiguous") else 1
+        return (float(item["p_value"]), specificity, has_jar, str(item["cls"]), f_str)
 
     correlations.sort(key=_sort_key)
     return {
@@ -3158,14 +4017,2229 @@ class StallOracle:
         }
 
 
+# --- Callback-driven numeric bisection & dependency-closed jar ddmin (ADR-125 2.4) ---
+
+
+def _select_numeric_arg_node(
+    node: CommandNode | str,
+    tree: CommandTree | None = None,
+) -> tuple[CommandNode, int]:
+    """Return `(numeric_arg_node, token_index_in_cmd)` for `node`."""
+    chain = _resolve_node_chain(node, tree)
+    numeric_kinds = ("integer", "long", "int", "float", "double")
+    best_node = chain[-1]
+    best_idx = max(1, len(chain) - 1)
+
+    tok_pos = 0
+    for idx, step_node in enumerate(chain):
+        p_kind = normalize_parser_kind(step_node.parser) if step_node.kind == "argument" else "literal"
+        if idx > 0 and step_node.kind == "argument" and p_kind in numeric_kinds:
+            best_node = step_node
+            best_idx = tok_pos
+        if p_kind in ("block_pos", "vec3"):
+            tok_pos += 3
+        elif p_kind in ("vec2", "column_pos", "rotation"):
+            tok_pos += 2
+        else:
+            tok_pos += 1
+
+    if best_node.kind != "argument" and tree is not None:
+        for cid in best_node.children:
+            ch = tree.nodes.get(cid)
+            if ch is not None and ch.kind == "argument":
+                best_node = ch
+                best_idx = max(1, tok_pos)
+                break
+    return best_node, best_idx
+
+
+def _parse_numeric_token(tok: str) -> float | None:
+    try:
+        val = float(tok)
+    except (ValueError, TypeError):
+        return None
+    if not math.isfinite(val):
+        return None
+    return val
+
+
+def _clone_program_structure(program: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in program or ():
+        if not isinstance(item, dict):
+            continue
+        copied = dict(item)
+        if isinstance(copied.get("program"), list):
+            copied["program"] = [dict(a) for a in copied["program"] if isinstance(a, dict)]
+        out.append(copied)
+    return out
+
+
+def bisect_numeric_arg(
+    program: list[dict[str, Any]],
+    node: CommandNode | str,
+    predicate_fn: Callable[[list[dict[str, Any]]], bool],
+    *,
+    denylist: Denylist | Iterable[str] | None = None,
+    passing_value: int | float | None = None,
+    tree: CommandTree | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Binary-search a numeric argument token in `program` to find the minimal failing threshold.
+
+    Uses an injected pure `predicate_fn(candidate_program) -> bool` callback and validates
+    every candidate command against `Denylist` before probing (ADR-125 section 2.4).
+    """
+    base_prog = _clone_program_structure(program)
+    if not base_prog:
+        return base_prog, None
+
+    active_deny: Denylist
+    if isinstance(denylist, Denylist):
+        active_deny = denylist
+    elif denylist is not None:
+        active_deny = Denylist(denylist)
+    elif tree is not None and tree.denylist_entries:
+        active_deny = Denylist(tree.denylist_entries)
+    else:
+        active_deny = Denylist()
+
+    arg_node, expected_tok_idx = _select_numeric_arg_node(node, tree)
+    if arg_node.denied:
+        return base_prog, None
+
+    p_kind = normalize_parser_kind(arg_node.parser)
+    is_float = p_kind in ("float", "double")
+    param_name = (arg_node.name or "value").strip("<>") or "value"
+
+    is_bot_list = isinstance(base_prog[0].get("program"), list)
+    target_bot_idx = -1
+    target_act_idx = -1
+    target_tok_idx = -1
+    leading_slash = False
+    cmd_tokens: list[str] = []
+
+    def _iter_actions() -> list[tuple[int, int, dict[str, Any]]]:
+        found: list[tuple[int, int, dict[str, Any]]] = []
+        if is_bot_list:
+            for b_i, b_dict in enumerate(base_prog):
+                for a_i, act in enumerate(b_dict.get("program") or ()):
+                    if isinstance(act, dict) and act.get("a") == "cmd" and isinstance(act.get("cmd"), str):
+                        found.append((b_i, a_i, act))
+        else:
+            for a_i, act in enumerate(base_prog):
+                if isinstance(act, dict) and act.get("a") == "cmd" and isinstance(act.get("cmd"), str):
+                    found.append((0, a_i, act))
+        return found
+
+    for b_i, a_i, act in _iter_actions():
+        raw_cmd = str(act.get("cmd") or "").strip()
+        if not raw_cmd:
+            continue
+        has_slash = raw_cmd.startswith("/")
+        clean_cmd = raw_cmd[1:].strip() if has_slash else raw_cmd
+        toks = [t for t in clean_cmd.split() if t]
+        if len(toks) < 2:
+            continue
+        chosen_t_idx = -1
+        if 0 < expected_tok_idx < len(toks) and _parse_numeric_token(toks[expected_tok_idx]) is not None:
+            chosen_t_idx = expected_tok_idx
+        else:
+            for t_i in range(len(toks) - 1, 0, -1):
+                if _parse_numeric_token(toks[t_i]) is not None:
+                    chosen_t_idx = t_i
+                    break
+        if chosen_t_idx > 0:
+            target_bot_idx = b_i
+            target_act_idx = a_i
+            target_tok_idx = chosen_t_idx
+            leading_slash = has_slash
+            cmd_tokens = toks
+            break
+
+    if target_act_idx < 0 or target_tok_idx <= 0:
+        return base_prog, None
+
+    parsed_fail = _parse_numeric_token(cmd_tokens[target_tok_idx])
+    if parsed_fail is None:
+        return base_prog, None
+
+    def _format_val(v: int | float) -> str:
+        if is_float:
+            vf = round(float(v), 4)
+            return f"{vf:.1f}" if vf.is_integer() else f"{vf:g}"
+        return str(int(round(float(v))))
+
+    def _build_candidate(v: int | float) -> tuple[list[dict[str, Any]], str]:
+        cand_prog = _clone_program_structure(base_prog)
+        formatted_v = _format_val(v)
+        new_toks = list(cmd_tokens)
+        new_toks[target_tok_idx] = formatted_v
+        new_cmd = ("/" if leading_slash else "") + " ".join(new_toks)
+        if is_bot_list:
+            cand_prog[target_bot_idx]["program"][target_act_idx]["cmd"] = new_cmd
+            for b_dict in cand_prog:
+                for act in b_dict.get("program") or ():
+                    if isinstance(act, dict) and act.get("a") == "cmd" and isinstance(act.get("cmd"), str):
+                        rc = act["cmd"].strip()
+                        hs = rc.startswith("/")
+                        ct = [t for t in (rc[1:].strip() if hs else rc).split() if t]
+                        if len(ct) > target_tok_idx and ct[0].lower() == cmd_tokens[0].lower() and _parse_numeric_token(ct[target_tok_idx]) is not None:
+                            ct[target_tok_idx] = formatted_v
+                            act["cmd"] = ("/" if hs else "") + " ".join(ct)
+        else:
+            cand_prog[target_act_idx]["cmd"] = new_cmd
+            for act in cand_prog:
+                if isinstance(act, dict) and act.get("a") == "cmd" and isinstance(act.get("cmd"), str):
+                    rc = act["cmd"].strip()
+                    hs = rc.startswith("/")
+                    ct = [t for t in (rc[1:].strip() if hs else rc).split() if t]
+                    if len(ct) > target_tok_idx and ct[0].lower() == cmd_tokens[0].lower() and _parse_numeric_token(ct[target_tok_idx]) is not None:
+                        ct[target_tok_idx] = formatted_v
+                        act["cmd"] = ("/" if hs else "") + " ".join(ct)
+        return cand_prog, new_cmd
+
+    orig_cmd = ("/" if leading_slash else "") + " ".join(cmd_tokens)
+    if active_deny.is_denied_command_line(orig_cmd, tree):
+        return base_prog, None
+
+    props = arg_node.properties or {}
+    if is_float:
+        fail_f = float(parsed_fail)
+        lo_f = float(props.get("min", min(0.0, fail_f)))
+        hi_f = float(props.get("max", max(fail_f, lo_f)))
+        if passing_value is not None:
+            pass_f = float(passing_value)
+        elif lo_f <= 1.0 <= fail_f:
+            pass_f = max(lo_f, 1.0 if lo_f >= 1.0 else 0.0)
+        else:
+            pass_f = lo_f
+        if abs(fail_f - pass_f) <= 1e-9:
+            return base_prog, f"{param_name} >= {_format_val(fail_f)}"
+
+        def _probe_f(v: float) -> tuple[bool, list[dict[str, Any]]]:
+            c_prog, c_cmd = _build_candidate(v)
+            if active_deny.is_denied_command_line(c_cmd, tree):
+                return False, c_prog
+            return bool(predicate_fn(c_prog)), c_prog
+
+        pass_ok, pass_prog_f = _probe_f(pass_f)
+        if pass_ok:
+            return pass_prog_f, f"{param_name} >= {_format_val(pass_f)}"
+
+        low_f, high_f = min(pass_f, fail_f), max(pass_f, fail_f)
+        best_f = fail_f
+        best_prog_f = base_prog
+        for _ in range(16):
+            mid_f = round((low_f + high_f) / 2.0, 4)
+            if abs(mid_f - low_f) <= 1e-6 or abs(mid_f - high_f) <= 1e-6:
+                break
+            ok_f, c_prog_f = _probe_f(mid_f)
+            if fail_f >= pass_f:
+                if ok_f:
+                    best_f = mid_f
+                    best_prog_f = c_prog_f
+                    high_f = mid_f
+                else:
+                    low_f = mid_f
+            else:
+                if ok_f:
+                    best_f = mid_f
+                    best_prog_f = c_prog_f
+                    low_f = mid_f
+                else:
+                    high_f = mid_f
+        op_str = ">=" if fail_f >= pass_f else "<="
+        return best_prog_f, f"{param_name} {op_str} {_format_val(best_f)}"
+
+    fail_i = int(round(parsed_fail))
+    lo_i = int(props.get("min", min(0, fail_i)))
+    hi_i = int(props.get("max", max(fail_i, lo_i)))
+    if passing_value is not None:
+        pass_i = int(round(float(passing_value)))
+    elif lo_i <= 1 <= fail_i:
+        pass_i = max(lo_i, 1 if lo_i >= 1 else 0)
+    else:
+        pass_i = lo_i
+
+    if fail_i == pass_i:
+        return base_prog, f"{param_name} >= {fail_i}"
+
+    memo_i: dict[int, tuple[bool, bool, list[dict[str, Any]]]] = {}
+
+    def _eval_int(v: int) -> tuple[bool, bool, list[dict[str, Any]]]:
+        if v not in memo_i:
+            c_prog, c_cmd = _build_candidate(v)
+            denied_flag = active_deny.is_denied_command_line(c_cmd, tree)
+            if denied_flag:
+                memo_i[v] = (False, True, c_prog)
+            else:
+                memo_i[v] = (bool(predicate_fn(c_prog)), False, c_prog)
+        return memo_i[v]
+
+    pass_fails, pass_denied, pass_prog = _eval_int(pass_i)
+    if pass_fails and not pass_denied:
+        return pass_prog, f"{param_name} >= {pass_i}"
+
+    if fail_i > pass_i:
+        low_i = pass_i + 1
+        high_i = fail_i
+        best_i = fail_i
+        best_prog_i, _ = _build_candidate(fail_i)
+        while low_i <= high_i:
+            mid_i = (low_i + high_i) // 2
+            probe_val = mid_i
+            fails, is_den, c_prog = _eval_int(probe_val)
+            if is_den:
+                # Find nearest non-denied integer in [low_i, high_i]
+                alt_val: int | None = None
+                for offset in range(1, (high_i - low_i) + 1):
+                    for cand_v in (mid_i + offset, mid_i - offset):
+                        if low_i <= cand_v <= high_i:
+                            _, cand_den, _ = _eval_int(cand_v)
+                            if not cand_den:
+                                alt_val = cand_v
+                                break
+                    if alt_val is not None:
+                        break
+                if alt_val is None:
+                    break
+                probe_val = alt_val
+                fails, _, c_prog = _eval_int(probe_val)
+
+            if fails:
+                best_i = probe_val
+                best_prog_i = c_prog
+                high_i = probe_val - 1
+            else:
+                low_i = probe_val + 1
+        return best_prog_i, f"{param_name} >= {best_i}"
+
+    # Symmetric case: fail_i < pass_i
+    low_i = fail_i
+    high_i = pass_i - 1
+    best_i = fail_i
+    best_prog_i, _ = _build_candidate(fail_i)
+    while low_i <= high_i:
+        mid_i = (low_i + high_i + 1) // 2
+        fails, is_den, c_prog = _eval_int(mid_i)
+        if is_den:
+            high_i = mid_i - 1
+            continue
+        if fails:
+            best_i = mid_i
+            best_prog_i = c_prog
+            low_i = mid_i + 1
+        else:
+            high_i = mid_i - 1
+    return best_prog_i, f"{param_name} <= {best_i}"
+
+
+def _normalize_jar_probe_result(
+    res: Any,
+    finding_k: int,
+) -> tuple[int, bool, bool]:
+    """Normalize a `probe_fn(active_jars)` return value to `(hits, all_loaded, reproduced)`."""
+    if isinstance(res, dict):
+        hits = int(res.get("hits", res.get("repro_count", 0)) or 0)
+        all_loaded = bool(res.get("all_loaded", True))
+    elif isinstance(res, tuple):
+        if len(res) >= 3:
+            hits = int(res[0] or 0)
+            all_loaded = bool(res[2])
+        elif len(res) == 2:
+            hits = int(res[0] or 0)
+            all_loaded = bool(res[1])
+        elif len(res) == 1:
+            hits = int(res[0] or 0)
+            all_loaded = True
+        else:
+            hits, all_loaded = 0, False
+    elif isinstance(res, bool):
+        hits = int(finding_k) if res else 0
+        all_loaded = True
+    elif isinstance(res, (int, float)):
+        hits = int(res)
+        all_loaded = True
+    else:
+        hits, all_loaded = 0, False
+
+    reproduced = bool(all_loaded) and (hits >= max(1, int(finding_k)))
+    return hits, all_loaded, reproduced
+
+
+def run_pre_ddmin_probes(
+    candidate_jars: Iterable[str],
+    probe_fn: Callable[[list[str]], tuple[int, bool] | int],
+    *,
+    finding_k: int = 3,
+    finding_n: int = 3,
+) -> dict[str, Any]:
+    """Run the two mandatory pre-`ddmin` guardrails (ADR-125 section 2.4).
+
+    1. Full candidate set (`list(candidate_jars)`): if `< finding_k` reproductions or a jar
+       failed to load, reports `not_reproducible_after_restart` and does not attribute.
+    2. Prerequisites only (`[]`): if `>= finding_k` reproductions with all prerequisites
+       loaded, labels the finding `server` and skips jar `ddmin` so no plugin/mod jar is blamed.
+    """
+    cands = [str(j).strip() for j in candidate_jars if str(j).strip()]
+    k_req = max(1, int(finding_k))
+    n_req = max(k_req, int(finding_n))
+
+    full_res = probe_fn(list(cands))
+    full_hits, full_loaded, full_repro = _normalize_jar_probe_result(full_res, k_req)
+    if not full_repro:
+        return {
+            "status": "not_reproducible_after_restart",
+            "attribution_status": "not_reproducible_after_restart",
+            "full_hits": full_hits,
+            "full_all_loaded": full_loaded,
+            "prereq_hits": 0,
+            "prereq_all_loaded": True,
+            "finding_k": k_req,
+            "finding_n": n_req,
+            "probes_run": 1,
+            "blamed_jars": [],
+        }
+
+    prereq_res = probe_fn([])
+    prereq_hits, prereq_loaded, prereq_repro = _normalize_jar_probe_result(prereq_res, k_req)
+    if prereq_repro:
+        return {
+            "status": "server",
+            "attribution_status": "server",
+            "full_hits": full_hits,
+            "full_all_loaded": full_loaded,
+            "prereq_hits": prereq_hits,
+            "prereq_all_loaded": prereq_loaded,
+            "finding_k": k_req,
+            "finding_n": n_req,
+            "probes_run": 2,
+            "blamed_jars": [],
+        }
+
+    return {
+        "status": "proceed_to_ddmin",
+        "attribution_status": "proceed_to_ddmin",
+        "full_hits": full_hits,
+        "full_all_loaded": full_loaded,
+        "prereq_hits": prereq_hits,
+        "prereq_all_loaded": prereq_loaded,
+        "finding_k": k_req,
+        "finding_n": n_req,
+        "probes_run": 2,
+        "blamed_jars": [],
+    }
+
+
+def ddmin_jars(
+    candidate_jars: Iterable[str],
+    jar_index: JarIndex | None,
+    probe_fn: Callable[[list[str]], tuple[int, bool] | int],
+    *,
+    finding_k: int = 3,
+    finding_n: int = 3,
+    max_probes: int = 32,
+    first_suspect: str | None = None,
+) -> dict[str, Any]:
+    """Isolate the minimal reproducing jar subset via dependency-closed `ddmin` (ADR-125 section 2.4).
+
+    Runs `run_pre_ddmin_probes` first, closes every candidate subset under `jar_index.close_deps`,
+    treats subsets where `all_loaded=False` as unresolved (non-reproducing), and falls back to
+    `INCONCLUSIVE` / `unconfirmed` (`first_suspect`) if `max_probes` is exhausted before isolation.
+    """
+    cands = list(dict.fromkeys(str(j).strip() for j in candidate_jars if str(j).strip()))
+    k_req = max(1, int(finding_k))
+    n_req = max(k_req, int(finding_n))
+    max_p = max(2, int(max_probes))
+
+    pre = run_pre_ddmin_probes(cands, probe_fn, finding_k=k_req, finding_n=n_req)
+    if pre["status"] == "not_reproducible_after_restart":
+        return {
+            **pre,
+            "verdict": "INCONCLUSIVE",
+            "first_suspect": first_suspect,
+            "budget_exhausted": False,
+            "dependency_closed_jars": [],
+        }
+    if pre["status"] == "server":
+        return {
+            **pre,
+            "verdict": "PASS",
+            "first_suspect": "server",
+            "budget_exhausted": False,
+            "dependency_closed_jars": [],
+        }
+
+    if not cands:
+        return {
+            **pre,
+            "status": "unconfirmed",
+            "attribution_status": "unconfirmed",
+            "verdict": "INCONCLUSIVE",
+            "first_suspect": first_suspect,
+            "budget_exhausted": False,
+            "dependency_closed_jars": [],
+        }
+
+    def _close_subset(sub: Iterable[str]) -> list[str]:
+        if jar_index is not None:
+            closed_set = set(jar_index.close_deps(sub))
+        else:
+            closed_set = {str(s).strip() for s in sub if str(s).strip()}
+        ordered = [j for j in cands if j in closed_set]
+        for extra in sorted(closed_set):
+            if extra not in ordered:
+                ordered.append(extra)
+        return ordered
+
+    if len(cands) == 1:
+        closed_single = _close_subset(cands)
+        return {
+            **pre,
+            "status": "confirmed",
+            "attribution_status": "confirmed",
+            "verdict": "FAIL",
+            "blamed_jars": list(cands),
+            "dependency_closed_jars": closed_single,
+            "first_suspect": first_suspect or cands[0],
+            "budget_exhausted": False,
+        }
+
+    full_closed = _close_subset(cands)
+    memo: dict[tuple[str, ...], tuple[int, bool, bool]] = {
+        tuple(sorted(full_closed)): (pre["full_hits"], pre["full_all_loaded"], True),
+        (): (pre["prereq_hits"], pre["prereq_all_loaded"], False),
+    }
+    probes_used = int(pre["probes_run"])
+    budget_exhausted = False
+
+    def _test_subset(sub: list[str]) -> bool:
+        nonlocal probes_used, budget_exhausted
+        if not sub:
+            return False
+        closed = _close_subset(sub)
+        key = tuple(sorted(closed))
+        if key in memo:
+            return memo[key][2]
+        if probes_used >= max_p:
+            budget_exhausted = True
+            return False
+        probes_used += 1
+        res = probe_fn(list(closed))
+        hits, all_loaded, passed = _normalize_jar_probe_result(res, k_req)
+        memo[key] = (hits, all_loaded, passed)
+        return passed
+
+    minimal = bf.ddmin(list(cands), _test_subset)
+    closed_minimal = _close_subset(minimal)
+
+    if budget_exhausted:
+        return {
+            **pre,
+            "status": "unconfirmed",
+            "attribution_status": "unconfirmed",
+            "verdict": "INCONCLUSIVE",
+            "probes_run": probes_used,
+            "blamed_jars": [],
+            "candidate_subset": list(minimal),
+            "dependency_closed_jars": closed_minimal,
+            "first_suspect": first_suspect,
+            "budget_exhausted": True,
+        }
+
+    return {
+        **pre,
+        "status": "confirmed",
+        "attribution_status": "confirmed",
+        "verdict": "FAIL",
+        "probes_run": probes_used,
+        "blamed_jars": list(minimal),
+        "dependency_closed_jars": closed_minimal,
+        "first_suspect": first_suspect or (minimal[0] if minimal else None),
+        "budget_exhausted": False,
+    }
+
+
+def _invoke_optional_callback(fn: Callable[..., Any], primary_arg: Any, context: dict[str, Any]) -> Any:
+    try:
+        return fn(primary_arg, context)
+    except TypeError:
+        return fn(primary_arg)
+
+
+def _resolve_node_for_finding(
+    node: CommandNode | str | None,
+    tree: CommandTree | None,
+    program: list[dict[str, Any]] | None = None,
+) -> tuple[CommandNode | None, CommandNode | None]:
+    """Return `(mitigation_node, numeric_or_exec_node)` resolved against `tree`."""
+    if isinstance(node, CommandNode):
+        root_node = tree.nodes.get(node._root_id) if (tree and node._root_id) else None
+        return (root_node or node), node
+
+    if tree is None:
+        if isinstance(node, str) and node.strip():
+            nid = node.strip()
+            synth = CommandNode(node_id=nid, name=nid.partition(" ")[0], kind="literal", aliases=[nid], min_tier="default")
+            return synth, synth
+        return None, None
+
+    tree._ensure_steps()
+
+    # Check if program contains an explicit `node` or `cmd` we can match in `tree`.
+    prog_cmd_str: str | None = None
+    prog_node_id: str | None = None
+    for item in program or ():
+        if not isinstance(item, dict):
+            continue
+        acts = item.get("program") if isinstance(item.get("program"), list) else [item]
+        for act in acts:
+            if isinstance(act, dict) and act.get("a") == "cmd":
+                if isinstance(act.get("node"), str) and act["node"].strip():
+                    prog_node_id = act["node"].strip()
+                if isinstance(act.get("cmd"), str) and act["cmd"].strip():
+                    prog_cmd_str = act["cmd"].strip()
+                break
+        if prog_node_id or prog_cmd_str:
+            break
+
+    raw_id = (str(node).strip() if isinstance(node, str) and str(node).strip() else None) or prog_node_id
+    exec_node: CommandNode | None = None
+    root_node: CommandNode | None = None
+
+    if raw_id:
+        if raw_id in tree.nodes:
+            exec_node = tree.nodes[raw_id]
+        else:
+            r_tok = raw_id.partition(" ")[0]
+            _, r_bare = split_namespace(r_tok)
+            canon_r = tree.alias_map.get(r_tok) or tree.alias_map.get(r_bare) or r_tok
+            rest = raw_id.partition(" ")[2].strip()
+            cand_id = f"{canon_r} {rest}".strip() if rest else canon_r
+            if cand_id in tree.nodes:
+                exec_node = tree.nodes[cand_id]
+            elif canon_r in tree.nodes:
+                root_node = tree.nodes[canon_r]
+
+    if exec_node is None and prog_cmd_str:
+        clean_line = prog_cmd_str.lstrip("/").strip()
+        toks = [t for t in clean_line.split() if t]
+        if toks:
+            r0 = toks[0]
+            _, r0_bare = split_namespace(r0)
+            canon_r0 = tree.alias_map.get(r0) or tree.alias_map.get(r0_bare) or r0
+            if canon_r0 in tree.nodes:
+                cur_n = tree.nodes[canon_r0]
+                root_node = cur_n
+                for tok in toks[1:]:
+                    matched_ch: CommandNode | None = None
+                    for cid in cur_n.children:
+                        ch = tree.nodes.get(cid)
+                        if ch is not None and ch.kind == "literal" and ch.name.lower() == tok.lower():
+                            matched_ch = ch
+                            break
+                    if matched_ch is None:
+                        for cid in cur_n.children:
+                            ch = tree.nodes.get(cid)
+                            if ch is not None and ch.kind == "argument":
+                                matched_ch = ch
+                                break
+                    if matched_ch is None:
+                        break
+                    cur_n = matched_ch
+                exec_node = cur_n
+
+    if exec_node is not None and root_node is None:
+        r_id = exec_node._root_id or exec_node.node_id.partition(" ")[0]
+        root_node = tree.nodes.get(r_id) or exec_node
+
+    if exec_node is not None and exec_node.kind != "argument":
+        for cid in exec_node.children:
+            ch = tree.nodes.get(cid)
+            if ch is not None and ch.kind == "argument":
+                return (root_node or exec_node), ch
+
+    return (root_node or exec_node), (exec_node or root_node)
+
+
+def build_finding_verdict(
+    *,
+    oracle: str,
+    signature: str,
+    node: CommandNode | str | None = None,
+    tree: CommandTree | None = None,
+    follow_up: str | None = None,
+    evidence: str = "",
+    first_suspect: str | None = None,
+    attribution_status: str = "unconfirmed",
+    blamed_jars: Iterable[str] = (),
+    shrunk_program: list[dict[str, Any]] | None = None,
+    bisected_bound: str | None = None,
+    k: int = 0,
+    n: int = 0,
+    server_dir: str = "<server_dir>",
+    profile: str = "paper",
+    replay_file: str = "episodes.jsonl",
+    ep: int | str = 0,
+) -> dict[str, Any]:
+    """Construct a structured finding verdict with `operator_mitigation` and `author_reproducer` (ADR-125 2.4)."""
+    mitigation_node, exec_node = _resolve_node_for_finding(node, tree, shrunk_program)
+    target_node = exec_node or mitigation_node
+
+    if target_node is not None:
+        canonical_node = mitigation_node.node_id if mitigation_node is not None else target_node.node_id
+        aliases: list[str] = []
+        for src in (mitigation_node, target_node):
+            if src is None:
+                continue
+            for a in (src.aliases or [src.node_id]):
+                if a and a not in aliases:
+                    aliases.append(a)
+        min_tier = target_node.min_tier or (mitigation_node.min_tier if mitigation_node else "default") or "default"
+    else:
+        raw_node_str = str(node).strip() if isinstance(node, str) and str(node).strip() else "unknown"
+        canonical_node = raw_node_str
+        aliases = [raw_node_str] if raw_node_str != "unknown" else []
+        min_tier = "default"
+
+    blamed_list = [str(j).strip() for j in (blamed_jars or ()) if str(j).strip()]
+    suspect = str(first_suspect).strip() if first_suspect else (blamed_list[0] if blamed_list else "server")
+    prog_copy = _clone_program_structure(shrunk_program or [])
+    k_val = max(0, int(k))
+    n_val = max(k_val, int(n))
+    replay_cmd = (
+        f"python3 scripts/bench_fuzz.py --mode server --profile {profile} "
+        f"--server-dir {server_dir} --replay {replay_file} --ep {ep}"
+    )
+
+    return {
+        "oracle": str(oracle),
+        "signature": str(signature),
+        "attribution_status": str(attribution_status),
+        "blamed_jars": blamed_list,
+        "first_suspect": suspect,
+        "reproduced": bool(k_val > 0 and k_val >= n_val) or attribution_status in ("confirmed", "server"),
+        "k": k_val,
+        "n": n_val,
+        "operator_mitigation": {
+            "canonical_node": canonical_node,
+            "aliases": aliases,
+            "min_tier": min_tier,
+            "bisected_bound": bisected_bound,
+            "follow_up": follow_up,
+        },
+        "author_reproducer": {
+            "oracle": str(oracle),
+            "attribution_status": str(attribution_status),
+            "blamed_jars": blamed_list,
+            "first_suspect": suspect,
+            "evidence": str(evidence),
+            "shrunk_program": prog_copy,
+            "reproduction": {"k": k_val, "n": n_val},
+            "replay_cmd": replay_cmd,
+        },
+    }
+
+
+# --- Declarative BIT Catalog, Tables & Survival Envelope (ADR-125) -----------
+
+BENCH_NAMESPACE: str = "BENCH"
+
+BENCH_BIT_CODES: dict[int, dict[str, Any]] = {
+    5001: {
+        "id": 5001,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_CMD_IMPACT",
+        "severity": "INFO",
+        "tier": "CBIT",
+        "component": "bench.surface",
+        "side_effect": "NONE",
+        "remediation": "Inspect observed command tick gap and post-GC retention metrics across tested scenario shapes.",
+    },
+    5002: {
+        "id": 5002,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_CMD_HITCH_SUBTHRESHOLD",
+        "severity": "WARNING",
+        "tier": "CBIT",
+        "component": "bench.surface",
+        "side_effect": "NONE",
+        "remediation": "Command exceeded 1.5x baseline p99 tick gap without crossing the hard stall failure threshold.",
+    },
+    5003: {
+        "id": 5003,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_MAIN_THREAD_FRAME",
+        "severity": "INFO",
+        "tier": "CBIT",
+        "component": "bench.frames",
+        "side_effect": "NONE",
+        "remediation": "Review main-thread stack frame share captured during elevated tick-gap intervals.",
+    },
+    5101: {
+        "id": 5101,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_STALL_ACUTE",
+        "severity": "ERROR",
+        "tier": "IBIT",
+        "component": "bench.attribution",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Restrict command min_tier, clamp argument to pass_domain, or disable blamed_jars.",
+    },
+    5102: {
+        "id": 5102,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_STALL_SUSTAINED",
+        "severity": "ERROR",
+        "tier": "IBIT",
+        "component": "bench.attribution",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Throttle repeated/concurrent command execution or disable blamed_jars.",
+    },
+    5103: {
+        "id": 5103,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_STALL_UNISOLATED",
+        "severity": "WARNING",
+        "tier": "IBIT",
+        "component": "bench.attribution",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Tick-gap stall observed during exploration; rerun with server restart enabled to complete jar ddmin.",
+    },
+    5201: {
+        "id": 5201,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_LEAK_POST_GC",
+        "severity": "ERROR",
+        "tier": "IBIT",
+        "component": "bench.attribution",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Disable blamed_jars or restrict the trigger command/departure path retaining objects after full GC.",
+    },
+    5202: {
+        "id": 5202,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_LEAK_UNISOLATED",
+        "severity": "WARNING",
+        "tier": "IBIT",
+        "component": "bench.attribution",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Post-GC class retention slope observed; rerun with higher episode budget or restart enabled to isolate.",
+    },
+    5301: {
+        "id": 5301,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_SURVIVAL_RAMP_PASS",
+        "severity": "INFO",
+        "tier": "IBIT",
+        "component": "bench.ramp",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Concurrency rung satisfied tick-gap, disconnect, and post-GC retention invariants.",
+    },
+    5302: {
+        "id": 5302,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_SURVIVAL_RAMP_DEGRADED",
+        "severity": "WARNING",
+        "tier": "IBIT",
+        "component": "bench.ramp",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Concurrency rung experienced elevated p95 tick gap without acute stall or disconnect failure.",
+    },
+    5303: {
+        "id": 5303,
+        "ns": BENCH_NAMESPACE,
+        "code": "BENCH_SURVIVAL_RAMP_FAIL",
+        "severity": "ERROR",
+        "tier": "IBIT",
+        "component": "bench.ramp",
+        "side_effect": "WORLD_SAFE",
+        "remediation": "Concurrency rung violated survival SLO invariants; inspect bench.attribution counterfactuals.",
+    },
+}
+
+BIT_TABLE_COLUMNS: tuple[str, ...] = (
+    "component",
+    "tier",
+    "sideEffect",
+    "health",
+    "E",
+    "W",
+    "severity",
+    "id",
+    "code",
+    "source",
+    "path",
+    "message",
+    "expected",
+    "suggestion",
+)
+
+_LINE_BREAK_RE = re.compile(r"[\r\n]+")
+
+
+def _bit_single_line(value: Any) -> str:
+    return _LINE_BREAK_RE.sub(" ", str(value if value is not None else ""))
+
+
+def _bit_csv_cell(value: Any) -> str:
+    """Format one CSV cell matching `io.github.dailystruggle.bit.BitTable.csvCell`."""
+    s = _bit_single_line(value)
+    quote = (
+        "," in s
+        or '"' in s
+        or (bool(s) and (s[0].isspace() or s[-1].isspace()))
+    )
+    if not quote:
+        return s
+    return '"' + s.replace('"', '""') + '"'
+
+
+def render_bit_table_csv(
+    rows: Iterable[dict[str, Any]],
+    columns: Iterable[str] = BIT_TABLE_COLUMNS,
+) -> str:
+    """Render an aligned CSV table matching `BitTable.render` (padding after `, ` delimiters)."""
+    col_list = [str(c) for c in columns]
+    row_list = list(rows or ())
+    widths = [len(_bit_csv_cell(c)) for c in col_list]
+    for r in row_list:
+        for i, col in enumerate(col_list):
+            cell_str = _bit_csv_cell(r.get(col, ""))
+            if len(cell_str) > widths[i]:
+                widths[i] = len(cell_str)
+
+    def _fmt_row(src: dict[str, Any] | None) -> str:
+        parts: list[str] = []
+        for i, col in enumerate(col_list):
+            cell_str = _bit_csv_cell(col if src is None else src.get(col, ""))
+            pad = " " * max(0, widths[i] - len(cell_str))
+            parts.append(pad + cell_str)
+        return ", ".join(parts)
+
+    out_lines = [_fmt_row(None)]
+    for r in row_list:
+        out_lines.append(_fmt_row(r))
+    return "\n".join(out_lines) + "\n"
+
+
+def _compact_program_sequence(shrunk_program: Iterable[dict[str, Any]] | None) -> list[str]:
+    """Summarize a shrunk bot program into declarative action tokens (e.g. `['cmd: rtp', 'wait: 200ms', 'quit']`)."""
+    seq: list[str] = []
+    for item in shrunk_program or ():
+        if not isinstance(item, dict):
+            continue
+        acts = item.get("program") if isinstance(item.get("program"), list) else [item]
+        for act in acts:
+            if not isinstance(act, dict):
+                continue
+            kind = str(act.get("a") or "")
+            if kind == "cmd":
+                seq.append(f"cmd: {act.get('cmd') or act.get('node') or ''}".strip())
+            elif kind == "wait":
+                seq.append(f"wait: {int(act.get('ms', 0) or 0)}ms")
+            elif kind == "move":
+                seq.append(
+                    f"move: dx={act.get('dx', 0)},dz={act.get('dz', 0)},{int(act.get('ms', 0) or 0)}ms"
+                )
+            elif kind == "click":
+                seq.append(f"click: slot={int(act.get('slot', 0) or 0)}")
+            elif kind == "rejoin":
+                seq.append("rejoin(rename)" if act.get("rename") else "rejoin")
+            elif kind:
+                seq.append(kind)
+    return seq
+
+
+def derive_parameter_boundary(
+    bisected_bound: str | None,
+    exec_node: CommandNode | None = None,
+) -> dict[str, Any] | None:
+    """Derive declarative `pass_domain` and `fail_domain` from `bisected_bound` and `exec_node` properties."""
+    if not bisected_bound:
+        return None
+    m = re.match(r"^\s*([A-Za-z0-9_.-]+)\s*(>=|<=)\s*([-+]?\d+(?:\.\d+)?)\s*$", str(bisected_bound))
+    if not m:
+        return {
+            "argument": exec_node.name if exec_node is not None else "arg",
+            "bisected_bound": str(bisected_bound),
+            "pass_domain": "unknown",
+            "fail_domain": str(bisected_bound),
+        }
+    arg_name, op_str, thresh_raw = m.group(1), m.group(2), m.group(3)
+    props = (exec_node.properties if exec_node is not None and isinstance(exec_node.properties, dict) else {}) or {}
+    is_int = "." not in thresh_raw and (
+        exec_node is None or exec_node.parser in (None, "brigadier:integer", "brigadier:long")
+    )
+    if is_int:
+        t_val = int(round(float(thresh_raw)))
+        lo_val = int(props["min"]) if "min" in props and props["min"] is not None else None
+        hi_val = int(props["max"]) if "max" in props and props["max"] is not None else None
+        if op_str == ">=":
+            fail_dom = f"[{t_val}, {hi_val}]" if hi_val is not None and hi_val >= t_val else f">= {t_val}"
+            if lo_val is not None:
+                pass_dom = f"[{lo_val}, {t_val - 1}]" if t_val - 1 >= lo_val else "none"
+            else:
+                pass_dom = f"<= {t_val - 1}"
+        else:
+            fail_dom = f"[{lo_val}, {t_val}]" if lo_val is not None and lo_val <= t_val else f"<= {t_val}"
+            if hi_val is not None:
+                pass_dom = f"[{t_val + 1}, {hi_val}]" if hi_val >= t_val + 1 else "none"
+            else:
+                pass_dom = f">= {t_val + 1}"
+    else:
+        t_f = float(thresh_raw)
+        lo_f = float(props["min"]) if "min" in props and props["min"] is not None else None
+        hi_f = float(props["max"]) if "max" in props and props["max"] is not None else None
+        if op_str == ">=":
+            fail_dom = f"[{t_f:g}, {hi_f:g}]" if hi_f is not None and hi_f >= t_f else f">= {t_f:g}"
+            pass_dom = f"[{lo_f:g}, <{t_f:g})" if lo_f is not None and t_f > lo_f else ("none" if lo_f is not None else f"< {t_f:g}")
+        else:
+            fail_dom = f"[{lo_f:g}, {t_f:g}]" if lo_f is not None and lo_f <= t_f else f"<= {t_f:g}"
+            pass_dom = f"(>{t_f:g}, {hi_f:g}]" if hi_f is not None and hi_f > t_f else ("none" if hi_f is not None else f"> {t_f:g}")
+
+    return {
+        "argument": arg_name,
+        "bisected_bound": str(bisected_bound),
+        "pass_domain": pass_dom,
+        "fail_domain": fail_dom,
+    }
+
+
+def summarize_main_thread_attribution(
+    records: Iterable[dict[str, Any]],
+    *,
+    profile: PlatformProfile | str = "paper",
+    jar_index: JarIndex | None = None,
+) -> list[dict[str, Any]]:
+    """Aggregate captured `jcmd Thread.print` main-thread stack frames into a frequency table."""
+    prof = profile if isinstance(profile, PlatformProfile) else get_platform_profile(profile)
+    counts: dict[tuple[str, str], int] = {}
+    total = 0
+    for r in records or ():
+        if not isinstance(r, dict):
+            continue
+        for td in r.get("thread_dumps") or ():
+            if not isinstance(td, str) or not td.strip():
+                continue
+            parsed = parse_main_thread_frame(td, profile=prof, jar_index=jar_index)
+            frame = str(parsed.get("culprit_frame") or parsed.get("top_frame") or "").strip()
+            if not frame:
+                frames = parsed.get("frames") or []
+                frame = str(frames[0]) if frames else "unknown"
+            owner = str(parsed.get("first_suspect") or "server").strip() or "server"
+            counts[(owner, frame)] = counts.get((owner, frame), 0) + 1
+            total += 1
+
+    if total == 0:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for (owner, frame), cnt in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0][0], kv[0][1])):
+        rows.append(
+            {
+                "owner_jar": owner,
+                "top_frame": frame,
+                "samples": cnt,
+                "total_samples": total,
+                "share_pct": round(100.0 * cnt / total, 1),
+            }
+        )
+    return rows
+
+
+def build_command_impact_table(
+    records: Iterable[dict[str, Any]],
+    *,
+    baseline_records: Iterable[dict[str, Any]] = (),
+    tree: CommandTree | None = None,
+    jar_index: JarIndex | None = None,
+    profile: PlatformProfile | str = "paper",
+    findings: Iterable[dict[str, Any]] = (),
+    baseline_p99_ms: float = 1000.0,
+    stall_ms: float = 2000.0,
+) -> list[dict[str, Any]]:
+    """Build a declarative impact leaderboard across all tested `(tier, command, shape)` arms."""
+    prof = profile if isinstance(profile, PlatformProfile) else get_platform_profile(profile)
+    base_max_delta: dict[str, float] = {}
+    for br in baseline_records or ():
+        if isinstance(br, dict):
+            for k_cls, v_delta in (br.get("deltas") or {}).items():
+                f_val = float(v_delta or 0.0)
+                if f_val > base_max_delta.get(k_cls, 0.0):
+                    base_max_delta[k_cls] = f_val
+    cmd_to_jar: dict[str, str] = {}
+    if jar_index is not None:
+        for j_name, meta in jar_index.jars.items():
+            p_ns = (meta.plugin_id or "").lower()
+            for c_name in meta.commands:
+                cl = c_name.lower()
+                cmd_to_jar.setdefault(cl, j_name)
+                if p_ns:
+                    cmd_to_jar.setdefault(f"{p_ns}:{cl}", j_name)
+            for al in meta.command_aliases:
+                al_l = al.lower()
+                cmd_to_jar.setdefault(al_l, j_name)
+                if p_ns:
+                    cmd_to_jar.setdefault(f"{p_ns}:{al_l}", j_name)
+
+    finding_by_cmd: dict[str, list[dict[str, Any]]] = {}
+    for f in findings or ():
+        if not isinstance(f, dict):
+            continue
+        op_mit = f.get("operator_mitigation") or {}
+        c_node = str(op_mit.get("canonical_node") or "").strip()
+        if c_node:
+            finding_by_cmd.setdefault(c_node, []).append(f)
+            finding_by_cmd.setdefault(c_node.partition(" ")[0], []).append(f)
+        for al in op_mit.get("aliases") or ():
+            if al:
+                finding_by_cmd.setdefault(str(al), []).append(f)
+
+    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for r in records or ():
+        if not isinstance(r, dict):
+            continue
+        node_str = str(r.get("node") or r.get("canonical_node") or "").strip()
+        if not node_str:
+            continue
+        shape_str = str(r.get("follow_up") or "default").strip() or "default"
+        node_obj = tree.nodes.get(node_str) if (tree is not None and node_str in tree.nodes) else None
+        tier_str = (node_obj.min_tier if node_obj is not None and node_obj.min_tier else "default")
+        groups.setdefault((tier_str, node_str, shape_str), []).append(r)
+
+    cand_jars: set[str] = set()
+    if jar_index is not None:
+        cand_jars = {j for j in jar_index.jars if not prof.is_prerequisite_jar(j)}
+
+    table: list[dict[str, Any]] = []
+    for (tier_str, node_str, shape_str), g_recs in groups.items():
+        all_gaps: list[dict[str, Any]] = []
+        all_windows: list[Any] = []
+        pos_retained_totals: list[float] = []
+        owner_votes: dict[str, float] = {}
+        for r in g_recs:
+            r_windows = r.get("exclusion_windows") or ()
+            kept_g, _ = filter_tick_gaps(r.get("tick_gaps") or (), r_windows)
+            all_gaps.extend(kept_g)
+            all_windows.extend(r_windows)
+            ep_pos = 0.0
+            for k_cls, v_delta in (r.get("deltas") or {}).items():
+                val = float(v_delta or 0.0) - base_max_delta.get(k_cls, 0.0)
+                if val <= 0.0:
+                    continue
+                c_clean = k_cls[len(CLS_PREFIX) :] if k_cls.startswith(CLS_PREFIX) else k_cls
+                if "$$Lambda" in c_clean:
+                    continue
+                if jar_index is not None:
+                    ow = jar_index.owner_of_class(c_clean, profile=prof)
+                    if ow and (not cand_jars or ow in cand_jars):
+                        ep_pos += val
+                        owner_votes[ow] = owner_votes.get(ow, 0.0) + val
+                else:
+                    ep_pos += val
+            pos_retained_totals.append(ep_pos)
+
+        gap_summary = summarize_tick_gaps(all_gaps, ())
+        p95_ms = round(float(gap_summary.get("p95_ms", 0.0) or 0.0), 1)
+        max_ms = round(float(gap_summary.get("max_ms", 0.0) or 0.0), 1)
+        mean_ret = round(sum(pos_retained_totals) / max(1, len(pos_retained_totals)), 1)
+
+        root_tok = node_str.partition(" ")[0].lower()
+        bare_tok = root_tok.split(":", 1)[1] if ":" in root_tok else root_tok
+        matched_findings = finding_by_cmd.get(node_str) or finding_by_cmd.get(root_tok) or finding_by_cmd.get(bare_tok) or []
+
+        owner_jar = cmd_to_jar.get(root_tok) or cmd_to_jar.get(bare_tok)
+        if not owner_jar and matched_findings:
+            f0 = matched_findings[0]
+            bl = f0.get("blamed_jars") or []
+            owner_jar = bl[0] if bl else f0.get("first_suspect")
+        if not owner_jar and owner_votes:
+            owner_jar = max(owner_votes.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        if not owner_jar:
+            owner_jar = "server"
+
+        status = "PASS"
+        for mf in matched_findings:
+            f_follow = (mf.get("operator_mitigation") or {}).get("follow_up")
+            if f_follow in (None, "", shape_str) or len(groups) == 1 or mf.get("oracle") == "leak":
+                bound = (mf.get("operator_mitigation") or {}).get("bisected_bound")
+                oracle_tag = str(mf.get("oracle") or "fault")
+                if mf.get("attribution_status") == "confirmed":
+                    status = f"FAIL ({oracle_tag}{', ' + bound if bound else ''})"
+                    break
+                if mf.get("attribution_status") == "unconfirmed" and status == "PASS":
+                    status = f"WARN ({oracle_tag})"
+        if status == "PASS" and max_ms >= max(1500.0, baseline_p99_ms * 1.5) and max_ms < baseline_p99_ms + stall_ms:
+            status = "WARN (hitch)"
+
+        table.append(
+            {
+                "tier": tier_str,
+                "command": node_str,
+                "shape": shape_str,
+                "episodes": len(g_recs),
+                "p95_gap_ms": p95_ms,
+                "max_gap_ms": max_ms,
+                "retained_per_ep": mean_ret,
+                "owner_jar": str(owner_jar),
+                "status": status,
+            }
+        )
+
+    def _impact_sort_key(row: dict[str, Any]) -> tuple[int, float, float, str, str]:
+        st = str(row.get("status") or "PASS")
+        rank = 0 if st.startswith("FAIL") else (1 if st.startswith("WARN") else 2)
+        return (
+            rank,
+            -float(row.get("max_gap_ms", 0.0) or 0.0),
+            -float(row.get("retained_per_ep", 0.0) or 0.0),
+            str(row.get("command") or ""),
+            str(row.get("shape") or ""),
+        )
+
+    table.sort(key=_impact_sort_key)
+    return table
+
+
+STANDARD_SURVIVAL_RUNGS: tuple[int, ...] = (10, 25, 50, 75, 100, 128)
+
+
+def build_survival_ramp_rungs(
+    target_players: int | None = None,
+    explicit_rungs: str | Iterable[int] | None = None,
+) -> list[int]:
+    """Build an ascending list of concurrency rungs (`<= 128`) for the survival benchmark."""
+    if explicit_rungs is not None:
+        if isinstance(explicit_rungs, str):
+            raw_parts = [p.strip() for p in explicit_rungs.split(",") if p.strip()]
+            parsed = [int(p) for p in raw_parts]
+        else:
+            parsed = [int(p) for p in explicit_rungs]
+        cleaned = sorted({p for p in parsed if 1 <= p <= 128})
+        if not cleaned:
+            raise ValueError(f"ramp rungs must contain at least one integer in [1, 128]; got {explicit_rungs!r}")
+        return cleaned
+
+    if target_players is None or int(target_players) <= 0:
+        return []
+    target = max(1, min(128, int(target_players)))
+    rungs = [r for r in STANDARD_SURVIVAL_RUNGS if r < target]
+    if not rungs and target > 2:
+        rungs.append(max(2, target // 2))
+    rungs.append(target)
+    return sorted(set(rungs))
+
+
+def build_ramp_wave_program(
+    player_count: int,
+    tree: CommandTree | None,
+    rng: random.Random,
+    *,
+    denylist: Denylist | Iterable[str] | None = None,
+    tiers: Iterable[str] = ("default",),
+    bot_prefix: str = "fzr",
+    preferred_node_ids: Iterable[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Build a concurrent `player_count`-bot player-taxonomy wave for a survival ramp rung."""
+    n_bots = max(1, min(128, int(player_count)))
+    active_deny = denylist if isinstance(denylist, Denylist) else Denylist(denylist)
+    allowed_nodes = (
+        (tree.allowed_executable_nodes(tiers) or tree.allowed_executable_nodes(None))
+        if tree is not None
+        else []
+    )
+    default_nodes = [n for n in allowed_nodes if (n.min_tier or "default") == "default"] or list(allowed_nodes)
+    pref_set = {str(nid) for nid in (preferred_node_ids or ()) if nid}
+    preferred_nodes = [n for n in default_nodes if n.node_id in pref_set] if pref_set else []
+
+    bots: list[dict[str, Any]] = []
+    for idx in range(n_bots):
+        b_name = f"{bot_prefix}_{idx}"[:16]
+        stagger_ms = (idx % 10) * 60
+        role = idx % 4
+        cmd_line: str | None = None
+        node_id: str | None = None
+        if default_nodes:
+            pool = preferred_nodes if (preferred_nodes and idx % 4 != 3) else default_nodes
+            chosen_node = pool[(idx + rng.randint(0, max(0, len(pool) - 1))) % len(pool)]
+            node_id = chosen_node.node_id
+            ramp_cap = 16 if n_bots <= 25 else 4096
+            for _ in range(5):
+                try:
+                    cand_cmd = gen_args(
+                        chosen_node,
+                        tree,
+                        rng,
+                        denylist=active_deny,
+                        bot_names=[b_name],
+                        cap=ramp_cap,
+                    )
+                except ValueError:
+                    continue
+                if not active_deny.is_denied_command_line(cand_cmd, tree):
+                    cmd_line = cand_cmd
+                    break
+
+        prog: list[dict[str, Any]] = []
+        if stagger_ms > 0:
+            prog.append({"a": "wait", "ms": stagger_ms})
+
+        if role == 0:
+            # Explorer wander: outward movement + command
+            prog.append({"a": "move", "dx": 12, "dz": 8, "ms": 400})
+            if cmd_line:
+                prog.append({"a": "cmd", "cmd": cmd_line, "node": node_id})
+            prog.append({"a": "move", "dx": 16, "dz": -10, "ms": 500})
+            prog.append({"a": "wait", "ms": 400})
+        elif role == 1:
+            # Homesteader reroll: evaluate landing, move, reroll
+            if cmd_line:
+                prog.append({"a": "cmd", "cmd": cmd_line, "node": node_id})
+            prog.append({"a": "wait", "ms": 250})
+            prog.append({"a": "move", "dx": 6, "dz": -6, "ms": 300})
+            if cmd_line:
+                prog.append({"a": "cmd", "cmd": cmd_line, "node": node_id})
+            prog.append({"a": "wait", "ms": 400})
+        elif role == 2:
+            # Co-op settler: steady traversal and interaction
+            prog.append({"a": "move", "dx": -10, "dz": 10, "ms": 400})
+            if cmd_line:
+                prog.append({"a": "cmd", "cmd": cmd_line, "node": node_id})
+            prog.append({"a": "wait", "ms": 500})
+        else:
+            # Session churner: command + early quit or rejoin
+            if cmd_line:
+                prog.append({"a": "cmd", "cmd": cmd_line, "node": node_id})
+            prog.append({"a": "wait", "ms": 200})
+            prog.append({"a": "quit"})
+
+        bots.append({"name": b_name, "program": prog})
+    return bots
+
+
+def evaluate_survival_envelope(
+    ramp_records: Iterable[dict[str, Any]] = (),
+    *,
+    baseline_records: Iterable[dict[str, Any]] = (),
+    stall_ms: float = 2000.0,
+    target_players: int | None = None,
+    jar_index: JarIndex | None = None,
+    profile: PlatformProfile | str = "paper",
+) -> dict[str, Any]:
+    """Evaluate empirical concurrency ramp records against declarative survival SLO invariants."""
+    prof = profile if isinstance(profile, PlatformProfile) else get_platform_profile(profile)
+    base_gaps: list[Any] = []
+    base_windows: list[Any] = []
+    base_max_delta: dict[str, float] = {}
+    for br in baseline_records or ():
+        if isinstance(br, dict):
+            base_gaps.extend(br.get("tick_gaps") or ())
+            base_windows.extend(br.get("exclusion_windows") or ())
+            for k_cls, v_delta in (br.get("deltas") or {}).items():
+                f_val = float(v_delta or 0.0)
+                if f_val > base_max_delta.get(k_cls, 0.0):
+                    base_max_delta[k_cls] = f_val
+    base_summary = summarize_tick_gaps(base_gaps, base_windows)
+    base_p99 = float(base_summary.get("p99_ms") or 1000.0)
+    if base_p99 <= 0.0:
+        base_p99 = 1000.0
+
+    slo_max_ms = round(base_p99 + float(stall_ms), 1)
+    slo_p95_ms = round(max(base_p99 * 1.25, base_p99 + min(500.0, float(stall_ms) * 0.4)), 1)
+    slo = {
+        "tick_gap_p95_ms": slo_p95_ms,
+        "tick_gap_max_ms": slo_max_ms,
+        "max_disconnects": 0,
+    }
+
+    cand_jars: set[str] = set()
+    if jar_index is not None:
+        cand_jars = {j for j in jar_index.jars if not prof.is_prerequisite_jar(j)}
+
+    rungs_out: list[dict[str, Any]] = []
+    for rec in ramp_records or ():
+        if not isinstance(rec, dict):
+            continue
+        players = int(rec.get("players") or len(rec.get("bots") or ()) or 1)
+        g_sum = summarize_tick_gaps(rec.get("tick_gaps") or (), rec.get("exclusion_windows") or ())
+        p95_ms = round(float(g_sum.get("p95_ms", 0.0) or 0.0), 1)
+        max_ms = round(float(g_sum.get("max_ms", 0.0) or 0.0), 1)
+        disconnects = int(rec.get("disconnects", rec.get("kicks", 0)) or 0)
+        retained_objs = 0.0
+        for k_cls, v_delta in (rec.get("deltas") or {}).items():
+            val = float(v_delta or 0.0) - base_max_delta.get(k_cls, 0.0) * max(1, players)
+            if val <= 0.0:
+                continue
+            c_clean = k_cls[len(CLS_PREFIX) :] if k_cls.startswith(CLS_PREFIX) else k_cls
+            if "$$Lambda" in c_clean:
+                continue
+            if jar_index is not None and cand_jars:
+                ow = jar_index.owner_of_class(c_clean, profile=prof)
+                if ow in cand_jars:
+                    retained_objs += val
+            else:
+                retained_objs += val
+        retained_objs = round(retained_objs, 1)
+
+        violated: list[str] = []
+        if max_ms > slo_max_ms:
+            violated.append("tick_gap_max_ms")
+        if disconnects > slo["max_disconnects"]:
+            violated.append("disconnects")
+
+        if violated:
+            status = "FAIL"
+        elif p95_ms > slo_p95_ms:
+            status = "DEGRADED"
+        else:
+            status = "PASS"
+
+        rungs_out.append(
+            {
+                "players": players,
+                "status": status,
+                "violated_invariants": violated,
+                "tick_gap_p95_ms": p95_ms,
+                "tick_gap_max_ms": max_ms,
+                "disconnects": disconnects,
+                "post_gc_retained_objects": retained_objs,
+            }
+        )
+
+    rungs_out.sort(key=lambda r: int(r["players"]))
+    first_failing: int | None = None
+    max_surviving = 0
+    for r in rungs_out:
+        if r["status"] == "FAIL":
+            if first_failing is None:
+                first_failing = int(r["players"])
+        elif first_failing is None:
+            max_surviving = max(max_surviving, int(r["players"]))
+
+    eff_target = int(target_players) if target_players is not None else (rungs_out[-1]["players"] if rungs_out else 0)
+    survived_target = (
+        bool(first_failing is None and max_surviving >= eff_target)
+        if rungs_out and eff_target > 0
+        else None
+    )
+    return {
+        "target_players": eff_target,
+        "max_surviving_players": max_surviving,
+        "first_failing_players": first_failing,
+        "survived_target": survived_target,
+        "slo": slo,
+        "rungs": rungs_out,
+    }
+
+
+def build_counterfactuals(
+    findings: Iterable[dict[str, Any]],
+    *,
+    tree: CommandTree | None = None,
+    stall_thresh_ms: float = 3000.0,
+) -> list[dict[str, Any]]:
+    """Build declarative counterfactual delta entries (`CF-1`, `CF-2`, ...) from evaluated findings."""
+    out: list[dict[str, Any]] = []
+    for idx, f in enumerate(findings or (), start=1):
+        if not isinstance(f, dict):
+            continue
+        oracle = str(f.get("oracle") or "fault")
+        attr_status = str(f.get("attribution_status") or "unconfirmed")
+        op_mit = f.get("operator_mitigation") or {}
+        auth_rep = f.get("author_reproducer") or {}
+        repro = auth_rep.get("reproduction") or {}
+        k_val = int(repro.get("k", f.get("k", 0)) or 0)
+        n_val = int(repro.get("n", f.get("n", 0)) or 0)
+        blamed = list(f.get("blamed_jars") or ())
+        suspect = str(f.get("first_suspect") or (blamed[0] if blamed else "server"))
+        c_node = str(op_mit.get("canonical_node") or "unknown")
+        min_tier = str(op_mit.get("min_tier") or "default")
+        follow_up = op_mit.get("follow_up")
+        bisected_bound = op_mit.get("bisected_bound")
+        shrunk_prog = auth_rep.get("shrunk_program") or []
+
+        _, exec_node = _resolve_node_for_finding(c_node, tree, shrunk_prog)
+        param_bound = derive_parameter_boundary(bisected_bound, exec_node)
+
+        if oracle == "stall":
+            inv_str = f"tick_gap_max_ms <= {stall_thresh_ms:.1f}"
+        elif oracle == "leak":
+            inv_str = "post_gc_class_slope <= 0.0"
+        else:
+            inv_str = "server_log_exceptions == 0"
+
+        if attr_status == "confirmed":
+            with_present = {"reproduced": f"{k_val}/{n_val}", "status": "FAIL"}
+            with_disabled = {"reproduced": f"0/{n_val}", "status": "PASS"}
+        elif attr_status == "server":
+            with_present = {"reproduced": f"{k_val}/{n_val}", "status": "FAIL (server)"}
+            with_disabled = {"reproduced": f"{k_val}/{n_val}", "status": "FAIL (server)"}
+        else:
+            with_present = {"reproduced": f"{k_val}/{n_val}", "status": attr_status.upper()}
+            with_disabled = {"reproduced": "not_run", "status": "UNKNOWN"}
+
+        out.append(
+            {
+                "id": f"CF-{idx}",
+                "oracle": oracle,
+                "signature": str(f.get("signature") or ""),
+                "invariant_violated": inv_str,
+                "trigger": {
+                    "command": c_node,
+                    "aliases": list(op_mit.get("aliases") or ()),
+                    "min_tier": min_tier,
+                    "shape": follow_up or "default",
+                    "minimal_sequence": _compact_program_sequence(shrunk_prog),
+                },
+                "parameter_boundary": param_bound,
+                "jar_isolation": {
+                    "attribution_status": attr_status,
+                    "blamed_jars": blamed,
+                    "first_suspect": suspect,
+                    "with_jar_present": with_present,
+                    "with_jar_disabled": with_disabled,
+                },
+            }
+        )
+    return out
+
+
+def build_server_bit_report(verdict: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Construct `(bit_report_dict, bit_table_rows)` matching `BitReport` JSON and `BitTable` CSV schemas."""
+    bit_findings: list[dict[str, Any]] = []
+    comp_items: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {
+        "bench.ramp": [],
+        "bench.attribution": [],
+        "bench.frames": [],
+        "bench.surface": [],
+    }
+
+    # 1. `bench.ramp`: progressive player concurrency survival envelope
+    envelope = verdict.get("survival_envelope") or {}
+    slo = envelope.get("slo") or {}
+    slo_p95 = slo.get("tick_gap_p95_ms", 1250.0)
+    slo_max = slo.get("tick_gap_max_ms", 3000.0)
+    for rung in envelope.get("rungs") or ():
+        st = str(rung.get("status") or "PASS")
+        players = int(rung.get("players", 0) or 0)
+        if st == "FAIL":
+            spec = BENCH_BIT_CODES[5303]
+        elif st == "DEGRADED":
+            spec = BENCH_BIT_CODES[5302]
+        else:
+            spec = BENCH_BIT_CODES[5301]
+        viol = ",".join(rung.get("violated_invariants") or ()) or "none"
+        f_obj = {
+            "severity": spec["severity"],
+            "id": spec["id"],
+            "ns": spec["ns"],
+            "code": spec["code"],
+            "source": "server",
+            "path": f"players={players}",
+            "message": (
+                f"status={st} p95_gap_ms={rung.get('tick_gap_p95_ms', 0.0)} "
+                f"max_gap_ms={rung.get('tick_gap_max_ms', 0.0)} "
+                f"disconnects={rung.get('disconnects', 0)} "
+                f"retained_objs=+{rung.get('post_gc_retained_objects', 0.0)}"
+            ),
+            "expected": f"p95_gap_ms<={slo_p95} max_gap_ms<={slo_max} disconnects==0",
+            "suggestion": (
+                f"max_surviving_players={envelope.get('max_surviving_players', 0)} "
+                f"violated={viol}"
+            ),
+        }
+        bit_findings.append(f_obj)
+        comp_items["bench.ramp"].append((spec, f_obj))
+
+    # 2. `bench.attribution`: confirmed/candidate stalls, leaks & counterfactuals
+    cfs = verdict.get("counterfactuals") or []
+    findings = verdict.get("findings") or []
+    for idx, f in enumerate(findings):
+        cf = cfs[idx] if idx < len(cfs) else {}
+        oracle = str(f.get("oracle") or "fault")
+        attr_status = str(f.get("attribution_status") or "unconfirmed")
+        sig = str(f.get("signature") or "")
+        op_mit = f.get("operator_mitigation") or {}
+        auth_rep = f.get("author_reproducer") or {}
+        if oracle == "stall":
+            if attr_status == "confirmed":
+                spec = BENCH_BIT_CODES[5102 if "sustained" in sig else 5101]
+            else:
+                spec = BENCH_BIT_CODES[5103]
+        else:
+            spec = BENCH_BIT_CODES[5201 if attr_status == "confirmed" else 5202]
+
+        blamed = f.get("blamed_jars") or []
+        source_str = ",".join(blamed) if blamed else str(f.get("first_suspect") or "server")
+        c_node = str(op_mit.get("canonical_node") or "unknown")
+        min_tier = str(op_mit.get("min_tier") or "default")
+        shape = str(op_mit.get("follow_up") or "default")
+        p_bound = cf.get("parameter_boundary") or {}
+        jar_iso = cf.get("jar_isolation") or {}
+        pass_dom = p_bound.get("pass_domain")
+        fail_dom = p_bound.get("fail_domain")
+        inv_str = str(cf.get("invariant_violated") or "invariant_ok")
+        exp_parts = [inv_str]
+        if pass_dom:
+            exp_parts.append(f"pass_domain={p_bound.get('argument', 'arg')}:{pass_dom}")
+        with_dis = (jar_iso.get("with_jar_disabled") or {}).get("status", "UNKNOWN")
+        with_dis_rep = (jar_iso.get("with_jar_disabled") or {}).get("reproduced", "n/a")
+        sug_parts = [f"with_jar_disabled={with_dis}({with_dis_rep})", f"min_tier={min_tier}"]
+        if fail_dom:
+            sug_parts.append(f"fail_domain={p_bound.get('argument', 'arg')}:{fail_dom}")
+        seq = (cf.get("trigger") or {}).get("minimal_sequence") or []
+        if seq:
+            sug_parts.append(f"seq=[{' -> '.join(seq)}]")
+
+        f_obj = {
+            "severity": spec["severity"],
+            "id": spec["id"],
+            "ns": spec["ns"],
+            "code": spec["code"],
+            "source": source_str,
+            "path": f"cmd:/{c_node} [tier={min_tier},shape={shape}]",
+            "message": str(auth_rep.get("evidence") or sig),
+            "expected": " ".join(exp_parts),
+            "suggestion": " ".join(sug_parts),
+        }
+        bit_findings.append(f_obj)
+        comp_items["bench.attribution"].append((spec, f_obj))
+
+    # 3. `bench.frames`: main-thread stall frame accounting
+    for fr in verdict.get("main_thread_attribution") or ():
+        spec = BENCH_BIT_CODES[5003]
+        f_obj = {
+            "severity": spec["severity"],
+            "id": spec["id"],
+            "ns": spec["ns"],
+            "code": spec["code"],
+            "source": str(fr.get("owner_jar") or "server"),
+            "path": str(fr.get("top_frame") or "unknown"),
+            "message": f"share={fr.get('share_pct', 0.0)}% samples={fr.get('samples', 0)}/{fr.get('total_samples', 0)}",
+            "expected": "samples==0 during tick_gap<=stall_ms",
+            "suggestion": f"owner_jar={fr.get('owner_jar') or 'server'}",
+        }
+        bit_findings.append(f_obj)
+        comp_items["bench.frames"].append((spec, f_obj))
+
+    # 4. `bench.surface`: tested command & action impact table
+    for row in verdict.get("command_impact_table") or ():
+        st = str(row.get("status") or "PASS")
+        spec = BENCH_BIT_CODES[5002 if st.startswith("WARN") else 5001]
+        f_obj = {
+            "severity": spec["severity"],
+            "id": spec["id"],
+            "ns": spec["ns"],
+            "code": spec["code"],
+            "source": str(row.get("owner_jar") or "server"),
+            "path": f"cmd:/{row.get('command')} [tier={row.get('tier')},shape={row.get('shape')}]",
+            "message": (
+                f"eps={row.get('episodes', 0)} p95_gap_ms={row.get('p95_gap_ms', 0.0)} "
+                f"max_gap_ms={row.get('max_gap_ms', 0.0)} retained_per_ep=+{row.get('retained_per_ep', 0.0)} "
+                f"status={st}"
+            ),
+            "expected": f"max_gap_ms<={slo_max} retained_per_ep<=0.0",
+            "suggestion": f"owner_jar={row.get('owner_jar') or 'server'} tier={row.get('tier')}",
+        }
+        bit_findings.append(f_obj)
+        comp_items["bench.surface"].append((spec, f_obj))
+
+    has_err = any(f["severity"] == "ERROR" for f in bit_findings)
+    has_warn = any(f["severity"] == "WARNING" for f in bit_findings)
+    overall_health = "FAILED" if has_err else ("DEGRADED" if has_warn else "HEALTHY")
+
+    table_rows: list[dict[str, Any]] = []
+    for comp_id in ("bench.ramp", "bench.attribution", "bench.frames", "bench.surface"):
+        items = comp_items[comp_id]
+        if not items:
+            continue
+        c_errs = sum(1 for _, f in items if f["severity"] == "ERROR")
+        c_warns = sum(1 for _, f in items if f["severity"] == "WARNING")
+        c_health = "FAILED" if c_errs > 0 else ("DEGRADED" if c_warns > 0 else "HEALTHY")
+        for spec, f in items:
+            table_rows.append(
+                {
+                    "component": comp_id,
+                    "tier": spec["tier"],
+                    "sideEffect": spec["side_effect"],
+                    "health": c_health,
+                    "E": str(c_errs),
+                    "W": str(c_warns),
+                    "severity": f["severity"],
+                    "id": f"{f['ns']}:{f['id']}",
+                    "code": f["code"],
+                    "source": f["source"],
+                    "path": f["path"],
+                    "message": f["message"],
+                    "expected": f["expected"],
+                    "suggestion": f["suggestion"],
+                }
+            )
+
+    if not table_rows:
+        table_rows.append(
+            {
+                "component": "bench.attribution",
+                "tier": "IBIT",
+                "sideEffect": "WORLD_SAFE",
+                "health": overall_health,
+                "E": "0",
+                "W": "0",
+                "severity": "",
+                "id": "",
+                "code": "",
+                "source": "",
+                "path": "",
+                "message": "",
+                "expected": "",
+                "suggestion": "",
+            }
+        )
+
+    bit_report = {
+        "schema": 1,
+        "health": overall_health,
+        "findings": bit_findings,
+    }
+    return bit_report, table_rows
+
+
+def format_server_findings_report(verdict: dict[str, Any]) -> str:
+    """Format a human-readable declarative `report.txt` (including `BitTable` aligned CSV) from `verdict`."""
+    lines: list[str] = []
+    lines.append("=== Whole-Server Trace Evaluation Report (ADR-125) ===")
+    lines.append(f"mode: {verdict.get('mode', 'server')}")
+    lines.append(f"status: {verdict.get('status', 'offline_trace_evaluated')}")
+    lines.append(f"verdict: {verdict.get('verdict', 'PASS')}")
+    lines.append(f"profile: {verdict.get('profile', 'paper')}")
+    lines.append(f"server_dir: {verdict.get('server_dir', '<server_dir>')}")
+    tiers = verdict.get("tiers") or ["default"]
+    lines.append(f"tiers: {', '.join(str(t) for t in tiers)}")
+    lines.append("")
+
+    culprits = verdict.get("confirmed_culprits") or []
+    blamed = verdict.get("blamed_jars") or []
+    lines.append("Attribution Summary:")
+    lines.append(f"  confirmed_culprits ({len(culprits)}): {', '.join(culprits) if culprits else 'none'}")
+    lines.append(f"  blamed_jars ({len(blamed)}): {', '.join(blamed) if blamed else 'none'}")
+    lines.append("")
+
+    envelope = verdict.get("survival_envelope") or {}
+    rungs = envelope.get("rungs") or []
+    if rungs:
+        lines.append("Declarative Survival Envelope:")
+        lines.append(f"  target_players: {envelope.get('target_players', 0)}")
+        lines.append(f"  max_surviving_players: {envelope.get('max_surviving_players', 0)}")
+        lines.append(f"  first_failing_players: {envelope.get('first_failing_players')}")
+        lines.append(f"  survived_target: {envelope.get('survived_target')}")
+        for r in rungs:
+            viol_s = ",".join(r.get("violated_invariants") or ()) or "none"
+            lines.append(
+                f"  - players={r.get('players')} status={r.get('status')} "
+                f"p95_gap_ms={r.get('tick_gap_p95_ms')} max_gap_ms={r.get('tick_gap_max_ms')} "
+                f"disconnects={r.get('disconnects')} retained_objs=+{r.get('post_gc_retained_objects')} "
+                f"violated={viol_s}"
+            )
+        lines.append("")
+
+    findings = verdict.get("findings") or []
+    lines.append(f"Findings ({len(findings)}):")
+    if not findings:
+        lines.append("  none")
+    for idx, f in enumerate(findings, start=1):
+        op_mit = f.get("operator_mitigation") or {}
+        auth_rep = f.get("author_reproducer") or {}
+        repro = auth_rep.get("reproduction") or {}
+        lines.append(
+            f"  [{idx}] oracle={f.get('oracle')} signature={f.get('signature')} "
+            f"status={f.get('attribution_status')}"
+        )
+        lines.append("      operator_mitigation:")
+        lines.append(f"        canonical_node: {op_mit.get('canonical_node')}")
+        lines.append(f"        aliases: {', '.join(op_mit.get('aliases') or [])}")
+        lines.append(f"        min_tier: {op_mit.get('min_tier')}")
+        lines.append(f"        bisected_bound: {op_mit.get('bisected_bound') or 'none'}")
+        lines.append("      author_reproducer:")
+        lines.append(
+            f"        blamed_jars: {', '.join(auth_rep.get('blamed_jars') or []) or 'none'} "
+            f"(first_suspect={auth_rep.get('first_suspect')})"
+        )
+        lines.append(f"        evidence: {auth_rep.get('evidence')}")
+        lines.append(f"        reproduction: {repro.get('k', 0)} of {repro.get('n', 0)}")
+        lines.append(f"        shrunk_program: {json.dumps(auth_rep.get('shrunk_program') or [])}")
+        lines.append(f"        replay_cmd: {auth_rep.get('replay_cmd')}")
+
+    cfs = verdict.get("counterfactuals") or []
+    if cfs:
+        lines.append("")
+        lines.append(f"Declarative Counterfactual Deltas ({len(cfs)}):")
+        for cf in cfs:
+            trig = cf.get("trigger") or {}
+            p_bound = cf.get("parameter_boundary") or {}
+            j_iso = cf.get("jar_isolation") or {}
+            w_pres = j_iso.get("with_jar_present") or {}
+            w_dis = j_iso.get("with_jar_disabled") or {}
+            lines.append(
+                f"  - id={cf.get('id')} invariant={cf.get('invariant_violated')!r} "
+                f"cmd={trig.get('command')!r} tier={trig.get('min_tier')} shape={trig.get('shape')}"
+            )
+            if p_bound:
+                lines.append(
+                    f"    parameter_boundary: arg={p_bound.get('argument')} "
+                    f"pass_domain={p_bound.get('pass_domain')} fail_domain={p_bound.get('fail_domain')}"
+                )
+            lines.append(
+                f"    jar_isolation: blamed={j_iso.get('blamed_jars')} "
+                f"with_jar_present={w_pres.get('status')}({w_pres.get('reproduced')}) "
+                f"with_jar_disabled={w_dis.get('status')}({w_dis.get('reproduced')})"
+            )
+
+    mt_frames = verdict.get("main_thread_attribution") or []
+    if mt_frames:
+        lines.append("")
+        lines.append("Main-Thread Stall Attribution:")
+        for fr in mt_frames:
+            lines.append(
+                f"  {fr.get('share_pct', 0.0):5.1f}% ({fr.get('samples', 0)}/{fr.get('total_samples', 0)}) "
+                f"owner={fr.get('owner_jar')} frame={fr.get('top_frame')}"
+            )
+
+    impact_rows = verdict.get("command_impact_table") or []
+    if impact_rows:
+        lines.append("")
+        lines.append("Tested Command & Action Impact Table:")
+        for r in impact_rows:
+            lines.append(
+                f"  tier={r.get('tier')} cmd={r.get('command')!r} shape={r.get('shape')} "
+                f"eps={r.get('episodes')} p95_gap_ms={r.get('p95_gap_ms')} "
+                f"max_gap_ms={r.get('max_gap_ms')} retained_per_ep=+{r.get('retained_per_ep')} "
+                f"owner={r.get('owner_jar')} status={r.get('status')}"
+            )
+
+    bit_csv = verdict.get("bit_table_csv")
+    if not bit_csv:
+        _, t_rows = build_server_bit_report(verdict)
+        bit_csv = render_bit_table_csv(t_rows)
+    lines.append("")
+    lines.append("BIT Table (Aligned CSV):")
+    lines.append(bit_csv.rstrip("\n"))
+    return "\n".join(lines) + "\n"
+
+
+def evaluate_server_trace(
+    records: list[dict[str, Any]],
+    baseline_records: list[dict[str, Any]] | tuple[dict[str, Any], ...] = (),
+    tree: CommandTree | None = None,
+    jar_index: JarIndex | None = None,
+    profile: PlatformProfile | str = "paper",
+    *,
+    denylist: Denylist | Iterable[str] | None = None,
+    stall_ms: float = 2000.0,
+    finding_k: int = 3,
+    finding_n: int = 3,
+    max_ddmin_probes: int = 32,
+    probe_fn: Callable[..., tuple[int, bool] | int] | None = None,
+    jar_probe_fn: Callable[..., tuple[int, bool] | int] | None = None,
+    bisect_predicate_fn: Callable[..., bool] | None = None,
+    predicate_fn: Callable[..., bool] | None = None,
+    shrink_probe_fn: Callable[..., tuple[int, int, bool]] | None = None,
+    server_dir: str = "<server_dir>",
+    ramp_records: Iterable[dict[str, Any]] = (),
+    target_players: int | None = None,
+) -> dict[str, Any]:
+    """Offline evaluator screening recorded episode telemetry against `baseline_records` (ADR-125 2.4).
+
+    Combines `screen_server_leaks`, `StallOracle`, optional `bf.shrink_bots`, `bisect_numeric_arg`,
+    `run_pre_ddmin_probes`, and `ddmin_jars` via injected callbacks, and formats structured
+    `operator_mitigation` and `author_reproducer` blocks without mutating `ServerRun`.
+    """
+    prof = profile if isinstance(profile, PlatformProfile) else get_platform_profile(profile)
+    active_jar_probe = jar_probe_fn or probe_fn
+    active_bisect_pred = bisect_predicate_fn or predicate_fn
+    base_list = list(baseline_records or ())
+    rec_list = list(records or ())
+    ramp_list = list(ramp_records or ())
+
+    if jar_index is not None:
+        installed_jars = sorted(jar_index.jars.keys())
+        prereq_jars = [j for j in installed_jars if prof.is_prerequisite_jar(j)]
+        candidate_jars = [j for j in installed_jars if j not in prereq_jars]
+    else:
+        installed_jars, prereq_jars, candidate_jars = [], [], []
+
+    # 1. Leak screening across episodes vs baseline
+    leak_screen = screen_server_leaks(
+        records=rec_list,
+        baseline_records=base_list,
+        jar_index=jar_index,
+        profile=prof,
+    )
+
+    candidate_findings: list[dict[str, Any]] = []
+    seen_leak_classes: set[str] = set()
+    seen_leak_keys: set[tuple[str, str]] = set()
+    for corr in leak_screen.get("correlations") or ():
+        cls_name = str(corr.get("cls") or "")
+        if not cls_name or cls_name in seen_leak_classes:
+            continue
+        feat = str(corr.get("feature") or "")
+        node_name: str | None = None
+        follow_up: str | None = None
+        if feat.startswith("arm:"):
+            parts = feat.split(":", 2)
+            node_name = parts[1] if len(parts) > 1 else None
+            follow_up = parts[2] if len(parts) > 2 else None
+        elif feat.startswith("node:"):
+            node_name = feat.partition(":")[2]
+
+        suspect_key = str(corr.get("first_suspect") or "server")
+        dedup_key = (str(node_name or feat), suspect_key if suspect_key == "server" else "node_primary")
+        if dedup_key in seen_leak_keys or (str(node_name or feat), "node_primary") in seen_leak_keys:
+            continue
+        seen_leak_classes.add(cls_name)
+        seen_leak_keys.add(dedup_key)
+
+        rep_ep = 0
+        rep_prog: list[dict[str, Any]] = []
+        best_cls_delta = -float("inf")
+        for r in rec_list:
+            if not isinstance(r, dict):
+                continue
+            r_feats = extract_server_episode_features(r)
+            if feat in r_feats and r_feats[feat] > 0:
+                r_cls_deltas = _extract_record_class_deltas(r)
+                c_delta = float(r_cls_deltas.get(cls_name, 0.0) or 0.0)
+                if c_delta > best_cls_delta or not rep_prog:
+                    best_cls_delta = c_delta
+                    rep_ep = r.get("ep", 0)
+                    if isinstance(r.get("bots"), list):
+                        rep_prog = _clone_program_structure(r["bots"])
+                    elif isinstance(r.get("program"), list):
+                        rep_prog = _clone_program_structure(r["program"])
+                    if isinstance(r.get("follow_up"), str):
+                        follow_up = r["follow_up"]
+
+        if not rep_prog and node_name:
+            rep_prog = [
+                {
+                    "name": "fz_0",
+                    "program": [
+                        {"a": "cmd", "cmd": node_name, "node": node_name},
+                        {"a": "wait", "ms": 400},
+                        {"a": "quit"} if follow_up in ("quit_lt1s", "quit_delay") else {"a": "wait", "ms": 100},
+                    ],
+                }
+            ]
+
+        slope = float(corr.get("slope", 0.0) or 0.0)
+        evidence_str = f"+{slope:.1f} {cls_name} per {feat} (z={corr.get('z', 0.0)}, p={corr.get('p_value', 0.0)})"
+        candidate_findings.append(
+            {
+                "oracle": "leak",
+                "signature": f"leak:{cls_name}:{feat}",
+                "node": node_name,
+                "follow_up": follow_up,
+                "evidence": evidence_str,
+                "first_suspect": corr.get("first_suspect") or "server",
+                "program": rep_prog,
+                "ep": rep_ep,
+            }
+        )
+
+    # 2. StallOracle evaluation across episodes vs baseline
+    baseline_gaps: list[Any] = []
+    baseline_windows: list[Any] = []
+    for br in base_list:
+        if isinstance(br, dict):
+            baseline_gaps.extend(br.get("tick_gaps") or ())
+            baseline_windows.extend(br.get("exclusion_windows") or ())
+
+    stall_oracle = StallOracle(
+        baseline_gaps=baseline_gaps,
+        stall_ms=stall_ms,
+        profile=prof,
+        jar_index=jar_index,
+        baseline_exclusion_windows=baseline_windows,
+    )
+
+    baseline_stall_sigs: set[str] = set()
+    for br in base_list:
+        if isinstance(br, dict) and br.get("tick_gaps"):
+            b_eval = stall_oracle.evaluate_episode(
+                br.get("tick_gaps") or (),
+                follow_up=br.get("follow_up"),
+                thread_dumps=br.get("thread_dumps") or (),
+                exclusion_windows=br.get("exclusion_windows"),
+            )
+            if b_eval.get("stalled") and b_eval.get("signature"):
+                baseline_stall_sigs.add(str(b_eval["signature"]))
+
+    seen_stall_sigs: set[str] = set()
+    for r in rec_list:
+        if not isinstance(r, dict) or not r.get("tick_gaps"):
+            continue
+        s_eval = stall_oracle.evaluate_episode(
+            r.get("tick_gaps") or (),
+            follow_up=r.get("follow_up"),
+            thread_dumps=r.get("thread_dumps") or (),
+            exclusion_windows=r.get("exclusion_windows"),
+        )
+        sig = s_eval.get("signature")
+        if not s_eval.get("stalled") or not sig or sig in baseline_stall_sigs or sig in seen_stall_sigs:
+            continue
+        seen_stall_sigs.add(str(sig))
+        r_node = r.get("node") or r.get("canonical_node")
+        r_follow = r.get("follow_up")
+        r_prog: list[dict[str, Any]] = []
+        if isinstance(r.get("bots"), list):
+            r_prog = _clone_program_structure(r["bots"])
+        elif isinstance(r.get("program"), list):
+            r_prog = _clone_program_structure(r["program"])
+        elif isinstance(r.get("cmd"), str):
+            r_prog = [{"name": "fz_0", "program": [{"a": "cmd", "cmd": r["cmd"], "node": r_node or r["cmd"]}]}]
+        elif r_node:
+            r_prog = [{"name": "fz_0", "program": [{"a": "cmd", "cmd": str(r_node), "node": str(r_node)}]}]
+
+        max_ms = s_eval["summary"]["max_ms"]
+        c_frame = s_eval.get("culprit_frame") or s_eval.get(" signature") or "server"
+        ev_str = (
+            f"stall ({s_eval.get('kind')}): max_gap={max_ms}ms "
+            f"(baseline_p99={s_eval.get('baseline_p99_ms')}ms) frame={c_frame}"
+        )
+        candidate_findings.append(
+            {
+                "oracle": "stall",
+                "signature": str(sig),
+                "node": r_node,
+                "follow_up": r_follow,
+                "evidence": ev_str,
+                "first_suspect": s_eval.get("first_suspect") or "server",
+                "program": r_prog,
+                "ep": r.get("ep", 0),
+            }
+        )
+
+    # 3. Shrink, numeric bisection, and dependency-closed jar ddmin per candidate finding
+    final_findings: list[dict[str, Any]] = []
+    for cand in candidate_findings:
+        prog = _clone_program_structure(cand.get("program") or [])
+        if shrink_probe_fn is not None and prog:
+            is_bots = isinstance(prog[0].get("program"), list)
+            bot_input = prog if is_bots else [{"name": "fz_0", "program": prog}]
+            shrink_res = bf.shrink_bots(
+                bot_input,
+                lambda b_sub, _c=cand: _invoke_optional_callback(shrink_probe_fn, b_sub, _c),
+            )
+            if shrink_res.get("bots"):
+                prog = shrink_res["bots"] if is_bots else shrink_res["bots"][0].get("program", prog)
+
+        mit_node, exec_node = _resolve_node_for_finding(cand.get("node"), tree, prog)
+        bisected_bound: str | None = None
+        if active_bisect_pred is not None and prog and (exec_node is not None or cand.get("node")):
+            target_for_bisect = exec_node or mit_node or str(cand.get("node"))
+            prog, bisected_bound = bisect_numeric_arg(
+                prog,
+                target_for_bisect,
+                lambda c_prog, _c=cand: bool(_invoke_optional_callback(active_bisect_pred, c_prog, _c)),
+                denylist=denylist,
+                tree=tree,
+            )
+        cand["shrunk_program"] = prog
+
+        attr_status = "unconfirmed"
+        blamed: list[str] = []
+        k_repro = 0
+        n_repro = int(finding_n)
+        suspect = cand.get("first_suspect") or "server"
+
+        if active_jar_probe is not None:
+            dd_res = ddmin_jars(
+                candidate_jars,
+                jar_index,
+                lambda active_set, _c=cand: _invoke_optional_callback(active_jar_probe, active_set, _c),
+                finding_k=finding_k,
+                finding_n=finding_n,
+                max_probes=max_ddmin_probes,
+                first_suspect=suspect,
+            )
+            attr_status = str(dd_res.get("attribution_status") or "unconfirmed")
+            blamed = list(dd_res.get("blamed_jars") or [])
+            suspect = str(dd_res.get("first_suspect") or suspect)
+            k_repro = int(dd_res.get("full_hits", finding_k if attr_status == "confirmed" else 0))
+
+        finding_dict = build_finding_verdict(
+            oracle=cand["oracle"],
+            signature=cand["signature"],
+            node=mit_node or exec_node or cand.get("node"),
+            tree=tree,
+            follow_up=cand.get("follow_up"),
+            evidence=cand["evidence"],
+            first_suspect=suspect,
+            attribution_status=attr_status,
+            blamed_jars=blamed,
+            shrunk_program=prog,
+            bisected_bound=bisected_bound,
+            k=k_repro,
+            n=n_repro,
+            server_dir=server_dir,
+            profile=prof.name,
+            ep=cand.get("ep", 0),
+        )
+        final_findings.append(finding_dict)
+
+    # Rank player-reachable (`default`) findings before `op` findings (ADR-125 2.4.1)
+    final_findings.sort(
+        key=lambda f: (
+            tier_rank(str((f.get("operator_mitigation") or {}).get("min_tier") or "default")),
+            0 if f.get("attribution_status") == "confirmed" else 1,
+            str(f.get("signature") or ""),
+        )
+    )
+
+    confirmed_culprits: list[str] = []
+    for f in final_findings:
+        if f.get("attribution_status") == "confirmed":
+            for j in f.get("blamed_jars") or ():
+                if j not in confirmed_culprits:
+                    confirmed_culprits.append(j)
+
+    if confirmed_culprits:
+        overall_verdict = "FAIL"
+    elif any(
+        f.get("attribution_status") in ("unconfirmed", "not_reproducible_after_restart")
+        for f in final_findings
+    ):
+        overall_verdict = "INCONCLUSIVE"
+    else:
+        overall_verdict = "PASS"
+
+    survival_env = evaluate_survival_envelope(
+        ramp_list,
+        baseline_records=base_list,
+        stall_ms=stall_ms,
+        target_players=target_players,
+        jar_index=jar_index,
+        profile=prof,
+    )
+    if survival_env.get("first_failing_players") is not None and overall_verdict == "PASS":
+        overall_verdict = "FAIL"
+
+    counterfactuals = build_counterfactuals(
+        final_findings,
+        tree=tree,
+        stall_thresh_ms=float(stall_oracle.baseline_p99_ms + stall_ms),
+    )
+    mt_attribution = summarize_main_thread_attribution(
+        rec_list + ramp_list,
+        profile=prof,
+        jar_index=jar_index,
+    )
+    impact_table = build_command_impact_table(
+        rec_list,
+        baseline_records=base_list,
+        tree=tree,
+        jar_index=jar_index,
+        profile=prof,
+        findings=final_findings,
+        baseline_p99_ms=float(stall_oracle.baseline_p99_ms),
+        stall_ms=stall_ms,
+    )
+
+    verdict_out: dict[str, Any] = {
+        "mode": "server",
+        "status": "offline_trace_evaluated",
+        "verdict": overall_verdict,
+        "profile": prof.name,
+        "server_dir": server_dir,
+        "tiers": list(tree.tiers) if tree is not None and tree.tiers else ["default"],
+        "leak_screen": leak_screen,
+        "confirmed_culprits": confirmed_culprits,
+        "blamed_jars": list(confirmed_culprits),
+        "findings": final_findings,
+        "survival_envelope": survival_env,
+        "counterfactuals": counterfactuals,
+        "main_thread_attribution": mt_attribution,
+        "command_impact_table": impact_table,
+    }
+    bit_report, bit_rows = build_server_bit_report(verdict_out)
+    verdict_out["bit_report"] = bit_report
+    verdict_out["bit_table_csv"] = render_bit_table_csv(bit_rows)
+    verdict_out["report_text"] = format_server_findings_report(verdict_out)
+    return verdict_out
+
+
 # --- Passive local server audit (`--mode server`, ADR-125) -------------------
 
 LOCAL_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1"})
+ALLOWED_BENCH_HOSTNAMES: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1", "leaf26", "bamboo"})
+ALLOWED_BENCH_SUFFIXES: tuple[str, ...] = (".local", ".lan", ".internal", ".home", ".ts.net")
+RFC1918_AND_TAILSCALE_NETS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("fc00::/7"),
+)
 DISPOSABLE_MARKER_FILES: tuple[str, ...] = (
     "bench-loop.sh",
     ".bench-disposable",
     "no-restart-script.sh",
 )
+
+# Flags always prohibited in `--mode server` (even with `--active`) per ADR-125 section 2.1 & 2.5.
+SERVER_ACTIVE_PROHIBITED_FLAGS: dict[str, tuple[str, str]] = {
+    "--cmd": ("cmd", "target-specific"),
+    "--names": ("names", "target-specific"),
+    "--jars": ("jars", "target-specific"),
+    "--plugin-packages": ("plugin_packages", "target-specific"),
+    "--targets": ("targets", "target-specific"),
+    "--rtp-args": ("rtp_args", "target-specific"),
+    "--grant": ("grant", "unsafe/op"),
+    "--lp-group": ("lp_group", "unsafe/op"),
+    "--console": ("console", "unsafe/op"),
+    "--console-p": ("console_p", "unsafe/op"),
+    "--console-max": ("console_max", "unsafe/op"),
+    "--console-timeout-s": ("console_timeout_s", "unsafe/op"),
+}
+
+
+def is_allowed_bench_host(host: str | None) -> tuple[bool, str]:
+    """Validate that `host` is loopback, private RFC1918 LAN, Tailscale CGNAT (`100.64.0.0/10`), or a local bench hostname (`leaf26`, `bamboo`, `*.local`, `*.lan`).
+
+    Rejects public WAN IP addresses and public internet domain names so the harness
+    cannot be repurposed against third-party servers.
+    """
+    raw = (host or "").strip().lower()
+    if not raw:
+        return False, "host must not be empty"
+    if raw.startswith("[") and raw.endswith("]"):
+        raw = raw[1:-1]
+    if raw in ALLOWED_BENCH_HOSTNAMES:
+        return True, "ok"
+    try:
+        addr = ipaddress.ip_address(raw)
+    except ValueError:
+        # Hostname check: allow single-label local bench hostnames (e.g. leaf26, bamboo) or local suffixes
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", raw):
+            return True, "ok"
+        if any(raw.endswith(sfx) for sfx in ALLOWED_BENCH_SUFFIXES) and re.fullmatch(
+            r"[a-z0-9.-]{1,253}", raw
+        ):
+            return True, "ok"
+        return (
+            False,
+            f"refusing public or external hostname {host!r}; --mode server --active only permits "
+            "loopback (127.0.0.1, localhost, ::1), RFC1918 LAN / Tailscale IPs, or local bench hostnames (leaf26, bamboo, *.local, *.lan)",
+        )
+
+    if addr.is_loopback or addr.is_link_local or any(addr in net for net in RFC1918_AND_TAILSCALE_NETS):
+        return True, "ok"
+    return (
+        False,
+        f"refusing public WAN IP address {host!r}; --mode server --active only permits "
+        "loopback, private RFC1918 LAN (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), or Tailscale CGNAT (100.64.0.0/10)",
+    )
 
 # Flags prohibited in `--mode server` passive local audit, grouped by category.
 SERVER_PROHIBITED_FLAGS: dict[str, tuple[str, str]] = {
@@ -3252,6 +6326,9 @@ SERVER_PROHIBITED_FLAGS: dict[str, tuple[str, str]] = {
     "--owner-timeout-s": ("owner_timeout_s", "budget/active"),
     "--stall-ms": ("stall_ms", "budget/active"),
     "--default-budget-share": ("default_budget_share", "budget/active"),
+    "--target-players": ("target_players", "budget/active"),
+    "--ramp-rungs": ("ramp_rungs", "budget/active"),
+    "--isolate-targets": ("isolate_targets", "budget/active"),
 }
 
 SERVER_ONLY_FLAGS: dict[str, str] = {
@@ -3264,6 +6341,13 @@ SERVER_ONLY_FLAGS: dict[str, str] = {
     "--container": "container",
     "--stall-ms": "stall_ms",
     "--default-budget-share": "default_budget_share",
+    "--active": "active",
+    "--ssh": "ssh",
+    "--remote-server-dir": "remote_server_dir",
+    "--baseline-episodes": "baseline_episodes",
+    "--target-players": "target_players",
+    "--ramp-rungs": "ramp_rungs",
+    "--isolate-targets": "isolate_targets",
 }
 
 
@@ -3369,11 +6453,144 @@ def validate_target_mode_args(
         elif attr == "deny":
             if val:
                 _fail(f"{flag} is only valid with --mode server")
-        elif attr == "jcmd_snapshot":
+        elif attr in ("jcmd_snapshot", "active"):
             if bool(val):
                 _fail(f"{flag} is only valid with --mode server")
         elif val is not None:
             _fail(f"{flag} is only valid with --mode server")
+
+
+def validate_active_server_mode_args(
+    args: Any,
+    parser: Any | None = None,
+    argv: Iterable[str] | None = None,
+) -> tuple[PlatformProfile, Denylist]:
+    """Validate `--mode server --active` arguments, enforcing anti-abuse host & proof-of-ownership gates."""
+    def _fail(msg: str) -> None:
+        if parser is not None:
+            parser.error(msg)
+        raise ValueError(msg)
+
+    opt_tokens = _extract_cli_option_tokens(argv)
+    for tok in opt_tokens:
+        if tok in SERVER_ACTIVE_PROHIBITED_FLAGS:
+            _, category = SERVER_ACTIVE_PROHIBITED_FLAGS[tok]
+            _fail(f"--mode server --active rejects {category} flag {tok}")
+
+    default_ns = bf.build_parser().parse_args(["--server-dir", "."])
+    for flag, (attr, category) in SERVER_ACTIVE_PROHIBITED_FLAGS.items():
+        if hasattr(args, attr) and hasattr(default_ns, attr):
+            if getattr(args, attr) != getattr(default_ns, attr):
+                _fail(f"--mode server --active rejects {category} flag {flag}")
+
+    raw_profile = getattr(args, "profile", None)
+    if raw_profile is None or not str(raw_profile).strip():
+        _fail("--mode server requires an explicit --profile (paper, fabric, or neoforge)")
+    try:
+        profile = get_platform_profile(str(raw_profile))
+    except ValueError as exc:
+        _fail(f"--mode server invalid --profile: {exc}")
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    raw_tiers = getattr(args, "tiers", "default")
+    parsed_tiers = [t.strip().lower() for t in str(raw_tiers or "").split(",") if t.strip()]
+    if not parsed_tiers or any(t not in TIER_ORDER for t in parsed_tiers):
+        _fail(
+            f"--mode server --active requires --tiers from {list(TIER_ORDER)} "
+            f"(e.g. 'default' or 'default,op'); got {raw_tiers!r}"
+        )
+
+    host = (getattr(args, "host", None) or "127.0.0.1").strip()
+    ok_host, host_reason = is_allowed_bench_host(host)
+    if not ok_host:
+        _fail(f"--mode server --active invalid --host: {host_reason}")
+
+    mc_host = getattr(args, "mc_host", None)
+    if mc_host is not None:
+        ok_mc, mc_reason = is_allowed_bench_host(str(mc_host).strip())
+        if not ok_mc:
+            _fail(f"--mode server --active invalid --mc-host: {mc_reason}")
+
+    ssh_target = getattr(args, "ssh", None)
+    if ssh_target is not None:
+        ssh_str = str(ssh_target).strip()
+        if not ssh_str or ssh_str.startswith("-"):
+            _fail(f"--mode server --active invalid --ssh target: {ssh_target!r}")
+        ssh_host = ssh_str.rpartition("@")[2] if "@" in ssh_str else ssh_str
+        ok_ssh, ssh_reason = is_allowed_bench_host(ssh_host)
+        if not ok_ssh:
+            _fail(f"--mode server --active invalid --ssh host: {ssh_reason}")
+
+    server_dir = getattr(args, "server_dir", None)
+    ok_disp, disp_reason = is_disposable_server_dir(server_dir)
+    if not ok_disp:
+        _fail(f"--mode server invalid --server-dir: {disp_reason}")
+
+    props = bf.bo.read_properties(server_dir)
+    try:
+        resolve_server_port(props, getattr(args, "mc_port", None))
+    except ValueError as exc:
+        _fail(f"--mode server invalid --mc-port: {exc}")
+
+    # Proof-of-ownership gate: active server mode requires a configured RCON password
+    rcon_pw = getattr(args, "password", None) or props.get("rcon.password", "").strip()
+    if not rcon_pw:
+        _fail(
+            "--mode server --active requires proof of server ownership: "
+            "rcon.password must be set in server.properties (or passed via --password)"
+        )
+
+    max_bots = int(getattr(args, "max_bots", 8) or 8)
+    min_bots = int(getattr(args, "min_bots", 2) or 2)
+    if not (1 <= min_bots <= max_bots <= 128):
+        _fail(f"--mode server --active requires 1 <= --min-bots <= --max-bots <= 128 (got {min_bots}..{max_bots})")
+
+    target_players = getattr(args, "target_players", None)
+    if target_players is not None:
+        if not (1 <= int(target_players) <= 128):
+            _fail(f"--mode server --active requires 1 <= --target-players <= 128; got {target_players!r}")
+
+    ramp_rungs_raw = getattr(args, "ramp_rungs", None)
+    if ramp_rungs_raw is not None:
+        try:
+            build_survival_ramp_rungs(explicit_rungs=str(ramp_rungs_raw))
+        except ValueError as exc:
+            _fail(f"--mode server --active invalid --ramp-rungs: {exc}")
+
+    jar_dir = profile.jar_dir(server_dir)
+    if not os.path.isdir(jar_dir):
+        _fail(
+            f"--mode server with --profile {profile.name} requires jar directory "
+            f"{jar_dir!r} inside --server-dir"
+        )
+
+    raw_deny = getattr(args, "deny", None) or []
+    if isinstance(raw_deny, str):
+        raw_deny = [raw_deny]
+    extra_deny: list[str] = []
+    for entry in raw_deny:
+        parts = [p.strip() for p in str(entry).split(",") if p.strip()]
+        if not parts:
+            _fail("--mode server --deny entry must not be empty")
+        extra_deny.extend(parts)
+    try:
+        denylist = Denylist(extra_deny)
+    except ValueError as exc:
+        _fail(f"--mode server invalid --deny pattern: {exc}")
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    pid_file = getattr(args, "pid_file", None)
+    pid_val = getattr(args, "pid", None)
+    if pid_file is not None and pid_val is not None:
+        _fail("--mode server rejects passing both --pid and --pid-file; pass at most one")
+    if pid_file is not None and not ssh_target:
+        pf = str(pid_file).strip()
+        if not pf or not os.path.isfile(pf):
+            _fail(f"--mode server --pid-file does not exist or is not a file: {pid_file!r}")
+    if pid_val is not None and int(pid_val) <= 0:
+        _fail(f"--mode server --pid must be a positive integer; got {pid_val!r}")
+
+    return profile, denylist
 
 
 def validate_server_mode_args(
@@ -3381,7 +6598,9 @@ def validate_server_mode_args(
     parser: Any | None = None,
     argv: Iterable[str] | None = None,
 ) -> tuple[PlatformProfile, Denylist]:
-    """Validate `--mode server` passive local audit arguments and fail closed on prohibited inputs."""
+    """Validate `--mode server` arguments (passive local audit by default, or active when `--active` is passed)."""
+    if bool(getattr(args, "active", False)):
+        return validate_active_server_mode_args(args, parser=parser, argv=argv)
     def _fail(msg: str) -> None:
         if parser is not None:
             parser.error(msg)
@@ -3594,16 +6813,22 @@ class ServerRun:
         swarm: Any | None = None,
         observer: JcmdObserver | None = None,
         jar_index: JarIndex | None = None,
+        driver: Any | None = None,
         stamp: str | None = None,
+        focus_jar_prefix: str | None = None,
     ):
         self.args = args
         self.run_dir = os.path.abspath(run_dir)
+        self.active = bool(getattr(args, "active", False))
         self.profile, self.denylist = validate_server_mode_args(args)
         self.server_dir = os.path.abspath(args.server_dir)
         self.swarm = swarm
         self.observer = observer
         self.jar_index = jar_index
+        self.driver = driver
         self.stamp = stamp or time.strftime("%Y%m%d-%H%M%S")
+        self.focus_jar_prefix = (focus_jar_prefix or "").strip().lower() or None
+        self._focused_default_nodes: list[str] = []
 
     def _wants_jcmd_snapshot(self) -> bool:
         return bool(
@@ -3611,11 +6836,14 @@ class ServerRun:
             or getattr(self.args, "pid_file", None)
             or getattr(self.args, "pid", None) is not None
             or getattr(self.args, "jcmd_snapshot", False)
+            or getattr(self.args, "ssh", None)
+            or getattr(self.args, "container", None)
+            or self.active
         )
 
     def _build_observer(self) -> JcmdObserver:
         if self.observer is not None:
-            if self.observer.container is not None or not self.observer.check_local_pid:
+            if not self.active and (self.observer.container is not None or not self.observer.check_local_pid):
                 raise JcmdError(
                     "--mode server passive_only local audit requires local JVM ownership verification "
                     "(container JcmdObserver or check_local_pid=False is not permitted)"
@@ -3625,11 +6853,16 @@ class ServerRun:
             return self.observer
         pid_val = getattr(self.args, "pid", None)
         pid_file = getattr(self.args, "pid_file", None)
+        container = getattr(self.args, "container", None) if self.active else None
+        ssh_target = getattr(self.args, "ssh", None) if self.active else None
+        remote_dir = getattr(self.args, "remote_server_dir", None) if self.active else None
         return JcmdObserver(
             pid=int(pid_val) if pid_val is not None else None,
             pid_file=str(pid_file) if pid_file else None,
+            container=str(container) if container else None,
+            ssh=str(ssh_target) if ssh_target else None,
+            remote_server_dir=str(remote_dir) if remote_dir else None,
             server_dir=self.server_dir,
-            container=None,
         )
 
     def _collect_jcmd_snapshot(self, obs: JcmdObserver, jar_index: JarIndex) -> dict[str, Any]:
@@ -3675,6 +6908,8 @@ class ServerRun:
         }
 
     def run(self) -> dict[str, Any]:
+        if self.active:
+            return self.run_active()
         os.makedirs(self.run_dir, exist_ok=True)
         warnings: list[str] = []
 
@@ -3797,6 +7032,1151 @@ class ServerRun:
 
         return verdict
 
+    def _build_driver(self, props: dict[str, str]) -> Any:
+        if self.driver is not None:
+            return self.driver
+        host = (getattr(self.args, "host", None) or "127.0.0.1").strip()
+        port = getattr(self.args, "port", None) or int(props.get("rcon.port", "25575"))
+        password = getattr(self.args, "password", None) or props.get("rcon.password", "").strip()
+        return bf.FuzzDriver(self.args, host, int(port), str(password))
+
+    def _set_candidate_jars_state(
+        self,
+        jar_index: JarIndex,
+        candidate_jars: list[str],
+        active_subset: Iterable[str],
+    ) -> None:
+        """Toggle candidate jars in `jar_index.jar_dir` by renaming disabled jars to `.jar.off`."""
+        active_set = set(active_subset)
+        jar_dir = jar_index.jar_dir
+        for j_name in candidate_jars:
+            enabled_path = os.path.join(jar_dir, j_name)
+            disabled_path = enabled_path + bf.bo.OFF_SUFFIX
+            if j_name in active_set:
+                if not os.path.exists(enabled_path) and os.path.exists(disabled_path):
+                    os.replace(disabled_path, enabled_path)
+            else:
+                if os.path.exists(enabled_path):
+                    os.replace(enabled_path, disabled_path)
+
+    def _verify_loaded_plugins(
+        self,
+        drv: Any,
+        jar_index: JarIndex,
+        active_subset: Iterable[str],
+    ) -> bool:
+        """Verify over RCON `plugins` / `forge mods` that all jars in `active_subset` loaded cleanly."""
+        reply = drv.try_cmd("plugins")
+        if not reply:
+            return True
+        low_reply = reply.lower()
+        for j_name in active_subset:
+            meta = jar_index.jars.get(j_name)
+            p_id = (meta.plugin_id if meta and meta.plugin_id else j_name[:-4]).lower()
+            if p_id and p_id not in low_reply:
+                return False
+        return True
+
+    def _restart_driver(self, drv: Any) -> bool:
+        """Restart the disposable bench server and wait for RCON to go down and return."""
+        if self.driver is not None:
+            return bool(drv.restart_once())
+        rc = getattr(self.args, "restart_command", "restart") or "restart"
+        try:
+            reply = drv.cmd(rc, timeout=15)
+            if "unknown or incomplete" in (reply or "").lower():
+                return False
+        except bf.bo.RconError:
+            pass
+        shutdown_s = float(getattr(self.args, "shutdown_wait_s", 1200) or 1200)
+        end_down = time.time() + shutdown_s
+        while time.time() < end_down:
+            if drv.try_cmd("list") is None:
+                break
+            time.sleep(0.25)
+        else:
+            return False
+        startup_s = float(getattr(self.args, "startup_wait_s", 900) or 900)
+        end_up = time.time() + startup_s
+        poll_s = 0.25
+        while time.time() < end_up:
+            if drv.try_cmd("list") is not None:
+                return True
+            time.sleep(poll_s)
+            poll_s = min(2.0, poll_s * 1.5)
+        return False
+
+    def _build_active_exploration_tree(
+        self,
+        tree: CommandTree,
+        jar_index: JarIndex,
+        candidate_jars: list[str],
+        tiers: list[str],
+        max_cmds_per_jar: int = 4,
+    ) -> CommandTree:
+        """Filter a copy of `tree` for active bandit exploration across `candidate_jars`."""
+        allowed = tree.allowed_executable_nodes(tiers)
+        if len(allowed) <= 8 or not candidate_jars:
+            return tree
+
+        # Map commands and aliases declared in plugin.yml across candidate vs prerequisite jars
+        alias_to_canon: dict[str, str] = {}
+        cmd_to_jar: dict[str, str] = {}
+        prereq_cmds: set[str] = set()
+        for j_name, meta in jar_index.jars.items():
+            is_cand = j_name in candidate_jars
+            p_ns = (meta.plugin_id or "").lower()
+            for c_name in meta.commands:
+                cl = c_name.lower()
+                if is_cand:
+                    cmd_to_jar.setdefault(cl, j_name)
+                    if p_ns:
+                        cmd_to_jar.setdefault(f"{p_ns}:{cl}", j_name)
+                else:
+                    prereq_cmds.add(cl)
+                    if p_ns:
+                        prereq_cmds.add(f"{p_ns}:{cl}")
+            for al, canon in meta.command_aliases.items():
+                al_l, canon_l = al.lower(), canon.lower()
+                alias_to_canon[al_l] = canon_l
+                if is_cand:
+                    cmd_to_jar.setdefault(al_l, j_name)
+                    if p_ns:
+                        cmd_to_jar.setdefault(f"{p_ns}:{al_l}", j_name)
+                else:
+                    prereq_cmds.add(al_l)
+
+        # Group allowed executable nodes by their root command token
+        by_root: dict[str, list[CommandNode]] = {}
+        for n in allowed:
+            r_tok = (n._root_id or n.node_id.split()[0]).lower()
+            by_root.setdefault(r_tok, []).append(n)
+
+        # Collapse plugin.yml aliases onto canonical root commands present in `by_root`
+        canonical_roots: dict[str, list[CommandNode]] = {}
+        for r_tok, n_list in by_root.items():
+            bare_r = r_tok.split(":", 1)[1] if ":" in r_tok else r_tok
+            canon = alias_to_canon.get(bare_r, bare_r)
+            target_root = r_tok
+            if bare_r == "betterrtp" and "rtp" in by_root:
+                target_root = "rtp"
+            elif canon != bare_r:
+                # Prefer `rtp` if `rtp` is present, else `canon` if `canon` is present
+                if "rtp" in by_root and (bare_r == "rtp" or canon == "betterrtp" or alias_to_canon.get("rtp") == canon):
+                    target_root = "rtp"
+                elif canon in by_root:
+                    target_root = canon
+            if target_root != r_tok and target_root in by_root:
+                root_node = tree.nodes.get(target_root)
+                if root_node is not None and r_tok not in root_node.aliases:
+                    root_node.aliases.append(r_tok)
+                continue
+            canonical_roots[r_tok] = n_list
+
+        # Within each root command, prefer typed Brigadier argument nodes over bare 0-arg literals,
+        # and bare 0-arg literals over untyped Bukkit `<args>` (`GREEDY_PHRASE`) wrappers.
+        selected_per_root: dict[str, list[CommandNode]] = {}
+        for r_tok, n_list in canonical_roots.items():
+            typed_nodes = [
+                n
+                for n in n_list
+                if n.kind == "argument"
+                and not (
+                    n.name == "args"
+                    and n.parser == "brigadier:string"
+                    and str(n.properties.get("value", "")).upper() == "GREEDY_PHRASE"
+                    and not n.completions
+                )
+            ]
+            literal_nodes = [n for n in n_list if n.kind == "literal"]
+            if typed_nodes:
+                selected_per_root[r_tok] = typed_nodes
+            elif literal_nodes:
+                selected_per_root[r_tok] = literal_nodes
+            else:
+                selected_per_root[r_tok] = n_list
+
+        # Filter to candidate plugin commands when JarIndex identifies them, and cap per jar
+        builtin_roots = {
+            "?", "about", "help", "icanhasbukkit", "me", "msg", "pl", "plugins",
+            "teammsg", "tell", "tm", "trigger", "ver", "version", "w",
+        }
+        focus_pfx = self.focus_jar_prefix
+        focused_jar_name = next(
+            (j for j in candidate_jars if focus_pfx and j.lower().startswith(focus_pfx)),
+            None,
+        )
+        dynamic_cand_jars = [
+            j for j in candidate_jars if not (jar_index.jars.get(j) and jar_index.jars[j].commands)
+        ]
+        rtp_family_roots = {"rtp", "wild", "randomtp", "forcertp", "justrtp", "asyrtp", "betterrtp"}
+        cand_jar_nodes: dict[str, list[CommandNode]] = {}
+        unassigned_nodes: list[CommandNode] = []
+        for r_tok, n_list in selected_per_root.items():
+            bare_r = r_tok.split(":", 1)[1] if ":" in r_tok else r_tok
+            ns_r = r_tok.split(":", 1)[0] if ":" in r_tok else ""
+            if ns_r in ("minecraft", "bukkit", "paper", "spigot") or bare_r in builtin_roots or r_tok in prereq_cmds or bare_r in prereq_cmds:
+                continue
+            owner_jar = cmd_to_jar.get(r_tok) or cmd_to_jar.get(bare_r)
+            if not owner_jar and ns_r:
+                owner_jar = jar_index.id_to_jar.get(ns_r)
+            if not owner_jar and bare_r in jar_index.id_to_jar:
+                owner_jar = jar_index.id_to_jar.get(bare_r)
+            if not owner_jar and focused_jar_name and bare_r in rtp_family_roots:
+                owner_jar = focused_jar_name
+            if not owner_jar and len(dynamic_cand_jars) == 1 and bare_r in rtp_family_roots:
+                owner_jar = dynamic_cand_jars[0]
+            if owner_jar and owner_jar in candidate_jars:
+                cand_jar_nodes.setdefault(owner_jar, []).extend(n_list)
+            else:
+                unassigned_nodes.extend(n_list)
+
+        keep_ids: set[str] = set()
+        focused_default: list[str] = []
+        if cand_jar_nodes:
+            for j_name, j_nodes in sorted(cand_jar_nodes.items()):
+                j_nodes.sort(
+                    key=lambda n: (
+                        0 if (n.node_id.split()[0].lower() in rtp_family_roots) else 1,
+                        0 if n.kind == "argument" else 1,
+                        len(n.node_id),
+                        n.node_id,
+                    )
+                )
+                is_focused = bool(focus_pfx and j_name.lower().startswith(focus_pfx))
+                jar_cap = max(12, max_cmds_per_jar * 3) if is_focused else (2 if focus_pfx else max(1, max_cmds_per_jar))
+                for n in j_nodes[:jar_cap]:
+                    keep_ids.add(n.node_id)
+                    if is_focused and (n.min_tier or "default") == "default":
+                        focused_default.append(n.node_id)
+        else:
+            for n in unassigned_nodes:
+                keep_ids.add(n.node_id)
+        self._focused_default_nodes = focused_default
+
+        if not keep_ids:
+            return tree
+
+        cloned_nodes: dict[str, CommandNode] = {}
+        for nid, n in tree.nodes.items():
+            cp = CommandNode.from_dict(n.to_dict())
+            if cp.executable and not cp.denied and nid not in keep_ids:
+                cp.executable = False
+            cloned_nodes[nid] = cp
+        return CommandTree(
+            tiers=list(tree.tiers),
+            nodes=cloned_nodes,
+            root_children=list(tree.root_children),
+            alias_map=dict(tree.alias_map),
+            denylist_entries=list(tree.denylist_entries),
+            truncated=tree.truncated,
+        )
+
+    def run_active(self) -> dict[str, Any]:
+        """Execute live active whole-server discovery fuzzing (`--mode server --active`, ADR-125)."""
+        os.makedirs(self.run_dir, exist_ok=True)
+        warnings: list[str] = []
+
+        # 1. Offline JarIndex inventory
+        jar_index = self.jar_index or JarIndex.from_server_dir(self.server_dir, self.profile)
+        installed_jars = sorted(jar_index.jars.keys())
+        prereq_jars = sorted(j for j in installed_jars if self.profile.is_prerequisite_jar(j))
+        candidate_jars = sorted(j for j in installed_jars if not self.profile.is_prerequisite_jar(j))
+
+        # 2. Proof-of-ownership RCON handshake before opening any bot connection
+        props = bf.bo.read_properties(self.server_dir)
+        mc_port = resolve_server_port(props, getattr(self.args, "mc_port", None))
+        drv = self._build_driver(props)
+        names_online = bf.online_names(drv)
+        if names_online is None:
+            raise ValueError(
+                f"RCON proof-of-ownership handshake failed against {getattr(self.args, 'host', '127.0.0.1')} "
+                "(check that the disposable bench server is running and rcon.password matches)"
+            )
+        foreign = bf.foreign_online(names_online)
+        if foreign and not getattr(self.args, "allow_online", False):
+            raise ValueError(
+                f"non-fuzz players online ({foreign[:5]}); stop external clients or pass --allow-online"
+            )
+
+        # 3. Observer setup: JcmdObserver (local / --ssh / --container)
+        obs = self._build_observer()
+        obs.resolve_pid()
+
+        raw_tiers = getattr(self.args, "tiers", "default")
+        tiers = sort_tiers([t.strip().lower() for t in str(raw_tiers or "default").split(",") if t.strip()]) or ["default"]
+        episode_max_s = float(getattr(self.args, "episode_max_s", 25.0) or 25.0)
+        discover_max_ms = max(1000, min(60000, int(episode_max_s * 1000)))
+        episode_max_ms = max(2000, min(300000, int(episode_max_s * 1000)))
+        stall_ms = float(getattr(self.args, "stall_ms", None) or 2000.0)
+        default_share = float(getattr(self.args, "default_budget_share", None) or 0.75)
+        n_episodes = max(1, int(getattr(self.args, "episodes", 12) or 12))
+        n_baseline = getattr(self.args, "baseline_episodes", None)
+        n_baseline_eps = max(1, int(n_baseline if n_baseline is not None else min(4, max(2, n_episodes // 3))))
+        finding_n = max(1, int(getattr(self.args, "finding_n", 3) or 3))
+        finding_k = max(1, min(finding_n, int(getattr(self.args, "finding_k", 2) or 2)))
+        seeds = [int(s) for s in str(getattr(self.args, "seeds", "1") or "1").split(",") if s.strip()] or [1]
+        seed = seeds[0]
+        rng = random.Random(seed)
+
+        own_swarm = self.swarm is None
+        swarm = self.swarm
+        if own_swarm:
+            swarm = bf.Swarm(
+                bf.swarm_argv(self.args, mc_port),
+                os.path.join(self.run_dir, "swarm.log"),
+            )
+
+        opped_bots: set[str] = set()
+
+        def _grant_op(bot_name: str) -> None:
+            if bot_name not in opped_bots:
+                drv.try_cmd(f"op {bot_name}")
+                opped_bots.add(bot_name)
+
+        def _revoke_all_ops() -> None:
+            for b_name in sorted(list(opped_bots)):
+                try:
+                    drv.try_cmd(f"deop {b_name}")
+                except Exception:
+                    pass
+                opped_bots.discard(b_name)
+
+        baseline_records: list[dict[str, Any]] = []
+        explore_records: list[dict[str, Any]] = []
+        ramp_records: list[dict[str, Any]] = []
+        traces_path = os.path.join(self.run_dir, "episodes.jsonl")
+        target_players = getattr(self.args, "target_players", None)
+        ramp_rungs_raw = getattr(self.args, "ramp_rungs", None)
+        ramp_rungs = build_survival_ramp_rungs(
+            target_players=int(target_players) if target_players is not None else None,
+            explicit_rungs=str(ramp_rungs_raw) if ramp_rungs_raw is not None else None,
+        )
+
+        try:
+            if own_swarm:
+                swarm.start()
+
+            # 4. Multi-tier protocol discovery (`declare_commands`)
+            tier_packets: dict[str, dict[str, Any]] = {}
+            for tier in tiers:
+                disc_bot = bf.bot_name(self.stamp, seed, f"d{tier[:3]}", 0)
+                if tier == "op":
+                    _grant_op(disc_bot)
+                try:
+                    pkt, _ = swarm.discover(
+                        f"discover-{tier}",
+                        tier=tier,
+                        bot=disc_bot,
+                        max_ms=discover_max_ms,
+                    )
+                    tier_packets[tier] = pkt
+                finally:
+                    if tier == "op":
+                        _revoke_all_ops()
+
+            commands_path = os.path.join(self.run_dir, "commands.json")
+            tree = merge_command_trees(
+                tier_packets,
+                denylist=self.denylist,
+                out_path=commands_path,
+            )
+            if tree.truncated:
+                warnings.append(
+                    f"Command graph truncated at {len(tree.nodes)} nodes; inspect {commands_path}."
+                )
+
+            allowed_exec = tree.allowed_executable_nodes(tiers)
+            if not allowed_exec:
+                raise ValueError(f"no allowed executable command nodes discovered for tiers={tiers}")
+
+            explore_tree = self._build_active_exploration_tree(tree, jar_index, candidate_jars, tiers)
+            active_exec = explore_tree.allowed_executable_nodes(tiers)
+            bf.log(
+                f"server active: discovered {len(allowed_exec)} executable nodes "
+                f"({len(active_exec)} selected for active exploration: {[n.node_id for n in active_exec]}); "
+                f"candidate_jars={candidate_jars}"
+            )
+
+            prev_histo = obs.class_histogram()
+
+            def _run_live_episode(
+                ep_label: str,
+                bots_prog: list[dict[str, Any]],
+                *,
+                node_id: str | None = None,
+                follow_up: str | None = None,
+                need_op: bool = False,
+                record_trace: bool = True,
+            ) -> dict[str, Any]:
+                nonlocal prev_histo
+                if own_swarm and obs.exclusion_windows:
+                    rem_ms = obs.exclusion_windows[-1].end_ms - obs._clock_ms()
+                    if rem_ms > 0:
+                        time.sleep((rem_ms + 30) / 1000.0)
+                live_bots = _clone_program_structure(bots_prog)
+                if own_swarm:
+                    obs_wait_ms = max(1500, min(5000, int(stall_ms * 1.5 + 1100)))
+                    for b_spec in live_bots:
+                        acts = b_spec.get("program")
+                        if isinstance(acts, list) and acts and acts[-1].get("a") not in ("quit", "rejoin"):
+                            if acts[-1].get("a") == "wait":
+                                acts[-1]["ms"] = max(int(acts[-1].get("ms", 0) or 0), obs_wait_ms)
+                            else:
+                                acts.append({"a": "wait", "ms": obs_wait_ms})
+
+                if need_op:
+                    for b_spec in live_bots:
+                        _grant_op(str(b_spec["name"]))
+
+                sampled_dumps: list[str] = []
+                stop_sampler = threading.Event()
+                sampler_thread: threading.Thread | None = None
+                if own_swarm:
+                    def _sample_inflight_threads() -> None:
+                        if stop_sampler.wait(0.45):
+                            return
+                        for _ in range(8):
+                            if stop_sampler.is_set():
+                                break
+                            try:
+                                td = obs.thread_print(record_window=False)
+                                parsed = parse_main_thread_frame(td, profile=self.profile, jar_index=jar_index)
+                                if parsed.get("culprit_frame"):
+                                    sampled_dumps.append(td)
+                                    break
+                                if not sampled_dumps:
+                                    sampled_dumps.append(td)
+                            except Exception:
+                                pass
+                            if stop_sampler.wait(0.4):
+                                break
+
+                    sampler_thread = threading.Thread(
+                        target=_sample_inflight_threads,
+                        name="jcmd-stall-sampler",
+                        daemon=True,
+                    )
+                    sampler_thread.start()
+
+                try:
+                    eff_max_ms = (
+                        max(episode_max_ms, 20000 + len(live_bots) * 350)
+                        if len(live_bots) > 4
+                        else episode_max_ms
+                    )
+                    req = bf.episode_request(ep_label[:64], "rtp", live_bots, eff_max_ms)
+                    req["telemetry"] = True
+                    try:
+                        events, done = swarm.run_episode(req, req["max_ms"] / 1000.0 + 15.0)
+                    except TypeError:
+                        events, done = swarm.run_episode(
+                            ep_label[:64],
+                            "rtp",
+                            live_bots,
+                            eff_max_ms,
+                            eff_max_ms / 1000.0 + 15.0,
+                            telemetry=True,
+                        )
+                finally:
+                    stop_sampler.set()
+                    if sampler_thread is not None:
+                        sampler_thread.join(timeout=2.0)
+                    if need_op:
+                        _revoke_all_ops()
+
+                tick_gaps = [e for e in events if isinstance(e, dict) and e.get("ev") == "tick_gap"]
+                kicks = sum(1 for e in events if isinstance(e, dict) and e.get("ev") == "kick")
+                departures = sum(
+                    1
+                    for b in bots_prog
+                    for act in (b.get("program") or ())
+                    if isinstance(act, dict) and act.get("a") in ("quit", "rejoin")
+                )
+
+                # Allow deferred 1-2s warmup/timer tasks (e.g. BetterRTP RTPDelay, queue timers) to fire
+                # after bot departure so their allocations are captured in the episode that scheduled them.
+                if own_swarm and departures > 0:
+                    time.sleep(2.2)
+
+                # If an acute tick gap was observed outside observer windows, attach in-flight or post main-thread dump
+                thread_dumps: list[str] = []
+                valid_gaps, _ = filter_tick_gaps(tick_gaps, obs.exclusion_windows)
+                max_gap = max((float(g.get("ms", 0.0) or 0.0) for g in valid_gaps), default=0.0)
+                if max_gap >= stall_ms:
+                    for td in sampled_dumps:
+                        thread_dumps.append(td)
+                    has_culprit = any(
+                        parse_main_thread_frame(td, profile=self.profile, jar_index=jar_index).get("culprit_frame")
+                        for td in thread_dumps
+                    )
+                    if not has_culprit:
+                        try:
+                            thread_dumps.append(obs.thread_print(record_window=not own_swarm))
+                        except JcmdError:
+                            pass
+
+                curr_histo = obs.class_histogram()
+                deltas: dict[str, float] = {}
+                all_cls = set(prev_histo.keys()) | set(curr_histo.keys())
+                for c_name in all_cls:
+                    clean_c = _clean_raw_histogram_class(c_name)
+                    if not clean_c or GC_FILLER_RE.search(clean_c):
+                        continue
+                    i0 = prev_histo.get(c_name, (0, 0))[0]
+                    i1 = curr_histo.get(c_name, (0, 0))[0]
+                    diff = float(i1 - i0)
+                    if diff != 0.0:
+                        deltas[f"{CLS_PREFIX}{clean_c}"] = diff
+                prev_histo = curr_histo
+
+                states = bf.extract_states(events, [b["name"] for b in bots_prog])
+                rec: dict[str, Any] = {
+                    "seed": seed,
+                    "ep": ep_label,
+                    "node": node_id,
+                    "follow_up": follow_up,
+                    "bots": bots_prog,
+                    "departures": departures,
+                    "kicks": kicks,
+                    "tick_gaps": tick_gaps,
+                    "thread_dumps": thread_dumps,
+                    "exclusion_windows": [w.to_dict() for w in obs.exclusion_windows],
+                    "deltas": deltas,
+                    "states": states,
+                    "ms": done.get("ms", 0),
+                }
+                if record_trace:
+                    bf.append_jsonl(traces_path, rec)
+                return rec
+
+            # 5. Idle / movement baseline episodes
+            for b_idx in range(n_baseline_eps):
+                b_bot = bf.bot_name(self.stamp, seed, f"base{b_idx}", 0)
+                base_prog = [
+                    {
+                        "name": b_bot,
+                        "program": [
+                            {"a": "wait", "ms": 200},
+                            {"a": "move", "dx": 8, "dz": 8, "ms": 300},
+                            {"a": "wait", "ms": 200},
+                        ],
+                    }
+                ]
+                b_rec = _run_live_episode(
+                    f"base-{b_idx}",
+                    base_prog,
+                    node_id=None,
+                    follow_up="idle",
+                    need_op=False,
+                )
+                baseline_records.append(b_rec)
+                bf.log(f"server active: baseline {b_idx + 1}/{n_baseline_eps} done ({b_rec.get('ms', 0)} ms)")
+
+            # 5b. Optional progressive player-concurrency survival ramp (--target-players / --ramp-rungs)
+            for rung_n in ramp_rungs:
+                wave_bots = build_ramp_wave_program(
+                    rung_n,
+                    explore_tree,
+                    rng,
+                    denylist=self.denylist,
+                    tiers=["default"],
+                    bot_prefix=f"fzr{rung_n}",
+                    preferred_node_ids=self._focused_default_nodes,
+                )
+                r_rec = _run_live_episode(
+                    f"ramp-{rung_n}",
+                    wave_bots,
+                    node_id=None,
+                    follow_up="survival_ramp",
+                    need_op=False,
+                )
+                r_rec["players"] = int(rung_n)
+                r_rec["disconnects"] = int(r_rec.get("kicks", 0) or 0)
+                ramp_records.append(r_rec)
+                r_gaps, _ = filter_tick_gaps(r_rec.get("tick_gaps") or (), obs.exclusion_windows)
+                r_max = max((float(g.get("ms", 0.0) or 0.0) for g in r_gaps), default=0.0)
+                bf.log(
+                    f"server active: survival ramp players={rung_n} max_gap={r_max:.0f}ms "
+                    f"disconnects={r_rec['disconnects']}"
+                )
+                if r_rec["disconnects"] > 0 or r_max > stall_ms * 2.5:
+                    bf.log(f"server active: stopping survival ramp early after failure at players={rung_n}")
+                    break
+
+            # 6. Tier-stratified UCB1 exploration over discovered command nodes & player-taxonomy shapes
+            priority_shapes = (
+                "quit_lt1s",
+                "quit_delay",
+                "repeat",
+                "homesteader_reroll",
+                "rejoin",
+                "coop_group",
+                "explorer_wander",
+                "concurrent",
+                "window_click",
+            )
+            bandit = NodeBandit(
+                explore_tree,
+                tiers=tiers,
+                default_budget_share=default_share,
+                rng=rng,
+                shapes=priority_shapes,
+            )
+            seen_states: set[tuple[str, str]] = set()
+            node_pulls: dict[str, int] = {}
+            node_stalled: set[str] = set()
+            node_leaked: set[str] = set()
+            max_node_pulls = max(6, n_episodes // max(2, len(active_exec)))
+            cand_jar_set = set(candidate_jars)
+            base_max_delta: dict[str, float] = {}
+            for b_rec in baseline_records:
+                for k_cls, v_delta in (b_rec.get("deltas") or {}).items():
+                    if v_delta > base_max_delta.get(k_cls, 0.0):
+                        base_max_delta[k_cls] = float(v_delta)
+
+            leak_confirm_shapes = ("quit_lt1s", "quit_lt1s", "rejoin", "quit_lt1s", "rejoin", "quit_lt1s")
+            for ep_idx in range(n_episodes):
+                # 1) Ensure every active node gets at least 1 pull (and typed argument nodes get up to 3 pulls
+                #    if not yet stalled) before saturating leak confirmation pulls.
+                forced_choice: tuple[str, str] | None = None
+                unvisited = [
+                    n.node_id for n in active_exec if node_pulls.get(n.node_id, 0) == 0
+                ]
+                if unvisited:
+                    unvisited.sort(
+                        key=lambda nid: (
+                            0 if tree.nodes[nid].kind == "argument" else 1,
+                            len(nid),
+                            nid,
+                        )
+                    )
+                    next_nid = unvisited[0]
+                    next_sh = "quit_delay" if tree.nodes[next_nid].kind == "argument" and "scan" in next_nid else "quit_lt1s"
+                    if (next_nid, next_sh) not in bandit.arms:
+                        next_sh = priority_shapes[0]
+                    forced_choice = (next_nid, next_sh)
+                else:
+                    for n in active_exec:
+                        if (
+                            n.kind == "argument"
+                            and n.node_id not in node_stalled
+                            and n.node_id not in node_leaked
+                            and node_pulls.get(n.node_id, 0) < 3
+                        ):
+                            sh = "explorer_wander" if node_pulls.get(n.node_id, 0) == 1 else "quit_delay"
+                            forced_choice = (n.node_id, sh)
+                            break
+                if forced_choice is None:
+                    for l_nid in sorted(node_leaked):
+                        p_cnt = node_pulls.get(l_nid, 0)
+                        if p_cnt < 6:
+                            sh = leak_confirm_shapes[min(p_cnt, len(leak_confirm_shapes) - 1)]
+                            forced_choice = (l_nid, sh)
+                            break
+
+                if forced_choice is not None:
+                    node_id, shape = forced_choice
+                    if (node_id, shape) in bandit.arms:
+                        bandit.arms[(node_id, shape)].pulls += 1
+                        bandit.total_pulls += 1
+                        st_tier = bandit.arms[(node_id, shape)].min_tier
+                        bandit.stratum_pulls[st_tier] = bandit.stratum_pulls.get(st_tier, 0) + 1
+                else:
+                    node_id, shape = bandit.select_arm()
+
+                node_pulls[node_id] = node_pulls.get(node_id, 0) + 1
+                node_obj = tree.nodes[node_id]
+                need_op = node_obj.min_tier != "default"
+                b0 = bf.bot_name(self.stamp, seed, f"e{ep_idx}", 0)
+                b1 = bf.bot_name(self.stamp, seed, f"e{ep_idx}", 1)
+                bots_prog = build_arm_program(
+                    node_obj,
+                    shape,
+                    tree,
+                    rng,
+                    denylist=self.denylist,
+                    bot_names=[b0, b1],
+                )
+                rec = _run_live_episode(
+                    str(ep_idx),
+                    bots_prog,
+                    node_id=node_id,
+                    follow_up=shape,
+                    need_op=need_op,
+                )
+                explore_records.append(rec)
+
+                new_pairs = 0
+                for st_pair in rec.get("states") or ():
+                    if isinstance(st_pair, (list, tuple)) and len(st_pair) == 2:
+                        t_pair = (str(st_pair[0]), str(st_pair[1]))
+                        if t_pair not in seen_states:
+                            seen_states.add(t_pair)
+                            new_pairs += 1
+
+                # Score positive class growth on candidate plugin classes above idle join baseline
+                cand_pos_growth = 0.0
+                for k_cls, v_delta in (rec.get("deltas") or {}).items():
+                    net_delta = float(v_delta) - base_max_delta.get(k_cls, 0.0)
+                    if net_delta <= 0:
+                        continue
+                    c_clean = k_cls[len(CLS_PREFIX) :] if k_cls.startswith(CLS_PREFIX) else k_cls
+                    if not cand_jar_set:
+                        cand_pos_growth += net_delta
+                    else:
+                        owner_j = jar_index.owner_of_class(c_clean, profile=self.profile)
+                        if owner_j in cand_jar_set and "$$Lambda" not in c_clean:
+                            cand_pos_growth += net_delta
+
+                valid_gaps, _ = filter_tick_gaps(rec.get("tick_gaps") or (), obs.exclusion_windows)
+                max_gap = max((float(g.get("ms", 0.0) or 0.0) for g in valid_gaps), default=0.0)
+                gap_excess = max(0.0, max_gap - stall_ms)
+                if max_gap >= stall_ms:
+                    node_stalled.add(node_id)
+                if cand_pos_growth >= 2.0 and rec.get("departures", 0) > 0:
+                    node_leaked.add(node_id)
+                elif rec.get("departures", 0) > 0 and cand_pos_growth <= 0.0:
+                    node_leaked.discard(node_id)
+
+                usage_err = any(
+                    "unknown command" in str(p[1]).lower() or "usage" in str(p[1]).lower()
+                    for p in (rec.get("states") or ())
+                    if len(p) == 2
+                )
+                bandit.update(
+                    node_id,
+                    shape,
+                    novelty=float(new_pairs),
+                    class_growth=min(500.0, cand_pos_growth * 25.0),
+                    tick_gap_excess_ms=min(2000.0, gap_excess),
+                    kicks=int(rec.get("kicks", 0) or 0),
+                    usage_error=usage_err,
+                )
+                # Once a node has reached max_node_pulls (or confirmed a stall without a pending leak), damp its arms
+                if node_pulls[node_id] >= max_node_pulls or (
+                    node_id in node_stalled and node_id not in node_leaked and node_pulls[node_id] >= 2
+                ):
+                    for (a_nid, a_sh), a_st in bandit.arms.items():
+                        if a_nid == node_id:
+                            a_st.pulls = max(a_st.pulls, 50)
+                            a_st.total_reward = min(a_st.total_reward, 0.0)
+
+                bf.log(
+                    f"server active: ep {ep_idx + 1}/{n_episodes} node={node_id!r} shape={shape} "
+                    f"max_gap={max_gap:.0f}ms cand_growth=+{cand_pos_growth:.0f} pulls={node_pulls[node_id]}"
+                )
+
+            # 7. Live reproduction, shrinking, numeric bisection & jar ddmin callbacks
+            repro_counter = {"idx": 0}
+            current_active_jars: set[str] = set(candidate_jars)
+
+            def _repro_candidate_once(prog_bots: list[dict[str, Any]], cand: dict[str, Any]) -> bool:
+                repro_counter["idx"] += 1
+                r_idx = repro_counter["idx"]
+                c_node = cand.get("node")
+                node_obj = tree.nodes.get(str(c_node)) if c_node and str(c_node) in tree.nodes else None
+                need_op = bool(node_obj and node_obj.min_tier != "default")
+                fresh_bots = [
+                    {
+                        "name": bf.bot_name(self.stamp, seed, f"r{r_idx}", i),
+                        "program": _clone_program_structure(b.get("program") or []),
+                    }
+                    for i, b in enumerate(prog_bots)
+                ]
+                rec = _run_live_episode(
+                    f"repro-{r_idx}",
+                    fresh_bots,
+                    node_id=str(c_node) if c_node else None,
+                    follow_up=cand.get("follow_up"),
+                    need_op=need_op,
+                    record_trace=False,
+                )
+                oracle = cand.get("oracle")
+                sig = str(cand.get("signature") or "")
+                if oracle == "leak":
+                    parts = sig.split(":", 2)
+                    leak_cls = parts[1] if len(parts) > 1 else ""
+                    delta_val = float((rec.get("deltas") or {}).get(f"{CLS_PREFIX}{leak_cls}", 0.0) or 0.0)
+                    return delta_val > 0.0
+                if oracle == "stall":
+                    valid_g, _ = filter_tick_gaps(rec.get("tick_gaps") or (), obs.exclusion_windows)
+                    return any(float(g.get("ms", 0.0) or 0.0) >= stall_ms for g in valid_g)
+                return False
+
+            no_restart = bool(getattr(self.args, "no_restart", False))
+
+            def _ensure_active_jars(active_subset: list[str]) -> bool:
+                nonlocal prev_histo, current_active_jars
+                target_set = set(active_subset)
+                if not no_restart and target_set != current_active_jars:
+                    bf.log(f"server active: ddmin_jars toggling active_subset={sorted(target_set)}")
+                    self._set_candidate_jars_state(jar_index, candidate_jars, active_subset)
+                    if not self._restart_driver(drv):
+                        return False
+                    current_active_jars = set(active_subset)
+                    obs.resolve_pid(refresh=True)
+                    prev_histo = obs.class_histogram()
+                    if not self._verify_loaded_plugins(drv, jar_index, active_subset):
+                        return False
+                return True
+
+            def _run_repro_probe(prog_bots: list[dict[str, Any]], cand: dict[str, Any]) -> tuple[int, int, bool]:
+                hits = 0
+                for _ in range(finding_n):
+                    if _repro_candidate_once(prog_bots, cand):
+                        hits += 1
+                return hits, finding_n, hits >= finding_k
+
+            def _shrink_probe(prog_bots: list[dict[str, Any]], cand: dict[str, Any]) -> tuple[int, int, bool]:
+                if not _ensure_active_jars(candidate_jars):
+                    return 0, finding_n, False
+                return _run_repro_probe(prog_bots, cand)
+
+            def _bisect_pred(prog_bots: list[dict[str, Any]], cand: dict[str, Any]) -> bool:
+                _, _, ok = _shrink_probe(prog_bots, cand)
+                return ok
+
+            def _jar_probe(active_subset: list[str], cand: dict[str, Any]) -> tuple[int, bool]:
+                prog_bots = cand.get("shrunk_program") or cand.get("program") or []
+                if not _ensure_active_jars(active_subset):
+                    return 0, False
+                hits, _, _ = _run_repro_probe(prog_bots, cand)
+                return hits, True
+
+            try:
+                eval_verdict = evaluate_server_trace(
+                    explore_records,
+                    baseline_records=baseline_records,
+                    tree=tree,
+                    jar_index=jar_index,
+                    profile=self.profile,
+                    denylist=self.denylist,
+                    stall_ms=stall_ms,
+                    finding_k=finding_k,
+                    finding_n=finding_n,
+                    shrink_probe_fn=_shrink_probe,
+                    bisect_predicate_fn=_bisect_pred,
+                    jar_probe_fn=_jar_probe,
+                    server_dir=self.server_dir,
+                    ramp_records=ramp_records,
+                    target_players=int(target_players) if target_players is not None else (ramp_rungs[-1] if ramp_rungs else None),
+                )
+            finally:
+                if not no_restart and candidate_jars:
+                    self._set_candidate_jars_state(jar_index, candidate_jars, candidate_jars)
+                    if current_active_jars != set(candidate_jars) and not self.focus_jar_prefix:
+                        self._restart_driver(drv)
+
+        finally:
+            _revoke_all_ops()
+            if own_swarm and swarm is not None:
+                swarm.close()
+
+        eval_verdict["status"] = "active_completed"
+        eval_verdict["tiers"] = tiers
+        eval_verdict["baseline"] = {
+            "available": True,
+            "status": "collected",
+            "episodes": len(baseline_records),
+        }
+        eval_verdict["commands"] = {
+            "file": commands_path,
+            "total_nodes": len(tree.nodes),
+            "allowed_executable_nodes": len(allowed_exec),
+            "denied_nodes": sum(1 for n in tree.nodes.values() if n.denied),
+            "truncated": bool(tree.truncated),
+            "denylist": list(self.denylist.entries),
+        }
+        eval_verdict["jars"] = {
+            "jar_dir": jar_index.jar_dir,
+            "installed_jars": installed_jars,
+            "prerequisite_jars": prereq_jars,
+            "candidate_jars": candidate_jars,
+            "indexed_classes": len(jar_index.class_to_jars),
+        }
+        eval_verdict["warnings"] = warnings
+        bit_report, bit_rows = build_server_bit_report(eval_verdict)
+        eval_verdict["bit_report"] = bit_report
+        eval_verdict["bit_table_csv"] = render_bit_table_csv(bit_rows)
+        eval_verdict["report_text"] = format_server_findings_report(eval_verdict)
+
+        verdict_path = os.path.join(self.run_dir, getattr(bf, "VERDICT_FILE", "verdict.json"))
+        bf.save_json(verdict_path, eval_verdict)
+        bit_report_path = os.path.join(self.run_dir, "bit-report.json")
+        bf.save_json(bit_report_path, bit_report)
+        bit_table_path = os.path.join(self.run_dir, "bit-table.csv")
+        with open(bit_table_path, "w", encoding="utf-8") as fh:
+            fh.write(eval_verdict["bit_table_csv"])
+        report_path = os.path.join(self.run_dir, getattr(bf, "REPORT_FILE", "report.txt"))
+        with open(report_path, "w", encoding="utf-8") as fh:
+            fh.write(eval_verdict["report_text"])
+
+        return eval_verdict
+
+
+def format_isolated_targets_comparison(
+    target_verdicts: dict[str, dict[str, Any]],
+) -> tuple[str, str]:
+    """Render an aligned CSV and declarative text report comparing isolated one-at-a-time server targets."""
+    cols = (
+        "target",
+        "jar",
+        "verdict",
+        "health",
+        "max_surviving_players",
+        "first_failing_players",
+        "p95_gap_ms",
+        "max_gap_ms",
+        "leaks",
+        "stalls",
+        "log_errors",
+        "blamed_jars",
+    )
+    rows: list[dict[str, str]] = []
+    for target, v in target_verdicts.items():
+        if v.get("status") == "skipped_missing_jar":
+            rows.append(
+                {
+                    "target": target,
+                    "jar": str(v.get("jar") or "MISSING"),
+                    "verdict": "SKIP",
+                    "health": "SKIPPED",
+                    "max_surviving_players": "-",
+                    "first_failing_players": "-",
+                    "p95_gap_ms": "-",
+                    "max_gap_ms": "-",
+                    "leaks": "0",
+                    "stalls": "0",
+                    "log_errors": "0",
+                    "blamed_jars": "-",
+                }
+            )
+            continue
+        env = v.get("survival_envelope") or {}
+        findings = [f for f in (v.get("findings") or ()) if isinstance(f, dict) and f.get("reproduced", True)]
+        leaks = sum(1 for f in findings if f.get("oracle") == "leak")
+        stalls = sum(1 for f in findings if f.get("oracle") == "stall")
+        logs = sum(1 for f in findings if f.get("oracle") == "log")
+        imp = v.get("command_impact_table") or []
+        worst_p95 = max((float(r.get("p95_gap_ms", 0.0) or 0.0) for r in imp if isinstance(r, dict)), default=0.0)
+        worst_max = max((float(r.get("max_gap_ms", 0.0) or 0.0) for r in imp if isinstance(r, dict)), default=0.0)
+        for rr in (env.get("rungs") or ()):
+            if isinstance(rr, dict):
+                worst_p95 = max(worst_p95, float(rr.get("tick_gap_p95_ms", 0.0) or 0.0))
+                worst_max = max(worst_max, float(rr.get("tick_gap_max_ms", 0.0) or 0.0))
+        blamed = ";".join(str(x) for x in (v.get("confirmed_culprits") or v.get("blamed_jars") or ())) or "-"
+        rows.append(
+            {
+                "target": target,
+                "jar": str(v.get("focused_jar") or "-"),
+                "verdict": str(v.get("verdict") or "UNKNOWN"),
+                "health": str((v.get("bit_report") or {}).get("health") or "-"),
+                "max_surviving_players": str(env.get("max_surviving_players", "-")),
+                "first_failing_players": str(env.get("first_failing_players") or "-"),
+                "p95_gap_ms": f"{worst_p95:.1f}" if worst_p95 > 0 else "-",
+                "max_gap_ms": f"{worst_max:.1f}" if worst_max > 0 else "-",
+                "leaks": str(leaks),
+                "stalls": str(stalls),
+                "log_errors": str(logs),
+                "blamed_jars": blamed,
+            }
+        )
+
+    widths = [len(c) for c in cols]
+    for r in rows:
+        for idx, c in enumerate(cols):
+            widths[idx] = max(widths[idx], len(str(r.get(c, ""))))
+
+    def _fmt_row(vals: Iterable[str]) -> str:
+        parts = []
+        for idx, val in enumerate(vals):
+            s = str(val).replace(",", ";")
+            parts.append(s.rjust(widths[idx]))
+        return ", ".join(parts)
+
+    csv_lines = [_fmt_row(cols)]
+    for r in rows:
+        csv_lines.append(_fmt_row(r.get(c, "") for c in cols))
+    csv_text = "\n".join(csv_lines) + "\n"
+
+    txt_lines = [
+        f"isolated_targets_count: {len(target_verdicts)}",
+        "=== CROSS-COMPETITOR DECLARATIVE BIT & SURVIVAL COMPARISON ===",
+        csv_text.rstrip("\n"),
+    ]
+    for target, v in target_verdicts.items():
+        txt_lines.append("")
+        txt_lines.append(f"================ TARGET: {target} ({v.get('focused_jar', '-')}) ================")
+        if v.get("report_text"):
+            txt_lines.append(str(v["report_text"]).rstrip("\n"))
+        else:
+            txt_lines.append(f"status: {v.get('status')}")
+    return csv_text, "\n".join(txt_lines) + "\n"
+
+
+def _parse_roster_jar_prefixes(raw_jars: str | None = None) -> dict[str, str]:
+    spec = raw_jars or getattr(bf.bo, "DEFAULT_JARS", "")
+    mapping: dict[str, str] = {}
+    for pair in str(spec).split(","):
+        t, _, prefix = pair.partition("=")
+        if t.strip() and prefix.strip():
+            mapping[t.strip().lower()] = prefix.strip().lower()
+    mapping.setdefault("fuzzfixture", "fuzzfixture")
+    mapping.setdefault("stresstestrtp", "stresstestrtp")
+    return mapping
+
+
+def _isolate_single_roster_jar(
+    jar_dir: str,
+    roster_prefixes: dict[str, str],
+    active_target: str | None,
+) -> list[str]:
+    """Enable only `active_target`'s jar among `roster_prefixes` in `jar_dir`; rename other roster jars to `.jar.off`."""
+    all_prefixes = tuple(sorted(set(roster_prefixes.values())))
+    want_prefix = roster_prefixes.get((active_target or "").lower()) if active_target else None
+    enabled_matches: list[str] = []
+    if not os.path.isdir(jar_dir):
+        return enabled_matches
+    off_sfx = bf.bo.OFF_SUFFIX
+    for fname in sorted(os.listdir(jar_dir)):
+        low = fname.lower()
+        is_on = low.endswith(".jar")
+        is_off = low.endswith(".jar" + off_sfx)
+        if not (is_on or is_off):
+            continue
+        base_jar = fname if is_on else fname[: -len(off_sfx)]
+        base_low = base_jar.lower()
+        if not any(base_low.startswith(pfx) for pfx in all_prefixes):
+            continue
+        want_on = bool(want_prefix and base_low.startswith(want_prefix))
+        src_path = os.path.join(jar_dir, fname)
+        if want_on:
+            dst_path = os.path.join(jar_dir, base_jar)
+            if fname != base_jar:
+                os.replace(src_path, dst_path)
+            enabled_matches.append(base_jar)
+        else:
+            if is_on:
+                os.replace(src_path, os.path.join(jar_dir, base_jar + off_sfx))
+    return enabled_matches
+
+
+def run_isolated_server_targets(
+    args: Any,
+    run_dir: str,
+    stamp: str,
+    targets: list[str],
+    *,
+    swarm: Any | None = None,
+    observer: JcmdObserver | None = None,
+    driver: Any | None = None,
+) -> dict[str, Any]:
+    """Run `ServerRun.run_active()` sequentially for each target in `targets` with one-at-a-time jar isolation."""
+    profile, _ = validate_server_mode_args(args)
+    server_dir = os.path.abspath(args.server_dir)
+    jar_dir = os.path.join(server_dir, profile.jar_subdir)
+    roster_prefixes = _parse_roster_jar_prefixes(getattr(args, "jars", None))
+    props = bf.bo.read_properties(server_dir)
+    no_restart = bool(getattr(args, "no_restart", False))
+
+    probe_runner = ServerRun(
+        args,
+        run_dir,
+        swarm=swarm,
+        observer=observer,
+        driver=driver,
+        stamp=stamp,
+    )
+    drv = probe_runner._build_driver(props)
+
+    target_verdicts: dict[str, dict[str, Any]] = {}
+    for idx, target in enumerate(targets):
+        t_clean = target.strip().lower()
+        if not t_clean:
+            continue
+        pfx = roster_prefixes.get(t_clean, t_clean)
+        enabled = _isolate_single_roster_jar(jar_dir, roster_prefixes, t_clean)
+        if not enabled:
+            bf.log(f"server active isolate: target={t_clean} (prefix={pfx}) has no jar in {jar_dir}; skipping")
+            target_verdicts[t_clean] = {
+                "target": t_clean,
+                "status": "skipped_missing_jar",
+                "verdict": "SKIP",
+                "jar": f"{pfx}*.jar (missing)",
+            }
+            continue
+
+        focused_jar = enabled[0]
+        bf.log(
+            f"server active isolate [{idx + 1}/{len(targets)}]: target={t_clean} "
+            f"enabled_jar={focused_jar} restarting={not no_restart}"
+        )
+        if not no_restart:
+            if not probe_runner._restart_driver(drv):
+                raise ValueError(f"server failed to restart for isolated target {t_clean!r} ({focused_jar})")
+            settle_s = max(2, int(getattr(args, "settle_s", 10) or 10))
+            time.sleep(min(15, settle_s))
+
+        t_dir = os.path.join(run_dir, t_clean)
+        os.makedirs(t_dir, exist_ok=True)
+        t_runner = ServerRun(
+            args,
+            t_dir,
+            swarm=swarm,
+            observer=observer,
+            driver=drv,
+            stamp=f"{stamp}-{t_clean}",
+            focus_jar_prefix=pfx,
+        )
+        t_verdict = t_runner.run_active()
+        t_verdict["target"] = t_clean
+        t_verdict["focused_jar"] = focused_jar
+        bf.save_json(os.path.join(t_dir, getattr(bf, "VERDICT_FILE", "verdict.json")), t_verdict)
+        target_verdicts[t_clean] = t_verdict
+
+        # Write incremental cross-target comparison after every completed target
+        comp_csv, comp_txt = format_isolated_targets_comparison(target_verdicts)
+        with open(os.path.join(run_dir, "comparison.csv"), "w", encoding="utf-8") as fh:
+            fh.write(comp_csv)
+        with open(os.path.join(run_dir, "comparison.txt"), "w", encoding="utf-8") as fh:
+            fh.write(comp_txt)
+        with open(os.path.join(run_dir, getattr(bf, "REPORT_FILE", "report.txt")), "w", encoding="utf-8") as fh:
+            fh.write(comp_txt)
+
+    comp_csv, comp_txt = format_isolated_targets_comparison(target_verdicts)
+    any_fail = any(v.get("verdict") == "FAIL" for v in target_verdicts.values())
+    combined_verdict: dict[str, Any] = {
+        "mode": "server",
+        "profile": profile.name,
+        "status": "active_completed",
+        "verdict": "FAIL" if any_fail else "PASS",
+        "isolated_targets": list(target_verdicts.keys()),
+        "targets": {
+            t: {
+                "focused_jar": v.get("focused_jar"),
+                "verdict": v.get("verdict"),
+                "status": v.get("status"),
+                "health": (v.get("bit_report") or {}).get("health"),
+                "survival_envelope": v.get("survival_envelope"),
+                "confirmed_culprits": v.get("confirmed_culprits", []),
+                "blamed_jars": v.get("blamed_jars", []),
+                "findings_count": len(v.get("findings") or ()),
+            }
+            for t, v in target_verdicts.items()
+        },
+        "comparison_csv": comp_csv,
+        "report_text": comp_txt,
+    }
+    bf.save_json(os.path.join(run_dir, getattr(bf, "VERDICT_FILE", "verdict.json")), combined_verdict)
+    with open(os.path.join(run_dir, "comparison.csv"), "w", encoding="utf-8") as fh:
+        fh.write(comp_csv)
+    with open(os.path.join(run_dir, "comparison.txt"), "w", encoding="utf-8") as fh:
+        fh.write(comp_txt)
+    with open(os.path.join(run_dir, getattr(bf, "REPORT_FILE", "report.txt")), "w", encoding="utf-8") as fh:
+        fh.write(comp_txt)
+    return combined_verdict
+
 
 def run_server_mode(
     args: Any,
@@ -3806,8 +8186,9 @@ def run_server_mode(
     swarm: Any | None = None,
     observer: JcmdObserver | None = None,
     jar_index: JarIndex | None = None,
+    driver: Any | None = None,
 ) -> int:
-    """Entry point for `bench_fuzz.py --mode server` passive local audit."""
+    """Entry point for `bench_fuzz.py --mode server` (passive local audit or `--active` live discovery fuzzing)."""
     validate_server_mode_args(args, parser=parser, argv=argv)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     out_dir = getattr(args, "out_dir", None) or os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
@@ -3815,24 +8196,41 @@ def run_server_mode(
     os.makedirs(run_dir, exist_ok=True)
     prev_log_fh = bf.bo.LOG_FH
     bf.bo.LOG_FH = open(os.path.join(run_dir, "fuzz.log"), "a", encoding="utf-8")
+    is_active = bool(getattr(args, "active", False))
+    isolate_raw = getattr(args, "isolate_targets", None)
+    isolate_list = [t.strip().lower() for t in str(isolate_raw or "").split(",") if t.strip()] if is_active and isolate_raw else []
+    mode_label = "server active fuzz" if is_active else "server passive audit"
     try:
         bf.log(
-            f"server passive audit: stamp={stamp} profile={args.profile} "
-            f"server_dir={args.server_dir} tiers=['default'] run_dir={run_dir}"
+            f"{mode_label}: stamp={stamp} profile={args.profile} "
+            f"server_dir={args.server_dir} tiers={getattr(args, 'tiers', 'default')} "
+            f"isolate_targets={isolate_list or None} run_dir={run_dir}"
         )
-        runner = ServerRun(
-            args,
-            run_dir,
-            swarm=swarm,
-            observer=observer,
-            jar_index=jar_index,
-            stamp=stamp,
-        )
-        runner.run()
-        bf.log(f"done (passive_only); artifacts under {run_dir}")
+        if isolate_list:
+            verdict = run_isolated_server_targets(
+                args,
+                run_dir,
+                stamp,
+                isolate_list,
+                swarm=swarm,
+                observer=observer,
+                driver=driver,
+            )
+        else:
+            runner = ServerRun(
+                args,
+                run_dir,
+                swarm=swarm,
+                observer=observer,
+                jar_index=jar_index,
+                driver=driver,
+                stamp=stamp,
+            )
+            verdict = runner.run()
+        bf.log(f"done ({verdict.get('status')}); artifacts under {run_dir}")
         return 0
     except (bf.SwarmError, JcmdError, ValueError) as exc:
-        bf.log(f"server passive audit failed: {exc}")
+        bf.log(f"{mode_label} failed: {exc}")
         print(f"error: {exc}", file=sys.stderr)
         return 2
     finally:

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.action;
 
 import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitCodes;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.bit.BitTier;
@@ -47,6 +48,7 @@ public final class ActionCbitCounters {
       "ACTION_CBIT_SESSION_ORPHANED", Level.WARNING, BitTier.CBIT, "action", "",
       "Check action lifecycle and teardown behavior before the session reaper window expires.");
 
+  private static final CbitCounter ACTION_OBSERVATIONS = new CbitCounter();
   private static final ConcurrentHashMap<String, CbitCounter> MISSING_OBJECTIVES = new ConcurrentHashMap<>();
   private static final AtomicInteger TRACKED_OBJECTIVES = new AtomicInteger();
   private static final CbitCounter OBJECTIVE_OVERFLOW_COUNTER = new CbitCounter();
@@ -62,6 +64,35 @@ public final class ActionCbitCounters {
   private static volatile String lastOrphanedAction = "";
 
   private ActionCbitCounters() {}
+
+  /** Records an observed action-engine evaluation sample. */
+  public static void observe() {
+    ACTION_OBSERVATIONS.observe();
+  }
+
+  /** Records multiple observed action-engine evaluation samples. */
+  public static void observe(long samples) {
+    ACTION_OBSERVATIONS.observe(samples);
+  }
+
+  public static long observations() {
+    long total = ACTION_OBSERVATIONS.observations()
+        + OBJECTIVE_OVERFLOW_COUNTER.observations()
+        + UNRESOLVED_PLACEHOLDERS.observations()
+        + UNKNOWN_ACTIONS.observations()
+        + ORPHANED_SESSIONS.observations();
+    for (CbitCounter counter : MISSING_OBJECTIVES.values()) {
+      total += counter.observations();
+    }
+    for (GateOutcomeCounter counter : GATE_OUTCOMES.values()) {
+      total += counter.evaluated();
+    }
+    return total;
+  }
+
+  public static boolean isObserved() {
+    return observations() > 0L;
+  }
 
   /** Records a runtime read for an external objective whose score was absent. */
   public static void recordMissingObjective(String objective) {
@@ -81,6 +112,7 @@ public final class ActionCbitCounters {
   /** Counts unresolved placeholder occurrences in a fully substituted payload. */
   public static void recordUnresolvedPlaceholders(String renderedPayload) {
     if (renderedPayload == null || renderedPayload.isEmpty()) return;
+    UNRESOLVED_PLACEHOLDERS.observe();
     Matcher matcher = UNRESOLVED_TOKEN.matcher(renderedPayload);
     while (matcher.find()) {
       UNRESOLVED_PLACEHOLDERS.increment();
@@ -163,11 +195,17 @@ public final class ActionCbitCounters {
               + snapshot.lastOrphanedAction() + ".",
           "expire, cancel or teardown before the reaper window", "");
     }
+    if (findings.isEmpty() && !isObserved()) {
+      addFinding(findings, BitCodes.CBIT_UNOBSERVED, "actions.observations",
+          "No action engine events or gate evaluations have been observed yet.",
+          "at least 1 observed action evaluation", BitCodes.CBIT_UNOBSERVED.remediation());
+    }
     return BitReport.of(findings);
   }
 
   /** Test isolation for this process-global counter set. */
   public static void reset() {
+    ACTION_OBSERVATIONS.reset();
     MISSING_OBJECTIVES.clear();
     TRACKED_OBJECTIVES.set(0);
     OBJECTIVE_OVERFLOW_COUNTER.reset();

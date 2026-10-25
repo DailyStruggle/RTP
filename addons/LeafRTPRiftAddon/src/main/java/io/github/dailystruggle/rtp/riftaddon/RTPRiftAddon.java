@@ -91,7 +91,9 @@ public final class RTPRiftAddon implements RTPAddon {
         effectsGroups.addParser(DEMO_GROUP);
         RTP.log(Level.INFO, "[LeafRTPRiftAddon] installed default definitions/effects/rift.yml demo group (when: preload).");
       }
-    } catch (Exception e) {
+    } catch (java.io.IOException | RuntimeException e) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+          "RTPRiftAddon#seedDemoGroup", e);
       // A failed demo install must never break addon load or the teleport pipeline.
       RTP.log(Level.WARNING, "[LeafRTPRiftAddon] failed to install rift.yml demo group", e);
     }

@@ -99,7 +99,9 @@ public final class BukkitMenuRenderer implements MenuRenderer {
             player.openInventory(DestinationPickerGui.from(model).getInventory());
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP-GUI] open: opened destination picker for " + playerId);
-          } catch (Throwable t) {
+          } catch (RuntimeException | LinkageError t) {
+            io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+                "BukkitMenuRenderer#open", t);
             RTP.log(java.util.logging.Level.WARNING,
                 "[RTP-GUI] open: failed to open destination picker for " + playerId, t);
           }

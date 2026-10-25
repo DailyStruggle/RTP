@@ -1,0 +1,80 @@
+package io.github.dailystruggle.server.api;
+
+import java.util.Objects;
+
+/**
+ * Platform-neutral description of an on-screen progress bar (e.g. Bukkit BossBar).
+ */
+public class ProgressBar {
+  private final String title;
+  private final double progress;
+  private final String viewerPermission;
+
+  /**
+   * Creates a platform-neutral progress bar specification.
+   *
+   * @param title the bar title, may contain legacy {@code &x} / {@code #RRGGBB} color codes;
+   *     the platform decides how (or whether) to render and/or strip them
+   * @param progress fill fraction in the range {@code [0, 1]} (clamped by the implementation)
+   * @param viewerPermission permission a player must hold to be shown the bar; {@code null} or
+   *     empty means "all players"
+   */
+  public ProgressBar(String title, double progress, String viewerPermission) {
+    this.title = title == null ? "" : title;
+    this.progress = progress;
+    this.viewerPermission = viewerPermission;
+  }
+
+  /**
+   * Returns the bar title, possibly containing legacy/hex color codes.
+   *
+   * @return the bar title; never {@code null}
+   */
+  public String title() {
+    return title;
+  }
+
+  /**
+   * Returns the fill fraction in {@code [0, 1]} (not yet clamped).
+   *
+   * @return fill fraction
+   */
+  public double progress() {
+    return progress;
+  }
+
+  /**
+   * Returns the permission required to view the bar, or {@code null}/empty for everyone.
+   *
+   * @return viewer permission or {@code null}
+   */
+  public String viewerPermission() {
+    return viewerPermission;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof ProgressBar)) return false;
+    ProgressBar that = (ProgressBar) o;
+    return Double.compare(that.progress, progress) == 0
+        && Objects.equals(title, that.title)
+        && Objects.equals(viewerPermission, that.viewerPermission);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(title, progress, viewerPermission);
+  }
+
+  @Override
+  public String toString() {
+    return "ProgressBar{title='"
+        + title
+        + "', progress="
+        + progress
+        + ", viewerPermission='"
+        + viewerPermission
+        + "'}";
+  }
+}

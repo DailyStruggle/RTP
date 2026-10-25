@@ -897,6 +897,10 @@ class TeleportPipelineTaskPhaseTest {
         io.github.dailystruggle.rtp.api.selection.GenerationContext ctx =
                 new io.github.dailystruggle.rtp.api.selection.GenerationContext(p, p, null);
 
+        // Test completeDeathTeleport with invulnerability and queueing branches
+        TeleportPipelineTask.ConfigCache.lockAfterUses = 5;
+        TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
+
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target);
         task.deathEffectTriggered = true;
 
@@ -914,9 +918,6 @@ class TeleportPipelineTaskPhaseTest {
         assertSame(task, DeathTeleports.pending().get(pid));
         assertFalse(data.completed);
 
-        // Test completeDeathTeleport with invulnerability and queueing branches
-        TeleportPipelineTask.ConfigCache.lockAfterUses = 5;
-        TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
         TeleportPipelineTask.teleportPostActions.add(t -> {
             throw new RuntimeException("simulated post action failure");
         });

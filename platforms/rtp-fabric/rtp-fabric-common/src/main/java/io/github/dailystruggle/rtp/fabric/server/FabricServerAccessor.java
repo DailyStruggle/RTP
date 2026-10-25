@@ -17,6 +17,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -962,22 +963,21 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // every log emitted after configs load (e.g. the locationLoaded
     // hydration banner) renders with the prefix resolved.
     String formatted = (msg == null) ? "" : formatForLog(msg);
-    // Route through Log4j2 (Minecraft's own logger framework) so the dedicated
-    // server's TerminalConsoleAppender translates section -codes to ANSI on the
-    // console. Apply a level-coloured prefix that mirrors Spigot's
-    // SendMessage.log so SEVERE/WARNING are visually distinct.
-    String ansi = FabricAnsiText.toAnsiString(prefixForLevel(level) + formatted);
+    // Strip legacy/MiniMessage color codes before routing through Log4j2 so
+    // logs/latest.log contains clean plain text and valid CSV for [RTP bit]
+    // tables without raw ESC[..m sequences (RTP-96).
+    String plain = FabricAnsiText.stripColor(prefixForLevel(level) + formatted);
     org.apache.logging.log4j.Logger logger = org.apache.logging.log4j.LogManager.getLogger("RTP");
-    logger.log(toLog4jLevel(level), ansi);
+    logger.log(toLog4jLevel(level), plain);
   }
 
   @Override
   public void log(Level level, String msg, Throwable throwable) {
     if (!isLoggable(level)) return;
     String formatted = (msg == null) ? "" : formatForLog(msg);
-    String ansi = FabricAnsiText.toAnsiString(prefixForLevel(level) + formatted);
+    String plain = FabricAnsiText.stripColor(prefixForLevel(level) + formatted);
     org.apache.logging.log4j.Logger logger = org.apache.logging.log4j.LogManager.getLogger("RTP");
-    logger.log(toLog4jLevel(level), ansi, throwable);
+    logger.log(toLog4jLevel(level), plain, throwable);
   }
 
   /**
@@ -1097,11 +1097,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         p.sendMessage(format(p.uuid(), msg));
       }
     }
-    // Console branch: route via Log4j2 with section -form so colour is preserved
-    // (sendSystemMessage(Component) logs plain text on the dedicated server).
     String consoleMsg = format(null, msg);
     org.apache.logging.log4j.LogManager.getLogger("RTP")
-        .info(FabricAnsiText.toAnsiString(consoleMsg));
+        .info(FabricAnsiText.stripColor(consoleMsg));
   }
 
   @Override
@@ -1969,8 +1967,10 @@ public final class FabricServerAccessor implements RTPServerAccessor {
           CoreMetrics.instance().snapshot();
       double v = (ticks >= 600) ? snap.tps15m : (ticks >= 100 ? snap.tps5m : snap.tps1m);
       if (!Double.isNaN(v)) return v;
-    } catch (Throwable ignored) {
-      // Defensive - snapshot() is non-throwing by contract.
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "FabricServerAccessor#getTPS",
+          e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     // Compute TPS from the server's recent average tick time. Mojang exposes
     // this via {@code MinecraftServer#getAverageTickTimeNanos()} on 1.21.x and
@@ -2518,15 +2518,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override
     public void sendMessage(String message) {
       if (message == null) return;
-      // Console rendering note: MinecraftServer.sendSystemMessage(Component)
-      // logs `component.getString()` (plain text) on the dedicated server,
-      // which strips styling. To keep colour on the console we route the
-      // ANSI form straight through Log4j2. Translating to ANSI here (rather
-      // than relying on TerminalConsoleAppender to convert section -codes) avoids
-      // mojibake on Windows consoles whose codepage isn't UTF-8: the raw section 
-      // (UTF-8 0xC2 0xA7) would otherwise render as "┬º".
-      String ansi = FabricAnsiText.toAnsiString(message);
-      org.apache.logging.log4j.LogManager.getLogger("RTP").info(ansi);
+      String plain = FabricAnsiText.stripColor(message);
+      org.apache.logging.log4j.LogManager.getLogger("RTP").info(plain);
     }
 
     @Override public RTPCommandSender clone() { return new FabricConsoleSender(server); }
@@ -2716,7 +2709,8 @@ public final class FabricServerAccessor implements RTPServerAccessor {
                 + " does not support map charts; /rtp visualizations will report"
                 + " mapBindingMissing (NoopMapBinding active).");
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded("FabricServerAccessor#setupMapBinding", t);
       RTP.log(Level.WARNING,
           "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
               + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "

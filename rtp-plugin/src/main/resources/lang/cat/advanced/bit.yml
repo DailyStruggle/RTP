@@ -12,6 +12,12 @@ strictConfig: false
 # Nombre mínim de mostres abans de classificar una porta com a sempre o mai superada.
 gateOutcomeSamples: 200
 
+# Escombrat BIT inicial programat que s'executa de manera asíncrona al tick +2.
+startupSweep: pbit
+
+# Proveïdor de cobertura diagnòstica en viu injectat a RtpBit.RUNNER.
+coverage: auto
+
 # Nivells de severitat per a codis BIT registrats; tenen prioritat sobre strictActions.
 # Nivells admesos: ERROR, WARNING, INFO, DEBUG, TRACE i OFF. OFF silencia la troballa.
 # Els codis o nivells desconeguts s'ignoren i es registren al log.

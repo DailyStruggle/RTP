@@ -76,6 +76,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    *
    * @return server name or {@code null}
    */
+  @Override
   default String getServerName() {
     return null;
   }
@@ -126,6 +127,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    *
    * @return immutable snapshot of online player names; never {@code null}
    */
+  @Override
   default Set<String> getOnlinePlayerNames() {
     return java.util.Collections.emptySet();
   }
@@ -154,6 +156,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    *
    * @return the platform lifecycle hook; never {@code null}
    */
+  @Override
   default PlayerLifecycleHook getPlayerLifecycleHook() {
     return NoopPlayerLifecycleHook.INSTANCE;
   }
@@ -163,14 +166,20 @@ public interface RTPServerAccessor extends ServerAccessor {
    *
    * @return over-time in ms; 0 if on time
    */
-  long overTime();
+  @Override
+  default long overTime() {
+    return 0L;
+  }
 
   /**
    * Returns the plugin's data folder (e.g. {@code plugins/RTP/}).
    *
    * @return the plugin data directory; never {@code null}
    */
-  File getPluginDirectory();
+  @Override
+  default File getPluginDirectory() {
+    return new File(".");
+  }
 
   /**
    * Sends configured message to a player with optional context tag.
@@ -277,6 +286,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param objective the objective name; must not be {@code null}
    * @return the player's score, or {@code null} if the objective or score does not exist
    */
+  @Override
   default Integer getScoreboardScore(UUID playerId, String objective) {
     return null;
   }
@@ -288,6 +298,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @return {@link Optional#of(Object)} containing {@code true} when present or {@code false} when
    *     absent, or {@link Optional#empty()} when the host cannot determine whether it is present
    */
+  @Override
   default Optional<Boolean> hasScoreboardObjective(String objective) {
     return Optional.empty();
   }
@@ -374,7 +385,10 @@ public interface RTPServerAccessor extends ServerAccessor {
    *
    * @return {@code true} if called from the primary server thread
    */
-  boolean isPrimaryThread();
+  @Override
+  default boolean isPrimaryThread() {
+    return true;
+  }
 
   /**
    * Returns the set of all material names known to the server
@@ -383,7 +397,10 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @return set of material name strings in the platform's canonical format;
    *         never {@code null}
    */
-  Set<String> materials();
+  @Override
+  default Set<String> materials() {
+    return java.util.Collections.emptySet();
+  }
 
   /**
    * Returns immutable snapshot of live block tags for safety parsing (ADR-017).
@@ -393,6 +410,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    *
    * @return immutable tag map; never {@code null}
    */
+  @Override
   default Map<String, Set<String>> blockTagSnapshot() {
     return java.util.Collections.emptyMap();
   }
@@ -405,6 +423,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * <p>The default implementation is a no-op for platforms that do not maintain
    * a tag snapshot.
    */
+  @Override
   default void rebuildBlockTagSnapshot() {
     // no-op by default.
   }
@@ -548,7 +567,10 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param ticks the sample window in ticks (e.g. 20 for 1 second, 100 for 5 seconds)
    * @return average TPS; typically between 0 and 20
    */
-  double getTPS(int ticks);
+  @Override
+  default double getTPS(int ticks) {
+    return 20.0;
+  }
 
   // ---------------------------------------------------------------------------
   // Progress-bar surface (platform-neutral on-screen progress feedback)
@@ -565,6 +587,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * Hides and discards every progress bar previously shown via
    * {@link #updateProgressBars(Map)}.
    */
+  @Override
   default void clearProgressBars() {}
 
   // ---------------------------------------------------------------------------
@@ -582,6 +605,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param player player UUID
    * @return non-null permission predicate
    */
+  @Override
   default Predicate<String> menuPermissionProbe(UUID player) {
     return node -> {
       if (player == null || node == null) {
@@ -602,6 +626,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param player player UUID
    * @return permission set; empty if unresolved
    */
+  @Override
   default Set<String> menuEffectivePermissions(UUID player) {
     if (player == null) {
       return java.util.Collections.emptySet();
@@ -624,6 +649,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param player player UUID
    * @return locale tag; defaults to "en_us"
    */
+  @Override
   default String menuLocale(UUID player) {
     return "en_us";
   }
@@ -634,6 +660,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param player player UUID
    * @return region descriptor; empty string if unknown
    */
+  @Override
   default String menuRegionDescriptor(UUID player) {
     return "";
   }
@@ -657,6 +684,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param rootCommand the command tree root (TreeCommand / CommandsAPICommand)
    * @param aliases     aliases to bind (e.g. "rtp", "wild")
    */
+  @Override
   default void registerCommands(Object rootCommand, String... aliases) {}
 
   /**
@@ -667,6 +695,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param commandLine full command string (e.g. "rtp world world_nether")
    * @return true if dispatched, false otherwise
    */
+  @Override
   default boolean executeCommand(UUID senderId, String commandLine) {
     return false;
   }
@@ -678,6 +707,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param lineConsumer consumer receiving each line of output
    * @return true if the command was successfully dispatched, false otherwise
    */
+  @Override
   default boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
     return false;
   }
@@ -688,6 +718,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param commandLine the command string to execute
    * @return CompletableFuture completing with captured output lines
    */
+  @Override
   default java.util.concurrent.CompletableFuture<List<String>> executeCommandWithCapture(String commandLine) {
     java.util.concurrent.CompletableFuture<List<String>> future = new java.util.concurrent.CompletableFuture<>();
     List<String> lines = new java.util.concurrent.CopyOnWriteArrayList<>();
@@ -712,6 +743,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param playerId player UUID
    * @return an unmodifiable set of scoreboard tags; empty if unknown or player offline
    */
+  @Override
   default Set<String> getScoreboardTags(UUID playerId) {
     return java.util.Collections.emptySet();
   }
@@ -723,6 +755,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param tag      the tag to add
    * @return true if added, false if already present or player offline
    */
+  @Override
   default boolean addScoreboardTag(UUID playerId, String tag) {
     return false;
   }
@@ -734,6 +767,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param tag      the tag to remove
    * @return true if removed, false if not present or player offline
    */
+  @Override
   default boolean removeScoreboardTag(UUID playerId, String tag) {
     return false;
   }
@@ -744,6 +778,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param objective the objective name
    * @param criteria  the objective criteria (defaults to "dummy" if null)
    */
+  @Override
   default void ensureScoreboardObjective(String objective, @Nullable String criteria) {}
 
   /**
@@ -753,6 +788,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param objective the objective name
    * @param score     the score value
    */
+  @Override
   default void setScoreboardScore(UUID playerId, String objective, int score) {}
 
   /**
@@ -761,6 +797,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param playerId  player UUID
    * @param objective objective name, or null to reset all
    */
+  @Override
   default void resetScoreboardScore(UUID playerId, @Nullable String objective) {}
 
   // ---------------------------------------------------------------------------
@@ -775,6 +812,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param centerZ  center Z coordinate
    * @param size     border diameter (width) in blocks
    */
+  @Override
   default void sendWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
     sendWorldBorder(playerId, centerX, centerZ, size, size, 0L);
   }
@@ -789,6 +827,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param newSize        target border diameter (width) in blocks
    * @param shrinkSeconds  duration in seconds to transition from oldSize to newSize (0 for instant)
    */
+  @Override
   default void sendWorldBorder(
       UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
     sendWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, 0.0, 0.0);
@@ -806,6 +845,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param damageAmount   damage per block outside buffer
    * @param damageBuffer   buffer distance in blocks before damage begins
    */
+  @Override
   default void sendWorldBorder(
       UUID playerId,
       double centerX,
@@ -822,6 +862,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param playerId player UUID
    * @param amount   amount of damage to apply
    */
+  @Override
   default void damagePlayer(UUID playerId, double amount) {}
 
   /**
@@ -829,6 +870,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    *
    * @param playerId player UUID whose world border is to be restored
    */
+  @Override
   default void resetWorldBorder(UUID playerId) {}
 
   // ---------------------------------------------------------------------------
@@ -846,6 +888,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param raw raw identifier from disk or config (e.g. "minecraft:stone", "stone")
    * @return canonical identifier for lookups, or null if raw is null
    */
+  @Override
   default String reconcilePaletteIdentifier(String raw) {
     return io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(raw);
   }
@@ -856,6 +899,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param raw collection of raw identifiers
    * @return unmodifiable set of canonical identifiers
    */
+  @Override
   default Set<String> reconcilePaletteIdentifiers(java.util.Collection<String> raw) {
     if (raw == null || raw.isEmpty()) return java.util.Collections.emptySet();
     Set<String> out = new java.util.LinkedHashSet<>(raw.size());
@@ -875,6 +919,7 @@ public interface RTPServerAccessor extends ServerAccessor {
    * @param reconciledUnsafe set of reconciled unsafe block identifiers
    * @return true if matches, false otherwise
    */
+  @Override
   default boolean matchesPaletteIdentifier(String rawPaletteId, Set<String> reconciledUnsafe) {
     if (reconciledUnsafe == null || reconciledUnsafe.isEmpty()) return false;
     String n = reconcilePaletteIdentifier(rawPaletteId);

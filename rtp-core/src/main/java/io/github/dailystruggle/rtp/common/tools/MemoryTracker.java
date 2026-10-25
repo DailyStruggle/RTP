@@ -217,7 +217,39 @@ public class MemoryTracker {
    * @param dataSizeString data size string
    */
   public static void setMemoryCeiling(String dataSizeString) {
-    memoryCeilingBytes = io.github.dailystruggle.rtp.common.selection.region.util.DataSizeParser.parseBytes(dataSizeString, -1L);
+    memoryCeilingBytes = parseDataSizeBytes(dataSizeString);
+  }
+
+  private static long parseDataSizeBytes(String input) {
+    if (input == null) return -1L;
+    String s = input.trim().replace(',', '.').toLowerCase(java.util.Locale.ROOT);
+    if (s.isEmpty()) return -1L;
+    if (s.equals("-1") || s.equals("infinite") || s.equals("unlimited") || s.equals("none")) {
+      return -1L;
+    }
+    int unitStart = s.length();
+    while (unitStart > 0 && Character.isLetter(s.charAt(unitStart - 1))) {
+      unitStart--;
+    }
+    double magnitude;
+    try {
+      magnitude = Double.parseDouble(s.substring(0, unitStart).trim());
+    } catch (NumberFormatException e) {
+      return -1L;
+    }
+    if (magnitude < 0) return -1L;
+    String suffix = s.substring(unitStart).trim();
+    double scale = switch (suffix) {
+      case "", "b", "byte", "bytes" -> 1.0;
+      case "kb", "kilobyte", "kilobytes" -> 1_000.0;
+      case "kib", "kibibyte", "kibibytes" -> 1_024.0;
+      case "mb", "megabyte", "megabytes" -> 1_000_000.0;
+      case "mib", "mebibyte", "mebibytes" -> 1_048_576.0;
+      case "gb", "gigabyte", "gigabytes" -> 1_000_000_000.0;
+      case "gib", "gibibyte", "gibibytes" -> 1_073_741_824.0;
+      default -> -1.0;
+    };
+    return scale < 0 ? -1L : Math.round(magnitude * scale);
   }
 
   /**

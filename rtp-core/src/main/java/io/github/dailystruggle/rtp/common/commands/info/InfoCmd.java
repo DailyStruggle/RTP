@@ -55,6 +55,51 @@ public class InfoCmd extends BaseRTPCmdImpl {
   }
 
   /**
+   * Formats per-region refill shares and distinct consumer counts for {@code /rtp info}
+   * (ADR-124 Section 5).
+   */
+  public static String formatRegionRefillShares(
+      io.github.dailystruggle.rtp.common.governor.GovernorSnapshot snapshot) {
+    if (snapshot == null || snapshot.regionRefillShares().isEmpty()) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder("&7Refill shares: &f");
+    boolean first = true;
+    for (Map.Entry<String, Double> e : snapshot.regionRefillShares().entrySet()) {
+      if (!first) sb.append("&7, &f");
+      first = false;
+      int nR = snapshot.regionDistinctConsumers().getOrDefault(e.getKey(), 1);
+      double planned = snapshot.wouldBeAttributedPlannedRates().getOrDefault(e.getKey(), 0.0);
+      sb.append(e.getKey())
+          .append(String.format(java.util.Locale.ROOT, " %.1f%% (n=%d, x=%.2f)",
+              e.getValue() * 100.0, nR, planned));
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Formats top consumers by attributed cost {@code a_p} (ms/min) for {@code /rtp info}
+   * (ADR-124 Section 5).
+   */
+  public static String formatTopConsumers(
+      io.github.dailystruggle.rtp.common.governor.GovernorSnapshot snapshot) {
+    if (snapshot == null || snapshot.topConsumers().isEmpty()) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder("&7Top consumers: &f");
+    List<io.github.dailystruggle.rtp.common.governor.ConsumerLedger.ConsumerCostEntry> top =
+        snapshot.topConsumers();
+    for (int i = 0; i < top.size(); i++) {
+      if (i > 0) sb.append("&7, &f");
+      io.github.dailystruggle.rtp.common.governor.ConsumerLedger.ConsumerCostEntry entry = top.get(i);
+      sb.append(entry.playerId())
+          .append(String.format(java.util.Locale.ROOT, " (%.2f ms/m)", entry.costMsPerMin()));
+    }
+    sb.append(String.format(java.util.Locale.ROOT, " &7[p99=%.2f ms/m]", snapshot.consumerCostP99Ms()));
+    return sb.toString();
+  }
+
+  /**
    * Routes a raw line to {@link RTP#messageTap} if one is installed for this
    * thread (book-mirroring path), or otherwise to {@link RTPRuntime#serverAccessor()}
    * for the normal chat path. When the tap is installed the line is run through
@@ -270,6 +315,16 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoGovernorSync.isEmpty()) emit(callerId, infoGovernorSync);
       if (!infoGovernorHotCap.isEmpty()) emit(callerId, infoGovernorHotCap);
       if (!infoGovernorGeneration.isEmpty()) emit(callerId, infoGovernorGeneration);
+      io.github.dailystruggle.rtp.common.governor.GovernorSnapshot govSnap =
+          io.github.dailystruggle.rtp.common.governor.ComputeGovernor.currentSnapshot();
+      if (govSnap != null && (govSnap.autoTune() || govSnap.observeOnly())) {
+        if (!govSnap.regionRefillShares().isEmpty()) {
+          emit(callerId, formatRegionRefillShares(govSnap));
+        }
+        if (!govSnap.topConsumers().isEmpty()) {
+          emit(callerId, formatTopConsumers(govSnap));
+        }
+      }
 
       // Folia aggregation - render the per-region table when the active
       // MetricsBinding publishes per-region detail (Folia).

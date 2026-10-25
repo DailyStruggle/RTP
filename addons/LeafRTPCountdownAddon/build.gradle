@@ -26,6 +26,9 @@ dependencies {
     // so the produced jar is discoverable via ServiceLoader on every RTP platform.
     compileOnly project(':rtp-api')
     compileOnly project(':rtp-core')
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
 }
 test {
     useJUnitPlatform()

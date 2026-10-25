@@ -15,20 +15,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Regression guard for ADR-003 + ADR-004: no class under
+ * Regression guard for ADR-003, ADR-004, and ADR-116: no class under
  * {@code io.github.dailystruggle.effectsapi.common.**} may reference any
- * platform-specific type ({@code org/bukkit/**} or {@code net/minecraft/**}).
+ * platform-specific or RTP-specific type ({@code org.bukkit.*},
+ * {@code net.minecraft.*}, or {@code io.github.dailystruggle.rtp.*}).
  *
- * <p>Implemented as a constant-pool scan against compiled {@code .class} files -
- * no ArchUnit dependency. The scan walks every UTF-8 entry in each class file's
- * constant pool (CONSTANT_Utf8 = tag 1) and fails if any references a forbidden
- * package prefix.
+ * <p>Implemented as both a bytecode constant-pool scan against compiled {@code .class}
+ * files and a source-import scan against {@code .java} files under
+ * {@code effectsapi/common/**}.
  */
 class EffectsApiCommonNoPlatformImportsTest {
 
     private static final String[] FORBIDDEN_PREFIXES = {
             "org/bukkit/",
-            "net/minecraft/"
+            "net/minecraft/",
+            "io/github/dailystruggle/rtp/"
+    };
+
+    private static final String[] FORBIDDEN_IMPORT_PREFIXES = {
+            "org.bukkit.",
+            "net.minecraft.",
+            "io.github.dailystruggle.rtp."
     };
 
     @Test
@@ -38,13 +45,6 @@ class EffectsApiCommonNoPlatformImportsTest {
 
         try (Stream<Path> walk = Files.walk(commonRoot)) {
             walk.filter(p -> p.toString().endsWith(".class"))
-                // The handle-SPI rework moved the concrete effect leaves into
-                // common/effects/*, and some (e.g. PotionEffect) intentionally
-                // carry a thin Bukkit dispatch path. The platform-free invariant
-                // therefore now applies to the common SPI surface (Effect,
-                // EffectFactory, common/spi/**) but not to the common/effects
-                // leaves, which are excluded from this scan.
-                .filter(p -> !p.toString().replace('\\', '/').contains("/common/effects/"))
                 .forEach(p -> {
                     try {
                         scanClassFile(p, commonRoot, violations);
@@ -55,7 +55,41 @@ class EffectsApiCommonNoPlatformImportsTest {
         }
 
         if (!violations.isEmpty()) {
-            fail("Platform imports leaked into effectsapi.common (ADR-003/ADR-004 violation):\n  - "
+            fail("Platform or RTP imports leaked into effectsapi.common (ADR-003/ADR-004/ADR-116 violation):\n  - "
+                    + String.join("\n  - ", violations));
+        }
+    }
+
+    @Test
+    void commonSourcesHaveNoPlatformOrRtpImports() throws IOException {
+        Path sourceRoot = Paths.get(System.getProperty("user.dir"))
+                .resolve("src/main/java/io/github/dailystruggle/effectsapi/common")
+                .toAbsolutePath()
+                .normalize();
+        assertTrue(Files.isDirectory(sourceRoot), "Could not locate effectsapi.common source root: " + sourceRoot);
+
+        List<String> violations = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(sourceRoot)) {
+            walk.filter(p -> p.toString().endsWith(".java"))
+                .forEach(p -> {
+                    try {
+                        for (String line : Files.readAllLines(p)) {
+                            String trimmed = line.trim();
+                            if (!trimmed.startsWith("import ")) continue;
+                            for (String forbidden : FORBIDDEN_IMPORT_PREFIXES) {
+                                if (trimmed.contains(forbidden)) {
+                                    violations.add(sourceRoot.relativize(p) + " -> " + trimmed);
+                                }
+                            }
+                        }
+                    } catch (IOException e) {
+                        fail("Failed to read " + p + ": " + e.getMessage());
+                    }
+                });
+        }
+
+        if (!violations.isEmpty()) {
+            fail("Forbidden import statements in effectsapi.common (ADR-116 violation):\n  - "
                     + String.join("\n  - ", violations));
         }
     }

@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.server.api.ServerAccessor;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -7,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 /**
  * Base {@link SchematicPaster} for Sponge {@code .schem} files (ADR-058).
@@ -49,17 +53,54 @@ public abstract class AbstractFileSchematicPaster implements SchematicPaster {
       // cause MUST be visible (S-004) - a silent null here is exactly the "no information around
       // its failure" gap. Log the real reason (bad magic, unsupported NBT tag, cell-count
       // mismatch, ...) via the API-level accessor when one is bound.
-      io.github.dailystruggle.rtp.api.server.RTPServerAccessor accessor =
-          io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor;
-      if (accessor != null) {
-        accessor.log(java.util.logging.Level.WARNING,
-            "[RTP] failed to decode schematic '"
-                + source.path()
-                + "' (" + source.formatHint() + "): "
-                + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
-      }
+      logIfPossible(
+          Level.WARNING,
+          "[RTP] failed to decode schematic '"
+              + source.path()
+              + "' ("
+              + source.formatHint()
+              + "): "
+              + e.getClass().getSimpleName()
+              + ": "
+              + e.getMessage(),
+          e);
       return CompletableFuture.completedFuture(null);
     }
+  }
+
+  /**
+   * Logs {@code message} at {@code level} via {@link ServerAccessors#get()}, falling back to
+   * {@link RTPAPI#serverAccessor} when no standalone server accessor is registered.
+   *
+   * @param level log level
+   * @param message message to log
+   */
+  protected static void logIfPossible(Level level, String message) {
+    ServerAccessor accessor = resolveAccessor();
+    if (accessor != null) {
+      accessor.log(level, message);
+    }
+  }
+
+  /**
+   * Logs {@code message} and {@code throwable} at {@code level} via {@link ServerAccessors#get()},
+   * falling back to {@link RTPAPI#serverAccessor} when no standalone server accessor is
+   * registered.
+   *
+   * @param level log level
+   * @param message message to log
+   * @param throwable exception cause
+   */
+  protected static void logIfPossible(Level level, String message, Throwable throwable) {
+    ServerAccessor accessor = resolveAccessor();
+    if (accessor != null) {
+      accessor.log(level, message, throwable);
+    }
+  }
+
+  private static ServerAccessor resolveAccessor() {
+    ServerAccessor accessor = ServerAccessors.get();
+    return accessor != null ? accessor : RTPAPI.serverAccessor;
   }
 
   /**

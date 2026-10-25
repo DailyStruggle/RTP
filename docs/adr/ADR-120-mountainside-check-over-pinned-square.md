@@ -1,6 +1,6 @@
 # ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-21
 **Extends:** [ADR-119](ADR-119-slope-detection-and-elevation-memory.md) (takes up its "most promising next step"), [ADR-016](ADR-016-anvil-subsystem.md) (one definition for probe and live). **Relates to:** [ADR-109](ADR-109-measured-cost-probe-first-gate.md), [ADR-110](ADR-110-purpose-gated-live-loads.md), [ADR-052](ADR-052-outcome-metrics-and-cause-tagged-bad-locations.md).
 

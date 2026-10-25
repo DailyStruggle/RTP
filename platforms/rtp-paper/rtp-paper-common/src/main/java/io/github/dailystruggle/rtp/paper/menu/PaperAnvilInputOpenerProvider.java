@@ -30,7 +30,9 @@ public final class PaperAnvilInputOpenerProvider implements AnvilInputOpenerProv
         try {
             Plugin plugin = JavaPlugin.getProvidingPlugin(PaperAnvilInputOpenerProvider.class);
             session.register(plugin);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAnvilInputDegraded(
+                    "PaperAnvilInputOpenerProvider#register", t);
             // Registration is best-effort: if the owning plugin cannot be
             // resolved the opener still functions for callers that do not
             // depend on its inventory event handlers; log and continue.

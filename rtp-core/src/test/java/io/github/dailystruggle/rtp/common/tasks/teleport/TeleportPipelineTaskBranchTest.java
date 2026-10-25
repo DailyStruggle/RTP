@@ -102,6 +102,14 @@ class TeleportPipelineTaskBranchTest {
 
         GenerationContext ctx = new GenerationContext(player, player, null);
         RTPCoords target = new RTPCoords(world.name(), 100, 70, 100);
+
+        // Turn on lockAfterUses & postTeleportQueueing to exercise those branches
+        long oldUses = TeleportPipelineTask.ConfigCache.lockAfterUses;
+        boolean oldPostQueue = TeleportPipelineTask.ConfigCache.postTeleportQueueing;
+        TeleportPipelineTask.ConfigCache.lockAfterUses = 5L;
+        TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000L;
+        TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
+
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target);
 
         TeleportData data = new TeleportData();
@@ -111,13 +119,6 @@ class TeleportPipelineTaskBranchTest {
 
         DeathTeleports.effectInFlight().add(pid);
         DeathTeleports.pending().put(pid, task);
-
-        // Turn on lockAfterUses & postTeleportQueueing to exercise those branches
-        long oldUses = TeleportPipelineTask.ConfigCache.lockAfterUses;
-        boolean oldPostQueue = TeleportPipelineTask.ConfigCache.postTeleportQueueing;
-        TeleportPipelineTask.ConfigCache.lockAfterUses = 5L;
-        TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000L;
-        TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
 
         try {
             task.completeDeathTeleport(true);
@@ -264,12 +265,6 @@ class TeleportPipelineTaskBranchTest {
         io.github.dailystruggle.rtp.api.world.ChunkReservation res =
                 new io.github.dailystruggle.rtp.api.world.ChunkReservation(set, world);
 
-        TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target, res);
-
-        TeleportData data = new TeleportData();
-        data.time = System.currentTimeMillis();
-        setField(task, "teleportData", data);
-
         boolean oldRespawn = TeleportPipelineTask.ConfigCache.setRespawnOnTeleport;
         long oldUses = TeleportPipelineTask.ConfigCache.lockAfterUses;
         boolean oldPostQueue = TeleportPipelineTask.ConfigCache.postTeleportQueueing;
@@ -278,6 +273,12 @@ class TeleportPipelineTaskBranchTest {
         TeleportPipelineTask.ConfigCache.lockAfterUses = 3L;
         TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 3600000L;
         TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
+
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target, res);
+
+        TeleportData data = new TeleportData();
+        data.time = System.currentTimeMillis();
+        setField(task, "teleportData", data);
 
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> cfg =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
@@ -308,6 +309,55 @@ class TeleportPipelineTaskBranchTest {
             if (cfg != null) {
                 cfg.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.setRespawnOnTeleport, oldRespawn);
             }
+        }
+    }
+
+    @Test
+    void testConfigCacheSnapshotIsolatesInFlightTeleportFromMidTeleportReload() throws Exception {
+        UUID pid = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(pid, "SnapshotPlayer", new RTPLocation(world, 0, 64, 0));
+        accessor.addPlayer(player);
+
+        String oldMessage = TeleportPipelineTask.ConfigCache.teleportMessage;
+        boolean oldRespawn = TeleportPipelineTask.ConfigCache.setRespawnOnTeleport;
+        try {
+            TeleportPipelineTask.ConfigCache.teleportMessage = "Generation-1 arrival";
+            TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
+
+            GenerationContext ctx = new GenerationContext(player, player, null);
+            RTPCoords target = new RTPCoords(world.name(), 120, 65, 120);
+            java.util.List<CompletableFuture<Long>> chunks = new ArrayList<>();
+            chunks.add(CompletableFuture.completedFuture(0L));
+            io.github.dailystruggle.rtp.api.world.ChunkSet set =
+                    new io.github.dailystruggle.rtp.api.world.ChunkSet(
+                            world, 120 >> 4, 120 >> 4, chunks, CompletableFuture.completedFuture(true));
+            io.github.dailystruggle.rtp.api.world.ChunkReservation res =
+                    new io.github.dailystruggle.rtp.api.world.ChunkReservation(set, world);
+
+            TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target, res);
+            TeleportData data = new TeleportData();
+            data.time = System.currentTimeMillis();
+            setField(task, "teleportData", data);
+
+            // Simulate /rtp reload mutating ConfigCache while the task is already in flight
+            TeleportPipelineTask.ConfigCache.teleportMessage = "Generation-2 arrival";
+            TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = false;
+
+            Method runTeleport = TeleportPipelineTask.class.getDeclaredMethod("runTeleport");
+            runTeleport.setAccessible(true);
+            runTeleport.invoke(task);
+
+            accessor.getMockScheduler().tick(1);
+            accessor.getMockScheduler().tick(1);
+
+            assertTrue(player.sentMessages.contains("Generation-1 arrival"),
+                    "In-flight teleport must use the ConfigCache snapshot captured at construction");
+            assertFalse(player.sentMessages.contains("Generation-2 arrival"));
+            assertNotNull(player.getRespawnLocation(),
+                    "In-flight teleport must honor setRespawnOnTeleport from its construction snapshot");
+        } finally {
+            TeleportPipelineTask.ConfigCache.teleportMessage = oldMessage;
+            TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = oldRespawn;
         }
     }
 

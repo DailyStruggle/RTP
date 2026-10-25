@@ -1,14 +1,19 @@
 # --- RTP Region Configuration ---
 # Documentation: docs/admin/configuration/REGIONS.md
 
-# Target world name (e.g. "world", "world_nether").
-# "[0]" = main world, "[1]" = 2nd loaded world, etc.
+# Target world for this region (e.g. "world", "world_nether", "world_the_end").
+# "[0]" = main overworld. Do NOT change default.yml to "world_nether" unless you want ALL
+# worlds to send players to the nether; instead create a new region (e.g. definitions/regions/nether.yml
+# with world: "world_nether", vert.maxY: 120, vert.requireSkyLight: false) and map it in
+# definitions/worlds/world_nether.yml (region: "nether") via /rtp editor, /rtp admin setup, or config.
 # @type: enum
 # @source: world
 world: "[0]"
 
-# Use the world's /worldborder as the bound instead of the shape below. When true, the
-# whole shape is replaced and radius/centerRadius/centerX/centerZ are ignored.
+# Not generally recommended: when true, replaces the whole shape block with a square matching
+# the vanilla /worldborder and ignores shape, radius, centerRadius, centerX, and centerZ.
+# Prefer setting shape.radius with a distance unit suffix (e.g. shape.radius: 2500b or 5km) in
+# /rtp editor or definitions/regions/<region>.yml so you keep your shape and inner centerRadius hole.
 worldBorderOverride: false
 
 # Spawn area shape and size.
@@ -19,29 +24,30 @@ worldBorderOverride: false
 # radius is the outer edge (nobody lands past it), centerRadius is the inner edge / donut hole
 # (nobody lands inside it), and centerRadius must stay below radius or there is no land left to pick from.
 #
-# The teleport radius can be set in two places; pick ONE:
-#   1. Shared default (most servers): edit `defaults.shape.radius` in config.yml.
-#      Leaving the value below as "@config" inherits that whole `defaults.shape`
-#      block, so a single-world server sets radius/centerRadius once, there.
-#   2. Per-region override (this region only): replace "@config" with an inline
-#      `shape:` block here. An inline block wins over the config.yml default.
+# Recommended ways to configure your region shape and radius:
+#   1. Visual browser workspace: run `/rtp editor` to drag region borders on the map and edit settings.
+#   2. Guided setup or command: run `/rtp admin setup` or `/rtp config regions default shape.radius=5km`.
+#   3. Region file (`definitions/regions/<region>.yml`): replace "@config" with an inline `shape:` block
+#      (or edit the starter fallback `defaults.shape` in config.yml).
 #
-# See docs/admin/configuration/CORE_CONFIG.md
-# Example per-region override (mirrors the defaults.shape block in config.yml):
+# See docs/admin/configuration/REGIONS.md and docs/admin/WEB_EDITOR_GUIDE.md
+# Example inline shape block:
 #   shape:
 #     name: "CIRCLE"
 #     mode: "REROLL"
-#     radius: 256
-#     centerRadius: 64
+#     radius: 4096b
+#     centerRadius: 1024b
 shape: "@config"
 
-# Vertical landing window. "@config" inherits the whole `defaults.vert` block from
-# config.yml. See docs/admin/configuration/CORE_CONFIG.md
-# Replace with an inline block to override per-region, e.g.:
+# Vertical landing window (minY, maxY, requireSkyLight, maxHillAngle). Configure in `/rtp editor`,
+# `/rtp config regions default vert.<key>=<value>`, or replace "@config" with an inline `vert:` block
+# here ("@config" inherits the starter fallback `defaults.vert` from config.yml).
+# See docs/admin/configuration/REGIONS.md
+# Replace with an inline block to override per-region (e.g. for Nether or cave worlds):
 #   vert:
 #     name: "LINEAR"
 #     minY: 32
-#     maxY: 128
+#     maxY: 120
 #     direction: 2
 #     requireSkyLight: false
 #     # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.

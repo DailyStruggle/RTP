@@ -123,7 +123,8 @@ DIRECT = lc.DIRECT
 # Namespaced (from each jar's plugin.yml) so a stray jar can never answer for another.
 DEFAULT_CMDS = {DIRECT: "rtpstress tp {self}", "rtp": "rtp:rtp", "betterrtp": "betterrtp:rtp",
                 "huskhomes": "huskhomes:rtp", "justrtp": "justrtp:justrtp", "jakesrtp": "jakesrtp:rtp",
-                "ezrtp": "ezrtp:rtp"}
+                "ezrtp": "ezrtp:rtp", "advancedrtp": "advancedrtp:rtp", "asyrtp": "asyrtp:rtp",
+                "sorekillrtp": "sorekillrtp:rtp"}
 FALLBACK_CMD = "rtp"
 
 # Generator actions; rejoin_same / rejoin_new become {"a":"rejoin","rename":bool}.
@@ -929,11 +930,11 @@ def significant(coef: float, ci, z: float) -> bool:
 
 
 def flag_features(fit: dict, control: dict | None, classes_tested: int = 0) -> list[dict]:
-    """Features whose interval excludes 0 for the target while the control's
-    interval for the same count and feature does not, sorted by |coef|/noise.
-    A count missing from the control fit counts as unflagged there. Class
-    counts need the Bonferroni z over classes_tested x features: with
-    thousands of classes, a 95 % interval excludes 0 somewhere by chance."""
+    """Features whose interval excludes 0 upwards for the target while the
+    control's interval for the same count and feature does not, sorted by
+    coef/noise. A count missing from the control fit counts as unflagged
+    there. Class counts need the Bonferroni z over classes_tested x features:
+    with thousands of classes, a 95 % interval excludes 0 somewhere by chance."""
     out = []
     zc = bonferroni_z(max(1, classes_tested) * len(FIT_FEATURES))
     for c, fc in fit.items():
@@ -941,12 +942,16 @@ def flag_features(fit: dict, control: dict | None, classes_tested: int = 0) -> l
             continue
         cc = (control or {}).get(c) or {}
         for k in FIT_FEATURES:
-            hit = (significant(fc["coef"][k], fc["ci"].get(k), zc) if c.startswith(CLS)
+            coef = fc["coef"][k]
+            if coef <= 0:
+                continue
+            hit = (significant(coef, fc["ci"].get(k), zc) if c.startswith(CLS)
                    else excludes_zero(fc["ci"].get(k)))
-            if hit and not excludes_zero((cc.get("ci") or {}).get(k)):
-                out.append({"count": c, "feature": k, "coef": fc["coef"][k], "ci": fc["ci"][k],
+            cci = (cc.get("ci") or {}).get(k)
+            if hit and not (bool(cci) and cci[0] > 0):
+                out.append({"count": c, "feature": k, "coef": coef, "ci": fc["ci"][k],
                             "control_coef": (cc.get("coef") or {}).get(k), "n": fc["n"]})
-    out.sort(key=lambda d: (-abs(d["coef"]) / fit[d["count"]]["noise"], d["count"], d["feature"]))
+    out.sort(key=lambda d: (-d["coef"] / fit[d["count"]]["noise"], d["count"], d["feature"]))
     return out
 
 
@@ -1739,10 +1744,18 @@ class PermissionGrant:
 PLUGIN_PACKAGES = {
     "io.github.dailystruggle.rtp": "LeafRTP",
     "com.betterrtp": "BetterRTP",
+    "me.SuperRonanCraft.BetterRTP": "BetterRTP",
     "me.jake.jakesrtp": "JakesRTP",
+    "biz.donvi.jakesRTP": "JakesRTP",
     "net.william278.huskhomes": "HuskHomes",
     "me.apick.ezrtp": "EzRTP",
+    "com.skyblockexp.ezrtp": "EzRTP",
+    "me.nik.ezrtp": "EzRTP",
     "com.justrtp": "JustRTP",
+    "eu.kotori.justRTP": "JustRTP",
+    "com.ervan27.advancedrtp": "AdvancedRTP",
+    "asygames.asyrtp": "AsyRTP",
+    "net.chumbucket.sorekillrtp": "SorekillRTP",
     "net.luckperms": "LuckPerms",
 }
 
@@ -2225,9 +2238,15 @@ class Swarm:
 
 
 def swarm_bot_cap(a) -> int:
-    """Bots per episode the swarm accepts: micro episodes (--max-bots) and every
-    ladder rung; a lower cap rejects the rung and the verdict goes INCONCLUSIVE."""
-    return max([a.max_bots, 8] + [b for b, _ in parse_rungs(a.rungs)])
+    """Bots per episode the swarm accepts: micro episodes (--max-bots), survival
+    ramp (--target-players / --ramp-rungs), and every ladder rung."""
+    target_players = int(getattr(a, "target_players", 0) or 0)
+    ramp_rungs_raw = getattr(a, "ramp_rungs", None)
+    ramp_max = max(
+        [int(x) for x in str(ramp_rungs_raw or "").split(",") if x.strip().isdigit()],
+        default=0,
+    )
+    return max([a.max_bots, 8, target_players, ramp_max] + [b for b, _ in parse_rungs(a.rungs)])
 
 
 def swarm_argv(a, mc_port: int) -> list[str]:
@@ -3161,7 +3180,7 @@ class TargetRun:
                 nets.append(float(r["deltas"].get(count, 0) or 0) - predict(rc, f))
                 p = predict(fc, f) - predict(rc, f) if fc and rc is not fc else 0.0
                 preds.append(p if p > 0 else c["net0"] * bots_n / max(1, c["bots0"]))
-                heaps.append(float(r["deltas"].get(HEAP, 0) or 0) - predict(hc, f))
+                heaps.append(float(r["deltas"].get(HEAP, 0) or 0) - max(0.0, predict(hc, f)))
             if self.over_heap():
                 stopped = True
                 break
@@ -3424,7 +3443,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cem-alpha", type=float, default=0.7, help="CEM smoothing: weight of the new elite fit")
     p.add_argument("--stall-gens", type=int, default=3, help="generations without a new best before a restart")
     p.add_argument("--ridge-lam", type=float, default=1.0, help="ridge penalty of the per-count fit")
-    p.add_argument("--shrink", type=int, default=2,
+    p.add_argument("--shrink", type=int, default=3,
                    help="shrink this many candidates (reproduced surprises, then flagged episodes) per seed")
     p.add_argument("--shrink-n", type=int, default=3, help="replays per shrink candidate")
     p.add_argument("--shrink-k", type=int, default=2, help="replays that must reproduce the count")
@@ -3486,6 +3505,21 @@ def build_parser() -> argparse.ArgumentParser:
                    help="stall threshold in ms (rejected in --mode server passive local audit)")
     p.add_argument("--default-budget-share", type=float, default=None,
                    help="default-tier bandit share (rejected in --mode server passive local audit)")
+    p.add_argument("--active", action="store_true",
+                   help="enable live active discovery fuzzing in --mode server (ADR-125)")
+    p.add_argument("--ssh", default=None,
+                   help="remote SSH target ([user@]host, e.g. bamboo) for jcmd in --mode server --active")
+    p.add_argument("--remote-server-dir", default=None,
+                   help="server directory path on --ssh host when different from local --server-dir mount")
+    p.add_argument("--baseline-episodes", type=int, default=None,
+                   help="idle baseline episodes before active exploration in --mode server --active (default 4)")
+    p.add_argument("--target-players", type=int, default=None,
+                   help="progressive player-concurrency survival target (e.g. 100) in --mode server --active")
+    p.add_argument("--ramp-rungs", default=None,
+                   help="comma-separated concurrency rungs (e.g. '10,25,50,75,100') for --mode server --active")
+    p.add_argument("--isolate-targets", default=None,
+                   help="comma-separated RTP plugin labels (e.g. 'rtp,justrtp,ezrtp,jakesrtp,huskhomes,advancedrtp,asyrtp') "
+                        "to benchmark one at a time in --mode server --active")
     p.add_argument("--promote-max", type=int, default=4,
                    help="faults: leak re-runs per generation for episodes that reached new probes or signatures")
     p.add_argument("--top-classes", type=int, default=0, help="per-class deltas kept per episode (0 = all)")

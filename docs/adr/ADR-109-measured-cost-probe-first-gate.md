@@ -1,6 +1,6 @@
 # ADR-109 - Measured-Cost Probe-First Gate
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-08
 **Extends:** [ADR-016](ADR-016-anvil-subsystem.md) (Anvil read-only subsystem; center-column probe stage)
 **Related:** [ADR-087](ADR-087-adaptive-compute-governor.md) (shared `common.predict` stochastic foundation), [ADR-110](ADR-110-purpose-gated-live-loads.md) (on speculative fill, native-load time is excluded from this governor's samples), [ADR-114](ADR-114-cost-governed-on-demand-chunk-reads.md) (shared `ComparativeCostGovernor` and `common.predict` estimators)

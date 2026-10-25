@@ -68,4 +68,24 @@ class BernoulliEstimatorTest {
         assertTrue(estimator.rate() >= 0.0);
         assertTrue(estimator.rate() < 0.05);
     }
+
+    @Test
+    @DisplayName("Mean, effectiveSampleCount, and reset preserve unsampled NaN and prior semantics")
+    void meanEffectiveSampleCountAndReset() {
+        BernoulliEstimator est = BernoulliEstimator.ofWindow(32);
+        assertTrue(Double.isNaN(est.mean()));
+        assertEquals(0.0, est.rate(), 1e-9);
+        assertEquals(0.0, est.effectiveSampleCount(), 1e-9);
+        assertEquals(32, est.windowSize());
+
+        for (int i = 0; i < 40; i++) {
+            est.recordOutcome(i % 2 == 0);
+        }
+        assertEquals(32.0, est.effectiveSampleCount(), 1e-9);
+        assertFalse(Double.isNaN(est.mean()));
+
+        est.reset();
+        assertTrue(Double.isNaN(est.mean()));
+        assertEquals(0L, est.sampleCount());
+    }
 }

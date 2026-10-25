@@ -58,6 +58,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Deprecation and API evolution policy | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) |
 | Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/configuration/CONFIGURATION.md), [REGIONS.md](../admin/configuration/REGIONS.md), [CORE_CONFIG.md](../admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../admin/configuration/PERFORMANCE.md), [ECONOMY.md](../admin/configuration/ECONOMY.md), [SAFETY.md](../admin/configuration/SAFETY.md), [ACTIONS.md](../admin/ACTIONS.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
+| Build a standalone multi-platform plugin or mod on the `api/*` SDK | [`../FOR_PLUGIN_AUTHORS.md`](../FOR_PLUGIN_AUTHORS.md); SDK catalog [`../../api/README.md`](../../api/README.md) |
 | Build a destination menu / GUI on `rtp-api` | [`ADDON_MENUS.md`](ADDON_MENUS.md) |
 | Offer remote (network-mode) destinations from an addon | [`ADDON_CROSS_SERVER.md`](ADDON_CROSS_SERVER.md) |
 | How to load / deploy an addon (ServiceLoader, classpath, lifecycle) | [`ADDON_LOADING.md`](ADDON_LOADING.md) (ADR-057) |
@@ -67,6 +68,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Failure detection and responses | [`HAZARDS.md#failure-modes`](HAZARDS.md#failure-modes) |
 | External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) (ADR-026) |
 | Player archetypes, utility functions & valuation weights | [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) |
+| Discord `#support` Forum bot design (corpus retrieval, prompt-injection bottleneck, dual NMT, causal reasoning) | [`DISCORD_SUPPORT_BOT_DESIGN.md`](DISCORD_SUPPORT_BOT_DESIGN.md) |
 | How and why AI tooling is used in this repository | [`AI_USAGE.md`](AI_USAGE.md) |
 
 ## Normative (read before writing code)

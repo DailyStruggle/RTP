@@ -150,6 +150,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
     private final ConcurrentHashMap<RegionKey, RegionProbe> probes = new ConcurrentHashMap<>();
     private final RegionTimers timers;
+    private volatile EntitySchedulerSampler entitySampler;
 
     private final LongSupplier nanoClock;
     private final IntSupplier playerCount;
@@ -412,6 +413,32 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
     @Override
     public boolean regionalTicking() { return true; }
+
+    public void setEntitySchedulerSampler(EntitySchedulerSampler sampler) {
+        this.entitySampler = sampler;
+    }
+
+    public EntitySchedulerSampler entitySchedulerSampler() {
+        return this.entitySampler;
+    }
+
+    @Override
+    public int regionSampledPlayers(UUID worldId, int chunkX, int chunkZ) {
+        EntitySchedulerSampler s = this.entitySampler;
+        return (s != null) ? s.sampledPopulation(worldId, chunkX, chunkZ) : -1;
+    }
+
+    @Override
+    public boolean regionSamplerBreached(UUID worldId, int chunkX, int chunkZ) {
+        EntitySchedulerSampler s = this.entitySampler;
+        return s != null && s.isCellBreached(worldId, chunkX, chunkZ);
+    }
+
+    @Override
+    public long regionSamplerOverrunsTotal() {
+        EntitySchedulerSampler s = this.entitySampler;
+        return (s != null) ? s.overrunsTotal() : 0L;
+    }
 
     /** 1m TPS of the region owning the chunk; UNSAMPLED when that region has no live sampler. */
     @Override

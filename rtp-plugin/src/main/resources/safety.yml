@@ -1,7 +1,7 @@
 # --- RTP Safety Configuration ---
 # Documentation: docs/admin/configuration/SAFETY.md
 
-# Seconds you can't be hurt after teleporting. 0 = off.
+# Seconds you can't be hurt after teleporting (post-teleport invulnerability / godmode immunity preventing fall damage, fire, or drowning). 0 = off.
 # Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
@@ -16,7 +16,7 @@ invulnerabilityTime: 5
 # @default: 0
 safetyRadius: 0
 
-# Size of the safety platform built under you. -1 = off.
+# Size of the safety platform built under you to prevent fall damage or landing in water/lava. -1 = off.
 # @type: integer
 # @range: [-1, null]
 # @unit: blocks

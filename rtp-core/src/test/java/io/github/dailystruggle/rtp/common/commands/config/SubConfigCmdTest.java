@@ -37,7 +37,7 @@ public class SubConfigCmdTest {
     private ConfigParser<PerformanceKeys> performanceConfig;
     private EnumMap<PerformanceKeys, Object> performanceData;
     private ConfigParser lang;
-    private io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase mockDb;
+    private io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -46,8 +46,8 @@ public class SubConfigCmdTest {
 
         Configs configs = ActiveConfigs.get();
 
-        mockDb = mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class.getDeclaredField("cachedLookup");
+        mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
+        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class.getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));
 

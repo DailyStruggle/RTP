@@ -120,6 +120,36 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     public int failures() {
       return missingMethod.size() + errors.size();
     }
+
+    public int resolved() {
+      return ok.size();
+    }
+
+    public int applicable() {
+      return ok.size() + missingMethod.size() + missingOptional.size() + errors.size();
+    }
+
+    public double coverageRatio() {
+      int app = applicable();
+      return app <= 0 ? 0.0 : (double) resolved() / app;
+    }
+
+    public String summary() {
+      return "[RTP test/api-compat] ok="
+          + ok.size()
+          + " skipped="
+          + skipped.size()
+          + " missing-method="
+          + missingMethod.size()
+          + " missing-optional="
+          + missingOptional.size()
+          + " errors="
+          + errors.size()
+          + " resolved="
+          + resolved()
+          + "/"
+          + applicable();
+    }
   }
 
   public TestApiCompatCmd(@Nullable CommandsAPICommand parent) {
@@ -153,17 +183,7 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     BitResult bitResult =
         RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(report)), Runnable::run);
 
-    String summary =
-        "[RTP test/api-compat] ok="
-            + report.ok.size()
-            + " skipped="
-            + report.skipped.size()
-            + " missing-method="
-            + report.missingMethod.size()
-            + " missing-optional="
-            + report.missingOptional.size()
-            + " errors="
-            + report.errors.size();
+    String summary = report.summary();
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
       RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }

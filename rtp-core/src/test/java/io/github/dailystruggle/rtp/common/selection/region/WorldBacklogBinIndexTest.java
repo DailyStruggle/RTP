@@ -154,4 +154,49 @@ class WorldBacklogBinIndexTest {
     assertEquals(0, idx.reapStale());
     assertEquals(2, idx.size());
   }
+
+  @Test
+  @DisplayName("ADR-028: clearing or draining a region's BacklogLocationBuffer detaches entries from shared WorldBacklogBinIndex and clears ownerOnReject")
+  void bufferClearAndDrainDetachFromSharedBinIndexAndClearOwnerSink() {
+    WorldBacklogBinIndex idx = new WorldBacklogBinIndex();
+    BacklogLocationBuffer regionOld = new BacklogLocationBuffer(4);
+    BacklogLocationBuffer regionNew = new BacklogLocationBuffer(4);
+
+    Object sentinelOwner = new Object();
+    java.lang.ref.WeakReference<Object> ownerRef = new java.lang.ref.WeakReference<>(sentinelOwner);
+
+    BacklogEntry old0 = regionOld.offerUnverified(loc(10, 20));
+    BacklogEntry old1 = regionOld.offerUnverified(loc(30, 40));
+    RegionFileCoord key = RegionFileCoord.of(old0.location().coords());
+    // Capture sentinelOwner in ownerOnReject lambda (simulating Region::onBacklogReject).
+    final Object capturedOwner = sentinelOwner;
+    old0.setOwnerOnReject(e -> {
+      if (capturedOwner.hashCode() == 0) e.setValidity(Validity.INVALIDATED);
+    });
+    old1.setOwnerOnReject(e -> {
+      if (capturedOwner.hashCode() == 0) e.setValidity(Validity.INVALIDATED);
+    });
+    idx.insert(key, old0);
+    idx.insert(key, old1);
+
+    // Replacement region stages an entry into the same bin BEFORE GC runs (reload scenario).
+    BacklogEntry new0 = regionNew.offerUnverified(loc(50, 60));
+    idx.insert(key, new0);
+    assertEquals(3, idx.snapshot(key).size());
+
+    // Old region drains one entry and then clears on shutdown.
+    old0.setValidity(Validity.VALIDATED);
+    List<BacklogEntry> drained = regionOld.pollContiguousValidatedHead(1);
+    assertEquals(1, drained.size());
+    assertEquals(null, old0.ownerOnReject(), "polled entry must clear ownerOnReject");
+    assertEquals(2, idx.snapshot(key).size(), "polled entry must be removed from shared bin list");
+
+    regionOld.clear();
+    assertEquals(null, old1.ownerOnReject(), "cleared entry must clear ownerOnReject");
+    List<BacklogEntry> remainingInBin = idx.snapshot(key);
+    assertEquals(1, remainingInBin.size(),
+        "clear() must remove old region's entries from shared WorldBacklogBinIndex bin list even while new region pins the bin");
+    assertSame(new0, remainingInBin.get(0));
+    assertFalse(ownerRef.get() == null && capturedOwner == null);
+  }
 }

@@ -1,6 +1,6 @@
 # ADR-038 — `/rtp admin setup` & Setup Wizards (Book-Menu & Console-Driven, Recipe & Prefab Chaining)
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-13 (Amended: 2026-09-24)
 **Target release:** `3.0.0-beta.4`
 

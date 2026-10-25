@@ -103,4 +103,47 @@ class EwmaLinearFitTest {
         assertTrue(seAtMean > 0.0);
         assertTrue(seFar > seAtMean, "Extrapolating away from meanX must increase standard error squared");
     }
+
+    @Test
+    @DisplayName("WindowedOlsSlope: Enforces exclusion window, minimum sample count, relative X range, and slope clamping")
+    void windowedOlsSlope_enforcesWindowExclusionRangeAndClamping() {
+        long sec = 1_000_000_000L;
+        double prior = 256.0 * 1024.0;
+        EwmaLinearFit.WindowedOlsSlope ols = new EwmaLinearFit.WindowedOlsSlope(
+                600 * sec, 60 * sec, 20, 0.25, prior, prior, 4.0 * prior);
+
+        assertEquals(prior, ols.estimate(), 1e-6);
+        assertEquals(prior, ols.priorSlope(), 1e-6);
+
+        // Exclusion window ignores samples within 60 s of event
+        ols.recordExclusionEvent(10 * sec);
+        for (int i = 0; i < 25; i++) {
+            double est = ols.recordSample(10 + i * 5, (10 + i * 5) * prior * 2.0, (20 + i) * sec);
+            assertEquals(prior, est, 1e-6);
+        }
+        assertEquals(0, ols.windowSampleCount());
+
+        // Unvaried X (< 25% range) retains prior
+        for (int i = 0; i < 25; i++) {
+            double est = ols.recordSample(100, 100 * prior * 2.5, (100 + i) * sec);
+            assertEquals(prior, est, 1e-6);
+        }
+
+        // Identified linear slope 2.5 * prior within [prior, 4 * prior]
+        ols.reset();
+        for (int i = 0; i < 25; i++) {
+            int tickets = 20 + i * 10;
+            double bytes = 50_000_000.0 + tickets * (2.5 * prior);
+            ols.recordSample(tickets, bytes, i * sec);
+        }
+        assertEquals(2.5 * prior, ols.estimate(), 1e-3);
+
+        // Steep slope clamps to maxSlope (4 * prior)
+        ols.reset();
+        for (int i = 0; i < 25; i++) {
+            int tickets = 20 + i * 10;
+            ols.recordSample(tickets, tickets * (10.0 * prior), i * sec);
+        }
+        assertEquals(4.0 * prior, ols.estimate(), 1e-6);
+    }
 }

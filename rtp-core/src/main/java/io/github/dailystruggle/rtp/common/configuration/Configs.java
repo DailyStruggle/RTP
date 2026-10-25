@@ -17,12 +17,16 @@ import io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
-import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache;
+import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 
 /** Main configuration manager for RTP */
@@ -32,11 +36,34 @@ public class Configs {
   /** Task, teleport and region steps of a reload; installed by the composition root (ADR-115). */
   private static volatile ConfigReloadLifecycle reloadLifecycle = ConfigReloadLifecycle.NONE;
 
+  private static final Predicate<String> WORLD_DYNAMIC_PARSER_PREDICATE =
+      worldName ->
+          RTPRuntime.serverAccessor() != null
+              && RTPRuntime.serverAccessor().getRTPWorld(worldName) != null;
+
+  static {
+    ConfigParser.setDefaultReferenceResolver(ConfigDefaultResolver::resolve);
+    ConfigParser.setSectionFactoryResolver(Configs::resolveSectionFactoryValue);
+    MultiConfigParser.setDefaultCanCreateDynamicParser(WORLD_DYNAMIC_PARSER_PREDICATE);
+  }
+
+  private static Object resolveSectionFactoryValue(String sectionName, String valueName) {
+    if ("shape".equals(sectionName)) {
+      Factory<?> shapeFactory = FactoryRegistry.get(FactoryNames.shape);
+      return shapeFactory != null ? shapeFactory.getOrDefault(valueName) : null;
+    }
+    if ("vert".equals(sectionName)) {
+      Factory<?> vertFactory = FactoryRegistry.get(FactoryNames.vert);
+      return vertFactory != null ? vertFactory.getOrDefault(valueName) : null;
+    }
+    return null;
+  }
+
   /** The plugin directory */
   public final File pluginDirectory;
 
   /** The file database */
-  public final YamlFileDatabase fileDatabase;
+  public final YamlFileCache fileDatabase;
 
   /** Map of configuration parsers */
   public Map<Class<?>, ConfigParser<?>> configParserMap = new ConcurrentHashMap<>();
@@ -55,7 +82,7 @@ public class Configs {
   public Configs(File pluginDirectory) {
     ActiveConfigs.set(this);
     this.pluginDirectory = pluginDirectory;
-    this.fileDatabase = new YamlFileDatabase(pluginDirectory);
+    this.fileDatabase = new YamlFileCache(pluginDirectory);
     this.fileDatabase.connect();
     //        this.fileDatabase.disconnect( connect );
   }
@@ -820,7 +847,8 @@ public class Configs {
     RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser definitions/worlds/*.yml");
     migrateLegacyMultiDir("worlds", "definitions/worlds");
     MultiConfigParser<WorldKeys> worlds =
-            new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory, "definitions/worlds", locale);
+          new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory, "definitions/worlds", locale);
+      worlds.setCanCreateDynamicParser(WORLD_DYNAMIC_PARSER_PREDICATE);
     newMultiConfigParserMap.put(WorldKeys.class, worlds);
 
     // effects-api-ADR-005: declarative effect groups under <pluginDir>/effects/<group>.yml.

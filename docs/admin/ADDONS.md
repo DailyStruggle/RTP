@@ -66,9 +66,9 @@ permanent opt-outs:
 1. **Delete the extracted jar** from `plugins/RTP/addons/` (and restart). The folder now
    exists, so RTP will not re-extract it - it stays gone.
 2. **Configure it off.** Most addons create their own config under `plugins/RTP/`. For the
-   GUI picker, the relevant knob lives in its config file (see the GUI addon's README);
-   setting the menu style back to classic makes bare `/rtp` teleport immediately again
-   without removing the addon.
+   GUI picker (`plugins/RTP/addons/guimenu.yml`), setting `openOnBareRtp: false` (and running
+   `/rtp reload`) disables opening the GUI/book menu on bare `/rtp` so bare `/rtp` teleports
+   immediately again while keeping `/rtp gui` and `/rtp menu` available.
 
 Deleting the entire `addons/` folder is **not** a reliable off switch for bundled addons:
 on the next start the folder is missing again, so RTP treats it as a fresh install and
@@ -88,8 +88,8 @@ gets the visual menu immediately.
   renderer is available (e.g. wrong platform) or the caller is not a resolvable player -
   it never silently does nothing.
 - **Custom items & at-a-glance status**: Destination and filler icons in `guimenu.yml` support custom items from ItemsAdder (`ia:<id>`), Oraxen (`oraxen:<id>`), Nexo (`nexo:<id>`), HeadDatabase (`hdb:<id>`), Base64 heads, and CustomModelData (`MATERIAL:CMD`). Blocked destinations swap to barrier blocks (`barrierOnUnavailable: true`), and hover tooltips render configurable duration and state placeholders. Third-party proprietary plugin compatibility is maintained on a best-effort basis (see [Custom Item & Menu Icon Integration](CUSTOM_ITEMS.md)).
-- To revert bare `/rtp` to the classic immediate teleport while keeping the addon, change
-  the menu style in the GUI addon's config (see the GUI addon's README).
+- To revert bare `/rtp` to the classic immediate teleport while keeping the addon, set
+  `openOnBareRtp: false` in `plugins/RTP/addons/guimenu.yml` (or adjust `menuStyle`) and run `/rtp reload`.
 - To remove the GUI entirely, delete its jar from `plugins/RTP/addons/` and restart.
 
 ---

@@ -38,10 +38,16 @@ DEFAULT_TARGETS = "rtp,betterrtp,huskhomes,justrtp,jakesrtp,ezrtp"
 # only the target's jar is enabled; the rest are renamed *.jar.off while the
 # server is down, so no competitor's background work (pre-caches, queues) runs
 # during another plugin's ramp.
-DEFAULT_JARS = "rtp=LeafRTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=justRTP,jakesrtp=JakesRTP,ezrtp=EzRTP"
+DEFAULT_JARS = (
+    "rtp=LeafRTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=justRTP,"
+    "jakesrtp=JakesRTP,ezrtp=EzRTP,advancedrtp=AdvancedRTP,asyrtp=asyrtp,sorekillrtp=SorekillRTP"
+)
 # target label -> plugin name as listed by the server's `plugins` command; checked after
 # every restart so a ramp never runs against the wrong plugin set.
-DEFAULT_NAMES = "rtp=RTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=JustRTP,jakesrtp=JakesRTP,ezrtp=EzRTP"
+DEFAULT_NAMES = (
+    "rtp=RTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=JustRTP,"
+    "jakesrtp=JakesRTP,ezrtp=EzRTP,advancedrtp=AdvancedRTP,asyrtp=AsyRTP,sorekillrtp=SorekillRTP"
+)
 OFF_SUFFIX = ".off"
 # Ladder first: it yields the stress point; flat 100 is the headline comparison.
 DEFAULT_ROUNDS = ["5,10,20,40,80,160,320@60", "100@120"]

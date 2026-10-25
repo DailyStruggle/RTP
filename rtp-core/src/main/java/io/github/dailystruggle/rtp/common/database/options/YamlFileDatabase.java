@@ -15,8 +15,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -24,18 +26,17 @@ import org.jetbrains.annotations.NotNull;
  * {@code io.github.dailystruggle.rtp.common.configuration.yaml} substrate (per
  * ADR-025). The substrate is comment-preserving and zero-dep.
  */
-public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig>> {
+public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig>>
+    implements ConfigParser.FileCacheProvider {
+  private final YamlFileCache fileCache;
+
   /** container for map reference access, such set() will propagate changes where == would not */
-  public final AtomicReference<Map<String, RtpYamlConfig>> cachedLookup = new AtomicReference<>();
+  public final AtomicReference<Map<String, RtpYamlConfig>> cachedLookup;
 
-  public final AtomicReference<Map<String, Long>> cachedLookupLastModified =
-      new AtomicReference<>();
+  public final AtomicReference<Map<String, Long>> cachedLookupLastModified;
+  /** Last parse error message recorded per file name when {@link #connect()} fails to load a file. */
+  public final Map<String, String> lastParseErrors;
   private final File directory;
-
-  {
-    cachedLookup.set(new ConcurrentHashMap<>());
-    cachedLookupLastModified.set(new ConcurrentHashMap<>());
-  }
 
   /**
    * constructor
@@ -44,6 +45,24 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
    */
   public YamlFileDatabase(File directory) {
     this.directory = directory;
+    this.fileCache = new YamlFileCache(directory);
+    this.cachedLookup = this.fileCache.cachedLookup;
+    this.cachedLookupLastModified = this.fileCache.cachedLookupLastModified;
+    this.lastParseErrors = this.fileCache.lastParseErrors;
+  }
+
+  @Override
+  public YamlFileCache yamlFileCache() {
+    return fileCache;
+  }
+
+  /**
+   * Returns the root directory backed by this YAML file database.
+   *
+   * @return the root directory
+   */
+  public File directory() {
+    return fileCache.directory();
   }
 
   @SuppressWarnings("unchecked") // value is instanceof-checked to Map before the String-keyed section cast
@@ -78,57 +97,20 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
   @Override
   @NotNull
   public Map<String, RtpYamlConfig> connect() {
-    if (!directory.exists() && !directory.mkdirs()) {
-      throw new IllegalStateException(
-          "unable to create directory " + directory.getAbsolutePath());
-    }
-
-    File[] files = directory.listFiles();
-    Map<String, RtpYamlConfig> res = new HashMap<>();
-    if (files == null) return res;
-    for (File file : files) {
-      if (!file.isFile()) continue;
-      // Skip the locale bootstrap file (LanguageBootstrap.FILE_NAME) - plugin configuration, not a database table.
-      if ("language.yml".equalsIgnoreCase(file.getName())) continue;
-
-      long lastModified = file.lastModified();
-      long dt = lastModified - cachedLookupLastModified.get().getOrDefault(file.getName(), -1L);
-      if (dt == 0) {
-        res.put(file.getName(), cachedLookup.get().get(file.getName()));
-        continue;
-      }
-
-      RtpYamlConfig yamlFile;
-      try {
-        yamlFile = new RtpYamlConfig(file);
-        yamlFile.loadWithComments();
-        cachedLookupLastModified.get().put(file.getName(), lastModified);
-        cachedLookup.get().put(file.getName(), yamlFile);
-      } catch (Exception exception) { // not a yaml file
-        continue;
-      }
-      res.put(file.getName(), yamlFile);
-      localTables.putIfAbsent(file.getName(), new ConcurrentHashMap<>());
-      Map<TableObj, TableObj> map = localTables.get(file.getName());
-      Map<String, Object> values = yamlFile.getMapValues(true);
-      for (Map.Entry<String, Object> entry : values.entrySet()) {
-        map.put(new TableObj(entry.getKey()), new TableObj(entry.getValue()));
-      }
-    }
-
-    return res;
+    return fileCache.connect(
+        (fileName, yamlFile) -> {
+          localTables.putIfAbsent(fileName, new ConcurrentHashMap<>());
+          Map<TableObj, TableObj> map = localTables.get(fileName);
+          Map<String, Object> values = yamlFile.getMapValues(true);
+          for (Map.Entry<String, Object> entry : values.entrySet()) {
+            map.put(new TableObj(entry.getKey()), new TableObj(entry.getValue()));
+          }
+        });
   }
 
   @Override
   public void disconnect(Map<String, RtpYamlConfig> database) {
-    for (RtpYamlConfig file : database.values()) {
-      try {
-        if (!file.exists()) file.createNewFile(true);
-        file.save();
-      } catch (IOException e) {
-        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
-      }
-    }
+    fileCache.disconnect(database);
   }
 
   @Override

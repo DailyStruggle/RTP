@@ -73,6 +73,45 @@ public final class DistanceParser {
   }
 
   /**
+   * Parse a distance string into a {@link ParsedDistance} using {@link SpatialUnit#CHUNK} as the
+   * default unit when no suffix is specified.
+   *
+   * @param input raw input string
+   * @return parsed distance, or null if unparseable
+   */
+  public static ParsedDistance parse(String input) {
+    return parse(input, SpatialUnit.CHUNK);
+  }
+
+  /**
+   * Parse a distance string and convert it into chunk units.
+   *
+   * @param input raw input string
+   * @param def fallback chunk value
+   * @return distance in chunks
+   */
+  public static double parseToChunks(String input, double def) {
+    if (input == null) return def;
+    ParsedDistance parsed = parse(input, SpatialUnit.CHUNK);
+    if (parsed == null) return def;
+    return parsed.toChunks();
+  }
+
+  /**
+   * Parse a distance string and convert it into block units.
+   *
+   * @param input raw input string
+   * @param def fallback block value
+   * @return distance in blocks
+   */
+  public static double parseToBlocks(String input, double def) {
+    if (input == null) return def;
+    ParsedDistance parsed = parse(input, SpatialUnit.BLOCK);
+    if (parsed == null) return def;
+    return parsed.toBlocks();
+  }
+
+  /**
    * Auto-interprets a dimensionless distance magnitude when auto-interpretation is enabled.
    *
    * <p>Heuristic:

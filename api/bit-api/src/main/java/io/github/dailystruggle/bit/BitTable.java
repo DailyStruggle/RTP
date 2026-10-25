@@ -76,6 +76,30 @@ public final class BitTable {
         return List.copyOf(output);
     }
 
+    /**
+     * Renders a header, aligned rows, and a concise coverage footer line when {@code coverage} is
+     * non-null and enabled.
+     */
+    public static List<String> render(
+            List<Row> rows,
+            List<String> columns,
+            Decorator decorator,
+            BitCoverageSnapshot coverage) {
+        List<String> base = render(rows, columns, decorator);
+        String footer = coverageFooter(coverage);
+        if (footer.isEmpty()) return base;
+        List<String> output = new ArrayList<>(base.size() + 1);
+        output.addAll(base);
+        output.add(footer);
+        return List.copyOf(output);
+    }
+
+    /** Formats a single-line coverage footer when coverage is enabled, or empty when disabled. */
+    public static String coverageFooter(BitCoverageSnapshot coverage) {
+        if (coverage == null || !coverage.isEnabled()) return "";
+        return coverage.summary();
+    }
+
     private static String renderRow(Row row, List<String> columns, int[] widths, Decorator decorator) {
         StringBuilder output = new StringBuilder();
         for (int index = 0; index < columns.size(); index++) {

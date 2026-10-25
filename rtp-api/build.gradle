@@ -21,6 +21,7 @@ dependencies {
     // units-api is the dependency-free shared unit/duration parser module.
     // Re-export it so core, proxy, and addon-facing consumers share one parser.
     api project(':units-api')
+    api project(':tags-api')
     api project(':anvil-api')
     // metrics-api: the GUI-author SPI exposes runtime-health reads
     // (RTPAPI.getMetricsSnapshot / getRegionSamples) returning MetricsSnapshot

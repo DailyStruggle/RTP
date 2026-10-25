@@ -40,6 +40,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
 - [`dev/TESTING_GUIDE.md`](dev/TESTING_GUIDE.md) — test suites, test tiers, and verification guide.
 - [`dev/TRANSLATION_GUIDE.md`](dev/TRANSLATION_GUIDE.md) — localization, translations, and locale parity.
+- [`dev/DISCORD_SUPPORT_BOT_DESIGN.md`](dev/DISCORD_SUPPORT_BOT_DESIGN.md) — Discord `#support` Forum bot architecture: `fts5vocab` corpus indexing, dual NMT, orderless prompt-injection bottleneck, and causal reasoning.
 - [`dev/LICENSING.md`](dev/LICENSING.md) — dual licensing and dependency audit.
 
 ## Decisions (`adr/`)

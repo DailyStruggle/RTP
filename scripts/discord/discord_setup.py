@@ -27,6 +27,7 @@ import os
 import pathlib
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -171,25 +172,37 @@ def _overwrites_match(actual: list[dict[str, Any]] | None, expected: list[dict[s
     return True
 
 
+def strip_leading_emoji_label(raw_name: str) -> tuple[str | None, str]:
+    """
+    Splits a leading non-ASCII emoji prefix (`"🌿 LeafRTP"`) into
+    `("🌿", "LeafRTP")` so Discord Forum `available_tags` do not render
+    duplicate icons (`[emoji_name] + [name]`).
+    """
+    cleaned = raw_name.strip()
+    parts = cleaned.split(" ", 1)
+    if len(parts) == 2 and not parts[0].isascii():
+        return parts[0], parts[1].strip()
+    return None, cleaned
+
+
 def build_forum_available_tags(forum_tags_spec: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """Flattens the Project, Platform, and Status tag groups into Discord `available_tags`."""
     tags: list[dict[str, Any]] = []
     for group in ("project", "platform", "status"):
         for item in forum_tags_spec.get(group, []):
-            raw_name = item["name"].strip()
-            parts = raw_name.split(" ", 1)
-            if len(parts) == 2 and not parts[0].isascii():
+            emoji_prefix, clean_name = strip_leading_emoji_label(item["name"])
+            if emoji_prefix:
                 tags.append(
                     {
-                        "name": raw_name,
+                        "name": clean_name,
                         "moderated": bool(item.get("moderated", False)),
-                        "emoji_name": parts[0],
+                        "emoji_name": emoji_prefix,
                     }
                 )
             else:
                 tags.append(
                     {
-                        "name": raw_name,
+                        "name": clean_name,
                         "moderated": bool(item.get("moderated", False)),
                     }
                 )
@@ -512,13 +525,27 @@ def compute_provisioning_plan(
                         )
                     )
                 else:
+                    existing_tags_by_name: dict[str, str] = {}
+                    for t in matching_ch.get("available_tags", []):
+                        if "name" in t and "id" in t:
+                            raw_t_name = str(t.get("name"))
+                            _, stripped_t_name = strip_leading_emoji_label(raw_t_name)
+                            existing_tags_by_name[raw_t_name] = str(t["id"])
+                            existing_tags_by_name[stripped_t_name] = str(t["id"])
                     existing_tag_names = [t.get("name") for t in matching_ch.get("available_tags", [])]
                     desired_tag_names = [t["name"] for t in forum_tags]
                     same_parent = str(matching_ch.get("parent_id")) == cat_id
                     same_flags = (int(matching_ch.get("flags", 0)) & CHANNEL_FLAG_REQUIRE_TAG) == forum_flags
                     same_tags = existing_tag_names == desired_tag_names
-                    same_topic = matching_ch.get("topic", "") == ch_spec.get("topic", "")
+                    same_topic = (matching_ch.get("topic") or "") == ch_spec.get("topic", "")
                     if not (same_parent and same_flags and same_tags and same_topic):
+                        merged_tags: list[dict[str, Any]] = []
+                        for tag_item in forum_tags:
+                            tag_copy = dict(tag_item)
+                            if tag_copy["name"] in existing_tags_by_name:
+                                tag_copy["id"] = existing_tags_by_name[tag_copy["name"]]
+                            merged_tags.append(tag_copy)
+                        forum_payload["available_tags"] = merged_tags
                         forum_payload["id"] = str(matching_ch["id"])
                         plan.actions.append(
                             ProvisionAction(
@@ -581,10 +608,16 @@ def compute_provisioning_plan(
                     )
                 )
 
-    # 5. Ensure the 5 pinned Forum reference threads exist in #support
+    # 5. Ensure the 5 Forum reference threads exist in #support.
+    # Note: Discord GUILD_FORUM channels enforce a hard limit of 1 pinned post
+    # (CHANNEL_FLAG_PINNED) per forum channel. We pin the primary "Read First"
+    # intake guide (idx == 0) at the top of #support and publish the 4 Quick Fix
+    # reference guides without CHANNEL_FLAG_PINNED.
     threads_by_title = {t.get("name", t.get("title", "")).strip(): t for t in existing_threads}
-    for pinned_spec in spec.get("pinned_forum_threads", []):
+    for idx, pinned_spec in enumerate(spec.get("pinned_forum_threads", [])):
         title = pinned_spec["title"].strip()
+        should_pin = bool(pinned_spec.get("pin", idx == 0))
+        desired_flags = CHANNEL_FLAG_PINNED if should_pin else 0
         existing = threads_by_title.get(title)
         if not existing:
             plan.actions.append(
@@ -595,15 +628,18 @@ def compute_provisioning_plan(
                         "name": title,
                         "applied_tags": pinned_spec.get("tags", []),
                         "message": {"content": pinned_spec["body"]},
-                        "flags": CHANNEL_FLAG_PINNED,
+                        "flags": desired_flags,
                     },
                     reason=f"Create and pin Forum guide: {title!r}.",
                 )
             )
         else:
-            existing_body = existing.get("body", existing.get("message", {}).get("content", ""))
+            has_body = ("body" in existing) or ("message" in existing)
+            existing_body = existing.get("body", (existing.get("message") or {}).get("content", ""))
             is_pinned = bool(int(existing.get("flags", 0)) & CHANNEL_FLAG_PINNED)
-            if existing_body != pinned_spec["body"] or not is_pinned:
+            body_mismatch = has_body and (existing_body != pinned_spec["body"])
+            pin_mismatch = should_pin and not is_pinned
+            if body_mismatch or pin_mismatch:
                 plan.actions.append(
                     ProvisionAction(
                         op="UPDATE_PINNED_THREAD",
@@ -613,7 +649,7 @@ def compute_provisioning_plan(
                             "name": title,
                             "applied_tags": pinned_spec.get("tags", []),
                             "message": {"content": pinned_spec["body"]},
-                            "flags": CHANNEL_FLAG_PINNED,
+                            "flags": desired_flags,
                         },
                         reason=f"Update pinned Forum guide content/pin state: {title!r}.",
                     )
@@ -623,7 +659,7 @@ def compute_provisioning_plan(
 
 
 class DiscordRestClient:
-    """Minimal stdlib REST client for Discord API v10."""
+    """Minimal stdlib REST client for Discord API v10 with 429 rate-limit backoff."""
 
     def __init__(self, bot_token: str, api_base: str = DISCORD_API_BASE) -> None:
         self.bot_token = bot_token
@@ -631,33 +667,89 @@ class DiscordRestClient:
 
     def request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
         url = f"{self.api_base}/{path.lstrip('/')}"
-        data = json.dumps(payload).encode("utf-8") if payload is not None else None
-        req = urllib.request.Request(
-            url,
-            data=data,
-            method=method,
-            headers={
-                "Authorization": f"Bot {self.bot_token}",
-                "Content-Type": "application/json",
-                "User-Agent": "LeafRTP-DiscordSetup/1.0 (+https://github.com/DailyStruggle/RTP)",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            raw = resp.read().decode("utf-8")
-            return json.loads(raw) if raw else None
+        headers = {
+            "Authorization": f"Bot {self.bot_token}",
+            "User-Agent": "LeafRTP-DiscordSetup/1.0 (+https://github.com/DailyStruggle/RTP)",
+        }
+        if payload is not None:
+            data: bytes | None = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        elif method in ("PUT", "POST"):
+            data = b""
+            headers["Content-Length"] = "0"
+        else:
+            data = None
+
+        for attempt in range(3):
+            req = urllib.request.Request(url, data=data, method=method, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8")
+                    return json.loads(raw) if raw else None
+            except urllib.error.HTTPError as exc:
+                raw_err = ""
+                try:
+                    raw_err = exc.read().decode("utf-8", errors="replace")
+                except OSError:
+                    pass
+                if exc.code == 429 and attempt < 2:
+                    retry_after = 2.0
+                    try:
+                        err_body = json.loads(raw_err)
+                        retry_after = float(err_body.get("retry_after", 2.0))
+                    except (ValueError, KeyError, TypeError):
+                        pass
+                    time.sleep(min(max(retry_after, 0.5), 30.0))
+                    continue
+                if raw_err:
+                    exc.msg = f"{exc.msg} ({method} {path}: {raw_err})"
+                raise
 
 
 def apply_provisioning_plan(
     client: DiscordRestClient,
     plan: ProvisioningPlan,
     guild_id: str,
+    current_channels: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Executes a `ProvisioningPlan` against the Discord REST API v10, resolving
-    planned category/channel IDs as resources are created.
+    planned category/channel IDs and Forum tag snowflake IDs as resources are created.
     """
     executed: list[dict[str, Any]] = []
     resolved_ids: dict[str, str] = {}
+    forum_tag_ids: dict[str, str] = {}
+
+    def _register_tag_map(tags_list: list[dict[str, Any]]) -> None:
+        for t in tags_list:
+            if "name" in t and "id" in t:
+                t_id = str(t["id"])
+                t_name = str(t["name"]).strip()
+                t_emoji = str(t.get("emoji_name") or "").strip()
+                _, stripped = strip_leading_emoji_label(t_name)
+                forum_tag_ids[t_name] = t_id
+                forum_tag_ids[stripped] = t_id
+                if t_emoji:
+                    forum_tag_ids[f"{t_emoji} {stripped}"] = t_id
+
+    for ch in current_channels or []:
+        ch_id = str(ch.get("id", ""))
+        ch_name = str(ch.get("name", ""))
+        ch_type = ch.get("type")
+        if ch_type == CHANNEL_TYPES["GUILD_CATEGORY"]:
+            resolved_ids[f"planned_cat_{ch_name}"] = ch_id
+        else:
+            resolved_ids[f"ch_{ch_name}"] = ch_id
+            if ch_type == CHANNEL_TYPES["GUILD_FORUM"] and ch_name.lower() == "support":
+                resolved_ids["forum_support"] = ch_id
+                _register_tag_map(ch.get("available_tags", []))
+
+    def resolve_tag_ids(raw_tags: list[str]) -> list[str]:
+        resolved: list[str] = []
+        for t in raw_tags:
+            _, stripped = strip_leading_emoji_label(t)
+            resolved.append(forum_tag_ids.get(t, forum_tag_ids.get(stripped, t)))
+        return resolved
 
     for act in plan.actions:
         payload = dict(act.payload)
@@ -678,6 +770,7 @@ def apply_provisioning_plan(
             res = client.request("PATCH", f"/channels/{ch_id}", payload)
             if act.op == "UPDATE_FORUM_CHANNEL" and isinstance(res, dict) and "id" in res:
                 resolved_ids["forum_support"] = str(res["id"])
+                _register_tag_map(res.get("available_tags", []))
             executed.append({"op": act.op, "target": act.target, "result": res})
         elif act.op in ("CREATE_CHANNEL", "CREATE_FORUM_CHANNEL"):
             res = client.request("POST", f"/guilds/{guild_id}/channels", payload)
@@ -685,6 +778,7 @@ def apply_provisioning_plan(
                 resolved_ids[f"ch_{act.target}"] = str(res["id"])
                 if act.op == "CREATE_FORUM_CHANNEL":
                     resolved_ids["forum_support"] = str(res["id"])
+                    _register_tag_map(res.get("available_tags", []))
             executed.append({"op": act.op, "target": act.target, "result": res})
         elif act.op == "PUBLISH_EMBEDS":
             ch_id = resolved_ids.get(f"ch_{act.target}", act.target)
@@ -692,11 +786,36 @@ def apply_provisioning_plan(
             executed.append({"op": act.op, "target": act.target, "result": res})
         elif act.op == "CREATE_PINNED_THREAD":
             forum_id = resolved_ids.get("forum_support", "support")
+            if "applied_tags" in payload:
+                payload["applied_tags"] = resolve_tag_ids(list(payload["applied_tags"]))
+            flags = payload.pop("flags", None)
             res = client.request("POST", f"/channels/{forum_id}/threads", payload)
+            if flags and isinstance(res, dict) and "id" in res:
+                try:
+                    client.request("PATCH", f"/channels/{res['id']}", {"flags": flags})
+                except urllib.error.HTTPError as exc:
+                    if exc.code not in (400, 403):
+                        raise
+                    print(
+                        f"Note: Could not pin thread {act.target!r} (Discord allows 1 pinned post per Forum): {exc}",
+                        file=sys.stderr,
+                    )
             executed.append({"op": act.op, "target": act.target, "result": res})
         elif act.op == "UPDATE_PINNED_THREAD":
             th_id = payload.pop("id")
+            msg_payload = payload.pop("message", None)
+            flags = payload.pop("flags", None)
+            if "applied_tags" in payload:
+                payload["applied_tags"] = resolve_tag_ids(list(payload["applied_tags"]))
             res = client.request("PATCH", f"/channels/{th_id}", payload)
+            if flags:
+                try:
+                    client.request("PATCH", f"/channels/{th_id}", {"flags": flags})
+                except urllib.error.HTTPError as exc:
+                    if exc.code not in (400, 403):
+                        raise
+            if isinstance(msg_payload, dict) and "content" in msg_payload:
+                client.request("PATCH", f"/channels/{th_id}/messages/{th_id}", {"content": msg_payload["content"]})
             executed.append({"op": act.op, "target": act.target, "result": res})
 
     return executed
@@ -742,12 +861,14 @@ def main(argv: list[str] | None = None) -> int:
     guild_id = os.environ.get("DISCORD_GUILD_ID", "100000000000000000")
     token = os.environ.get("DISCORD_BOT_TOKEN", "")
     client: DiscordRestClient | None = None
+    published_embed_channels: set[str] = set()
 
     if args.snapshot:
         snap = json.loads(args.snapshot.read_text(encoding="utf-8"))
         channels = snap.get("channels", snap if isinstance(snap, list) else [])
         roles = snap.get("roles", [])
         threads = snap.get("threads", [])
+        published_embed_channels = set(snap.get("published_embed_channels", []))
     elif args.apply:
         if not token or guild_id == "100000000000000000":
             print(
@@ -759,16 +880,45 @@ def main(argv: list[str] | None = None) -> int:
         channels = client.request("GET", f"/guilds/{guild_id}/channels") or []
         roles = client.request("GET", f"/guilds/{guild_id}/roles") or []
         active_threads = client.request("GET", f"/guilds/{guild_id}/threads/active") or {}
-        threads = active_threads.get("threads", []) if isinstance(active_threads, dict) else []
+        threads = list(active_threads.get("threads", [])) if isinstance(active_threads, dict) else []
+
+        # Also inspect existing embed channels (#start-here, #benchmarks) and archived forum threads
+        # so re-running --apply never posts duplicate embeds or duplicate reference guides.
+        embed_targets = set(spec.get("channel_embeds", {}).keys())
+        for ch in channels:
+            ch_name = str(ch.get("name", ""))
+            ch_id = str(ch.get("id", ""))
+            ch_type = ch.get("type")
+            if ch_name in embed_targets and ch_id:
+                try:
+                    msgs = client.request("GET", f"/channels/{ch_id}/messages?limit=5") or []
+                    if any(isinstance(m, dict) and m.get("embeds") for m in msgs):
+                        published_embed_channels.add(ch_name)
+                except OSError:
+                    pass
+            elif ch_type == CHANNEL_TYPES["GUILD_FORUM"] and ch_name.lower() == "support" and ch_id:
+                try:
+                    arch = client.request("GET", f"/channels/{ch_id}/threads/archived/public") or {}
+                    if isinstance(arch, dict):
+                        threads.extend(arch.get("threads", []))
+                except OSError:
+                    pass
     else:
         channels = default_legacy_guild_snapshot(guild_id)
         roles = []
         threads = []
 
-    plan = compute_provisioning_plan(channels, roles, threads, spec, guild_id)
+    plan = compute_provisioning_plan(
+        channels,
+        roles,
+        threads,
+        spec,
+        guild_id,
+        published_embed_channels=published_embed_channels,
+    )
     print(plan.format_summary())
     if args.apply and client is not None:
-        apply_provisioning_plan(client, plan, guild_id)
+        apply_provisioning_plan(client, plan, guild_id, channels)
     return 0
 
 

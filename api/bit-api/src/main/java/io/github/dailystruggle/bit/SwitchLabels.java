@@ -2,6 +2,8 @@ package io.github.dailystruggle.bit;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -9,13 +11,16 @@ import java.util.regex.Pattern;
 public final class SwitchLabels {
     private static final Pattern CASE_START = Pattern.compile("\\bcase\\s++");
     private static final Pattern LABEL = Pattern.compile("\"([^\"]+)\"|\\b([A-Z][A-Z0-9_]*)\\b");
+    private static final Map<String, Pattern> SWITCH_PATTERNS = new ConcurrentHashMap<>();
 
     private SwitchLabels() {}
 
+    @SuppressWarnings({"PMD.RegexCompiledPerCall", "external_pmd:RegexCompiledPerCall"})
     public static List<String> extract(String source, String switchExpression) {
         if (source == null || switchExpression == null || switchExpression.isBlank()) return List.of();
-        @SuppressWarnings("external_pmd:RegexCompiledPerCall")
-        Pattern switchPattern = Pattern.compile("switch\\s*\\(\\s*" + Pattern.quote(switchExpression.trim()) + "\\s*\\)\\s*\\{");
+        Pattern switchPattern = SWITCH_PATTERNS.computeIfAbsent(
+                switchExpression.trim(),
+                expr -> Pattern.compile("switch\\s*\\(\\s*" + Pattern.quote(expr) + "\\s*\\)\\s*\\{"));
         Matcher switchMatcher = switchPattern.matcher(source);
         if (!switchMatcher.find()) return List.of();
         int open = switchMatcher.end() - 1;

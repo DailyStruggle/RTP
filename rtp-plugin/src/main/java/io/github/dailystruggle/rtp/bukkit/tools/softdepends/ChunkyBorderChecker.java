@@ -12,9 +12,9 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.ChunkyRTPShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
-import io.github.dailystruggle.rtp.common.tools.ChunkyRTPShape;
 import java.util.Optional;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;

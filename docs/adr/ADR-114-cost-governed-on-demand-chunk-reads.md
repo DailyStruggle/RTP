@@ -1,6 +1,6 @@
 # ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-14
 **Extends:** [ADR-001](ADR-001-archimedean-spiral-1d-mapping.md) (Archimedean spiral 1D mapping), [ADR-009](ADR-009-configurable-spatial-distributions.md) (Configurable spatial distributions), [ADR-016](ADR-016-anvil-subsystem.md) (Anvil read-only subsystem), [ADR-028](ADR-028-l3-backlog-cache.md) (L3 backlog cache order preservation), [ADR-087](ADR-087-adaptive-compute-governor.md) (Adaptive compute governor: `ComputeBudget#generationCap()` and `ComputeBudget#cpuTarget()`), [ADR-109](ADR-109-measured-cost-probe-first-gate.md) (Measured-cost probe-first gate), [ADR-110](ADR-110-purpose-gated-live-loads.md) (Purpose-gated live loads)
 **Related:** [ADR-067](ADR-067-adaptive-scan-rate-and-mca-header-generation-check.md) (MCA header generation check), [ADR-112](ADR-112-per-region-work-division-on-folia.md) (Per-region work division on Folia)

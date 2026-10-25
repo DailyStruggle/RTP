@@ -218,7 +218,7 @@ final class PregenState {
                 rejection ->
                         RTPRuntime.log(
                                 Level.WARNING,
-                                "[safety.yml] rejected unsafe-blocks token '"
+                                "[advanced/blocks.yml] rejected unsafe-blocks token '"
                                         + rejection.rawToken()
                                         + "': "
                                         + rejection.reason()));

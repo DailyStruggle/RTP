@@ -39,6 +39,10 @@ public final class RTPRuntime {
   /** True until {@link #flushPendingLogs()} runs; volatile so the hot log path needs no lock. */
   private static volatile boolean logsBuffered = true;
 
+  static {
+    ServerAccessors.setLogSink(RTPRuntime::log);
+  }
+
   private static final RTPContext CONTEXT = new RTPContext() {
     @Override
     public RTPServerAccessor serverAccessor() {
@@ -81,6 +85,7 @@ public final class RTPRuntime {
   public static void setServerAccessor(RTPServerAccessor accessor) {
     serverAccessor = accessor;
     ServerAccessors.set(accessor);
+    ServerAccessors.setLogSink(RTPRuntime::log);
   }
 
   public static RTPScheduler scheduler() {
@@ -167,10 +172,18 @@ public final class RTPRuntime {
       return;
     }
     if (accessor == null) {
-      Logger.getLogger("RTP").log(level, str, throwable);
+      if (throwable == null) {
+        Logger.getLogger("RTP").log(level, str);
+      } else {
+        Logger.getLogger("RTP").log(level, str, throwable);
+      }
       return;
     }
-    accessor.log(level, str, throwable);
+    if (throwable == null) {
+      accessor.log(level, str);
+    } else {
+      accessor.log(level, str, throwable);
+    }
   }
 
   /** Test hook: re-arms the bootstrap buffer and drops pending records. */

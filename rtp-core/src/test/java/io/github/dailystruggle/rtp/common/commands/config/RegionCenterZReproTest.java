@@ -53,9 +53,9 @@ public class RegionCenterZReproTest {
         ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
         Configs configs = ActiveConfigs.get();
 
-        io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase mockDb =
-                mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class
+        io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb =
+                mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
+        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class
                 .getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));

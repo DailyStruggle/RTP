@@ -20,6 +20,7 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,13 +38,15 @@ import org.junit.jupiter.api.Test;
  * <p>Uses real world data from the test server, falling back to synthetic terrain
  * if no world data is found.
  */
+@Tag("drawing")
 public class ElevationMapVisualizationTest {
 
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$");
 
   /** Reference save: a 26.3 Paper overworld. Override with -Drtp.elevation.regionDir=<dir>. */
   private static final Path REFERENCE_REGION_DIR = Path.of(
-      "/home/johngoldsmith/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
+      System.getProperty("user.home", "")
+          + "/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
           + "/world/dimensions/minecraft/overworld/region");
 
   private static final Path[] WORLD_REGION_PATHS = {

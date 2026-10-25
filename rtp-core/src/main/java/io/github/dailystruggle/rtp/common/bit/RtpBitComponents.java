@@ -55,6 +55,7 @@ public final class RtpBitComponents {
         RtpBit.RUNNER.register(TestBitCodes.ANVIL_LIVE_PARITY);
         RtpBit.RUNNER.register(PlatformHookBitComponent.PLATFORM_HOOKS);
         RtpBit.RUNNER.register(PipelineCbitCounters.PIPELINE_CBIT);
+        RtpBit.RUNNER.register(CoreFallbackCbitCounters.CORE_FALLBACK_CBIT);
         io.github.dailystruggle.rtp.common.bit.config.ConfigPbit.registerComponents();
     }
 

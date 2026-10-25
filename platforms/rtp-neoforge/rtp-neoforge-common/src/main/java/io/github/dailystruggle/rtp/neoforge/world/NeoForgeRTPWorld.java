@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -246,8 +247,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 for (Object o : c) if (o != null) out.add(o.toString());
                 return out;
             }
-        } catch (Throwable ignored) {
-            // Fall through to empty.
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeRTPWorld#currentUnsafeBlocks",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         return java.util.Collections.emptySet();
     }
@@ -563,7 +566,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         final java.nio.file.Path worldFolder;
         try {
             worldFolder = server.getWorldPath(LevelResource.ROOT);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeRTPWorld#getWorldPath:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return java.util.Collections.emptyMap();
         }
         final String dim = dimensionRegionSubpath(worldFolder, level);
@@ -575,7 +581,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             // One whole-file read under a pooled-buffer lease.
             return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
                 regionFile, rcx, rcz, y, NeoForgeRTPWorld::canonicaliseBiome);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordBiomeColorDegraded(
+                    "NeoForgeRTPWorld#readBiomesInRegionFile:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP] NeoForgeRTPWorld.readBiomesInRegionFile failed for world=" + name
                     + " region=(" + rcx + "," + rcz + "): "
@@ -598,7 +607,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             if (regionFile == null) return java.util.Collections.emptyMap();
             return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
                 regionFile, rcx, rcz, y, localIndices, NeoForgeRTPWorld::canonicaliseBiome);
-        } catch (Throwable t) {
+        } catch (java.io.IOException | RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordBiomeColorDegraded(
+                    "NeoForgeRTPWorld#sampleBiomesInRegionFile:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP] NeoForgeRTPWorld.sampleBiomesInRegionFile failed for world=" + name
                     + " region=(" + rcx + "," + rcz + "): "
@@ -613,8 +625,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         if (level == null) return null;
         try {
             return level.getServer().getWorldPath(LevelResource.ROOT);
-        } catch (Throwable t) {
-            // detached level (no server): no world folder
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeRTPWorld#anvilWorldFolder:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return null;
         }
     }
@@ -626,7 +640,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         if (level == null || worldFolder == null) return "";
         try {
             return dimensionRegionSubpath(worldFolder, level);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeRTPWorld#anvilDimensionSubpath:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return "";
         }
     }
@@ -825,7 +842,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             }
             return io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache
                 .isOccupied(regionFile, cx, cz);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeRTPWorld#isChunkGenerated:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return true;
         }
     }

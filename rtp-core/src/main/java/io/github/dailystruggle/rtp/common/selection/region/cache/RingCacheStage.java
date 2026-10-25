@@ -1,8 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region.cache;
 
-import io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer;
-import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
-
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,6 +18,7 @@ import java.util.function.Consumer;
  * any surplus beyond the new capacity, and atomically swaps the ring reference.
  *
  * @param <T> stage entry type
+ * @governedBy ADR-115 (Package DAG Disentanglement and Finite Decision-Preservation Hypergraph)
  */
 public final class RingCacheStage<T> implements CacheStage<T> {
     private final String name;
@@ -53,7 +51,7 @@ public final class RingCacheStage<T> implements CacheStage<T> {
     }
 
     private final AtomicReference<Ring<T>> currentRing;
-    private final LockFreeLocationBuffer delegate;
+    private final RingBufferDelegate delegate;
 
     /**
      * @param name      stage identity for logs and metrics.
@@ -77,20 +75,20 @@ public final class RingCacheStage<T> implements CacheStage<T> {
     }
 
     /**
-     * Constructs a {@link RingCacheStage} that wraps an existing {@link LockFreeLocationBuffer} storage.
+     * Constructs a {@link RingCacheStage} that wraps an existing {@link RingBufferDelegate} storage.
      *
      * @param name      stage identity for logs and metrics.
      * @param delegate  the underlying lock-free location buffer.
      * @param onDispose terminal disposal handler.
      */
     public RingCacheStage(String name,
-                          LockFreeLocationBuffer delegate,
+                          RingBufferDelegate delegate,
                           Consumer<T> onDispose) {
         this(name, delegate, null, null, onDispose);
     }
 
     /**
-     * Constructs a {@link RingCacheStage} that wraps an existing {@link LockFreeLocationBuffer} storage
+     * Constructs a {@link RingCacheStage} that wraps an existing {@link RingBufferDelegate} storage
      * with optional callbacks.
      *
      * @param name      stage identity for logs and metrics.
@@ -101,7 +99,7 @@ public final class RingCacheStage<T> implements CacheStage<T> {
      */
     @SuppressWarnings("unchecked")
     public RingCacheStage(String name,
-                          LockFreeLocationBuffer delegate,
+                          RingBufferDelegate delegate,
                           Consumer<T> onAdd,
                           Consumer<T> onRemove,
                           Consumer<T> onDispose) {
@@ -113,7 +111,7 @@ public final class RingCacheStage<T> implements CacheStage<T> {
         this.onDispose = onDispose;
         this.currentRing = null;
         if (onAdd != null || onRemove != null) {
-            delegate.setCallbacks(
+            delegate.setRawCallbacks(
                     onAdd != null ? loc -> onAdd.accept((T) loc) : null,
                     onRemove != null ? loc -> onRemove.accept((T) loc) : null
             );
@@ -121,9 +119,9 @@ public final class RingCacheStage<T> implements CacheStage<T> {
     }
 
     /**
-     * @return the underlying {@link LockFreeLocationBuffer} if wrapped, or {@code null} if self-contained.
+     * @return the underlying {@link RingBufferDelegate} if wrapped, or {@code null} if self-contained.
      */
-    public LockFreeLocationBuffer delegate() {
+    public RingBufferDelegate delegate() {
         return delegate;
     }
 
@@ -155,7 +153,7 @@ public final class RingCacheStage<T> implements CacheStage<T> {
     @SuppressWarnings("unchecked")
     private Optional<T> poll0(boolean fireCallback) {
         if (delegate != null) {
-            RTPLocation loc = fireCallback ? delegate.poll() : delegate.pollSilently();
+            Object loc = fireCallback ? delegate.pollItem() : delegate.pollItemSilently();
             return Optional.ofNullable((T) loc);
         }
         Ring<T> ring = currentRing.get();
@@ -184,11 +182,7 @@ public final class RingCacheStage<T> implements CacheStage<T> {
     private boolean offer0(T item, boolean fireCallback) {
         if (item == null) return false;
         if (delegate != null) {
-            if (!(item instanceof RTPLocation loc)) {
-                dispose(item);
-                return false;
-            }
-            boolean accepted = fireCallback ? delegate.offer(loc) : delegate.offerSilently(loc);
+            boolean accepted = fireCallback ? delegate.offerItem(item) : delegate.offerItemSilently(item);
             if (!accepted) {
                 dispose(item);
                 return false;

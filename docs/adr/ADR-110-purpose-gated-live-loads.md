@@ -1,6 +1,6 @@
 # ADR-110 - Purpose-Gated Live Loads
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-10-08 (amended 2026-10-13: unpinned fallback for fresh worlds)
 **Extends:** [ADR-016](ADR-016-anvil-subsystem.md) (Anvil read-only data source), [ADR-015](ADR-015-stale-chunk-guard-countbound-pipes.md) (chunk tickets and stale guard)
 **Related:** [ADR-087](ADR-087-adaptive-compute-governor.md) (dynamic `ComputeBudget#hotCap(region)` bounds pin slots), [ADR-109](ADR-109-measured-cost-probe-first-gate.md) (probe-first governor)

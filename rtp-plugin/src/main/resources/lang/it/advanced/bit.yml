@@ -12,6 +12,12 @@ strictConfig: false
 # Numero minimo di campioni prima di classificare una condizione come sempre o mai superata.
 gateOutcomeSamples: 200
 
+# Scansione BIT iniziale pianificata eseguita in modo asincrono al tick +2.
+startupSweep: pbit
+
+# Fornitore di copertura diagnostica live iniettato in RtpBit.RUNNER.
+coverage: auto
+
 # Livelli per i codici BIT registrati; prevalgono su strictActions.
 # Valori consentiti: ERROR, WARNING, INFO, DEBUG, TRACE e OFF. OFF nasconde il rilievo.
 # Codici e livelli sconosciuti vengono ignorati e registrati nel log.

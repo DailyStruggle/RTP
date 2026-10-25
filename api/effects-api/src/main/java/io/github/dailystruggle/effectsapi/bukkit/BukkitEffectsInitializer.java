@@ -1,13 +1,6 @@
 package io.github.dailystruggle.effectsapi.bukkit;
 
 import io.github.dailystruggle.effectsapi.EffectsAPI;
-import io.github.dailystruggle.effectsapi.common.effects.FireworkEffect;
-import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
-import io.github.dailystruggle.effectsapi.common.effects.NoteEffect;
-import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
-import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
-import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
-import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import org.bukkit.Bukkit;
@@ -81,22 +74,20 @@ public final class BukkitEffectsInitializer {
         // #fixData all delegate to EffectFactory.getCoercer().
         BukkitHandles.register();
         EffectFactory.setCoercer(new BukkitValueCoercer());
-        EffectFactory.addEffect("FIREWORK", new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, Color.WHITE));
-        EffectFactory.addEffect("NOTE", new NoteEffect(Instrument.PIANO));
-        if (EffectsAPI.getServerIntVersion() > 8) {
-            EffectFactory.addEffect("PARTICLE", new ParticleEffect(Particle.EXPLOSION_NORMAL));
+        int serverVersion = EffectsAPI.getServerIntVersion();
+        EffectFactory.registerBuiltInEffects(
+                Sound.valueOf("ENTITY_PLAYER_LEVELUP"),
+                serverVersion > 8 ? Particle.EXPLOSION_NORMAL : null,
+                PotionEffectType.BLINDNESS,
+                org.bukkit.FireworkEffect.Type.BALL,
+                Color.WHITE,
+                Instrument.PIANO);
+        if (serverVersion <= 8) {
+            EffectFactory.removeEffect("PARTICLE");
         }
-        EffectFactory.addEffect("POTION", new PotionEffect(PotionEffectType.BLINDNESS));
-        EffectFactory.addEffect("SOUND", new SoundEffect(Sound.valueOf("ENTITY_PLAYER_LEVELUP")));
-        // Glide requires elytra (1.9+); register conditionally to keep older servers happy.
-        if (EffectsAPI.getServerIntVersion() >= 9) EffectFactory.addEffect("GLIDE", new GlideEffect());
-        EffectFactory.addEffect("TITLE", new TitleEffect());
-        EffectFactory.addEffect("COMMAND", new io.github.dailystruggle.effectsapi.common.effects.CommandEffect());
-        EffectFactory.addEffect("DROP_INVENTORY", new io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect());
-        EffectFactory.addEffect("DROP_EXP", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
-        EffectFactory.addEffect("DROP_EXPERIENCE", new io.github.dailystruggle.effectsapi.common.effects.DropExpEffect());
-        EffectFactory.addEffect("DEATH", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
-        EffectFactory.addEffect("KILL", new io.github.dailystruggle.effectsapi.common.effects.DeathEffect());
+        if (serverVersion < 9) {
+            EffectFactory.removeEffect("GLIDE");
+        }
     }
 
     /**

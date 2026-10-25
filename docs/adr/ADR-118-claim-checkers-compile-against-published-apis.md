@@ -1,6 +1,6 @@
 # ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
 
-**Status:** Proposed
+**Status:** Accepted (implemented 2026-10-24)
 **Date:** 2026-10-19
 **Extends:** [ADR-069](ADR-069-claim-integrations-extracted-to-bundled-addon.md) (claim integrations in `LeafRTPClaimAddon`).
 
@@ -43,9 +43,8 @@ minePlots publishes `pl.minecodes.plots:plugin-api` on a public Maven repository
 
 ## References
 
-- `addons/LeafRTPClaimAddon/build.gradle` (mineCodes repository, `pl.minecodes.plots:plugin-api:4.6.2`).
-- `addons/LeafRTPClaimAddon/.../MinePlotsChecker.java`, `ClaimCheckFailure.java`, `ClaimIntegrations.java`.
-- `MinePlotsCheckerS003Test` (REQ-RTP-S-003 regression; see `docs/dev/TRACEABILITY.md`).
+- `addons/LeafRTPClaimAddon/build.gradle` (mineCodes and William278 repositories, `pl.minecodes.plots:plugin-api:4.6.2`, `com.intellectualsites.plotsquared:plotsquared-core:7.6.0`, and `shadedClaimPlugins` extraction for `huskclaims-bukkit:1.5.10`, `husktowns-bukkit:3.1.4`, `Residence:6.0.2.3`, and `Saber-Factions:4.1.4-STABLE`).
+- `addons/LeafRTPClaimAddon/.../MinePlotsChecker.java`, `HuskClaimsChecker.java`, `HuskTownsChecker.java`, `PlotSquaredChecker.java`, `ResidenceChecker.java`, `SaberFactionsChecker.java`, `ClaimCheckFailure.java`, `ClaimIntegrations.java`.
+- `MinePlotsCheckerS003Test`, `DirectApiClaimCheckersS003Test`, `ReflectiveClaimCheckerApiShapeS003Test` (REQ-RTP-S-003 regression; see `docs/dev/TRACEABILITY.md`).
 - `docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md`; `docs/dev/EXTERNAL_HOOKS.md` (ADR-026 verifier surface).
-- `docs/dev/POTENTIAL_BUGS.md` entry "Reflective claim checkers built on guessed class and method names" (the remaining checkers).
 - ADR-026 (external hook API surface), ADR-069 (claim addon), ADR-113 (Java 17 baseline).

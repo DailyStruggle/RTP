@@ -81,7 +81,17 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
      * mistyped permission tokens (see AGENTS.md: "Zero
      * {@code printStackTrace()}").
      */
-    private static volatile Consumer<String> defaultWarn = msg -> System.err.println("[effects-api] " + msg);
+    private static final Consumer<String> FALLBACK_WARN = msg -> {
+        io.github.dailystruggle.server.api.ServerAccessor accessor =
+                io.github.dailystruggle.server.api.ServerAccessors.get();
+        if (accessor != null) {
+            accessor.log(java.util.logging.Level.WARNING, "[effects-api] " + msg);
+        } else {
+            System.err.println("[effects-api] " + msg);
+        }
+    };
+
+    private static volatile Consumer<String> defaultWarn = FALLBACK_WARN;
 
     /**
      * Replace the default diagnostic sink used by {@link #applyByType} when

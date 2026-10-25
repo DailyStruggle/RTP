@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -311,7 +312,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                 java.nio.file.Path worldFolder;
                 try {
                     worldFolder = probeServer.getWorldPath(LevelResource.ROOT);
-                } catch (Throwable t) {
+                } catch (RuntimeException | LinkageError t) {
+                    PlatformHookBitComponent.recordWorldHookDegraded(
+                            "FabricRTPWorld#getWorldPath:" + name,
+                            t.getClass().getSimpleName() + ": " + t.getMessage());
                     worldFolder = null;
                 }
                 if (worldFolder != null) {
@@ -362,8 +366,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                 for (Object o : c) if (o != null) out.add(o.toString());
                 return out;
             }
-        } catch (Throwable ignored) {
-            // Fall through to empty.
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "FabricRTPWorld#currentUnsafeBlocks",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         return java.util.Collections.emptySet();
     }
@@ -810,7 +816,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             if (v == null) return 2;
             if (v.startsWith("1.20")) return 2;
             return 4;
-        } catch (Throwable ignored) {
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "FabricRTPWorld#resolveLiveLoadPermits",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             return 2;
         }
     }
@@ -1068,7 +1077,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         final java.nio.file.Path worldFolder;
         try {
             worldFolder = server.getWorldPath(LevelResource.ROOT);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "FabricRTPWorld#getWorldPath:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return java.util.Collections.emptyMap();
         }
         final String dim = dimensionRegionSubpath(level);
@@ -1079,7 +1091,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             if (regionFile == null) return java.util.Collections.emptyMap();
             return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
                 regionFile, rcx, rcz, y, FabricRTPWorld::canonicaliseBiome);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordBiomeColorDegraded(
+                    "FabricRTPWorld#readBiomesInRegionFile:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP] FabricRTPWorld.readBiomesInRegionFile failed for world=" + name
                     + " region=(" + rcx + "," + rcz + "): "
@@ -1108,7 +1123,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             if (regionFile == null) return java.util.Collections.emptyMap();
             return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
                 regionFile, rcx, rcz, y, localIndices, FabricRTPWorld::canonicaliseBiome);
-        } catch (Throwable t) {
+        } catch (java.io.IOException | RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordBiomeColorDegraded(
+                    "FabricRTPWorld#sampleBiomesInRegionFile:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP] FabricRTPWorld.sampleBiomesInRegionFile failed for world=" + name
                     + " region=(" + rcx + "," + rcz + "): "
@@ -1123,7 +1141,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (level == null) return null;
         try {
             return level.getServer().getWorldPath(LevelResource.ROOT);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "FabricRTPWorld#anvilWorldFolder:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return null;
         }
     }
@@ -1298,7 +1319,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             // .mca mtime advances. Parity with v26_1_R1 and the unobf carrier.
             return io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache
                 .isOccupied(regionFile, cx, cz);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "FabricRTPWorld#isChunkGenerated:" + name,
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             // Conservative default per RTPWorld javadoc: a false-positive only
             // forfeits a perf fast path; a false-negative could re-introduce
             // the ADR-016 section 13.3 palette-drift bug.

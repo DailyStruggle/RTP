@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
@@ -162,6 +163,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                 } catch (RuntimeException re) {
                     reloadFailure = re;
                     RTP.reloading.set(false);
+                    CoreFallbackCbitCounters.recordSetupWizardDegraded("SetupConfirmCmd.reload", re);
                 }
 
                 if (reloaded) {
@@ -173,6 +175,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                     SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Run &f/rtp reload&7 to pick up changes.");
                 }
             } catch (IOException | RuntimeException e) {
+                CoreFallbackCbitCounters.recordSetupWizardDegraded("SetupConfirmCmd.applyTask", e);
                 RTPRuntime.log(Level.WARNING, "[setup] Failed to write setup recipe to disk: " + e.getMessage(), e);
                 SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Error writing setup configuration to disk: " + e.getMessage());
             }

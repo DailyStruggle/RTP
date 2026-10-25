@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.api.schematic;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import java.util.List;
 import java.util.Map;
@@ -74,5 +75,90 @@ class SchematicPlacementPlannerSurfaceCenterTest {
         .map(BlockPlacement::y).sorted().toList();
     assertEquals(List.of(99, 102), stoneY, "interior floor below feet, roof well above the head");
     assertTrue(stoneY.get(0) < 100, "interior floor is below the arrival Y, player is inside");
+  }
+
+  @Test
+  @DisplayName("coordinate-based plan, planDeltas, and planBlockEntities match RTPLocation overloads across anchors")
+  void coordinateOverloadsMatchRtpLocationAcrossAnchors() {
+    BlockEntityData chestEntity = new BlockEntityData(1, 1, 1, "minecraft:chest", Map.of());
+    LoadedSchematic schem = new LoadedSchematic() {
+      @Override public SchematicSource source() {
+        return new SchematicSource("box", java.nio.file.Path.of("box.schem"), "schem");
+      }
+      @Override public int width() { return 3; }
+      @Override public int height() { return 4; }
+      @Override public int length() { return 3; }
+      @Override public int offsetX() { return -1; }
+      @Override public int offsetY() { return 2; }
+      @Override public int offsetZ() { return -1; }
+      @Override public List<String> palette() { return List.of(AIR, DIRT, STONE); }
+      @Override public int paletteIndexAt(int x, int y, int z) {
+        return (y == 0) ? 2 : (y == 1 && x == 1 && z == 1 ? 1 : 0);
+      }
+      @Override public List<BlockEntityData> blockEntities() {
+        return List.of(chestEntity);
+      }
+    };
+
+    RTPLocation at = new RTPLocation(null, 12, 70, -8);
+    for (PasteAnchor anchor : PasteAnchor.values()) {
+      PasteOptions opts = new PasteOptions(anchor, false, true);
+      List<BlockPlacement> byLoc = SchematicPlacementPlanner.plan(schem, at, opts);
+      List<BlockPlacement> byCoords =
+          SchematicPlacementPlanner.plan(schem, 12, 70, -8, opts);
+      assertEquals(byLoc, byCoords, "plan parity for anchor " + anchor);
+
+      List<BlockDelta> expectedDeltas =
+          byCoords.stream().map(BlockPlacement::toBlockDelta).toList();
+      assertEquals(
+          expectedDeltas,
+          SchematicPlacementPlanner.planDeltas(schem, 12, 70, -8, opts),
+          "planDeltas coordinate parity for anchor " + anchor);
+      assertEquals(
+          expectedDeltas,
+          SchematicPlacementPlanner.planDeltas(schem, at, opts),
+          "planDeltas location parity for anchor " + anchor);
+
+      List<PlacedBlockEntity> entitiesByLoc =
+          SchematicPlacementPlanner.planBlockEntities(schem, at, opts);
+      List<PlacedBlockEntity> entitiesByCoords =
+          SchematicPlacementPlanner.planBlockEntities(schem, 12, 70, -8, opts);
+      assertEquals(entitiesByLoc.size(), entitiesByCoords.size());
+      for (int i = 0; i < entitiesByLoc.size(); i++) {
+        PlacedBlockEntity a = entitiesByLoc.get(i);
+        PlacedBlockEntity b = entitiesByCoords.get(i);
+        assertEquals(a.x(), b.x());
+        assertEquals(a.y(), b.y());
+        assertEquals(a.z(), b.z());
+        assertEquals(a.data(), b.data());
+      }
+    }
+
+    // Also exercise pasteAir=true, out-of-bounds palette indices, null palette entry, empty entities, and no standable floor
+    LoadedSchematic edgeSchem = new LoadedSchematic() {
+      @Override public SchematicSource source() {
+        return new SchematicSource("edge", java.nio.file.Path.of("edge.schem"), "schem");
+      }
+      @Override public int width() { return 4; }
+      @Override public int height() { return 1; }
+      @Override public int length() { return 1; }
+      @Override public List<String> palette() {
+        return java.util.Arrays.asList(AIR, null, "invalid::[state");
+      }
+      @Override public int paletteIndexAt(int x, int y, int z) {
+        if (x == 0) return -1;
+        if (x == 1) return 99;
+        if (x == 2) return 1;
+        return 2;
+      }
+    };
+    List<BlockPlacement> edgePlacements =
+        SchematicPlacementPlanner.plan(
+            edgeSchem, 0, 64, 0, new PasteOptions(PasteAnchor.SURFACE_CENTER, true, true));
+    assertEquals(1, edgePlacements.size());
+    assertTrue(
+        SchematicPlacementPlanner.planBlockEntities(
+                edgeSchem, 0, 64, 0, PasteOptions.defaults())
+            .isEmpty());
   }
 }

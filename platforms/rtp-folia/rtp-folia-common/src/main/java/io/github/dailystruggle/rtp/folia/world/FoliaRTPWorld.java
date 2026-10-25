@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.ref.WeakReference;
@@ -290,6 +290,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
                     ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                     : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
       } catch (Throwable t) {
+        PlatformHookBitComponent.recordWorldHookDegraded(
+            "FoliaRTPWorld#probeChunkColumn:" + name,
+            t.getClass().getSimpleName() + ": " + t.getMessage());
         RTP.log(java.util.logging.Level.FINE,
             "[RTP] probeChunkColumn failed for world=" + name
                 + " chunk=(" + cx + "," + cz + "): "
@@ -325,7 +328,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       if (regionFile == null) return java.util.Collections.emptyMap();
       return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
           regionFile, rcx, rcz, y, FoliaRTPWorld::canonicaliseBiome);
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordBiomeColorDegraded(
+          "FoliaRTPWorld#readBiomesInRegionFile:" + name,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] readBiomesInRegionFile failed for world=" + name
               + " region=(" + rcx + "," + rcz + "): "
@@ -352,7 +358,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       if (regionFile == null) return java.util.Collections.emptyMap();
       return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
           regionFile, rcx, rcz, y, localIndices, FoliaRTPWorld::canonicaliseBiome);
-    } catch (Throwable t) {
+    } catch (java.io.IOException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordBiomeColorDegraded(
+          "FoliaRTPWorld#sampleBiomesInRegionFile:" + name,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] sampleBiomesInRegionFile failed for world=" + name
               + " region=(" + rcx + "," + rcz + "): "
@@ -365,7 +374,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   public java.nio.file.Path anvilWorldFolder() {
     try {
       return (world == null) ? null : world.getWorldFolder().toPath();
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "FoliaRTPWorld#anvilWorldFolder:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
       return null;
     }
   }
@@ -591,7 +603,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     try {
       World w = world();
       return (w == null) ? null : w.getEnvironment().name();
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "FoliaRTPWorld#environment:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
       return null;
     }
   }
@@ -616,8 +631,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
         for (Object o : c) if (o != null) out.add(o.toString());
         return out;
       }
-    } catch (Throwable ignored) {
-      // Fall through to empty.
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "FoliaRTPWorld#currentUnsafeBlocks",
+          e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     return java.util.Collections.emptySet();
   }
@@ -986,7 +1003,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     if (world == null) return false;
     try {
       return world.getGenerator() == null && world.getBiomeProvider() == null;
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "FoliaRTPWorld#isVanilla:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
       return false;
     }
   }

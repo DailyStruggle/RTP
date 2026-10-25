@@ -1,6 +1,6 @@
 # ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
 
-- **Status:** Proposed (2026-05-23)
+- **Status:** Accepted
 - **Scope:** `rtp-api` (`menu/`, `server/RTPServerAccessor`), `rtp-core` (`common/commands/menu/`), `rtp-bukkit-common`, `rtp-fabric-common` (+ `-common-unobf`), `rtp-plugin` (Paper + Fabric command roots).
 - **Supersedes:** none. Amends the platform-shaped wiring contract assumed by [ADR-035](ADR-035-interactive-menus-book-first.md), [ADR-044](ADR-044-command-tree-menu-reflector.md), [ADR-045](ADR-045-rtp-docs-menu-consumer.md), [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md).
 - **Related:** [ADR-035](ADR-035-interactive-menus-book-first.md) (menu rollout - Paper book renderer + Fabric chat renderer), [ADR-044](ADR-044-command-tree-menu-reflector.md) (`MenuModel` reflector), [rtp-fabric-ADR-011](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md) (Fabric effective-permission resolver, feeds the accessor), [rtp-fabric-ADR-012](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md) (Fabric chat-first renderer; ADR-012 will be amended to consume the accessor introduced here).

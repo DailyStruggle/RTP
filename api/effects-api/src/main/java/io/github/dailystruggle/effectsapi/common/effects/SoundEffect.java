@@ -13,6 +13,10 @@ import java.util.EnumMap;
 public class SoundEffect extends Effect<SoundEffect.SoundKeys> {
     public enum SoundKeys { TYPE, VOLUME, PITCH, DX, DY, DZ }
 
+    public SoundEffect() {
+        this("ENTITY_PLAYER_LEVELUP");
+    }
+
     public SoundEffect(Object defaultSound) {
         super(new EnumMap<>(SoundKeys.class));
         data.put(SoundKeys.TYPE, defaultSound);

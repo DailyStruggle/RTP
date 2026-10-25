@@ -1,16 +1,26 @@
 package io.github.dailystruggle.rtp.api.schematic;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.server.api.ServerAccessor;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Verifies the decode cache added to {@link AbstractFileSchematicPaster} (ADR-058): a schematic
@@ -83,6 +93,75 @@ class AbstractFileSchematicPasterCacheTest {
 
     // load failing file
     org.junit.jupiter.api.Assertions.assertNull(paster.load(nonExistentSource).get());
+  }
+
+  @Test
+  void loadDecodeFailureLogsViaServerAccessorsFirstAndFallsBackToRtpApi() throws Exception {
+    NoopPaster paster = new NoopPaster();
+    SchematicSource nonExistent =
+        new SchematicSource("bad", Path.of("does_not_exist_logging.schem"), "schem");
+
+    ServerAccessor prevServerAccessor = ServerAccessors.get();
+    RTPServerAccessor prevRtpAccessor = RTPAPI.serverAccessor;
+    try {
+      List<String> serverApiLogs = new ArrayList<>();
+      ServerAccessor standaloneAccessor =
+          new ServerAccessor() {
+            @Override
+            public String getServerVersion() {
+              return "test";
+            }
+
+            @Override
+            public String getPlatform() {
+              return "paper";
+            }
+
+            @Override
+            public Integer getServerIntVersion() {
+              return 21;
+            }
+
+            @Override
+            public void log(Level level, String message) {
+              serverApiLogs.add(level + ":" + message);
+            }
+
+            @Override
+            public void log(Level level, String message, Throwable throwable) {
+              serverApiLogs.add(level + ":" + message);
+            }
+          };
+
+      ServerAccessors.set(standaloneAccessor);
+      RTPAPI.serverAccessor = null;
+      paster.load(nonExistent).get();
+      assertEquals(1, serverApiLogs.size(), "logged via standalone ServerAccessors.get()");
+      assertTrue(serverApiLogs.get(0).contains("does_not_exist_logging.schem"));
+      AbstractFileSchematicPaster.logIfPossible(Level.INFO, "direct message");
+      assertEquals(2, serverApiLogs.size());
+
+      List<String> rtpFallbackLogs = new ArrayList<>();
+      RTPServerAccessor fallbackAccessor =
+          (RTPServerAccessor)
+              Proxy.newProxyInstance(
+                  RTPServerAccessor.class.getClassLoader(),
+                  new Class<?>[] {RTPServerAccessor.class},
+                  (proxy, method, args) -> {
+                    if ("log".equals(method.getName()) && args != null && args.length >= 2) {
+                      rtpFallbackLogs.add(args[0] + ":" + args[1]);
+                    }
+                    return null;
+                  });
+      ServerAccessors.set(null);
+      RTPAPI.serverAccessor = fallbackAccessor;
+      paster.load(nonExistent).get();
+      assertEquals(1, rtpFallbackLogs.size(), "fell back to RTPAPI.serverAccessor when ServerAccessors.get() is null");
+      assertTrue(rtpFallbackLogs.get(0).contains("does_not_exist_logging.schem"));
+    } finally {
+      RTPAPI.serverAccessor = prevRtpAccessor;
+      ServerAccessors.set(prevServerAccessor);
+    }
   }
 
   private static LoadedSchematic load(AbstractFileSchematicPaster paster, SchematicSource source)

@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.ref.WeakReference;
@@ -292,7 +292,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   private boolean isResident(int cx, int cz) {
     try {
       return world != null && world.isChunkLoaded(cx, cz);
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "BukkitRTPWorld#isResident:" + name, e.getClass().getSimpleName() + ": " + e.getMessage());
       return false;
     }
   }
@@ -351,6 +353,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
                     ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                     : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
       } catch (Throwable t) {
+        PlatformHookBitComponent.recordWorldHookDegraded(
+            "BukkitRTPWorld#probeChunkColumn:" + name,
+            t.getClass().getSimpleName() + ": " + t.getMessage());
         RTP.log(java.util.logging.Level.FINE,
             "[RTP] probeChunkColumn failed for world=" + name
                 + " chunk=(" + cx + "," + cz + "): "
@@ -389,7 +394,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       if (regionFile == null) return java.util.Collections.emptyMap();
       return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
           regionFile, rcx, rcz, y, BukkitRTPWorld::canonicaliseBiome);
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordBiomeColorDegraded(
+          "BukkitRTPWorld#readBiomesInRegionFile:" + name,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] readBiomesInRegionFile failed for world=" + name
               + " region=(" + rcx + "," + rcz + "): "
@@ -416,7 +424,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       if (regionFile == null) return java.util.Collections.emptyMap();
       return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
           regionFile, rcx, rcz, y, localIndices, BukkitRTPWorld::canonicaliseBiome);
-    } catch (Throwable t) {
+    } catch (java.io.IOException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordBiomeColorDegraded(
+          "BukkitRTPWorld#sampleBiomesInRegionFile:" + name,
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] sampleBiomesInRegionFile failed for world=" + name
               + " region=(" + rcx + "," + rcz + "): "
@@ -561,7 +572,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     try {
       World w = world();
       return (w == null) ? null : w.getEnvironment().name();
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "BukkitRTPWorld#environment:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
       return null;
     }
   }
@@ -571,7 +585,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     try {
       World w = world;
       return (w == null) ? null : w.getWorldFolder().toPath();
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "BukkitRTPWorld#anvilWorldFolder:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
       return null;
     }
   }
@@ -601,8 +618,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         for (Object o : c) if (o != null) out.add(o.toString());
         return out;
       }
-    } catch (Throwable ignored) {
-      // Fall through to empty.
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "BukkitRTPWorld#currentUnsafeBlocks",
+          e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     return java.util.Collections.emptySet();
   }
@@ -1090,7 +1109,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     if (world == null) return false;
     try {
       return world.getGenerator() == null && world.getBiomeProvider() == null;
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "BukkitRTPWorld#isVanilla:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
       return false;
     }
   }
@@ -1127,8 +1149,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     if (world == null) return true;
     try {
       if (world.isChunkLoaded(cx, cz)) return true;
-    } catch (Throwable ignored) {
-      // Fall through to the on-disk probe.
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "BukkitRTPWorld#isChunkLoaded:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     try {
       java.nio.file.Path worldFolder = world.getWorldFolder().toPath();
@@ -1140,7 +1164,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       }
       return io.github.dailystruggle.rtp.anvil.AnvilRegionOccupancyCache
           .isOccupied(regionFile, cx, cz);
-    } catch (Throwable ignored) {
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "BukkitRTPWorld#isChunkGenerated:" + name,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
       return true;
     }
   }

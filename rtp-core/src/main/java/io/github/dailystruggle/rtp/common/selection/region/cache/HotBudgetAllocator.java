@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.cache;
 
+import io.github.dailystruggle.rtp.common.predict.EwmaEstimator;
+import io.github.dailystruggle.rtp.common.predict.WaterFillingAllocator;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -22,7 +25,7 @@ public class HotBudgetAllocator {
     public static final double DEFAULT_EWMA_ALPHA = 0.3;
 
     private final double alpha;
-    private final Map<String, Double> smoothedDemand = new ConcurrentHashMap<>();
+    private final Map<String, EwmaEstimator> smoothedDemand = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> rawDemandCounters = new ConcurrentHashMap<>();
 
     public HotBudgetAllocator() {
@@ -66,15 +69,9 @@ public class HotBudgetAllocator {
                 observed = sink.demandWeight();
             }
 
-            Double current = smoothedDemand.get(name);
-            double updated;
-            if (current == null) {
-                updated = (double) observed;
-            } else {
-                updated = (alpha * observed) + ((1.0 - alpha) * current);
-            }
-            smoothedDemand.put(name, updated);
-            weights.put(name, updated);
+            EwmaEstimator estimator = smoothedDemand.computeIfAbsent(name, k -> EwmaEstimator.ofAlpha(alpha));
+            estimator.recordSample((double) observed);
+            weights.put(name, estimator.mean());
         }
         return weights;
     }
@@ -86,7 +83,18 @@ public class HotBudgetAllocator {
      * @return the EWMA smoothed demand, or 0.0 if unknown
      */
     public double getSmoothedDemand(String sinkName) {
-        return smoothedDemand.getOrDefault(sinkName, 0.0);
+        if (sinkName == null) return 0.0;
+        EwmaEstimator estimator = smoothedDemand.get(sinkName);
+        if (estimator == null) return 0.0;
+        double mean = estimator.mean();
+        return Double.isNaN(mean) ? 0.0 : mean;
+    }
+
+    private double resolveSmoothedDemandOrFallback(String sinkName, double fallback) {
+        EwmaEstimator estimator = (sinkName != null) ? smoothedDemand.get(sinkName) : null;
+        if (estimator == null) return fallback;
+        double mean = estimator.mean();
+        return Double.isNaN(mean) ? fallback : mean;
     }
 
     /**
@@ -147,7 +155,7 @@ public class HotBudgetAllocator {
             costs.put(name, cost);
             totalFloorChunks += floor * cost;
 
-            double demand = smoothedDemand.getOrDefault(name, (double) sink.demandWeight());
+            double demand = resolveSmoothedDemandOrFallback(name, (double) sink.demandWeight());
             normalizedDemands.put(name, demand / cost);
         }
 
@@ -205,6 +213,131 @@ public class HotBudgetAllocator {
                     int newTarget = Math.min(cap, currentTarget + additionalEntries);
                     targets.put(name, newTarget);
                 }
+            }
+        }
+
+        return targets;
+    }
+
+    /**
+     * Pure constrained water-filling allocation function (ADR-124 Section 2 & 6):
+     * {@code x_r = min(d_bar_r, w_r * theta)} chosen so that {@code sum_r x_r = totalBudget}
+     * whenever {@code totalBudget < sum_r d_bar_r}.
+     */
+    public static Map<String, Double> computeWaterFilling(
+            Map<String, Double> deliverableDemands,
+            Map<String, Double> weights,
+            double totalBudget
+    ) {
+        return WaterFillingAllocator.allocate(deliverableDemands, weights, totalBudget);
+    }
+
+    /**
+     * Computes target quotas (in entries) for each sink using water-filling over smoothed demand
+     * after satisfying floor guarantees (ADR-124 Section 2 & 6).
+     */
+    public <T> Map<String, Integer> computeWaterFilledQuotas(
+            Collection<HotSink<T>> sinks,
+            Map<String, SinkConfig> configs,
+            int maxCachedChunks
+    ) {
+        return computeWaterFilledQuotas(sinks, configs, null, maxCachedChunks);
+    }
+
+    /**
+     * Computes target quotas (in entries) for each sink using weighted max-min fairness (water-filling)
+     * with weights {@code consumerWeights} (or smoothed demand when {@code consumerWeights} is null)
+     * after honoring floor guarantees (ADR-124 Section 2 & 6).
+     *
+     * @param sinks           the collection of hot sinks
+     * @param configs         sink-specific configurations (floor and maxCap)
+     * @param consumerWeights optional per-sink consumer attribution weights {@code n_r}
+     * @param maxCachedChunks total resident chunk ceiling for the region
+     * @return map of sink name to target capacity (entry count)
+     */
+    public <T> Map<String, Integer> computeWaterFilledQuotas(
+            Collection<HotSink<T>> sinks,
+            Map<String, SinkConfig> configs,
+            Map<String, Double> consumerWeights,
+            int maxCachedChunks
+    ) {
+        Map<String, Integer> targets = new LinkedHashMap<>();
+        if (sinks == null || sinks.isEmpty() || maxCachedChunks <= 0) {
+            if (sinks != null) {
+                for (HotSink<T> sink : sinks) {
+                    if (sink != null) targets.put(sink.name(), 0);
+                }
+            }
+            return targets;
+        }
+
+        int totalFloorChunks = 0;
+        Map<String, Integer> floors = new LinkedHashMap<>();
+        Map<String, Integer> caps = new LinkedHashMap<>();
+        Map<String, Integer> costs = new LinkedHashMap<>();
+        Map<String, Double> weights = new LinkedHashMap<>();
+
+        for (HotSink<T> sink : sinks) {
+            if (sink == null) continue;
+            String name = sink.name();
+            SinkConfig config = configs != null ? configs.get(name) : null;
+            int floor = config != null ? config.floor() : 0;
+            int maxCap = config != null ? config.maxCap() : Integer.MAX_VALUE;
+            int cost = Math.max(1, sink.chunkCostPerEntry());
+
+            floors.put(name, floor);
+            caps.put(name, maxCap);
+            costs.put(name, cost);
+            totalFloorChunks += floor * cost;
+
+            double rawWeight;
+            if (consumerWeights != null && consumerWeights.containsKey(name)) {
+                rawWeight = Math.max(0.0, consumerWeights.get(name));
+            } else {
+                rawWeight = Math.max(0.0, resolveSmoothedDemandOrFallback(name, (double) sink.demandWeight())) / cost;
+            }
+            weights.put(name, rawWeight);
+        }
+
+        double floorScale = 1.0;
+        if (totalFloorChunks > maxCachedChunks && totalFloorChunks > 0) {
+            floorScale = (double) maxCachedChunks / (double) totalFloorChunks;
+        }
+
+        int remainingChunks = maxCachedChunks;
+        Map<String, Double> extraChunkDemands = new LinkedHashMap<>();
+        for (HotSink<T> sink : sinks) {
+            if (sink == null) continue;
+            String name = sink.name();
+            int floor = floors.get(name);
+            int effectiveFloor = (floorScale < 1.0) ? (int) Math.floor(floor * floorScale) : floor;
+            int cap = caps.get(name);
+            int cost = costs.get(name);
+            int target = Math.min(effectiveFloor, cap);
+            targets.put(name, target);
+            remainingChunks -= target * cost;
+
+            long maxExtraEntries = Math.max(0L, (long) cap - (long) target);
+            double maxExtraChunks = (cap == Integer.MAX_VALUE)
+                    ? (double) maxCachedChunks
+                    : Math.min((double) maxCachedChunks, (double) maxExtraEntries * (double) cost);
+            extraChunkDemands.put(name, Math.max(0.0, maxExtraChunks));
+        }
+        remainingChunks = Math.max(0, remainingChunks);
+
+        if (remainingChunks > 0) {
+            Map<String, Double> allocatedExtraChunks = computeWaterFilling(
+                    extraChunkDemands, weights, (double) remainingChunks);
+            for (HotSink<T> sink : sinks) {
+                if (sink == null) continue;
+                String name = sink.name();
+                int cost = costs.get(name);
+                int currentTarget = targets.get(name);
+                int cap = caps.get(name);
+                double chunkShare = allocatedExtraChunks.getOrDefault(name, 0.0);
+                int additionalEntries = (int) Math.floor((chunkShare + 1e-9) / cost);
+                int newTarget = (int) Math.min((long) cap, (long) currentTarget + Math.max(0, additionalEntries));
+                targets.put(name, newTarget);
             }
         }
 

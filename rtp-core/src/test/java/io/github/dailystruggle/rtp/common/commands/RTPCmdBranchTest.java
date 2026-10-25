@@ -195,6 +195,46 @@ class RTPCmdBranchTest {
     }
 
     @Test
+    @DisplayName("RTP-32: bare /rtp early guard honors a shorter world-default region cooldown override")
+    void testOnCommandBareRtpAllowsShorterWorldDefaultRegionCooldownOverride() {
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("rtp32ShortWorld");
+        accessor.addWorld(world);
+        Region shortRegion = putOverrideRegion("rtp32ShortWorldDefault", false, 5000L);
+        Region previousDefault = ActiveSelection.get().permRegionLookup.get("default");
+        ActiveSelection.get().permRegionLookup.put("default", shortRegion);
+        try {
+            MockRTPPlayer sender = new MockRTPPlayer(
+                    UUID.randomUUID(),
+                    "bareShortOverrideUser",
+                    new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+            sender.setCooldown(60000L);
+            sender.setPermission("rtp.nocooldown", false);
+            sender.setPermission("rtp.noCooldown", false);
+            accessor.addPlayer(sender);
+
+            TeleportData data = new TeleportData();
+            data.time = System.currentTimeMillis() - 10000L;
+            data.completed = true;
+            data.targetRegion = shortRegion;
+            TeleportSessions.current().latestTeleportData.put(sender.uuid(), data);
+
+            String cooldownMsg = (String) ActiveConfigs.get().getConfigValue(
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.cooldownMessage, "");
+            assertTrue(rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[0]));
+            assertFalse(sender.sentMessages.contains(cooldownMsg),
+                    "10s after last teleport, the world-default region's 5s override must allow bare /rtp despite 60s global cooldown");
+        } finally {
+            ActiveSelection.get().permRegionLookup.remove("rtp32ShortWorldDefault");
+            if (previousDefault != null) {
+                ActiveSelection.get().permRegionLookup.put("default", previousDefault);
+            } else {
+                ActiveSelection.get().permRegionLookup.remove("default");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("RTP-32: requested region cooldown applies only to a permitted local region with an override")
     void testRequestedRegionWithOverrideResolution() {
         MockRTPPlayer sender = cooldownSubject("regionPermUser", 0L);

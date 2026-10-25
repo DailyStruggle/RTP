@@ -1,6 +1,6 @@
 # ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-14
 
 ## Context

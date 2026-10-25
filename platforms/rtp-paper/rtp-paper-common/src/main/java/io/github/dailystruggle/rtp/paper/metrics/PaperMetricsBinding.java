@@ -103,7 +103,10 @@ public final class PaperMetricsBinding implements MetricsBinding {
             double[] tps = s.getTPS();
             if (idx >= tps.length) return MetricsSnapshot.UNSAMPLED;
             return tps[idx];
-        } catch (Throwable ignored) {
+        } catch (RuntimeException | LinkageError e) {
+            io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordSamplerDegraded(
+                    "PaperMetricsBinding#safeTpsIndex:" + idx,
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             return MetricsSnapshot.UNSAMPLED;
         }
     }
@@ -112,7 +115,10 @@ public final class PaperMetricsBinding implements MetricsBinding {
         try {
             Server s = Bukkit.getServer();
             return s.getAverageTickTime();
-        } catch (Throwable ignored) {
+        } catch (RuntimeException | LinkageError e) {
+            io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordSamplerDegraded(
+                    "PaperMetricsBinding#safeMspt",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             return MetricsSnapshot.UNSAMPLED;
         }
     }
@@ -121,7 +127,10 @@ public final class PaperMetricsBinding implements MetricsBinding {
         try {
             Server s = Bukkit.getServer();
             return s.getOnlinePlayers().size();
-        } catch (Throwable ignored) {
+        } catch (RuntimeException | LinkageError e) {
+            io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordSamplerDegraded(
+                    "PaperMetricsBinding#safePlayerCount",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             return 0;
         }
     }
@@ -130,7 +139,10 @@ public final class PaperMetricsBinding implements MetricsBinding {
         try {
             Server s = Bukkit.getServer();
             return s.getMaxPlayers();
-        } catch (Throwable ignored) {
+        } catch (RuntimeException | LinkageError e) {
+            io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordSamplerDegraded(
+                    "PaperMetricsBinding#safeMaxPlayers",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
             return 0;
         }
     }

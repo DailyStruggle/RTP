@@ -9,7 +9,7 @@ import java.util.function.Consumer;
  *
  * @since 3.0.0-beta.4
  */
-public interface PlayerLifecycleHook {
+public interface PlayerLifecycleHook extends io.github.dailystruggle.server.api.PlayerLifecycleHook {
 
     /**
      * Subscribe to player join events.
@@ -17,6 +17,7 @@ public interface PlayerLifecycleHook {
      * @param handler invoked with the joining player's UUID; must not be {@code null}
      * @return a closeable that unregisters this handler when closed; never {@code null}
      */
+    @Override
     AutoCloseable onPlayerJoin(Consumer<UUID> handler);
 
     /**
@@ -25,5 +26,6 @@ public interface PlayerLifecycleHook {
      * @param handler invoked with the quitting player's UUID; must not be {@code null}
      * @return a closeable that unregisters this handler when closed; never {@code null}
      */
+    @Override
     AutoCloseable onPlayerQuit(Consumer<UUID> handler);
 }

@@ -1,6 +1,6 @@
 # ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-14
 **Target release:** post-`3.0.0-beta.3` (after ADR-037 / ADR-041 land; closes `CONFIG_COMMAND_SPEC.md` Appendix A12)
 **Supersedes / amends:** scopes ADR-025 (SnakeYAML wrapper) by deciding *how* the wrapper exposes comments on write.

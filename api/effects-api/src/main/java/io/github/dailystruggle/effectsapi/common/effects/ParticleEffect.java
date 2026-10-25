@@ -13,6 +13,10 @@ import java.util.EnumMap;
 public class ParticleEffect extends Effect<ParticleEffect.ParticleKeys> {
     public enum ParticleKeys { TYPE, NUMBER, DX, DY, DZ, SPEED }
 
+    public ParticleEffect() {
+        this("EXPLOSION_NORMAL");
+    }
+
     public ParticleEffect(Object defaultParticle) {
         super(new EnumMap<>(ParticleKeys.class));
         data.put(ParticleKeys.TYPE, defaultParticle);

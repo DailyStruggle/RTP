@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -106,6 +107,8 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
       } finally {
         try {
           if (hookHolder[0] != null) hookHolder[0].run();
+        } catch (Throwable t) {
+          CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("events.unregisterJob", t);
         } finally {
           TestSemaphore.release(callerId, name());
         }
@@ -244,6 +247,7 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
             closeable.close();
           }
         } catch (Throwable t) {
+          CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("events.closeListener", t);
           if (result.threw == null) result.threw = t.getClass().getSimpleName() + ": " + t.getMessage();
           if (emit) {
             RTPRuntime.log(Level.WARNING, "[RTP test/events] error unregistering listener: " + t.getMessage(), t);

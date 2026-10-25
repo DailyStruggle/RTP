@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -96,11 +97,13 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
       // call getLocation from an async context later). From the console
       // this is null and the region tier is skipped.
       RTPLocation callerLoc = null;
-      try {
-        RTPPlayer caller = RTPRuntime.serverAccessor().getPlayer(callerId);
-        if (caller != null) callerLoc = caller.getLocation();
-      } catch (Throwable ignored) {
-        // region probe skipped below
+      if (RTPRuntime.serverAccessor() != null) {
+        try {
+          RTPPlayer caller = RTPRuntime.serverAccessor().getPlayer(callerId);
+          if (caller != null) callerLoc = caller.getLocation();
+        } catch (RuntimeException ignored) {
+          // region probe skipped below
+        }
       }
       final RTPLocation loc = callerLoc;
 
@@ -124,7 +127,13 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
                       Runnable::run);
               ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
             } finally {
-              if (hookHolder[0] != null) hookHolder[0].run();
+              if (hookHolder[0] != null) {
+                try {
+                  hookHolder[0].run();
+                } catch (Throwable t) {
+                  CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("scheduler.unregisterJob", t);
+                }
+              }
             }
           });
       return true;

@@ -4,9 +4,9 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
+import io.github.dailystruggle.rtp.common.selection.region.util.BaseDistanceParameter;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,17 +33,17 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     // Mirrors V2 sub-parameter UX so users see the format and scale.
     subParameters.put("mode", new EnumParameter<>(
         "rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
-    subParameters.put("width", new DistanceParameter(
+    subParameters.put("width", new BaseDistanceParameter(
         "rtp.params", "region width", (sender, s) -> true, 64, 128, 256, 512, 1024));
-    subParameters.put("height", new DistanceParameter(
+    subParameters.put("height", new BaseDistanceParameter(
         "rtp.params", "region height", (sender, s) -> true, 64, 128, 256, 512, 1024));
-    subParameters.put("length", new DistanceParameter(
+    subParameters.put("length", new BaseDistanceParameter(
         "rtp.params", "region length", (sender, s) -> true, 64, 128, 256, 512, 1024));
     subParameters.put("rotation", new IntegerParameter(
         "rtp.params", "rotation in degrees", (sender, s) -> true, 0, 30, 45, 60, 90));
-    subParameters.put("centerx", new DistanceParameter(
+    subParameters.put("centerx", new BaseDistanceParameter(
         "rtp.params", "center point x", (sender, s) -> true, "~", "-~", "0"));
-    subParameters.put("centerz", new DistanceParameter(
+    subParameters.put("centerz", new BaseDistanceParameter(
         "rtp.params", "center point z", (sender, s) -> true, "~", "-~", "0"));
     subParameters.put("uniqueplacements", new IntegerParameter(
         "rtp.params", "chunk radius cleared around each selection ('auto', 0 = off, 1 = landing chunk)", (sender, s) -> true, "auto", 0, 1, 2, 4, 8, 16));
@@ -76,6 +76,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     long cx = getNumber(RectangleParams.centerX, 0L).longValue();
     long cz = getNumber(RectangleParams.centerZ, 0L).longValue();
     long width = getNumber(RectangleParams.width, 256L).longValue();
+    long height = getNumber(RectangleParams.height, 256L).longValue();
 
     // shift point back to origin:
     x -= cx;
@@ -84,6 +85,8 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     int[] input = new int[] {(int) x, (int) z};
 
     input = rotate(input, -degrees);
+    input[0] += (int) (width / 2);
+    input[1] += (int) (height / 2);
 
     // translate to position
     return input[1] * width + input[0];
@@ -121,6 +124,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     long cx = getNumber(RectangleParams.centerX, 0L).longValue();
     long cz = getNumber(RectangleParams.centerZ, 0L).longValue();
     long width = getNumber(RectangleParams.width, 256L).longValue();
+    long height = getNumber(RectangleParams.height, 256L).longValue();
 
     // shift point back to origin:
     long x = coords.x - cx;
@@ -129,6 +133,8 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     int[] input = new int[] {(int) x, (int) z};
 
     input = rotate(input, -degrees);
+    input[0] += (int) (width / 2);
+    input[1] += (int) (height / 2);
 
     // translate to position
     return input[1] * width + input[0];
@@ -175,18 +181,26 @@ public class Rectangle extends MemoryShape<RectangleParams> {
       return (first >= 0L) ? new long[]{first} : EMPTY_LONG_ARRAY;
     }
 
-    // Rotated: probe row/column neighbours (±1, ±width). The floating-point
-    // rotation in {@link #locationToXZ(long, long)} can round two adjacent
-    // grid cells to the same integer chunk; ≤ 2 by the unit-chunk √2 bound.
-    long base = (first >= 0L) ? first : representative;
-    if (base >= 0L) {
-      for (long off : new long[]{1L, -1L, width, -width}) {
-        long cand = base + off;
-        if (cand < 0L || cand >= range) continue;
+    // Rotated: probe the 5x5 cell neighbourhood around (col, row). Two-stage
+    // integer truncation in Shape.rotate can shift each axis by up to 2 cells
+    // (sqrt(2) + 1 < 2.42); still bounded to <= 2 returned preimages.
+    int[] deltas = new int[] {0, 1, -1, 2, -2};
+    outer:
+    for (int dRow : deltas) {
+      long cRow = row + dRow;
+      if (cRow < 0L || cRow >= height) continue;
+      for (int dCol : deltas) {
+        if (dRow == 0 && dCol == 0) continue;
+        long cCol = col + dCol;
+        if (cCol < 0L || cCol >= width) continue;
+        long cand = cRow * width + cCol;
         int[] decoded = locationToXZ(cand);
         if (decoded[0] == cx && decoded[1] == cz) {
           if (first < 0L) first = cand;
-          else if (cand != first) { second = cand; break; }
+          else if (cand != first) {
+            second = cand;
+            break outer;
+          }
         }
       }
     }

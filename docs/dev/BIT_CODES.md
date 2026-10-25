@@ -56,6 +56,8 @@ Generated from the registered BIT catalog. IDs and keys are stable; retired code
 | 7 | `BIT_COMPONENT_UNKNOWN` | ERROR | IBIT | bit | - | Select a registered component or a matching tier/subsystem. |
 | 8 | `BIT_OPTIONAL_UNAVAILABLE` | INFO | PBIT | bit | - | Install zstd-jni to enable Zstandard-backed region-file support. |
 | 9 | `BIT_NAMESPACE_CONFLICT` | ERROR | PBIT | bit | - | Two plugins reserved the same BIT code prefix; change one plugin's prefix or remove one of them. |
+| 10 | `BIT_COVERAGE_AGENT_UNAVAILABLE` | WARNING | PBIT | bit | - | Attach -javaagent:jacocoagent.jar at JVM startup or set coverage: surface in advanced/bit.yml. |
+| 11 | `BIT_CBIT_UNOBSERVED` | INFO | CBIT | bit | - | Exercise the subsystem or run /rtp test to populate continuous test observations. |
 
 ## `GOVERNOR`
 
@@ -171,6 +173,14 @@ Generated from the registered BIT catalog. IDs and keys are stable; retired code
 | 1802 | `RTP_CBIT_PREFILTER_SECTION_UNPARSEABLE` | WARNING | CBIT | pipeline | - | Inspect the reported region file and chunk coordinate or update anvil-api for the new chunk NBT section layout. |
 | 1803 | `RTP_CBIT_STALE_CHUNK_GUARD_TRIPPED` | WARNING | CBIT | pipeline | - | Check region-thread backlog or tune staleChunkRetryLimit in safety.yml (ADR-015). |
 | 1804 | `RTP_CBIT_CHUNK_TICKET_HIGH_WATER` | WARNING | CBIT | pipeline | - | Inspect active chunk ticket counts and activeChunkCap / memory tracker diagnostics (S-002). |
+| 1811 | `RTP_CBIT_LIFECYCLE_CLEANUP_DEGRADED` | WARNING | CBIT | core | - | Inspect server logs for the first-trip stack trace during RTP startup, reload, migration, or shutdown. |
+| 1812 | `RTP_CBIT_ACTION_DISPATCH_DEGRADED` | WARNING | CBIT | action | - | Check action definition commands, reservation lifecycle, and hook bindings in server logs. |
+| 1813 | `RTP_CBIT_MENU_REDEEM_DEGRADED` | WARNING | CBIT | menu | - | Verify menu command tree synchronization and active configuration parsers. |
+| 1814 | `RTP_CBIT_EDITOR_SESSION_DEGRADED` | WARNING | CBIT | editor | - | Inspect web editor session telemetry, schema introspection, or cached config refresh logs. |
+| 1815 | `RTP_CBIT_SETUP_WIZARD_DEGRADED` | WARNING | CBIT | setup | - | Verify setup wizard world enumeration, diff preview, and configuration reload permissions. |
+| 1816 | `RTP_CBIT_PREGEN_EXTRACTOR_DEGRADED` | WARNING | CBIT | fill | - | Inspect region file format readers and world folder resolution for pregenerated chunk extraction. |
+| 1817 | `RTP_CBIT_CONFIG_LOOKUP_DEGRADED` | WARNING | CBIT | config | - | Check active configuration parsers and platform registry hooks for unexpected runtime lookup errors. |
+| 1818 | `RTP_CBIT_TEST_PROBE_CLEANUP_DEGRADED` | WARNING | CBIT | test | - | Inspect IBIT test probe teardown and resource release paths (REQ-RTP-S-002, REQ-RTP-S-004). |
 
 ## `TEST`
 
@@ -251,3 +261,11 @@ Generated from the registered BIT catalog. IDs and keys are stable; retired code
 | 4022 | `TEST_PLATFORM_MENU_RENDERER_DEGRADED` | WARNING | PBIT | platform | - | Check MenuRendererProvider / Adventure book support on this server; fallback rendering is active. |
 | 4023 | `TEST_PLATFORM_WORLD_BORDER_DEGRADED` | WARNING | PBIT | platform | - | Verify WorldBorder packet or native border API compatibility for this server version. |
 | 4024 | `TEST_PLATFORM_PALETTE_RECONCILER_DEGRADED` | WARNING | PBIT | platform | - | Verify platform Material/Biome registry lookup compatibility; string normalization fallback is active. |
+| 4025 | `TEST_PLATFORM_CUSTOM_ITEM_DEGRADED` | WARNING | PBIT | platform | - | Check custom item hook or skull profile API compatibility; material fallback is active. |
+| 4026 | `TEST_PLATFORM_BIOME_COLOR_DEGRADED` | WARNING | PBIT | platform | - | Check Biome map-color or region biome sampling compatibility; categorical palette fallback is active. |
+| 4027 | `TEST_PLATFORM_COMMAND_REGISTRAR_DEGRADED` | WARNING | PBIT | platform | - | Check command map or Brigadier tree sync compatibility for this server version. |
+| 4028 | `TEST_PLATFORM_MESSAGE_FORMAT_DEGRADED` | WARNING | PBIT | platform | - | Check PlaceholderAPI, MiniMessage, or Adventure component serializer compatibility on this server. |
+| 4029 | `TEST_PLATFORM_PLAYER_HOOK_DEGRADED` | WARNING | PBIT | platform | - | Check platform player hook compatibility (view distance, permissions, teleport, or client block changes) for this server version. |
+| 4030 | `TEST_PLATFORM_WORLD_HOOK_DEGRADED` | WARNING | PBIT | platform | - | Check platform world, chunk, scoreboard, or server accessor hook compatibility for this server version. |
+| 4031 | `TEST_PLATFORM_SAMPLER_DEGRADED` | WARNING | PBIT | platform | - | Check backend state sampler or tick-time probe compatibility for this server version. |
+| 4032 | `TEST_PLATFORM_ADDON_HOOK_DEGRADED` | WARNING | PBIT | platform | - | Check addon integration or third-party plugin hook compatibility for this server version. |

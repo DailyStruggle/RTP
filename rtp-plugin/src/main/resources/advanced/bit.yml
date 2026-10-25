@@ -17,6 +17,18 @@ strictConfig: false
 # @default: 200
 gateOutcomeSamples: 200
 
+# Scheduled startup BIT sweep executed asynchronously at tick +2.
+# @type: string
+# @options: [pbit, all, off]
+# @default: pbit
+startupSweep: pbit
+
+# Live diagnostic coverage provider injected into RtpBit.RUNNER.
+# @type: string
+# @options: [auto, surface, jacoco, off]
+# @default: auto
+coverage: auto
+
 # Severity overrides for registered BIT code keys; these take precedence over strictActions.
 # Allowed levels: ERROR, WARNING, INFO, DEBUG, TRACE and OFF. OFF suppresses the finding.
 # Unknown codes and levels are ignored and logged.

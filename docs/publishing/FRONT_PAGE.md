@@ -489,7 +489,7 @@ Six token shapes can be mixed freely in `unsafeBlocks` and `airBlocks` (`advance
 - **Tag + state predicate:** `#minecraft:slabs[waterlogged=true]`.
 - **Wildcard + state predicate:** `*[waterlogged=true]`: one line instead of listing every waterloggable block.
 
-Unknown tags and properties fail open: a config written for a newer MC version still loads on an older one. Malformed tokens are never silent: `[WARNING] [safety.yml] rejected unsafe-blocks token '<token>': <reason>` (the log prefix still names `safety.yml`, where these lists used to live). Block states are only read when a token needs them, and plain-material configs cost nothing extra. On an older install, lists kept in `safety.yml` are moved into `advanced/blocks.yml` on load, and plain-material entries keep working unchanged.
+Unknown tags and properties fail open: a config written for a newer MC version still loads on an older one. Malformed tokens are never silent: `[WARNING] [advanced/blocks.yml] rejected unsafe-blocks token '<token>': <reason>`. Block states are only read when a token needs them, and plain-material configs cost nothing extra. On an older install, lists kept in `safety.yml` are moved into `advanced/blocks.yml` on load, and plain-material entries keep working unchanged.
 
 </details>
 

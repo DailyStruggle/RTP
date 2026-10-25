@@ -84,6 +84,56 @@ public class ReqRtpFabricServerAccessorNoChatTypesTest {
         assertNotNull(accessor);
     }
 
+    @Test
+    public void fabricServerAccessor_logAndConsoleSender_emitZeroAnsiEscapeSequences() {
+        FabricServerAccessor accessor = new FabricServerAccessor();
+        org.apache.logging.log4j.core.Logger coreLogger =
+                (org.apache.logging.log4j.core.Logger) org.apache.logging.log4j.LogManager.getLogger("RTP");
+        java.util.List<String> captured = new java.util.ArrayList<>();
+        org.apache.logging.log4j.core.Appender appender =
+                new org.apache.logging.log4j.core.appender.AbstractAppender(
+                        "Rtp96FabricTestAppender", null, null, true,
+                        org.apache.logging.log4j.core.config.Property.EMPTY_ARRAY) {
+                    @Override
+                    public void append(org.apache.logging.log4j.core.LogEvent event) {
+                        if (event != null && event.getMessage() != null) {
+                            captured.add(event.getMessage().getFormattedMessage());
+                        }
+                    }
+                };
+        appender.start();
+        org.apache.logging.log4j.Level priorLevel = coreLogger.getLevel();
+        coreLogger.setLevel(org.apache.logging.log4j.Level.ALL);
+        coreLogger.addAppender(appender);
+        try {
+            accessor.log(java.util.logging.Level.INFO,
+                    "<rainbow>[RTP]</rainbow> &a[RTP bit] csv,row,#ff8800value");
+            accessor.log(java.util.logging.Level.WARNING,
+                    "&eWarn message with \u00A7ccolor", new RuntimeException("test"));
+            io.github.dailystruggle.rtp.api.entity.RTPCommandSender console =
+                    accessor.getSender(io.github.dailystruggle.rtp.api.RTPAPI.serverId);
+            if (console != null) {
+                console.sendMessage("&bConsole <red>styled</red> #112233line");
+            }
+
+            assertFalse(captured.isEmpty(), "Expected Log4j2 RTP logger to capture messages");
+            for (String msg : captured) {
+                assertFalse(msg.contains("\u001b["),
+                        "RTP-96: log output must not contain ANSI escape sequences, got: " + msg);
+                assertFalse(msg.contains("\u00A7"),
+                        "RTP-96: log output must not contain section color codes, got: " + msg);
+            }
+            assertTrue(captured.get(0).contains("[RTP] [RTP bit] csv,row,value"),
+                    "Expected clean plain text in captured log line: " + captured.get(0));
+        } finally {
+            coreLogger.removeAppender(appender);
+            appender.stop();
+            if (priorLevel != null) {
+                coreLogger.setLevel(priorLevel);
+            }
+        }
+    }
+
     /** Locate {@code FabricServerAccessor.class} on the test runtime classpath. */
     private static Path locateClassFile() throws Exception {
         String resource = FabricServerAccessor.class.getName().replace('.', '/') + ".class";

@@ -181,6 +181,10 @@ public class VerticalAdjustorBaseTest {
         DummyAdjustor adj2 = new DummyAdjustor("dummy_eq_2", def2, null);
 
         assertEquals(adj1, adj2, "Adjustors with matching numerical values and case-insensitive strings should be equal");
+        assertEquals(adj1.hashCode(), adj2.hashCode(),
+                "Equal adjustors must produce identical hashCode even when names and numeric runtime types differ");
+        assertEquals(adj1, adj1, "Reflexive equals must hold");
+        assertFalse(adj1.equals(null), "Direct equals(null) must return false without NPE");
 
         // Different number
         EnumMap<DummyKeys, Object> defDiffNum = new EnumMap<>(DummyKeys.class);

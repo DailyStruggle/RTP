@@ -34,6 +34,8 @@ public final class EwmaEstimator {
     private final int weightNew;
     private final int totalWeight;
     private final boolean unbiasEarlySamples;
+    private final double initialMean;
+    private final long initialValueNanos;
 
     // Fractional state guarded by synchronized monitor
     private double mean = Double.NaN;
@@ -53,7 +55,9 @@ public final class EwmaEstimator {
         this.weightNew = weightNew;
         this.totalWeight = weightHistory + weightNew;
         this.unbiasEarlySamples = unbiasEarlySamples;
-        this.integerMean = new AtomicLong(initialValueNanos);
+        this.initialMean = initialMean;
+        this.initialValueNanos = Math.max(0L, initialValueNanos);
+        this.integerMean = new AtomicLong(this.initialValueNanos);
 
         if (mode == DecayMode.FRACTIONAL && !Double.isNaN(initialMean)) {
             this.mean = initialMean;
@@ -89,6 +93,21 @@ public final class EwmaEstimator {
         }
         double a = 2.0 / (windowSize + 1.0);
         return new EwmaEstimator(DecayMode.FRACTIONAL, windowSize, a, 0, 0, 0L, initialMean, false);
+    }
+
+    /**
+     * Creates an uninitialized fractional EWMA estimator with an explicit smoothing factor &alpha; in (0, 1].
+     * First recorded sample sets the initial mean directly; subsequent samples apply fixed &alpha; blending.
+     *
+     * @param alpha smoothing factor in (0, 1]
+     * @return configured estimator
+     */
+    public static EwmaEstimator ofAlpha(double alpha) {
+        if (Double.isNaN(alpha) || alpha <= 0.0 || alpha > 1.0) {
+            throw new IllegalArgumentException("alpha must be in (0, 1], got " + alpha);
+        }
+        int effWindow = Math.max(1, (int) Math.round((2.0 / alpha) - 1.0));
+        return new EwmaEstimator(DecayMode.FRACTIONAL, effWindow, alpha, 0, 0, 0L, Double.NaN, false);
     }
 
     /**
@@ -153,7 +172,7 @@ public final class EwmaEstimator {
 
         synchronized (this) {
             count++;
-            if (count == 1 && Double.isNaN(mean)) {
+            if (Double.isNaN(mean)) {
                 mean = value;
                 variance = 0.0;
                 return;
@@ -307,5 +326,41 @@ public final class EwmaEstimator {
      */
     public DecayMode decayMode() {
         return mode;
+    }
+
+    /**
+     * Directly overrides the current mean estimate and resets variance to {@code 0.0}.
+     *
+     * @param newMean new mean value (or {@code Double.NaN} to clear in fractional mode)
+     */
+    public void setMean(double newMean) {
+        if (Double.isInfinite(newMean) || (!Double.isNaN(newMean) && newMean < 0.0)) {
+            return;
+        }
+        if (mode == DecayMode.INTEGER_SEVEN_EIGHTHS) {
+            integerMean.set(Double.isNaN(newMean) ? 0L : Math.max(0L, Math.round(newMean)));
+            return;
+        }
+        synchronized (this) {
+            this.mean = newMean;
+            this.variance = 0.0;
+        }
+    }
+
+    /**
+     * Resets the estimator to its initial prior mean (or {@code Double.NaN} if uninitialized)
+     * and clears sample counts and variance.
+     */
+    public void reset() {
+        if (mode == DecayMode.INTEGER_SEVEN_EIGHTHS) {
+            integerMean.set(initialValueNanos);
+            sampleCounter.set(0L);
+            return;
+        }
+        synchronized (this) {
+            this.mean = initialMean;
+            this.variance = 0.0;
+            this.count = 0L;
+        }
     }
 }

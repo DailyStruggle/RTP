@@ -1,6 +1,6 @@
 # ADR-044 — `menu-api` Module for Generalized Interactive Menus
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-15
 **Target release:** `3.0.0-beta.3` (surface + reflector already shipped under `rtp-api`/`rtp-core`); module extraction lands once Stage 5 of `CHECKLIST-generalized-menu.md` completes.
 **Supersedes (in part):** the prior "Command-Tree Menu Reflector" draft of this ADR (which placed `CommandTreeMenuBuilder` permanently in `rtp-core`).

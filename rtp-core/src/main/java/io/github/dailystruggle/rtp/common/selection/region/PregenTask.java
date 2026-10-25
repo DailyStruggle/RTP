@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.governor.RegionShareAllocator;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.GenerationBudget;
@@ -66,6 +67,52 @@ final class PregenTask implements Runnable {
     private final java.util.concurrent.atomic.AtomicReference<ImmediateLoadGovernor.GenerationPermit> immediatePermit = new java.util.concurrent.atomic.AtomicReference<>(null);
     // ADR-028: backlog entry this attempt took; returned to the backlog if the attempt defers.
     private volatile BacklogLocationBuffer.BacklogEntry takenFromBacklog;
+
+    private static final java.util.concurrent.atomic.AtomicLong inlineFallbackCount =
+            new java.util.concurrent.atomic.AtomicLong(0L);
+
+    static long inlineFallbackCount() {
+        return inlineFallbackCount.get();
+    }
+
+    static void resetInlineFallbackCount() {
+        inlineFallbackCount.set(0L);
+    }
+
+    /**
+     * Completes {@link #result} off the calling region thread via the async scheduler so
+     * placement-free dependent stages never run inline on a tick region thread (ADR-123 Section 2 & 11).
+     */
+    private void completeOffRegion(@org.jetbrains.annotations.Nullable GenerationResult value) {
+        try {
+            if (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getScheduler() != null) {
+                RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(() -> result.complete(value));
+                return;
+            }
+        } catch (Throwable t) {
+            inlineFallbackCount.incrementAndGet();
+            RTPRuntime.log(Level.FINE, "[RTP] PregenTask off-region completion rejected; falling back inline: " + t);
+        }
+        result.complete(value);
+    }
+
+    /**
+     * Evaluates whether a speculative background candidate at chunk {@code (cx, cz)} should be
+     * deferred by Folia region steering, honoring the 60 s / 8-deferral Invariant I9 aging bound
+     * and never deferring interactive player-facing work (Invariant I4, ADR-123 Section 7).
+     */
+    boolean shouldDeferBySteering(
+            int cx,
+            int cz,
+            RegionShareAllocator.RegionSteeringWeight weight,
+            boolean pausedOrZeroQuota,
+            long nowNanos
+    ) {
+        if (!speculative() || state == null || state.region == null) {
+            return false;
+        }
+        return state.region.shouldDeferBackgroundCandidate(cx, cz, weight, pausedOrZeroQuota, nowNanos);
+    }
 
     PregenTask(PregenState state, CompletableFuture<GenerationResult> result, long initialAttempt) {
         this.state = state;
@@ -1639,8 +1686,8 @@ final class PregenTask implements Runnable {
                         }
                         recordOutcome("safetyExternal[" + className + "] ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
-                            io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTracker
-                                    .encapsulateClaim((MemoryShape<?>) state.shape, state.world.name(), finalX, finalZ, failedClass);
+                            RegionClaimTracker.encapsulateClaim(
+                                    (MemoryShape<?>) state.shape, state.world.name(), finalX, finalZ, failedClass);
                         }
                         closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);
@@ -1672,7 +1719,7 @@ final class PregenTask implements Runnable {
             // teleport-time preload (viewDistanceTeleport) loads it when a player is waiting.
             if (radius > 0) gate().onRingSkipped();
             closeIfPresent(reservation);
-            result.complete(new GenerationResult(resCoords, i, null));
+            completeOffRegion(new GenerationResult(resCoords, i, null));
             return;
         }
         List<CompletableFuture<Long>> chunks = new ArrayList<>();
@@ -1690,13 +1737,13 @@ final class PregenTask implements Runnable {
             // reservation to the kept queue or closes it.
             ChunkReservation pin = new ChunkReservation(verifiedChunks, state.world);
             closeIfPresent(reservation);
-            result.complete(new GenerationResult(resCoords, i, verifiedChunks, pin));
+            completeOffRegion(new GenerationResult(resCoords, i, verifiedChunks, pin));
             return;
         }
         // Close the per-iteration reservation; ownership of the verifiedChunks set
         // transfers via the returned GenerationResult (matches the prior contract).
         closeIfPresent(reservation);
-        result.complete(new GenerationResult(resCoords, i, verifiedChunks));
+        completeOffRegion(new GenerationResult(resCoords, i, verifiedChunks));
     }
 
     private void completeExhausted() {

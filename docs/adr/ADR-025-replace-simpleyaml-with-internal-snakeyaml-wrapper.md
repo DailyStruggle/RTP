@@ -1,6 +1,6 @@
 # ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-01 (initial) / 2026-05-15 (decision reversed: in-house parser
 chosen over a SnakeYAML-backed wrapper; see *Decision History* below)
 

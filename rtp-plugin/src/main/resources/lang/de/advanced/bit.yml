@@ -12,6 +12,12 @@ strictConfig: false
 # Mindestanzahl der Stichproben, bevor ein Gate als immer oder nie bestanden gilt.
 gateOutcomeSamples: 200
 
+# Geplanter BIT-Startdurchlauf, der bei Tick +2 asynchron ausgeführt wird.
+startupSweep: pbit
+
+# Live-Diagnose-Abdeckungsanbieter, der in RtpBit.RUNNER injiziert wird.
+coverage: auto
+
 # Schweregrade für registrierte BIT-Codes; diese Einstellung hat Vorrang vor strictActions.
 # Zulässig: ERROR, WARNING, INFO, DEBUG, TRACE und OFF. OFF unterdrückt den Befund.
 # Unbekannte Codes und Stufen werden ignoriert und protokolliert.

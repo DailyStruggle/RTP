@@ -1,6 +1,6 @@
 # ADR-074 - Operator-Facing RTP Throughput and Cost Metrics (Paired Rates, EWMA Windows, Color-Coded Readout)
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-23
 
 ## Context

@@ -12,6 +12,12 @@ strictConfig: false
 # 将门判定为始终通过或始终不通过前所需的最少评估次数。
 gateOutcomeSamples: 200
 
+# 在第 +2 刻异步执行的启动 BIT 扫描范围。
+startupSweep: pbit
+
+# 注入到 RtpBit.RUNNER 的实时诊断覆盖率提供器。
+coverage: auto
+
 # 已注册 BIT 代码的严重级别；优先于 strictActions 预设。
 # 可用值：ERROR、WARNING、INFO、DEBUG、TRACE、OFF。OFF 会抑制该问题。
 # 未知代码和级别将被忽略并写入日志。

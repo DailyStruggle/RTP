@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.countdownaddon;
 
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -115,14 +117,55 @@ public final class CountdownHooks {
   private void onSetup(TeleportPipelineTask task) {
     if (!flag(CountdownKeys.delayCountdown)) return;
     if (task == null || task.player() == null) return;
+    if (task.isCancelled() || task.getPhase() != TeleportPipelineTask.Phase.SETUP) return;
 
     UUID id = task.player().uuid();
-    // delay() is reported in milliseconds; round to whole seconds for the countdown.
-    long delayMillis = task.player().delay();
+    // Effective delay is reported in milliseconds; round to whole seconds for the countdown.
+    long delayMillis = effectiveDelayMillis(task);
     int seconds = (int) (delayMillis / 1000L);
     if (seconds <= 0) return;
 
     RTPRuntime.scheduler().runTask(() -> startDelayCountdown(id, seconds, task));
+  }
+
+  static long effectiveDelayMillis(TeleportPipelineTask task) {
+    if (task == null || task.player() == null) return 0L;
+    if (task.isCancelled() || task.getPhase() != TeleportPipelineTask.Phase.SETUP) return 0L;
+    UUID playerId = task.player().uuid();
+    TeleportData data =
+        (playerId != null && TeleportSessions.current() != null)
+            ? TeleportSessions.current().latestTeleportData.get(playerId)
+            : null;
+    if (data != null && data.completed) return 0L;
+
+    RTPCommandSender sender = task.sender();
+    if (sender == null && data != null) {
+      sender = data.sender;
+    }
+    if (sender == null) {
+      sender = task.player();
+    }
+    if (sender.uuid() != null && !sender.uuid().equals(playerId)) {
+      return 0L;
+    }
+    if (sender.hasPermission("rtp.noDelay") || sender.hasPermission("rtp.nodelay")) {
+      return 0L;
+    }
+    Region region = task.region();
+    if (region == null && data != null) {
+      region = data.targetRegion;
+    }
+    return RTP.getDelay(sender, region != null ? region.getSettings() : null);
+  }
+
+  private static boolean isTeleportDone(UUID id, TeleportPipelineTask pipeline) {
+    if (pipeline == null || pipeline.isCancelled()) return true;
+    if (pipeline.getPhase() == TeleportPipelineTask.Phase.CLEANUP) return true;
+    if (id != null && TeleportSessions.current() != null) {
+      TeleportData data = TeleportSessions.current().latestTeleportData.get(id);
+      if (data != null && data.completed) return true;
+    }
+    return false;
   }
 
   /** The teleport was cancelled: drop both bars now instead of letting them count down. */
@@ -145,8 +188,8 @@ public final class CountdownHooks {
   }
 
   private void startDelayCountdown(UUID id, int seconds, TeleportPipelineTask pipeline) {
-    // Cancelled between the setup hook and this scheduled start.
-    if (pipeline.isCancelled()) return;
+    // Cancelled or completed between the setup hook and this scheduled start.
+    if (isTeleportDone(id, pipeline)) return;
     if (RTPRuntime.serverAccessor().getPlayer(id) == null) return;
 
     // Replace any stale countdown for this player.
@@ -159,7 +202,7 @@ public final class CountdownHooks {
         RTPRuntime.scheduler().runTaskTimer(
             () -> {
               RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(id);
-              if (p == null || remaining[0] <= 0 || pipeline.isCancelled()) {
+              if (p == null || remaining[0] <= 0 || isTeleportDone(id, pipeline)) {
                 if (p != null) p.clearProgressBar(DELAY_BAR);
                 Object self = delayTasks.remove(id);
                 if (self != null) RTPRuntime.scheduler().cancelTask(self);

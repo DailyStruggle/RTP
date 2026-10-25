@@ -5,6 +5,8 @@ public enum BitKeys {
     strictActions,
     strictConfig,
     gateOutcomeSamples,
+    startupSweep,
+    coverage,
     overrides,
     version
 }

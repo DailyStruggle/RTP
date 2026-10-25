@@ -40,35 +40,57 @@ public class NeoForgePotionEffect extends Effect<NeoForgePotionKeys> {
 
     @Override
     public void run() {
-        if (!(target instanceof ServerPlayer)) return;
-        ServerPlayer player = (ServerPlayer) target;
+        ServerPlayer player = NeoForgeHandles.unwrapPlayer(target);
+        if (player == null) return;
 
         Object typeObj = data.get(NeoForgePotionKeys.TYPE);
-        if (!(typeObj instanceof MobEffect)) return;
-        MobEffect potion = (MobEffect) typeObj;
-
         int duration  = numAsInt(data.get(NeoForgePotionKeys.DURATION),  200);
         int amplifier = numAsInt(data.get(NeoForgePotionKeys.AMPLIFIER), 0);
         boolean ambient   = boolOrDefault(data.get(NeoForgePotionKeys.AMBIENT),   false);
         boolean particles = boolOrDefault(data.get(NeoForgePotionKeys.PARTICLES), true);
         boolean icon      = boolOrDefault(data.get(NeoForgePotionKeys.ICON),      true);
 
+        applyToPlayer(player, typeObj, duration, amplifier, ambient, particles, icon);
+    }
+
+    static MobEffect resolveMobEffect(Object typeObj) {
+        if (typeObj instanceof MobEffect me) return me;
+        if (typeObj instanceof Holder<?> h && h.value() instanceof MobEffect me) return me;
+        if (typeObj != null) {
+            try {
+                return NeoForgeRegistryResolver.resolve(BuiltInRegistries.MOB_EFFECT, typeObj.toString());
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public static boolean applyToPlayer(ServerPlayer player, Object typeObj,
+                                        int duration, int amplifier,
+                                        boolean ambient, boolean particles, boolean icon) {
+        if (player == null) return false;
+        MobEffect potion = resolveMobEffect(typeObj);
+        if (potion == null) return false;
+
         Object instance = buildInstance(potion, duration, amplifier, ambient, particles, icon);
         if (instance == null) {
             warnOnce("could not construct MobEffectInstance (" + INSTANCE_FAILURE + ")");
-            return;
+            return false;
         }
         Method add = resolveAddEffect(instance.getClass());
         if (add == null) {
             warnOnce("no LivingEntity#addEffect(" + instance.getClass().getSimpleName()
                     + ") method found (mapping drift)");
-            return;
+            return false;
         }
         try {
             add.invoke(player, instance);
+            return true;
         } catch (Throwable t) {
             warnOnce("addEffect threw " + t.getClass().getSimpleName()
                     + (t.getMessage() == null ? "" : ": " + t.getMessage()));
+            return false;
         }
     }
 

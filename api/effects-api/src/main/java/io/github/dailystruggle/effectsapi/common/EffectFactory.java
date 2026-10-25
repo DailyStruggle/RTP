@@ -1,45 +1,97 @@
 package io.github.dailystruggle.effectsapi.common;
 
+import io.github.dailystruggle.effectsapi.common.effects.CommandEffect;
+import io.github.dailystruggle.effectsapi.common.effects.DeathEffect;
+import io.github.dailystruggle.effectsapi.common.effects.DropExpEffect;
+import io.github.dailystruggle.effectsapi.common.effects.DropInventoryEffect;
+import io.github.dailystruggle.effectsapi.common.effects.FireworkEffect;
+import io.github.dailystruggle.effectsapi.common.effects.GlideEffect;
+import io.github.dailystruggle.effectsapi.common.effects.NoteEffect;
+import io.github.dailystruggle.effectsapi.common.effects.ParticleEffect;
+import io.github.dailystruggle.effectsapi.common.effects.PotionEffect;
+import io.github.dailystruggle.effectsapi.common.effects.SoundEffect;
+import io.github.dailystruggle.effectsapi.common.effects.TitleEffect;
 import io.github.dailystruggle.effectsapi.common.spi.ValueCoercer;
+import io.github.dailystruggle.server.api.ServerAccessors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 /**
  * Factory and registry for {@link Effect} prototypes, keyed by name.
  *
- * <p>Platform-neutral as of effects-api-ADR-003: the static Bukkit-effect
- * registration block previously living here has moved to
- * {@code io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer}.
- * Fabric (and any other platform) registers its own concrete effects via
- * {@link #addEffect(String, Effect)} from a parallel platform initializer.
+ * <p>Per ADR-116, {@link #registerBuiltInEffects()} provides the single canonical
+ * registration entry point for all platform-neutral built-in effects across
+ * Bukkit, Fabric (obf + 26.x unobf), and NeoForge.
  */
 public class EffectFactory {
+    /** Canonical built-in effect keys required across every supported platform (ADR-116). */
+    public static final Set<String> BUILT_IN_EFFECT_KEYS = Set.of(
+            "TITLE", "GLIDE", "COMMAND", "DEATH", "DROP_INVENTORY", "DROP_EXP",
+            "SOUND", "PARTICLE", "POTION", "FIREWORK", "NOTE"
+    );
+
+    /** Canonical built-in effect aliases registered alongside {@link #BUILT_IN_EFFECT_KEYS}. */
+    public static final Set<String> BUILT_IN_EFFECT_ALIASES = Set.of(
+            "DROP_EXPERIENCE", "KILL"
+    );
+
     //map name to effect type
     //  this is a runtime solution for effectively a switch statement, to allow addition and removal
     private static final ConcurrentHashMap<String, Effect<?>> effectMap = new ConcurrentHashMap<>();
 
     private static final Set<String> warnedUnknownTypes = ConcurrentHashMap.newKeySet();
 
+    private static final Set<String> warnedUnsupportedPrimitives = ConcurrentHashMap.newKeySet();
+
     private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
 
     /**
-     * Clear the cache of warned unknown effect types. Primarily for tests.
+     * Clear the cache of warned unknown effect types so reloading effects
+     * re-enables warnings for reintroduced unknown effect types.
      */
     public static void clearWarnedUnknownTypes() {
         warnedUnknownTypes.clear();
+    }
+
+    /**
+     * Report once per {@code (platform, primitive)} pair that an effect primitive
+     * is unsupported or could not execute on the active runtime (ADR-116 Decision 3, S-004).
+     */
+    public static void reportUnsupportedPrimitive(
+            @NotNull String platform, @NotNull String primitive, @NotNull String reason) {
+        String key = platform.toUpperCase(Locale.ROOT) + ":" + primitive.toUpperCase(Locale.ROOT);
+        if (warnedUnsupportedPrimitives.add(key)) {
+            Effect.warn("[" + platform + "] Effect primitive '" + primitive
+                    + "' could not be executed: " + reason);
+        }
+    }
+
+    /**
+     * @return immutable snapshot of {@code PLATFORM:PRIMITIVE} keys reported via
+     *         {@link #reportUnsupportedPrimitive(String, String, String)}.
+     */
+    @NotNull
+    public static Set<String> unsupportedPrimitives() {
+        return Collections.unmodifiableSet(new TreeSet<>(warnedUnsupportedPrimitives));
+    }
+
+    /** Clear the reported unsupported-primitive set (for reloads and tests). */
+    public static void clearUnsupportedPrimitives() {
+        warnedUnsupportedPrimitives.clear();
     }
 
     /**
@@ -82,7 +134,70 @@ public class EffectFactory {
     }
 
     public static void addEffect(String effectName, Effect<?> effect) {
-        effectMap.putIfAbsent(effectName.toUpperCase(), effect);
+        effectMap.putIfAbsent(effectName.toUpperCase(Locale.ROOT), effect);
+    }
+
+    /**
+     * Register or replace an effect prototype under {@code effectName}.
+     */
+    public static void putEffect(String effectName, Effect<?> effect) {
+        effectMap.put(effectName.toUpperCase(Locale.ROOT), effect);
+    }
+
+    /**
+     * Single canonical registration entry point for all platform-neutral built-in
+     * effects ({@link #BUILT_IN_EFFECT_KEYS} plus {@link #BUILT_IN_EFFECT_ALIASES})
+     * using platform-neutral default tokens (ADR-116 Decision 3).
+     *
+     * <p>Uses {@link #addEffect(String, Effect)} ({@code putIfAbsent}) so any
+     * platform-specific prototype registered prior to this call is preserved.
+     */
+    public static void registerBuiltInEffects() {
+        addEffect("TITLE", new TitleEffect());
+        addEffect("GLIDE", new GlideEffect());
+        addEffect("COMMAND", new CommandEffect());
+        addEffect("DEATH", new DeathEffect());
+        addEffect("KILL", new DeathEffect());
+        addEffect("DROP_INVENTORY", new DropInventoryEffect());
+        addEffect("DROP_EXP", new DropExpEffect());
+        addEffect("DROP_EXPERIENCE", new DropExpEffect());
+        addEffect("SOUND", new SoundEffect());
+        addEffect("PARTICLE", new ParticleEffect());
+        addEffect("POTION", new PotionEffect());
+        addEffect("FIREWORK", new FireworkEffect());
+        addEffect("NOTE", new NoteEffect());
+    }
+
+    /**
+     * Canonical registration entry point for all built-in effects, binding the
+     * supplied platform-typed default values for {@code SOUND}, {@code PARTICLE},
+     * {@code POTION}, {@code FIREWORK}, and {@code NOTE} (ADR-116 Decision 3).
+     */
+    public static void registerBuiltInEffects(
+            @Nullable Object defaultSound,
+            @Nullable Object defaultParticle,
+            @Nullable Object defaultPotion,
+            @Nullable Object defaultFireworkType,
+            @Nullable Object defaultFireworkColor,
+            @Nullable Object defaultInstrument) {
+        registerBuiltInEffects();
+        if (defaultSound != null) {
+            putEffect("SOUND", new SoundEffect(defaultSound));
+        }
+        if (defaultParticle != null) {
+            putEffect("PARTICLE", new ParticleEffect(defaultParticle));
+        }
+        if (defaultPotion != null) {
+            putEffect("POTION", new PotionEffect(defaultPotion));
+        }
+        if (defaultFireworkType != null || defaultFireworkColor != null) {
+            putEffect("FIREWORK", new FireworkEffect(
+                    defaultFireworkType != null ? defaultFireworkType : "BALL",
+                    defaultFireworkColor != null ? defaultFireworkColor : "WHITE"));
+        }
+        if (defaultInstrument != null) {
+            putEffect("NOTE", new NoteEffect(defaultInstrument));
+        }
     }
 
     public static Enumeration<String> listEffects() {
@@ -90,7 +205,7 @@ public class EffectFactory {
     }
 
     public static void removeEffect(String effectName) {
-        effectMap.remove(effectName.toUpperCase());
+        effectMap.remove(effectName.toUpperCase(Locale.ROOT));
     }
 
     /**
@@ -105,9 +220,9 @@ public class EffectFactory {
     public static <T extends Enum<T>> Effect<T> buildEffect(String name) {
         Effect<T> effect;
         try {
-            effect = (Effect<T>) effectMap.get(name.toUpperCase()).clone();
+            effect = (Effect<T>) effectMap.get(name.toUpperCase(Locale.ROOT)).clone();
         } catch (Throwable throwable) {
-            Logger.getLogger(EffectFactory.class.getName()).log(Level.WARNING, throwable, () -> "Failed to build effect: " + name);
+            ServerAccessors.log(Level.WARNING, "Failed to build effect: " + name, throwable);
             return null;
         }
         return effect;

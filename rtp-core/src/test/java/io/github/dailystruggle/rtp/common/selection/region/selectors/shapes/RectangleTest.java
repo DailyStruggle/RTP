@@ -338,4 +338,76 @@ public class RectangleTest {
         Rectangle shape = new Rectangle("MY_RECT");
         assertEquals("MY_RECT", shape.name);
     }
+
+    @Test
+    void xzToLocation_and_locationToXZ_roundTripAcrossRotations() {
+        long width = 64L;
+        long height = 48L;
+        long cx = 10L;
+        long cz = -20L;
+        long[] rotations = new long[] {0L, 45L, 90L, 180L};
+
+        for (long rotation : rotations) {
+            Rectangle shape = new Rectangle();
+            shape.set(RectangleParams.width, width);
+            shape.set(RectangleParams.height, height);
+            shape.set(RectangleParams.centerX, cx);
+            shape.set(RectangleParams.centerZ, cz);
+            shape.set(RectangleParams.rotation, rotation);
+
+            long range = shape.getRange();
+            long centerLoc = (height / 2) * width + (width / 2);
+            int[] centerXz = shape.locationToXZ(centerLoc);
+            assertEquals(centerLoc, shape.xzToLocation(centerXz[0], centerXz[1]),
+                    "Center location must round-trip for rotation=" + rotation);
+            assertEquals(centerLoc, shape.xzToLocation(new MutableRTPCoords(centerXz[0], centerXz[1])),
+                    "Center MutableRTPCoords must round-trip for rotation=" + rotation);
+
+            for (long loc = 0; loc < range; loc += 37L) {
+                int[] xz = shape.locationToXZ(loc);
+                long fromLong = shape.xzToLocation(xz[0], xz[1]);
+                long fromCoords = shape.xzToLocation(new MutableRTPCoords(xz[0], xz[1]));
+                assertEquals(fromLong, fromCoords,
+                        "xzToLocation overloads must agree at loc=" + loc + " rotation=" + rotation);
+                assertTrue(fromLong >= 0 && fromLong < range,
+                        "xzToLocation must stay within [0, range) at loc=" + loc + " rotation=" + rotation);
+
+                if (rotation == 0L) {
+                    assertEquals(loc, fromLong,
+                            "Unrotated rectangle must round-trip loc=" + loc);
+                } else {
+                    long dRow = Math.abs((fromLong / width) - (loc / width));
+                    long dCol = Math.abs((fromLong % width) - (loc % width));
+                    assertTrue(dRow <= 2 && dCol <= 2,
+                            "Rotated xzToLocation(locationToXZ(loc)) must stay within 2 cells of loc=" + loc
+                                    + " (got " + fromLong + ") for rotation=" + rotation);
+                }
+
+                long[] preimages = shape.chunkToLocations(xz[0], xz[1]);
+                assertTrue(preimages.length >= 1 && preimages.length <= 2,
+                        "chunkToLocations must find 1..2 preimages for decoded chunk at loc=" + loc + " rotation=" + rotation);
+                for (long p : preimages) {
+                    int[] decoded = shape.locationToXZ(p);
+                    assertEquals(xz[0], decoded[0],
+                            "Preimage " + p + " must decode to x=" + xz[0] + " for rotation=" + rotation);
+                    assertEquals(xz[1], decoded[1],
+                            "Preimage " + p + " must decode to z=" + xz[1] + " for rotation=" + rotation);
+                }
+                if (rotation == 0L || rotation == 90L || rotation == 180L) {
+                    boolean containsLoc = false;
+                    for (long p : preimages) {
+                        if (p == loc) {
+                            containsLoc = true;
+                            break;
+                        }
+                    }
+                    assertTrue(containsLoc,
+                            "chunkToLocations(locationToXZ(loc)) must contain loc=" + loc + " for rotation=" + rotation);
+                } else {
+                    assertTrue(shape.contains(xz[0], xz[1]),
+                            "Decoded chunk (" + xz[0] + "," + xz[1] + ") must be contained for rotation=" + rotation);
+                }
+            }
+        }
+    }
 }

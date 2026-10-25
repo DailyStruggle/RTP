@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.api.hooks.RootActionRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
 import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -154,6 +155,8 @@ public final class RTPGuiCommonAddon implements RTPAddon {
         registry.clear();
       }
     } catch (IllegalStateException coreNotLoaded) {
+      PlatformHookBitComponent.recordAddonHookDegraded(
+          "RTPGuiCommonAddon#syncRootActionBinding", coreNotLoaded);
       RTP.log(Level.WARNING,
           "[RTP-GUI] core not loaded; bare /rtp will not open the menu", coreNotLoaded);
     }
@@ -367,11 +370,16 @@ public final class RTPGuiCommonAddon implements RTPAddon {
               classNames.add(line);
             }
           }
-        } catch (Throwable badFile) {
+        } catch (java.io.IOException | RuntimeException badFile) {
+          PlatformHookBitComponent.recordAddonHookDegraded(
+              "RTPGuiCommonAddon#serviceFile",
+              badFile.getClass().getSimpleName() + ": " + badFile.getMessage());
           RTP.log(Level.FINE, "[RTP-GUI] could not read a MenuRenderer service file", badFile);
         }
       }
-    } catch (Throwable t) {
+    } catch (java.io.IOException | RuntimeException t) {
+      PlatformHookBitComponent.recordAddonHookDegraded(
+          "RTPGuiCommonAddon#serviceDiscovery", t);
       RTP.log(Level.WARNING, "[RTP-GUI] MenuRenderer service discovery failed", t);
       return;
     }
@@ -417,7 +425,9 @@ public final class RTPGuiCommonAddon implements RTPAddon {
         if (renderer.key() != null) {
           serviceStyles.add(renderer.key());
         }
-      } catch (Throwable badEntry) {
+      } catch (ReflectiveOperationException | RuntimeException | LinkageError badEntry) {
+        PlatformHookBitComponent.recordAddonHookDegraded(
+            className, badEntry.getClass().getSimpleName() + ": " + badEntry.getMessage());
         RTP.log(Level.FINE, "[RTP-GUI] skipped a MenuRenderer service entry '"
             + className + "': " + badEntry.getClass().getSimpleName() + " " + badEntry.getMessage());
       }
@@ -455,7 +465,7 @@ public final class RTPGuiCommonAddon implements RTPAddon {
     try {
       Class.forName(fqcn, false, RTPGuiCommonAddon.class.getClassLoader());
       return true;
-    } catch (Throwable notPresent) {
+    } catch (ClassNotFoundException | LinkageError notPresent) {
       return false;
     }
   }
@@ -486,7 +496,8 @@ public final class RTPGuiCommonAddon implements RTPAddon {
         if (parent != null && !parent.exists()) parent.mkdirs();
         java.nio.file.Files.move(legacy.toPath(), moved.toPath());
       }
-    } catch (Exception e) {
+    } catch (java.io.IOException | RuntimeException e) {
+      PlatformHookBitComponent.recordAddonHookDegraded("RTPGuiCommonAddon#migrateLegacyRoot", e);
       RTP.log(Level.WARNING,
           "[RTP-GUI] failed to migrate legacy " + fileName + " into addons/", e);
     }

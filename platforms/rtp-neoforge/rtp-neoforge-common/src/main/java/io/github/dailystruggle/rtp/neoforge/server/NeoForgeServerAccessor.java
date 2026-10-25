@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
@@ -167,7 +168,10 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             return net.neoforged.fml.ModList.get().getModContainerById("rtp")
                 .map(c -> c.getModInfo().getVersion().toString())
                 .orElse("unknown");
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeServerAccessor#getPluginVersion",
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return "unknown";
         }
     }
@@ -461,16 +465,16 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     public void log(Level level, String msg) {
         if (!isLoggable(level)) return;
         String formatted = (msg == null) ? "" : formatForLog(msg);
-        String ansi = NeoForgeAnsiText.toAnsiString(prefixForLevel(level) + formatted);
-        org.apache.logging.log4j.LogManager.getLogger("RTP").log(toLog4jLevel(level), ansi);
+        String plain = NeoForgeAnsiText.stripColor(prefixForLevel(level) + formatted);
+        org.apache.logging.log4j.LogManager.getLogger("RTP").log(toLog4jLevel(level), plain);
     }
 
     @Override
     public void log(Level level, String msg, Throwable throwable) {
         if (!isLoggable(level)) return;
         String formatted = (msg == null) ? "" : formatForLog(msg);
-        String ansi = NeoForgeAnsiText.toAnsiString(prefixForLevel(level) + formatted);
-        org.apache.logging.log4j.LogManager.getLogger("RTP").log(toLog4jLevel(level), ansi, throwable);
+        String plain = NeoForgeAnsiText.stripColor(prefixForLevel(level) + formatted);
+        org.apache.logging.log4j.LogManager.getLogger("RTP").log(toLog4jLevel(level), plain, throwable);
     }
 
     private String formatForLog(String msg) {
@@ -545,7 +549,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             }
         }
         org.apache.logging.log4j.LogManager.getLogger("RTP")
-                .info(NeoForgeAnsiText.toAnsiString(format(null, msg)));
+                .info(NeoForgeAnsiText.stripColor(format(null, msg)));
     }
 
     // ---------------------------------------------------------------------------
@@ -861,16 +865,20 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             io.github.dailystruggle.metrics.api.MetricsSnapshot snap = CoreMetrics.instance().snapshot();
             double v = (ticks >= 600) ? snap.tps15m : (ticks >= 100 ? snap.tps5m : snap.tps1m);
             if (!Double.isNaN(v)) return v;
-        } catch (Throwable ignored) {
-            // fall through
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeServerAccessor#getTPS:snapshot",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         MinecraftServer s = server;
         if (s == null) return 20.0;
         try {
             long nanos = s.getAverageTickTimeNanos();
             if (nanos > 0L) return Math.min(1_000_000_000.0 / nanos, 20.0);
-        } catch (Throwable ignored) {
-            // fall through
+        } catch (RuntimeException | LinkageError e) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeServerAccessor#getAverageTickTimeNanos",
+                    e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         return 20.0;
     }
@@ -886,7 +894,10 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             try {
                 RTPCommandSender sender = getSender(player);
                 return sender != null && sender.hasPermission(node);
-            } catch (Throwable t) {
+            } catch (RuntimeException | LinkageError t) {
+                PlatformHookBitComponent.recordWorldHookDegraded(
+                        "NeoForgeServerAccessor#menuPermissionProbe",
+                        t.getClass().getSimpleName() + ": " + t.getMessage());
                 return false;
             }
         };
@@ -900,7 +911,10 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
             if (sender == null) return Collections.emptySet();
             Set<String> perms = sender.getEffectivePermissions();
             return perms == null ? Collections.emptySet() : perms;
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeServerAccessor#menuEffectivePermissions",
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
             return Collections.emptySet();
         }
     }
@@ -928,8 +942,10 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
                     }
                 }
             }
-        } catch (Throwable t) {
-            // fall through
+        } catch (RuntimeException | LinkageError t) {
+            PlatformHookBitComponent.recordWorldHookDegraded(
+                    "NeoForgeServerAccessor#menuRegionDescriptor",
+                    t.getClass().getSimpleName() + ": " + t.getMessage());
         }
         return "";
     }
@@ -969,7 +985,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         public void sendMessage(String message) {
             if (message == null) return;
             org.apache.logging.log4j.LogManager.getLogger("RTP")
-                    .info(NeoForgeAnsiText.toAnsiString(message));
+                    .info(NeoForgeAnsiText.stripColor(message));
         }
 
         @Override public RTPCommandSender clone() { return new NeoForgeConsoleSender(server); }
@@ -1124,7 +1140,9 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
                     for (net.minecraft.server.level.ServerPlayer player : server.getPlayerList().getPlayers()) {
                         server.getCommands().sendCommands(player);
                     }
-                } catch (Throwable t) {
+                } catch (RuntimeException | LinkageError t) {
+                    PlatformHookBitComponent.recordWorldHookDegraded(
+                            "NeoForgeServerAccessor#registerCommands", t);
                     log(Level.WARNING, "[RTP][NeoForge] Dynamic runtime command registration failed: " + t.getMessage());
                 }
             }

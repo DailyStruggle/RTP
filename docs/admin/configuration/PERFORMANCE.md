@@ -23,6 +23,8 @@ Keys marked **Integer / Duration** below accept a plain number or a duration wit
 
 ## Server Health & Timing
 
+> **How `autoTune` composes with baseline settings:** `autoTune: true` acts as a **relative adaptive scaler** on top of your configured baseline ceilings (`syncAllottedTime`, `asyncAllottedTime`, `period`, and per-region `activeChunkCap`) rather than overriding them. Tightening `syncAllottedTime` and keeping `autoTune: true` are pure backend budget controls (invisible to players as long as the `hot` queue stays populated), whereas `viewDistanceSelect: 0` (surrounding view-distance chunks load after arrival rather than before) and `pregeneratedPreference: 0.8` (biases candidate selection toward chunks already generated on disk) are structural per-candidate work-reduction knobs with visible arrival trade-offs.
+
 | Key | Type | Default | Description | Impact |
 |---|---|---|---|---|
 | `autoTune` | Boolean | `true` | Adapt background compute (`asyncAllottedTime`, `syncAllottedTime`), refill cadence (`period`), cold-to-hot promotion rate, per-region hot-cache size (`activeChunkCap`), and chunk-generation concurrency to measured server headroom and player demand. While `true`, the configured budgets below (and region `activeChunkCap`) act as ceilings for background work, while waiting players keep the full configured budgets. Set `false` to run at the fixed configured values and refill once per `period`. | **LOW** |

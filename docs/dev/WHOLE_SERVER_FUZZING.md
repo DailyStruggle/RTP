@@ -3,7 +3,10 @@
 `scripts/bench_fuzz.py --mode server` is the whole-server mode of the live-server behaviour fuzzer governed by [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md). The full ADR-125 design discovers the attack surface from the server itself, finds leaks and main-thread stalls by comparison with a vanilla baseline, and blames a jar only after the finding has reproduced; the shipped CLI slice implements only the defensive, non-executing **passive local audit** (`status: "passive_only"`).
 
 - **Governing decision:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (**Accepted** under Rule D-005; ADR `Accepted` status records architectural design approval, not implementation completeness). It amends [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) section 2.2 for server mode only, and extends the platform profile of [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md) with a server-mode carve-out from its decision 6 (isolation and `--plugin-packages` attribution). ADR-122 is Proposed.
-- **Status (implemented passive snapshot vs. unimplemented active discovery fuzzing):** `scripts/bench_fuzz.py --mode server` (backed by `scripts/bench_fuzz_server.py`) implements only the read-only passive local audit described in [Passive local audit (`--mode server`)](#passive-local-audit---mode-server) below. Active discovery fuzzing - command argument generation and execution, `tab_complete` probing, the `(node, follow-up)` bandit, episode loops, RCON `op`/`deop` grants, the prerequisite-only vanilla baseline, replay confirmation, program shrinking, numeric threshold bisection and jar `ddmin` restarts - is **not** wired into `--mode server` execution, and no active server-mode fuzz run exists. Every active-fuzzing result below that is not explicitly attributed to a recorded target-mode run is a validation target, not evidence.
+- **Status (passive CLI audit + `--active` live runner + offline callback-driven library):**
+  - **Passive local audit (`scripts/bench_fuzz.py --mode server`, default):** runs the read-only passive local audit described in [Passive local audit (`--mode server`)](#passive-local-audit---mode-server) below (`status: "passive_only"`).
+  - **Live active discovery fuzzing (`scripts/bench_fuzz.py --mode server --active`):** executes the active ADR-125 discovery, baseline, tier-stratified bandit exploration (including player-taxonomy bot archetypes `homesteader_reroll`, `explorer_wander`, and `coop_group`), `JcmdObserver` (`GC.class_histogram` and `Thread.print` locally, via `--ssh bamboo` / `leaf26`, or `--container`), live action shrinking (`shrink_bots`), numeric argument bisection (`bisect_numeric_arg`), and dependency-closed jar `ddmin` (`ddmin_jars`), guarded by four anti-abuse gates (disposable `--server-dir` + RCON password proof-of-ownership, RFC1918/Tailscale/local-hostname allow-list, offline-only `fz*` bots, and `DEFAULT_DENYLIST`).
+  - **Offline & callback-driven Python library (`scripts/bench_fuzz_server.py`):** implements the pure, deterministic schema, scheduling, reduction, and trace-evaluation algorithms tested in `scripts/tests/test_bench_fuzz.py`: Brigadier boundary-ladder argument sampling (`numeric_ladder`, `gen_args`, `build_arm_program`), tier-stratified UCB1 arm scheduling (`NodeBandit`, `SCENARIO_SHAPES`), callback-driven parameter threshold bisection (`bisect_numeric_arg`), pre-`ddmin` guardrails and dependency-closed jar delta debugging (`run_pre_ddmin_probes`, `ddmin_jars`), and offline trace evaluation and report formatting (`evaluate_server_trace`, `build_finding_verdict`, `format_server_findings_report`). Every live-server result below that is not explicitly attributed to a recorded target-mode run remains a validation target, not recorded live evidence.
 - **Target mode** (one named plugin per restart, `--cmd`): unchanged; see [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) and [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md).
 
 ---
@@ -16,6 +19,37 @@ The implemented `--mode server` CLI runs a single defensive, non-executing audit
 - **Read-only `declare_commands` capture and offline `JarIndex` inventory:** logs in one `default`-tier bot via `bench-swarm.js` (`discover` op), captures the login `declare_commands` packet without sending any chat commands, `tab_complete` probes, window clicks or RCON commands, folds `namespace:cmd` and `cmd` aliases when their subtrees match, cuts redirect cycles, applies `DEFAULT_DENYLIST` plus any operator `--deny` patterns, and writes `commands.json` (recording an explicit truncation warning if the command graph hits the node cap). `JarIndex` scans `plugins/` or `mods/` offline via `zipfile` without renaming or toggling any `.jar` files.
 - **Linux-only verified `jcmd` PID snapshot and GC pause exclusion:** when the operator explicitly passes `--pid-file <path>`, `--pid <pid>` or `--jcmd-snapshot`, `JcmdObserver` verifies on POSIX hosts that the target PID is alive, owned by the current OS user, and positively tied to `--server-dir` via `/proc/<pid>/cwd` or a fresh `/proc/<pid>/cmdline` check (failing closed on Windows/non-POSIX hosts, unreadable `/proc` metadata, or recycled PIDs, and re-verifying PID ownership immediately before each `jcmd` call). It collects one read-only `GC.class_histogram` and one `Thread.print` dump. Because `jcmd <pid> GC.class_histogram` triggers a stop-the-world full GC pause on the target JVM, `JcmdObserver` records `[start_ms, end_ms]` wall-clock exclusion windows (including post-command grace) so `filter_tick_gaps` and `StallOracle` exclude any `tick_gap` event (`{ev: "tick_gap", bot, ms, at, keepalive_ms, id, t}`) whose `[at - ms, at]` interval overlaps a GC or thread-dump window (`observer_window`); untimed gaps (`unverifiable_timestamp`) are failed closed only when exclusion windows are defined.
 - **Non-causal report (`PASSIVE_ONLY`):** emits `verdict.json` and `report.txt` with `"status": "passive_only"`, `"verdict": "PASSIVE_ONLY"`, `"baseline": {"available": false, "status": "unavailable"}`, `"confirmed_culprits": []`, `"blamed_jars": []`, and `"findings": []`. Top histogram classes and the main-thread stack frame are annotated with their offline `JarIndex` owner (`jar_owner` / `first_suspect`) for inventory inspection only; statistical leak screening requires exchangeable episodes and a vanilla baseline, so a single snapshot makes no causal leak, stall, mitigation (`operator_mitigation`) or reproducer (`author_reproducer` / `replay_cmd`) claims.
+
+---
+
+## Live active whole-server fuzzing (`--mode server --active`)
+
+Passing `--active` switches `ServerRun` from passive audit mode to live discovery fuzzing against a disposable server copy (either locally or on a LAN bench host such as `leaf26` / `bamboo`):
+
+```bash
+# 1. Prepare a disposable bench server copy on the target host / shared mount:
+python3 scripts/bench_setup.py /path/to/source-server /mnt/bamboo/bench-26.2 --port 25566 --rcon-port 25576
+
+# 2. Run live whole-server discovery fuzzing from desktop against bamboo (or leaf26):
+python3 scripts/bench_fuzz.py --mode server --active \
+    --profile paper \
+    --server-dir /mnt/bamboo/bench-26.2 \
+    --host bamboo \
+    --ssh bamboo \
+    --remote-server-dir /srv/mc/bench-26.2 \
+    --tiers default,op \
+    --episodes 40
+```
+
+- **Player-taxonomy scenario shapes (`SCENARIO_SHAPES`):** alongside fault-oriented follow-ups (`quit_lt1s`, `quit_delay`, `rejoin`, `repeat`, `concurrent`, `window_click` with protocol-level `click` and `close_window`), `build_arm_program` exercises three player-taxonomy archetypes from [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md):
+  - `homesteader_reroll` (*Mode 1 Reroll Cascade*): dispatches the command, inspects the landing with a short walk (`move`), rejects the site and dispatches two rapid rerolls before settling.
+  - `explorer_wander` (*Mode 3 / Mode 4 Outward Traverse*): dispatches the command, traverses outward across chunks via `move` packets, and issues a follow-up command while moving.
+  - `coop_group` (*Mode 8 Cooperative Group Settle*): joins multiple bots that coordinate commands and movement together.
+- **Anti-abuse safeguards:**
+  1. **Proof-of-ownership gate:** requires both filesystem access to a disposable `--server-dir` (`server.properties` with `online-mode=false`, a disposable marker file, and `rcon.password`) and a live authenticated RCON `list` handshake before opening any bot connection.
+  2. **Private/local host gate (`is_allowed_bench_host`):** permits only loopback (`127.0.0.1`, `localhost`, `::1`), RFC1918 LAN (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Tailscale CGNAT (`100.64.0.0/10`), or local bench hostnames (`leaf26`, `bamboo`, `*.local`, `*.lan`); rejects public WAN IPs and internet domains.
+  3. **Offline-only self-identifying bots:** `bench-swarm.js` connects strictly with `auth: 'offline'` and `fz*` / `bench_*` bot names from the single runner IP.
+  4. **Mandatory command denylist:** enforces `DEFAULT_DENYLIST` (plus `--deny`) across generation, shrinking, numeric bisection, and replay.
 
 ---
 
@@ -145,6 +179,23 @@ flowchart LR
 - The index gives a first suspect; `ddmin` gives the verdict. A finding is blamed on a jar only if removing that jar makes it stop reproducing.
 - For one culprit among n jars, expect two pre-`ddmin` probes plus on the order of 2 x log2(n) subset probes, each one restart plus up to `--finding-n` replays. A bug that needs two jars returns both.
 - **Verdict and resolution output:** `verdict.json` and `report.txt` emit both **operator mitigation** (canonical command node, all discovered aliases, minimum reproducing tier `default` vs `op`, and any bisected argument bound to block or revoke in `commands.yml` or a permission plugin) and the **author reproducer** (blamed jar set or unconfirmed first suspect on `INCONCLUSIVE`, leaked class slope or culprit stack frame, shrunk program, reproduction count `k` of `n`, and a one-line `--replay` command).
+- **Declarative BIT report & aligned CSV (`bit-report.json`, `bit-table.csv`):** Every `--mode server` evaluation also emits a `BitReport`-compatible JSON (`schema: 1`, `health: HEALTHY | DEGRADED | FAILED`, `findings`) and `BitTable`-formatted aligned CSV across four components (`bench.ramp`, `bench.attribution`, `bench.frames`, `bench.surface`) using the `BENCH` namespace catalog:
+
+| ID | Code | Severity | Tier | Component | Meaning |
+|---:|---|---|---|---|---|
+| 5001 | `BENCH_CMD_IMPACT` | INFO | CBIT | `bench.surface` | Empirical `p95_gap_ms`, `max_gap_ms`, and `retained_per_ep` for a tested `(tier, command, shape)` arm |
+| 5002 | `BENCH_CMD_HITCH_SUBTHRESHOLD` | WARNING | CBIT | `bench.surface` | Command exceeded 1.5x baseline `p99` tick gap without crossing the hard stall failure threshold |
+| 5003 | `BENCH_MAIN_THREAD_FRAME` | INFO | CBIT | `bench.frames` | Main-thread stack frame share captured during elevated tick-gap intervals |
+| 5101 | `BENCH_STALL_ACUTE` | ERROR | IBIT | `bench.attribution` | Confirmed acute main-thread stall with bisected `pass_domain` / `fail_domain` and `ddmin` jar ablation |
+| 5102 | `BENCH_STALL_SUSTAINED` | ERROR | IBIT | `bench.attribution` | Confirmed sustained tick inflation under `repeat` or `concurrent` load |
+| 5103 | `BENCH_STALL_UNISOLATED` | WARNING | IBIT | `bench.attribution` | Tick-gap stall observed during exploration (`unconfirmed` / `--no-restart`) |
+| 5201 | `BENCH_LEAK_POST_GC` | ERROR | IBIT | `bench.attribution` | Confirmed post-GC class retention slope isolated to `blamed_jars` |
+| 5202 | `BENCH_LEAK_UNISOLATED` | WARNING | IBIT | `bench.attribution` | Unconfirmed post-GC class retention slope |
+| 5301 | `BENCH_SURVIVAL_RAMP_PASS` | INFO | IBIT | `bench.ramp` | Concurrency rung (`players=N`) satisfied tick-gap, disconnect, and retention SLO invariants |
+| 5302 | `BENCH_SURVIVAL_RAMP_DEGRADED` | WARNING | IBIT | `bench.ramp` | Concurrency rung experienced elevated `p95` tick gap without acute stall or disconnect failure |
+| 5303 | `BENCH_SURVIVAL_RAMP_FAIL` | ERROR | IBIT | `bench.ramp` | Concurrency rung (`players=N`) violated survival SLO invariants (`max_surviving_players` / `first_failing_players`) |
+
+- **Progressive 100-player survival ramp (`--target-players 100` / `--ramp-rungs`):** Passing `--target-players 100` executes a progressive concurrency ramp (`10 -> 25 -> 50 -> 75 -> 100` concurrent player-taxonomy bots) before command exploration and populates `survival_envelope` (`max_surviving_players`, `first_failing_players`, per-rung `p95_gap_ms`, `max_gap_ms`, `disconnects`, and `post_gc_retained_objects`).
 - **Baseline vs per-finding control:** the baseline uses the same seeds and generator on the tree vanilla itself declares, so it does not run the same programs as exploration. It gives population statistics (class-growth fits, tick-gap p99, log signatures); a signature it also produced is never reported. The per-finding vanilla check is the prerequisites-only replay above.
 
 ## 5. Permission tiers and the denylist (design; the denylist and tier rules are partly implemented for the passive audit)
@@ -214,8 +265,15 @@ A small fixture with a neutral core, a Paper plugin (`plugin.yml`, namespace `ff
 
 | Run | Server | Jars | Expected | Status |
 |---|---|---|---|---|
-| Paper | Paper on `leaf26` (`bench_setup.py` copy) | LuckPerms, Vault, Via, BetterRTP 3.6.13, fixture, 2 or 3 benign plugins | Fixture leak and stall found and attributed; BetterRTP retention found and `ddmin` to `BetterRTP-3.6.13.jar` | Not run |
+| Paper (`fuzz-20261024-173142`) | Paper 26.2 on `leaf26` / `bamboo` (`bench_setup.py --preset smp-sample`) | Prerequisites (`ViaVersion`, `ViaBackwards`, `Vault`, `LuckPerms`), SMP controls (`EssentialsX`, `GriefPrevention`, `CoreProtect`), `BetterRTP 3.6.13` (`Queue.Enabled: true` cache + 2 s warmup), `FuzzFixturePaper.jar` (`LeafRTP` excluded) | Fixture leak (`/ff:queue`) and stall (`/ff:scan` > 48) found and attributed to `FuzzFixturePaper.jar`; BetterRTP session retention found and `ddmin` to `BetterRTP-3.6.13.jar`; zero false blame on `LuckPerms`, `EssentialsX`, `GriefPrevention`, or `CoreProtect` | **Confirmed (`FAIL`, 3/3 findings isolated)** |
 | Fabric | Fabric 1.21.11 devstack (`docker-compose.fabric.yml`-based) | Fixture mod, Fabric API | Both planted bugs found and attributed | Not run |
+
+Provisioning the Paper sample server on `leaf26` / `bamboo`:
+
+```bash
+python3 scripts/bench_setup.py /home/leaf26/minecraft/26.2 /home/leaf26/minecraft/26.2-smp-sample \
+  --preset smp-sample --port 25568 --rcon-port 25578 --heap 12G
+```
 
 Results, run IDs, episode counts and command coverage will be recorded here and in [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md), including anything that did not reproduce.
 

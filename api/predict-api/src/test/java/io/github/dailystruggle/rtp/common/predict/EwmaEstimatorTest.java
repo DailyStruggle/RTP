@@ -156,4 +156,32 @@ class EwmaEstimatorTest {
         assertEquals(threads * perThread, estimator.sampleCount());
         assertTrue(estimator.meanNanos() > 0L);
     }
+
+    @Test
+    @DisplayName("Fractional: ofAlpha, setMean, and reset preserve initial priors and unsampled NaN semantics")
+    void fractional_ofAlphaSetMeanAndReset() {
+        EwmaEstimator unsampled = EwmaEstimator.ofAlpha(0.1);
+        assertTrue(Double.isNaN(unsampled.mean()));
+        unsampled.recordSample(100.0);
+        assertEquals(100.0, unsampled.mean(), 1e-9);
+        unsampled.recordSample(200.0);
+        assertEquals(110.0, unsampled.mean(), 1e-9);
+
+        unsampled.setMean(50.0);
+        assertEquals(50.0, unsampled.mean(), 1e-9);
+        unsampled.recordSample(150.0);
+        assertEquals(60.0, unsampled.mean(), 1e-9);
+
+        unsampled.reset();
+        assertTrue(Double.isNaN(unsampled.mean()));
+        assertEquals(0L, unsampled.sampleCount());
+
+        EwmaEstimator withPrior = EwmaEstimator.ofAlpha(0.1, 25.0);
+        assertEquals(25.0, withPrior.mean(), 1e-9);
+        withPrior.recordSample(125.0);
+        assertEquals(35.0, withPrior.mean(), 1e-9);
+        withPrior.reset();
+        assertEquals(25.0, withPrior.mean(), 1e-9);
+        assertEquals(0L, withPrior.sampleCount());
+    }
 }

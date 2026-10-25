@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -61,7 +62,9 @@ public class SendMessage {
       Class.forName("net.kyori.adventure.text.minimessage.MiniMessage");
       Class.forName("net.kyori.adventure.text.serializer.gson.GsonComponentSerializer");
       return true;
-    } catch (Throwable ignored) {
+    } catch (ClassNotFoundException | LinkageError e) {
+      PlatformHookBitComponent.recordMessageFormatDegraded(
+          "SendMessage#detectMiniMessage", e.getClass().getSimpleName() + ": " + e.getMessage());
       return false;
     }
   }
@@ -307,7 +310,9 @@ public class SendMessage {
     if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(resolved).find()) {
       try {
         return miniFinisher.apply(MiniMessageRenderer.render(resolved));
-      } catch (Throwable t) {
+      } catch (RuntimeException | LinkageError t) {
+        PlatformHookBitComponent.recordMessageFormatDegraded(
+            "MiniMessageRenderer#render", t.getClass().getSimpleName() + ": " + t.getMessage());
         RTP.log(
             Level.FINE,
             "[RTP] MiniMessage render failed; falling back to legacy color codes for: " + text,
@@ -424,7 +429,9 @@ public class SendMessage {
       cachedMinLevel = parsed;
       applyToBukkitLogger(parsed);
       return parsed;
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordMessageFormatDegraded(
+          "SendMessage#resolveMinLevel", t.getClass().getSimpleName() + ": " + t.getMessage());
       return Level.ALL;
     }
   }
@@ -457,8 +464,9 @@ public class SendMessage {
         }
         cursor = cursor.getParent();
       }
-    } catch (Throwable ignored) {
-      // Never let log-config plumbing break the caller.
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordMessageFormatDegraded(
+          "SendMessage#applyToBukkitLogger", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
   }
 
@@ -501,6 +509,13 @@ public class SendMessage {
     message = ChatColor.translateAlternateColorCodes('&', message);
     intercept(level, message);
 
+    if (level.intValue() >= Level.WARNING.intValue()) {
+      for (String s : message.split("\n")) {
+        Bukkit.getLogger().log(level, ChatColor.stripColor(s));
+      }
+      return;
+    }
+
     if (RTPRuntime.serverAccessor().getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
 
     ChatColor color = colorFor(level);
@@ -537,7 +552,9 @@ public class SendMessage {
     if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(legacyText).find()) {
       try {
         return MiniMessageRenderer.render(legacyText);
-      } catch (Throwable t) {
+      } catch (RuntimeException | LinkageError t) {
+        PlatformHookBitComponent.recordMessageFormatDegraded(
+            "MiniMessageRenderer#consoleRender", t.getClass().getSimpleName() + ": " + t.getMessage());
         RTP.log(
             Level.FINE,
             "[RTP] MiniMessage console render failed; falling back to legacy color codes for: "
@@ -561,6 +578,16 @@ public class SendMessage {
     // re-introduced by placeholder substitution. Idempotent.
     formatted = ChatColor.translateAlternateColorCodes('&', formatted);
     intercept(level, formatted);
+
+    if (level.intValue() >= Level.WARNING.intValue()) {
+      String stripped = ChatColor.stripColor(formatted);
+      if (throwable == null) {
+        Bukkit.getLogger().log(level, stripped);
+      } else {
+        Bukkit.getLogger().log(level, stripped, throwable);
+      }
+      return;
+    }
 
     ChatColor color = colorFor(level);
     if (color == null) {

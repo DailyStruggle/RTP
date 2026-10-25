@@ -29,6 +29,10 @@ public class NoteEffect extends Effect<NoteEffect.NoteKeys> {
         TONE
     }
 
+    public NoteEffect() {
+        this("PIANO");
+    }
+
     /**
      * @param defaultInstrument platform instrument default (e.g. Bukkit
      *                          {@code Instrument.PIANO}).

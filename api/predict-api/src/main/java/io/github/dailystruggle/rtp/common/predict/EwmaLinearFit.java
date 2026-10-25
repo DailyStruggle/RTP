@@ -1,5 +1,10 @@
 package io.github.dailystruggle.rtp.common.predict;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Exponentially-weighted online simple linear regression {@code y = intercept + slope * x}
  * for amortised batched or coalesced operation costs (ADR-109, ADR-087).
@@ -152,5 +157,169 @@ public final class EwmaLinearFit {
 
     public synchronized double covarianceXY() {
         return covXY;
+    }
+
+    /**
+     * Lock-free time-windowed Ordinary Least Squares (OLS) slope estimator with post-event
+     * exclusion window, minimum sample count, minimum regressor relative range, and clamped
+     * prior fallback (ADR-087 Section 4.2).
+     *
+     * <p>Holds zero locks and creates zero threads (F-001, ADR-087 Invariant I8).
+     */
+    public static final class WindowedOlsSlope {
+
+        private record Sample(long timestampNanos, double x, double y) {}
+
+        private final long windowNanos;
+        private final long exclusionNanos;
+        private final int minSamples;
+        private final double minRelativeXRange;
+        private final double priorSlope;
+        private final double minSlope;
+        private final double maxSlope;
+
+        private final ConcurrentLinkedDeque<Sample> window = new ConcurrentLinkedDeque<>();
+        private final AtomicLong lastExclusionNanos = new AtomicLong(Long.MIN_VALUE);
+        private final AtomicLong estimateBits;
+
+        public WindowedOlsSlope(
+                long windowNanos,
+                long exclusionNanos,
+                int minSamples,
+                double minRelativeXRange,
+                double priorSlope,
+                double minSlope,
+                double maxSlope
+        ) {
+            if (windowNanos < 1L) {
+                throw new IllegalArgumentException("windowNanos must be >= 1, got " + windowNanos);
+            }
+            if (exclusionNanos < 0L) {
+                throw new IllegalArgumentException("exclusionNanos must be >= 0, got " + exclusionNanos);
+            }
+            if (minSamples < 2) {
+                throw new IllegalArgumentException("minSamples must be >= 2, got " + minSamples);
+            }
+            if (Double.isNaN(minRelativeXRange) || minRelativeXRange < 0.0) {
+                throw new IllegalArgumentException("minRelativeXRange must be >= 0, got " + minRelativeXRange);
+            }
+            if (Double.isNaN(priorSlope) || Double.isNaN(minSlope) || Double.isNaN(maxSlope) || maxSlope < minSlope) {
+                throw new IllegalArgumentException("Invalid slope bounds: prior=" + priorSlope
+                        + ", min=" + minSlope + ", max=" + maxSlope);
+            }
+            this.windowNanos = windowNanos;
+            this.exclusionNanos = exclusionNanos;
+            this.minSamples = minSamples;
+            this.minRelativeXRange = minRelativeXRange;
+            this.priorSlope = Math.max(minSlope, Math.min(maxSlope, priorSlope));
+            this.minSlope = minSlope;
+            this.maxSlope = maxSlope;
+            this.estimateBits = new AtomicLong(Double.doubleToRawLongBits(this.priorSlope));
+        }
+
+        /**
+         * Records a contraction or invalidation event at {@code nowNanos} so samples within the
+         * next {@code exclusionNanos} are ignored.
+         *
+         * @param nowNanos monotonic timestamp in nanoseconds
+         */
+        public void recordExclusionEvent(long nowNanos) {
+            lastExclusionNanos.set(nowNanos);
+        }
+
+        /**
+         * Records a sample {@code (x, y)} at {@code nowNanos}, evicts expired samples outside
+         * {@code windowNanos}, and updates the clamped OLS slope estimate when identification
+         * criteria are met.
+         *
+         * @param x        non-negative regressor value (e.g. held chunk tickets)
+         * @param y        non-negative response value (e.g. post-GC tenured bytes)
+         * @param nowNanos monotonic timestamp in nanoseconds
+         * @return updated or retained slope estimate
+         */
+        public double recordSample(double x, double y, long nowNanos) {
+            if (Double.isNaN(x) || Double.isInfinite(x) || x < 0.0
+                    || Double.isNaN(y) || Double.isInfinite(y) || y < 0.0) {
+                return estimate();
+            }
+            long lastExcl = lastExclusionNanos.get();
+            if (lastExcl != Long.MIN_VALUE && nowNanos >= lastExcl && (nowNanos - lastExcl) <= exclusionNanos) {
+                return estimate();
+            }
+
+            window.addLast(new Sample(nowNanos, x, y));
+            while (!window.isEmpty()) {
+                Sample head = window.peekFirst();
+                if (head == null || nowNanos - head.timestampNanos() <= windowNanos) {
+                    break;
+                }
+                window.pollFirst();
+            }
+
+            List<Sample> samples = new ArrayList<>(window);
+            if (samples.size() < minSamples) {
+                estimateBits.set(Double.doubleToRawLongBits(priorSlope));
+                return priorSlope;
+            }
+
+            double sumX = 0.0;
+            double sumY = 0.0;
+            double minX = Double.POSITIVE_INFINITY;
+            double maxX = Double.NEGATIVE_INFINITY;
+            for (Sample s : samples) {
+                sumX += s.x();
+                sumY += s.y();
+                minX = Math.min(minX, s.x());
+                maxX = Math.max(maxX, s.x());
+            }
+            int n = samples.size();
+            double meanX = sumX / n;
+            double meanY = sumY / n;
+
+            if (meanX <= 0.0 || (maxX - minX) < minRelativeXRange * meanX) {
+                estimateBits.set(Double.doubleToRawLongBits(priorSlope));
+                return priorSlope;
+            }
+
+            double sxx = 0.0;
+            double sxy = 0.0;
+            for (Sample s : samples) {
+                double dx = s.x() - meanX;
+                double dy = s.y() - meanY;
+                sxx += dx * dx;
+                sxy += dx * dy;
+            }
+            if (sxx <= 1e-9) {
+                estimateBits.set(Double.doubleToRawLongBits(priorSlope));
+                return priorSlope;
+            }
+
+            double slope = sxy / sxx;
+            double clamped = Math.max(minSlope, Math.min(maxSlope, slope));
+            estimateBits.set(Double.doubleToRawLongBits(clamped));
+            return clamped;
+        }
+
+        /** Returns the current slope estimate. */
+        public double estimate() {
+            return Double.longBitsToDouble(estimateBits.get());
+        }
+
+        /** Returns the configured prior slope. */
+        public double priorSlope() {
+            return priorSlope;
+        }
+
+        /** Returns the current number of samples retained in the sliding window. */
+        public int windowSampleCount() {
+            return window.size();
+        }
+
+        /** Clears the sliding window, exclusion timestamp, and resets the estimate to {@link #priorSlope()}. */
+        public void reset() {
+            window.clear();
+            lastExclusionNanos.set(Long.MIN_VALUE);
+            estimateBits.set(Double.doubleToRawLongBits(priorSlope));
+        }
     }
 }

@@ -12,6 +12,12 @@ strictConfig: false
 # Minimaal aantal metingen voordat een poort als altijd of nooit geslaagd geldt.
 gateOutcomeSamples: 200
 
+# Geplande BIT-opstartcontrole die asynchroon op tick +2 wordt uitgevoerd.
+startupSweep: pbit
+
+# Live diagnostische dekkingsprovider die in RtpBit.RUNNER wordt geïnjecteerd.
+coverage: auto
+
 # Ernstniveaus voor geregistreerde BIT-codes; deze hebben voorrang op strictActions.
 # Toegestaan: ERROR, WARNING, INFO, DEBUG, TRACE en OFF. OFF onderdrukt de vondst.
 # Onbekende codes en niveaus worden genegeerd en gelogd.

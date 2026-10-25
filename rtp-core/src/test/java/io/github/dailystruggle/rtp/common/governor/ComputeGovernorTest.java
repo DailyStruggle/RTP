@@ -739,4 +739,108 @@ class ComputeGovernorTest {
         assertEquals(2, snap.regionalInflightCount());
         assertEquals(4, snap.regionalInflightCeiling());
     }
+
+    @Test
+    @DisplayName("ADR-124 Section 7: Consumer attribution water-filling properties, Folia f_A < 1 cut, and I4/I11 preservation")
+    void adr124ConsumerAttributionAndProcessCpuCutTests() {
+        Random rnd = new Random(12407L);
+
+        // 1. Property test: water-filling never exceeds d_bar_r, gives every unsatisfied region the same
+        //    per-player share (n-player region gets n * 1-player region share), equals max-min fairness when
+        //    all n_r are equal, and sums to r* when constrained.
+        for (int trial = 0; trial < 50; trial++) {
+            Map<String, Double> demands = new LinkedHashMap<>();
+            Map<String, Double> weights = new LinkedHashMap<>();
+            Map<String, Double> equalWeights = new LinkedHashMap<>();
+            int regionCount = 3 + rnd.nextInt(4);
+            double sumDemands = 0.0;
+            for (int i = 0; i < regionCount; i++) {
+                String r = "reg_" + i;
+                double d = 1.0 + rnd.nextDouble() * 20.0;
+                int nR = 1 + rnd.nextInt(40);
+                demands.put(r, d);
+                weights.put(r, (double) nR);
+                equalWeights.put(r, 1.0);
+                sumDemands += d;
+            }
+            double rStar = sumDemands * (0.15 + rnd.nextDouble() * 0.75); // strictly constrained (< sumDemands)
+            Map<String, Double> alloc = ComputeGovernor.computeWaterFilling(demands, weights, rStar);
+
+            double sumAlloc = 0.0;
+            Double referencePerPlayerShare = null;
+            for (String r : demands.keySet()) {
+                double x = alloc.get(r);
+                double d = demands.get(r);
+                double nR = weights.get(r);
+                assertTrue(x <= d + 1e-9, "Water-filling must never exceed deliverable demand d_bar_r");
+                sumAlloc += x;
+                if (x < d - 1e-6) {
+                    // Unsatisfied region: per-player share x_r / n_r must be identical across all unsatisfied regions
+                    double perPlayer = x / nR;
+                    if (referencePerPlayerShare == null) {
+                        referencePerPlayerShare = perPlayer;
+                    } else {
+                        assertEquals(referencePerPlayerShare, perPlayer, 1e-6,
+                                "Every unsatisfied region must receive the exact same per-player share theta");
+                    }
+                }
+            }
+            assertEquals(rStar, sumAlloc, 1e-6, "Constrained water-filling allocation must sum to r*");
+
+            // With all n_r equal (e.g. 5 players each), allocation equals unweighted max-min fairness (1 player each)
+            Map<String, Double> uniformFive = new LinkedHashMap<>();
+            for (String r : demands.keySet()) uniformFive.put(r, 5.0);
+            Map<String, Double> allocEqual1 = ComputeGovernor.computeWaterFilling(demands, equalWeights, rStar);
+            Map<String, Double> allocEqual5 = ComputeGovernor.computeWaterFilling(demands, uniformFive, rStar);
+            for (String r : demands.keySet()) {
+                assertEquals(allocEqual1.get(r), allocEqual5.get(r), 1e-6,
+                        "Equal n_r across regions must match unweighted max-min fairness");
+            }
+        }
+
+        // 2. Design behaviour test (ADR-124 Section 7): on Folia (regionalTicking = true), process CPU above
+        //    T_proc on two evaluations with RTP async CPU >= 10% cuts l_A (f_A < 1), lowers r*, and cuts
+        //    the lowest-n_r region first while preserving proportional n_r share among unsatisfied regions.
+        governor.reset();
+        governor.setUnitCostsForTesting(2 * MS, 0.5 * MS, 0.5 * MS);
+        ComputeSignals foliaHealthy = ComputeSignals.builder()
+                .autoTune(true)
+                .regionalTicking(true)
+                .configuredAsyncNanos(20 * MS) // asyncRateCap = 10 units/tick
+                .configuredPeriodTicks(20L)
+                .processCpuLoad(ComputeSignals.SampledSignal.fresh(0.40, SEC))
+                .rtpAsyncCpuShare(ComputeSignals.SampledSignal.fresh(0.20, SEC))
+                .region(new ComputeSignals.RegionDemand("popular", 100L, 3.0, 5, 10, 0, false, 40)) // d_bar = 8.0
+                .region(new ComputeSignals.RegionDemand("solo", 20L, 1.0, 5, 10, 0, false, 1))      // d_bar = 2.0
+                .build();
+        ComputeBudget bUnconstrained = governor.evaluate(foliaHealthy, SEC);
+        // Unconstrained: sum(d_bar) = 10.0 == asyncRateCap -> both get full deliverable demand (8.0 and 2.0)
+        assertEquals(10.0, bUnconstrained.targetUnitRate(), 1e-6);
+        assertEquals(8.0, bUnconstrained.plannedRate("popular"), 1e-6);
+        assertEquals(2.0, bUnconstrained.plannedRate("solo"), 1e-6);
+
+        // Two consecutive process CPU breaches (> 0.90 with RTP share >= 0.10) cut l_A in half -> f_A = 0.5 -> r* = 5.0
+        ComputeSignals foliaProcBreach = ComputeSignals.builder()
+                .autoTune(true)
+                .regionalTicking(true)
+                .configuredAsyncNanos(20 * MS)
+                .configuredPeriodTicks(20L)
+                .processCpuLoad(ComputeSignals.SampledSignal.fresh(0.95, SEC))
+                .rtpAsyncCpuShare(ComputeSignals.SampledSignal.fresh(0.20, SEC))
+                .region(new ComputeSignals.RegionDemand("popular", 100L, 3.0, 5, 10, 0, false, 40))
+                .region(new ComputeSignals.RegionDemand("solo", 20L, 1.0, 5, 10, 0, false, 1))
+                .build();
+        governor.evaluate(foliaProcBreach, 2 * SEC);
+        ComputeBudget bCut = governor.evaluate(foliaProcBreach, 3 * SEC);
+
+        assertEquals(5.0, bCut.targetUnitRate(), 1e-6, "Two process CPU breaches must halve l_A and cut r* to 5.0");
+        // Under water-filling with weights 40:1 and r* = 5.0 (both unsatisfied since 5 * 40/41 < 8 and 5 * 1/41 < 2):
+        // popular gets 40 * (5 / 41) = 4.878, solo gets 1 * (5 / 41) = 0.122 (40x ratio)
+        assertEquals(40.0 * bCut.plannedRate("solo"), bCut.plannedRate("popular"), 1e-6);
+        assertEquals(5.0, bCut.plannedRate("popular") + bCut.plannedRate("solo"), 1e-6);
+
+        GovernorSnapshot snap = governor.snapshot();
+        assertEquals(40.0 / 41.0, snap.regionRefillShares().get("popular"), 1e-6);
+        assertEquals(1.0 / 41.0, snap.regionRefillShares().get("solo"), 1e-6);
+    }
 }

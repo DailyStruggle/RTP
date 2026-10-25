@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.PersonalBossBars;
@@ -217,7 +218,8 @@ public final class FoliaRTPPlayer implements RTPPlayer {
                 .whenComplete((s, err) -> completionFuture.complete(err == null && Boolean.TRUE.equals(s)));
           }, () -> completionFuture.complete(false));
           if (scheduled == null) completionFuture.complete(false);
-        } catch (Exception e) {
+        } catch (RuntimeException | LinkageError e) {
+          PlatformHookBitComponent.recordPlayerHookDegraded("FoliaRTPPlayer#buildPlatformTask", e);
           completionFuture.complete(false);
           if (to.getReservation() != null) to.getReservation().close();
         }
@@ -403,13 +405,15 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     java.lang.reflect.Method set = null;
     try {
       get = Player.class.getMethod("getViewDistance");
-    } catch (Throwable ignored) {
-      // older API without per-player view distance; feature no-ops
+    } catch (NoSuchMethodException | SecurityException | LinkageError e) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#getViewDistance", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     try {
       set = Player.class.getMethod("setViewDistance", int.class);
-    } catch (Throwable ignored) {
-      // older API without per-player view distance; feature no-ops
+    } catch (NoSuchMethodException | SecurityException | LinkageError e) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#setViewDistance", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     GET_VIEW_DISTANCE = get;
     SET_VIEW_DISTANCE = set;
@@ -423,7 +427,9 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     try {
       Object v = GET_VIEW_DISTANCE.invoke(player);
       return (v instanceof Integer) ? (Integer) v : -1;
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#getViewDistance", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[RTP] getViewDistance unavailable for " + uuid(), t);
       return -1;
     }
@@ -436,7 +442,9 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     if (player == null || SET_VIEW_DISTANCE == null) return;
     try {
       SET_VIEW_DISTANCE.invoke(player, viewDistance);
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#setViewDistance", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[RTP] setViewDistance(" + viewDistance + ") failed for " + uuid(), t);
     }
   }

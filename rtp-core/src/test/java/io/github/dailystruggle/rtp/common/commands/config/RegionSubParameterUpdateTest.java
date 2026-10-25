@@ -44,7 +44,7 @@ public class RegionSubParameterUpdateTest {
     private ConfigParser<RegionKeys> regionConfig;
     private EnumMap<RegionKeys, Object> regionData;
     private ConfigParser lang;
-    private io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase mockDb;
+    private io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache mockDb;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -53,8 +53,8 @@ public class RegionSubParameterUpdateTest {
 
         Configs configs = ActiveConfigs.get();
 
-        mockDb = mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
-        Field cachedLookupField = io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class
+        mockDb = mock(io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class);
+        Field cachedLookupField = io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache.class
                 .getDeclaredField("cachedLookup");
         cachedLookupField.setAccessible(true);
         cachedLookupField.set(mockDb, new AtomicReference<>(new ConcurrentHashMap<>()));

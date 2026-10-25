@@ -3,5 +3,7 @@
 strictActions: strictActions
 strictConfig: strictConfig
 gateOutcomeSamples: gateOutcomeSamples
+startupSweep: startupSweep
+coverage: coverage
 overrides: overrides
 version: version

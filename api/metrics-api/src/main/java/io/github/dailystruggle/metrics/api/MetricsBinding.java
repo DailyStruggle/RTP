@@ -79,6 +79,26 @@ public interface MetricsBinding {
     default void observeRegion(Object world, int cx, int cz) {}
 
     /**
+     * Sampled online player population {@code P_k} in the tick region owning chunk {@code (chunkX, chunkZ)}
+     * over the last completed {@code EntitySchedulerSampler} rotation (ADR-123 Section 5 & 11).
+     * Returns {@code -1} ({@code NEVER_SAMPLED}) on single-loop runtimes or before the first rotation completes.
+     */
+    default int regionSampledPlayers(UUID worldId, int chunkX, int chunkZ) { return -1; }
+
+    /**
+     * Whether the {@code EntitySchedulerSampler} observed a consecutive-tick interval breach
+     * ({@code >= 2} gaps above 60 ms in 10 ticks, or any single gap above 100 ms) in the tick region
+     * owning chunk {@code (chunkX, chunkZ)} (ADR-123 Section 5).
+     */
+    default boolean regionSamplerBreached(UUID worldId, int chunkX, int chunkZ) { return false; }
+
+    /**
+     * Cumulative count of consecutive-tick overruns ({@code > 60 ms}) observed by the Folia
+     * {@code EntitySchedulerSampler} for {@code rtp_governor_overruns_total} (ADR-123 Section 5 & 10).
+     */
+    default long regionSamplerOverrunsTotal() { return 0L; }
+
+    /**
      * Whether this binding is {@code other} or decorates it. Lets a platform binding that
      * is wrapped (e.g. by a spark decorator) recognise that it is still the installed one.
      */

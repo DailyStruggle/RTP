@@ -11,11 +11,12 @@ This document provides a detailed reference for all configuration options availa
 ## Updating Settings
 
 You can create and update regions through:
-1. **In-game admin menu**: Run `/rtp admin` or `/rtp menu` -> click **Regions**.
-2. **Command line**: Use `/rtp config region <name> <key>=<value>` (e.g. `/rtp config region default shape.radius=625`).
-3. **Direct editing**: Edit `definitions/regions/<name>.yml` on disk and run `/rtp reload`.
+1. **Browser map workspace (`/rtp editor`)**: The recommended first choice - drag region boundaries on a 2D map, pick the target world, and edit `shape` and `vert` settings with live validation ([Web Editor Guide](../WEB_EDITOR_GUIDE.md)).
+2. **Guided setup or in-game menu (`/rtp admin setup` / `/rtp admin`)**: Run `/rtp admin setup` for the multi-world/radius wizard, or `/rtp admin` -> click **Regions**.
+3. **Command line**: Use `/rtp config regions <name> <key>=<value>` (e.g. `/rtp config regions default shape.radius=5000b`).
+4. **Direct editing**: Edit `definitions/regions/<name>.yml` on disk and run `/rtp reload`.
 
-> 📎 See [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full menu and command navigation details.
+> 📎 See [WEB_EDITOR_GUIDE.md](../WEB_EDITOR_GUIDE.md) and [IN_GAME_CONFIG.md](IN_GAME_CONFIG.md) for full editor, menu, and command navigation details.
 
 ---
 
@@ -23,8 +24,8 @@ You can create and update regions through:
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `world` | String | `"[0]"` | The target world for this region. Supports `[0]`, `[1]`, `[2]` placeholders or exact names. |
-| `worldBorderOverride` | Boolean | `false` | If true, the `shape` block is replaced by a square matching the world's vanilla `/worldborder`, and the configured `radius` / `centerRadius` / `centerX` / `centerZ` are ignored. See [Region Size](#region-size-radius-and-centerradius). |
+| `world` | String | `"[0]"` | The target world for this region. Supports `[0]`, `[1]`, `[2]` placeholders or exact names. To enable RTP in another dimension (like `world_nether` or `world_the_end`), create a dedicated region file in `definitions/regions/` and map the world to it in `definitions/worlds/<world>.yml` (via `/rtp editor` or `/rtp admin setup`) rather than changing `default.yml` to send everyone to the nether. |
+| `worldBorderOverride` | Boolean | `false` | **Not generally recommended.** If `true`, replaces the entire `shape` block with a square matching the world's vanilla `/worldborder` and ignores `shape.radius`, `shape.centerRadius`, `centerX`, and `centerZ`. Prefer setting `shape.radius` with a unit suffix (e.g. `2500b` or `5km`) in `definitions/regions/<name>.yml` or `/rtp editor`. See [Region Size](#region-size-radius-and-centerradius). |
 | `requirePermission` | Boolean | `false` | If true, players need `rtp.regions.<name>` permission to use this region. |
 | `override` | String | `"default"` | If a player lacks permission, they are redirected to this region instead. |
 | `cacheCap` | Integer | `50` | Maximum number of safe locations to pre-calculate and store in the background. |
@@ -157,30 +158,30 @@ Rules and gotchas:
 - `centerRadius` must be **smaller** than `radius`. If the two are equal, or `centerRadius` is larger, there is no band left to pick from and the region cannot produce locations.
 - The pickable band is `radius - centerRadius` chunks wide. Raising `centerRadius` to push players away from spawn without raising `radius` shrinks the usable land, so raise both together.
 - Total selectable area is roughly `pi x (radius^2 - centerRadius^2)` chunks for `CIRCLE`, and `(2 x radius)^2 - (2 x centerRadius)^2` chunks for `SQUARE`.
-- Radius is **not** clamped to the vanilla world border unless you ask for it. A `radius` that reaches past the border triggers a startup/reload audit warning and wastes selection attempts on unreachable land; either shrink it, use chunk-inscribed bounding, or set `worldBorderOverride: true`.
-- `worldBorderOverride: true` **replaces the whole `shape` block** with a square derived from the world's `/worldborder` (chunk radius = border size / 32). Your `radius`, `centerRadius`, `centerX`, and `centerZ` are ignored while it is on.
+- Radius is **not** clamped to the vanilla world border unless you ask for it. A `radius` that reaches past the border triggers a startup/reload audit warning and wastes selection attempts on unreachable land; shrink `shape.radius` to fit inside your border using a distance unit suffix (e.g. `radius: 2500b` or `2.5km` for a 5,000-block wide world border).
+- **`worldBorderOverride: true` is generally not recommended.** When enabled, it **replaces the whole `shape` block** with a plain square derived from the world's `/worldborder` (chunk radius = border size / 32) and discards your configured `shape.name`, `radius`, `centerRadius` (spawn exclusion hole), `centerX`, and `centerZ`. Setting `shape.radius` with a unit suffix (`b`, `km`, `c`) in `/rtp editor` or `definitions/regions/<name>.yml` keeps your shape and inner exclusion zone intact.
 - Large radii cost pre-calculation time, not memory: see *Massive Radii* under [Tips for Customization](#tips-for-customization) and the *Backlog Cache (L3)* section below.
 
 #### Where to set the radius
 
-Four places, in increasing precedence:
+Recommended places to configure region distance and geometry:
 
-1. **Shared default** - `defaults.shape.radius` in `config.yml`. Applies to every region whose `shape` key is the literal `"@config"`. This is the right place on a single-world server: set it once.
-2. **Per region** - replace `shape: "@config"` in `regions/<name>.yml` with an inline block. An inline block wins over the shared default and must be complete (copy the `defaults.shape` block from `config.yml` and edit it).
+1. **Browser map workspace (`/rtp editor`) or guided setup (`/rtp admin setup`)** - The recommended first choice: drag the region border visually on the map in `/rtp editor` (or pick a distance preset in `/rtp admin setup`) and apply the diff directly to `definitions/regions/<name>.yml`.
+2. **Per region (`definitions/regions/<name>.yml` or `/rtp config regions <name>`)** - Run `/rtp config regions <region> shape.radius=5000b` (add `--dry-run` to preview), or replace `shape: "@config"` in `definitions/regions/<name>.yml` with an inline `shape:` block:
    ```yaml
    shape:
      name: "CIRCLE"
      mode: "ACCUMULATE"
-     radius: 625          # 10,000 blocks from the center
-     centerRadius: 64     # keep players 1,024+ blocks away from the center
+     radius: 5000b        # 5,000 blocks from the center (or 5km / 312c)
+     centerRadius: 1024b  # keep players 1,024+ blocks away from the center
      centerX: 0
      centerZ: 0
      weight: 1.0
      uniquePlacements: 0
      expand: false
    ```
-3. **Persistent edit from in-game** - `/rtp config regions <region> shape.radius=625` writes the value to the region file. Add `--dry-run` to preview it first.
-4. **One-off teleport** - `/rtp region=default shape=SQUARE radius=256` applies to that teleport only and changes nothing on disk.
+3. **Starter fallback (`defaults.shape.radius` in `config.yml`)** - Applies only to regions whose `shape` key is still the literal `"@config"` fallback token.
+4. **One-off test teleport** - `/rtp region=default shape=SQUARE radius=256c` applies to that single test teleport only (`rtp.params`) and changes nothing on disk.
 
 Changing a radius invalidates cached locations for that region, so the first few `/rtp` calls afterwards may be slower while the cache refills.
 
@@ -261,7 +262,7 @@ Uses explicit side lengths instead of a radius.
 - `rotation`: Rotation in degrees around the center.
 
 #### `POLYGON`
-An arbitrary closed boundary, including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
+An arbitrary closed boundary (such as a triangle, pentagon, hexagon, octagon, or custom map border), including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
 - `vertices`: List of `[x, z]` pairs in traversal order, written Chunky-style - one bracketed pair per list item:
 
   ```yaml

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import io.github.dailystruggle.rtp.anvil.AnvilPrefilter;
-import io.github.dailystruggle.rtp.anvil.AnvilReader;
 import io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache;
 import io.github.dailystruggle.rtp.anvil.AnvilRegionHeaderCache;
 import io.github.dailystruggle.rtp.anvil.ChunkColumnProbe;
@@ -19,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -28,10 +28,12 @@ import org.junit.jupiter.api.Test;
  * the region bytes resident. Reads the ADR-119 reference save ({@code -Drtp.elevation.regionDir}
  * overrides); skips when it is absent.
  */
+@Tag("slow")
 class TerrainSquareProbeBenchmarkTest {
 
   private static final String REGION_DIR = System.getProperty("rtp.elevation.regionDir",
-      "/home/johngoldsmith/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
+      System.getProperty("user.home", "")
+          + "/Documents/GameServers/Minecraft/testServer/RTP-Paper/26.3"
           + "/world/dimensions/minecraft/overworld/region");
   private static final int GROUP = Integer.getInteger("rtp.terrainBench.group", 16);
   private static final int ROUNDS = Integer.getInteger("rtp.terrainBench.rounds", 200);
@@ -79,16 +81,12 @@ class TerrainSquareProbeBenchmarkTest {
       Path file = files.get(rnd.nextInt(files.size()));
       String[] parts = file.getFileName().toString().split("\\.");
       int rx = Integer.parseInt(parts[1]), rz = Integer.parseInt(parts[2]);
-      AnvilRegionHeaderCache.get(file);
-      byte[] bytes;
-      try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(file)) {
-        if (lease == null) continue;
-        bytes = java.util.Arrays.copyOf(lease.buffer(), lease.length());
-      }
+      AnvilRegionHeaderCache.Header hdr = AnvilRegionHeaderCache.get(file);
+      if (hdr == null) continue;
       List<int[]> picks = new ArrayList<>();
       for (int tries = 0; picks.size() < GROUP && tries < 400; tries++) {
         int lx = rnd.nextInt(32), lz = rnd.nextInt(32);
-        if (AnvilReader.INSTANCE.isChunkGenerated(bytes, lx, lz)) picks.add(new int[] {rx * 32 + lx, rz * 32 + lz});
+        if (hdr.isOccupied(lx + lz * 32)) picks.add(new int[] {rx * 32 + lx, rz * 32 + lz});
       }
       if (round == WARMUP) decodes0 = AnvilPrefilter.squareJobDecodes();
       long s = System.nanoTime();

@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.ChunkyRTPShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

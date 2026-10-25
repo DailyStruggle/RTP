@@ -13,6 +13,9 @@ The RTP (Random Teleport) plugin is built with a multi-module architecture to en
 ## Module Breakdown
 
 ### Core & API Modules
+
+> **Building a standalone plugin or mod?** All 14 `api/*` libraries below are published to Maven Central and JitPack with zero `rtp-core` dependencies. See [`../FOR_PLUGIN_AUTHORS.md`](../FOR_PLUGIN_AUTHORS.md) for the 5-file multi-platform plugin blueprint and [`../../api/README.md`](../../api/README.md) for the standalone SDK catalog.
+
 * **rtp-api**: Contains the public interfaces, APIs, and shared models used by the plugin and external integrations ([ADR-011](../adr/ADR-011-rtp-api-separate-module.md), [ADR-051](../adr/ADR-051-two-tier-api-extension-model.md)). Addon developers compile against this module.
 * **rtp-core**: Contains the platform-neutral core logic of the plugin: region management, random location selection algorithms (shapes), 3-tier queue management (`Hot` / `Cold` / `Backlog`), stochastic cost modeling (`predict`), database interactions, and memory tracking (`MemoryTracker`). Internal packages are structured in a 4-tier Directed Acyclic Graph (DAG) to eliminate SonarQube package tangles and isolate domain algorithms from execution pipelines ([ADR-115](../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph.md); see [Package Architecture](../architecture/16-package-dag-and-decision-preservation-graph.md)).
 * **anvil-api** (`api/anvil-api`): Standalone, platform-neutral off-tick region decoder and prefilter framework ([ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-077](../adr/ADR-077-multi-format-region-support.md)). Defines the `RegionFileReader` SPI and ships the built-in Anvil reader (`.mca` / Zlib / LZ4), decoded off the main thread. Addons may register other formats through `RegionFormatRegistry` or a `RegionFileReaderProvider` service; files in an unregistered format (e.g. `.linear`) are ignored and their chunks fall back to the platform's live async chunk load.

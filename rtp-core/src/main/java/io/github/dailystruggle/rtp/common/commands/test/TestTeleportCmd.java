@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.api.RTPResult;
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
@@ -159,6 +160,8 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
       } finally {
         try {
           unregister.run();
+        } catch (Throwable t) {
+          CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("teleport.unregisterJob", t);
         } finally {
           if (!parentHeld) TestSemaphore.release(callerId, name());
         }
@@ -318,6 +321,7 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
     try {
       RTPAPI.cancel(mock.uuid());
     } catch (RuntimeException e) {
+      CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("teleport.abandonCancel", e);
       RTPRuntime.log(Level.WARNING, LOG_PREFIX + "cancel failed for " + mock.uuid(), e);
     }
   }

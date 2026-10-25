@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
 import java.lang.ref.WeakReference;
@@ -199,10 +200,12 @@ public class BukkitRTPPlayer implements RTPPlayer {
           java.lang.reflect.Method m = null;
           try {
             m = p.getClass().getMethod("teleportAsync", Location.class);
-          } catch (Throwable t) {
+          } catch (NoSuchMethodException | SecurityException | LinkageError t) {
             try {
               m = Player.class.getMethod("teleportAsync", Location.class);
-            } catch (Throwable ignored) {
+            } catch (NoSuchMethodException | SecurityException | LinkageError e) {
+              PlatformHookBitComponent.recordPlayerHookDegraded(
+                  "Player#teleportAsync", e.getClass().getSimpleName() + ": " + e.getMessage());
               m = null;
             }
           }
@@ -271,6 +274,7 @@ public class BukkitRTPPlayer implements RTPPlayer {
       } catch (ReflectiveOperationException | RuntimeException e) {
         // teleportAsync unavailable/failed unexpectedly; fall through to the sync path below so
         // the teleport failure is never silently swallowed (REQ-RTP-S-004).
+        PlatformHookBitComponent.recordPlayerHookDegraded("Player#teleportAsync", e);
         RTP.log(Level.WARNING, "[RTP] teleportAsync unavailable, falling back to sync teleport", e);
       }
     }
@@ -295,7 +299,8 @@ public class BukkitRTPPlayer implements RTPPlayer {
     boolean success;
     try {
       success = player.teleport(location);
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordPlayerHookDegraded("Player#teleport", t);
       RTP.log(Level.WARNING, "[RTP] direct teleport threw, falling back to teleportAsync", t);
       return false;
     }
@@ -396,7 +401,9 @@ public class BukkitRTPPlayer implements RTPPlayer {
     try {
       Player.class.getMethod("sendBlockChanges", java.util.Collection.class);
       return true;
-    } catch (NoSuchMethodException e) {
+    } catch (NoSuchMethodException | SecurityException | LinkageError e) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#sendBlockChanges", e.getClass().getSimpleName() + ": " + e.getMessage());
       return false;
     }
   }
@@ -487,13 +494,15 @@ public class BukkitRTPPlayer implements RTPPlayer {
     java.lang.reflect.Method set = null;
     try {
       get = Player.class.getMethod("getViewDistance");
-    } catch (Throwable ignored) {
-      // older API without per-player view distance; feature no-ops
+    } catch (NoSuchMethodException | SecurityException | LinkageError e) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#getViewDistance", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     try {
       set = Player.class.getMethod("setViewDistance", int.class);
-    } catch (Throwable ignored) {
-      // older API without per-player view distance; feature no-ops
+    } catch (NoSuchMethodException | SecurityException | LinkageError e) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#setViewDistance", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     GET_VIEW_DISTANCE = get;
     SET_VIEW_DISTANCE = set;
@@ -506,7 +515,9 @@ public class BukkitRTPPlayer implements RTPPlayer {
     try {
       Object v = GET_VIEW_DISTANCE.invoke(p);
       return (v instanceof Integer) ? (Integer) v : -1;
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#getViewDistance", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[RTP] getViewDistance unavailable for " + uuid(), t);
       return -1;
     }
@@ -518,7 +529,9 @@ public class BukkitRTPPlayer implements RTPPlayer {
     if (p == null || SET_VIEW_DISTANCE == null) return;
     try {
       SET_VIEW_DISTANCE.invoke(p, viewDistance);
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordPlayerHookDegraded(
+          "Player#setViewDistance", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[RTP] setViewDistance(" + viewDistance + ") failed for " + uuid(), t);
     }
   }

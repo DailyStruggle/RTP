@@ -141,6 +141,9 @@ class PregenStateTest {
     @Test
     @DisplayName("build compiles unsafe blocks and handles invalid tokens via SafetyCompilationCache")
     void build_unsafeBlocksAndTokens() {
+        io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache.clear();
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
+        accessor.logMessages.clear();
         ConfigParser<BlocksKeys> blocksParser =
                 (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
         blocksParser.set(BlocksKeys.unsafeBlocks, List.of("LAVA", "WATER", "#invalid_tag:bad!"));
@@ -150,6 +153,9 @@ class PregenStateTest {
         assertNotNull(state);
         assertTrue(state.unsafeBlocks.contains("LAVA"));
         assertTrue(state.unsafeBlocks.contains("WATER"));
+        assertTrue(accessor.logMessages.stream().anyMatch(
+                msg -> msg.contains("[advanced/blocks.yml] rejected unsafe-blocks token '#INVALID_TAG:BAD!'")),
+                "Rejected unsafe-blocks token warning must name [advanced/blocks.yml]; logs=" + accessor.logMessages);
     }
 
     @Test

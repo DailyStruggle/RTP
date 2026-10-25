@@ -590,11 +590,11 @@ public class TeleportPipelineTaskMutationTest {
         List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
         MockRTPPlayer player = eventPlayer("SchemFailP", events);
         LoadedSchematic schem = new TestSchematic(3, 3, 3, 0, 0);
+        String savedUnsafe = TeleportPipelineTask.ConfigCache.unsafe;
+        TeleportPipelineTask.ConfigCache.unsafe = "UNSAFE_FOOTING";
         TeleportPipelineTask task = schematicTeleportTask(player, createTestRegion("schem_fail_reg"),
                 recordingPaster(schem, () -> { throw new LinkageError("paste exploded"); }), schem);
         TeleportSessions.current().processingPlayers.add(player.uuid());
-        String savedUnsafe = TeleportPipelineTask.ConfigCache.unsafe;
-        TeleportPipelineTask.ConfigCache.unsafe = "UNSAFE_FOOTING";
         try {
             task.run();
             for (int i = 0; i < 3; i++) accessor.getMockScheduler().tick(1);
@@ -625,10 +625,6 @@ public class TeleportPipelineTaskMutationTest {
         ChunkSet chunkSet = new ChunkSet(world, 3, 3, chunks, CompletableFuture.completedFuture(true));
         ChunkReservation res = new ChunkReservation(chunkSet, world);
 
-        GenerationContext ctx = new GenerationContext(player, player, null);
-        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
-        task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
-
         // Turn on all relevant flags
         ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.setRespawnOnTeleport, true);
         TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
@@ -636,6 +632,10 @@ public class TeleportPipelineTaskMutationTest {
         TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000;
         TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
         TeleportPipelineTask.ConfigCache.teleportMessage = "You arrived safely!";
+
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
+        task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
 
         ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
 
@@ -701,12 +701,12 @@ public class TeleportPipelineTaskMutationTest {
         ChunkSet chunkSet = new ChunkSet(world, 3, 3, chunks, CompletableFuture.completedFuture(true));
         ChunkReservation res = new ChunkReservation(chunkSet, world);
 
+        TeleportPipelineTask.ConfigCache.unsafe = "Destination was unsafe!";
+        TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
+
         GenerationContext ctx = new GenerationContext(player, player, null);
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
         task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
-
-        TeleportPipelineTask.ConfigCache.unsafe = "Destination was unsafe!";
-        TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
 
         ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 0L);
         ActiveDatabase.setAccessor(Mockito.mock(DatabaseAccessor.class));
@@ -921,6 +921,9 @@ public class TeleportPipelineTaskMutationTest {
     void processGenerationResult_chunk_window_loading() throws Exception {
         Region reg = createTestRegion("chunk_win_reg");
         SettablePlayer player = createPlayer("ChunkWinP");
+        // Set viewDistanceTeleport to 1 (3x3 chunk window: -1..1 x -1..1 = 9 chunks)
+        TeleportPipelineTask.ConfigCache.viewDistanceTeleport = 1;
+
         GenerationContext ctx = new GenerationContext(player, player, null);
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg);
 
@@ -934,9 +937,6 @@ public class TeleportPipelineTaskMutationTest {
         Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
         fData.setAccessible(true);
         fData.set(task, data);
-
-        // Set viewDistanceTeleport to 1 (3x3 chunk window: -1..1 x -1..1 = 9 chunks)
-        TeleportPipelineTask.ConfigCache.viewDistanceTeleport = 1;
 
         RTPCoords targetCoords = new RTPCoords(world.name(), 32, 64, 48); // cx=2, cz=3
         GenerationResult genResult = new GenerationResult(targetCoords, 3L, null);
@@ -2059,15 +2059,15 @@ public class TeleportPipelineTaskMutationTest {
         ChunkSet chunkSet = new ChunkSet(world, 3, 3, chunks, CompletableFuture.completedFuture(true));
         ChunkReservation res = new ChunkReservation(chunkSet, world);
 
-        GenerationContext ctx = new GenerationContext(player, player, null);
-        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
-        task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
-
         // Test lockAfterUses == 0 (boundary check: does not record)
         TeleportPipelineTask.ConfigCache.lockAfterUses = 0;
         TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = false;
         TeleportPipelineTask.ConfigCache.postTeleportQueueing = false;
         ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 0L);
+
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
+        task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
 
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis();
@@ -2109,12 +2109,12 @@ public class TeleportPipelineTaskMutationTest {
         ChunkSet chunkSet = new ChunkSet(world, 3, 3, chunks, CompletableFuture.completedFuture(true));
         ChunkReservation res = new ChunkReservation(chunkSet, world);
 
+        TeleportPipelineTask.ConfigCache.viewDistanceTeleport = 2;
+        TeleportPipelineTask.ConfigCache.viewDistanceRestoreInterval = 100L;
+
         GenerationContext ctx = new GenerationContext(player, player, null);
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, res);
         task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
-
-        TeleportPipelineTask.ConfigCache.viewDistanceTeleport = 2;
-        TeleportPipelineTask.ConfigCache.viewDistanceRestoreInterval = 100L;
 
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis() - 50L;
@@ -2187,6 +2187,8 @@ public class TeleportPipelineTaskMutationTest {
         Region reg = createTestRegion("msg_reg");
         RTPCoords coords = new RTPCoords(world.name(), 10, 64, 10);
 
+        TeleportPipelineTask.ConfigCache.unsafe = "Destination was unsafe!";
+
         GenerationContext ctx = new GenerationContext(player, player, null);
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords, null);
 
@@ -2202,7 +2204,6 @@ public class TeleportPipelineTaskMutationTest {
             fData.set(task, data);
         } catch (Exception ignored) {}
 
-        TeleportPipelineTask.ConfigCache.unsafe = "Destination was unsafe!";
         GenerationResult failureRes = new GenerationResult(
                 null, 0L, (ChunkSet) null);
 
@@ -3466,17 +3467,16 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
 
         // 2. respawned = true with duration > 0, lockAfterUses > 0, postTeleportQueueing = true
+        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
+        TeleportPipelineTask.ConfigCache.lockAfterUses = 5L;
+        TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000L;
+        TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
         TeleportPipelineTask task2 = new TeleportPipelineTask(ctx, reg);
         TeleportData data2 = new TeleportData();
         data2.sender = player;
         data2.targetRegion = reg;
         data2.completed = false;
         tpDataField.set(task2, data2);
-
-        ActiveConfigs.get().getParser(SafetyKeys.class).set(SafetyKeys.invulnerabilityTime, 5L);
-        TeleportPipelineTask.ConfigCache.lockAfterUses = 5L;
-        TeleportPipelineTask.ConfigCache.lockAfterResetMillis = 60000L;
-        TeleportPipelineTask.ConfigCache.postTeleportQueueing = true;
         try {
             task2.completeDeathTeleport(true);
             assertTrue(data2.completed);

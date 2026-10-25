@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -46,9 +47,11 @@ class SchematicModelsTest {
     assertEquals(64, bp.y());
     assertEquals(20, bp.z());
     assertEquals("minecraft:stone", bp.blockState());
+    assertEquals(new BlockDelta(10, 64, 20, "minecraft:stone"), bp.toBlockDelta());
     assertTrue(bp.toString().contains("BlockPlacement"));
 
     BlockPlacement bp2 = new BlockPlacement(10, 64, 20, "minecraft:stone");
+    assertTrue(bp.equals(bp));
     assertEquals(bp, bp2);
     assertEquals(bp.hashCode(), bp2.hashCode());
     assertFalse(bp.equals(null));

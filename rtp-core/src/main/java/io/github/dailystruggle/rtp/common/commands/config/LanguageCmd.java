@@ -27,8 +27,7 @@ import java.util.logging.Level;
 public class LanguageCmd extends BaseRTPCmdImpl {
 
   /** Locales bundled inside the JAR under {@code lang/<locale>/}. */
-  private static final Set<String> BUNDLED_LOCALES =
-      Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList("en", "de", "es", "fr", "nl")));
+  private static final Set<String> BUNDLED_LOCALES = LanguageBootstrap.BUNDLED_LOCALES;
 
   private static final String PARAM_LOCALE = "locale";
 

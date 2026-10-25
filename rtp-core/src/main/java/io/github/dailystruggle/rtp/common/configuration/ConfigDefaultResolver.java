@@ -7,7 +7,6 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
-import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Level;
 
@@ -25,7 +24,7 @@ public final class ConfigDefaultResolver {
    * @return {@code true} when {@code value} is a string {@code @<file>} reference token
    */
   public static boolean isReference(Object value) {
-    return value instanceof String s && s.trim().startsWith("@") && s.trim().length() > 1;
+    return ConfigParser.isReference(value);
   }
 
   /**
@@ -33,8 +32,7 @@ public final class ConfigDefaultResolver {
    * @return lower-cased base file name (e.g. {@code "config"} for {@code "@config"}), or {@code null}
    */
   public static String referencedFile(Object value) {
-    if (!isReference(value)) return null;
-    return ((String) value).trim().substring(1).toLowerCase(Locale.ROOT);
+    return ConfigParser.referencedFile(value);
   }
 
   /**

@@ -1,8 +1,8 @@
 (function () {
   // RTP editor curve helper (ADR-106): Rectangle.
   // Row-major walk of a width x height grid centred on (centerX, centerZ), rotated by
-  // rotation degrees with Shape.rotate's int truncation. xzToLocation mirrors the Java method as
-  // is, including its missing half-extent offset. No runtime state.
+  // rotation degrees with Shape.rotate's int truncation. xzToLocation mirrors the Java method
+  // including its half-extent offset. No runtime state.
   'use strict';
 
   var DEGREES_TO_RADIANS = 0.017453292519943295; // java.lang.Math.toRadians factor
@@ -82,9 +82,12 @@
       var cx = num(params, 'centerX', 0);
       var cz = num(params, 'centerZ', 0);
       var width = num(params, 'width', 256);
+      var height = num(params, 'height', 256);
 
       var rotated = rotate((x - cx) | 0, (z - cz) | 0, -degrees);
-      var loc = rotated[1] * width + rotated[0];
+      var rx = (rotated[0] + (idiv(width, 2) | 0)) | 0;
+      var ry = (rotated[1] + (idiv(height, 2) | 0)) | 0;
+      var loc = ry * width + rx;
       return loc < 0 ? -1 : loc;
     }
   };

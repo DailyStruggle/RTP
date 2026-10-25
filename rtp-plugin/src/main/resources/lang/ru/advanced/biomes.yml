@@ -3,13 +3,13 @@
 
 # Split out of safety.yml so the common safety knobs stay uncluttered.
 #
-# If true, the biomes list is a whitelist (only these biomes are
-# allowed). If false, it is a blacklist (these biomes are excluded).
+# Если true, список биомов ниже работает как белый список (разрешены только они).
+# Если false — как чёрный список (исключает океан, море, воду, реки и пещеры).
 # @type: boolean
 # @default: false
 белыйСписокБиомов: false
 
-# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# Список биомов для белого или чёрного списка (по умолчанию исключает океаны, моря, воду и пещеры).
 # @type: list<biome>
 # @source: biome
 биомы:

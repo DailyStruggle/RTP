@@ -1,6 +1,6 @@
 # ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
 
-**Status:** Proposed (targeted after 3.3.0; amends effects-api-ADR-003 and effects-api-ADR-006 on acceptance)
+**Status:** Accepted (implemented 2026-10-24; amends effects-api-ADR-003 and effects-api-ADR-006)
 **Date:** 2026-10-18
 **Linear:** RTP-70
 
@@ -27,10 +27,18 @@ Effects used per-platform initializers because effects-api could not depend on t
 
    **Foundation implemented 2026-10-21:** `ServerAccessor`, `PlatformFamily` and the `ServerAccessors` holder now live in `api/server-api`; `RTPServerAccessor` extends the neutral interface, and the existing RTP registration sites also install the common holder. RTP-specific player, world and location types remain in `rtp-api` for the later extraction.
 
+   **Effects routing and unified registration implemented 2026-10-24:** `api/effects-api` now depends on `api/server-api` (routing default diagnostics and failure logs through `ServerAccessors`), `EffectFactory.registerBuiltInEffects(...)` registers the full 11-effect canonical key set (`TITLE`, `GLIDE`, `COMMAND`, `DEATH`, `DROP_INVENTORY`, `DROP_EXP`, `SOUND`, `PARTICLE`, `POTION`, `FIREWORK`, `NOTE` plus aliases `DROP_EXPERIENCE` and `KILL`) once across Bukkit, Fabric (obf + 26.x unobf), and NeoForge, `NeoForgeHandles` (and the Fabric handle carriers) implement `sendTitle`, `playNote`, and `spawnFirework` with once-per-primitive unsupported/failure reporting (`EffectFactory.reportUnsupportedPrimitive`), and `EffectRegistrationParityTest` + `EffectsApiCommonNoPlatformImportsTest` guard cross-platform parity and package boundaries.
+
 2. **Platform code implements effect primitives on the accessor.** The accessor gains the primitives effects need: title, glide start/stop, sound / particle / potion by string key, note, firework, inventory and experience drop, kill, and command dispatch. Each platform implements them once in its existing accessor. `HandleRegistry`, `PlayerHandle` and the effect registration in the per-platform initializers are removed. Registry lookups (`Sound`, `Particle`, `PotionEffectType`, Minecraft registries) stay platform-side behind string keys, which also replaces the `ValueCoercer` binding.
-3. **One registration.** effects-api registers every built-in effect once. A platform that cannot run a primitive reports that explicitly (logged once per primitive, visible from `/effectsapi`). An empty method body is not allowed.
+
+   **Status (2026-10-24):** `EffectFactory.registerBuiltInEffects(...)` and the `NeoForgeHandles` / Fabric handle primitive implementations (`sendTitle`, `playNote`, `spawnFirework`) have landed with `EffectFactory.reportUnsupportedPrimitive` diagnostics; retiring `HandleRegistry` / `PlayerHandle` in favor of direct `ServerAccessor` primitive methods remains paired with the Decision 4 carrier move.
+
+3. **One registration.** effects-api registers every built-in effect once (`EffectFactory.registerBuiltInEffects`). A platform that cannot run a primitive reports that explicitly (logged once per primitive via `EffectFactory.reportUnsupportedPrimitive`, visible from `/effectsapi`). An empty method body is not allowed.
 4. **effects-api carries no platform code.** `effectsapi/bukkit` (`BukkitHandles`, Bukkit listeners, `/effectsapi` Bukkit commands) moves to the Bukkit carrier, and `spigot-api` leaves `effects-api/build.gradle`. The Fabric and NeoForge effect classes stay in their carriers as accessor implementations.
-5. **Mechanical guards.** A parity test asserts every platform accessor exposes the full built-in effect set or declares each unsupported primitive. An architecture test asserts effects-api imports no `org.bukkit.*`, `net.minecraft.*` or `io.github.dailystruggle.rtp.*` type.
+
+   **Status (2026-10-24):** `io.github.dailystruggle.effectsapi.common` is verified free of platform and RTP imports by `EffectsApiCommonNoPlatformImportsTest` and depends on `api/server-api`; relocating `io.github.dailystruggle.effectsapi.bukkit` and `HandleRegistry` out of `api/effects-api` into the Bukkit carrier is tracked as the remaining `RTP-70` slice in `docs/dev/POTENTIAL_BUGS.md`.
+
+5. **Mechanical guards.** `EffectRegistrationParityTest` asserts every platform initializer exposes the full built-in effect set or declares each unsupported primitive. `EffectsApiCommonNoPlatformImportsTest` asserts `effectsapi.common` imports no `org.bukkit.*`, `net.minecraft.*` or `io.github.dailystruggle.rtp.*` type.
 
 ## Alternatives Considered
 

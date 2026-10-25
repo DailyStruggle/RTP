@@ -12,6 +12,9 @@
 // No Loom here, so effects-api builds as a plain Java 17 library (ADR-113).
 
 dependencies {
+    // --- neutral server accessor seam (ADR-116) ---
+    api project(':server-api')
+
     // --- bukkit/ subpackage ---
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'

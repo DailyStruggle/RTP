@@ -1,6 +1,6 @@
 # ADR-059 — Relative Ground-Distance Safety Predicate (synthetic block-state property)
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 
 ## Context

@@ -20,18 +20,27 @@ the `publishedModulePaths` closure) and is shared by all channels.
 
 ## What gets published
 
-`maven-publish` is applied to exactly this closure (root `build.gradle`):
+`maven-publish` is applied to the 17-module closure in the root `build.gradle` (all 14 platform-neutral `api/*` SDK modules plus `rtp-api`, `rtp-core`, and `rtp-proxy:rtp-proxy-common`):
 
 | Module | Why it is in the closure |
 |--------|--------------------------|
-| `rtp-api` | addon SPI (direct addon dependency) |
+| `rtp-api` | RTP addon SPI (direct addon dependency) |
 | `rtp-core` | `RTP` facade + `Shape` (direct addon dependency) |
-| `commands-api` | `api` dep of `rtp-api` / `rtp-core` |
-| `yaml-api` | `api` dep of `rtp-api` / `rtp-core` |
-| `metrics-api` | `api` dep of `rtp-api` |
-| `effects-api` | `api` dep of `rtp-core` |
-| `maps-api` | `api` dep of `rtp-core` |
-| `rtp-proxy:rtp-proxy-common` | `api` dep of `rtp-core` |
+| `rtp-proxy:rtp-proxy-common` | `api` dep of `rtp-core` (cross-server reservation & snapshot contracts) |
+| `server-api` | `api` dep of `rtp-api` / `menu-api`; standalone SDK for platform detection, `PlatformFamily` gating, and `TaskScheduler` |
+| `anvil-api` | `api` dep of `rtp-core`; standalone SDK for off-tick `.mca` / custom region decoding (`RegionFileReader`) |
+| `bit-api` | `api` dep of `rtp-api` / `anvil-api` / `config-bit-api`; standalone SDK for PBIT/CBIT/IBIT self-tests (`BitRunner`, `BitComponent`) |
+| `bstats-api` | `api` dep of `rtp-core`; standalone zero-dependency bStats v2 metrics client SPI |
+| `commands-api` | `api` dep of `rtp-api` / `rtp-core` / `menu-api`; standalone Brigadier command-tree framework (`TreeCommand`) |
+| `config-bit-api` | `api` dep of `rtp-core`; standalone YAML `@type` / `@options` / `@range` / `@pattern` directive & locale-parity PBIT library |
+| `effects-api` | `api` dep of `rtp-core`; standalone cross-platform visual, sound, potion, and hologram effects SPI |
+| `maps-api` | `api` dep of `rtp-core`; standalone runtime cartography, heatmap, and Mermaid chart rendering SPI |
+| `menu-api` | `api` dep of `rtp-api` / `rtp-core`; standalone declarative chest/book menu, token redemption, and anvil prompt SPI |
+| `metrics-api` | `api` dep of `rtp-api` / `rtp-proxy-common`; standalone TPS/MSPT/heap and `FoliaRegionSample` telemetry SPI |
+| `predict-api` | `api` dep of `rtp-core`; standalone stochastic estimation (`EwmaEstimator`), AIMD (`AimdLimiter`), water-filling (`WaterFillingAllocator`), and Folia share allocation (`ProbedShareAllocator`) |
+| `tags-api` | `api` dep of `rtp-core`; standalone zero-dependency Minecraft block and biome tag JSON resolver (`TagResolver`) |
+| `units-api` | `api` dep of `rtp-api` / `config-bit-api`; standalone duration, distance (`DistanceParser`), and data-size unit parsers |
+| `yaml-api` | `api` dep of `rtp-api` / `rtp-core` / `config-bit-api`; standalone zero-dependency comment-preserving YAML parser and writer (`RtpYamlConfig`) |
 
 Every coordinate that can appear in a generated POM must itself be published, otherwise a
 consumer's transitive resolution fails. Platform adapters (`rtp-bukkit`, `rtp-paper`,
@@ -132,9 +141,14 @@ The exact command JitPack runs can be reproduced locally to confirm the publicat
 
 ```powershell
 .\gradlew --no-daemon -PexcludeJdk25 `
-    :commands-api:publishToMavenLocal :yaml-api:publishToMavenLocal `
-    :metrics-api:publishToMavenLocal :maps-api:publishToMavenLocal `
-    :effects-api:publishToMavenLocal :rtp-proxy:rtp-proxy-common:publishToMavenLocal `
+    :server-api:publishToMavenLocal :anvil-api:publishToMavenLocal `
+    :bit-api:publishToMavenLocal :bstats-api:publishToMavenLocal `
+    :commands-api:publishToMavenLocal :config-bit-api:publishToMavenLocal `
+    :effects-api:publishToMavenLocal :maps-api:publishToMavenLocal `
+    :menu-api:publishToMavenLocal :metrics-api:publishToMavenLocal `
+    :predict-api:publishToMavenLocal :tags-api:publishToMavenLocal `
+    :units-api:publishToMavenLocal :yaml-api:publishToMavenLocal `
+    :rtp-proxy:rtp-proxy-common:publishToMavenLocal `
     :rtp-api:publishToMavenLocal :rtp-core:publishToMavenLocal
 ```
 
@@ -216,11 +230,20 @@ graph:
 
 ```powershell
 .\gradlew --no-daemon `
+    :server-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :anvil-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :bit-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :bstats-api:publishMavenJavaPublicationToGitHubPackagesRepository `
     :commands-api:publishMavenJavaPublicationToGitHubPackagesRepository `
-    :yaml-api:publishMavenJavaPublicationToGitHubPackagesRepository `
-    :metrics-api:publishMavenJavaPublicationToGitHubPackagesRepository `
-    :maps-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :config-bit-api:publishMavenJavaPublicationToGitHubPackagesRepository `
     :effects-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :maps-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :menu-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :metrics-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :predict-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :tags-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :units-api:publishMavenJavaPublicationToGitHubPackagesRepository `
+    :yaml-api:publishMavenJavaPublicationToGitHubPackagesRepository `
     :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToGitHubPackagesRepository `
     :rtp-api:publishMavenJavaPublicationToGitHubPackagesRepository `
     :rtp-core:publishMavenJavaPublicationToGitHubPackagesRepository
@@ -437,11 +460,20 @@ In-memory-key form (CI):
 
 ```powershell
 .\gradlew --no-daemon `
+    :server-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :anvil-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :bit-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :bstats-api:publishMavenJavaPublicationToCentralStagingRepository `
     :commands-api:publishMavenJavaPublicationToCentralStagingRepository `
-    :yaml-api:publishMavenJavaPublicationToCentralStagingRepository `
-    :metrics-api:publishMavenJavaPublicationToCentralStagingRepository `
-    :maps-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :config-bit-api:publishMavenJavaPublicationToCentralStagingRepository `
     :effects-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :maps-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :menu-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :metrics-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :predict-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :tags-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :units-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :yaml-api:publishMavenJavaPublicationToCentralStagingRepository `
     :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository `
     :rtp-api:publishMavenJavaPublicationToCentralStagingRepository `
     :rtp-core:publishMavenJavaPublicationToCentralStagingRepository
@@ -452,11 +484,20 @@ Local `gpg` CLI form (recommended on a box with a modern GnuPG, e.g. this dev bo
 
 ```powershell
 .\gradlew --no-daemon -PsignWithGpgCmd `
+    :server-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :anvil-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :bit-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :bstats-api:publishMavenJavaPublicationToCentralStagingRepository `
     :commands-api:publishMavenJavaPublicationToCentralStagingRepository `
-    :yaml-api:publishMavenJavaPublicationToCentralStagingRepository `
-    :metrics-api:publishMavenJavaPublicationToCentralStagingRepository `
-    :maps-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :config-bit-api:publishMavenJavaPublicationToCentralStagingRepository `
     :effects-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :maps-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :menu-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :metrics-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :predict-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :tags-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :units-api:publishMavenJavaPublicationToCentralStagingRepository `
+    :yaml-api:publishMavenJavaPublicationToCentralStagingRepository `
     :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository `
     :rtp-api:publishMavenJavaPublicationToCentralStagingRepository `
     :rtp-core:publishMavenJavaPublicationToCentralStagingRepository

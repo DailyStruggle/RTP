@@ -22,6 +22,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -62,6 +63,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *       bounding and resource spikes.
  * </ol>
  */
+@Tag("simulation")
 @DisplayName("ADR-114 on-demand chunk resolution baseline benchmark")
 public class OnDemandChunkReadBenchmarkTest {
 

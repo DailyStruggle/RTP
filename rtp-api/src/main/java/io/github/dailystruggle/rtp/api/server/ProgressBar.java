@@ -1,14 +1,9 @@
 package io.github.dailystruggle.rtp.api.server;
 
-import java.util.Objects;
-
 /**
  * Platform-neutral description of an on-screen progress bar (e.g. Bukkit BossBar).
  */
-public final class ProgressBar {
-  private final String title;
-  private final double progress;
-  private final String viewerPermission;
+public final class ProgressBar extends io.github.dailystruggle.server.api.ProgressBar {
 
   /**
    * @param title the bar title, may contain legacy {@code &x} / {@code #RRGGBB} color codes;
@@ -18,44 +13,39 @@ public final class ProgressBar {
    *     empty means "all players"
    */
   public ProgressBar(String title, double progress, String viewerPermission) {
-    this.title = title == null ? "" : title;
-    this.progress = progress;
-    this.viewerPermission = viewerPermission;
+    super(title, progress, viewerPermission);
   }
 
   /** @return the bar title, possibly containing legacy/hex color codes (never {@code null}). */
+  @Override
   public String title() {
-    return title;
+    return super.title();
   }
 
   /** @return the fill fraction in {@code [0, 1]} (not yet clamped). */
+  @Override
   public double progress() {
-    return progress;
+    return super.progress();
   }
 
   /** @return the permission required to view the bar, or {@code null}/empty for everyone. */
+  @Override
   public String viewerPermission() {
-    return viewerPermission;
+    return super.viewerPermission();
   }
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (!(o instanceof ProgressBar)) return false;
-    ProgressBar that = (ProgressBar) o;
-    return Double.compare(that.progress, progress) == 0
-        && Objects.equals(title, that.title)
-        && Objects.equals(viewerPermission, that.viewerPermission);
+    return super.equals(o);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(title, progress, viewerPermission);
+    return super.hashCode();
   }
 
   @Override
   public String toString() {
-    return "ProgressBar{title='" + title + "', progress=" + progress
-        + ", viewerPermission='" + viewerPermission + "'}";
+    return super.toString();
   }
 }

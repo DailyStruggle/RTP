@@ -161,8 +161,9 @@ public final class DestinationPickerGui implements InventoryHolder {
     }
     try {
       text = MiniMessageColorExpander.expand(text);
-    } catch (Throwable ignored) {
-      // Best-effort expander fallback
+    } catch (RuntimeException e) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordAddonHookDegraded(
+          "DestinationPickerGui#colorize", e.getClass().getSimpleName() + ": " + e.getMessage());
     }
     Matcher m1 = HEX_PATTERN_1.matcher(text);
     if (m1.find()) {

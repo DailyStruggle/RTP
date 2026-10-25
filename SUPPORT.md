@@ -20,7 +20,7 @@ Check these first. Most questions are already answered:
    ([`docs/admin/FAQ.md`](docs/admin/FAQ.md))
 4. **Commands reference** — <https://dailystruggle.github.io/RTP/admin/COMMANDS/>
    ([`docs/admin/COMMANDS.md`](docs/admin/COMMANDS.md))
-5. **Resource page** — <https://www.spigotmc.org/resources/rtp.94812/>
+5. **Resource page** — <https://www.spigotmc.org/resources/leafrtp.94812/>
 6. **Existing issues** — search **open *and* closed** issues; your problem has
    probably been reported.
 7. **Update first** — confirm the problem reproduces on the latest release
@@ -51,7 +51,7 @@ will be closed and redirected to Discord `#support` or GitHub Discussions.
 
 A report without the following will be closed without a reply:
 
-- **Platform** — Spigot, Paper, or Folia (choose one; write "I'm not sure"
+- **Platform** — Spigot, Paper, Folia, Fabric, or NeoForge (choose one; write "I'm not sure"
   only if you genuinely don't know and then attach `/version` output).
 - **Server version** — full output of `/version`.
 - **RTP version** — output of `/rtp version`.

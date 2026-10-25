@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.common.action.ActionServices;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -138,8 +139,8 @@ public class RTP {
         try {
           Map<String, Set<String>> s = RTPRuntime.serverAccessor().blockTagSnapshot();
           if (s != null) tagSnapshot = s;
-        } catch (Throwable ignoredTag) {
-          // best-effort
+        } catch (RuntimeException e) {
+          CoreFallbackCbitCounters.recordConfigLookupDegraded("RTP.getAirBlocks.blockTagSnapshot", e);
         }
       }
       Set<String> raw = new HashSet<>();
@@ -153,7 +154,8 @@ public class RTP {
       Set<String> reconciled = io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(raw);
       AIR_BLOCKS_CACHE.set(reconciled);
       return reconciled;
-    } catch (Throwable ignored) {
+    } catch (RuntimeException e) {
+      CoreFallbackCbitCounters.recordConfigLookupDegraded("RTP.getAirBlocks", e);
       return cached;
     }
   }
@@ -616,7 +618,7 @@ public class RTP {
     };
 
     io.github.dailystruggle.rtp.api.RTPAPI.queueDepthDelegate = world -> {
-      if (world == null) return 0;
+      if (world == null || ActiveConfigs.get() == null || ActiveSelection.get() == null) return 0;
       try {
         Region region = resolveApiRegion(
             io.github.dailystruggle.rtp.api.RtpTarget.world(world.name()), null);
@@ -624,6 +626,7 @@ public class RTP {
         long depth = region.getPublicQueueLength();
         return (int) Math.max(0, Math.min(Integer.MAX_VALUE, depth));
       } catch (RuntimeException ex) {
+        CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.queueDepth", ex);
         return 0;
       }
     };
@@ -654,8 +657,8 @@ public class RTP {
           try {
             Region defaultRegion = ActiveSelection.get().getRegion(player);
             if (defaultRegion != null) defaultRegionName = defaultRegion.name;
-          } catch (RuntimeException ignored) {
-            // Defensive: default-region resolution must not break enumeration.
+          } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.allowedTargets.defaultRegion", e);
           }
         }
 
@@ -694,7 +697,8 @@ public class RTP {
                 }
               }
             }
-          } catch (Throwable ignored) {
+          } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.allowedTargets.worlds", e);
           }
         }
         if (ActiveConfigs.get() != null && ActiveConfigs.get().multiConfigParserMap != null) {
@@ -766,7 +770,8 @@ public class RTP {
           } else {
             biomeCandidates.addAll(io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.observedBiomes(null));
           }
-        } catch (Throwable ignored) {
+        } catch (RuntimeException e) {
+          CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.allowedTargets.observedBiomes", e);
         }
         for (String biomeName : biomeCandidates) {
           if (biomeName == null || biomeName.isBlank()) continue;
@@ -877,8 +882,8 @@ public class RTP {
               environment = reg.peerRegionAttribute(serverId, regionKey, "env");
               label = reg.peerRegionAttribute(serverId, regionKey, "label");
             }
-          } catch (Throwable ignored) {
-            // Defensive: a flaky network layer must not crash status reads.
+          } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.targetStatus.network", e);
           }
           return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
               reachable
@@ -929,7 +934,8 @@ public class RTP {
                 }
               }
             }
-          } catch (Throwable ignored) {
+          } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.targetStatus.fallbackRegion", e);
           }
         }
         if (region == null || region.getWorld() == null) {
@@ -997,8 +1003,8 @@ public class RTP {
             combatRemaining = io.github.dailystruggle.rtp.common.pvp.PvPGate.combatRemainingMillis(uuid);
             if (combatRemaining <= 0L) combatRemaining = 1000L;
           }
-        } catch (Throwable ignored) {
-          // Defensive: combat hook failure reports not-in-combat; status must not break.
+        } catch (RuntimeException e) {
+          CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.targetStatus.pvpGate", e);
         }
 
         long targetDelay = getDelay(player, regSettings);
@@ -1037,8 +1043,8 @@ public class RTP {
               localLabel = regionDisplayName;
             }
           }
-        } catch (Throwable ignored) {
-          // Defensive: env/label enrichment is a cosmetic hint and must never break status.
+        } catch (RuntimeException e) {
+          CoreFallbackCbitCounters.recordConfigLookupDegraded("RTPAPI.targetStatus.environment", e);
         }
         return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
             availability, remaining, Math.max(0.0, cost), null, localEnv, localLabel, targetDelay, combatRemaining);
@@ -1151,8 +1157,8 @@ public class RTP {
           if (live != null && live.peerRegionRegistry() != null) {
             peerRegionGated = live.peerRegionRegistry().peerRegionRequiresPermission(serverId, regionKey);
           }
-        } catch (Throwable ignored) {
-          // Defensive: a flaky network layer falls back to the server-level gate only.
+        } catch (RuntimeException e) {
+          CoreFallbackCbitCounters.recordConfigLookupDegraded("RTP.apiTargetPermissionDenied.network", e);
         }
         return (!player.hasPermission("rtp.servers." + serverId)
                 && !player.hasPermission("rtp.servers.*"))
@@ -1295,8 +1301,8 @@ public class RTP {
       if (sharedTime <= 0L && inst != null && inst.networkManager != null) {
         sharedTime = inst.networkManager.getLastTeleportTime(uuid);
       }
-    } catch (Throwable ignored) {
-      // Defensive: network read failure degrades safely to no shared timestamp.
+    } catch (RuntimeException e) {
+      CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.getSharedLastTeleportTime", e);
     }
     return sharedTime;
   }
@@ -1321,7 +1327,8 @@ public class RTP {
       if (inst.networkManager != null) {
         inst.networkManager.setLastTeleportTime(uuid, epochMillis);
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException t) {
+      CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.updateSharedLastTeleportTime", t);
       log(Level.FINE, "[RTP] updateSharedLastTeleportTime failed: " + t.getMessage());
     }
   }
@@ -1517,8 +1524,8 @@ public class RTP {
             () -> {
                 try {
                     CoreMetrics.instance().snapshotRing().recordFromSnapshot(CoreMetrics.instance().snapshot());
-                } catch (Throwable ignored) {
-                    // Sampler shall never poison the scheduler thread.
+                } catch (RuntimeException e) {
+                    CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.metricsSnapshotSampler", e);
                 }
             },
             20L,
@@ -1602,7 +1609,8 @@ public class RTP {
               ActionServices.actionManager().handlePlayerQuit(uuid);
             }
           });
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
+          CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.playerQuitHook", t);
           log(Level.FINE, "[RTP] player quit hook registration in RTP init skipped: " + t);
         }
       }
@@ -1720,7 +1728,9 @@ public class RTP {
               if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sqlDb) {
                 sqlDb.cacheValue(teleportData);
               }
-            } catch (Exception ignored) {}
+            } catch (RuntimeException e) {
+              CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.handleMigration.teleportData", e);
+            }
           }
         }
 
@@ -1767,7 +1777,9 @@ public class RTP {
                       sqlDb.cacheValue(teleportData);
                       success = true;
                     }
-                  } catch (Exception ignored) {}
+                  } catch (RuntimeException e) {
+                    CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.handleMigration.record", e);
+                  }
                 }
                 if (success) {
                   boolean renamed = file.renameTo(new File(file.getAbsolutePath() + ".migrated"));
@@ -1775,7 +1787,9 @@ public class RTP {
                     RTP.log(Level.FINE, "[RTP] Failed to rename migrated file: " + file.getName());
                   }
                 }
-              } catch (Exception ignored) {}
+              } catch (Exception e) {
+                CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.handleMigration.file:" + file.getName(), e);
+              }
             }
           }
         }
@@ -1808,6 +1822,12 @@ public class RTP {
     addShape(new Circle_Normal());
     addShape(new Square_Normal());
     addShape(new Polygon());
+    final Factory<Shape<?>> finalShapeFactory = shapeFactory;
+    ChunkyChecker.setShapeRegistrar(s -> {
+      if (finalShapeFactory.get(s) == null) {
+        addShape(new io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.ChunkyRTPShape(s));
+      }
+    });
   }
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
@@ -1940,6 +1960,8 @@ public class RTP {
           future.complete(null);
         } catch (CancellationException ignored) {
 
+        } catch (RuntimeException e) {
+          CoreFallbackCbitCounters.recordLifecycleCleanupDegraded("RTP.stop.futureComplete", e);
         }
       }
     }

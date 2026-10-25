@@ -288,7 +288,7 @@ final class EditorCurveModel {
     static String kindOf(CommandParameter p) {
         for (Class<?> c = p.getClass(); c != null && c != CommandParameter.class; c = c.getSuperclass()) {
             switch (c.getSimpleName()) {
-                case "DistanceParameter": return "distance";
+                case "DistanceParameter", "BaseDistanceParameter": return "distance";
                 case "IntegerParameter": return "integer";
                 case "FloatParameter": return "number";
                 case "BooleanParameter": return "boolean";

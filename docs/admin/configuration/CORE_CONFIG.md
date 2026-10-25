@@ -66,14 +66,16 @@ Configures the menu interface. Nested under the `menu:` block.
 |---|---|---|---|
 | `renderer` | List | `[ "book" ]` | Ordered preference list of renderer ids. On exception or a missing adapter the framework walks the list and falls back to the next entry. Available ids: `book`, `chat`. If the list is exhausted, the no-token open-page path falls back to the configurable `menuInvalid` message. |
 
-## Defaults (inheritance)
+## Defaults (starter fallback inheritance)
 
-Nested under the `defaults:` block. Holds global default templates and values that region/world files inherit when configured with `@config`.
+Nested under the `defaults:` block. Holds starter fallback templates and values that region/world files inherit when left at `"@config"`.
+
+> **Recommended workflow (`/rtp editor` and `definitions/regions/` first):** `config.yml` holds basic global timers (`teleportDelay`, `teleportCooldown`, `cancelDistance`) and starter fallback defaults so a fresh install works out of the box. When configuring your server's teleport areas, **start with `/rtp editor` (the browser map workspace), `/rtp admin setup`, and `definitions/regions/<name>.yml` (`shape` and `vert` settings)** rather than treating `config.yml` as the primary place to configure region geometry.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `shape` | Block | (`CIRCLE` block) | Default shape block inherited whole by a region whose `shape` is `@config`. Holds the teleport size knobs: `radius` (outer edge, default `256`) and `centerRadius` (inner edge / donut hole, default `64`), both in **chunks**. See [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius). |
-| `vert` | Block | (`LINEAR` block) | Default vertical adjustor block inherited whole by a region whose `vert` is `@config`. |
+| `shape` | Block | (`CIRCLE` block) | Starter fallback shape block inherited whole by a region whose `shape` is still `"@config"`. Holds `radius` (default `4096b` / `256c`) and `centerRadius` (default `64` chunks / `1,024` blocks). Prefer setting `shape` per region via `/rtp editor` or `definitions/regions/<name>.yml`. See [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius). |
+| `vert` | Block | (`LINEAR` block) | Starter fallback vertical adjustor block (`minY`, `maxY`, `requireSkyLight`, `maxHillAngle`) inherited whole by a region whose `vert` is still `"@config"`. Prefer configuring `vert` per region in `/rtp editor` or `definitions/regions/<name>.yml` (especially for Nether `maxY: 120`, `requireSkyLight: false`). |
 | `cacheCap` | Integer | `50` | Default region `cacheCap` (max pre-calculated safe locations). |
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Default region `backlogCacheCap` (L3 backlog buffer; `0` disables). |
 | `activeChunkCap` | Integer | `10` | Default region `activeChunkCap` (chunks kept loaded for zero-latency). |
@@ -84,7 +86,7 @@ Nested under the `defaults:` block. Holds global default templates and values th
 
 > The type-bearing `shape`/`vert` settings inherit as a **whole named block**, while type-free scalars (`cacheCap`, `backlogCacheCap`, `activeChunkCap`, `spatialResolution`, `requirePermission`, `cooldown`, `delay`) inherit individually. Other source files own their own defaults: e.g. a region's `price` can reference `@economy` to inherit from [economy.yml](ECONOMY.md).
 
-> **Teleport distance lives here.** On a single-world server, `defaults.shape.radius` is the one place to set how far `/rtp` throws players, because the bundled `regions/default.yml` ships `shape: "@config"`. Sizes default to **chunks** (1 chunk = 16 blocks), so `radius: 256` is 4,096 blocks and `radius: 625` is 10,000 blocks; `centerRadius` is the matching minimum distance. You can also specify spatial unit suffixes directly, such as `4096b` (or `4096m`), `256c`, `4r`, or `5km`. Full reference, including unit suffixes, auto-interpretation, and per-region and per-command overrides: [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius).
+> **Configuring teleport distance and vertical bounds:** Use `/rtp editor`, `/rtp admin setup`, or `/rtp config regions <region> shape.radius=<value>` to configure `definitions/regions/<region>.yml` directly. Sizes default to **chunks** (1 chunk = 16 blocks), or accept explicit spatial unit suffixes such as `4096b` (`4096m`), `256c`, `4r`, or `5km` (prefer explicit unit suffixes on `shape.radius` rather than enabling `worldBorderOverride: true`). Full reference: [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius).
 
 ---
 

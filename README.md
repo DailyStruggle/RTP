@@ -201,6 +201,10 @@ The first build downloads the Minecraft and loader dependencies and takes a whil
 
 Compile against `rtp-api` only. It lets you register custom shapes, landing rules and claim checks without touching the plugin. Start with the [addon quickstart](docs/ADDON_QUICKSTART.md) and [FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md).
 
+### Reusing the multi-platform SDK (`api/*`) & toolchain
+
+Building a standalone plugin or mod (unrelated to RTP)? All 14 platform-neutral `api/*` libraries (`server-api`, `commands-api`, `yaml-api`, `bit-api`, `config-bit-api`, `menu-api`, `effects-api`, `predict-api`, `anvil-api`, `tags-api`, `units-api`, `metrics-api`, `bstats-api`, `maps-api`) are published to Maven Central and JitPack. Start with [FOR_PLUGIN_AUTHORS.md](docs/FOR_PLUGIN_AUTHORS.md) and the [`api/` SDK catalog](api/README.md).
+
 ---
 
 ## How it works
@@ -216,10 +220,11 @@ For the details (selection algorithm, threading model, design decisions), see [H
 |---|---|
 | `rtp-api/` | Public API for addon developers. |
 | `rtp-core/` | Platform-independent engine: regions, shapes, queues, database. |
-| `commands-api/`, `effects-api/` | Shared command and effects frameworks. |
+| `api/` | 14 standalone, platform-neutral SDK libraries (`server-api`, `commands-api`, `yaml-api`, `config-bit-api`, `menu-api`, `bit-api`, `predict-api`, `anvil-api`, `effects-api`, `maps-api`, `metrics-api`, `bstats-api`, `tags-api`, `units-api`). |
 | `rtp-plugin/` | Bukkit-family entry point and the shipped jar. |
 | `platforms/` | Spigot, Paper, Folia, Fabric, NeoForge and proxy adapters. |
 | `addons/` | Optional addons (GUI menu, countdown, integrations). |
+| `scripts/` | Whole-server discovery fuzzer (`bench_fuzz.py`), Discord support bot, web-editor generator, storefront builder. |
 | `docs/` | Everything published on the documentation site. |
 | `devstack/` | Docker-based multi-server test environment. |
 
@@ -236,6 +241,7 @@ For the details (selection algorithm, threading model, design decisions), see [H
 | Install and run RTP on my server | [FOR_SERVER_ADMINS.md](docs/FOR_SERVER_ADMINS.md) |
 | Copy a setup for a common task | [Recipes](docs/admin/RECIPES.md) |
 | Write an addon | [FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md) |
+| Build a standalone multi-platform plugin or mod with the `api/*` SDK | [FOR_PLUGIN_AUTHORS.md](docs/FOR_PLUGIN_AUTHORS.md) |
 | Work on RTP itself | [FOR_CONTRIBUTORS.md](docs/FOR_CONTRIBUTORS.md) |
 
 ---

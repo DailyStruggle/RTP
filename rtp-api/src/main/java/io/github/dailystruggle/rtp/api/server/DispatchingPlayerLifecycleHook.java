@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.api.server;
 
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
@@ -11,23 +10,18 @@ import java.util.function.Consumer;
  *
  * @since 3.0.0-beta.4
  */
-public class DispatchingPlayerLifecycleHook implements PlayerLifecycleHook {
-
-    private final CopyOnWriteArrayList<Consumer<UUID>> joinHandlers = new CopyOnWriteArrayList<>();
-    private final CopyOnWriteArrayList<Consumer<UUID>> quitHandlers = new CopyOnWriteArrayList<>();
+public class DispatchingPlayerLifecycleHook
+        extends io.github.dailystruggle.server.api.DispatchingPlayerLifecycleHook
+        implements PlayerLifecycleHook {
 
     @Override
     public AutoCloseable onPlayerJoin(Consumer<UUID> handler) {
-        if (handler == null) throw new IllegalArgumentException("handler must not be null");
-        joinHandlers.add(handler);
-        return () -> joinHandlers.remove(handler);
+        return super.onPlayerJoin(handler);
     }
 
     @Override
     public AutoCloseable onPlayerQuit(Consumer<UUID> handler) {
-        if (handler == null) throw new IllegalArgumentException("handler must not be null");
-        quitHandlers.add(handler);
-        return () -> quitHandlers.remove(handler);
+        return super.onPlayerQuit(handler);
     }
 
     /**
@@ -37,15 +31,9 @@ public class DispatchingPlayerLifecycleHook implements PlayerLifecycleHook {
      *
      * @param uuid the joining player's UUID; must not be {@code null}
      */
+    @Override
     public void fireJoin(UUID uuid) {
-        if (uuid == null) return;
-        for (Consumer<UUID> h : joinHandlers) {
-            try {
-                h.accept(uuid);
-            } catch (Throwable ignored) {
-                // intentional: a faulty subscriber must not break fan-out
-            }
-        }
+        super.fireJoin(uuid);
     }
 
     /**
@@ -55,22 +43,17 @@ public class DispatchingPlayerLifecycleHook implements PlayerLifecycleHook {
      *
      * @param uuid the quitting player's UUID; must not be {@code null}
      */
+    @Override
     public void fireQuit(UUID uuid) {
-        if (uuid == null) return;
-        for (Consumer<UUID> h : quitHandlers) {
-            try {
-                h.accept(uuid);
-            } catch (Throwable ignored) {
-                // intentional: a faulty subscriber must not break fan-out
-            }
-        }
+        super.fireQuit(uuid);
     }
 
     /**
      * @return {@code true} iff at least one handler is registered for either
      *     join or quit
      */
+    @Override
     public boolean hasSubscribers() {
-        return !joinHandlers.isEmpty() || !quitHandlers.isEmpty();
+        return super.hasSubscribers();
     }
 }

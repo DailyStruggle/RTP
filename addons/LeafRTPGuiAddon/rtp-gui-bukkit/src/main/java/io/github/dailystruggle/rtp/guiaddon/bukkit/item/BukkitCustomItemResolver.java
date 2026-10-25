@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.guiaddon.bukkit.item;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
 import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -117,7 +118,8 @@ public final class BukkitCustomItemResolver {
         ItemStack item = resolveCustomModelData(trimmed);
         if (item != null) return item;
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded(spec, t);
       RTP.log(Level.WARNING, "[RTP-GUI] Error resolving item spec '" + spec + "': " + t.getMessage());
     }
 
@@ -160,7 +162,10 @@ public final class BukkitCustomItemResolver {
   private static ItemStack createSafeItem(Material material) {
     try {
       return new ItemStack(material);
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded(
+          material != null ? material.name() : "<null>",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
       return new ItemStack(Material.COMPASS);
     }
   }
@@ -168,8 +173,9 @@ public final class BukkitCustomItemResolver {
   private static boolean isPluginAvailable(String pluginName) {
     try {
       return Bukkit.getPluginManager().isPluginEnabled(pluginName);
-    } catch (Throwable ignored) {
-      // unset server (tests, early load) surfaces as NPE: treat as unavailable
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordCustomItemDegraded(
+          pluginName, e.getClass().getSimpleName() + ": " + e.getMessage());
       return false;
     }
   }
@@ -193,7 +199,8 @@ public final class BukkitCustomItemResolver {
         Method getItemStack = clazz.getMethod("getItemStack");
         return (ItemStack) getItemStack.invoke(customStack);
       }
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded("ItemsAdder:" + id, t);
       RTP.log(Level.FINE, "[RTP-GUI] ItemsAdder failed to resolve item '" + id + "': " + t.getMessage());
     }
     return null;
@@ -214,7 +221,8 @@ public final class BukkitCustomItemResolver {
         Method build = result.getClass().getMethod("build");
         return (ItemStack) build.invoke(result);
       }
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded("Oraxen:" + id, t);
       RTP.log(Level.FINE, "[RTP-GUI] Oraxen failed to resolve item '" + id + "': " + t.getMessage());
     }
     return null;
@@ -235,7 +243,8 @@ public final class BukkitCustomItemResolver {
         Method build = result.getClass().getMethod("build");
         return (ItemStack) build.invoke(result);
       }
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded("Nexo:" + id, t);
       RTP.log(Level.FINE, "[RTP-GUI] Nexo failed to resolve item '" + id + "': " + t.getMessage());
     }
     return null;
@@ -251,7 +260,8 @@ public final class BukkitCustomItemResolver {
       Object api = clazz.getDeclaredConstructor().newInstance();
       Method getItemHead = clazz.getMethod("getItemHead", String.class);
       return (ItemStack) getItemHead.invoke(api, id);
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded("HeadDatabase:" + id, t);
       RTP.log(Level.FINE, "[RTP-GUI] HeadDatabase failed to resolve head '" + id + "': " + t.getMessage());
     }
     return null;
@@ -268,7 +278,8 @@ public final class BukkitCustomItemResolver {
         skullMeta.setOwner(owner);
         item.setItemMeta(skullMeta);
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded("PlayerHead:" + owner, t);
       RTP.log(Level.FINE, "[RTP-GUI] Failed to set head owner '" + owner + "': " + t.getMessage());
     }
     return item;
@@ -286,7 +297,8 @@ public final class BukkitCustomItemResolver {
         applyBase64Texture(skullMeta, base64);
         item.setItemMeta(skullMeta);
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded("Base64Head", t);
       RTP.log(Level.WARNING, "[RTP-GUI] Failed to apply base64 texture to head: " + t.getMessage(), t);
     }
     return item;
@@ -299,7 +311,9 @@ public final class BukkitCustomItemResolver {
       if (m.find() && applyProfileApi(meta, m.group(1))) {
         return;
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded(
+          "Base64TextureJson", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[RTP-GUI] Base64 JSON decoding / profile lookup failed: " + t.getMessage());
     }
 
@@ -330,9 +344,13 @@ public final class BukkitCustomItemResolver {
         profileField.setAccessible(true);
         profileField.set(meta, profile);
       } else {
+        PlatformHookBitComponent.recordCustomItemDegraded(
+            "SkullMeta#profile", "missing profile field on " + meta.getClass().getName());
         RTP.log(Level.WARNING, "[RTP-GUI] Failed to find profile field on SkullMeta: " + meta.getClass().getName());
       }
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded(
+          "GameProfile", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.WARNING, "[RTP-GUI] Failed to apply base64 texture to head via reflection: " + t.getMessage(), t);
     }
   }
@@ -367,7 +385,9 @@ public final class BukkitCustomItemResolver {
         m.invoke(meta, pp);
         return true;
       }
-    } catch (Throwable t) {
+    } catch (ReflectiveOperationException | java.net.MalformedURLException | RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded(
+          "PlayerProfile", t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[RTP-GUI] Public profile API failed: " + t.getMessage());
       return false;
     }
@@ -398,7 +418,9 @@ public final class BukkitCustomItemResolver {
         meta.setCustomModelData(cmd);
         item.setItemMeta(meta);
       }
-    } catch (Throwable t) {
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordCustomItemDegraded(
+          "CustomModelData:" + spec, t.getClass().getSimpleName() + ": " + t.getMessage());
       RTP.log(Level.FINE, "[RTP-GUI] Failed to set CustomModelData on item: " + t.getMessage());
     }
     return item;

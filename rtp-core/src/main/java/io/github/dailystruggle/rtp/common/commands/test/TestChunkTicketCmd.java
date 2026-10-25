@@ -9,6 +9,7 @@ import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.bit.BitSideEffect;
 import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
@@ -316,13 +317,15 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
       if (ticketOpened) {
         try {
           world.forgetChunkAt(cx, cz);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+          CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("chunk-ticket.forgetChunkAt", t);
         }
       }
       if (trackerId != null) {
         try {
           MemoryTracker.untrack(trackerId);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+          CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("chunk-ticket.untrack", t);
         }
       }
     }

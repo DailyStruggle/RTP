@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuOpenRequest;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.factory.FactoryNames;
@@ -1070,9 +1071,11 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             Set<String> r = param.relevantValues(senderId);
             entries = (r != null) ? r : param.values();
         } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.relevantValues:" + paramName, e);
             try {
                 entries = param.values();
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException inner) {
+                CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.values:" + paramName, inner);
                 entries = java.util.Collections.emptySet();
             }
         }
@@ -1360,14 +1363,16 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     break;
                 }
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.resolveConfigParser:" + bareFileName, e);
             return "";
         }
         if (match == null) return "";
         java.util.EnumMap<?, Object> data;
         try {
             data = match.getData();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.getData:" + bareFileName, e);
             return "";
         }
         return resolveDottedValueString(data, paramName);
@@ -1441,7 +1446,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         if (value instanceof io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection section) {
             try {
                 return section.get(dottedPath);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.descendDotted:" + dottedPath, e);
                 return null;
             }
         }
@@ -1480,14 +1486,16 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> entry;
         try {
             entry = mcp.getParser(entryName);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.getMultiParser:" + entryName, e);
             return "";
         }
         if (entry == null) return "";
         java.util.EnumMap<?, Object> data;
         try {
             data = entry.getData();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.getMultiData:" + entryName, e);
             return "";
         }
         return resolveDottedValueString(data, paramName);
@@ -1629,7 +1637,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         if (yamlRoot != null) {
             try {
                 comment = yamlRoot.getComment(paramName);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException e) {
+                CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.getComment:" + paramName, e);
                 comment = null;
             }
         }
@@ -1671,7 +1680,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 case "region" -> keys = ActiveSelection.get().regionNames();
                 default -> { /* unknown source - no finite domain */ }
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.resolveFiniteOptions:" + source, e);
             return java.util.List.of();
         }
         if (keys == null || keys.isEmpty()) return java.util.List.of();
@@ -1751,7 +1761,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     if (hasFiniteDomain(d)) return d;
                 }
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.resolveInheritedDirectives:" + paramName, e);
             // fall through to candidate C
         }
 
@@ -1781,7 +1792,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         String comment;
         try {
             comment = root.getComment(key);
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.directivesFor:" + key, e);
             return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(null);
         }
         return io.github.dailystruggle.rtp.common.configuration.ConfigDirectives.parse(comment);
@@ -1836,7 +1848,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     return p.getYamlRoot();
                 }
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.resolveYamlRootForFile:" + fileName, e);
             return null;
         }
         return null;
@@ -2610,7 +2623,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     return p;
                 }
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.resolveMultiConfigParser:" + parserKind, e);
             return null;
         }
         return null;
@@ -2923,10 +2937,12 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     parser.getParser(entry);
             if (region == null) return;
             io.github.dailystruggle.rtp.api.world.RTPWorld world = null;
-            try {
-                world = RTPRuntime.serverAccessor().getRTPWorld(entry);
-            } catch (RuntimeException ignored) {
-                // serverAccessor null in tests; amender tolerates null world
+            if (RTPRuntime.serverAccessor() != null) {
+                try {
+                    world = RTPRuntime.serverAccessor().getRTPWorld(entry);
+                } catch (RuntimeException e) {
+                    CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.tryAmendNetherEndSeed:" + entry, e);
+                }
             }
             @SuppressWarnings({"unchecked", "rawtypes"})
             io.github.dailystruggle.rtp.common.configuration.ConfigParser raw = region;
@@ -2958,7 +2974,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 return kindTree;
             }
             return null;
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.resolveParentConfigCmd:" + kind, e);
             return null;
         }
     }
@@ -3006,7 +3023,8 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 return kindMirrorTree;
             }
             return null;
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            CoreFallbackCbitCounters.recordMenuRedeemDegraded("MenuRedeemSubcommand.resolveMenuMirrorParent:" + kind, e);
             return null;
         }
     }

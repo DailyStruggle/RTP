@@ -4,6 +4,8 @@ This document is the operational blueprint for the **`LeafCraft Plugin Support`*
 
 All public channel embeds, pinned Forum guides, and automated bot responses follow **Rule D-006** ([`docs/dev/RULES.md`](../dev/RULES.md)): first-person maintainer voice ("I"), plain engineering language, concrete numbers and caveats, ASCII hyphens (`-`) only, and zero sales buzzwords.
 
+For the full retrieval, prompt-injection bottleneck, dual-translator, and causal-reasoning architecture of the support bot (and how to replicate it in another project), see [`docs/dev/DISCORD_SUPPORT_BOT_DESIGN.md`](../dev/DISCORD_SUPPORT_BOT_DESIGN.md).
+
 ---
 
 ## 1. Non-Destructive Reorganization Strategy
@@ -52,8 +54,8 @@ To fix this without losing years of searchable troubleshooting history:
   - `NeoForge`
   - `Velocity / Proxy`
 - **Status Tags (bot / maintainer managed):**
-  - `✅ Solved` (applied when the author clicks **[✅ Solved]** or a maintainer closes the thread)
-  - `⏳ Needs Info / Logs` (moderated; applied when a bug report is missing `/rtp version`, `/version`, `/rtp test`, or an `mclo.gs` log link)
+  - `✅ Solved` (applied when the author reacts `✅`, replies `solved`, clicks **[✅ Solved]**, or a maintainer closes the thread)
+  - `⏳ Needs Info / Logs` (moderated; applied when the bot is investigating an uncertain question or waiting on diagnostic items before pinging the maintainer)
   - `🐛 Confirmed Bug` (moderated; applied after reproduction)
   - `💎 Pro Priority` (moderated; applied automatically when the thread author holds `@Pro Supporter`)
 
@@ -88,6 +90,11 @@ DISCORD_BOT_TOKEN="..." DISCORD_GUILD_ID="..." python3 scripts/discord/discord_s
 
 ### 4.3 Run the Read-Only Forum Triage Bot
 ```sh
+# Single sequential REST poll pass over active #support threads:
 DISCORD_BOT_TOKEN="..." DISCORD_GUILD_ID="..." DISCORD_MAINTAINER_ID="..." \
-  python3 scripts/discord/discord_support_bot.py
+  python3 scripts/discord/discord_support_bot.py --once
+
+# Continuous sequential REST polling loop (15s interval, 5s settle window to coalesce rapid posts):
+DISCORD_BOT_TOKEN="..." DISCORD_GUILD_ID="..." DISCORD_MAINTAINER_ID="..." \
+  python3 scripts/discord/discord_support_bot.py --listen --interval 15 --settle-seconds 5
 ```

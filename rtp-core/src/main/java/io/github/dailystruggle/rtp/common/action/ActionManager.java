@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.CoreFallbackCbitCounters;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -90,7 +91,8 @@ public final class ActionManager implements ActionService {
         if (loc != null && loc.getReservation() != null) {
           try {
             loc.getReservation().close();
-          } catch (Throwable ignored) {
+          } catch (Exception e) {
+            CoreFallbackCbitCounters.recordActionDispatchDegraded("PrevalidatedActionPlacement.release", e);
           }
         }
       }
@@ -105,7 +107,8 @@ public final class ActionManager implements ActionService {
       if (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPlayerLifecycleHook() != null) {
         RTPRuntime.serverAccessor().getPlayerLifecycleHook().onPlayerQuit(this::handlePlayerQuit);
       }
-    } catch (Throwable ignored) {
+    } catch (RuntimeException e) {
+      CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.initPlayerQuitHook", e);
     }
   }
 
@@ -174,7 +177,9 @@ public final class ActionManager implements ActionService {
     if (commandRegistrar == null) {
       try {
         Class.forName("io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd");
-      } catch (Throwable ignored) {}
+      } catch (ClassNotFoundException | LinkageError e) {
+        CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.ensureCommandRegistrar", e);
+      }
     }
   }
 
@@ -230,8 +235,9 @@ public final class ActionManager implements ActionService {
             triggerRegistrar.accept(trigger);
             clearRegistrationFailure("trigger", definition.id(), trigger.id());
             RTPRuntime.log(Level.FINE, "[RTP Action] Registered physical trigger: " + trigger.id() + " -> " + definition.id());
-          } catch (Exception e) {
+          } catch (RuntimeException e) {
             recordRegistrationFailure("trigger", definition.id(), trigger.id(), e.getMessage());
+            CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.registerTrigger:" + trigger.id(), e);
             RTPRuntime.log(Level.WARNING, "[RTP Action] Failed registering trigger " + trigger.id() + ": " + e.getMessage());
           }
         }
@@ -476,7 +482,8 @@ public final class ActionManager implements ActionService {
         }
       }
       accessor.executeCommand(serverId, "tag @a remove rtp_session_*");
-    } catch (Exception e) {
+    } catch (RuntimeException e) {
+      CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.sweepStartupOrphans", e);
       RTPRuntime.log(Level.WARNING, "[RTP Action] Failed sweeping startup orphan scoreboards: " + e.getMessage());
     }
   }
@@ -854,7 +861,8 @@ public final class ActionManager implements ActionService {
         }
         try {
           accessor.executeCommand(new UUID(0, 0), substituted);
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
+          CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.enqueueConsoleCommand", t);
           RTPRuntime.log(Level.WARNING, "[RTP Action] Enqueue command execution failed: " + substituted, t);
         }
       }
@@ -872,7 +880,8 @@ public final class ActionManager implements ActionService {
           }
           try {
             accessor.executeCommand(pid, substituted);
-          } catch (Throwable t) {
+          } catch (RuntimeException t) {
+            CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.enqueuePlayerCommand", t);
             RTPRuntime.log(Level.WARNING, "[RTP Action] Enqueue player command execution failed: " + substituted, t);
           }
         }
@@ -1207,7 +1216,8 @@ public final class ActionManager implements ActionService {
                         if (loc.getReservation() != null) {
                           try {
                             loc.getReservation().close();
-                          } catch (Throwable ignored) {
+                          } catch (Exception closeEx) {
+                            CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.reservationClose", closeEx);
                           }
                         }
                         if (ex != null || !Boolean.TRUE.equals(ok)) {
@@ -1220,7 +1230,8 @@ public final class ActionManager implements ActionService {
                       if (loc.getReservation() != null) {
                         try {
                           loc.getReservation().close();
-                        } catch (Throwable ignored) {
+                        } catch (Exception closeEx) {
+                          CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.reservationClose", closeEx);
                         }
                       }
                       done.complete(false);
@@ -1228,13 +1239,15 @@ public final class ActionManager implements ActionService {
                   } else if (loc.getReservation() != null) {
                     try {
                       loc.getReservation().close();
-                    } catch (Throwable ignored) {
+                    } catch (Exception closeEx) {
+                      CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.reservationClose", closeEx);
                     }
                   }
                 } else if (loc.getReservation() != null) {
                   try {
                     loc.getReservation().close();
-                  } catch (Throwable ignored) {
+                  } catch (Exception closeEx) {
+                    CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.reservationClose", closeEx);
                   }
                 }
               }
@@ -1245,7 +1258,8 @@ public final class ActionManager implements ActionService {
                 if (excessLoc != null && excessLoc.getReservation() != null) {
                   try {
                     excessLoc.getReservation().close();
-                  } catch (Throwable ignored) {
+                  } catch (Exception closeEx) {
+                    CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.reservationClose", closeEx);
                   }
                 }
               }
@@ -1479,7 +1493,8 @@ public final class ActionManager implements ActionService {
               }
             }
           }
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
+          CoreFallbackCbitCounters.recordActionDispatchDegraded("ActionManager.resolveClaimBoundary", t);
           io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
               java.util.logging.Level.WARNING,
               "[RTP] Failed to resolve claim boundary for action anchor",

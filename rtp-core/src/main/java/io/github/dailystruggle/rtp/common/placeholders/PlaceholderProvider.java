@@ -1312,6 +1312,23 @@ public class PlaceholderProvider {
                 "govMaxConsumerSkew",
                 uuid -> String.format(java.util.Locale.ROOT, "%.2fx",
                         currentRtpExt().computeGovernor.maxConsumerSkewRatio()));
+        placeholders.put(
+                "govConsumerCostP99Ms",
+                uuid -> String.format(java.util.Locale.ROOT, "%.2f",
+                        currentRtpExt().computeGovernor.consumerCostP99Ms()));
+        placeholders.put(
+                "govRegionRefillShare",
+                uuid -> String.format(java.util.Locale.ROOT, "%.1f%%",
+                        resolveGovRegionRefillShare() * 100.0));
+        placeholders.put(
+                "govRegionDistinctConsumers",
+                uuid -> String.valueOf(resolveGovRegionDistinctConsumers()));
+        placeholders.put(
+                "govTopConsumers",
+                uuid -> resolveGovTopConsumers());
+        placeholders.put(
+                "govRegionRefillShares",
+                uuid -> resolveGovRegionRefillShares());
     }
 
     private static int resolveGovHotCapConfigured() {
@@ -1372,6 +1389,65 @@ public class PlaceholderProvider {
             return gov.regionUnitsPerTurn().values().iterator().next();
         }
         return 0;
+    }
+
+    private static double resolveGovRegionRefillShare() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Double share = gov.regionRefillShares().get(region.name);
+            return (share != null) ? share : 0.0;
+        }
+        if (!gov.regionRefillShares().isEmpty()) {
+            return gov.regionRefillShares().values().iterator().next();
+        }
+        return 0.0;
+    }
+
+    private static int resolveGovRegionDistinctConsumers() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Region region = RegionContext.region().get();
+        if (region != null) {
+            Integer n = gov.regionDistinctConsumers().get(region.name);
+            return (n != null) ? n : 1;
+        }
+        if (!gov.regionDistinctConsumers().isEmpty()) {
+            return gov.regionDistinctConsumers().values().iterator().next();
+        }
+        return 1;
+    }
+
+    private static String resolveGovTopConsumers() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        List<io.github.dailystruggle.rtp.common.governor.ConsumerLedger.ConsumerCostEntry> top = gov.topConsumers();
+        if (top == null || top.isEmpty()) {
+            return "none";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < top.size(); i++) {
+            if (i > 0) sb.append(", ");
+            io.github.dailystruggle.rtp.common.governor.ConsumerLedger.ConsumerCostEntry e = top.get(i);
+            sb.append(e.playerId()).append(String.format(java.util.Locale.ROOT, " (%.2f ms/m)", e.costMsPerMin()));
+        }
+        return sb.toString();
+    }
+
+    private static String resolveGovRegionRefillShares() {
+        io.github.dailystruggle.rtp.common.governor.GovernorSnapshot gov = currentRtpExt().computeGovernor;
+        Map<String, Double> shares = gov.regionRefillShares();
+        if (shares == null || shares.isEmpty()) {
+            return "none";
+        }
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, Double> e : shares.entrySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            int nR = gov.regionDistinctConsumers().getOrDefault(e.getKey(), 1);
+            sb.append(e.getKey()).append(String.format(java.util.Locale.ROOT,
+                    "=%.1f%% (n=%d)", e.getValue() * 100.0, nR));
+        }
+        return sb.toString();
     }
 
     /**
