@@ -111,10 +111,14 @@ class RegionThreadBudgetTest {
 
     // 1. Two distant cells (0,0) and (80,80) start in separate tick regions -> 2 live groups
     String g1 = governed.beginSliceGroup(worldId, 0, 0, (cx, cz) -> cx < 32);
+    governed.charge(g1, TimeUnit.MILLISECONDS.toNanos(1), false);
     governed.endSliceGroup();
     String g2 = governed.beginSliceGroup(worldId, 80, 80, (cx, cz) -> cx >= 32);
+    governed.charge(g2, TimeUnit.MILLISECONDS.toNanos(2), false);
     governed.endSliceGroup();
     assertEquals(2, governed.liveGroupCount());
+    assertEquals(TimeUnit.MILLISECONDS.toNanos(1), governed.groupChargedNanos(g1));
+    assertEquals(TimeUnit.MILLISECONDS.toNanos(2), governed.groupChargedNanos(g2));
 
     // 2. Nearby cell (8,0) in same region joins g1
     String g1Near = governed.beginSliceGroup(worldId, 8, 0, (cx, cz) -> cx < 32);
@@ -128,12 +132,26 @@ class RegionThreadBudgetTest {
     governed.endSliceGroup();
     assertEquals(1, governed.liveGroupCount(), "Merge probe must collapse merged groups into one");
     assertEquals(merged, governed.groupForCell(worldId, 80, 80));
+    String absorbed = merged.equals(g1) ? g2 : g1;
+    assertEquals(0L, governed.groupChargedNanos(absorbed),
+        "Absorbed group's charge entry must be pruned on merge");
+    assertEquals(TimeUnit.MILLISECONDS.toNanos(3), governed.groupChargedNanos(merged),
+        "Surviving group must fold the absorbed group's charged nanos");
 
     // 4. Global region span charges k = "global"
     long gSpan = governed.beginGlobal();
     clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(2));
     governed.endGlobal(gSpan);
     assertEquals(TimeUnit.MILLISECONDS.toNanos(2), governed.globalChargedNanos());
+
+    // 5. Evicting idle groups after > 60 s prunes their groupChargedNanos entry
+    clock.addAndGet(RegionThreadBudget.GROUP_IDLE_NANOS + 1L);
+    String gFresh = governed.beginSliceGroup(worldId, 200, 200, (cx, cz) -> cx == 200);
+    governed.endSliceGroup();
+    assertEquals(0L, governed.groupChargedNanos(merged),
+        "Evicted idle group must have its groupChargedNanos entry removed");
+    assertEquals(1, governed.liveGroupCount());
+    assertEquals(gFresh, governed.groupForCell(worldId, 200, 200));
   }
 
   @Test

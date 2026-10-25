@@ -238,6 +238,9 @@ public final class EntitySchedulerSampler {
         if (rotationCursor >= totalOnline) {
             rotationCursor = 0;
             roundsInCurrentRotation = 0;
+            if (activeProbes.isEmpty()) {
+                completeRotationAndPublish(clock.getAsLong(), activeCellsSupplier.get());
+            }
         }
         return started;
     }
@@ -257,6 +260,9 @@ public final class EntitySchedulerSampler {
         if (handle == null) {
             activeProbes.remove(playerId, probe);
             probe.cancelAndClear();
+            if (activeProbes.isEmpty() && rotationCursor == 0) {
+                completeRotationAndPublish(clock.getAsLong(), activeCellsSupplier.get());
+            }
             return false;
         }
         probe.handle = handle;
@@ -381,6 +387,9 @@ public final class EntitySchedulerSampler {
     private void onProbeRetired(ActivePlayerProbe probe) {
         activeProbes.remove(probe.playerId, probe);
         probe.cancelAndClear();
+        if (activeProbes.isEmpty() && rotationCursor == 0) {
+            completeRotationAndPublish(clock.getAsLong(), activeCellsSupplier.get());
+        }
     }
 
     /**

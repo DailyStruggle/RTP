@@ -218,6 +218,10 @@ final class RegionThreadBudget {
       surviving.bucket.clampToMin(absorbed.bucket);
       surviving.interactiveChargedNanos.addAndGet(absorbed.interactiveChargedNanos.get());
       surviving.backgroundChargedNanos.addAndGet(absorbed.backgroundChargedNanos.get());
+      AtomicLong absorbedCharge = groupChargedNanos.remove(absorbed.groupId);
+      if (absorbedCharge != null) {
+        recordGroupCharge(surviving.groupId, absorbedCharge.get());
+      }
       surviving.lastActiveNanos = nowNanos;
       for (Map.Entry<CellId, String> e : cellToGroup.entrySet()) {
         if (absorbed.groupId.equals(e.getValue())) {
@@ -245,6 +249,7 @@ final class RegionThreadBudget {
       if (g != null && nowNanos >= g.lastActiveNanos && (nowNanos - g.lastActiveNanos) > GROUP_IDLE_NANOS) {
         if (liveGroups.remove(e.getKey(), g)) {
           cellToGroup.entrySet().removeIf(ce -> e.getKey().equals(ce.getValue()));
+          groupChargedNanos.remove(e.getKey());
         }
       }
     }
