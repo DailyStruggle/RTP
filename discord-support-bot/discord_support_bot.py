@@ -89,6 +89,9 @@ from discord_setup import (
     CHANNEL_FLAG_PINNED,
     CHANNEL_TYPES,
     DiscordRestClient,
+    resolve_discord_bot_token,
+    resolve_discord_guild_id,
+    resolve_discord_maintainer_id,
     strip_leading_emoji_label,
 )
 
@@ -158,7 +161,7 @@ FOLLOWUP_INVESTIGATE_RE = re.compile(
 DIAGNOSTIC_REFUSAL_RE = re.compile(
     r"(?i)(?:"
     r"\b(?:can'?t|cannot|won'?t|will\s+not|not\s+going\s+to|refuse\s+to|don'?t\s+want\s+to)\s+"
-    r"(?:(?:to\s+)?(?:share|upload|post|send|give|provide|paste)\s+)?(?:(?:my|the|any|private|server|full|latest|console|confidential|sensitive)\s+)*(?:logs?|console|config|files?|mclo\.gs)|"
+    r"(?:to\s+)?(?:share|upload|post|send|give|provide|paste)\s+(?:(?:my|the|any|private|server|full|latest|console|confidential|sensitive)\s+)*(?:logs?|console|config|files?|mclo\.gs)\b|"
     r"\blogs?\s+(?:are|is)\s+(?:private|confidential|sensitive)|"
     r"\b(?:not\s+uploading|not\s+sharing)\s+(?:(?:private|my|the|any|server|full|latest|console)\s+)*logs?|"
     r"\b(?:on\s+my\s+phone|away\s+from\s+(?:the\s+|my\s+)?(?:console|pc|computer|server)|not\s+at\s+(?:my\s+)?(?:pc|computer|console))|"
@@ -316,6 +319,10 @@ class BotDecision:
     detected_intent: str | None = None
     doc_gap_digest: str | None = None
     worth_a_look_reasons: tuple[str, ...] = ()
+    linked_similar_threads: tuple[str, ...] = ()
+    user_score: float = 0.5
+    user_profile: dict[str, Any] | None = None
+    training_record: dict[str, Any] | None = None
 
 
 def build_resolution_buttons() -> list[dict[str, Any]]:
@@ -387,6 +394,7 @@ def _priority_trim_reply_to_budget(text: str, max_chars: int = 1950) -> str:
             "I am not 100% sure the standard docs",
             "Based on that additional context",
             "One related setting to check",
+            "Related in `#support`:",
             "- **",
         ))
 
@@ -2798,6 +2806,459 @@ class LocalLlmSynthesizer:
         return sanitize_bot_output(content)
 
 
+KNOWN_CANONICAL_PLATFORMS: tuple[str, ...] = (
+    "Paper",
+    "Spigot",
+    "Folia",
+    "Fabric",
+    "NeoForge",
+    "Velocity",
+    "BungeeCord",
+)
+VALID_TECHNICAL_TIERS: tuple[str, ...] = (
+    "standard",
+    "step_by_step",
+    "concise_technical",
+)
+VALID_TRAINING_EVENTS: tuple[str, ...] = (
+    "NEW_THREAD",
+    "FOLLOWUP_TURN",
+    "SOLVED_CONFIRMATION",
+    "NEED_HELP_ESCALATION",
+)
+VALID_OUTCOME_STATUSES: tuple[str, ...] = (
+    "ANSWERED",
+    "NEEDS_INFO",
+    "CONVERGED_ON_FOLLOWUP",
+    "ESCALATED",
+    "SOLVED_BY_USER",
+    "SILENT_SKIP",
+    "REFUSAL_GRACE",
+)
+FORBIDDEN_PROSE_RECORD_KEYS: frozenset[str] = frozenset({
+    "body",
+    "title",
+    "raw_text",
+    "message_body",
+    "reply_text",
+    "prompt",
+    "instructions",
+    "system_prompt",
+    "user_text",
+    "bystander_text",
+})
+SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_:-]{1,64}$")
+SAFE_VERSION_RE = re.compile(r"^v?\d+\.\d+(?:\.\d+)?$")
+
+
+def validate_prose_free_training_record(
+    conn: sqlite3.Connection,
+    record: dict[str, Any],
+    project: str = DEFAULT_PROJECT,
+) -> tuple[bool, dict[str, Any], str]:
+    """
+    Validates and sanitizes a training corpus entry so that ZERO free-form user
+    prose, prompt-injection instructions, unknown keys, or unverified URLs can
+    ever be stored in `training-corpus.jsonl` or fed to a downstream research model.
+    Every string field is constrained to closed enums, `corpus_vocab(conn)` single
+    tokens, `doc-index.sqlite` schema keys, or `ALLOWED_DOMAINS` doc URLs.
+    """
+    if not isinstance(record, dict):
+        return False, {}, "training record must be a dict"
+
+    for bad_key in FORBIDDEN_PROSE_RECORD_KEYS:
+        if bad_key in record:
+            return False, {}, f"forbidden prose field in training record: {bad_key}"
+
+    thread_id = str(record.get("thread_id", "")).strip()
+    author_id = str(record.get("author_id", "")).strip()
+    if not SAFE_ID_RE.match(thread_id) or not SAFE_ID_RE.match(author_id):
+        return False, {}, "invalid thread_id or author_id format"
+
+    event_type = str(record.get("event_type", "NEW_THREAD")).strip()
+    if event_type not in VALID_TRAINING_EVENTS:
+        return False, {}, f"invalid event_type: {event_type}"
+
+    detected_intent = str(record.get("detected_intent") or "TROUBLESHOOTING_DIAGNOSIS").strip()
+    if not re.match(r"^[A-Z0-9_]{3,40}$", detected_intent):
+        return False, {}, f"invalid detected_intent: {detected_intent}"
+
+    vocab = corpus_vocab(conn)
+    raw_facets = record.get("corpus_facets") or ()
+    clean_facets: list[str] = []
+    for tok in raw_facets:
+        s_tok = str(tok).strip().lower()
+        if not s_tok or " " in s_tok or len(s_tok) > 64:
+            return False, {}, f"non-atomic or oversized facet token: {s_tok!r}"
+        if s_tok in vocab and s_tok not in clean_facets:
+            clean_facets.append(s_tok)
+
+    valid_cfg_rows = conn.execute(
+        "SELECT file_path, key_path FROM config_keys WHERE project = ?",
+        (project,),
+    ).fetchall()
+    valid_cfg_pairs = {
+        f"{r['file_path']} -> {r['key_path']}".replace("defaults.", "")
+        for r in valid_cfg_rows
+    } | {
+        f"{r['file_path']} -> {r['key_path']}"
+        for r in valid_cfg_rows
+    } | {
+        str(r["key_path"]).replace("defaults.", "")
+        for r in valid_cfg_rows
+    }
+
+    def _filter_cfg_keys(items: Any) -> tuple[bool, list[str], str]:
+        out: list[str] = []
+        for it in items or ():
+            s = str(it).strip()
+            if s not in valid_cfg_pairs:
+                return False, [], f"unverified config key in training record: {s!r}"
+            if s not in out:
+                out.append(s)
+        return True, out, ""
+
+    ok_yaml, clean_yaml_keys, err_yaml = _filter_cfg_keys(record.get("non_default_yaml_keys"))
+    if not ok_yaml:
+        return False, {}, err_yaml
+
+    bot_resp_in = record.get("bot_response") if isinstance(record.get("bot_response"), dict) else {}
+    for bad_key in FORBIDDEN_PROSE_RECORD_KEYS:
+        if bad_key in bot_resp_in:
+            return False, {}, f"forbidden prose field in bot_response: {bad_key}"
+
+    ok_surf, clean_surf_cfg, err_surf = _filter_cfg_keys(bot_resp_in.get("surfaced_config_keys"))
+    if not ok_surf:
+        return False, {}, err_surf
+
+    valid_bits = {
+        str(r["key"])
+        for r in conn.execute("SELECT key FROM bit_codes WHERE project = ?", (project,)).fetchall()
+    }
+    clean_bits: list[str] = []
+    for b in record.get("matched_bit_codes") or ():
+        sb = str(b).strip()
+        if sb not in valid_bits:
+            return False, {}, f"unverified bit_code in training record: {sb!r}"
+        if sb not in clean_bits:
+            clean_bits.append(sb)
+
+    valid_classes = {
+        str(r["class_name"])
+        for r in conn.execute("SELECT DISTINCT class_name FROM code_sections WHERE project = ?", (project,)).fetchall()
+    }
+    clean_classes: list[str] = []
+    for c in record.get("matched_code_classes") or ():
+        sc = str(c).strip().removesuffix(".java")
+        if sc not in valid_classes:
+            return False, {}, f"unverified code class in training record: {sc!r}"
+        if sc not in clean_classes:
+            clean_classes.append(sc)
+
+    clean_urls: list[str] = []
+    for u in bot_resp_in.get("surfaced_doc_urls") or ():
+        su = str(u).strip()
+        parsed = urllib.parse.urlparse(su)
+        if parsed.scheme != "https" or (parsed.hostname or "").lower() not in ALLOWED_DOMAINS or " " in su:
+            return False, {}, f"disallowed doc URL in training record: {su!r}"
+        if su not in clean_urls:
+            clean_urls.append(su)
+
+    clean_linked: list[str] = []
+    for lt in bot_resp_in.get("linked_similar_threads") or ():
+        slt = str(lt).strip()
+        if not SAFE_ID_RE.match(slt):
+            return False, {}, f"invalid linked thread_id: {slt!r}"
+        if slt not in clean_linked:
+            clean_linked.append(slt)
+
+    outcome_in = record.get("outcome") if isinstance(record.get("outcome"), dict) else {}
+    status = str(outcome_in.get("status", "ANSWERED")).strip()
+    if status not in VALID_OUTCOME_STATUSES:
+        return False, {}, f"invalid outcome status: {status!r}"
+
+    clean_delta: list[str] = []
+    for dt in outcome_in.get("convergence_delta_facets") or ():
+        sdt = str(dt).strip().lower()
+        if " " in sdt or len(sdt) > 64:
+            return False, {}, f"non-atomic convergence delta token: {sdt!r}"
+        if sdt in vocab and sdt not in clean_delta:
+            clean_delta.append(sdt)
+
+    clean_platforms = [
+        p for p in (record.get("platform_tags") or ())
+        if str(p).strip() in KNOWN_CANONICAL_PLATFORMS
+    ]
+    diag_in = record.get("diagnostics_present") if isinstance(record.get("diagnostics_present"), dict) else {}
+    flags_in = record.get("behavioral_flags") if isinstance(record.get("behavioral_flags"), dict) else {}
+
+    sanitized: dict[str, Any] = {
+        "schema_version": 1,
+        "thread_id": thread_id,
+        "author_id": author_id,
+        "timestamp": float(record.get("timestamp", 0.0)),
+        "project": str(project).strip().lower(),
+        "platform_tags": clean_platforms,
+        "event_type": event_type,
+        "turn_index": max(1, int(record.get("turn_index", 1))),
+        "detected_intent": detected_intent,
+        "corpus_facets": clean_facets,
+        "non_default_yaml_keys": clean_yaml_keys,
+        "matched_bit_codes": clean_bits,
+        "matched_code_classes": clean_classes,
+        "diagnostics_present": {
+            k: bool(diag_in.get(k, False))
+            for k in ("rtp_version", "server_version", "rtp_test", "log_link")
+        },
+        "behavioral_flags": {
+            k: bool(flags_in.get(k, False))
+            for k in (
+                "is_pro_supporter",
+                "had_secret_redacted",
+                "had_bystander_footgun",
+                "is_explicit_refusal",
+                "is_hostile_signal",
+                "had_ocr_attachment",
+            )
+        },
+        "bot_response": {
+            "should_reply": bool(bot_resp_in.get("should_reply", True)),
+            "surfaced_config_keys": clean_surf_cfg,
+            "surfaced_doc_urls": clean_urls,
+            "linked_similar_threads": clean_linked,
+            "escalated_to_maintainer": bool(bot_resp_in.get("escalated_to_maintainer", False)),
+            "in_needs_info": bool(bot_resp_in.get("in_needs_info", False)),
+            "worth_a_look_categories": [
+                str(c).strip()
+                for c in (bot_resp_in.get("worth_a_look_categories") or ())
+                if re.match(r"^[a-z0-9_]{2,32}$", str(c).strip())
+            ],
+        },
+        "outcome": {
+            "status": status,
+            "convergence_delta_facets": clean_delta,
+            "turns_to_resolution": (
+                int(outcome_in["turns_to_resolution"])
+                if outcome_in.get("turns_to_resolution") is not None
+                else None
+            ),
+        },
+    }
+    return True, sanitized, "ok"
+
+
+def build_research_model_attunement_payload(
+    conn: sqlite3.Connection,
+    records: list[dict[str, Any]],
+    project: str = DEFAULT_PROJECT,
+) -> dict[str, Any]:
+    """
+    Compiles prose-free `training-corpus.jsonl` records into a structured
+    evaluation payload for an offline research model to score users and attune
+    facet -> config key retrieval weights with zero exposure to raw user text.
+    """
+    validated_records: list[dict[str, Any]] = []
+    for rec in records:
+        ok, clean_rec, _ = validate_prose_free_training_record(conn, rec, project=project)
+        if ok:
+            validated_records.append(clean_rec)
+
+    user_rollups: dict[str, dict[str, Any]] = {}
+    facet_resolution_clusters: list[dict[str, Any]] = []
+
+    for rec in validated_records:
+        uid = rec["author_id"]
+        u = user_rollups.setdefault(
+            uid,
+            {
+                "author_id": uid,
+                "events_count": 0,
+                "solved_count": 0,
+                "converged_count": 0,
+                "diag_complete_events": 0,
+                "refusal_events": 0,
+                "hostile_events": 0,
+                "high_signal_events": 0,
+                "known_platforms": [],
+            },
+        )
+        u["events_count"] += 1
+        for plat in rec.get("platform_tags") or ():
+            if plat not in u["known_platforms"]:
+                u["known_platforms"].append(plat)
+        diag = rec.get("diagnostics_present") or {}
+        if sum(1 for v in diag.values() if v) >= 2:
+            u["diag_complete_events"] += 1
+        flags = rec.get("behavioral_flags") or {}
+        if flags.get("is_explicit_refusal"):
+            u["refusal_events"] += 1
+        if flags.get("is_hostile_signal"):
+            u["hostile_events"] += 1
+        bot_resp = rec.get("bot_response") or {}
+        if bot_resp.get("worth_a_look_categories"):
+            u["high_signal_events"] += 1
+        outcome = rec.get("outcome") or {}
+        if outcome.get("status") == "SOLVED_BY_USER":
+            u["solved_count"] += 1
+        elif outcome.get("status") == "CONVERGED_ON_FOLLOWUP":
+            u["converged_count"] += 1
+
+        if outcome.get("status") in ("SOLVED_BY_USER", "CONVERGED_ON_FOLLOWUP", "ANSWERED") and bot_resp.get("surfaced_config_keys"):
+            facet_resolution_clusters.append(
+                {
+                    "corpus_facets": rec.get("corpus_facets", []),
+                    "convergence_delta_facets": outcome.get("convergence_delta_facets", []),
+                    "surfaced_config_keys": bot_resp.get("surfaced_config_keys", []),
+                    "outcome_status": outcome.get("status"),
+                }
+            )
+
+    return {
+        "schema_version": 1,
+        "project": project,
+        "prose_free_verified": True,
+        "total_validated_records": len(validated_records),
+        "user_rollups": list(user_rollups.values()),
+        "facet_resolution_clusters": facet_resolution_clusters,
+    }
+
+
+def verify_and_apply_research_attunement(
+    conn: sqlite3.Connection,
+    attunement_data: dict[str, Any],
+    engine: SupportBotEngine | None = None,
+    project: str = DEFAULT_PROJECT,
+) -> tuple[bool, dict[str, Any], str]:
+    """
+    Enforces the Attunement Schema Firewall on recommendations returned by a
+    comprehensive research model:
+      - Rejects any free-form prompt/instruction override fields.
+      - Clamps `user_score` to `[0.0, 1.0]` and validates `technical_tier` and
+        `known_platforms` against closed enums.
+      - Validates every `facet_config_boosts` entry against `corpus_vocab(conn)`
+        and `config_keys` in `doc-index.sqlite` so a poisoned or hallucinating
+        research model can never inject fake config keys or prose into replies.
+    """
+    if not isinstance(attunement_data, dict):
+        return False, {}, "attunement_data must be a dict"
+
+    for bad_key in FORBIDDEN_PROSE_RECORD_KEYS:
+        if bad_key in attunement_data:
+            return False, {}, f"forbidden prose/instruction field in attunement_data: {bad_key}"
+
+    vocab = corpus_vocab(conn)
+    valid_cfg_rows = conn.execute(
+        "SELECT file_path, key_path FROM config_keys WHERE project = ?",
+        (project,),
+    ).fetchall()
+    valid_cfg_map: dict[tuple[str, str], dict[str, str]] = {}
+    for r in valid_cfg_rows:
+        fp = str(r["file_path"])
+        kp = str(r["key_path"])
+        valid_cfg_map[(fp, kp)] = dict(r)
+        valid_cfg_map[(fp, kp.replace("defaults.", ""))] = dict(r)
+
+    verified_profiles: dict[str, dict[str, Any]] = {}
+    raw_profiles = attunement_data.get("user_profiles") or {}
+    if not isinstance(raw_profiles, dict):
+        return False, {}, "user_profiles must be a dict"
+
+    for uid, prof in raw_profiles.items():
+        s_uid = str(uid).strip()
+        if not SAFE_ID_RE.match(s_uid) or not isinstance(prof, dict):
+            return False, {}, f"invalid user_profile entry for {s_uid!r}"
+        for bad_key in FORBIDDEN_PROSE_RECORD_KEYS:
+            if bad_key in prof:
+                return False, {}, f"forbidden prose field in user_profile {s_uid!r}: {bad_key}"
+        tier = str(prof.get("technical_tier", "standard")).strip()
+        if tier not in VALID_TECHNICAL_TIERS:
+            return False, {}, f"invalid technical_tier {tier!r} for {s_uid!r}"
+        try:
+            raw_score = float(prof.get("user_score", 0.5))
+        except (ValueError, TypeError):
+            return False, {}, f"non-numeric user_score for {s_uid!r}"
+        score = round(min(max(raw_score, 0.0), 1.0), 3)
+
+        platforms: list[str] = []
+        for p in prof.get("known_platforms") or ():
+            sp = str(p).strip()
+            if sp not in KNOWN_CANONICAL_PLATFORMS:
+                return False, {}, f"unknown platform {sp!r} in user_profile {s_uid!r}"
+            if sp not in platforms:
+                platforms.append(sp)
+
+        versions: list[str] = []
+        for v in prof.get("known_versions") or ():
+            sv = str(v).strip()
+            if not SAFE_VERSION_RE.match(sv):
+                return False, {}, f"invalid version token {sv!r} in user_profile {s_uid!r}"
+            if sv not in versions:
+                versions.append(sv)
+
+        verified_profiles[s_uid] = {
+            "user_score": score,
+            "technical_tier": tier,
+            "known_platforms": platforms,
+            "known_versions": versions,
+            "threads_seen": max(1, int(prof.get("threads_seen", 1))),
+            "solved_count": max(0, int(prof.get("solved_count", 0))),
+            "diagnostic_completions": max(0, int(prof.get("diagnostic_completions", 0))),
+        }
+
+    verified_boosts: list[dict[str, Any]] = []
+    raw_boosts = attunement_data.get("facet_config_boosts") or []
+    if not isinstance(raw_boosts, list):
+        return False, {}, "facet_config_boosts must be a list"
+
+    for b_entry in raw_boosts:
+        if not isinstance(b_entry, dict):
+            return False, {}, "facet_config_boost entry must be a dict"
+        for bad_key in FORBIDDEN_PROSE_RECORD_KEYS:
+            if bad_key in b_entry:
+                return False, {}, f"forbidden prose field in facet_config_boost: {bad_key}"
+        raw_facets = b_entry.get("facets") or ()
+        if not raw_facets:
+            return False, {}, "facet_config_boost requires non-empty facets"
+        b_facets: list[str] = []
+        for f_tok in raw_facets:
+            sf = str(f_tok).strip().lower()
+            if sf not in vocab or " " in sf:
+                return False, {}, f"unverified or non-corpus facet {sf!r} in facet_config_boost"
+            if sf not in b_facets:
+                b_facets.append(sf)
+
+        fp = str(b_entry.get("file_path", "")).strip()
+        kp = str(b_entry.get("key_path", "")).strip()
+        if (fp, kp) not in valid_cfg_map:
+            return False, {}, f"hallucinated config target {fp} -> {kp} in facet_config_boost"
+        try:
+            boost_val = float(b_entry.get("boost", 1.25))
+        except (ValueError, TypeError):
+            return False, {}, "non-numeric boost in facet_config_boost"
+        verified_boosts.append(
+            {
+                "facets": sorted(b_facets),
+                "file_path": fp,
+                "key_path": valid_cfg_map[(fp, kp)]["key_path"],
+                "boost": round(min(max(boost_val, 0.5), 2.0), 3),
+            }
+        )
+
+    sanitized_attunement = {
+        "user_profiles": verified_profiles,
+        "facet_config_boosts": verified_boosts,
+    }
+    if engine is not None:
+        for uid, uprof in verified_profiles.items():
+            existing = engine.user_profiles.get(uid, {})
+            merged = dict(existing)
+            merged.update(uprof)
+            engine.user_profiles[uid] = merged
+        engine.attunement_boosts = list(verified_boosts)
+
+    return True, sanitized_attunement, "ok"
+
+
 class SupportBotEngine:
     """
     Stateful, deterministic Forum triage engine backed by `doc-index.sqlite`.
@@ -2816,6 +3277,8 @@ class SupportBotEngine:
         ocr_extractor: Callable[[str], str] | None = None,
         text_attachment_fetcher: Callable[[str], str] | None = None,
         manifest: pathlib.Path | str | dict[str, Any] | None = None,
+        allow_maintainer_threads: bool = False,
+        training_corpus_path: pathlib.Path | None = None,
     ) -> None:
         self.manifest = load_support_bot_manifest(manifest)
         if conn is not None:
@@ -2830,12 +3293,19 @@ class SupportBotEngine:
             self._owns_conn = True
 
         self.maintainer_id = str(maintainer_id)
+        self.allow_maintainer_threads = allow_maintainer_threads
         self.cooldown_seconds = cooldown_seconds
         self.log_fetcher = log_fetcher or (lambda pid: fetch_mclogs_raw(pid, manifest=self.manifest))
         self.llm_synthesizer = llm_synthesizer
         self.translator = translator
         self.ocr_extractor = ocr_extractor or ocr_image_source
         self.text_attachment_fetcher = text_attachment_fetcher or read_text_attachment_source
+        self.training_corpus_path = training_corpus_path
+        self.training_corpus: list[dict[str, Any]] = []
+        self.resolved_threads: dict[str, dict[str, Any]] = {}
+        self._thread_grounded_signatures: dict[str, dict[str, Any]] = {}
+        self.user_profiles: dict[str, dict[str, Any]] = {}
+        self.attunement_boosts: list[dict[str, Any]] = []
         self.escalated_threads: set[str] = set()
         self.investigative_threads: set[str] = set()
         self.model_refrained_threads: set[str] = set()
@@ -2989,7 +3459,7 @@ class SupportBotEngine:
         so `DiscordForumPoller` can post an immediate "working on it" status
         message and edit it in place once the response is ready.
         """
-        if post.author_id == self.maintainer_id:
+        if post.author_id == self.maintainer_id and not self.allow_maintainer_threads:
             return False
         project = resolve_post_project(post.applied_tags, manifest=self.manifest)
         if not has_project_docs(self.conn, project):
@@ -3049,6 +3519,482 @@ class SupportBotEngine:
         self.user_last_action[user_id] = now
         return False
 
+    def register_resolved_thread(
+        self,
+        thread_id: str,
+        project: str = DEFAULT_PROJECT,
+        config_keys: list[str] | tuple[str, ...] = (),
+        doc_urls: list[str] | tuple[str, ...] = (),
+        bit_codes: list[str] | tuple[str, ...] = (),
+        corpus_facets: list[str] | tuple[str, ...] | frozenset[str] = (),
+        is_pinned_guide: bool = False,
+        guide_label: str = "",
+        solved_confirmed: bool = True,
+    ) -> None:
+        """
+        Registers a preexisting resolved thread or pinned `embeds.json` reference
+        guide using ONLY its prose-free grounded facet signature so cross-thread
+        prompt injection is impossible by construction.
+        """
+        clean_tid = str(thread_id).strip()
+        if not SAFE_ID_RE.match(clean_tid):
+            return
+        vocab = corpus_vocab(self.conn)
+        clean_facets = tuple(
+            sorted(
+                {
+                    str(f).strip().lower()
+                    for f in corpus_facets
+                    if str(f).strip().lower() in vocab and " " not in str(f).strip()
+                }
+            )
+        )
+        clean_cfg = tuple(
+            dict.fromkeys(
+                str(k).strip().replace("defaults.", "")
+                for k in config_keys
+                if str(k).strip()
+            )
+        )
+        clean_urls = tuple(
+            dict.fromkeys(
+                str(u).strip()
+                for u in doc_urls
+                if str(u).strip().startswith("https://")
+                and (urllib.parse.urlparse(str(u).strip()).hostname or "").lower() in ALLOWED_DOMAINS
+            )
+        )
+        clean_bits = tuple(dict.fromkeys(str(b).strip() for b in bit_codes if str(b).strip()))
+        safe_label = ""
+        if is_pinned_guide and guide_label:
+            safe_label = re.sub(r"[`*_~<>@\r\n]+", " ", str(guide_label)).strip()[:90]
+
+        if not (clean_cfg or clean_urls or clean_bits or clean_facets):
+            return
+
+        self.resolved_threads[clean_tid] = {
+            "thread_id": clean_tid,
+            "project": (project or DEFAULT_PROJECT).strip().lower(),
+            "is_pinned_guide": bool(is_pinned_guide),
+            "guide_label": safe_label,
+            "config_keys": clean_cfg,
+            "doc_urls": clean_urls,
+            "bit_codes": clean_bits,
+            "corpus_facets": clean_facets,
+            "solved_confirmed": bool(solved_confirmed),
+        }
+
+    def seed_pinned_reference_guides(
+        self,
+        thread_id_map: dict[str, str] | None = None,
+        spec_path: pathlib.Path | None = None,
+    ) -> int:
+        """
+        Indexes the 5 `embeds.json` `pinned_forum_threads` reference guides into
+        `self.resolved_threads` by their grounded `doc-index.sqlite` config keys,
+        doc URLs, BIT codes, and corpus facets.
+        """
+        target_spec = spec_path or (BOT_DIR / "embeds.json")
+        if not target_spec.is_file():
+            return 0
+        try:
+            spec_data = json.loads(target_spec.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return 0
+
+        seeded = 0
+        for idx, item in enumerate(spec_data.get("pinned_forum_threads", []), 1):
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title", "")).strip()
+            body = str(item.get("body", "")).strip()
+            if not title or not body:
+                continue
+            tags = tuple(str(t) for t in (item.get("tags") or ()))
+            project = resolve_post_project(tags, manifest=self.manifest)
+            tid = (thread_id_map or {}).get(title) or f"pinned_guide_{idx}"
+            combined = f"{title}\n{body}"
+            cfg_hits, doc_hits = combinatorial_retrieve(
+                self.conn,
+                combined,
+                cfg_limit=5,
+                doc_limit=3,
+                project=project,
+            )
+            cfg_keys = [
+                f"{c['file_path']} -> {c['key_path'].replace('defaults.', '')}"
+                for c in cfg_hits
+                if c.get("confidence") == "high"
+            ]
+            urls = [str(d["url"]) for d in doc_hits if d.get("url")]
+            for m in ANY_URL_RE.finditer(body):
+                u = m.group(0).rstrip(".,;:!?)>")
+                if u.startswith("https://dailystruggle.github.io/") and u not in urls:
+                    urls.append(u)
+            bits = [str(b["key"]) for b in extract_bit_codes(self.conn, combined, project=project, manifest=self.manifest)]
+            facets = self._extract_corpus_facets(combined, project=project)
+            self.register_resolved_thread(
+                thread_id=tid,
+                project=project,
+                config_keys=cfg_keys,
+                doc_urls=urls,
+                bit_codes=bits,
+                corpus_facets=facets,
+                is_pinned_guide=True,
+                guide_label=title,
+                solved_confirmed=True,
+            )
+            seeded += 1
+        return seeded
+
+    def _find_similar_resolved_threads(
+        self,
+        current_thread_id: str,
+        project: str,
+        surfaced_cfg_keys: list[str],
+        surfaced_doc_urls: list[str],
+        bit_keys: list[str],
+        corpus_facets: frozenset[str],
+        max_links: int = 2,
+    ) -> list[tuple[str, str]]:
+        """
+        Matches the current question against `self.resolved_threads` using
+        weighted overlap over canonical `config_keys`, `bit_codes`, `doc_urls`,
+        and `corpus_facets`. Renders links using ONLY `<#thread_id>` + the shared
+        canonical schema key or static `embeds.json` guide title (zero user prose).
+        """
+        if not self.resolved_threads:
+            return []
+        cur_cfg_set = {k.replace("defaults.", "") for k in surfaced_cfg_keys if k}
+        cur_url_set = set(surfaced_doc_urls)
+        cur_bit_set = set(bit_keys)
+        cur_facet_set = set(corpus_facets)
+
+        scored: list[tuple[float, str, str]] = []
+        for tid, entry in self.resolved_threads.items():
+            if tid == current_thread_id or not entry.get("solved_confirmed", True):
+                continue
+            if entry.get("project", DEFAULT_PROJECT) != project:
+                continue
+            ent_cfg = set(entry.get("config_keys") or ())
+            ent_urls = set(entry.get("doc_urls") or ())
+            ent_bits = set(entry.get("bit_codes") or ())
+            ent_facets = set(entry.get("corpus_facets") or ())
+
+            shared_cfg = sorted(cur_cfg_set & ent_cfg)
+            shared_bits = sorted(cur_bit_set & ent_bits)
+            shared_urls = sorted(cur_url_set & ent_urls)
+            shared_facets = cur_facet_set & ent_facets
+
+            if not shared_cfg and not shared_bits:
+                if not (shared_urls and len(shared_facets) >= 2):
+                    continue
+
+            score = (
+                3.0 * len(shared_cfg)
+                + 3.0 * len(shared_bits)
+                + 1.5 * len(shared_urls)
+                + 0.4 * len(shared_facets)
+            )
+            if score < 2.2:
+                continue
+
+            if entry.get("is_pinned_guide") and entry.get("guide_label"):
+                topic_desc = f"Pinned guide: *{entry['guide_label']}*"
+                if shared_cfg:
+                    topic_desc += f" - `{shared_cfg[0]}`"
+            elif shared_cfg:
+                topic_desc = f"resolved thread on `{shared_cfg[0]}`"
+            elif shared_bits:
+                topic_desc = f"resolved thread on `{shared_bits[0]}`"
+            else:
+                topic_desc = f"resolved thread on <{shared_urls[0]}>"
+
+            bullet = f"- <#{tid}> ({topic_desc})"
+            scored.append((score, tid, bullet))
+
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [(tid, bullet) for _, tid, bullet in scored[:max_links]]
+
+    def _apply_attunement_boosts(
+        self,
+        corpus_facets: frozenset[str],
+        cfg_hits: list[dict[str, str]],
+        project: str,
+    ) -> list[dict[str, str]]:
+        """
+        Applies schema-verified `self.attunement_boosts` (from research-model
+        review) when the post's whitelisted `corpus_facets` contain all facets
+        of a verified boost rule.
+        """
+        if not self.attunement_boosts or not corpus_facets:
+            return cfg_hits
+        boosted_front: list[dict[str, str]] = []
+        seen_pairs: set[tuple[str, str]] = set()
+        for rule in sorted(self.attunement_boosts, key=lambda r: -float(r.get("boost", 1.0))):
+            req_facets = set(rule.get("facets") or ())
+            if not req_facets or not req_facets.issubset(corpus_facets):
+                continue
+            fp = str(rule.get("file_path", ""))
+            kp = str(rule.get("key_path", ""))
+            row = self.conn.execute(
+                """
+                SELECT file_path, key_path, default_value, value_type, description, range_spec, options_spec
+                FROM config_keys
+                WHERE project = ? AND file_path = ? AND (key_path = ? OR key_path = ?)
+                LIMIT 1
+                """,
+                (project, fp, kp, f"defaults.{kp}"),
+            ).fetchone()
+            if row is not None:
+                hit = dict(row)
+                hit["confidence"] = "high"
+                pair = (str(hit["file_path"]), str(hit["key_path"]))
+                if pair not in seen_pairs:
+                    seen_pairs.add(pair)
+                    boosted_front.append(hit)
+
+        if not boosted_front:
+            return cfg_hits
+        remaining = [
+            c for c in cfg_hits
+            if (str(c.get("file_path", "")), str(c.get("key_path", ""))) not in seen_pairs
+        ]
+        return boosted_front + remaining
+
+    def _extract_platforms_and_versions(
+        self,
+        applied_tags: tuple[str, ...],
+        text: str,
+    ) -> tuple[list[str], list[str]]:
+        platforms: list[str] = []
+        combined = " ".join(applied_tags) + "\n" + (text or "")
+        for plat in KNOWN_CANONICAL_PLATFORMS:
+            if re.search(rf"(?i)\b{re.escape(plat)}\b", combined) and plat not in platforms:
+                platforms.append(plat)
+        versions: list[str] = []
+        for m in re.finditer(r"\b(v?\d+\.\d+(?:\.\d+)?)\b", text or ""):
+            ver = m.group(1)
+            if SAFE_VERSION_RE.match(ver) and ver not in versions:
+                versions.append(ver[:16])
+        return platforms[:4], versions[:4]
+
+    def _recall_user_environment_diagnostics(
+        self,
+        author_id: str,
+        thread_id: str,
+        diag: dict[str, bool],
+    ) -> tuple[dict[str, bool], str]:
+        """
+        Recalls known platform (`server_version`) and plugin version (`rtp_version`)
+        from a returning user's longitudinal `UserIntelligenceProfile` when they
+        open a new thread and omit environment details they already shared earlier.
+        """
+        prof = self.user_profiles.get(author_id)
+        if not prof:
+            return diag, ""
+        seen_threads = set(prof.get("seen_thread_ids") or ())
+        if not seen_threads or (seen_threads == {thread_id} and int(prof.get("threads_seen", 0)) <= 1):
+            return diag, ""
+
+        updated = dict(diag)
+        recalled_parts: list[str] = []
+        known_plats = list(prof.get("known_platforms") or ())
+        known_vers = list(prof.get("known_versions") or ())
+        if not updated.get("server_version") and known_plats:
+            updated["server_version"] = True
+            recalled_parts.append("/".join(known_plats[:2]))
+        if not updated.get("rtp_version") and any(v.lower().startswith("v") or v.startswith("3.") for v in known_vers):
+            updated["rtp_version"] = True
+            recalled_parts.append(next(v for v in known_vers if v.lower().startswith("v") or v.startswith("3.")))
+        elif known_vers and recalled_parts:
+            recalled_parts.append(known_vers[0])
+
+        note = f"Using your remembered `{', '.join(recalled_parts)}` setup from your earlier thread" if recalled_parts else ""
+        return updated, note
+
+    def _update_user_intelligence_profile(
+        self,
+        post: ForumPostContext,
+        combined_text: str,
+        diag: dict[str, bool],
+        is_high_signal: bool = False,
+        is_explicit_refusal: bool = False,
+        is_hostile: bool = False,
+        had_footgun: bool = False,
+        is_meta_clarification: bool = False,
+        solved_confirmed: bool = False,
+        converged_on_followup: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Updates the per-user longitudinal "Personal Intelligence" profile
+        (`known_platforms`, `known_versions`, `technical_tier`, `user_score`)
+        using strictly grounded signals (zero raw user prose stored).
+        """
+        uid = str(post.author_id).strip()
+        prof = self.user_profiles.get(uid)
+        if prof is None:
+            prof = {
+                "user_score": 0.5,
+                "technical_tier": "standard",
+                "known_platforms": [],
+                "known_versions": [],
+                "threads_seen": 0,
+                "solved_count": 0,
+                "diagnostic_completions": 0,
+                "seen_thread_ids": [],
+            }
+            self.user_profiles[uid] = prof
+
+        seen_tids: list[str] = list(prof.get("seen_thread_ids") or [])
+        if post.thread_id not in seen_tids:
+            seen_tids.append(post.thread_id)
+            prof["seen_thread_ids"] = seen_tids
+            prof["threads_seen"] = max(int(prof.get("threads_seen", 0)) + 1, len(seen_tids))
+
+        obs_plats, obs_vers = self._extract_platforms_and_versions(post.applied_tags, combined_text)
+        known_plats = list(prof.get("known_platforms") or [])
+        for p in obs_plats:
+            if p not in known_plats:
+                known_plats.append(p)
+        prof["known_platforms"] = known_plats[:6]
+
+        known_vers = list(prof.get("known_versions") or [])
+        for v in obs_vers:
+            if v not in known_vers:
+                known_vers.append(v)
+        prof["known_versions"] = known_vers[:6]
+
+        score = float(prof.get("user_score", 0.5))
+        diag_count = sum(1 for v in diag.values() if v)
+        if diag_count >= 3:
+            score += 0.12
+            prof["diagnostic_completions"] = int(prof.get("diagnostic_completions", 0)) + 1
+        elif diag_count >= 2:
+            score += 0.05
+        if is_high_signal:
+            score += 0.15
+        if solved_confirmed:
+            score += 0.10
+            prof["solved_count"] = int(prof.get("solved_count", 0)) + 1
+        if converged_on_followup:
+            score += 0.08
+        if is_explicit_refusal:
+            score -= 0.15
+        if is_hostile:
+            score -= 0.25
+        if had_footgun:
+            score -= 0.10
+
+        prof["user_score"] = round(min(max(score, 0.0), 1.0), 3)
+
+        cur_tier = str(prof.get("technical_tier", "standard"))
+        if is_meta_clarification:
+            prof["technical_tier"] = "step_by_step"
+        elif (is_high_signal or diag_count >= 3 or prof["user_score"] >= 0.72) and cur_tier == "standard":
+            prof["technical_tier"] = "concise_technical"
+
+        return {
+            "user_score": prof["user_score"],
+            "technical_tier": prof["technical_tier"],
+            "known_platforms": list(prof["known_platforms"]),
+            "known_versions": list(prof["known_versions"]),
+            "threads_seen": int(prof["threads_seen"]),
+            "solved_count": int(prof["solved_count"]),
+            "diagnostic_completions": int(prof["diagnostic_completions"]),
+        }
+
+    def _record_training_interaction(
+        self,
+        post: ForumPostContext,
+        project: str,
+        event_type: str,
+        turn_index: int,
+        detected_intent: str,
+        corpus_facets: frozenset[str] | list[str] | tuple[str, ...],
+        yaml_overrides: list[dict[str, str]],
+        bit_matches: list[dict[str, Any]],
+        code_hits: list[dict[str, str]],
+        diag: dict[str, bool],
+        is_pro: bool,
+        has_secret: bool,
+        has_footgun: bool,
+        is_refusal: bool,
+        is_hostile: bool,
+        has_ocr: bool,
+        should_reply: bool,
+        surfaced_cfg_keys: list[str],
+        surfaced_doc_urls: list[str],
+        linked_threads: list[str],
+        escalated: bool,
+        in_needs_info: bool,
+        worth_a_look_categories: list[str] | tuple[str, ...],
+        outcome_status: str,
+        convergence_delta_facets: frozenset[str] | list[str] = (),
+        turns_to_resolution: int | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Records a validated, prose-free interaction entry to `self.training_corpus`
+        (and `self.training_corpus_path` JSONL if configured).
+        """
+        obs_plats, _ = self._extract_platforms_and_versions(post.applied_tags, "")
+        raw_rec: dict[str, Any] = {
+            "schema_version": 1,
+            "thread_id": post.thread_id,
+            "author_id": post.author_id,
+            "timestamp": post.timestamp,
+            "project": project,
+            "platform_tags": obs_plats,
+            "event_type": event_type,
+            "turn_index": turn_index,
+            "detected_intent": detected_intent,
+            "corpus_facets": sorted(set(corpus_facets)),
+            "non_default_yaml_keys": [
+                f"{ov['file_path']} -> {ov['key_path'].replace('defaults.', '')}"
+                if ov.get("file_path")
+                else str(ov["key_path"]).replace("defaults.", "")
+                for ov in yaml_overrides
+                if ov.get("key_path")
+            ],
+            "matched_bit_codes": [str(b["key"]) for b in bit_matches if b.get("key")],
+            "matched_code_classes": [str(c["class_name"]) for c in code_hits if c.get("class_name")],
+            "diagnostics_present": diag,
+            "behavioral_flags": {
+                "is_pro_supporter": is_pro,
+                "had_secret_redacted": has_secret,
+                "had_bystander_footgun": has_footgun,
+                "is_explicit_refusal": is_refusal,
+                "is_hostile_signal": is_hostile,
+                "had_ocr_attachment": has_ocr,
+            },
+            "bot_response": {
+                "should_reply": should_reply,
+                "surfaced_config_keys": surfaced_cfg_keys,
+                "surfaced_doc_urls": surfaced_doc_urls,
+                "linked_similar_threads": linked_threads,
+                "escalated_to_maintainer": escalated,
+                "in_needs_info": in_needs_info,
+                "worth_a_look_categories": list(worth_a_look_categories),
+            },
+            "outcome": {
+                "status": outcome_status,
+                "convergence_delta_facets": sorted(set(convergence_delta_facets)),
+                "turns_to_resolution": turns_to_resolution,
+            },
+        }
+        ok, clean_rec, _ = validate_prose_free_training_record(self.conn, raw_rec, project=project)
+        if not ok:
+            return None
+        self.training_corpus.append(clean_rec)
+        if self.training_corpus_path is not None:
+            try:
+                self.training_corpus_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.training_corpus_path.open("a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(clean_rec, sort_keys=True) + "\n")
+            except OSError:
+                pass
+        return clean_rec
+
     def _format_triage_digest(
         self,
         post: ForumPostContext,
@@ -3080,6 +4026,12 @@ class SupportBotEngine:
             if len(clean_note) > 110:
                 clean_note = clean_note[:107] + "..."
             logs_str = f"{logs_str} | Context: {clean_note}"
+        u_prof = self.user_profiles.get(post.author_id)
+        if u_prof and int(u_prof.get("threads_seen", 0)) > 1:
+            logs_str = (
+                f"{logs_str} | User Score: {float(u_prof.get('user_score', 0.5)):.2f} "
+                f"({u_prof.get('technical_tier', 'standard')})"
+            )
         lines = [
             f"**[{tier}]** Thread <#{post.thread_id}> (`{post.thread_id}`) by <@{post.author_id}> ({post.author_name}) - <@{self.maintainer_id}>",
             f"- **Title & Tags:** {post.title.strip()} ({tags_str})",
@@ -3412,7 +4364,7 @@ class SupportBotEngine:
 
     def handle_new_thread(self, post: ForumPostContext) -> BotDecision:
         """Evaluates a newly created `#support` Forum thread."""
-        if post.author_id == self.maintainer_id:
+        if post.author_id == self.maintainer_id and not self.allow_maintainer_threads:
             return BotDecision(
                 reply_text="",
                 applied_tags=post.applied_tags,
@@ -3503,6 +4455,9 @@ class SupportBotEngine:
             normalized_user_text = f"{normalized_user_text}\n{ov_keys}".strip()
         is_startup_crash = bool(STARTUP_CRASH_KEYWORDS.search(normalized_user_text))
         diag = inspect_diagnostics(normalized_user_text, fetched_logs, project=project, manifest=self.manifest)
+        diag, recalled_env_note = self._recall_user_environment_diagnostics(
+            post.author_id, post.thread_id, diag
+        )
         missing_diag = missing_diagnostic_items(diag, is_startup_crash=is_startup_crash, project=project, manifest=self.manifest)
         all_diag_present = len(missing_diag) == 0
 
@@ -3588,6 +4543,40 @@ class SupportBotEngine:
                 missing_diag=missing_diag,
                 cumulative_terms=specific_tokens,
             )
+            u_prof = self._update_user_intelligence_profile(
+                post=post,
+                combined_text=combined_user_text,
+                diag=diag,
+                is_high_signal=False,
+                is_hostile=hostile,
+                had_footgun=bool(danger_warning),
+            )
+            t_rec = self._record_training_interaction(
+                post=post,
+                project=project,
+                event_type="NEW_THREAD",
+                turn_index=1,
+                detected_intent="ABSTAIN_NEEDS_INFO",
+                corpus_facets=self.thread_last_facets.get(post.thread_id, frozenset()),
+                yaml_overrides=yaml_overrides,
+                bit_matches=bit_matches,
+                code_hits=[],
+                diag=diag,
+                is_pro=pro,
+                has_secret=has_secret,
+                has_footgun=bool(danger_warning),
+                is_refusal=False,
+                is_hostile=hostile,
+                has_ocr=bool(ocr_text),
+                should_reply=True,
+                surfaced_cfg_keys=[],
+                surfaced_doc_urls=[],
+                linked_threads=[],
+                escalated=False,
+                in_needs_info=True,
+                worth_a_look_categories=(),
+                outcome_status="NEEDS_INFO",
+            )
             return BotDecision(
                 reply_text=sanitize_bot_output("\n\n".join(sections)),
                 applied_tags=tuple(tags),
@@ -3601,6 +4590,9 @@ class SupportBotEngine:
                 refrained_status=refrained_status,
                 detected_intent="ABSTAIN_NEEDS_INFO",
                 worth_a_look_reasons=(),
+                user_score=u_prof["user_score"],
+                user_profile=u_prof,
+                training_record=t_rec,
             )
 
         cfg_hits, doc_hits = combinatorial_retrieve(
@@ -3608,6 +4600,11 @@ class SupportBotEngine:
             normalized_user_text,
             cfg_limit=7,
             doc_limit=5,
+            project=project,
+        )
+        cfg_hits = self._apply_attunement_boosts(
+            self.thread_last_facets.get(post.thread_id, frozenset()),
+            cfg_hits,
             project=project,
         )
         if yaml_overrides:
@@ -3811,6 +4808,50 @@ class SupportBotEngine:
             is_hostile=hostile,
         )
 
+        surfaced_cfg_keys = [
+            f"{c['file_path']} -> {c['key_path'].replace('defaults.', '')}"
+            for c in select_diverse_config_hits(cfg_hits, max_hits=3, max_per_file=3)
+        ]
+        surfaced_doc_urls = [
+            str(d["url"])
+            for d in select_diverse_doc_hits(
+                doc_hits,
+                max_hits=(3 if detected_intent == "REFERENCE_LOOKUP" else 2),
+                max_per_doc=1,
+            )
+            if d.get("url")
+        ]
+        bit_key_list = [str(b["key"]) for b in bit_matches]
+        cur_facets = self.thread_last_facets.get(post.thread_id, frozenset())
+        self._thread_grounded_signatures[post.thread_id] = {
+            "project": project,
+            "config_keys": surfaced_cfg_keys,
+            "doc_urls": surfaced_doc_urls,
+            "bit_codes": bit_key_list,
+            "corpus_facets": cur_facets,
+        }
+
+        if (self.user_profiles.get(post.author_id) or {}).get("technical_tier") == "step_by_step" and surfaced_cfg_keys:
+            sections.append(
+                "Tip: After editing the YAML file under `plugins/RTP/` or running `/rtp config`, run `/rtp reload` to apply changes."
+            )
+
+        linked_similar_ids: list[str] = []
+        if not is_unsure and not danger_warning and (surfaced_cfg_keys or bit_key_list or has_high_conf_doc):
+            similar_matches = self._find_similar_resolved_threads(
+                current_thread_id=post.thread_id,
+                project=project,
+                surfaced_cfg_keys=surfaced_cfg_keys,
+                surfaced_doc_urls=surfaced_doc_urls,
+                bit_keys=bit_key_list,
+                corpus_facets=cur_facets,
+            )
+            if similar_matches:
+                linked_similar_ids = [tid for tid, _ in similar_matches]
+                sections.append(
+                    "Related in `#support`:\n" + "\n".join(bullet for _, bullet in similar_matches)
+                )
+
         refrained_status: str | None = None
         if is_unsure and (not should_escalate_now or (pro and is_bug and not all_diag_present)):
             self.investigative_threads.add(post.thread_id)
@@ -3821,17 +4862,18 @@ class SupportBotEngine:
                     "I do not have an exact match for that in the documentation index, "
                     "so rather than pointing you at an unrelated guide, let me gather the details for the maintainer."
                 )
-            sections.append(
-                self._build_investigative_prompt(
-                    combined_text=combined_user_text,
-                    diag=diag,
-                    missing_diag=missing_diag,
-                    has_doc_or_cfg=bool((cfg_hits or doc_hits or bit_matches) and model_refrained_reason is None),
-                    is_bug=is_bug,
-                    is_startup_crash=is_startup_crash,
-                    project=project,
-                )
+            inv_prompt = self._build_investigative_prompt(
+                combined_text=combined_user_text,
+                diag=diag,
+                missing_diag=missing_diag,
+                has_doc_or_cfg=bool((cfg_hits or doc_hits or bit_matches) and model_refrained_reason is None),
+                is_bug=is_bug,
+                is_startup_crash=is_startup_crash,
+                project=project,
             )
+            if recalled_env_note:
+                inv_prompt = f"{recalled_env_note} - {inv_prompt}"
+            sections.append(inv_prompt)
             refrained_status = self._format_refrain_status(
                 post=ForumPostContext(
                     thread_id=post.thread_id,
@@ -3862,6 +4904,15 @@ class SupportBotEngine:
             if doc_gap_digest and not should_escalate_now:
                 refrained_status = doc_gap_digest
 
+        u_prof = self._update_user_intelligence_profile(
+            post=post,
+            combined_text=combined_user_text,
+            diag=diag,
+            is_high_signal=bool(worth_a_look_reasons),
+            is_hostile=hostile,
+            had_footgun=bool(danger_warning),
+        )
+
         triage_digest: str | None = None
         ping_maintainer = False
         if should_escalate_now and not hostile and post.thread_id not in self.escalated_threads:
@@ -3879,12 +4930,44 @@ class SupportBotEngine:
                     timestamp=post.timestamp,
                 ),
                 pro_priority=pro,
-                bit_keys=[str(b["key"]) for b in bit_matches],
+                bit_keys=bit_key_list,
                 mclogs_ids=mclogs_ids,
                 worth_a_look_reasons=worth_a_look_reasons or None,
                 code_classes=[f"{c['class_name']}.java" for c in code_hits[:3]] if (is_bug or bit_matches or code_hits) and code_hits else None,
                 cumulative_facets=signals.get("corpus_terms") or specific_tokens,
             )
+
+        outcome_status = (
+            "ESCALATED"
+            if ping_maintainer
+            else ("NEEDS_INFO" if TAG_NEEDS_INFO in tags else "ANSWERED")
+        )
+        t_rec = self._record_training_interaction(
+            post=post,
+            project=project,
+            event_type="NEW_THREAD",
+            turn_index=1,
+            detected_intent=detected_intent,
+            corpus_facets=cur_facets,
+            yaml_overrides=yaml_overrides,
+            bit_matches=bit_matches,
+            code_hits=code_hits,
+            diag=diag,
+            is_pro=pro,
+            has_secret=has_secret,
+            has_footgun=bool(danger_warning),
+            is_refusal=False,
+            is_hostile=hostile,
+            has_ocr=bool(ocr_text),
+            should_reply=True,
+            surfaced_cfg_keys=surfaced_cfg_keys,
+            surfaced_doc_urls=surfaced_doc_urls,
+            linked_threads=linked_similar_ids,
+            escalated=ping_maintainer,
+            in_needs_info=(TAG_NEEDS_INFO in tags),
+            worth_a_look_categories=interaction.get("categories") or (),
+            outcome_status=outcome_status,
+        )
 
         reply = sanitize_bot_output("\n\n".join(sections))
         return BotDecision(
@@ -3901,6 +4984,10 @@ class SupportBotEngine:
             detected_intent=detected_intent,
             doc_gap_digest=doc_gap_digest,
             worth_a_look_reasons=tuple(worth_a_look_reasons),
+            linked_similar_threads=tuple(linked_similar_ids),
+            user_score=u_prof["user_score"],
+            user_profile=u_prof,
+            training_record=t_rec,
         )
 
     def handle_followup_message(
@@ -4172,6 +5259,11 @@ class SupportBotEngine:
             doc_limit=5,
             project=project,
         )
+        cum_cfg = self._apply_attunement_boosts(
+            self._extract_corpus_facets(cumulative_turns_text, project=project),
+            cum_cfg,
+            project=project,
+        )
         has_high_cum_doc_section = any(h.get("confidence") == "high" for h in cum_docs[:3])
         has_high_cum = any(h.get("confidence") == "high" for h in cum_cfg[:3]) or has_high_cum_doc_section
         f_code_hits, cum_cfg = self._retrieve_second_class_code_hits(
@@ -4391,6 +5483,58 @@ class SupportBotEngine:
             self.model_refrained_threads.discard(post.thread_id)
             self.investigative_threads.discard(post.thread_id)
             self.refusal_grace_threads.discard(post.thread_id)
+            conv_surfaced_cfg = [
+                f"{c['file_path']} -> {c['key_path'].replace('defaults.', '')}"
+                for c in select_diverse_config_hits(cum_cfg, max_hits=3, max_per_file=2)
+            ]
+            conv_surfaced_urls = [
+                str(d["url"])
+                for d in select_diverse_doc_hits(cum_docs, max_hits=2, max_per_doc=1)
+                if d.get("url")
+            ]
+            self._thread_grounded_signatures[post.thread_id] = {
+                "project": project,
+                "config_keys": conv_surfaced_cfg,
+                "doc_urls": conv_surfaced_urls,
+                "bit_codes": [str(b["key"]) for b in all_bit_matches],
+                "corpus_facets": new_facets,
+            }
+            u_prof = self._update_user_intelligence_profile(
+                post=post,
+                combined_text=combined,
+                diag=diag,
+                converged_on_followup=True,
+                is_hostile=hostile,
+                had_footgun=bool(danger_warning),
+            )
+            t_rec = self._record_training_interaction(
+                post=post,
+                project=project,
+                event_type="FOLLOWUP_TURN",
+                turn_index=len(self.thread_turns.get(post.thread_id, [])),
+                detected_intent=cum_intent,
+                corpus_facets=new_facets,
+                yaml_overrides=f_yaml_overrides,
+                bit_matches=all_bit_matches,
+                code_hits=f_code_hits,
+                diag=diag,
+                is_pro=pro,
+                has_secret=has_secret,
+                has_footgun=bool(danger_warning),
+                is_refusal=False,
+                is_hostile=hostile,
+                has_ocr=bool(followup_ocr),
+                should_reply=True,
+                surfaced_cfg_keys=conv_surfaced_cfg,
+                surfaced_doc_urls=conv_surfaced_urls,
+                linked_threads=[],
+                escalated=False,
+                in_needs_info=False,
+                worth_a_look_categories=(),
+                outcome_status="CONVERGED_ON_FOLLOWUP",
+                convergence_delta_facets=added_facets,
+                turns_to_resolution=len(self.thread_turns.get(post.thread_id, [])),
+            )
             sections.append(
                 "If this answered your question, react with ✅ (or reply `solved`) to close this thread. "
                 "If you still need help or want to report a bug, react with ❓ (or reply with what happened)."
@@ -4405,6 +5549,9 @@ class SupportBotEngine:
                 secret_warning=has_secret,
                 should_reply=True,
                 detected_intent=cum_intent,
+                user_score=u_prof["user_score"],
+                user_profile=u_prof,
+                training_record=t_rec,
             )
 
         ready_to_escalate = (pro and not hostile) or self._is_investigation_complete(
@@ -4582,8 +5729,55 @@ class SupportBotEngine:
                 should_reply=True,
                 refrained_status=refrained_status,
                 detected_intent=cum_intent,
+                user_score=self._update_user_intelligence_profile(
+                    post=post,
+                    combined_text=combined,
+                    diag=diag,
+                    is_explicit_refusal=is_explicit_refusal,
+                    is_hostile=hostile,
+                    had_footgun=bool(danger_warning),
+                    is_meta_clarification=bool(
+                        re.search(r"(?i)\b(?:how\s+do\s+i\s+run|what\s+permission\s+node)\b", normalized_followup)
+                    ),
+                )["user_score"],
+                user_profile=self.user_profiles.get(post.author_id),
+                training_record=self._record_training_interaction(
+                    post=post,
+                    project=project,
+                    event_type="FOLLOWUP_TURN",
+                    turn_index=len(self.thread_turns.get(post.thread_id, [])),
+                    detected_intent=cum_intent,
+                    corpus_facets=new_facets,
+                    yaml_overrides=f_yaml_overrides,
+                    bit_matches=all_bit_matches,
+                    code_hits=f_code_hits,
+                    diag=diag,
+                    is_pro=pro,
+                    has_secret=has_secret,
+                    has_footgun=bool(danger_warning),
+                    is_refusal=is_explicit_refusal,
+                    is_hostile=hostile,
+                    has_ocr=bool(followup_ocr),
+                    should_reply=True,
+                    surfaced_cfg_keys=[],
+                    surfaced_doc_urls=[],
+                    linked_threads=[],
+                    escalated=False,
+                    in_needs_info=True,
+                    worth_a_look_categories=(),
+                    outcome_status="NEEDS_INFO",
+                    convergence_delta_facets=added_facets,
+                ),
             )
 
+        u_prof = self._update_user_intelligence_profile(
+            post=post,
+            combined_text=combined,
+            diag=diag,
+            is_explicit_refusal=is_explicit_refusal,
+            is_hostile=hostile,
+            had_footgun=bool(danger_warning),
+        )
         triage_digest: str | None = None
         ping_maintainer = False
         if post.thread_id not in self.escalated_threads and not hostile:
@@ -4608,6 +5802,35 @@ class SupportBotEngine:
                 cumulative_facets=cum_signals.get("corpus_terms"),
             )
 
+        t_rec = self._record_training_interaction(
+            post=post,
+            project=project,
+            event_type="FOLLOWUP_TURN",
+            turn_index=len(self.thread_turns.get(post.thread_id, [])),
+            detected_intent=cum_intent,
+            corpus_facets=new_facets,
+            yaml_overrides=f_yaml_overrides,
+            bit_matches=all_bit_matches,
+            code_hits=f_code_hits,
+            diag=diag,
+            is_pro=pro,
+            has_secret=has_secret,
+            has_footgun=bool(danger_warning),
+            is_refusal=is_explicit_refusal,
+            is_hostile=hostile,
+            has_ocr=bool(followup_ocr),
+            should_reply=True,
+            surfaced_cfg_keys=[],
+            surfaced_doc_urls=[],
+            linked_threads=[],
+            escalated=ping_maintainer,
+            in_needs_info=False,
+            worth_a_look_categories=(),
+            outcome_status="ESCALATED" if ping_maintainer else "ANSWERED",
+            convergence_delta_facets=added_facets,
+            turns_to_resolution=len(self.thread_turns.get(post.thread_id, [])),
+        )
+
         sections.append(
             "Thanks - I have enough context and diagnostics now. "
             "I have queued this thread in `#bot-triage-queue` and notified the maintainer to step in."
@@ -4622,6 +5845,9 @@ class SupportBotEngine:
             secret_warning=has_secret,
             should_reply=True,
             detected_intent=cum_intent,
+            user_score=u_prof["user_score"],
+            user_profile=u_prof,
+            training_record=t_rec,
         )
 
     def handle_button_interaction(
@@ -4635,11 +5861,57 @@ class SupportBotEngine:
         pro = is_pro_supporter(post.author_roles)
         if pro and TAG_PRO_PRIORITY not in tags:
             tags.append(TAG_PRO_PRIORITY)
+        project = resolve_post_project(post.applied_tags, manifest=self.manifest)
 
         if custom_id == BUTTON_SOLVED_ID:
             tags = [t for t in tags if t != TAG_NEEDS_INFO]
             if TAG_SOLVED not in tags:
                 tags.append(TAG_SOLVED)
+            sig = self._thread_grounded_signatures.get(post.thread_id)
+            if sig:
+                self.register_resolved_thread(
+                    thread_id=post.thread_id,
+                    project=str(sig.get("project") or project),
+                    config_keys=tuple(sig.get("config_keys") or ()),
+                    doc_urls=tuple(sig.get("doc_urls") or ()),
+                    bit_codes=tuple(sig.get("bit_codes") or ()),
+                    corpus_facets=frozenset(sig.get("corpus_facets") or ()),
+                    is_pinned_guide=False,
+                    solved_confirmed=True,
+                )
+            u_prof = self._update_user_intelligence_profile(
+                post=post,
+                combined_text=f"{post.title}\n{post.body}",
+                diag={},
+                solved_confirmed=True,
+            )
+            t_rec = self._record_training_interaction(
+                post=post,
+                project=project,
+                event_type="SOLVED_CONFIRMATION",
+                turn_index=max(1, len(self.thread_turns.get(post.thread_id, []))),
+                detected_intent="CONFIG_HOWTO",
+                corpus_facets=self.thread_last_facets.get(post.thread_id, frozenset()),
+                yaml_overrides=[],
+                bit_matches=[],
+                code_hits=[],
+                diag={},
+                is_pro=pro,
+                has_secret=False,
+                has_footgun=False,
+                is_refusal=False,
+                is_hostile=False,
+                has_ocr=False,
+                should_reply=True,
+                surfaced_cfg_keys=list((sig or {}).get("config_keys") or ()),
+                surfaced_doc_urls=list((sig or {}).get("doc_urls") or ()),
+                linked_threads=[],
+                escalated=False,
+                in_needs_info=False,
+                worth_a_look_categories=(),
+                outcome_status="SOLVED_BY_USER",
+                turns_to_resolution=max(1, len(self.thread_turns.get(post.thread_id, []))),
+            )
             return BotDecision(
                 reply_text=sanitize_bot_output(
                     f"Marked as **{TAG_SOLVED}** by <@{actor_id}>. Locking and archiving thread - "
@@ -4651,6 +5923,9 @@ class SupportBotEngine:
                 triage_digest=None,
                 ping_maintainer=False,
                 archived=True,
+                user_score=u_prof["user_score"],
+                user_profile=u_prof,
+                training_record=t_rec,
             )
 
         # BUTTON_NEED_HELP_ID
@@ -4799,6 +6074,7 @@ class DiscordForumPoller:
         state_path: pathlib.Path = DEFAULT_STATE_PATH,
         settle_seconds: float = 5.0,
         include_buttons: bool = False,
+        allow_maintainer_threads: bool = False,
         now_fn: Callable[[], float] = time.time,
     ) -> None:
         self.client = client
@@ -4807,6 +6083,7 @@ class DiscordForumPoller:
         self.state_path = state_path
         self.settle_seconds = settle_seconds
         self.include_buttons = include_buttons
+        self.allow_maintainer_threads = allow_maintainer_threads
         self.now_fn = now_fn
 
         self.bot_user_id: str = ""
@@ -4817,6 +6094,7 @@ class DiscordForumPoller:
         self.role_id_to_name: dict[str, str] = {}
         self.member_roles_cache: dict[str, tuple[str, ...]] = {}
         self.handled_reactions: set[str] = set()
+        self.thread_last_evaluated_msg_id: dict[str, str] = {}
         self.reference_thread_titles: set[str] = self._load_reference_thread_titles()
 
         self._load_state()
@@ -4875,6 +6153,11 @@ class DiscordForumPoller:
                         pass
             for rk in data.get("handled_reactions", []):
                 self.handled_reactions.add(str(rk))
+            raw_eval_ids = data.get("thread_last_evaluated_msg_id", {})
+            if isinstance(raw_eval_ids, dict):
+                for tid, mid in raw_eval_ids.items():
+                    if mid:
+                        self.thread_last_evaluated_msg_id[str(tid)] = str(mid)
         except (OSError, ValueError):
             pass
 
@@ -4892,6 +6175,7 @@ class DiscordForumPoller:
                 "thread_last_diag": {k: sorted(v) for k, v in sorted(self.engine.thread_last_diag.items())},
                 "thread_bot_reply_counts": dict(sorted(self.engine.thread_bot_reply_counts.items())),
                 "handled_reactions": sorted(self.handled_reactions),
+                "thread_last_evaluated_msg_id": dict(sorted(self.thread_last_evaluated_msg_id.items())),
             }
             self.state_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         except OSError:
@@ -5214,7 +6498,11 @@ class DiscordForumPoller:
                 author_name = str((messages[0].get("author") or {}).get("username", "user"))
 
                 # Skip threads created by the maintainer, staff, or the bot itself (e.g. reference guides)
-                if owner_id in (self.engine.maintainer_id, self.bot_user_id) or self._is_staff_replier(owner_id):
+                if owner_id == self.bot_user_id:
+                    continue
+                if not self.allow_maintainer_threads and (
+                    owner_id == self.engine.maintainer_id or self._is_staff_replier(owner_id)
+                ):
                     continue
 
                 # Check settle window on the newest non-bot message so back-to-back posts coalesce
@@ -5252,9 +6540,17 @@ class DiscordForumPoller:
                     self.engine.thread_bot_reply_counts[thread_id] = len(bot_indices)
 
                 author_roles = self._resolve_author_roles(owner_id)
+                latest_non_bot_id = str(non_bot_msgs[-1].get("id", "")) if non_bot_msgs else ""
 
                 # Case 1: Bot has not replied in this thread yet -> coalesce all author messages
                 if not bot_indices and effective_bot_replies == 0 and not window_evicted_history:
+                    if (
+                        latest_non_bot_id
+                        and self.thread_last_evaluated_msg_id.get(thread_id) == latest_non_bot_id
+                        and not existing_placeholder_id
+                    ):
+                        continue
+
                     # Staff-Only Backoff: only stay silent if the maintainer or a staff member
                     # already replied before the bot polled (never let a random bystander silence the bot).
                     staff_repliers = [
@@ -5283,7 +6579,10 @@ class DiscordForumPoller:
                         if str(m.get("content", "")).strip()
                     )
                     coalesced_attachments = tuple(
-                        extract_image_attachment_urls(author_msgs, inline_text=coalesced_body)
+                        dict.fromkeys(
+                            extract_image_attachment_urls(author_msgs, inline_text=coalesced_body)
+                            + extract_text_attachment_urls(author_msgs, inline_text=coalesced_body)
+                        )
                     )
                     post = ForumPostContext(
                         thread_id=thread_id,
@@ -5306,6 +6605,7 @@ class DiscordForumPoller:
                                 "raw_tag_ids": raw_tag_ids,
                                 "post": post,
                                 "progress_msg_id": progress_msg_id,
+                                "latest_non_bot_id": latest_non_bot_id,
                             }
                         )
                     else:
@@ -5313,6 +6613,8 @@ class DiscordForumPoller:
                         if decision.rate_limited:
                             # Defer cooldown-limited thread to next poll cycle instead of stranding it with a dummy reply
                             continue
+                        if latest_non_bot_id:
+                            self.thread_last_evaluated_msg_id[thread_id] = latest_non_bot_id
                         if decision.should_reply:
                             actions.append(
                                 self._apply_decision(
@@ -5322,14 +6624,17 @@ class DiscordForumPoller:
                                     progress_message_id=existing_placeholder_id,
                                 )
                             )
+                        else:
+                            self._save_state()
                     continue
 
                 # Case 2: Bot has already replied (or 50+ message window evicted earlier bot replies)
                 if bot_indices:
+                    first_bot_idx = bot_indices[0]
                     last_bot_idx = bot_indices[-1]
                     last_bot_msg = messages[last_bot_idx]
                     last_bot_msg_id = str(last_bot_msg["id"])
-                    prior_slice = messages[:last_bot_idx]
+                    prior_slice = messages[:first_bot_idx]
                     after_slice = messages[last_bot_idx + 1 :]
                 else:
                     last_bot_idx = -1
@@ -5337,6 +6642,13 @@ class DiscordForumPoller:
                     last_bot_msg_id = ""
                     prior_slice = []
                     after_slice = messages
+
+                last_eval_id = self.thread_last_evaluated_msg_id.get(thread_id, "")
+                if last_eval_id and after_slice:
+                    for a_idx, a_msg in enumerate(after_slice):
+                        if str(a_msg.get("id", "")) == last_eval_id:
+                            after_slice = after_slice[a_idx + 1 :]
+                            break
 
                 prior_author_msgs = [
                     m
@@ -5351,7 +6663,10 @@ class DiscordForumPoller:
                 if not prior_author_body and thread_id in self.engine.thread_turns and self.engine.thread_turns[thread_id]:
                     prior_author_body = self.engine.thread_turns[thread_id][0]
                 prior_attachments = tuple(
-                    extract_image_attachment_urls(prior_author_msgs, inline_text=prior_author_body)
+                    dict.fromkeys(
+                        extract_image_attachment_urls(prior_author_msgs, inline_text=prior_author_body)
+                        + extract_text_attachment_urls(prior_author_msgs, inline_text=prior_author_body)
+                    )
                 )
                 post = ForumPostContext(
                     thread_id=thread_id,
@@ -5426,9 +6741,15 @@ class DiscordForumPoller:
                     if str(m.get("content", "")).strip()
                 ]
                 followup_attachments = tuple(
-                    extract_image_attachment_urls(
-                        after_author_msg_objs,
-                        inline_text="\n".join(after_author_msgs),
+                    dict.fromkeys(
+                        extract_image_attachment_urls(
+                            after_author_msg_objs,
+                            inline_text="\n".join(after_author_msgs),
+                        )
+                        + extract_text_attachment_urls(
+                            after_author_msg_objs,
+                            inline_text="\n".join(after_author_msgs),
+                        )
                     )
                 )
                 if not after_author_msgs and not followup_attachments and not has_bystander_danger:
@@ -5442,11 +6763,22 @@ class DiscordForumPoller:
                     and len(latest_author_msg) <= 80
                     and SOLVED_TEXT_RE.match(latest_author_msg)
                 ):
+                    if latest_non_bot_id:
+                        self.thread_last_evaluated_msg_id[thread_id] = latest_non_bot_id
                     decision = self.engine.handle_button_interaction(post, BUTTON_SOLVED_ID, actor_id=owner_id)
                     actions.append(self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=False))
                     continue
 
-                if coalesced_followup and NEED_HELP_TEXT_RE.search(coalesced_followup) and TAG_NEEDS_INFO not in tag_names:
+                is_standalone_need_help = bool(
+                    latest_author_msg
+                    and len(latest_author_msg) <= 40
+                    and re.match(r"(?i)^\s*!?\s*(?:still\s+need\s+help|need\s+help|escalate)[.!?\s]*$", latest_author_msg)
+                )
+                if coalesced_followup and NEED_HELP_TEXT_RE.search(coalesced_followup) and (
+                    TAG_NEEDS_INFO not in tag_names or is_standalone_need_help
+                ):
+                    if latest_non_bot_id:
+                        self.thread_last_evaluated_msg_id[thread_id] = latest_non_bot_id
                     decision = self.engine.handle_button_interaction(post, BUTTON_NEED_HELP_ID, actor_id=owner_id)
                     actions.append(
                         self._apply_decision(thread_id, raw_tag_ids, decision, seed_reactions=not decision.archived)
@@ -5468,6 +6800,8 @@ class DiscordForumPoller:
                             followup_attachments=followup_attachments,
                             bystander_text=bystander_after_text,
                         )
+                        if latest_non_bot_id and not decision.rate_limited:
+                            self.thread_last_evaluated_msg_id[thread_id] = latest_non_bot_id
                         if decision.ping_maintainer and decision.should_reply:
                             actions.append(
                                 self._apply_decision(
@@ -5478,6 +6812,8 @@ class DiscordForumPoller:
                                     progress_message_id=existing_placeholder_id,
                                 )
                             )
+                        else:
+                            self._save_state()
                     continue
 
                 if TAG_NEEDS_INFO in tag_names or thread_id not in self.engine.escalated_threads or has_bystander_danger:
@@ -5497,6 +6833,7 @@ class DiscordForumPoller:
                                 "followup_attachments": followup_attachments,
                                 "bystander_text": bystander_after_text,
                                 "progress_msg_id": progress_msg_id,
+                                "latest_non_bot_id": latest_non_bot_id,
                             }
                         )
                     else:
@@ -5508,6 +6845,8 @@ class DiscordForumPoller:
                         )
                         if decision.rate_limited:
                             continue
+                        if latest_non_bot_id:
+                            self.thread_last_evaluated_msg_id[thread_id] = latest_non_bot_id
                         if decision.should_reply:
                             actions.append(
                                 self._apply_decision(
@@ -5518,6 +6857,8 @@ class DiscordForumPoller:
                                     progress_message_id=existing_placeholder_id,
                                 )
                             )
+                        else:
+                            self._save_state()
             except (OSError, sqlite3.Error):
                 continue
 
@@ -5529,6 +6870,8 @@ class DiscordForumPoller:
                 t_raw_tags: list[str] = list(task["raw_tag_ids"])
                 t_post: ForumPostContext = task["post"]
                 t_prog_id: str | None = task["progress_msg_id"]
+                t_latest_id: str = str(task.get("latest_non_bot_id") or "")
+                prev_cnt = self.engine.thread_bot_reply_counts.get(t_id, 0)
                 if task["kind"] == "new":
                     decision = self.engine.handle_new_thread(t_post)
                     if decision.rate_limited:
@@ -5540,7 +6883,10 @@ class DiscordForumPoller:
                             decision,
                             progress_message_id=t_prog_id,
                         )
-                        if not t_prog_id or (t_id in self.engine.thread_bot_reply_counts):
+                        if not t_prog_id or (self.engine.thread_bot_reply_counts.get(t_id, 0) > prev_cnt):
+                            if t_latest_id:
+                                self.thread_last_evaluated_msg_id[t_id] = t_latest_id
+                                self._save_state()
                             actions.append(applied)
                 else:
                     decision = self.engine.handle_followup_message(
@@ -5559,8 +6905,14 @@ class DiscordForumPoller:
                             seed_reactions=not decision.archived,
                             progress_message_id=t_prog_id,
                         )
-                        if not t_prog_id or (t_id in self.engine.thread_bot_reply_counts):
+                        if not t_prog_id or (self.engine.thread_bot_reply_counts.get(t_id, 0) > prev_cnt):
+                            if t_latest_id:
+                                self.thread_last_evaluated_msg_id[t_id] = t_latest_id
+                                self._save_state()
                             actions.append(applied)
+                    elif t_latest_id:
+                        self.thread_last_evaluated_msg_id[t_id] = t_latest_id
+                        self._save_state()
             except (OSError, sqlite3.Error):
                 continue
 
@@ -5666,9 +7018,15 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_MANIFEST_PATH,
         help="Path to declarative support-bot.yml project and security manifest.",
     )
+    parser.add_argument(
+        "--allow-maintainer-threads",
+        action="store_true",
+        default=os.environ.get("RTP_DISCORD_ALLOW_MAINTAINER_THREADS", "").strip().lower() in ("1", "true", "yes"),
+        help="Allow polling non-reference threads opened by DISCORD_MAINTAINER_ID (for live test-server runs).",
+    )
     args = parser.parse_args(argv)
 
-    maintainer_id = os.environ.get("DISCORD_MAINTAINER_ID", "999999999999999999")
+    maintainer_id = resolve_discord_maintainer_id("999999999999999999")
     llm_synth: LocalLlmSynthesizer | None = None
     if args.llm_endpoint and args.llm_endpoint.strip().lower() not in ("off", "none", "false", "0"):
         llm_synth = LocalLlmSynthesizer(
@@ -5686,6 +7044,7 @@ def main(argv: list[str] | None = None) -> int:
         llm_synthesizer=llm_synth,
         translator=translator_fn,
         manifest=args.manifest,
+        allow_maintainer_threads=args.allow_maintainer_threads,
     )
     try:
         if args.query or args.image:
@@ -5704,11 +7063,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.once or args.listen:
-            token = os.environ.get("DISCORD_BOT_TOKEN", "")
-            guild_id = os.environ.get("DISCORD_GUILD_ID", "")
+            token = resolve_discord_bot_token()
+            guild_id = resolve_discord_guild_id("")
             if not token or not guild_id:
                 print(
-                    "Error: --once / --listen requires DISCORD_BOT_TOKEN and DISCORD_GUILD_ID environment variables.",
+                    "Error: --once / --listen requires DISCORD_BOT_TOKEN and DISCORD_GUILD_ID (or ~/.DISCORD_* files).",
                     file=sys.stderr,
                 )
                 return 2
@@ -5720,6 +7079,7 @@ def main(argv: list[str] | None = None) -> int:
                 guild_id=guild_id,
                 state_path=args.state,
                 settle_seconds=args.settle_seconds,
+                allow_maintainer_threads=args.allow_maintainer_threads,
             )
             poller.refresh_guild_metadata()
             print(

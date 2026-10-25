@@ -80,21 +80,23 @@ python3 discord-support-bot/build_doc_index.py
 Compiles `docs/admin/**`, `docs/site/*`, `docs/FOR_SERVER_ADMINS.md`, `docs/FOR_ADDON_DEVELOPERS.md`, `docs/dev/BIT_CODES.md`, `docs/dev/SUPPORT_MATRIX.md`, `docs/dev/bit-codes.lock`, and shipped `*.yml` files into `discord-support-bot/generated/doc-index.sqlite`.
 
 ### 4.2 Preview or Apply Server Reorganization
+`discord_setup.py` and `discord_support_bot.py` read `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID` (or `DISCORD_TEST_SERVER_ID`), and `DISCORD_MAINTAINER_ID` from environment variables or automatically from `~/.DISCORD_BOT_TOKEN`, `~/.DISCORD_TEST_SERVER_ID` (`~/.DISCORD_GUILD_ID`), and `~/.DISCORD_MAINTAINER_ID`.
 ```sh
-# Dry-run diff against a saved guild channel snapshot or live guild (default, zero mutations):
-python3 discord-support-bot/discord_setup.py --dry-run
+# Dry-run diff against the live guild (zero mutations):
+python3 discord-support-bot/discord_setup.py --dry-run --live
 
 # Apply in-place via Discord REST API (requires Manage Guild + Manage Channels + Manage Roles):
-DISCORD_BOT_TOKEN="..." DISCORD_GUILD_ID="..." python3 discord-support-bot/discord_setup.py --apply
+python3 discord-support-bot/discord_setup.py --apply
+
+# Clear non-reference user test threads in #support, #bot-triage-queue cards, and bot-state.json:
+python3 discord-support-bot/discord_setup.py --reset-test-server
 ```
 
 ### 4.3 Run the Read-Only Forum Triage Bot
 ```sh
 # Single sequential REST poll pass over active #support threads:
-DISCORD_BOT_TOKEN="..." DISCORD_GUILD_ID="..." DISCORD_MAINTAINER_ID="..." \
-  python3 discord-support-bot/discord_support_bot.py --once
+python3 discord-support-bot/discord_support_bot.py --once
 
-# Continuous sequential REST polling loop (15s interval, 5s settle window to coalesce rapid posts):
-DISCORD_BOT_TOKEN="..." DISCORD_GUILD_ID="..." DISCORD_MAINTAINER_ID="..." \
-  python3 discord-support-bot/discord_support_bot.py --listen --interval 15 --settle-seconds 5
+# Continuous sequential REST polling loop (add --allow-maintainer-threads when posting test threads from the maintainer account):
+python3 discord-support-bot/discord_support_bot.py --listen --interval 15 --settle-seconds 5 --allow-maintainer-threads
 ```

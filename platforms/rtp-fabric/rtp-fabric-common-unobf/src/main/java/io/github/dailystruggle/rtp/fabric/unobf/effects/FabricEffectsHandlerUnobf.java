@@ -139,10 +139,10 @@ public final class FabricEffectsHandlerUnobf {
             dispatchByUuid("rtp.effect.queuepop", uuid, runtime);
         });
 
-        registerDeathHook(runtime);
+        registerDeathHook(runtime, parser);
     }
 
-    private static void registerDeathHook(FabricEffectRuntimeUnobf runtime) {
+    private static void registerDeathHook(FabricEffectRuntimeUnobf runtime, FactoryValue<PerformanceKeys> parser) {
         try {
             Class<?> sleeCls = Class.forName("net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents");
             Class<?> eventCls = Class.forName("net.fabricmc.fabric.api.event.Event");
@@ -156,7 +156,8 @@ public final class FabricEffectsHandlerUnobf {
                     afterDeathCallback.getClassLoader(),
                     new Class<?>[]{afterDeathCallback},
                     (p, method, args) -> {
-                        if (args != null && args.length >= 1 && args[0] instanceof ServerPlayer sp) {
+                        if (args != null && args.length >= 1 && args[0] instanceof ServerPlayer sp
+                                && effectParsingEnabled(parser)) {
                             try {
                                 if (RTPRuntime.serverAccessor() != null) {
                                     RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(sp.getUUID());
@@ -164,7 +165,9 @@ public final class FabricEffectsHandlerUnobf {
                                         dispatch("rtp.effect.death", rp, runtime);
                                     }
                                 }
-                            } catch (Throwable ignored) {}
+                            } catch (Throwable t) {
+                                RTP.log(Level.FINE, "[RTP][Fabric] death effect dispatch failed", t);
+                            }
                         }
                         return null;
                     });

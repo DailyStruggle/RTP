@@ -1,7 +1,6 @@
 package io.github.dailystruggle.helpers.stresstestrtp;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
@@ -20,7 +19,7 @@ public final class SchedulerGauge {
 
     static final long SAMPLE_MS = 100L;
     static final int SAMPLES_PER_ROW = 10;
-    static final String RTP_CLASS = "io.github.dailystruggle.rtp.common.RTP";
+    static final String RTP_CLASS = "io.github.dailystruggle.rtp.common.runtime.RTPRuntime";
     static final String HEADER = "epoch_ms,inflight_last,inflight_max,inflight_mean,at_cap_fraction,"
             + "max_inflight,interactive_queue_last,interactive_queue_max,samples";
 
@@ -125,10 +124,10 @@ public final class SchedulerGauge {
                 if (p == null || p.classLoader() == null) continue;
                 try {
                     Class<?> rtp = Class.forName(RTP_CLASS, false, p.classLoader());
-                    Field f = rtp.getField("scheduler");
-                    found = f.get(null);
+                    Method m = rtp.getMethod("scheduler");
+                    found = m.invoke(null);
                     if (found != null) break;
-                } catch (ClassNotFoundException | NoSuchFieldException ignored) {
+                } catch (ClassNotFoundException | NoSuchMethodException ignored) {
                 }
             }
             if (found != null) {
