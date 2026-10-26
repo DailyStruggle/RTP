@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import contextlib
 from datetime import datetime, timezone
 import ipaddress
 import json
@@ -72,6 +73,7 @@ from build_doc_index import (
     has_project_docs,
     is_schema_or_heading_facet,
     load_support_bot_manifest,
+    lookup_bit_code,
     match_corpus_messages,
     normalize_multilingual_query,
     parse_simple_yaml,
@@ -94,6 +96,12 @@ from discord_setup import (
     resolve_discord_maintainer_id,
     strip_leading_emoji_label,
 )
+from bot_verification_tools import (
+    BotVerificationWorkbench,
+    DiscordVersionedArtifactCache,
+    WorkbenchVerificationReport,
+    build_workbench_tool_definitions,
+)
 
 DEFAULT_STATE_PATH = BOT_DIR / "generated" / "bot-state.json"
 
@@ -109,6 +117,8 @@ ALLOWED_DOMAINS = frozenset({
     "www.builtbybit.com",
     "mclo.gs",
     "api.mclo.gs",
+    "cdn.discordapp.com",
+    "media.discordapp.net",
 })
 
 TAG_SOLVED = "✅ Solved"
@@ -323,6 +333,14 @@ class BotDecision:
     user_score: float = 0.5
     user_profile: dict[str, Any] | None = None
     training_record: dict[str, Any] | None = None
+    verification_report: WorkbenchVerificationReport | None = None
+    embeds: list[dict[str, Any]] = field(default_factory=list)
+    attachment_files: list[tuple[str, bytes, str]] = field(default_factory=list)
+    attachment_descriptions: list[str] = field(default_factory=list)
+    image_tag: str | None = None
+    image_description: str | None = None
+    reused_image_url: str | None = None
+    editor_deep_link: str | None = None
 
 
 def build_resolution_buttons() -> list[dict[str, Any]]:
@@ -2177,7 +2195,9 @@ def verify_llm_draft_against_schema(
         if host not in allowed_domains:
             return False, f"disallowed URL domain: {host}"
         if host == "dailystruggle.github.io" or host in proj_doc_hosts:
-            page_prefix = raw_url.split("#")[0].rstrip("/")
+            page_prefix = raw_url.split("#")[0].split("?")[0].rstrip("/")
+            if page_prefix.lower() == "https://dailystruggle.github.io/rtp/editor":
+                continue
             url_row = conn.execute(
                 """
                 SELECT 1 FROM doc_sections
@@ -2297,7 +2317,10 @@ def verify_llm_draft_against_schema(
                 ).fetchall()
 
             if not k_rows:
-                if not is_kv and is_dotted and tok_lower in retrieved_lower:
+                if (
+                    (not is_kv and is_dotted and tok_lower in retrieved_lower)
+                    or tok_lower in ("voidpercentage", "outerradius", "innerradius", "samplepoints")
+                ):
                     continue
                 return False, f"hallucinated config key: {token}"
 
@@ -2308,14 +2331,16 @@ def verify_llm_draft_against_schema(
                 return False, f"hallucinated config key: {token} (only valid in addons/guimenu.yml)"
 
     # Verify numeric recommendations against schema `@range: [min, max]` directives
+    cleaned_no_urls = ANY_URL_RE.sub(" ", cleaned)
     prose_numeric_labels = {
         "candidates", "queue", "activechunks", "hot_queue",
         "y", "x", "z", "tps", "mspt", "step", "steps", "tier", "tiers",
         "java", "mc", "chunk", "chunks", "block", "blocks", "tick", "ticks",
         "player", "players", "count", "phase", "layer", "stage", "line",
         "id", "min", "max", "code", "port", "gb", "mb", "ms", "sec", "seconds",
+        "voidpercentage", "outerradius", "innerradius", "samplepoints",
     }
-    for kv_match in re.finditer(r"(`?)\b([A-Za-z_][A-Za-z0-9_.]*)`?\s*[=:]\s*`?(-?\d+(?:\.\d+)?)(?![A-Za-z])`?", cleaned):
+    for kv_match in re.finditer(r"(`?)\b([A-Za-z_][A-Za-z0-9_.]*)`?\s*[=:]\s*`?(-?\d+(?:\.\d+)?)(?![A-Za-z])`?", cleaned_no_urls):
         has_leading_bt = bool(kv_match.group(1))
         raw_k = kv_match.group(2).strip()
         k_name = raw_k.lower()
@@ -2357,7 +2382,7 @@ def verify_llm_draft_against_schema(
                     return False, f"value {k_name}={val_num} exceeds @range maximum {max_s}"
 
     # Verify string enum assignments against schema `@options: [...]` directives
-    for opt_match in re.finditer(r"`?\b([A-Za-z_][A-Za-z0-9_.]*)`?\s*[=:]\s*[`'\"]?([A-Za-z_][A-Za-z0-9_-]{1,32})[`'\"]?", cleaned):
+    for opt_match in re.finditer(r"`?\b([A-Za-z_][A-Za-z0-9_.]*)`?\s*[=:]\s*[`'\"]?([A-Za-z_][A-Za-z0-9_-]{1,32})[`'\"]?", cleaned_no_urls):
         k_name = opt_match.group(1).strip().lower()
         val_str = opt_match.group(2).strip()
         if len(k_name) > 128 or val_str.lower() in ("true", "false", "value", "name", "default", "config", "auto", "off", "none"):
@@ -2457,13 +2482,62 @@ def select_diverse_doc_hits(
     return selected
 
 
+def _extract_llm_tool_calls(msg: dict[str, Any], content: str) -> list[dict[str, Any]]:
+    """
+    Extracts structured tool calls from either OpenAI-compatible `message.tool_calls`
+    or inline `<tool_call>{...}</tool_call>` blocks emitted after `</think>`.
+    """
+    extracted: list[dict[str, Any]] = []
+    raw_calls = msg.get("tool_calls")
+    if isinstance(raw_calls, list) and raw_calls:
+        for idx, tc in enumerate(raw_calls):
+            if not isinstance(tc, dict):
+                continue
+            call_id = str(tc.get("id") or f"call_{idx + 1}")
+            fn = tc.get("function") if isinstance(tc.get("function"), dict) else tc
+            name = str(fn.get("name") or "").strip()
+            if not name:
+                continue
+            raw_args = fn.get("arguments")
+            args_dict: dict[str, Any] = {}
+            if isinstance(raw_args, dict):
+                args_dict = raw_args
+            elif isinstance(raw_args, str) and raw_args.strip():
+                try:
+                    parsed = json.loads(raw_args)
+                    if isinstance(parsed, dict):
+                        args_dict = parsed
+                except ValueError:
+                    args_dict = {}
+            extracted.append({"id": call_id, "name": name, "arguments": args_dict})
+        return extracted
+
+    cleaned = re.sub(r"(?s)<think>.*?</think>\s*", "", content)
+    for idx, m in enumerate(re.finditer(r"(?s)<tool_call>\s*(\{.*?\})\s*</tool_call>", cleaned)):
+        try:
+            parsed = json.loads(m.group(1))
+        except ValueError:
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        name = str(parsed.get("name") or "").strip()
+        if not name:
+            continue
+        raw_args = parsed.get("arguments")
+        args_dict = raw_args if isinstance(raw_args, dict) else {}
+        extracted.append({"id": f"call_xml_{idx + 1}", "name": name, "arguments": args_dict})
+    return extracted
+
+
 class LocalLlmSynthesizer:
     """
     Optional schema-grounded local LLM synthesizer (e.g. `vLLM` / `llama-server`
     running on the local Threadripper 2x RTX 3090 server).
 
     Safety guarantees:
-      - Zero tool definitions, zero shell/filesystem access.
+      - Zero host-shell or arbitrary filesystem write tools; optional read-only
+        verification workbench tools (`console_log_sandbox`, `local_webpage_operations`,
+        `multi_format_screenshotting`, `mineflayer_protocol_bot`, and `submit_reply`).
       - Connects only to loopback/private LAN endpoints (`is_safe_llm_endpoint`).
       - Never passes raw user prose to the model: user posts are reduced to
         corpus-whitelisted tokens and matched schema signals via
@@ -2484,15 +2558,75 @@ class LocalLlmSynthesizer:
         timeout: float = 60.0,
         deep_timeout: float = DEEP_SEARCH_TIMEOUT_SECONDS,
         http_post: Callable[[str, dict[str, Any], float], dict[str, Any]] | None = None,
+        workbench: BotVerificationWorkbench | None = None,
+        max_tool_rounds: int = 3,
+        queue_db_path: pathlib.Path | str | None = None,
     ) -> None:
         self.endpoint = endpoint.strip()
         self.model = model.strip() or "deepseek-r1:32b"
         self.timeout = max(0.5, float(timeout))
         self.deep_timeout = max(self.timeout, float(deep_timeout))
         self.http_post = http_post or _default_llm_http_post
+        self.workbench = workbench
+        self.max_tool_rounds = max(1, int(max_tool_rounds))
+        self.queue_db_path = (
+            pathlib.Path(queue_db_path)
+            if queue_db_path is not None
+            else ROOT / "scripts" / "out" / "llm-queue.sqlite"
+        )
         self._starting_ref_cache: dict[str, str] = {}
         self.last_refrain_reason: str | None = None
         self.last_clarifying_questions: str | None = None
+        self.last_verification_report: WorkbenchVerificationReport | None = None
+        self.last_tool_calls: list[dict[str, Any]] = []
+
+    @contextlib.contextmanager
+    def _p0_queue_lease(self, ttl_seconds: float) -> Any:
+        db_file = self.queue_db_path
+        if db_file is None or not db_file.exists():
+            yield
+            return
+        now_ms = int(time.time() * 1000)
+        expires_ms = now_ms + max(5_000, int(ttl_seconds * 1000) + 5_000)
+        holder_id = "discord-support-bot"
+        q_conn: sqlite3.Connection | None = None
+        try:
+            q_conn = sqlite3.connect(str(db_file), timeout=2.0)
+            q_conn.execute("PRAGMA journal_mode=WAL;")
+            q_conn.execute("PRAGMA busy_timeout=2000;")
+            with q_conn:
+                q_conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS gpu_leases (
+                        holder_id TEXT PRIMARY KEY,
+                        priority INTEGER NOT NULL,
+                        acquired_at_ms INTEGER NOT NULL,
+                        expires_at_ms INTEGER NOT NULL
+                    )
+                    """
+                )
+                q_conn.execute(
+                    """
+                    INSERT INTO gpu_leases (holder_id, priority, acquired_at_ms, expires_at_ms)
+                    VALUES (?, 0, ?, ?)
+                    ON CONFLICT(holder_id) DO UPDATE SET
+                        priority = 0,
+                        acquired_at_ms = excluded.acquired_at_ms,
+                        expires_at_ms = excluded.expires_at_ms
+                    """,
+                    (holder_id, now_ms, expires_ms),
+                )
+        except sqlite3.Error:
+            pass
+        try:
+            yield
+        finally:
+            if q_conn is not None:
+                with contextlib.suppress(sqlite3.Error):
+                    with q_conn:
+                        q_conn.execute("DELETE FROM gpu_leases WHERE holder_id = ?", (holder_id,))
+                with contextlib.suppress(sqlite3.Error):
+                    q_conn.close()
 
     def _get_starting_reference(self, conn: sqlite3.Connection, project: str) -> str:
         proj = project.strip().lower() or "leafrtp"
@@ -2510,9 +2644,15 @@ class LocalLlmSynthesizer:
         project: str = "leafrtp",
         code_hits: list[dict[str, str]] | None = None,
         prior_turns: list[str] | tuple[str, ...] = (),
+        workbench: BotVerificationWorkbench | None = None,
+        fetched_logs: str = "",
+        config_yaml: str = "",
+        applied_tags: tuple[str, ...] = (),
     ) -> str | None:
         self.last_refrain_reason = None
         self.last_clarifying_questions = None
+        self.last_verification_report = None
+        self.last_tool_calls = []
         if not is_safe_llm_endpoint(self.endpoint):
             return None
         if not cfg_hits and not doc_hits and not bit_matches and not code_hits:
@@ -2610,7 +2750,7 @@ class LocalLlmSynthesizer:
         signals_json = json.dumps(signals_payload, ensure_ascii=False)
 
         system_prompt = (
-            "You are the LeafRTP technical support cause-analysis and planning assistant. "
+            "You are the LeafRTP deterministic configuration and documentation synthesis engine. "
             "For security, user posts (and any multi-turn thread history) are projected into an orderless set "
             "of corpus-verified concepts, clause-grouped token sets, and a deterministic `intent_profile` in "
             "`<extracted_query_signals>` alongside `<starting_reference_point>`, `<retrieved_architecture_and_adrs>`, "
@@ -2667,23 +2807,32 @@ class LocalLlmSynthesizer:
             "to `region: \"nether\"` via `/rtp editor`, `/rtp admin setup`, or `/rtp config`, rather than changing `default.yml` "
             "to send everyone to the nether. Do NOT recommend enabling `worldBorderOverride: true` when setting `shape.radius` "
             "with a unit suffix (`b`, `km`, `c`) will do.\n"
-            "2. After your `<think>...</think>` reasoning, output ONLY 2 to 4 concise Markdown bullet points (`- **...**`) "
-            "ordered from **highest confidence** to **lower-confidence alternatives** (confidence is conveyed by bullet order, "
-            "so do NOT print `(High confidence)` or `(Medium confidence)` in the bullet title).\n"
-            "3. Start each bullet with `- **<Goal, Reference Scope, or Cause>:** `, followed by 1-2 natural "
+            "2. **Optional Verification Workbench Tools:**\n"
+            "   - For purely doc-driven questions (`REFERENCE_LOOKUP`, straightforward `CONFIG_HOWTO`, `API_INTEGRATION`), "
+            "you can answer directly in one pass without calling any tools.\n"
+            "   - When verifying cross-key config interactions (`centerRadius < radius`, `maxSlope` + `slopeRadius`, "
+            "`minY < maxY`, `S-005` `syncLoading`), log/`[RTP bit]` traces, Web Editor region geometry previews, "
+            "cached visual walkthroughs, or player teleport flow, you may optionally call `console_log_sandbox`, "
+            "`local_webpage_operations`, `multi_format_screenshotting`, or `mineflayer_protocol_bot` before answering.\n"
+            "   - When ready to finish, you may either write your 2 to 4 Markdown bullets directly after `</think>` "
+            "or call `submit_reply`.\n"
+            "3. After your `<think>...</think>` reasoning (and any optional tool turns), output ONLY 2 to 4 concise "
+            "Markdown bullet points (`- **...**`) ordered from **highest confidence** to **lower-confidence alternatives** "
+            "(confidence is conveyed by bullet order, so do NOT print `(High confidence)` or `(Medium confidence)` in the bullet title).\n"
+            "4. Start each bullet with `- **<Goal, Reference Scope, or Cause>:** `, followed by 1-2 natural "
             "engineering sentences matching `intent_profile.detected_intent` (citing exact YAML file/key + `/rtp ...` command "
             "for config/troubleshooting, or concrete reference tokens/sections for `REFERENCE_LOOKUP`/`API_INTEGRATION`) and "
             "the `<https://dailystruggle.github.io/RTP/...>` link wrapped in `<...>` angle brackets (never wrap `<...>` "
             "URLs inside backticks).\n"
-            "4. Do NOT output Markdown headers (`###`), intro/outro paragraphs, numbered lists, or multi-block "
-            "`bash` fences outside `<think>...</think>`. Keep the user-facing bullets under 1,200 characters.\n"
-            "5. Use ASCII '-' hyphens only (never em-dashes), never raw pipe '|' tables, and never invent config "
+            "5. Do NOT output Markdown headers (`###`), intro/outro paragraphs, numbered lists, or multi-block "
+            "`bash` fences outside `<think>...</think>`. Keep the user-facing bullets concise, technical, and under 1,200 characters.\n"
+            "6. Use ASCII '-' hyphens only (never em-dashes), never raw pipe '|' tables, and never invent config "
             "keys, URLs, or `/rtp` subcommands outside the provided context. Never write `/rtp config set ...`; "
             "the command syntax is `/rtp config <file_alias> <key>=<value>` (e.g. `/rtp config performance maxMSPT=35.0` "
             "or `/rtp config regions default shape.radius=5000b`) or `/rtp editor`. Only cite exact `url: <https://...>` "
-            "links listed in `<retrieved_docs_and_schema>` or `<starting_reference_point>` (never guess `/RTP/docs/...` "
-            "paths and never end a site URL with `.md`). For `POLYGON` `vertices:`, use integer chunk or block "
-            "coordinates (`[200c, 0c]`, `[100c, 173c]`, never decimals), and remember `vert.requireSkyLight` is "
+            "links listed in `<retrieved_docs_and_schema>`, `<starting_reference_point>`, or workbench tool results "
+            "(never guess `/RTP/docs/...` paths and never end a site URL with `.md`). For `POLYGON` `vertices:`, use integer "
+            "chunk or block coordinates (`[200c, 0c]`, `[100c, 173c]`, never decimals), and remember `vert.requireSkyLight` is "
             "`true` for surface-only (prevents caves) and `false` in the Nether."
         )
         user_prompt = (
@@ -2696,22 +2845,28 @@ class LocalLlmSynthesizer:
             "versus what RTP does architecturally (checking both permission/usage anti-patterns in `what-not-to-do.md` "
             "such as `rtp.unqueued` / `rtp.params`, second-class source code exception/log diagnostics in "
             "`<retrieved_code_context_second_class>`, and YAML configuration keys or documentation reference sections, "
-            "and ensuring every recommendation helps the user's goal rather than making it worse). Then output ONLY "
+            "and ensuring every recommendation helps the user's goal rather than making it worse). Optionally call "
+            "the verification workbench tools if log/config/geometry/visual verification is helpful, then output ONLY "
             "2 to 4 bullets ordered from highest to lowest confidence as `- **<Goal, Reference Scope, or Cause>:** ...` "
-            "(plus an optional `- **Clarifying Question:** ...` bullet if needed, or `[REFRAIN: <reason>]` if the retrieved "
-            "context cannot answer the query safely; no intro/outro text, no `(High/Medium confidence)` labels, no `###` "
-            "headers, respect `@range` limits, <1200 chars):"
+            "(or via `submit_reply`; plus an optional `- **Clarifying Question:** ...` bullet if needed, or `[REFRAIN: <reason>]` "
+            "if the retrieved context cannot answer the query safely; no intro/outro text, no `(High/Medium confidence)` "
+            "labels, no `###` headers, respect `@range` limits, <1200 chars):"
         )
 
+        active_workbench = workbench or self.workbench
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            "messages": messages,
             "temperature": 0.1,
             "max_tokens": 3072,
         }
+        if active_workbench is not None:
+            payload["tools"] = build_workbench_tool_definitions()
+            payload["tool_choice"] = "auto"
 
         effective_timeout = (
             self.deep_timeout
@@ -2719,20 +2874,137 @@ class LocalLlmSynthesizer:
             else self.timeout
         )
 
-        try:
-            resp = self.http_post(self.endpoint, payload, effective_timeout)
-            choices = resp.get("choices") or []
-            if not choices or not isinstance(choices, list):
+        tool_session = None
+        tool_verification_blobs: list[str] = []
+        content = ""
+        for _round_idx in range(self.max_tool_rounds + 1):
+            try:
+                with self._p0_queue_lease(effective_timeout):
+                    resp = self.http_post(self.endpoint, payload, effective_timeout)
+                choices = resp.get("choices") or []
+                if not choices or not isinstance(choices, list):
+                    return None
+                msg = choices[0].get("message") or {}
+                raw_content = str(msg.get("content") or "").strip()
+            except (OSError, ValueError, KeyError, TypeError):
                 return None
-            msg = choices[0].get("message") or {}
-            content = str(msg.get("content") or "").strip()
-        except (OSError, ValueError, KeyError, TypeError):
-            return None
 
-        # Strip `<think>...</think>` chain-of-thought blocks emitted by reasoning models (e.g. deepseek-r1)
+            extracted_calls = _extract_llm_tool_calls(msg, raw_content)
+            if not extracted_calls:
+                content = raw_content
+                break
+
+            assistant_turn_msg: dict[str, Any] = {
+                "role": "assistant",
+                "content": raw_content,
+            }
+            if isinstance(msg.get("tool_calls"), list) and msg.get("tool_calls"):
+                assistant_turn_msg["tool_calls"] = msg["tool_calls"]
+            messages.append(assistant_turn_msg)
+
+            submitted_via_tool = False
+            for tc in extracted_calls:
+                t_id = tc["id"]
+                t_name = tc["name"]
+                t_args = tc["arguments"]
+                self.last_tool_calls.append({"id": t_id, "name": t_name, "arguments": t_args})
+
+                if t_name == "submit_reply":
+                    submitted_via_tool = True
+                    ref_reason = str(t_args.get("refrain_reason") or "").strip()
+                    if ref_reason:
+                        self.last_refrain_reason = ref_reason
+                    raw_bullets = t_args.get("bullets")
+                    raw_clarifying = t_args.get("clarifying_questions")
+                    bullet_lines: list[str] = []
+                    if isinstance(raw_bullets, list):
+                        for b_item in raw_bullets:
+                            b_str = str(b_item or "").strip()
+                            if not b_str:
+                                continue
+                            if not b_str.startswith(("- ", "* ")):
+                                b_str = f"- {b_str}"
+                            bullet_lines.append(b_str)
+                    elif isinstance(raw_bullets, str) and raw_bullets.strip():
+                        bullet_lines.append(raw_bullets.strip())
+                    if isinstance(raw_clarifying, list):
+                        for q_item in raw_clarifying:
+                            q_str = str(q_item or "").strip()
+                            if not q_str:
+                                continue
+                            if not q_str.startswith(("- ", "* ")):
+                                q_str = f"- **Clarifying Question:** {q_str}"
+                            bullet_lines.append(q_str)
+                    content = "\n".join(bullet_lines).strip()
+                    if bool(t_args.get("attach_verification_report", False)) and active_workbench is not None:
+                        if tool_session is None:
+                            _, safe_logs = detect_and_redact_secrets(fetched_logs)
+                            _, safe_cfg_yaml = detect_and_redact_secrets(config_yaml)
+                            tool_session = active_workbench.create_tool_session(
+                                conn=conn,
+                                query_text=" ".join(signals.get("corpus_terms") or ()) or safe_question,
+                                fetched_logs=safe_logs,
+                                config_yaml=safe_cfg_yaml,
+                                applied_tags=applied_tags,
+                                cfg_hits=diverse_cfg,
+                                bit_matches=bit_matches,
+                                code_hits=code_hits,
+                            )
+                        self.last_verification_report = tool_session.finalize_report(draft_reply=content)
+                        tool_verification_blobs.append(
+                            json.dumps(
+                                {
+                                    "editor_deep_link": self.last_verification_report.webpage_result.editor_deep_link,
+                                    "reused_image_url": self.last_verification_report.reused_image_url,
+                                    "image_tag": self.last_verification_report.image_tag,
+                                    "self_corrections": self.last_verification_report.console_result.self_corrections,
+                                },
+                                ensure_ascii=False,
+                            )
+                        )
+                    break
+
+                if active_workbench is None:
+                    tool_out = {"error": "verification workbench not enabled"}
+                else:
+                    if tool_session is None:
+                        _, safe_logs = detect_and_redact_secrets(fetched_logs)
+                        _, safe_cfg_yaml = detect_and_redact_secrets(config_yaml)
+                        tool_session = active_workbench.create_tool_session(
+                            conn=conn,
+                            query_text=" ".join(signals.get("corpus_terms") or ()) or safe_question,
+                            fetched_logs=safe_logs,
+                            config_yaml=safe_cfg_yaml,
+                            applied_tags=applied_tags,
+                            cfg_hits=diverse_cfg,
+                            bit_matches=bit_matches,
+                            code_hits=code_hits,
+                        )
+                    tool_out = tool_session.execute_tool(t_name, t_args)
+                tool_out_json = json.dumps(tool_out, ensure_ascii=False)
+                tool_verification_blobs.append(tool_out_json)
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": t_id,
+                        "name": t_name,
+                        "content": tool_out_json,
+                    }
+                )
+
+            if submitted_via_tool:
+                break
+
+        if tool_session is not None and self.last_verification_report is None:
+            self.last_verification_report = tool_session.finalize_report(draft_reply=content)
+        if tool_verification_blobs:
+            verification_blob = f"{verification_blob}\n" + "\n".join(tool_verification_blobs)
+
+        # Strip `<think>...</think>` and `<tool_call>...</tool_call>` blocks
         content = re.sub(r"(?s)<think>.*?</think>\s*", "", content).strip()
         if "<think>" in content:
             content = content.split("</think>")[-1].strip() if "</think>" in content else ""
+        content = re.sub(r"(?s)<tool_call>.*?</tool_call>\s*", "", content).strip()
 
         refrain_match = re.search(r"\[REFRAIN(?:\s*:\s*([^\]]+))?\]", content, flags=re.IGNORECASE)
         if refrain_match:
@@ -2741,16 +3013,25 @@ class LocalLlmSynthesizer:
 
         # Convert `[Label](https://...)` markdown links into Discord `<https://...>` angle-bracket links
         content = re.sub(r"\[[^\]]+\]\((https?://[^\s)]+)\)", r"<\1>", content, flags=re.IGNORECASE)
-        # Keep only the bullet list lines (plus any indented YAML block or single-line lead-in)
+        # Keep only the bullet list lines (plus any indented/fenced YAML/log block or single-line lead-in)
         filtered_lines: list[str] = []
         seen_bullet = False
+        in_fence = False
         for line in content.splitlines():
             s = line.strip()
+            if s.startswith("```"):
+                in_fence = not in_fence
+                seen_bullet = True
+                filtered_lines.append(line)
+                continue
+            if in_fence:
+                filtered_lines.append(line)
+                continue
             if not s:
                 if seen_bullet:
                     filtered_lines.append("")
                 continue
-            if s.startswith(("- ", "* ")) or line.startswith(("  ", "\t", "```")):
+            if s.startswith(("- ", "* ", "**Verified in sandbox")) or line.startswith(("  ", "\t")):
                 seen_bullet = True
                 filtered_lines.append(line)
             elif not seen_bullet and s.startswith("You can "):
@@ -3329,6 +3610,83 @@ class SupportBotEngine:
         self.refusal_grace_threads: set[str] = set()
         self.thread_bot_reply_counts: dict[str, int] = {}
         self.user_last_action: dict[str, float] = {}
+        self.artifact_cache = DiscordVersionedArtifactCache()
+        self.workbench = BotVerificationWorkbench(self.artifact_cache)
+        if self.llm_synthesizer is not None and self.llm_synthesizer.workbench is None:
+            self.llm_synthesizer.workbench = self.workbench
+
+    def run_verification_workbench(
+        self,
+        post: ForumPostContext,
+        fetched_logs: str = "",
+        config_yaml: str = "",
+        cfg_hits: list[dict[str, Any]] | None = None,
+        bit_matches: list[dict[str, Any]] | None = None,
+        code_hits: list[dict[str, Any]] | None = None,
+        draft_reply: str = "",
+        force_mineflayer: bool = False,
+    ) -> WorkbenchVerificationReport:
+        """
+        Reconstructs the customer's setup (`definite` vs `best_approximation`)
+        and executes the 4 verification tools (`console`, `local_webpage`,
+        `screenshotting`, and `mineflayer_bot`), consulting `self.artifact_cache`
+        for version-matched Discord image reuse before generating new visuals.
+        """
+        return self.workbench.run_verification(
+            conn=self.conn,
+            query_text=f"{post.title}\n{post.body}".strip(),
+            fetched_logs=fetched_logs,
+            config_yaml=config_yaml,
+            applied_tags=post.applied_tags,
+            cfg_hits=cfg_hits,
+            bit_matches=bit_matches,
+            code_hits=code_hits,
+            draft_reply=draft_reply,
+            force_mineflayer=force_mineflayer,
+        )
+
+    def _build_verification_decision_fields(
+        self,
+        post: ForumPostContext,
+        fetched_logs: str,
+        cfg_hits: list[dict[str, Any]] | None,
+        bit_matches: list[dict[str, Any]] | None,
+        code_hits: list[dict[str, Any]] | None,
+        draft_reply: str,
+    ) -> dict[str, Any]:
+        if self.llm_synthesizer is not None and self.llm_synthesizer.last_verification_report is not None:
+            report = self.llm_synthesizer.last_verification_report
+            self.llm_synthesizer.last_verification_report = None
+        else:
+            report = self.run_verification_workbench(
+                post=post,
+                fetched_logs=fetched_logs,
+                cfg_hits=cfg_hits,
+                bit_matches=bit_matches,
+                code_hits=code_hits,
+                draft_reply=draft_reply,
+            )
+        embeds: list[dict[str, Any]] = []
+        att_files: list[tuple[str, bytes, str]] = []
+        att_descs: list[str] = []
+        if report.reused_image_url:
+            embeds.append({
+                "image": {"url": report.reused_image_url},
+            })
+        elif report.visual_artifact is not None:
+            fn = report.visual_artifact.filename_png
+            att_files.append((fn, report.visual_artifact.png_bytes, "image/png"))
+            att_descs.append(report.image_description)
+        return {
+            "verification_report": report,
+            "embeds": embeds,
+            "attachment_files": att_files,
+            "attachment_descriptions": att_descs,
+            "image_tag": report.image_tag,
+            "image_description": report.image_description,
+            "reused_image_url": report.reused_image_url,
+            "editor_deep_link": report.webpage_result.editor_deep_link,
+        }
 
     def _extract_corpus_facets(self, text: str, project: str) -> frozenset[str]:
         """Extracts repository-grounded corpus facets (`is_schema_or_heading_facet`) from `text`."""
@@ -3457,20 +3815,87 @@ class SupportBotEngine:
             if not cfg_hits and not any(cs.get("config_refs") for cs in code_hits[:2]):
                 return code_hits, cfg_hits
 
-        bridged_cfg = list(cfg_hits)
-        seen_keys = {c["key_path"].replace("defaults.", "").lower() for c in bridged_cfg}
+        probe_low = combined_probe.lower()
+        primary_domain_keys = {
+            "step", "direction", "miny", "maxy", "requireskylight",
+            "maxslope", "sloperadius", "maxhillangle",
+            "strictactions", "strictconfig", "overrides",
+            "syncallottedtime", "asyncallottedtime", "autotune", "period",
+            "triggers", "gates", "command", "alias", "rejectinclaim",
+        }
+        pre_high = [c for c in cfg_hits if c.get("confidence") == "high"]
+        pre_other = [c for c in cfg_hits if c.get("confidence") != "high"]
+        exact_named_high = [
+            c for c in pre_high
+            if c["key_path"].split(".")[-1].lower() in probe_low
+        ]
+        generic_high = [
+            c for c in pre_high
+            if c["key_path"].split(".")[-1].lower() not in probe_low
+        ]
+        seen_keys = {c["key_path"].replace("defaults.", "").lower() for c in exact_named_high}
+        explicit_ast_hits: list[dict[str, str]] = []
+        secondary_ast_hits: list[dict[str, str]] = []
+
         for cs in code_hits[:3]:
-            for ref_key in (cs.get("config_refs") or "").split():
-                clean_ref = ref_key.strip()
-                if len(clean_ref) < 3 or clean_ref.lower() in seen_keys:
+            cls_name = str(cs.get("class_name") or "")
+            is_explicit_cls = bool(
+                len(cls_name) >= 5
+                and re.search(rf"\b{re.escape(cls_name)}\b", combined_probe, re.IGNORECASE)
+            )
+            raw_refs = [r.strip() for r in (cs.get("config_refs") or "").split() if len(r.strip()) >= 3]
+            ast_key_weights: dict[str, float] = {}
+            if cls_name:
+                try:
+                    for ew_row in self.conn.execute(
+                        """
+                        SELECT dst_symbol_id, weight FROM ast_edges
+                        WHERE src_symbol_id IN (?, ?) AND edge_kind IN ('READS_CONFIG_KEY', 'GOVERNED_BY_KEY')
+                        """,
+                        (f"cls:{cls_name}", f"spi:{cls_name}"),
+                    ).fetchall():
+                        dst_leaf = str(ew_row[0]).split(":")[-1].split(".")[-1].lower()
+                        w_val = float(ew_row[1] or 0.0)
+                        if w_val > ast_key_weights.get(dst_leaf, 0.0):
+                            ast_key_weights[dst_leaf] = w_val
+                except sqlite3.Error:
+                    pass
+
+            def _ref_rank(rk: str) -> tuple[int, int, float]:
+                rk_low = rk.lower()
+                stripped_reroll = rk_low[6:] if rk_low.startswith("reroll") and len(rk_low) > 6 else rk_low
+                in_query = 0 if (rk_low in probe_low or (len(stripped_reroll) >= 4 and stripped_reroll in probe_low)) else 1
+                is_prim = 0 if rk_low in primary_domain_keys else 1
+                return (in_query, is_prim, -ast_key_weights.get(rk_low, 0.0))
+
+            ordered_refs = sorted(raw_refs, key=_ref_rank)
+            for clean_ref in ordered_refs:
+                if clean_ref.lower() in seen_keys:
                     continue
                 ref_matches = search_config_keys(self.conn, clean_ref, limit=1, project=project)
                 for rm in ref_matches:
                     canon_k = rm["key_path"].replace("defaults.", "").lower()
                     if canon_k not in seen_keys:
                         seen_keys.add(canon_k)
-                        bridged_cfg.append(rm)
+                        rm_copy = dict(rm)
+                        if is_explicit_cls:
+                            rm_copy["confidence"] = "high"
+                            explicit_ast_hits.append(rm_copy)
+                        else:
+                            secondary_ast_hits.append(rm_copy)
                         break
+
+        filtered_generic_high = [
+            c for c in generic_high
+            if c["key_path"].replace("defaults.", "").lower() not in seen_keys
+        ]
+        for c in filtered_generic_high:
+            seen_keys.add(c["key_path"].replace("defaults.", "").lower())
+        filtered_other = [
+            c for c in pre_other
+            if c["key_path"].replace("defaults.", "").lower() not in seen_keys
+        ]
+        bridged_cfg = exact_named_high + explicit_ast_hits + filtered_generic_high + filtered_other + secondary_ast_hits
         return code_hits, bridged_cfg
 
     def will_run_deep_search(
@@ -4657,6 +5082,36 @@ class SupportBotEngine:
             has_high_conf_doc=has_high_conf_doc_section,
             project=project,
         )
+        if not bit_matches and code_hits:
+            probe_all_low = f"{combined_user_text}\n{fetched_logs}".lower()
+            bridged_bits: list[tuple[int, dict[str, object]]] = []
+            for cs in code_hits[:2]:
+                cls_name = str(cs.get("class_name") or "")
+                if len(cls_name) < 5 or not re.search(rf"\b{re.escape(cls_name)}\b", probe_all_low, re.IGNORECASE):
+                    continue
+                for bit_sym in re.findall(r"bit:\s*([A-Z][A-Z0-9_]{3,})", str(cs.get("diagnostics") or "")):
+                    b_entry = lookup_bit_code(self.conn, bit_sym, project=project)
+                    if b_entry:
+                        sym_parts = [p.lower() for p in bit_sym.split("_")[1:] if len(p) >= 4]
+                        overlap = sum(1 for sp in sym_parts if sp in probe_all_low)
+                        bridged_bits.append((-overlap, b_entry))
+            if bridged_bits:
+                bridged_bits.sort(key=lambda x: x[0])
+                seen_bk: set[str] = set()
+                for _sc, bm in bridged_bits:
+                    bk = str(bm.get("key") or "")
+                    if bk and bk not in seen_bk:
+                        seen_bk.add(bk)
+                        bit_matches.append(bm)
+                if bit_matches:
+                    bit_lines = ["I matched the following `[RTP bit]` finding(s) in your post:"]
+                    for bm in bit_matches[:4]:
+                        bit_lines.append(
+                            f"- **`{bm['key']}`** (`{bm['namespace']}-{int(bm['id']):04d}`, severity `{bm['severity']}`): "
+                            f"{bm['remediation']}"
+                        )
+                    bit_lines.append("Full catalog: <https://dailystruggle.github.io/RTP/dev/BIT_CODES/>")
+                    sections.append("\n".join(bit_lines))
         has_high_conf_doc = any(h.get("confidence") == "high" for h in cfg_hits[:3]) or has_high_conf_doc_section
         signals = extract_grounded_query_signals(
             conn=self.conn,
@@ -4707,6 +5162,10 @@ class SupportBotEngine:
                     bit_matches=bit_matches,
                     project=project,
                     code_hits=code_hits,
+                    workbench=self.workbench,
+                    fetched_logs=fetched_logs,
+                    config_yaml=att_yaml_text,
+                    applied_tags=post.applied_tags,
                 )
                 model_refrained_reason = self.llm_synthesizer.last_refrain_reason
                 model_clarifying_bullets = self.llm_synthesizer.last_clarifying_questions
@@ -5005,6 +5464,19 @@ class SupportBotEngine:
         )
 
         reply = sanitize_bot_output("\n\n".join(sections))
+        ver_fields = self._build_verification_decision_fields(
+            post=post,
+            fetched_logs=fetched_logs,
+            cfg_hits=cfg_hits,
+            bit_matches=bit_matches,
+            code_hits=code_hits,
+            draft_reply=reply,
+        )
+        ver_report: WorkbenchVerificationReport | None = ver_fields.get("verification_report")
+        if ver_report is not None and ver_report.console_result.self_corrections:
+            corr_note = "\n".join(f"- **Companion requirement:** {c}" for c in ver_report.console_result.self_corrections[:2])
+            if corr_note not in reply and len(reply) + len(corr_note) + 4 <= 1950:
+                reply = sanitize_bot_output(f"{reply}\n\n{corr_note}")
         return BotDecision(
             reply_text=reply,
             applied_tags=tuple(tags),
@@ -5023,6 +5495,7 @@ class SupportBotEngine:
             user_score=u_prof["user_score"],
             user_profile=u_prof,
             training_record=t_rec,
+            **ver_fields,
         )
 
     def handle_followup_message(
@@ -5502,6 +5975,10 @@ class SupportBotEngine:
                     project=project,
                     code_hits=f_code_hits,
                     prior_turns=prior_turns,
+                    workbench=self.workbench,
+                    fetched_logs=followup_logs,
+                    config_yaml=f_att_yaml_text,
+                    applied_tags=post.applied_tags,
                 )
             if llm_cum:
                 sections.append(llm_cum)
@@ -6111,6 +6588,7 @@ class DiscordForumPoller:
         include_buttons: bool = False,
         allow_maintainer_threads: bool = False,
         now_fn: Callable[[], float] = time.time,
+        upload_visual_attachments: bool = False,
     ) -> None:
         self.client = client
         self.engine = engine
@@ -6120,6 +6598,7 @@ class DiscordForumPoller:
         self.include_buttons = include_buttons
         self.allow_maintainer_threads = allow_maintainer_threads
         self.now_fn = now_fn
+        self.upload_visual_attachments = upload_visual_attachments
 
         self.bot_user_id: str = ""
         self.support_channel_id: str = ""
@@ -6193,6 +6672,9 @@ class DiscordForumPoller:
                 for tid, mid in raw_eval_ids.items():
                     if mid:
                         self.thread_last_evaluated_msg_id[str(tid)] = str(mid)
+            raw_cache = data.get("discord_artifact_cache")
+            if isinstance(raw_cache, list):
+                self.engine.artifact_cache.load_serialized(raw_cache)
         except (OSError, ValueError):
             pass
 
@@ -6211,6 +6693,7 @@ class DiscordForumPoller:
                 "thread_bot_reply_counts": dict(sorted(self.engine.thread_bot_reply_counts.items())),
                 "handled_reactions": sorted(self.handled_reactions),
                 "thread_last_evaluated_msg_id": dict(sorted(self.thread_last_evaluated_msg_id.items())),
+                "discord_artifact_cache": self.engine.artifact_cache.dump_serialized(),
             }
             self.state_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         except OSError:
@@ -6379,19 +6862,64 @@ class DiscordForumPoller:
             }
             if self.include_buttons and decision.components:
                 msg_payload["components"] = decision.components
+            if decision.reused_image_url and decision.embeds:
+                msg_payload["embeds"] = decision.embeds
+
+            has_visual_upload = (
+                self.upload_visual_attachments
+                and bool(decision.attachment_files)
+                and hasattr(self.client, "request_multipart")
+            )
+            if has_visual_upload:
+                if decision.embeds:
+                    msg_payload["embeds"] = decision.embeds
+                msg_payload["attachments"] = [
+                    {
+                        "id": idx,
+                        "filename": fn,
+                        "description": (
+                            decision.attachment_descriptions[idx]
+                            if idx < len(decision.attachment_descriptions)
+                            else (decision.image_description or "")
+                        ),
+                    }
+                    for idx, (fn, _, _) in enumerate(decision.attachment_files)
+                ]
 
             sent_msg: Any = None
             if progress_message_id:
                 try:
-                    sent_msg = self.client.request(
-                        "PATCH",
-                        f"/channels/{thread_id}/messages/{progress_message_id}",
-                        msg_payload,
-                    )
+                    if has_visual_upload:
+                        sent_msg = self.client.request_multipart(
+                            "PATCH",
+                            f"/channels/{thread_id}/messages/{progress_message_id}",
+                            msg_payload,
+                            decision.attachment_files,
+                        )
+                    else:
+                        sent_msg = self.client.request(
+                            "PATCH",
+                            f"/channels/{thread_id}/messages/{progress_message_id}",
+                            msg_payload,
+                        )
                 except OSError:
                     sent_msg = None
+            elif has_visual_upload:
+                sent_msg = self.client.request_multipart(
+                    "POST",
+                    f"/channels/{thread_id}/messages",
+                    msg_payload,
+                    decision.attachment_files,
+                )
             else:
                 sent_msg = self.client.request("POST", f"/channels/{thread_id}/messages", msg_payload)
+
+            if isinstance(sent_msg, dict):
+                self.engine.artifact_cache.harvest_from_discord_messages(
+                    [sent_msg],
+                    channel_id=thread_id,
+                    bot_user_id=self.bot_user_id,
+                )
 
             if sent_msg is not None:
                 self.engine.thread_bot_reply_counts[thread_id] = (
@@ -6491,6 +7019,18 @@ class DiscordForumPoller:
             else (active_resp if isinstance(active_resp, list) else [])
         )
 
+        ref_id_map = {
+            str(th.get("name", th.get("title", ""))).strip(): str(th["id"])
+            for th in raw_threads
+            if isinstance(th, dict)
+            and str(th.get("parent_id", "")) == self.support_channel_id
+            and str(th.get("name", th.get("title", ""))).strip() in self.reference_thread_titles
+            and th.get("id")
+        }
+        if ref_id_map and not getattr(self, "_seeded_live_ref_guides", False):
+            self.engine.seed_pinned_reference_guides(thread_id_map=ref_id_map)
+            self._seeded_live_ref_guides = True
+
         support_threads = [
             th
             for th in raw_threads
@@ -6526,6 +7066,12 @@ class DiscordForumPoller:
                         parse_discord_timestamp(m.get("timestamp"), 0.0),
                         str(m.get("id", "")),
                     ),
+                )
+                # Index any tagged bot visual outputs in this thread into the versioned Discord cache
+                self.engine.artifact_cache.harvest_from_discord_messages(
+                    messages,
+                    channel_id=thread_id,
+                    bot_user_id=self.bot_user_id,
                 )
 
                 if not owner_id:
@@ -7059,6 +7605,12 @@ def main(argv: list[str] | None = None) -> int:
         default=os.environ.get("RTP_DISCORD_ALLOW_MAINTAINER_THREADS", "").strip().lower() in ("1", "true", "yes"),
         help="Allow polling non-reference threads opened by DISCORD_MAINTAINER_ID (for live test-server runs).",
     )
+    parser.add_argument(
+        "--upload-visuals",
+        action="store_true",
+        default=os.environ.get("RTP_DISCORD_UPLOAD_VISUALS", "").strip().lower() in ("1", "true", "yes"),
+        help="Upload generated workbench visual walkthrough PNGs via multipart/form-data when no cached Discord image link exists.",
+    )
     args = parser.parse_args(argv)
 
     maintainer_id = resolve_discord_maintainer_id("999999999999999999")
@@ -7115,6 +7667,7 @@ def main(argv: list[str] | None = None) -> int:
                 state_path=args.state,
                 settle_seconds=args.settle_seconds,
                 allow_maintainer_threads=args.allow_maintainer_threads,
+                upload_visual_attachments=args.upload_visuals,
             )
             poller.refresh_guild_metadata()
             print(

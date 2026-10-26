@@ -71,10 +71,15 @@ public final class BytesocksTransport implements ChannelTransport {
         void cancel(Object handle);
     }
 
+    /** Negotiated relay room descriptor returned by {@link #createChannelNegotiated}. */
+    public record CreatedChannel(String relayUrl, String id, int framesPerWindow, long ttlMillis) {
+    }
+
     private final HttpClient http;
     private final String id;
     private final URI socketUri;
     private final long ttlMillis;
+    private final int framesPerWindow;
     private final LongSupplier clock;
     private final Timer timer;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -97,11 +102,21 @@ public final class BytesocksTransport implements ChannelTransport {
      * @param id       channel key from {@link #createChannel}
      */
     public BytesocksTransport(HttpClient http, String relayUrl, String id, long ttlMillis, LongSupplier clock, Timer timer) {
+        this(http, relayUrl, id, ttlMillis, FRAMES_PER_WINDOW, clock, timer);
+    }
+
+    /**
+     * As the 6-argument constructor, with an explicit plugin frame share per 2-minute window
+     * negotiated from the relay's rate-limit headers (ADR-106 §5.5, ADR-108).
+     */
+    public BytesocksTransport(HttpClient http, String relayUrl, String id, long ttlMillis, int framesPerWindow,
+                              LongSupplier clock, Timer timer) {
         this.http = Objects.requireNonNull(http, "http");
         if (id == null || !KEY.matcher(id).matches()) throw new IllegalArgumentException("bad relay channel key");
         this.id = id;
         this.socketUri = socketUri(relayUrl, id);
         this.ttlMillis = ttlMillis;
+        this.framesPerWindow = framesPerWindow > 0 ? framesPerWindow : FRAMES_PER_WINDOW;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.timer = Objects.requireNonNull(timer, "timer");
     }
@@ -124,14 +139,46 @@ public final class BytesocksTransport implements ChannelTransport {
      * naming the reason (the caller logs it and continues snapshot-only).
      */
     public static CompletableFuture<String> createChannel(HttpClient http, String relayUrl) {
+        return createChannelAt(http, relayUrl, java.util.Map.of()).thenApply(CreatedChannel::id);
+    }
+
+    /**
+     * Creates a relay channel with rate-limit negotiation and optional fallback relay failover (S-004).
+     * Reads {@code X-RTP-Frames-Per-Window} (or {@code X-RateLimit-Limit}) and
+     * {@code X-RTP-Session-TTL-Seconds} when advertised by a first-party or self-hosted relay.
+     */
+    public static CompletableFuture<CreatedChannel> createChannelNegotiated(
+            HttpClient http, String relayUrl, String fallbackRelayUrl, java.util.Map<String, String> extraHeaders) {
+        java.util.Map<String, String> headers = extraHeaders == null ? java.util.Map.of() : extraHeaders;
+        return createChannelAt(http, relayUrl, headers).handle((created, err) -> {
+            if (err == null) {
+                return CompletableFuture.completedFuture(created);
+            }
+            if (fallbackRelayUrl != null && !fallbackRelayUrl.equals(relayUrl)) {
+                RTPRuntime.log(Level.WARNING, "[editor] primary relay " + relayUrl
+                        + " unavailable; retrying fallback relay " + fallbackRelayUrl + ": " + rootMessage(err));
+                return createChannelAt(http, fallbackRelayUrl, headers);
+            }
+            Throwable c = err.getCause() != null ? err.getCause() : err;
+            return CompletableFuture.<CreatedChannel>failedFuture(c);
+        }).thenCompose(f -> f);
+    }
+
+    private static CompletableFuture<CreatedChannel> createChannelAt(
+            HttpClient http, String relayUrl, java.util.Map<String, String> extraHeaders) {
         HttpRequest req;
         try {
-            req = HttpRequest.newBuilder()
+            HttpRequest.Builder b = HttpRequest.newBuilder()
                     .uri(URI.create(TRAILING_SLASHES.matcher(relayUrl).replaceAll("") + "/create"))
                     .header("User-Agent", USER_AGENT)
                     .timeout(Duration.ofMillis(CREATE_TIMEOUT_MILLIS))
-                    .GET()
-                    .build();
+                    .GET();
+            if (extraHeaders != null) {
+                for (java.util.Map.Entry<String, String> e : extraHeaders.entrySet()) {
+                    b.header(e.getKey(), e.getValue());
+                }
+            }
+            req = b.build();
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(new IOException("bad relay URL '" + relayUrl + "': " + e.getMessage(), e));
         }
@@ -152,8 +199,40 @@ public final class BytesocksTransport implements ChannelTransport {
             if (key == null || !KEY.matcher(key).matches()) {
                 throw new java.util.concurrent.CompletionException(new IOException("relay " + relayUrl + " returned no usable channel key"));
             }
-            return key;
+            int negotiatedFrames = negotiatePluginFrameShare(res.headers());
+            long negotiatedTtl = negotiateSessionTtlMillis(res.headers());
+            return new CreatedChannel(relayUrl, key, negotiatedFrames, negotiatedTtl);
         });
+    }
+
+    static int negotiatePluginFrameShare(java.net.http.HttpHeaders headers) {
+        if (headers == null) return FRAMES_PER_WINDOW;
+        String raw = headers.firstValue("X-RTP-Frames-Per-Window")
+                .or(() -> headers.firstValue("X-RateLimit-Limit"))
+                .orElse(null);
+        if (raw == null || raw.isBlank()) return FRAMES_PER_WINDOW;
+        try {
+            int total = Integer.parseInt(raw.trim());
+            if (total > 30) {
+                return Math.min(600, Math.max(FRAMES_PER_WINDOW, (total * 6) / 10));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return FRAMES_PER_WINDOW;
+    }
+
+    static long negotiateSessionTtlMillis(java.net.http.HttpHeaders headers) {
+        if (headers == null) return DEFAULT_TTL_MILLIS;
+        String raw = headers.firstValue("X-RTP-Session-TTL-Seconds").orElse(null);
+        if (raw == null || raw.isBlank()) return DEFAULT_TTL_MILLIS;
+        try {
+            long sec = Long.parseLong(raw.trim());
+            if (sec >= 60L) {
+                return Math.min(8L * 3_600_000L, sec * 1_000L);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return DEFAULT_TTL_MILLIS;
     }
 
     private static String lastSegment(String location) {
@@ -419,7 +498,7 @@ public final class BytesocksTransport implements ChannelTransport {
 
     @Override
     public int framesPerWindow() {
-        return FRAMES_PER_WINDOW;
+        return framesPerWindow;
     }
 
     private static String rootMessage(Throwable t) {

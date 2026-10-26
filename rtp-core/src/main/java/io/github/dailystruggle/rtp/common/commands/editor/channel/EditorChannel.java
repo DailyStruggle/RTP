@@ -204,6 +204,7 @@ public final class EditorChannel {
     private long heldPushChars;
     private long heldPushSerial;
     private long lastBundleAt = Long.MIN_VALUE / 2;
+    private boolean deferBundleFlush;
     private volatile long lastFrameAt = Long.MIN_VALUE / 2;
     private volatile String lastDropReason;
     private volatile String closeReason;
@@ -347,13 +348,35 @@ public final class EditorChannel {
         }
     }
 
-    /** The snapshot's {@code channel} block: {@code {relay, id, pluginKey}}. */
+    /** The snapshot's {@code channel} block: {@code {relay, id, pluginKey}}, plus negotiated frame shares when elevated. */
     public Map<String, Object> snapshotBlock() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("relay", transport.relay());
         m.put("id", id);
         m.put("pluginKey", keys.publicKeyBase64());
+        int fpw = transport.framesPerWindow();
+        if (fpw > BytesocksTransport.FRAMES_PER_WINDOW) {
+            m.put("framesPerWindow", fpw);
+            m.put("pageFramesPerWindow", Math.min(300, Math.max(10, (fpw * 2) / 3)));
+        }
         return m;
+    }
+
+    /** Negotiated plugin frame share per 2-minute window ({@code 0} when unlimited). */
+    public int framesPerWindow() {
+        return transport.framesPerWindow();
+    }
+
+    /**
+     * Shortest gap between two bundles for the given plugin frame share: {@link #BUNDLE_INTERVAL_MILLIS}
+     * ({@code 8,000 ms}) at the default public relay share ({@code 18}), scaling down proportionally
+     * on higher-capacity relays down to {@code 500 ms} on Pro/self-hosted relays.
+     */
+    public static long bundleIntervalMillis(int framesPerWindow) {
+        if (framesPerWindow <= BytesocksTransport.FRAMES_PER_WINDOW) {
+            return BUNDLE_INTERVAL_MILLIS;
+        }
+        return Math.max(500L, BUNDLE_INTERVAL_MILLIS * BytesocksTransport.FRAMES_PER_WINDOW / framesPerWindow);
     }
 
     // ---- inbound ----
@@ -691,6 +714,10 @@ public final class EditorChannel {
                         + "' is not a declared push type; not sent");
                 return false;
             }
+            int limit = transport.framesPerWindow();
+            if (limit > 0 && !deferBundleFlush && !heldPushes.isEmpty()) {
+                flushLocked(limit);
+            }
             rollWindow(clock.getAsLong());
             long own = extensionBytes.getOrDefault(extensionId, 0L);
             if (own + bytes > EXTENSION_BYTES_PER_MINUTE
@@ -701,7 +728,7 @@ public final class EditorChannel {
             }
             if (delivery != null) {
                 double share = delivery == EditorDelivery.LATEST ? EXTENSION_LATEST_SHARE : EXTENSION_ORDERED_SHARE;
-                if (windowBytes + bytes > (long) (OUTBOUND_BYTES_PER_MINUTE * share)) {
+                if (windowBytes + heldPushChars + bytes > (long) (OUTBOUND_BYTES_PER_MINUTE * share)) {
                     logLimited("ext|session|" + extensionId, Level.INFO, "[editor] channel " + shortId()
                             + ": session outbound budget is busy; skipping extension push '" + type + "'");
                     return false;
@@ -735,6 +762,9 @@ public final class EditorChannel {
         int limit = transport.framesPerWindow();
         if (closed.get()) return false;
         if (limit <= 0 || "bye".equals(type)) return sendFrame(trimmed, to, type);
+        if (!deferBundleFlush && !heldPushes.isEmpty()) {
+            flushLocked(limit);
+        }
         boolean accepted;
         if (to == null && (BUNDLED.contains(type) || extensionPushes.containsKey(type))) {
             accepted = holdPush(trimmed, type, body, coalesceKey);
@@ -747,16 +777,30 @@ public final class EditorChannel {
             heldReplies.add(new String[]{trimmed, to, type});
             accepted = true;
         }
-        flushLocked(limit);
+        if (deferBundleFlush) {
+            flushRepliesLocked(limit, clock.getAsLong());
+        } else {
+            flushLocked(limit);
+        }
         return accepted;
+    }
+
+    /**
+     * Brackets a multi-push producer tick so pushes generated in the same tick coalesce into one
+     * bundle and leave together on {@link #flush()}, while targeted replies still leave immediately.
+     */
+    public void deferBundleFlush(boolean defer) {
+        synchronized (sendLock) {
+            this.deferBundleFlush = defer;
+        }
     }
 
     /** Sends held replies and a due bundle as far as the frame budget allows; any thread. */
     public void flush() {
         int limit = transport.framesPerWindow();
-        if (limit <= 0) return;
         synchronized (sendLock) {
-            if (!closed.get()) flushLocked(limit);
+            deferBundleFlush = false;
+            if (limit > 0 && !closed.get()) flushLocked(limit);
         }
     }
 
@@ -769,6 +813,11 @@ public final class EditorChannel {
 
     /** Under {@link #sendLock}: coalesces a bundled push, or refuses it while a frame's worth waits. */
     private boolean holdPush(String body, String type, Map<String, Object> parsed, String coalesceKey) {
+        if (!fitsFrame(body)) {
+            logLimited("out|" + type, Level.WARNING, "[editor] channel " + shortId() + ": '" + type
+                    + "' message exceeds the " + (MAX_FRAME_BYTES >> 10) + " KiB frame cap; not sent");
+            return false;
+        }
         EditorDelivery delivery = extensionPushes.get(type);
         String key;
         if (delivery != null) {
@@ -782,9 +831,28 @@ public final class EditorChannel {
             };
         }
         String old = heldPushes.get(key);
+        if (DROPPABLE.contains(type)) {
+            long now = clock.getAsLong();
+            rollWindow(now);
+            int bytes = utf8Length(body) + (old == null ? ENVELOPE_OVERHEAD : -utf8Length(old));
+            long budget = FIRST_DEFERRED.equals(type)
+                    ? (long) (OUTBOUND_BYTES_PER_MINUTE * FIRST_DEFERRED_SHARE) : OUTBOUND_BYTES_PER_MINUTE;
+            if (windowBytes + heldPushChars + bytes > budget) {
+                logLimited("budget", Level.INFO, "[editor] channel " + shortId() + ": outbound budget of "
+                        + (OUTBOUND_BYTES_PER_MINUTE >> 20) + " MiB/min reached; skipping '" + type + "' pushes");
+                return false;
+            }
+        }
         long chars = heldPushChars - (old == null ? 0 : old.length()) + body.length();
         // A replacement never grows the backlog by more than itself; new items wait for room
-        if (old == null && !heldPushes.isEmpty() && chars > MAX_FRAME_BYTES - ENVELOPE_OVERHEAD) return false;
+        if (old == null && !heldPushes.isEmpty() && chars > MAX_FRAME_BYTES - ENVELOPE_OVERHEAD) {
+            int limit = transport.framesPerWindow();
+            if (limit > 0 && clock.getAsLong() - lastBundleAt >= bundleIntervalMillis(limit)) {
+                flushLocked(limit);
+                chars = heldPushChars + body.length();
+            }
+            if (!heldPushes.isEmpty() && chars > MAX_FRAME_BYTES - ENVELOPE_OVERHEAD) return false;
+        }
         String ext = delivery == null ? null : type.substring(0, type.indexOf('.'));
         if (ext != null) {
             long held = extensionHeld.getOrDefault(ext, 0L) - (old == null ? 0 : old.length()) + body.length();
@@ -816,16 +884,21 @@ public final class EditorChannel {
         }
     }
 
-    /** Under {@link #sendLock}: held replies first, then one bundle when due and within the reserve. */
-    private void flushLocked(int limit) {
-        long now = clock.getAsLong();
+    /** Under {@link #sendLock}: drains held replies up to the frame window limit. */
+    private void flushRepliesLocked(int limit, long now) {
         while (!sentAt.isEmpty() && now - sentAt.peekFirst() >= ChannelTransport.FRAME_WINDOW_MILLIS) sentAt.pollFirst();
         while (!heldReplies.isEmpty() && sentAt.size() < limit) {
             String[] r = heldReplies.poll();
             if (sendFrame(r[0], r[1], r[2])) sentAt.addLast(now);
         }
+    }
+
+    /** Under {@link #sendLock}: held replies first, then one bundle when due and within the reserve. */
+    private void flushLocked(int limit) {
+        long now = clock.getAsLong();
+        flushRepliesLocked(limit, now);
         if (heldPushes.isEmpty() || !heldReplies.isEmpty()) return;
-        if (sentAt.size() >= Math.max(1, limit - REPLY_RESERVE) || now - lastBundleAt < BUNDLE_INTERVAL_MILLIS) return;
+        if (sentAt.size() >= Math.max(1, limit - REPLY_RESERVE) || now - lastBundleAt < bundleIntervalMillis(limit)) return;
         StringBuilder items = new StringBuilder();
         List<String> taken = new ArrayList<>();
         String single = null;

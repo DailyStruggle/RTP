@@ -159,6 +159,18 @@ def on_config(config):
     if adr_nav is not None and isinstance(config.get("nav"), list):
         config["nav"].append(adr_nav)
 
+    try:
+        import sys
+        repo_root = Path(__file__).parent
+        bot_dir = repo_root / "discord-support-bot"
+        if bot_dir.is_dir():
+            if str(bot_dir) not in sys.path:
+                sys.path.insert(0, str(bot_dir))
+            from web_relay_and_triage import export_web_corpus_json
+            export_web_corpus_json(out_path=repo_root / "docs" / "assets" / "support-corpus.json")
+    except Exception as exc:
+        import sys
+        sys.stderr.write(f"[mkdocs_hooks] warning: could not pre-export support-corpus.json: {exc}\n")
 
     return config
 
@@ -236,11 +248,23 @@ def on_post_page(output, page, config):
 
 
 def on_post_build(config):
-    """Drop noindex pages from sitemap.xml and its .gz twin.
+    """Drop noindex pages from sitemap.xml and its .gz twin, and export support-corpus.json.
 
     Listing a noindex page in the sitemap sends crawlers contradictory signals.
     """
     site_dir = Path(config["site_dir"])
+    try:
+        import sys
+        bot_dir = Path(__file__).parent / "discord-support-bot"
+        if bot_dir.is_dir():
+            if str(bot_dir) not in sys.path:
+                sys.path.insert(0, str(bot_dir))
+            from web_relay_and_triage import export_web_corpus_json
+            export_web_corpus_json(out_path=site_dir / "assets" / "support-corpus.json")
+    except Exception as exc:
+        import sys
+        sys.stderr.write(f"[mkdocs_hooks] warning: could not export site support-corpus.json: {exc}\n")
+
     sitemap = site_dir / "sitemap.xml"
     if not sitemap.is_file():
         return

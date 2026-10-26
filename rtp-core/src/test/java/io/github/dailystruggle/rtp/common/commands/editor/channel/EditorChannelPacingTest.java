@@ -222,4 +222,97 @@ class EditorChannelPacingTest {
         assertFalse(BytesocksTransport.channelGone(new IOException("Connection refused")));
         assertFalse(BytesocksTransport.channelGone(new IOException("status code 4000")));
     }
+
+    @Test
+    @DisplayName("ADR-106 / ADR-108: high-capacity and Pro relays negotiate higher frame shares, longer TTL, and faster bundle intervals")
+    void negotiatedHighRateRelayScalesBundleIntervalAndSnapshot() {
+        java.net.http.HttpHeaders defaultHeaders = java.net.http.HttpHeaders.of(java.util.Map.of(), (a, b) -> true);
+        assertEquals(BytesocksTransport.FRAMES_PER_WINDOW, BytesocksTransport.negotiatePluginFrameShare(defaultHeaders));
+        assertEquals(BytesocksTransport.DEFAULT_TTL_MILLIS, BytesocksTransport.negotiateSessionTtlMillis(defaultHeaders));
+
+        java.net.http.HttpHeaders proHeaders = java.net.http.HttpHeaders.of(
+                java.util.Map.of(
+                        "X-RTP-Frames-Per-Window", java.util.List.of("600"),
+                        "X-RTP-Session-TTL-Seconds", java.util.List.of("7200")
+                ),
+                (a, b) -> true
+        );
+        int proShare = BytesocksTransport.negotiatePluginFrameShare(proHeaders);
+        assertEquals(360, proShare, "60% of 600 frames/window allocated to plugin");
+        assertEquals(7_200_000L, BytesocksTransport.negotiateSessionTtlMillis(proHeaders));
+
+        assertEquals(EditorChannel.BUNDLE_INTERVAL_MILLIS, EditorChannel.bundleIntervalMillis(18));
+        assertEquals(2_000L, EditorChannel.bundleIntervalMillis(72));
+        assertEquals(500L, EditorChannel.bundleIntervalMillis(360));
+
+        InMemoryTransport[] pair = InMemoryTransport.pair();
+        pair[0].withFramesPerWindow(proShare);
+        EditorChannel proChannel = new EditorChannel(EditorChannel.newChannelId(), EditorKeys.generate(),
+                TrustedEditors.inMemory(), pair[0], (n, f) -> { }, now::get);
+        java.util.Map<String, Object> snap = proChannel.snapshotBlock();
+        assertEquals(360, snap.get("framesPerWindow"));
+        assertEquals(240, snap.get("pageFramesPerWindow"));
+        proChannel.close("done");
+    }
+
+    @Test
+    @DisplayName("ADR-106 / ADR-108: deferBundleFlush coalesces same-tick bursts, drains due bundles before backlog checks, and enforces byte-budget shedding on paced relays")
+    void sameTickCoalescingDueBundleDrainAndPacedByteBudgetShedding() {
+        InMemoryTransport[] pair = InMemoryTransport.pair();
+        pair[0].withFramesPerWindow(360);
+        EditorKeys keys = EditorKeys.generate();
+        EditorChannel pro = new EditorChannel(EditorChannel.newChannelId(), keys,
+                TrustedEditors.inMemory(), pair[0], (n, f) -> { }, now::get);
+        pro.declarePush("ext.latest", io.github.dailystruggle.rtp.api.editor.EditorDelivery.LATEST);
+        pro.declarePush("ext.ordered", io.github.dailystruggle.rtp.api.editor.EditorDelivery.ORDERED);
+        pro.start();
+        ChannelPageStub proPage = new ChannelPageStub(pair[1], pro.id(), keys.publicKey());
+
+        // 1. Same-tick batching via deferBundleFlush: curves, hazards, extensions, and feed leave in 1 single bundle
+        pro.deferBundleFlush(true);
+        assertTrue(pro.send("{\"type\":\"curve\",\"region\":\"alpha\",\"v\":1}"));
+        assertTrue(pro.send("{\"type\":\"curve\",\"region\":\"alpha\",\"v\":2}"));
+        assertTrue(pro.send("{\"type\":\"hazard-delta\",\"region\":\"alpha\",\"base\":0,\"version\":1}"));
+        assertTrue(pro.send("{\"type\":\"feed\",\"data\":{\"n\":1}}"));
+        assertTrue(pro.send("{\"type\":\"feed\",\"data\":{\"n\":2}}"));
+        assertTrue(pro.sendExtension("ext", "{\"type\":\"ext.latest\",\"v\":1}", null, "world"));
+        assertEquals(0, proPage.received.size(), "deferred tick pushes wait for flush()");
+        assertTrue(pro.send("{\"type\":\"apply-reply\",\"ok\":true}", proPage.fingerprint()), "targeted replies still leave immediately");
+        assertEquals(1, proPage.received.size(), "targeted reply arrived immediately");
+        pro.flush();
+        assertEquals(2, proPage.received.size(), "all pushes from the tick leave together as one bundle");
+        JsonObject firstBundle = proPage.last(EditorChannel.BUNDLE_TYPE);
+        assertNotNull(firstBundle);
+        assertEquals(4, firstBundle.getAsJsonArray("items").size());
+
+        // 2. Due-bundle drain before holdPush backlog check: fill backlog (~26 KiB), advance past 500ms interval,
+        // and send a 7 KiB extension push WITHOUT calling flush() first -> due bundle drains automatically.
+        String pad26k = "x".repeat(26_000);
+        assertTrue(pro.send("{\"type\":\"land\",\"world\":\"w\",\"pad\":\"" + pad26k + "\"}"));
+        assertEquals(1, pro.heldCount(), "held inside current 500ms interval");
+        now.addAndGet(EditorChannel.bundleIntervalMillis(360));
+        assertTrue(pro.sendExtension("ext", "{\"type\":\"ext.latest\",\"pad\":\"" + "a".repeat(7_000) + "\"}", null, "world"),
+                "due bundle from previous interval drains first so new push is not falsely refused");
+
+        // 3. Paced byte-budget shedding: over 120 x 500ms steps (60s), land defers at 75% (1.5 MiB/min)
+        // and feed at 100% (2 MiB/min), while curve and targeted replies deliver 100%.
+        now.addAndGet(60_000L);
+        pro.flush();
+        String pad16k = "z".repeat(16_000);
+        int landAccepted = 0, feedAccepted = 0, curveAccepted = 0, replyAccepted = 0;
+        for (int i = 0; i < 120; i++) {
+            now.addAndGet(500L);
+            pro.deferBundleFlush(true);
+            if (pro.send("{\"type\":\"land\",\"world\":\"w\",\"pad\":\"" + pad16k + "\"}")) landAccepted++;
+            if (pro.send("{\"type\":\"feed\",\"pad\":\"" + "f".repeat(10_000) + "\"}")) feedAccepted++;
+            if (pro.send("{\"type\":\"curve\",\"region\":\"r" + (i % 3) + "\",\"pad\":\"" + "c".repeat(2_000) + "\"}")) curveAccepted++;
+            if (pro.send("{\"type\":\"apply-reply\",\"ok\":true}", proPage.fingerprint())) replyAccepted++;
+            pro.flush();
+        }
+        assertTrue(landAccepted >= 40 && landAccepted <= 80, "land is shed first near 75% byte budget: " + landAccepted);
+        assertTrue(feedAccepted > landAccepted && feedAccepted < 120, "feed continues after land is deferred until 100% budget: " + feedAccepted);
+        assertEquals(120, curveAccepted, "non-droppable curve pushes are never shed by byte budget");
+        assertEquals(120, replyAccepted, "targeted replies are never shed by byte budget");
+        pro.close("done");
+    }
 }

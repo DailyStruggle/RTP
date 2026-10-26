@@ -812,6 +812,7 @@ class DiscordSupportBotTest(unittest.TestCase):
             llm_synthesizer=valid_llm,
         )
         d_valid = engine_with_valid_llm.handle_new_thread(post)
+        self.assert_non_negative_response(d_valid)
         self.assertIn("You can create a hexagon in two ways:", d_valid.reply_text)
         self.assertIn("REGIONS/#polygon", d_valid.reply_text)
 

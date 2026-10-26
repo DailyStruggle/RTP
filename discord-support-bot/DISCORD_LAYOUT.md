@@ -63,7 +63,7 @@ To fix this without losing years of searchable troubleshooting history:
 
 Defined in `discord-support-bot/embeds.json` under `pinned_forum_threads` and idempotently created/updated by `discord_setup.py`:
 
-1. **`Read First: How to get fast help (and /rtp test)`** - Explains how the closed-world doc bot works, how to run `/rtp version`, `/rtp info`, and `/rtp test` (`[RTP bit]` self-test), and the 4 items needed for bug escalation.
+1. **`Read First: How to get fast help (and /rtp test)`** - Explains how the deterministic docs & schema index works (every cited setting, `@range` bound, and `/rtp` command is verified against the shipped RTP schema, and the bot mutes itself automatically once the maintainer replies), how to run `/rtp version`, `/rtp info`, and `/rtp test` (`[RTP bit]` self-test), and the 4 items needed for bug escalation.
 2. **`Quick Fix: Setting Region Radius, Inner Spawn Hole & World Border`** - Covers `/rtp config regions default shape.radius=10km shape.centerRadius=1km`, `/rtp editor`, `/rtp admin setup`, `config.yml` vs. `definitions/regions/default.yml`, `worldBorderOverride: true`, and `RTP_SHAPE_RADIUS_NOT_ABOVE_CENTER`.
 3. **`Quick Fix: Toggling Bare /rtp GUI vs. Instant Teleport (openOnBareRtp)`** - Explains setting `openOnBareRtp: false` in `addons/guimenu.yml` (while keeping `/rtp gui` active) and why deleting the individual jar inside `plugins/RTP/addons/` is required rather than deleting the `addons/` folder.
 4. **`Quick Fix: 1-Command Migration from BetterRTP, EzRTP, or JustRTP (/rtp config import)`** - Covers `/rtp config import` dry-run preview, `overwrite=true`, `/rtp config import permissions apply=true`, and why per-world permissions (`requirePermission: false`) are not needed out of the box.

@@ -76,6 +76,9 @@ plugins:
 hooks:
   - mkdocs_hooks.py
 
+extra_javascript:
+  - assets/javascripts/rtp-support-doctor.js
+
 # Narrative + operator-facing pages are the hand-authored nav. The internal
 # engineering trees (dev/, adr/, architecture/) are still built so deep links
 # resolve, but mkdocs_hooks.py marks them noindex and drops them from the

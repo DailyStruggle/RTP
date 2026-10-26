@@ -1,6 +1,6 @@
 {
  "shipped": {
-  "advanced/biomes.yml": "# --- RTP Biome Filter (advanced) ---\n# Documentation: docs/admin/configuration/SAFETY.md\n\n# true = only land in the listed biomes. false = never land in them.\n# @type: boolean\n# @default: false\nbiomeWhitelist: false\n\n# The biomes the list above uses.\n# @type: list<biome>\n# @source: biome\nbiomes:\n  - \"OCEAN\"\n  - \"DEEP_OCEAN\"\n  - \"WARM_OCEAN\"\n  - \"LUKEWARM_OCEAN\"\n  - \"DEEP_LUKEWARM_OCEAN\"\n  - \"COLD_OCEAN\"\n  - \"DEEP_COLD_OCEAN\"\n  - \"FROZEN_OCEAN\"\n  - \"DEEP_FROZEN_OCEAN\"\n  - \"RIVER\"\n  - \"FROZEN_RIVER\"\n  - \"BEACH\"\n  - \"SNOWY_BEACH\"\n  - \"STONY_SHORE\"\n  - \"SWAMP\"\n  - \"MANGROVE_SWAMP\"\n  - \"SMALL_END_ISLANDS\"\n  - \"BASALT_DELTAS\"\n  - \"DRIPSTONE_CAVES\"\n  - \"LUSH_CAVES\"\n  - \"DEEP_DARK\"\n  - \"THE_VOID\"\n\n# --- Biome weighting ---\n# Pick each biome equally instead of by size. Needs biomeRecall.\n# @type: boolean\n# @default: false\nbiomeWeighted: false\n\n# How often each biome is picked (needs biomeWeighted).\n# 1.0 = normal, 2.0 = twice as often, 0.0 = never. Add modded biomes by id.\n# @type: map<string, number>\nbiomeWeights:\n  # Relative selection weight for this biome (1.0 = no bias).\n  # @type: number\n  # @range: [0.0, null]\n  # @default: 1.0\n  # --- Overworld ---\n  plains: 1.0\n  sunflower_plains: 1.0\n  snowy_plains: 1.0\n  ice_spikes: 1.0\n  desert: 1.0\n  swamp: 1.0\n  mangrove_swamp: 1.0\n  forest: 1.0\n  flower_forest: 1.0\n  birch_forest: 1.0\n  dark_forest: 1.0\n  old_growth_birch_forest: 1.0\n  old_growth_pine_taiga: 1.0\n  old_growth_spruce_taiga: 1.0\n  taiga: 1.0\n  snowy_taiga: 1.0\n  savanna: 1.0\n  savanna_plateau: 1.0\n  windswept_hills: 1.0\n  windswept_gravelly_hills: 1.0\n  windswept_forest: 1.0\n  windswept_savanna: 1.0\n  jungle: 1.0\n  sparse_jungle: 1.0\n  bamboo_jungle: 1.0\n  badlands: 1.0\n  eroded_badlands: 1.0\n  wooded_badlands: 1.0\n  meadow: 1.0\n  cherry_grove: 1.0\n  pale_garden: 1.0\n  grove: 1.0\n  snowy_slopes: 1.0\n  frozen_peaks: 1.0\n  jagged_peaks: 1.0\n  stony_peaks: 1.0\n  river: 1.0\n  frozen_river: 1.0\n  beach: 1.0\n  snowy_beach: 1.0\n  stony_shore: 1.0\n  warm_ocean: 1.0\n  lukewarm_ocean: 1.0\n  deep_lukewarm_ocean: 1.0\n  ocean: 1.0\n  deep_ocean: 1.0\n  cold_ocean: 1.0\n  deep_cold_ocean: 1.0\n  frozen_ocean: 1.0\n  deep_frozen_ocean: 1.0\n  mushroom_fields: 1.0\n  dripstone_caves: 1.0\n  lush_caves: 1.0\n  deep_dark: 1.0\n\n  # --- Nether ---\n  nether_wastes: 1.0\n  warped_forest: 1.0\n  crimson_forest: 1.0\n  soul_sand_valley: 1.0\n  basalt_deltas: 1.0\n\n  # --- The End ---\n  the_end: 1.0\n  end_highlands: 1.0\n  end_midlands: 1.0\n  small_end_islands: 1.0\n  end_barrens: 1.0\n\n  # --- Misc / technical ---\n  the_void: 1.0\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.0\n",
+  "advanced/biomes.yml": "# --- RTP Biome Filter (advanced) ---\n# Documentation: docs/admin/configuration/SAFETY.md\n\n# true = only land in the listed biomes (whitelist). false = never land in them (blacklist excluding ocean, sea, water, river, drown, and cave biomes).\n# @type: boolean\n# @default: false\nbiomeWhitelist: false\n\n# The biomes the list above skips or allows (default blacklist excludes ocean, sea, water, river, and cave biomes).\n# @type: list<biome>\n# @source: biome\nbiomes:\n  - \"OCEAN\"\n  - \"DEEP_OCEAN\"\n  - \"WARM_OCEAN\"\n  - \"LUKEWARM_OCEAN\"\n  - \"DEEP_LUKEWARM_OCEAN\"\n  - \"COLD_OCEAN\"\n  - \"DEEP_COLD_OCEAN\"\n  - \"FROZEN_OCEAN\"\n  - \"DEEP_FROZEN_OCEAN\"\n  - \"RIVER\"\n  - \"FROZEN_RIVER\"\n  - \"BEACH\"\n  - \"SNOWY_BEACH\"\n  - \"STONY_SHORE\"\n  - \"SWAMP\"\n  - \"MANGROVE_SWAMP\"\n  - \"SMALL_END_ISLANDS\"\n  - \"BASALT_DELTAS\"\n  - \"DRIPSTONE_CAVES\"\n  - \"LUSH_CAVES\"\n  - \"DEEP_DARK\"\n  - \"THE_VOID\"\n\n# --- Biome weighting ---\n# Pick each biome equally instead of by size. Needs biomeRecall.\n# @type: boolean\n# @default: false\nbiomeWeighted: false\n\n# How often each biome is picked (needs biomeWeighted).\n# 1.0 = normal, 2.0 = twice as often, 0.0 = never. Add modded biomes by id.\n# @type: map<string, number>\nbiomeWeights:\n  # Relative selection weight for this biome (1.0 = no bias).\n  # @type: number\n  # @range: [0.0, null]\n  # @default: 1.0\n  # --- Overworld ---\n  plains: 1.0\n  sunflower_plains: 1.0\n  snowy_plains: 1.0\n  ice_spikes: 1.0\n  desert: 1.0\n  swamp: 1.0\n  mangrove_swamp: 1.0\n  forest: 1.0\n  flower_forest: 1.0\n  birch_forest: 1.0\n  dark_forest: 1.0\n  old_growth_birch_forest: 1.0\n  old_growth_pine_taiga: 1.0\n  old_growth_spruce_taiga: 1.0\n  taiga: 1.0\n  snowy_taiga: 1.0\n  savanna: 1.0\n  savanna_plateau: 1.0\n  windswept_hills: 1.0\n  windswept_gravelly_hills: 1.0\n  windswept_forest: 1.0\n  windswept_savanna: 1.0\n  jungle: 1.0\n  sparse_jungle: 1.0\n  bamboo_jungle: 1.0\n  badlands: 1.0\n  eroded_badlands: 1.0\n  wooded_badlands: 1.0\n  meadow: 1.0\n  cherry_grove: 1.0\n  pale_garden: 1.0\n  grove: 1.0\n  snowy_slopes: 1.0\n  frozen_peaks: 1.0\n  jagged_peaks: 1.0\n  stony_peaks: 1.0\n  river: 1.0\n  frozen_river: 1.0\n  beach: 1.0\n  snowy_beach: 1.0\n  stony_shore: 1.0\n  warm_ocean: 1.0\n  lukewarm_ocean: 1.0\n  deep_lukewarm_ocean: 1.0\n  ocean: 1.0\n  deep_ocean: 1.0\n  cold_ocean: 1.0\n  deep_cold_ocean: 1.0\n  frozen_ocean: 1.0\n  deep_frozen_ocean: 1.0\n  mushroom_fields: 1.0\n  dripstone_caves: 1.0\n  lush_caves: 1.0\n  deep_dark: 1.0\n\n  # --- Nether ---\n  nether_wastes: 1.0\n  warped_forest: 1.0\n  crimson_forest: 1.0\n  soul_sand_valley: 1.0\n  basalt_deltas: 1.0\n\n  # --- The End ---\n  the_end: 1.0\n  end_highlands: 1.0\n  end_midlands: 1.0\n  small_end_islands: 1.0\n  end_barrens: 1.0\n\n  # --- Misc / technical ---\n  the_void: 1.0\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.0\n",
   "advanced/bit.yml": "# --- Built-In Test (BIT) Configuration ---\n# Documentation: docs/admin/configuration/BIT.md\n\n# Log structural action findings as warnings instead of blocking action registration.\n# Set true to prevent an action with an effective ERROR finding from registering.\n# @type: boolean\nstrictActions: false\n\n# Log configuration findings that older releases accepted as warnings, so /rtp reload is not rejected.\n# Set true to treat them as errors; a reload or Hot-Apply with any error keeps the running config.\n# @type: boolean\nstrictConfig: false\n\n# Minimum sample size before a gate is classified as never or always passing.\n# @type: integer\n# @range: [1, 100000]\n# @default: 200\ngateOutcomeSamples: 200\n\n# Scheduled startup BIT sweep executed asynchronously at tick +2.\n# @type: string\n# @options: [pbit, all, off]\n# @default: pbit\nstartupSweep: pbit\n\n# Live diagnostic coverage provider injected into RtpBit.RUNNER.\n# @type: string\n# @options: [auto, surface, jacoco, off]\n# @default: auto\ncoverage: auto\n\n# Severity overrides for registered BIT code keys; these take precedence over strictActions.\n# Allowed levels: ERROR, WARNING, INFO, DEBUG, TRACE and OFF. OFF suppresses the finding.\n# Unknown codes and levels are ignored and logged.\noverrides:\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1",
   "advanced/blocks.yml": "# --- RTP Landing Block Lists (advanced) ---\n# Documentation: docs/admin/configuration/SAFETY.md\n\n# Blocks you can stand in (counted as air). Use names or #minecraft:<tag>.\n# @type: list<material>\n# @source: material\nairBlocks:\n  - \"AIR\"\n  - \"CAVE_AIR\"\n  - \"VOID_AIR\"\n  - \"LEGACY_AIR\"\n  - \"STRUCTURE_VOID\"\n  - \"LIGHT\"\n  - \"#minecraft:flowers\"\n  - \"#minecraft:small_flowers\"\n\n  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members\n  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by\n  # #minecraft:flowers above.\n  - \"SHORT_GRASS\"\n  - \"TALL_GRASS\"\n  - \"SHORT_DRY_GRASS\"\n  - \"TALL_DRY_GRASS\"\n  - \"FERN\"\n  - \"LARGE_FERN\"\n  - \"DEAD_BUSH\"\n  - \"BUSH\"\n  - \"WILDFLOWERS\"\n  - \"FIREFLY_BUSH\"\n  - \"LEGACY_LONG_GRASS\"\n  - \"LEGACY_DEAD_BUSH\"\n  - \"#minecraft:saplings\"\n  - \"BROWN_MUSHROOM\"\n  - \"RED_MUSHROOM\"\n  - \"CRIMSON_FUNGUS\"\n  - \"WARPED_FUNGUS\"\n  - \"#minecraft:crops\"\n  - \"MELON_STEM\"\n  - \"PUMPKIN_STEM\"\n  - \"SUGAR_CANE\"\n  - \"BAMBOO_SAPLING\"\n  - \"VINE\"\n  - \"GLOW_LICHEN\"\n  - \"WEEPING_VINES\"\n  - \"TWISTING_VINES\"\n  - \"HANGING_ROOTS\"\n  - \"PALE_HANGING_MOSS\"\n  - \"RESIN_CLUMP\"\n  - \"#minecraft:rails\"\n  - \"REDSTONE_WIRE\"\n  - \"COMPARATOR\"\n  - \"REPEATER\"\n  - \"LEVER\"\n  - \"STRING\"\n  - \"TRIPWIRE\"\n  - \"TORCH\"\n  - \"WALL_TORCH\"\n  - \"SOUL_TORCH\"\n  - \"SOUL_WALL_TORCH\"\n  - \"REDSTONE_TORCH\"\n  - \"REDSTONE_WALL_TORCH\"\n  - \"END_ROD\"\n  - \"#minecraft:buttons\"\n  - \"#minecraft:pressure_plates\"\n  - \"#minecraft:standing_signs\"\n  - \"#minecraft:wall_signs\"\n  - \"#minecraft:ceiling_hanging_signs\"\n  - \"#minecraft:wall_hanging_signs\"\n  - \"LEGACY_SIGN\"\n  - \"LEGACY_WALL_SIGN\"\n  - \"SNOW\"\n  - \"MOSS_CARPET\"\n  - \"PALE_MOSS_CARPET\"\n  - \"LEAF_LITTER\"\n  - \"#minecraft:leaves\"\n\n# Blocks that make a spot unsafe (lava, hazards). Names, #minecraft:<tag>,\n# or state checks like \"LAVA[level<=3]\". See SAFETY.md for the full syntax.\n# @type: list<material>\n# @source: material\nunsafeBlocks:\n  - \"WATER\"\n  - \"LAVA\"\n  - \"BUBBLE_COLUMN\"\n  - \"*[waterlogged=true]\"\n  - \"#minecraft:fire\"\n  - \"POWDER_SNOW\"\n  - \"MAGMA_BLOCK\"\n  - \"#minecraft:campfires\"\n  - \"CACTUS\"\n  - \"SWEET_BERRY_BUSH\"\n  - \"WITHER_ROSE\"\n  - \"CHORUS_PLANT\"\n  - \"CHORUS_FLOWER\"\n  - \"POINTED_DRIPSTONE\"\n  - \"COBWEB\"\n  - \"CREAKING_HEART\"\n  - \"BEDROCK\"\n  - \"NETHER_PORTAL\"\n  - \"END_PORTAL\"\n  - \"END_GATEWAY\"\n  - \"TNT\"\n  - \"END_CRYSTAL\"\n  - \"RESPAWN_ANCHOR\"\n  - \"SEAGRASS\"\n  - \"TALL_SEAGRASS\"\n  - \"KELP\"\n  - \"KELP_PLANT\"\n  - \"#minecraft:logs\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.0\n",
   "advanced/database.yml": "# --- RTP Database / Persistence Configuration ---\n# Documentation: docs/admin/configuration/CORE_CONFIG.md\n\n# Where RTP saves its data.\ndatabase:\n  # Which database to use.\n  # @type: enum\n  # @options: [\"yaml\", \"sqlite\", \"mysql\", \"postgresql\"]\n  # @default: \"sqlite\"\n  type: \"sqlite\"\n\n  # Address. mysql/postgresql only.\n  # @type: string\n  host: \"127.0.0.1\"\n\n  # Port. mysql/postgresql only.\n  # @type: integer\n  # @range: [1, 65535]\n  port: 3306\n\n  # Database name. mysql/postgresql only.\n  # @type: string\n  name: \"rtp\"\n\n  # Username. mysql/postgresql only.\n  # @type: string\n  username: \"root\"\n\n  # Password. mysql/postgresql only.\n  # @type: string\n  password: \"password\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1\n",
@@ -11,18 +11,18 @@
   "advanced/messages/player.yml": "# --- RTP Player-Facing Messages ---\n# Strings a player sees directly: the teleport flow, command feedback sent to\n# the player, on-screen visuals, time-unit labels, command descriptions, and\n# the PlaceholderAPI status words.\n#\n# Formatting:\n#   - Bukkit legacy color codes (e.g. &a, &e, &c)\n#   - Hex color codes (e.g. #2636ef)\n#   - MiniMessage tags (e.g. <gradient:#5e4fa2:#f79459>, <rainbow>, <#rrggbb>)\n#     On Paper/Folia all MiniMessage tags are supported.\n#     On Spigot, gradient/rainbow/transition tags are expanded to per-character\n#     hex codes; other MiniMessage tags are stripped by the legacy pipeline.\n#   - PlaceholderAPI placeholders (when PAPI is installed)\n#\n# Placeholders:\n#   - Shared \"[Pn]\" placeholders (e.g. [P0], the RTP prefix) live in\n#     placeholders.yml and apply to every message in this file.\n#   - Per-message placeholders (e.g. [attempts], [world]) are documented inline\n#     above each message that uses them.\n\n# ###############################################################################\n# Section 1: Teleportation\n# ###############################################################################\n# when teleporting, say this\nalreadyTeleporting: \"&7[P0] ⚡ you're already teleporting!\"\n\n# when participant is already in an active session\nalreadyInSession: \"&c[P0] [player] is already in an active match session.\"\n\n# when an action subcommand (e.g. leave) is used outside a match of that action\nnotInSession: \"&c[P0] You are not in a match for this action.\"\n\n# if the plugin is currently reloading\nteleportDeniedReloading: \"&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly.\"\ndelayMessage: \"<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleporting in [delay]. Don't move</gradient>\"\nchunkLoading: \"&7[P0] ⚙ Loading chunks! please wait...\"\n# placeholders: [attempts], [processingTime], <distance>, <distance_blocks>\n# example: \"<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported <distance> blocks away in [attempts] attempts, in [processingTime]</gradient>\"\nteleportMessage: \"<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]</gradient>\"\n\n# if teleport is cancelled\nteleportCancel: \"&7[P0] ⚡ Teleport cancelled!\"\n\n# Sent when the optional PvP combat check refuses /rtp because the player is in combat\npvpInCombat: \"&c[P0] You cannot random-teleport while in combat.\"\n\n# if no safe places after reaching max attempts\n# placeholder: [attempts] - the maximum number of attempts\nunsafe: \"&7[P0] ⌖ could not find a safe location within [attempts] attempts\"\n\n# when the player is on cooldown\n# placeholder: [remainingCooldown] - the remaining time\ncooldownMessage: \"&7[P0] ⚡ You can't teleport again for [remainingCooldown]\"\n\n# when the player has reached the lockAfterUses cap and is locked out (BetterRTP LockAfter parity)\n# placeholder: [remainingLockTime] - time left until the lockAfterResetSeconds window resets.\n# Resolves to empty when no reset window is configured (an absolute cap); if you run an\n# absolute cap, reword this without the placeholder (e.g. \"Please try again later.\").\nlockedAfterUses: \"&7[P0] ⌖ You have reached your random-teleport limit. Try again in [remainingLockTime].\"\n\n# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission\nnoLocationsQueued: \"#f5eb73[P0] ⌖ no locations ready at this time\"\n\n# when the queue line shifts\n# placeholder: [spot] - the current position in line\nqueueUpdate: \"#2636ef[P0] your spot in line: [spot]\"\n\n# if the player doesn't have enough money to teleport in the region\n# placeholder: [money] - how much money is required for the command\nnotEnoughMoney: \"&7[P0] you need at least $[money] for that.\"\n\n# ###############################################################################\n# Section 2: Command Feedback\n# ###############################################################################\n# Player- and console-facing responses to a command attempt (sent directly to\n# whoever ran the command), distinct from the operator lifecycle logs in\n# system.yml.\n# world doesn't exist in bukkit\n# placeholder: [world] - the world name\ninvalidWorld: \"&7[P0] could not find world '[world]'\"\n\n# no previous location saved for /rtp back\nnoBackLocation: \"&c[P0] No previous teleport location found.\"\n\n# successfully teleported back\nbackSuccess: \"<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Returned to previous location.</gradient>\"\n\n# plugin doesn't have the command the user requested\n# placeholder: [arg] - the argument attempted\nbadArg: \"&c[P0] invalid command argument [arg]\"\n\n# plugin doesn't have the subcommand or parameter the user requested\n# placeholder: [arg] - the argument attempted\ninvalidCommand: \"&c[P0] invalid command - [arg]\"\n\n# user doesn't have permission for the command requested\nnoPerms: \"&7I'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error.\"\n\n# plugin is busy reloading\nbusy: \"&c[P0] busy\"\n\n# when the console tries to run a command meant only for players\nconsoleCmdNotAllowed: \"&c[P0] You must be an in-game player to execute this command.\"\n\n# ###############################################################################\n# Section 4: Visuals\n# ###############################################################################\n# title settings\n# remove or set title to \"\" to disable\n# PlaceholderAPI is recommended for coordinates\ntitle: \"<rainbow>Teleported!</rainbow>\"\nsubtitle: \"<gradient:#A78BFA:#E876A0>have fun!</gradient>\"\nfadeIn: 20\nstay: 20\nfadeOut: 20\n\n# actionbar setting\nactionbar: \"\"\n\n# ###############################################################################\n# Section 5: Time Formatting\n# ###############################################################################\n# for time placeholders, what to call days, hours, minutes, seconds, and milliseconds\ndays: \"d\"\nhours: \"h\"\nminutes: \"m\"\nseconds: \"s\"\nmillis: \"ms\"\n\n# ###############################################################################\n# Section 6: Command Descriptions\n# ###############################################################################\n# shown in help command\nrtp: \"&b/rtp - teleport to a random location\"\nrtp_description: \"teleport to a random location\"\nhelp: \"&b/rtp help - see this\"\nhelp_description: \"describe commands\"\nreload: \"&b/rtp reload - reload config files\"\nreload_description: \"reload config files\"\nscan: \"&b/rtp scan - try all possible region placements to improve load times\"\nscan_description: \"clear stored data and try all possible region placements\"\nconfig_description: \"update configuration files at runtime\"\ninfo_description: \"check the current state of the plugin\"\ntest_description: \"test RTP functions\"\n\n# ###############################################################################\n# Section 12: PlaceholderAPI Support\n# ###############################################################################\n# status placeholders for players\nPLAYER_AVAILABLE: \"&aAVAILABLE\"\nPLAYER_COOLDOWN: \"#9D7CD8ON COOLDOWN\"\nPLAYER_SETUP: \"&bPICKING A LOCATION\"\nPLAYER_LOADING: \"&bLOADING CHUNKS\"\nPLAYER_TELEPORTING: \"&bTELEPORTING\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.0\n",
   "advanced/messages/system.yml": "# --- RTP System / Logging / Control Messages ---\n# Admin/console lifecycle notices, administrative log lines, plugin metadata,\n# and developer options. Not shown to ordinary players.\n#\n# Formatting and shared [Pn] placeholders follow the same rules as player.yml.\n\n# ###############################################################################\n# Section 10: System & Management\n# ###############################################################################\n# Admin/console lifecycle notices (config version bumps, world detection, reload\n# and update progress). Not shown to ordinary players.\n# a configuration file 'version' is lower than the latest\n# placeholder: [filename] - name of file, including file extension\noldFile: \"&b[P0] old [filename] detected. Updating\"\n\n# detected a bukkit world that isn't in the config file\n# placeholder: [world] - the world detected\nnewWorld: \"&b[P0] detected a new world '[world]'\"\n\n# plugin reload/update text\n# placeholder: [filename] - name of file\nreloading: \"&b[P0] loading [filename]...\"\nreloaded: \"&b[P0] successfully loaded [filename].\"\nreloadFailed: \"&c[P0] Failed to reload configs. Check the server log.\"\n# Sent when /rtp reload (or Hot-Apply) is rejected by config PBIT; the running config is kept.\n# Placeholders: [count] error count, [code] [source] [path] of the first error.\nreloadRejected: \"&c[P0] Reload rejected: [count] config error(s); the running config is kept. First: [code] in [source] at [path]. Details: /rtp test subsystem=config\"\nupdating: \"&a[P0] updating [filename]...\"\nupdated: \"&a[P0] successfully updated [filename].\"\n\n# ###############################################################################\n# Section 11: Administrative Logs\n# ###############################################################################\n# logged when locations are saved/loaded from database\n# placeholder: [amount] - number of locations\n# placeholder: [region] - name of region\nlocationSaved: \"&7[P0] Successfully saved [amount] locations for [region]\"\nlocationLoaded: \"&7[P0] Successfully loaded [amount] locations for [region]\"\n\n# ###############################################################################\n# Section 14: Developer Options\n# ###############################################################################\n# set to true to append a dev tag (e.g. §8(RTP:ClassName)) to every message\nshowDevTag: false\n\n# ###############################################################################\n# Section 13: Metadata\n# ###############################################################################\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.2\n",
   "advanced/metrics.yml": "# --- RTP Metrics Settings ---\n# Documentation: docs/admin/configuration/METRICS.md\n\n# Report per-region detail on Folia. Does nothing on other platforms.\n# @type: boolean\n# @default: true\nfoliaIncludeRegions: true\n\n# How to combine per-region TPS on Folia.\n# @type: enum\n# @options: [mean, max]\n# @default: mean\nfoliaAggregationTps: \"mean\"\n\n# How to combine per-region MSPT on Folia.\n# @type: enum\n# @options: [mean, max]\n# @default: max\nfoliaAggregationMspt: \"max\"\n\n# How to combine per-region tick budget on Folia.\n# @type: enum\n# @options: [mean, max]\n# @default: max\nfoliaAggregationTickBudget: \"max\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1\n",
-  "advanced/network.yml": "# RTP Network Mode (multi-server / proxy). Documentation: docs/admin/proxies/CONFIGURATION.md\n\n# Off by default. Set network.enabled true to use it.\nnetwork:\n  # false = this file is ignored (no network).\n  # @type: boolean\n  # @default: false\n  enabled: false\n\n  # This server's unique name. Needed when enabled. Don't reuse it.\n  # @type: string\n  # @default: \"\"\n  serverId: \"\"\n\n  # Env var that holds the shared secret. Needed for redis.\n  # @type: string\n  # @default: \"RTP_NET_SECRET\"\n  secretEnv: \"RTP_NET_SECRET\"\n\n  # true = run plugin-message / proxy-cache / auto without the secret. Clients can then fake server data.\n  # @type: boolean\n  # @default: false\n  allowUnsigned: false\n\n# Backing store for cross-process state.\ntransport:\n  # How servers share data.\n  # @type: enum\n  # @options: [\"auto\", \"plugin-message\", \"in-memory\", \"sql\", \"redis\"]\n  # @default: \"auto\"\n  type: \"auto\"\n  pluginMessage:\n    # Proxy message channel. Leave as-is unless your proxy differs.\n    # @type: string\n    # @default: \"bungeecord:main\"\n    channel: \"bungeecord:main\"\n  redis:\n    # Redis address shared by all servers (needed for redis).\n    # @type: string\n    # @default: \"localhost\"\n    host: \"localhost\"\n\n    # Redis port.\n    # @type: integer\n    # @default: 6379\n    port: 6379\n\n    # Redis password. Empty = none.\n    # @type: string\n    # @default: \"\"\n    password: \"\"\n\n# How servers tell each other they're alive.\nheartbeat:\n  # How often to report this server (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 1000\n  intervalMs: 1000\n\n  # How long a server is trusted after its last report (ms). Keep above intervalMs.\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 5000\n  staleAfterMs: 5000\n\n# How /rtp picks a server.\nrouting:\n  # local = this server, auto = here first then others, always = always others.\n  # @type: enum\n  # @options: [\"local\", \"auto\", \"always\"]\n  # @default: \"local\"\n  mode: \"local\"\n\n  # Cross-server dispatch mechanism.\n  # direct-db = direct backend-to-backend dispatch over SQL/Redis with native proxy Connect (no proxy plugin needed).\n  # proxy-broker = enqueue to NetworkRequestQueue; proxy companion dequeues and routes.\n  # auto = auto-select proxy-broker if proxy companion detected or proxy-direct; direct-db if SQL/Redis without proxy companion.\n  # @type: enum\n  # @options: [\"auto\", \"direct-db\", \"proxy-broker\"]\n  # @default: \"auto\"\n  dispatchMode: \"auto\"\n\n  # true = this server only sends players to other servers.\n  # @type: boolean\n  # @default: false\n  lobbyMode: false\n\n# Line of players waiting for a cross-server teleport.\nqueue:\n  # Most players that can wait before new /rtp is refused.\n  # @type: integer\n  # @default: 50\n  maxDepth: 50\n\n  # How often to send updates (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 250\n  flushIntervalMs: 250\n\n  # How often to refresh each player's progress (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 1000\n  pollIntervalMs: 1000\n\n  # Cancel non-terminal entries whose last status update is this old (ms). 0 = off.\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 0\n  entryTtlMs: 0\n\n  # Max cross-server /rtp per second.\n  # @type: number\n  # @default: 5\n  crossServerRequestsPerSecond: 5\n\n  # Short burst allowance on top of the rate above.\n  # @type: number\n  # @default: 10\n  crossServerRequestsBurst: 10\n\n  # Proxy worker threads. Raise only if one is too busy.\n  # @type: integer\n  # @default: 1\n  workerThreads: 1\n\n# Held spots for traveling players.\nreservation:\n  # How often to clean up expired holds (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 30000\n  reapIntervalMs: 30000\n\n  # How long a held spot lasts before it's freed (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 60000\n  ttlMs: 60000\n\n# What to do if two servers share a region name. Only `warn` works.\nregionCollision:\n  # Action at startup.\n  # @type: enum\n  # @options: [\"warn\", \"rename-local\", \"reject-startup\"]\n  # @default: \"warn\"\n  policy: \"warn\"\n\n# Optional per-server rules (matched by serverId). Leave commented for most setups.\n# servers:\n#  example-backend:\n#    # Permission required to target this destination (empty = none).\n#    # @type: string\n#    # @default: \"\"\n#    permission: \"\"\n#    # Label shown in menus / suggestions (default: serverId).\n#    # @type: string\n#    # @default: \"\"\n#    display-name: \"Example\"\n#    # Hide from tab-completion when it has no servable region.\n#    # @type: boolean\n#    # @default: false\n#    hide-when-unavailable: false\n#    # Allow targeting it even when it reports no servable region.\n#    # @type: boolean\n#    # @default: true\n#    allow-when-unavailable: true\n# Picks the best server for a plain /rtp. Lowest score wins. Documentation: docs/admin/proxies/CONFIGURATION.md\nloadBalancer:\n  # Weight of the built-in scarcity term. 0 = the `region` term handles it.\n  # @type: number\n  # @default: 0\n  regionScarcityWeight: 0\n\n  # One scoring rule per metric (input + weight + curve).\n  terms:\n    # Tick pressure; sigmoid knee at 0.6.\n    mspt:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"mspt\"\n      input: \"mspt\"\n\n      # Term weight.\n      # @type: number\n      # @default: 1.0\n      weight: 1.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"sigmoid\"\n        type: \"sigmoid\"\n\n        # Steepness.\n        # @type: number\n        # @range: [0.1, 20]\n        # @default: 8.0\n        k: 8.0\n\n        # Midpoint.\n        # @type: number\n        # @range: [0, 1]\n        # @default: 0.6\n        x0: 0.6\n\n    # Queue depth; small queues silent, large ones explode.\n    queue:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"queueDepth\"\n      input: \"queueDepth\"\n\n      # Term weight.\n      # @type: number\n      # @default: 1.0\n      weight: 1.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"exponential\"\n        type: \"exponential\"\n\n        # Steepness.\n        # @type: number\n        # @range: [0.1, 20]\n        # @default: 3.0\n        k: 3.0\n\n    # Heap gate; fires at >= 85% used.\n    heap:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"heapUsed\"\n      input: \"heapUsed\"\n\n      # Term weight.\n      # @type: number\n      # @default: 5.0\n      weight: 5.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"step\"\n        type: \"step\"\n\n        # Step threshold.\n        # @type: number\n        # @range: [0, 1]\n        # @default: 0.85\n        threshold: 0.85\n\n    # Region gate; fires when the kept pool is >= 95% full.\n    region:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"keptRegion\"\n      input: \"keptRegion\"\n\n      # Term weight.\n      # @type: number\n      # @default: 5.0\n      weight: 5.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"step\"\n        type: \"step\"\n\n        # Step threshold.\n        # @type: number\n        # @range: [0, 1]\n        # @default: 0.95\n        threshold: 0.95\n\n    # Gentle tie-breaker on kept count.\n    kept:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"keptCount\"\n      input: \"keptCount\"\n\n      # Term weight.\n      # @type: number\n      # @default: 0.25\n      weight: 0.25\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"logarithmic\"\n        type: \"logarithmic\"\n\n        # Steepness.\n        # @type: number\n        # @range: [0.1, 20]\n        # @default: 9.0\n        k: 9.0\n\n# Web editor (/rtp editor) services. Leave blank to use the built-in defaults.\neditor:\n  # Upload store for editor sessions. Default: https://bytebin.lucko.me\n  # @type: string\n  bytebinUrl: \"\"\n\n  # Live-update relay (bytesocks-compatible). Default: https://usersockets.luckperms.net\n  # Point this at your own bytesocks server to avoid depending on a public one.\n  # @type: string\n  relayUrl: \"\"\n\n  # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).\n  trust:\n    # Days a browser stays trusted after /rtp editor trust. 0 = never expires.\n    # Supports duration units (e.g. 24h, 1d).\n    # @type: integer\n    # @default: 0\n    maxAgeDays: 0\n\n# Config schema version (do not edit).\nversion: 1.1\n",
-  "advanced/performance.yml": "# --- RTP Performance Settings ---\n# Documentation: docs/admin/configuration/PERFORMANCE.md\n\n# --- Server health ---\n# Adapts background compute, promotion rate, hot-cache size, and generation concurrency to server headroom and demand.\n# Configured values below act as ceilings while active. Set false to run at fixed configured values.\n# @type: boolean\n# @default: true\nautoTune: true\n\n# Pause background cache filling when TPS drops below this. On Folia the\n# slowest region counts. Waiting players are still served. 0 = off.\n# @type: number\n# @range: [0.0, 20.0]\n# @default: 19.0\nminTPS: 19.0\n\n# Pause background cache filling when a tick takes longer than this (ms).\n# Catches lag that TPS hides (TPS stays 20 up to 50 ms). 0 = off.\n# @type: number\n# @range: [0.0, null]\n# @unit: ms\n# @default: 45.0\nmaxMSPT: 45.0\n\n# Pause cache filling when memory use passes this %. 0/100 = off.\n# @type: number\n# @range: [0.0, 100.0]\n# @default: 85.0\nmaxHeapPercent: 85.0\n\n# How many spots to try per /rtp before giving up.\n# @type: integer\n# @range: [1, null]\n# @default: 32\nmaxAttempts: 32\n\n# Ticks between refills of the same region. Regions take turns.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [1, null]\n# @unit: ticks\n# @default: 20\nperiod: 20\n\n# Max ms per tick for main-thread work. Capped at 25.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [1, 25]\n# @unit: ms\n# @default: 5\nsyncAllottedTime: 5\n\n# Max ms per pulse for background work. Capped at 25.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [1, 25]\n# @unit: ms\n# @default: 25\nasyncAllottedTime: 25\n\n# --- View-distance smoothing ---\n# Chunks loaded around a spot while searching. 0 = just the spot.\n# @type: integer\n# @range: [0, null]\n# @unit: chunks\n# @default: 0\nviewDistanceSelect: 0\n\n# Chunks loaded around the final spot before teleport. 0 = just the spot.\n# @type: integer\n# @range: [0, null]\n# @unit: chunks\n# @default: 0\nviewDistanceTeleport: 0\n\n# Ticks to ease view distance back to normal after arrival. 0 = off.\n# NOTE: Temporarily forced to 0. The gradual restore causes client-side\n# flashing / re-rendering on arrival. Leave at 0 until further notice.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: ticks\n# @default: 200\nviewDistanceRestoreInterval: 0\n\n# --- Caching / pre-fill ---\n# Refill the cache right after a teleport.\n# @type: boolean\n# @default: false\npostTeleportQueueing: false\n\n# Learn biomes from chunks already loaded (no extra work).\n# @type: boolean\n# @default: true\ncheckOnChunkLoads: true\n\n# Refill the backlog when it drops to this fraction. 0.5 = at 50%.\n# @type: number\n# @range: [0.0, 1.0]\n# @default: 0.5\nbacklogRefillThreshold: 0.5\n\n# Backlog Candidate Generation Strategy.\n# FLAT_STRIDE = Uses the same 1D Hilbert dyadic-stride Feistel permutation as live/uncached selection.\n# BINNED_AMORTIZED = Uses region-file binned PRP with amortized batch quotas and within-bin dyadic stride.\n# @type: string\n# @options: [\"FLAT_STRIDE\", \"BINNED_AMORTIZED\"]\n# @default: \"FLAT_STRIDE\"\nbacklogGenerationStrategy: \"FLAT_STRIDE\"\n\n# Chance to skip new (ungenerated) land. 0 = don't care, 1 = avoid it.\n# @type: number\n# @range: [0.0, 1.0]\n# @default: 0.0\npregeneratedPreference: 0.0\n\n# Keep spare spots ready for players joining the server.\n# @type: boolean\n# @default: false\nloginCacheEnabled: false\n\n# Max size of the join-spot cache. 0 = auto (max players).\n# @type: integer\n# @range: [0, null]\n# @default: 0\nloginCacheCap: 0\n\n# --- Biome recall ---\n# Reuse saved biome spots from the cache.\n# @type: boolean\n# @default: true\nbiomeRecall: true\n\n# Only use cached biome spots, never search for new ones. Needs biomeRecall.\n# @type: boolean\n# @default: false\nbiomeRecallForced: false\n\n# --- Auditing counters ---\n# Warn when a teleport takes longer than this (ms). 0 or less = off.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: ms\n# @default: 5000\nslowPipelineThresholdMs: 5000\n\n# Warn when this many players are waiting. 0 or less = off.\n# @type: integer\n# @range: [0, null]\n# @unit: players\n# @default: 0\nqueueGrowthWarnThreshold: 0\n\n# --- Advanced (rarely touched) ---\n# Load chunks on the main thread. NOT RECOMMENDED (causes lag).\n# @type: boolean\n# @default: false\nsyncLoading: false\n\n# Teleport path on Paper. AUTO = same-tick teleport when the spot's chunk is\n# already loaded, else teleportAsync. ASYNC = always teleportAsync (one tick slower).\n# @type: string\n# @options: [\"AUTO\", \"ASYNC\"]\n# @default: \"AUTO\"\nteleportPath: \"AUTO\"\n\n# Re-read permissions every event instead of caching them.\n# @type: boolean\n# @default: false\nonEventParsing: false\n\n# Parse effect permission nodes at startup.\n# @type: boolean\n# @default: true\neffectParsing: true\n\n# Enable background data gathering for visitor analytics.\n# @type: boolean\n# @default: false\nvisitorEnabled: false\n\n# Settings for /rtp admin prefab. Keeps backups of changed files.\nprefab:\n  # How many backups to keep per file.\n  # @type: integer\n  # @range: [1, null]\n  # @default: 3\n  bakRetention: 3\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1\n",
+  "advanced/network.yml": "# RTP Network Mode (multi-server / proxy). Documentation: docs/admin/proxies/CONFIGURATION.md\n\n# Off by default. Set network.enabled true to use it.\nnetwork:\n  # false = this file is ignored (no network).\n  # @type: boolean\n  # @default: false\n  enabled: false\n\n  # This server's unique name. Needed when enabled. Don't reuse it.\n  # @type: string\n  # @default: \"\"\n  serverId: \"\"\n\n  # Env var that holds the shared secret. Needed for redis.\n  # @type: string\n  # @default: \"RTP_NET_SECRET\"\n  secretEnv: \"RTP_NET_SECRET\"\n\n  # true = run plugin-message / proxy-cache / auto without the secret. Clients can then fake server data.\n  # @type: boolean\n  # @default: false\n  allowUnsigned: false\n\n# Backing store for cross-process state.\ntransport:\n  # How servers share data.\n  # @type: enum\n  # @options: [\"auto\", \"plugin-message\", \"in-memory\", \"sql\", \"redis\"]\n  # @default: \"auto\"\n  type: \"auto\"\n  pluginMessage:\n    # Proxy message channel. Leave as-is unless your proxy differs.\n    # @type: string\n    # @default: \"bungeecord:main\"\n    channel: \"bungeecord:main\"\n  redis:\n    # Redis address shared by all servers (needed for redis).\n    # @type: string\n    # @default: \"localhost\"\n    host: \"localhost\"\n\n    # Redis port.\n    # @type: integer\n    # @default: 6379\n    port: 6379\n\n    # Redis password. Empty = none.\n    # @type: string\n    # @default: \"\"\n    password: \"\"\n\n# How servers tell each other they're alive.\nheartbeat:\n  # How often to report this server (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 1000\n  intervalMs: 1000\n\n  # How long a server is trusted after its last report (ms). Keep above intervalMs.\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 5000\n  staleAfterMs: 5000\n\n# How /rtp picks a server.\nrouting:\n  # local = this server, auto = here first then others, always = always others.\n  # @type: enum\n  # @options: [\"local\", \"auto\", \"always\"]\n  # @default: \"local\"\n  mode: \"local\"\n\n  # Cross-server dispatch mechanism.\n  # direct-db = direct backend-to-backend dispatch over SQL/Redis with native proxy Connect (no proxy plugin needed).\n  # proxy-broker = enqueue to NetworkRequestQueue; proxy companion dequeues and routes.\n  # auto = auto-select proxy-broker if proxy companion detected or proxy-direct; direct-db if SQL/Redis without proxy companion.\n  # @type: enum\n  # @options: [\"auto\", \"direct-db\", \"proxy-broker\"]\n  # @default: \"auto\"\n  dispatchMode: \"auto\"\n\n  # true = this server only sends players to other servers.\n  # @type: boolean\n  # @default: false\n  lobbyMode: false\n\n# Line of players waiting for a cross-server teleport.\nqueue:\n  # Most players that can wait before new /rtp is refused.\n  # @type: integer\n  # @default: 50\n  maxDepth: 50\n\n  # How often to send updates (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 250\n  flushIntervalMs: 250\n\n  # How often to refresh each player's progress (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 1000\n  pollIntervalMs: 1000\n\n  # Cancel non-terminal entries whose last status update is this old (ms). 0 = off.\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 0\n  entryTtlMs: 0\n\n  # Max cross-server /rtp per second.\n  # @type: number\n  # @default: 5\n  crossServerRequestsPerSecond: 5\n\n  # Short burst allowance on top of the rate above.\n  # @type: number\n  # @default: 10\n  crossServerRequestsBurst: 10\n\n  # Proxy worker threads. Raise only if one is too busy.\n  # @type: integer\n  # @default: 1\n  workerThreads: 1\n\n# Held spots for traveling players.\nreservation:\n  # How often to clean up expired holds (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 30000\n  reapIntervalMs: 30000\n\n  # How long a held spot lasts before it's freed (ms).\n  # Supports duration units (e.g. 24h, 1d).\n  # @type: integer\n  # @default: 60000\n  ttlMs: 60000\n\n# What to do if two servers share a region name. Only `warn` works.\nregionCollision:\n  # Action at startup.\n  # @type: enum\n  # @options: [\"warn\", \"rename-local\", \"reject-startup\"]\n  # @default: \"warn\"\n  policy: \"warn\"\n\n# Optional per-server rules (matched by serverId). Leave commented for most setups.\n# servers:\n#  example-backend:\n#    # Permission required to target this destination (empty = none).\n#    # @type: string\n#    # @default: \"\"\n#    permission: \"\"\n#    # Label shown in menus / suggestions (default: serverId).\n#    # @type: string\n#    # @default: \"\"\n#    display-name: \"Example\"\n#    # Hide from tab-completion when it has no servable region.\n#    # @type: boolean\n#    # @default: false\n#    hide-when-unavailable: false\n#    # Allow targeting it even when it reports no servable region.\n#    # @type: boolean\n#    # @default: true\n#    allow-when-unavailable: true\n# Picks the best server for a plain /rtp. Lowest score wins. Documentation: docs/admin/proxies/CONFIGURATION.md\nloadBalancer:\n  # Weight of the built-in scarcity term. 0 = the `region` term handles it.\n  # @type: number\n  # @default: 0\n  regionScarcityWeight: 0\n\n  # One scoring rule per metric (input + weight + curve).\n  terms:\n    # Tick pressure; sigmoid knee at 0.6.\n    mspt:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"mspt\"\n      input: \"mspt\"\n\n      # Term weight.\n      # @type: number\n      # @default: 1.0\n      weight: 1.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"sigmoid\"\n        type: \"sigmoid\"\n\n        # Steepness.\n        # @type: number\n        # @range: [0.1, 20]\n        # @default: 8.0\n        k: 8.0\n\n        # Midpoint.\n        # @type: number\n        # @range: [0, 1]\n        # @default: 0.6\n        x0: 0.6\n\n    # Queue depth; small queues silent, large ones explode.\n    queue:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"queueDepth\"\n      input: \"queueDepth\"\n\n      # Term weight.\n      # @type: number\n      # @default: 1.0\n      weight: 1.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"exponential\"\n        type: \"exponential\"\n\n        # Steepness.\n        # @type: number\n        # @range: [0.1, 20]\n        # @default: 3.0\n        k: 3.0\n\n    # Heap gate; fires at >= 85% used.\n    heap:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"heapUsed\"\n      input: \"heapUsed\"\n\n      # Term weight.\n      # @type: number\n      # @default: 5.0\n      weight: 5.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"step\"\n        type: \"step\"\n\n        # Step threshold.\n        # @type: number\n        # @range: [0, 1]\n        # @default: 0.85\n        threshold: 0.85\n\n    # Region gate; fires when the kept pool is >= 95% full.\n    region:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"keptRegion\"\n      input: \"keptRegion\"\n\n      # Term weight.\n      # @type: number\n      # @default: 5.0\n      weight: 5.0\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"step\"\n        type: \"step\"\n\n        # Step threshold.\n        # @type: number\n        # @range: [0, 1]\n        # @default: 0.95\n        threshold: 0.95\n\n    # Gentle tie-breaker on kept count.\n    kept:\n      # Metric input.\n      # @type: enum\n      # @options: [\"mspt\", \"queueDepth\", \"heapUsed\", \"heapFree\", \"playerCount\", \"keptCount\", \"tps\", \"keptRegion\"]\n      # @default: \"keptCount\"\n      input: \"keptCount\"\n\n      # Term weight.\n      # @type: number\n      # @default: 0.25\n      weight: 0.25\n      curve:\n        # Curve type.\n        # @type: enum\n        # @options: [\"linear\", \"exponential\", \"logarithmic\", \"sigmoid\", \"step\", \"power\"]\n        # @default: \"logarithmic\"\n        type: \"logarithmic\"\n\n        # Steepness.\n        # @type: number\n        # @range: [0.1, 20]\n        # @default: 9.0\n        k: 9.0\n\n# Web editor (/rtp editor) services. Leave blank to use the built-in defaults.\neditor:\n  # Upload store for editor sessions. Default: https://bytebin.lucko.me\n  # @type: string\n  bytebinUrl: \"\"\n\n  # Live-update relay (bytesocks-compatible). Default: https://usersockets.luckperms.net\n  # Point this at your own bytesocks server to avoid depending on a public one.\n  # @type: string\n  relayUrl: \"\"\n\n  # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).\n  trust:\n    # Days a browser stays trusted after /rtp editor trust. 0 = never expires.\n    # Supports duration units (e.g. 24h, 1d).\n    # @type: integer\n    # @default: 0\n    maxAgeDays: 0\n\n# Cross-backend metric time-series publication (ADR-040).\nmetrics:\n  networkTimeSeries:\n    # Publish condensed metric buckets to the shared network store.\n    # @type: boolean\n    # @default: false\n    publish: false\n\n    # Condensed tier to publish cross-backend.\n    # @type: string\n    # @default: \"24h@1m\"\n    tier: \"24h@1m\"\n\n    # Days to retain published metric buckets for this backend.\n    # @type: integer\n    # @range: [1, null]\n    # @default: 7\n    retentionDays: 7\n\n    # Maximum metric bucket rows written per periodic flush pass.\n    # @type: integer\n    # @range: [1, null]\n    # @default: 64\n    perPassWriteCap: 64\n\n# Config schema version (do not edit).\nversion: 1.1\n",
+  "advanced/performance.yml": "# --- RTP Performance Settings ---\n# Documentation: docs/admin/configuration/PERFORMANCE.md\n\n# --- Server health ---\n# Relative adaptive scaler: scales background compute, promotion rate, hot-cache size, and generation concurrency relative to the configured baselines below (`syncAllottedTime`, `asyncAllottedTime`, `period`, `activeChunkCap`) based on live MSPT and heap telemetry to prevent lag and TPS drops (keep true; invisible to players while the hot queue stays populated).\n# Set false to run at fixed configured values.\n# @type: boolean\n# @default: true\nautoTune: true\n\n# Pause background cache filling when TPS drops below this to prevent server lag (raise toward 19.5 to pause earlier). On Folia the\n# slowest region counts. Waiting players are still served. 0 = off.\n# @type: number\n# @range: [0.0, 20.0]\n# @default: 19.0\nminTPS: 19.0\n\n# Pause background cache filling when a tick takes longer than this in ms (lower toward 35.0-40.0 to pause background work earlier and reduce lag; 1 tick = 50 ms at 20 TPS).\n# Catches lag that TPS hides (TPS stays 20 up to 50 ms). 0 = off.\n# @type: number\n# @range: [0.0, 50.0]\n# @unit: ms\n# @default: 45.0\nmaxMSPT: 45.0\n\n# Pause cache filling when memory use passes this %. 0/100 = off.\n# @type: number\n# @range: [0.0, 100.0]\n# @default: 85.0\nmaxHeapPercent: 85.0\n\n# How many spots to try per /rtp before giving up.\n# @type: integer\n# @range: [1, null]\n# @default: 32\nmaxAttempts: 32\n\n# Ticks between queue refills of the same region (lower values refill the queue faster and speed up queued wait times). Regions take turns.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [1, null]\n# @unit: ticks\n# @default: 20\nperiod: 20\n\n# Max ms per tick for main-thread work (lower toward 2-3 ms to give autoTune a tighter baseline ceiling and reduce main-thread tick lag; invisible to players while the hot queue stays populated). Capped at 25.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [1, 25]\n# @unit: ms\n# @default: 5\nsyncAllottedTime: 5\n\n# Max ms per pulse for background work. Capped at 25.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [1, 25]\n# @unit: ms\n# @default: 25\nasyncAllottedTime: 25\n\n# --- View-distance smoothing ---\n# Chunks loaded around a spot while searching. Keep at 0 (just the spot; surrounding view-distance chunks load after arrival rather than before); values above 0 load extra chunks per candidate and cause lag spikes.\n# @type: integer\n# @range: [0, null]\n# @unit: chunks\n# @default: 0\nviewDistanceSelect: 0\n\n# Chunks loaded around the final spot before teleport. 0 = just the spot.\n# @type: integer\n# @range: [0, null]\n# @unit: chunks\n# @default: 0\nviewDistanceTeleport: 0\n\n# Ticks to ease view distance back to normal after arrival. 0 = off.\n# NOTE: Temporarily forced to 0. The gradual restore causes client-side\n# flashing / re-rendering on arrival. Leave at 0 until further notice.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: ticks\n# @default: 200\nviewDistanceRestoreInterval: 0\n\n# --- Caching / pre-fill ---\n# Refill the cache right after a teleport.\n# @type: boolean\n# @default: false\npostTeleportQueueing: false\n\n# Learn biomes from chunks already loaded (no extra work).\n# @type: boolean\n# @default: true\ncheckOnChunkLoads: true\n\n# Refill the backlog when it drops to this fraction. 0.5 = at 50%.\n# @type: number\n# @range: [0.0, 1.0]\n# @default: 0.5\nbacklogRefillThreshold: 0.5\n\n# Backlog Candidate Generation Strategy.\n# FLAT_STRIDE = Uses the same 1D Hilbert dyadic-stride Feistel permutation as live/uncached selection.\n# BINNED_AMORTIZED = Uses region-file binned PRP with amortized batch quotas and within-bin dyadic stride.\n# @type: string\n# @options: [\"FLAT_STRIDE\", \"BINNED_AMORTIZED\"]\n# @default: \"FLAT_STRIDE\"\nbacklogGenerationStrategy: \"FLAT_STRIDE\"\n\n# Chance to skip new (ungenerated) land and prefer pregenerated chunks on disk (0 = don't care, raise toward 0.8-1.0 to avoid chunk-generation lag at the trade-off of biasing destinations toward already-generated terrain).\n# @type: number\n# @range: [0.0, 1.0]\n# @default: 0.0\npregeneratedPreference: 0.0\n\n# Keep spare spots ready for players joining the server.\n# @type: boolean\n# @default: false\nloginCacheEnabled: false\n\n# Max size of the join-spot cache. 0 = auto (max players).\n# @type: integer\n# @range: [0, null]\n# @default: 0\nloginCacheCap: 0\n\n# --- Biome recall ---\n# Reuse saved biome spots from the cache.\n# @type: boolean\n# @default: true\nbiomeRecall: true\n\n# Only use cached biome spots, never search for new ones. Needs biomeRecall.\n# @type: boolean\n# @default: false\nbiomeRecallForced: false\n\n# --- Auditing counters ---\n# Warn when a teleport takes longer than this (ms). 0 or less = off.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: ms\n# @default: 5000\nslowPipelineThresholdMs: 5000\n\n# Warn when this many players are waiting. 0 or less = off.\n# @type: integer\n# @range: [0, null]\n# @unit: players\n# @default: 0\nqueueGrowthWarnThreshold: 0\n\n# --- Advanced (rarely touched) ---\n# Load chunks on the main thread. NOT RECOMMENDED (keep false; setting true blocks the main thread and causes severe server hangs).\n# @type: boolean\n# @default: false\nsyncLoading: false\n\n# Teleport path on Paper. AUTO = same-tick teleport when the spot's chunk is\n# already loaded, else teleportAsync. ASYNC = always teleportAsync (one tick slower).\n# @type: string\n# @options: [\"AUTO\", \"ASYNC\"]\n# @default: \"AUTO\"\nteleportPath: \"AUTO\"\n\n# Re-read permissions every event instead of caching them.\n# @type: boolean\n# @default: false\nonEventParsing: false\n\n# Parse effect permission nodes at startup.\n# @type: boolean\n# @default: true\neffectParsing: true\n\n# Enable background data gathering for visitor analytics.\n# @type: boolean\n# @default: false\nvisitorEnabled: false\n\n# Settings for /rtp admin prefab. Keeps backups of changed files.\nprefab:\n  # How many backups to keep per file.\n  # @type: integer\n  # @range: [1, null]\n  # @default: 3\n  bakRetention: 3\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1\n",
   "advanced/ttl.yml": "# --- RTP Spatial Memory TTL Settings ---\n# Documentation: docs/admin/configuration/TTL.md\n\n# Base retention durations for rejected coordinate runs in spatial memory.\n# Supported duration formats: e.g. 14d, 12h, 30m, 3600s, 40t, 2500ms, or composite 1d12h.\n# Set to -1 or \"infinite\" for permanent retention (static terrain).\ncauses:\n  # Natural terrain & geometry (permanent)\n  biome: -1\n  worldBorder: -1\n  vert: -1\n  safety: -1\n  prefilterBiome: -1\n  prefilterBlock: -1\n\n  # Dynamic player and server state\n  uniquePlacement: 30d\n  safetyExternal: 14d\n\n# Per-verifier overrides keyed by checker class name (e.g. GriefPreventionChecker, WorldGuardChecker).\n# If omitted or unlisted, external checkers inherit causes.safetyExternal.\nverifiers:\n  # WorldGuardChecker: -1\n  # GriefPreventionChecker: 14d\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.0\n",
-  "config.yml": "# --- RTP Core Configuration ---\n# Documentation: docs/admin/configuration/CORE_CONFIG.md\n# Pick your language in language.yml.\n#\n# Where to find things (files/folders in this RTP folder):\n#   config.yml    - this file: core teleport behavior and shared defaults\n#   safety.yml    - where players may or may not land (blocks, biomes)\n#   economy.yml   - charge players for /rtp (needs Vault)\n#   language.yml  - pick your language\n#   messages/     - all player-facing text (commands, player, system, network, placeholders)\n#   effects/      - particle and sound effects on teleport\n#   regions/      - per-region settings\n#   worlds/       - per-world settings\n#   advanced/     - tuning you usually do not need (performance, database, logging, metrics, network, biomes, blocks)\n#   addons/       - config for optional add-ons (countdown, GUI menu, claim integrations)\n\n# Seconds to wait before teleporting. 0 = right away. Supports duration units (e.g. 2s, 40t, 1500ms).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 2\nteleportDelay: 2\n\n# How far you can move before the teleport cancels.\n# @type: integer\n# @range: [0, null]\n# @unit: blocks\n# @default: 2\ncancelDistance: 2\n\n# Wait time between /rtp uses. Skipped by rtp.nocooldown. Supports duration units (e.g. 5m, 300s, 1h).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 300\nteleportCooldown: 300\n\n# Max /rtp uses before lockout. 0 = no limit. Skipped by rtp.nolock.\n# @type: integer\n# @range: [0, null]\n# @default: 0\nlockAfterUses: 0\n\n# Seconds until the use count resets. 0 = never resets. Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 0\nlockAfterResetSeconds: 0\n\n# true = set your spawn point where you land.\n# @type: boolean\n# @default: false\nsetRespawnOnTeleport: false\n\n# Console commands run after teleport. [player] = the player's name.\n# @type: list<string>\nconsoleCommands:\n  - \"say [player] has just randomly teleported!\"\n\n# Commands run as the player after teleport. [player] = their name.\n# @type: list<string>\nplayerCommands:\n  - \"\"\n\n# Menu look. renderer = list of styles to try in order.\nmenu:\n  # Menu styles to try; first one that works wins.\n  # @type: list<enum>\n  # @options: [\"book\", \"chat\"]\n  renderer:\n    - \"book\"\n\n# Shared defaults. A region/world value of \"@config\" copies the matching entry below,\n# so you change a setting once here instead of in every region file.\ndefaults:\n  # Default area shape and size, used by every region whose shape is \"@config\".\n  # Sizes default to chunks (1 chunk = 16 blocks), e.g. 256 chunks = 4,096 blocks.\n  # Suffixes: b (blocks), c (chunks), r (regions), km (kilometers). See REGIONS.md.\n  # radius: outer bound. centerRadius: inner donut hole. centerRadius must stay below radius.\n  shape:\n    # Landing area shape algorithm.\n    # @type: enum\n    # @source: shape\n    name: \"CIRCLE\"\n    mode: \"REROLL\"\n\n    # Outer edge, in blocks (4096 blocks = 256 chunks).\n    radius: 4096b\n\n    # Inner edge / donut hole, in chunks (64 chunks = 1,024 blocks). 0 = no hole.\n    centerRadius: 64\n\n    # Center of the area, in CHUNK coordinates (chunk 0,0 covers blocks 0-15).\n    centerX: 0\n    centerZ: 0\n\n    # Bias inside the centerRadius-to-radius band: >1.0 favors the center, <1.0 the edge.\n    weight: 1.0\n\n    # Keep spots from being reused. \"auto\" = view-distance radius (default), 0 = off, 1 = the landing chunk, N = bigger square.\n    uniquePlacements: \"auto\"\n    expand: false\n\n  # Default high/low landing window.\n  vert:\n    # Vertical placement algorithm.\n    # @type: enum\n    # @source: vert\n    name: \"LINEAR\"\n    minY: 32\n    maxY: 255\n\n    # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.\n    direction: 2\n    requireSkyLight: true\n\n    # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.\n    # \"off\" is fastest. 30 refuses about 1 in 5 land spots, 45 about 1 in 12, 60 about 1 in 60.\n    # Any number from 0 to 89 also works. With it on, the search reads the chunks around each spot.\n    # @type: enum\n    # @options: [\"off\", 30, 45, 60]\n    # @default: \"off\"\n    maxHillAngle: \"off\"\n\n  # How many safe spots to pre-calculate.\n  cacheCap: 50\n\n  # Extra unverified spots kept ready. 0 = off.\n  backlogCacheCap: 1000\n\n  # Max chunks kept loaded for instant teleports.\n  activeChunkCap: 10\n\n  # Bad-spot tracking precision (any positive integer, or \"auto\").\n  spatialResolution: \"auto\"\n\n  # Whether regions/worlds need permission.\n  requirePermission: false\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 3.1\n",
+  "config.yml": "# --- RTP Core Configuration ---\n# Documentation: docs/admin/configuration/CORE_CONFIG.md\n# Pick your language in language.yml.\n#\n# Where to find things (files/folders in this RTP folder):\n#   config.yml    - this file: core teleport behavior and shared defaults\n#   safety.yml    - where players may or may not land (blocks, biomes)\n#   economy.yml   - charge players for /rtp (needs Vault)\n#   language.yml  - pick your language\n#   messages/     - all player-facing text (commands, player, system, network, placeholders)\n#   effects/      - particle and sound effects on teleport\n#   regions/      - per-region settings\n#   worlds/       - per-world settings\n#   advanced/     - tuning you usually do not need (performance, database, logging, metrics, network, biomes, blocks)\n#   addons/       - config for optional add-ons (countdown, GUI menu, claim integrations)\n\n# Warmup seconds to wait (stand still) before teleporting. 0 = instant / right away. Skipped by rtp.nodelay. Supports duration units (e.g. 2s, 40t, 1500ms).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 2\nteleportDelay: 2\n\n# How far (blocks) you can move or walk during teleportDelay before the teleport cancels or aborts.\n# @type: integer\n# @range: [0, null]\n# @unit: blocks\n# @default: 2\ncancelDistance: 2\n\n# Wait time between /rtp uses. Skipped by rtp.nocooldown. Supports duration units (e.g. 5m, 300s, 1h).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 300\nteleportCooldown: 300\n\n# Max /rtp uses before lockout. 0 = no limit. Skipped by rtp.nolock.\n# @type: integer\n# @range: [0, null]\n# @default: 0\nlockAfterUses: 0\n\n# Seconds until the use count resets. 0 = never resets. Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 0\nlockAfterResetSeconds: 0\n\n# true = set your respawn / bed spawn point where you land.\n# @type: boolean\n# @default: false\nsetRespawnOnTeleport: false\n\n# Console commands run after teleport. [player] = the player's name.\n# @type: list<string>\nconsoleCommands:\n  - \"say [player] has just randomly teleported!\"\n\n# Commands run as the player after teleport. [player] = their name.\n# @type: list<string>\nplayerCommands:\n  - \"\"\n\n# Menu look. renderer = list of styles to try in order.\nmenu:\n  # Menu styles to try; first one that works wins.\n  # @type: list<enum>\n  # @options: [\"book\", \"chat\"]\n  renderer:\n    - \"book\"\n\n# Starter fallback defaults. A region/world value of \"@config\" inherits the matching entry below.\n# Recommended: use `/rtp editor` (browser map workspace), `/rtp admin setup`, or edit\n# `definitions/regions/<region>.yml` directly to configure per-region `shape` and `vert` settings.\ndefaults:\n  # Starter fallback area shape and size, inherited by any region whose shape is still \"@config\".\n  # Prefer configuring per-region `shape` in `/rtp editor` or `definitions/regions/<region>.yml`.\n  # Sizes default to chunks (1 chunk = 16 blocks), or use explicit unit suffixes:\n  # b (blocks), c (chunks), r (regions), km (kilometers), e.g. `radius: 4096b` or `5km`. See REGIONS.md.\n  # radius: outer bound. centerRadius: inner donut hole. centerRadius must stay below radius.\n  shape:\n    # Landing area shape algorithm.\n    # @type: enum\n    # @source: shape\n    name: \"CIRCLE\"\n\n    # How known-bad chunks are skipped: REROLL (draw again), ACCUMULATE (draw only open chunks), NEAREST, or NONE.\n    mode: \"REROLL\"\n\n    # Outer edge, in blocks (4096 blocks = 256 chunks).\n    radius: 4096b\n\n    # Inner edge / donut hole, in chunks (64 chunks = 1,024 blocks). 0 = no hole.\n    centerRadius: 64\n\n    # Center of the area, in CHUNK coordinates (chunk 0,0 covers blocks 0-15).\n    centerX: 0\n    centerZ: 0\n\n    # Bias inside the centerRadius-to-radius band: >1.0 favors the center, <1.0 the edge.\n    weight: 1.0\n\n    # Keep spots from being reused. \"auto\" = view-distance radius (default), 0 = off, 1 = the landing chunk, N = bigger square.\n    uniquePlacements: \"auto\"\n\n    # Grow the outer radius automatically to replace chunks cleared by uniquePlacements.\n    expand: false\n\n  # Default high/low landing window.\n  vert:\n    # Vertical placement algorithm.\n    # @type: enum\n    # @source: vert\n    name: \"LINEAR\"\n\n    # Lowest Y-level players can land at (lower for deep caves, e.g. -50).\n    minY: 32\n\n    # Highest Y-level players can land at (set to 120 in the Nether to stay under / below the Y=128 bedrock roof).\n    maxY: 255\n\n    # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.\n    direction: 2\n\n    # true = surface only (requires sky light / sunlight, prevents underground caves). Set false for Nether or underground regions.\n    requireSkyLight: true\n\n    # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.\n    # \"off\" is fastest. 30 refuses about 1 in 5 land spots, 45 about 1 in 12, 60 about 1 in 60.\n    # Any number from 0 to 89 also works. With it on, the search reads the chunks around each spot.\n    # @type: enum\n    # @options: [\"off\", 30, 45, 60]\n    # @default: \"off\"\n    maxHillAngle: \"off\"\n\n  # How many safe spots to pre-calculate.\n  cacheCap: 50\n\n  # Extra unverified spots kept ready. 0 = off.\n  backlogCacheCap: 1000\n\n  # Max chunks kept loaded for instant teleports.\n  activeChunkCap: 10\n\n  # Bad-spot tracking precision (any positive integer, or \"auto\").\n  spatialResolution: \"auto\"\n\n  # Whether regions/worlds need permission.\n  requirePermission: false\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 3.1\n",
   "definitions/effects/default-cancel.yml": "# --- effects/default-cancel.yml: plays when a teleport is cancelled ---\n# Docs: docs/admin/configuration/EVENTS_AND_EFFECTS.md (see effects/default.yml too)\n\nwhen: cancel\neffects:\n  # Use whole numbers. Volume/pitch are percent (100 = full).\n  - SOUND.BLOCK_NOTE_BLOCK_BASS.100.50.0.0.0\n\nversion: \"1.0\"\n",
   "definitions/effects/default-pre.yml": "# --- effects/default-pre.yml: plays just before a teleport ---\n# Docs: docs/admin/configuration/EVENTS_AND_EFFECTS.md (see effects/default.yml too)\n\nwhen: preteleport\neffects:\n  - POTION.BLINDNESS.40.0\n\nversion: \"1.0\"\n",
   "definitions/effects/default.yml": "# --- effects/default.yml ---\n# Documentation: docs/admin/configuration/EVENTS_AND_EFFECTS.md\n# Writing your own: https://github.com/DailyStruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md\n#\n# One file = one effect group (filename = group name).\n#   when:    when it plays (e.g. postteleport, join, cancel). REQUIRED.\n#   effects: list of EFFECT.arg1.arg2... lines (see examples below). REQUIRED.\n# Tip: numbers must be whole. Sound volume/pitch are percent (100 = full).\n# The `default` group always exists even if you delete this file.\n#\n# Uncomment any example line below to turn it on.\n\nwhen: postteleport\neffects:\n  # --- Active set (kept small so default servers stay quiet) ---\n  # Use whole numbers. Volume/pitch are percent (100 = full).\n  - SOUND.ENTITY_ENDERMAN_TELEPORT.100.100.0.0.0\n  - PARTICLE.PORTAL.32\n  - POTION.SLOW_FALLING.60.1.false.false.false\n  - POTION.BLINDNESS.40.1.false.false.false\n\n  # --- SOUND catalog (TYPE.VOLUME.PITCH.DX.DY.DZ) ---\n  #- SOUND.ENTITY_PLAYER_LEVELUP.100.100.0.0.0\n  #- SOUND.ENTITY_EXPERIENCE_ORB_PICKUP.60.120.0.0.0\n  #- SOUND.BLOCK_PORTAL_TRAVEL.40.80.0.0.0\n  #- SOUND.BLOCK_NOTE_BLOCK_PLING.100.200.0.0.0\n  #- SOUND.UI_TOAST_CHALLENGE_COMPLETE.100.100.0.0.0\n  #- SOUND.ENTITY_FIREWORK_ROCKET_BLAST.100.100.0.0.0\n  #- SOUND.ENTITY_LIGHTNING_BOLT_THUNDER.50.100.0.0.0\n  #- SOUND.AMBIENT_CAVE.100.100.0.0.0\n  # DX/DY/DZ offset (here: 5 blocks east):\n  #- SOUND.ENTITY_ENDERMAN_TELEPORT.100.100.5.0.0\n\n  # --- PARTICLE catalog (TYPE.NUMBER), 1.9+ only ---\n  #- PARTICLE.FLAME.40\n  #- PARTICLE.HEART.8\n  #- PARTICLE.CLOUD.32\n  #- PARTICLE.END_ROD.24\n  #- PARTICLE.DRAGON_BREATH.24\n  #- PARTICLE.SOUL_FIRE_FLAME.32\n  #- PARTICLE.TOTEM_OF_UNDYING.40\n  #- PARTICLE.ENCHANTED_HIT.16\n  #- PARTICLE.HAPPY_VILLAGER.16\n  #- PARTICLE.WAX_ON.12\n  #- PARTICLE.SCULK_SOUL.16\n\n  # --- POTION catalog (TYPE.DURATION.AMPLIFIER.AMBIENT.PARTICLES.ICON) ---\n  # DURATION in ticks (20 = 1s). Last 3 are optional true/false.\n  #- POTION.SPEED.200.1\n  #- POTION.JUMP_BOOST.200.2\n  #- POTION.REGENERATION.200.0\n  #- POTION.RESISTANCE.200.2\n  #- POTION.FIRE_RESISTANCE.200.0\n  #- POTION.NIGHT_VISION.400.0\n  #- POTION.INVISIBILITY.200.0.true.false.true\n  #- POTION.SLOW_FALLING.120.0\n  #- POTION.LEVITATION.40.0\n  #- POTION.GLOWING.200.0.false.false.true\n  #- POTION.ABSORPTION.200.1\n\n  # --- NOTE catalog (TYPE.TONE) ---\n  # TONE: 0..24. See EVENTS_AND_EFFECTS.md for instrument names.\n  #- NOTE.PIANO.12\n  #- NOTE.BELL.18\n  #- NOTE.CHIME.20\n  #- NOTE.XYLOPHONE.16\n  #- NOTE.PLING.10\n  #- NOTE.HARP.7\n\n  # --- FIREWORK catalog\n  #     (TYPE.NUMBER.POWER.COLOR.FADE.FLICKER.TRAIL.SAFE.DX.DY.DZ) ---\n  # TYPE: BALL, BALL_LARGE, STAR, BURST, CREEPER. See EVENTS_AND_EFFECTS.md for the rest.\n  #- FIREWORK.BALL.1.1.RED.YELLOW.true.true.true.0.0.0\n  #- FIREWORK.BALL_LARGE.1.2.AQUA.WHITE.false.true.true.0.1.0\n  #- FIREWORK.STAR.1.1.LIME.PURPLE.true.false.true.0.0.0\n  #- FIREWORK.BURST.2.1.ORANGE.YELLOW.true.true.true.0.0.0\n  #- FIREWORK.CREEPER.1.1.GREEN.BLACK.false.false.true.0.0.0\n\n  # --- GLIDE catalog (PLATFORM.RELATIVE.MAX.TIMEOUT.FIREWORKS.PLACE.WORLD) ---\n  # Lifts you RELATIVE blocks (capped at Y=MAX) and starts an elytra glide down.\n  # No elytra or addon needed; the glide holds until you are just above ground.\n  # All args optional.\n  # PLATFORM = block for an emergency landing pad if the server stops mid-glide.\n  # TIMEOUT in ticks forces a landing. Leave out SLOW_FALLING when gliding.\n  #- GLIDE.STONE.60.320\n  #- GLIDE.STONE.100.320.400\n\n# DO NOT TOUCH VERSION NUMBER\nversion: \"1.0\"\n",
-  "definitions/regions/default.yml": "# --- RTP Region Configuration ---\n# Documentation: docs/admin/configuration/REGIONS.md\n\n# Target world name (e.g. \"world\", \"world_nether\").\n# \"[0]\" = main world, \"[1]\" = 2nd loaded world, etc.\n# @type: enum\n# @source: world\nworld: \"[0]\"\n\n# Use the world's /worldborder as the bound instead of the shape below. When true, the\n# whole shape is replaced and radius/centerRadius/centerX/centerZ are ignored.\nworldBorderOverride: false\n\n# Spawn area shape and size.\n#\n# SIZES DEFAULT TO CHUNKS (1 chunk = 16 blocks):\n# radius 256 = 4,096 blocks, and radius 625 = 10,000 blocks.\n# You can also use spatial unit suffixes directly (e.g. radius: 4096b, 256c, 4r, 5km).\n# radius is the outer edge (nobody lands past it), centerRadius is the inner edge / donut hole\n# (nobody lands inside it), and centerRadius must stay below radius or there is no land left to pick from.\n#\n# The teleport radius can be set in two places; pick ONE:\n#   1. Shared default (most servers): edit `defaults.shape.radius` in config.yml.\n#      Leaving the value below as \"@config\" inherits that whole `defaults.shape`\n#      block, so a single-world server sets radius/centerRadius once, there.\n#   2. Per-region override (this region only): replace \"@config\" with an inline\n#      `shape:` block here. An inline block wins over the config.yml default.\n#\n# See docs/admin/configuration/CORE_CONFIG.md\n# Example per-region override (mirrors the defaults.shape block in config.yml):\n#   shape:\n#     name: \"CIRCLE\"\n#     mode: \"REROLL\"\n#     radius: 256\n#     centerRadius: 64\nshape: \"@config\"\n\n# Vertical landing window. \"@config\" inherits the whole `defaults.vert` block from\n# config.yml. See docs/admin/configuration/CORE_CONFIG.md\n# Replace with an inline block to override per-region, e.g.:\n#   vert:\n#     name: \"LINEAR\"\n#     minY: 32\n#     maxY: 128\n#     direction: 2\n#     requireSkyLight: false\n#     # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.\n#     # \"off\" (fastest, default), 30, 45 or 60.\n#     maxHillAngle: 30\nvert: \"@config\"\n\n# If true, rtp.regions.<name> is required. \"@config\" inherits defaults.requirePermission\n# from config.yml. See docs/admin/configuration/CORE_CONFIG.md\n# Replace with a literal to override per-region, e.g.:\n#   requirePermission: true\nrequirePermission: \"@config\"\n\n# Region to redirect to if no permission\n# @type: enum\n# @source: region\noverride: \"default\"\n\n# Economy cost override for this region (added on top of the economy.yml base price).\n# Use \"@economy\" to inherit the base price from economy.yml instead of a literal.\n# See docs/admin/configuration/ECONOMY.md\n# Replace with a number or the inheritance token to override per-region, e.g.:\n#   price: 100.0\n#   price: \"@economy\"\nprice: 0.0\n\n# Optional cosmetic display name shown in /rtp info and the GUI menu. Does NOT\n# change the region's identity (commands/permissions still use the file name).\n# Supports color codes (e.g. &#55ff55 or &a). Defaults to the region name.\n# displayName: \"&#55ff55Wild Overworld\"\n\n# --- Advanced (cache/precision tuning; defaults suit most servers) ---\n# Each \"@config\" inherits the matching defaults.<key> value from config.yml;\n# replace with a number to override per-region. See:\n#   docs/admin/configuration/CORE_CONFIG.md\n#   docs/admin/configuration/REGIONS.md\n# Max pre-calculated safe locations. Example override:\n#   cacheCap: 64\ncacheCap: \"@config\"\n\n# Backlog cache capacity for candidate locations pre-filtered before full safety checks. 0 disables it.\n# Example override:\n#   backlogCacheCap: 1000\nbacklogCacheCap: \"@config\"\n\n# Max chunks kept loaded for zero-latency. Example override:\n#   activeChunkCap: 10\nactiveChunkCap: \"@config\"\n\n# Precision for bad-location tracking (any positive integer, or \"auto\"). Example override:\n#   spatialResolution: \"auto\"\nspatialResolution: \"@config\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: \"1.1\"\n",
-  "definitions/worlds/default.yml": "# --- RTP World Configuration ---\n# Documentation: docs/admin/configuration/WORLDS.md\n\n# Region used for this world: /rtp in this world answers with this region, and the region\n# owns the destination - target world, distance (radius), shape, vertical range, price.\n# Point several worlds at one region to share its settings, or at their own regions to\n# tune them separately. This file is routing only; it holds no distance of its own.\n# See docs/admin/configuration/REGIONS.md\n# @type: enum\n# @source: region\nregion: \"default\"\n\n# true = need permission rtp.worlds.<worldname>. \"@config\" inherits\n# defaults.requirePermission from config.yml.\n# See docs/admin/configuration/CORE_CONFIG.md\n# Replace with a literal to override per-world, e.g.:\n#   requirePermission: true\nrequirePermission: \"@config\"\n\n# World to send to if no permission\n# @type: enum\n# @source: world\noverride: \"[0]\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: \"1.0\"",
+  "definitions/regions/default.yml": "# --- RTP Region Configuration ---\n# Documentation: docs/admin/configuration/REGIONS.md\n\n# Target world for this region (e.g. \"world\", \"world_nether\", \"world_the_end\").\n# \"[0]\" = main overworld. Do NOT change default.yml to \"world_nether\" unless you want ALL\n# worlds to send players to the nether; instead create a new region (e.g. definitions/regions/nether.yml\n# with world: \"world_nether\", vert.maxY: 120, vert.requireSkyLight: false) and map it in\n# definitions/worlds/world_nether.yml (region: \"nether\") via /rtp editor, /rtp admin setup, or config.\n# @type: enum\n# @source: world\nworld: \"[0]\"\n\n# Not generally recommended: when true, replaces the whole shape block with a square matching\n# the vanilla /worldborder and ignores shape, radius, centerRadius, centerX, and centerZ.\n# Prefer setting shape.radius with a distance unit suffix (e.g. shape.radius: 2500b or 5km) in\n# /rtp editor or definitions/regions/<region>.yml so you keep your shape and inner centerRadius hole.\nworldBorderOverride: false\n\n# Spawn area shape and size.\n#\n# Write distances with a unit suffix: 4096b (blocks), 10km (kilometers), 256c (chunks), or 4r (region files).\n# Bare numbers without a suffix default to chunks (1 chunk = 16 blocks).\n# radius is the outer edge (nobody lands past it), centerRadius is the inner edge / donut hole\n# (nobody lands inside it), and centerRadius must stay below radius or there is no land left to pick from.\n#\n# Recommended ways to configure your region shape and radius:\n#   1. Visual browser workspace: run `/rtp editor` to drag region borders on the map and edit settings.\n#   2. Guided setup or command: run `/rtp admin setup` or `/rtp config regions default shape.radius=5km`.\n#   3. Region file (`definitions/regions/<region>.yml`): replace \"@config\" with an inline `shape:` block\n#      (or edit the starter fallback `defaults.shape` in config.yml).\n#\n# See docs/admin/configuration/REGIONS.md and docs/admin/WEB_EDITOR_GUIDE.md\n# Example inline shape block:\n#   shape:\n#     name: \"CIRCLE\"\n#     mode: \"REROLL\"\n#     radius: 4096b\n#     centerRadius: 1024b\nshape: \"@config\"\n\n# Vertical landing window (minY, maxY, requireSkyLight, maxHillAngle). Configure in `/rtp editor`,\n# `/rtp config regions default vert.<key>=<value>`, or replace \"@config\" with an inline `vert:` block\n# here (\"@config\" inherits the starter fallback `defaults.vert` from config.yml).\n# See docs/admin/configuration/REGIONS.md\n# Replace with an inline block to override per-region (e.g. for Nether or cave worlds):\n#   vert:\n#     name: \"LINEAR\"\n#     minY: 32\n#     maxY: 120\n#     direction: 2\n#     requireSkyLight: false\n#     # Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.\n#     # \"off\" (fastest, default), 30, 45 or 60.\n#     maxHillAngle: 30\nvert: \"@config\"\n\n# If true, rtp.regions.<name> is required. \"@config\" inherits defaults.requirePermission\n# from config.yml. See docs/admin/configuration/CORE_CONFIG.md\n# Replace with a literal to override per-region, e.g.:\n#   requirePermission: true\nrequirePermission: \"@config\"\n\n# Region to redirect to if no permission\n# @type: enum\n# @source: region\noverride: \"default\"\n\n# Economy cost override for this region (added on top of the economy.yml base price).\n# Use \"@economy\" to inherit the base price from economy.yml instead of a literal.\n# See docs/admin/configuration/ECONOMY.md\n# Replace with a number or the inheritance token to override per-region, e.g.:\n#   price: 100.0\n#   price: \"@economy\"\nprice: 0.0\n\n# Optional cosmetic display name shown in /rtp info and the GUI menu. Does NOT\n# change the region's identity (commands/permissions still use the file name).\n# Supports color codes (e.g. &#55ff55 or &a). Defaults to the region name.\n# displayName: \"&#55ff55Wild Overworld\"\n\n# --- Advanced (cache/precision tuning; defaults suit most servers) ---\n# Each \"@config\" inherits the matching defaults.<key> value from config.yml;\n# replace with a number to override per-region. See:\n#   docs/admin/configuration/CORE_CONFIG.md\n#   docs/admin/configuration/REGIONS.md\n# Max pre-calculated safe locations. Example override:\n#   cacheCap: 64\ncacheCap: \"@config\"\n\n# Backlog cache capacity for candidate locations pre-filtered before full safety checks. 0 disables it.\n# Example override:\n#   backlogCacheCap: 1000\nbacklogCacheCap: \"@config\"\n\n# Max chunks kept loaded for zero-latency. Example override:\n#   activeChunkCap: 10\nactiveChunkCap: \"@config\"\n\n# Precision for bad-location tracking (any positive integer, or \"auto\"). Example override:\n#   spatialResolution: \"auto\"\nspatialResolution: \"@config\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: \"1.1\"\n",
+  "definitions/worlds/default.yml": "# --- RTP World Configuration ---\n# Documentation: docs/admin/configuration/WORLDS.md\n\n# Region used when a player runs /rtp in this world (or `/rtp world=<world>`).\n# Out of the box, unconfigured worlds (like world_nether or world_the_end) fall back to \"default\"\n# (which targets the overworld). To make `/rtp` or `/rtp world=world_nether` stay in the Nether,\n# create a nether region (`definitions/regions/nether.yml` with `world: \"world_nether\"`,\n# `vert.maxY: 120`, `vert.requireSkyLight: false`) and map `definitions/worlds/world_nether.yml`\n# to `region: \"nether\"` via `/rtp editor`, `/rtp admin setup`, or `/rtp config worlds world_nether region=nether`.\n# The region owns the destination world, distance (shape.radius), shape, vertical range (vert), and price.\n# See docs/admin/configuration/WORLDS.md and docs/admin/configuration/REGIONS.md\n# @type: enum\n# @source: region\nregion: \"default\"\n\n# true = need permission rtp.worlds.<worldname>. \"@config\" inherits\n# defaults.requirePermission from config.yml.\n# See docs/admin/configuration/CORE_CONFIG.md\n# Replace with a literal to override per-world, e.g.:\n#   requirePermission: true\nrequirePermission: \"@config\"\n\n# World to send to if no permission\n# @type: enum\n# @source: world\noverride: \"[0]\"\n\n# DO NOT TOUCH VERSION NUMBER\nversion: \"1.0\"",
   "economy.yml": "# --- RTP Economy Settings ---\n# Documentation: docs/admin/configuration/ECONOMY.md\n\n# Cost for a /rtp.\n# @type: number\n# @range: [0.0, null]\n# @default: 50.0\nprice: 50.0\n\n# Extra cost to /rtp another player.\n# @type: number\n# @range: [0.0, null]\n# @default: 200.0\npriceOther: 200.0\n\n# Extra cost when you add parameters to /rtp.\n# @type: number\n# @range: [0.0, null]\n# @default: 1000000000.0\nparamsPrice: 1000000000.0\n\n# Extra cost when you pick a biome.\n# @type: number\n# @range: [0.0, null]\n# @default: 5000.0\nbiomePrice: 5000.0\n\n# Give money back if the teleport is cancelled.\n# @type: boolean\n# @default: true\nrefundOnCancel: true\n\n# Lowest balance you can have left after paying.\n# @type: number\n# @range: [0.0, null]\n# @default: 0.0\nbalanceFloor: 0.0\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1\n",
   "language.yml": "# --- RTP Language Selection ---\n# Documentation: docs/admin/configuration/LANGUAGE.md\n\n# Loaded first so every other file reads from lang/<language>/.\n# Bundled: en, de, es, fr, ja, ko, nl, zh. Add more in lang/<code>/.\n# Run /rtp reload after changing this.\nlanguage: en\n\n# Config schema version (do not edit).\nversion: 1.0\n",
-  "safety.yml": "# --- RTP Safety Configuration ---\n# Documentation: docs/admin/configuration/SAFETY.md\n\n# Seconds you can't be hurt after teleporting. 0 = off.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 5\ninvulnerabilityTime: 5\n\n# How many blocks around you we check for danger. 0 = just the spot.\n# @type: integer\n# @range: [0, null]\n# @unit: blocks\n# @default: 0\nsafetyRadius: 0\n\n# Size of the safety platform built under you. -1 = off.\n# @type: integer\n# @range: [-1, null]\n# @unit: blocks\n# @default: -1\nplatformRadius: -1\n\n# How thick the safety platform is.\n# @type: integer\n# @range: [1, null]\n# @unit: blocks\n# @default: 1\nplatformDepth: 1\n\n# How much air is cleared above the platform.\n# @type: integer\n# @range: [0, null]\n# @unit: blocks\n# @default: 2\nplatformAirHeight: 2\n\n# Block the platform is made of.\n# @type: material\n# @source: material\n# @default: GLASS\nplatformMaterial: \"GLASS\"\n\n# Seconds until the platform turns back into the old blocks. -1 = never, 0 = on reload.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [-1, null]\n# @unit: seconds\n# @default: -1\nplatformRestoreSeconds: -1\n\n# --- Optional PvP / combat-tag check ---\n# true = check if you're fighting before teleporting.\n# @type: boolean\n# @default: false\npvpCheckEnabled: false\n\n# Seconds you stay \"in combat\" after a PvP hit (built-in tracker only).\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 15\npvpCombatTagSeconds: 15\n\n# What to do if you /rtp while fighting.\n# ALLOW = let it, DENY = block it, DELAY = wait, CANCEL = stop it.\n# @type: enum\n# @options: [ALLOW, DENY, DELAY, CANCEL]\n# @default: DENY\npvpOnCombat: \"DENY\"\n\n# Where to read combat state from.\n# AUTO = plugin if present else built-in, NATIVE = built-in, EXTERNAL = plugin only.\n# @type: enum\n# @options: [AUTO, NATIVE, EXTERNAL]\n# @default: AUTO\npvpSource: \"AUTO\"\n\n# Built-in tracker: tag the player who gets hit.\n# @type: boolean\n# @default: true\npvpTagVictim: true\n\n# Built-in tracker: tag the player who hits.\n# @type: boolean\n# @default: true\npvpTagAggressor: true\n\n# --- Advanced (most servers leave these alone) ---\n# How many retries before a chunk check gives up.\n# @type: integer\n# @range: [0, null]\n# @default: 2\nstaleChunkRetryLimit: 2\n\n# Skip bad spots without loading chunks (faster).\n# @type: boolean\n# @default: true\nanvilPrefilterEnabled: true\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1\n"
+  "safety.yml": "# --- RTP Safety Configuration ---\n# Documentation: docs/admin/configuration/SAFETY.md\n\n# Seconds you can't be hurt after teleporting (post-teleport invulnerability / godmode immunity preventing fall damage, fire, or drowning). 0 = off.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 5\ninvulnerabilityTime: 5\n\n# How many blocks around you we check for danger. 0 = just the spot.\n# @type: integer\n# @range: [0, null]\n# @unit: blocks\n# @default: 0\nsafetyRadius: 0\n\n# Size of the safety platform built under you to prevent fall damage or landing in water/lava. -1 = off.\n# @type: integer\n# @range: [-1, null]\n# @unit: blocks\n# @default: -1\nplatformRadius: -1\n\n# How thick the safety platform is.\n# @type: integer\n# @range: [1, null]\n# @unit: blocks\n# @default: 1\nplatformDepth: 1\n\n# How much air is cleared above the platform.\n# @type: integer\n# @range: [0, null]\n# @unit: blocks\n# @default: 2\nplatformAirHeight: 2\n\n# Block the platform is made of.\n# @type: material\n# @source: material\n# @default: GLASS\nplatformMaterial: \"GLASS\"\n\n# Seconds until the platform turns back into the old blocks. -1 = never, 0 = on reload.\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [-1, null]\n# @unit: seconds\n# @default: -1\nplatformRestoreSeconds: -1\n\n# --- Optional PvP / combat-tag check ---\n# true = check if you're fighting before teleporting.\n# @type: boolean\n# @default: false\npvpCheckEnabled: false\n\n# Seconds you stay \"in combat\" after a PvP hit (built-in tracker only).\n# Supports duration units (e.g. 24h, 1d).\n# @type: integer\n# @range: [0, null]\n# @unit: seconds\n# @default: 15\npvpCombatTagSeconds: 15\n\n# What to do if you /rtp while fighting.\n# ALLOW = let it, DENY = block it, DELAY = wait, CANCEL = stop it.\n# @type: enum\n# @options: [ALLOW, DENY, DELAY, CANCEL]\n# @default: DENY\npvpOnCombat: \"DENY\"\n\n# Where to read combat state from.\n# AUTO = plugin if present else built-in, NATIVE = built-in, EXTERNAL = plugin only.\n# @type: enum\n# @options: [AUTO, NATIVE, EXTERNAL]\n# @default: AUTO\npvpSource: \"AUTO\"\n\n# Built-in tracker: tag the player who gets hit.\n# @type: boolean\n# @default: true\npvpTagVictim: true\n\n# Built-in tracker: tag the player who hits.\n# @type: boolean\n# @default: true\npvpTagAggressor: true\n\n# --- Advanced (most servers leave these alone) ---\n# How many retries before a chunk check gives up.\n# @type: integer\n# @range: [0, null]\n# @default: 2\nstaleChunkRetryLimit: 2\n\n# Skip bad spots without loading chunks (faster).\n# @type: boolean\n# @default: true\nanvilPrefilterEnabled: true\n\n# DO NOT TOUCH VERSION NUMBER\nversion: 1.1\n"
  },
  "docTracker": {
   "world": {
@@ -35,8 +35,8 @@
   },
   "worldborderoverride": {
    "title": "worldBorderOverride",
-   "desc": "If true, the `shape` block is replaced by a square matching the world's vanilla `/worldborder`, and the configured `radius` / `centerRadius` / `centerX` / `centerZ` are ignored. See [Region Size](#region-size-radius-and-centerradius).",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">If true, the <code style=\\\"color:var(--yellow);\\\"><b>shape</b></code> block is replaced by a square matching the world's vanilla <code style=\\\"color:var(--yellow);\\\"><b>/worldborder</b></code>, and the configured <code style=\\\"color:var(--yellow);\\\"><b>radius</b></code> / <code style=\\\"color:var(--yellow);\\\"><b>centerRadius</b></code> / <code style=\\\"color:var(--yellow);\\\"><b>centerX</b></code> / <code style=\\\"color:var(--yellow);\\\"><b>centerZ</b></code> are ignored. See <a href=\\\"#region-size-radius-and-centerradius\\\" target=\\\"_blank\\\" style=\\\"color:var(--accent);\\\">Region Size</a>.</p>",
+   "desc": "**Not generally recommended.** If `true`, replaces the entire `shape` block with a square matching the world's vanilla `/worldborder` and ignores `shape.radius`, `shape.centerRadius`, `centerX`, and `centerZ`. Prefer setting `shape.radius` with a unit suffix (e.g. `2500b` or `5km`) in `definitions/regions/<name>.yml` or `/rtp editor`. See [Region Size](#region-size-radius-and-centerradius).",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\"><b>Not generally recommended.</b> If <code style=\\\"color:var(--yellow);\\\"><b>true</b></code>, replaces the entire <code style=\\\"color:var(--yellow);\\\"><b>shape</b></code> block with a square matching the world's vanilla <code style=\\\"color:var(--yellow);\\\"><b>/worldborder</b></code> and ignores <code style=\\\"color:var(--yellow);\\\"><b>shape.radius</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>shape.centerRadius</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>centerX</b></code>, and <code style=\\\"color:var(--yellow);\\\"><b>centerZ</b></code>. Prefer setting <code style=\\\"color:var(--yellow);\\\"><b>shape.radius</b></code> with a unit suffix (e.g. <code style=\\\"color:var(--yellow);\\\"><b>2500b</b></code> or <code style=\\\"color:var(--yellow);\\\"><b>5km</b></code>) in <code style=\\\"color:var(--yellow);\\\"><b>definitions/regions/<name>.yml</b></code> or <code style=\\\"color:var(--yellow);\\\"><b>/rtp editor</b></code>. See <a href=\\\"#region-size-radius-and-centerradius\\\" target=\\\"_blank\\\" style=\\\"color:var(--accent);\\\">Region Size</a>.</p>",
    "meta": "Type: Boolean | Default: `false` | Docs: REGIONS.md",
    "defaultVal": "`false`",
    "defaultSnippet": "worldBorderOverride: `false`"
@@ -123,8 +123,8 @@
   },
   "shapename": {
    "title": "shape.name",
-   "desc": "Shape engine: `CIRCLE`, `CIRCLE_NORMAL`, `CIRCLE_OPTIMIZED_DUAL_LAYER`, `CIRCLE_DEPRECATED_PURE_SPIRAL`, `SQUARE`, `SQUARE_NORMAL`, `SQUARE_OPTIMIZED_DUAL_LAYER`, `SQUARE_DEPRECATED_PURE_SPIRAL`, `ELLIPSE`, `RECTANGLE`, `POLYGON`.",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Shape engine: <code style=\\\"color:var(--yellow);\\\"><b>CIRCLE</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>CIRCLE_NORMAL</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>CIRCLE_OPTIMIZED_DUAL_LAYER</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>CIRCLE_DEPRECATED_PURE_SPIRAL</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>SQUARE</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>SQUARE_NORMAL</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>SQUARE_OPTIMIZED_DUAL_LAYER</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>SQUARE_DEPRECATED_PURE_SPIRAL</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>ELLIPSE</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>RECTANGLE</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>POLYGON</b></code>.</p>",
+   "desc": "Shape: `CIRCLE` (default), `SQUARE`, `RECTANGLE`, `ELLIPSE`, or `POLYGON`.",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Shape: <code style=\\\"color:var(--yellow);\\\"><b>CIRCLE</b></code> (default), <code style=\\\"color:var(--yellow);\\\"><b>SQUARE</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>RECTANGLE</b></code>, <code style=\\\"color:var(--yellow);\\\"><b>ELLIPSE</b></code>, or <code style=\\\"color:var(--yellow);\\\"><b>POLYGON</b></code>.</p>",
    "meta": "Type: String | Docs: CONFIGURATION.md",
    "defaultVal": "",
    "defaultSnippet": ""
@@ -264,38 +264,6 @@
    "meta": "Type: Boolean | Default: false | Docs: REGIONS.md",
    "defaultVal": "false",
    "defaultSnippet": "expand: false"
-  },
-  "shapemean": {
-   "title": "shape.mean",
-   "desc": "Mean of the normal distribution (0.0 = centre, 1.0 = edge).",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Mean of the normal distribution (0.0 = centre, 1.0 = edge).</p>",
-   "meta": "Type: Double | Docs: CONFIGURATION.md",
-   "defaultVal": "",
-   "defaultSnippet": ""
-  },
-  "mean": {
-   "title": "mean",
-   "desc": "Mean of the normal distribution (0.0 = centre, 1.0 = edge).",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Mean of the normal distribution (0.0 = centre, 1.0 = edge).</p>",
-   "meta": "Type: Double | Docs: CONFIGURATION.md",
-   "defaultVal": "",
-   "defaultSnippet": ""
-  },
-  "shapedeviation": {
-   "title": "shape.deviation",
-   "desc": "Standard deviation. Smaller = tighter cluster; larger = wider spread.",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Standard deviation. Smaller = tighter cluster; larger = wider spread.</p>",
-   "meta": "Type: Double | Docs: CONFIGURATION.md",
-   "defaultVal": "",
-   "defaultSnippet": ""
-  },
-  "deviation": {
-   "title": "deviation",
-   "desc": "Standard deviation. Smaller = tighter cluster; larger = wider spread.",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Standard deviation. Smaller = tighter cluster; larger = wider spread.</p>",
-   "meta": "Type: Double | Docs: CONFIGURATION.md",
-   "defaultVal": "",
-   "defaultSnippet": ""
   },
   "shapewidth": {
    "title": "shape.width",
@@ -480,6 +448,38 @@
    "meta": "Type: `\"off\"` or degrees | Default: `\"off\"` | Docs: CONFIGURATION.md",
    "defaultVal": "`\"off\"`",
    "defaultSnippet": "maxHillAngle: `\"off\"`"
+  },
+  "vertmaxslope": {
+   "title": "vert.maxSlope",
+   "desc": "`LINEAR` and `JUMP` only. Largest floor-Y step (in blocks) allowed between the landing spot and the floor `slopeRadius` blocks away (`-1` or omitted = disabled, `0` = flat ground only). See [REGIONS.md](REGIONS.md#slope-check-details-maxslope).",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\"><code style=\\\"color:var(--yellow);\\\"><b>LINEAR</b></code> and <code style=\\\"color:var(--yellow);\\\"><b>JUMP</b></code> only. Largest floor-Y step (in blocks) allowed between the landing spot and the floor <code style=\\\"color:var(--yellow);\\\"><b>slopeRadius</b></code> blocks away (<code style=\\\"color:var(--yellow);\\\"><b>-1</b></code> or omitted = disabled, <code style=\\\"color:var(--yellow);\\\"><b>0</b></code> = flat ground only). See <a href=\\\"REGIONS.md#slope-check-details-maxslope\\\" target=\\\"_blank\\\" style=\\\"color:var(--accent);\\\">REGIONS.md</a>.</p>",
+   "meta": "Type: Integer | Default: `-1` | Docs: CONFIGURATION.md",
+   "defaultVal": "`-1`",
+   "defaultSnippet": "maxSlope: `-1`"
+  },
+  "maxslope": {
+   "title": "maxSlope",
+   "desc": "`LINEAR` and `JUMP` only. Largest floor-Y step (in blocks) allowed between the landing spot and the floor `slopeRadius` blocks away (`-1` or omitted = disabled, `0` = flat ground only). See [REGIONS.md](REGIONS.md#slope-check-details-maxslope).",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\"><code style=\\\"color:var(--yellow);\\\"><b>LINEAR</b></code> and <code style=\\\"color:var(--yellow);\\\"><b>JUMP</b></code> only. Largest floor-Y step (in blocks) allowed between the landing spot and the floor <code style=\\\"color:var(--yellow);\\\"><b>slopeRadius</b></code> blocks away (<code style=\\\"color:var(--yellow);\\\"><b>-1</b></code> or omitted = disabled, <code style=\\\"color:var(--yellow);\\\"><b>0</b></code> = flat ground only). See <a href=\\\"REGIONS.md#slope-check-details-maxslope\\\" target=\\\"_blank\\\" style=\\\"color:var(--accent);\\\">REGIONS.md</a>.</p>",
+   "meta": "Type: Integer | Default: `-1` | Docs: CONFIGURATION.md",
+   "defaultVal": "`-1`",
+   "defaultSnippet": "maxSlope: `-1`"
+  },
+  "vertsloperadius": {
+   "title": "vert.slopeRadius",
+   "desc": "`LINEAR` and `JUMP` only. Horizontal distance (in blocks, `1` to `8`) from the landing spot where `maxSlope` samples the floor.",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\"><code style=\\\"color:var(--yellow);\\\"><b>LINEAR</b></code> and <code style=\\\"color:var(--yellow);\\\"><b>JUMP</b></code> only. Horizontal distance (in blocks, <code style=\\\"color:var(--yellow);\\\"><b>1</b></code> to <code style=\\\"color:var(--yellow);\\\"><b>8</b></code>) from the landing spot where <code style=\\\"color:var(--yellow);\\\"><b>maxSlope</b></code> samples the floor.</p>",
+   "meta": "Type: Integer | Default: `2` | Docs: CONFIGURATION.md",
+   "defaultVal": "`2`",
+   "defaultSnippet": "slopeRadius: `2`"
+  },
+  "sloperadius": {
+   "title": "slopeRadius",
+   "desc": "`LINEAR` and `JUMP` only. Horizontal distance (in blocks, `1` to `8`) from the landing spot where `maxSlope` samples the floor.",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\"><code style=\\\"color:var(--yellow);\\\"><b>LINEAR</b></code> and <code style=\\\"color:var(--yellow);\\\"><b>JUMP</b></code> only. Horizontal distance (in blocks, <code style=\\\"color:var(--yellow);\\\"><b>1</b></code> to <code style=\\\"color:var(--yellow);\\\"><b>8</b></code>) from the landing spot where <code style=\\\"color:var(--yellow);\\\"><b>maxSlope</b></code> samples the floor.</p>",
+   "meta": "Type: Integer | Default: `2` | Docs: CONFIGURATION.md",
+   "defaultVal": "`2`",
+   "defaultSnippet": "slopeRadius: `2`"
   },
   "vertstep": {
    "title": "vert.step",
@@ -1291,8 +1291,8 @@
   },
   "invulnerabilitytime": {
    "title": "invulnerabilityTime",
-   "desc": "Seconds of invulnerability granted after teleporting. Prevents fall, fire, or drowning damage on arrival. `0` disables.",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Seconds of invulnerability granted after teleporting. Prevents fall, fire, or drowning damage on arrival. <code style=\\\"color:var(--yellow);\\\"><b>0</b></code> disables.</p>",
+   "desc": "Seconds of invulnerability granted after teleporting. Prevents **fall**, fire, or **drowning** damage on arrival. `0` **disables**.",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Seconds of invulnerability granted after teleporting. Prevents <b>fall</b>, fire, or <b>drowning</b> damage on arrival. <code style=\\\"color:var(--yellow);\\\"><b>0</b></code> <b>disables</b>.</p>",
    "meta": "Type: Integer / Duration | Default: `5` | Docs: SAFETY.md",
    "defaultVal": "`5`",
    "defaultSnippet": "invulnerabilityTime: `5`"
@@ -1716,7 +1716,8 @@
    "vert",
    "minY",
    "maxY",
-   "unsafe-blocks"
+   "unsafe-blocks",
+   "unsafeBlocks"
   ],
   "underground": [
    "vert",
@@ -1724,6 +1725,7 @@
    "maxY"
   ],
   "altura": [
+   "height",
    "vert",
    "minY",
    "maxY"
@@ -1765,40 +1767,49 @@
    "cooldown",
    "teleportCooldown",
    "teleport-delay",
+   "teleportDelay",
    "timer",
    "cancel"
   ],
   "speed": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown",
    "warmup"
   ],
   "timer": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown"
   ],
   "retraso": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown"
   ],
   "delai": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown"
   ],
   "délai": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown"
   ],
   "wartezeit": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown"
   ],
   "opoznienie": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown"
   ],
   "opóźnienie": [
    "teleport-delay",
+   "teleportDelay",
    "cooldown"
   ],
   "performance": [
@@ -1861,6 +1872,7 @@
   ],
   "safety": [
    "unsafe-blocks",
+   "unsafeBlocks",
    "check-blocks",
    "claim",
    "ground",
@@ -1874,40 +1886,48 @@
   ],
   "water": [
    "unsafe-blocks",
+   "unsafeBlocks",
    "safety"
   ],
   "lava": [
    "unsafe-blocks",
+   "unsafeBlocks",
    "safety"
   ],
   "seguridad": [
    "safety",
    "unsafe-blocks",
+   "unsafeBlocks",
    "check-blocks"
   ],
   "securite": [
    "safety",
    "unsafe-blocks",
+   "unsafeBlocks",
    "check-blocks"
   ],
   "sécurité": [
    "safety",
    "unsafe-blocks",
+   "unsafeBlocks",
    "check-blocks"
   ],
   "sicherheit": [
    "safety",
    "unsafe-blocks",
+   "unsafeBlocks",
    "check-blocks"
   ],
   "bezpieczenstwo": [
    "safety",
    "unsafe-blocks",
+   "unsafeBlocks",
    "check-blocks"
   ],
   "bezpieczeństwo": [
    "safety",
    "unsafe-blocks",
+   "unsafeBlocks",
    "check-blocks"
   ],
   "nether": [
@@ -1943,6 +1963,7 @@
   ],
   "biomes": [
    "blocked-biomes",
+   "biomes",
    "biomePrice",
    "weight",
    "biome"
@@ -1953,6 +1974,3912 @@
    "rectangle",
    "spiral",
    "polygon"
+  ],
+  "rtp": [
+   "airBlocks",
+   "lockAfterUses",
+   "lockAfterResetSeconds",
+   "requirePermission",
+   "biomes",
+   "biomeWeights",
+   "price",
+   "biomePrice",
+   "balanceFloor",
+   "region",
+   "network",
+   "teleportCooldown",
+   "override"
+  ],
+  "actionconfigconstraints": [
+   "triggers",
+   "gates",
+   "command",
+   "alias",
+   "placement"
+  ],
+  "actionconfigloader": [
+   "alias",
+   "permission",
+   "description",
+   "icon",
+   "title",
+   "placement",
+   "confinement",
+   "lifecycle",
+   "command",
+   "gate",
+   "gates",
+   "trigger",
+   "triggers"
+  ],
+  "actiondefinitionvalidator": [
+   "triggers",
+   "gates",
+   "command",
+   "alias",
+   "placement"
+  ],
+  "actionengineselftest": [
+   "triggers",
+   "gates",
+   "command",
+   "alias",
+   "placement"
+  ],
+  "bitseveritypolicy": [
+   "gateOutcomeSamples",
+   "strictActions",
+   "strictConfig",
+   "overrides"
+  ],
+  "rtpbitcli": [
+   "triggers",
+   "gates",
+   "command",
+   "alias",
+   "placement"
+  ],
+  "rtpbitcomponents": [
+   "triggers",
+   "gates",
+   "command",
+   "alias",
+   "placement"
+  ],
+  "rtpbitstartup": [
+   "startupSweep",
+   "coverage"
+  ],
+  "configreferencecheck": [
+   "defaults",
+   "cooldown",
+   "teleportCooldown",
+   "delay",
+   "teleportDelay",
+   "world",
+   "override",
+   "region"
+  ],
+  "effectsgroupvalidator": [
+   "when",
+   "permission",
+   "players",
+   "inherit",
+   "effects"
+  ],
+  "sendertimings": [
+   "teleportCooldown",
+   "teleportDelay"
+  ],
+  "menurendererdiscovery": [
+   "menu"
+  ],
+  "netherendconfigamender": [
+   "vert"
+  ],
+  "rtpcmd": [
+   "region",
+   "lockAfterUses",
+   "lockAfterResetSeconds",
+   "command",
+   "syncLoading",
+   "price",
+   "priceOther",
+   "paramsPrice",
+   "biomePrice",
+   "balanceFloor",
+   "shape"
+  ],
+  "subconfigcmd": [
+   "database"
+  ],
+  "commandtreemenubuilder": [
+   "teleportDelay"
+  ],
+  "menubindingsupport": [
+   "menu"
+  ],
+  "menucolor": [
+   "region"
+  ],
+  "prefabapplycmd": [
+   "region"
+  ],
+  "scanresetcmd": [
+   "spatialResolution"
+  ],
+  "scanstartcmd": [
+   "spatialResolution"
+  ],
+  "testactioncmd": [
+   "triggers",
+   "gates",
+   "command",
+   "alias",
+   "placement"
+  ],
+  "testanvilprefiltercmd": [
+   "anvilPrefilterEnabled"
+  ],
+  "testconfigsetcmd": [
+   "viewDistanceSelect"
+  ],
+  "configdefaultresolver": [
+   "defaults",
+   "teleportCooldown",
+   "teleportDelay"
+  ],
+  "configs": [
+   "detailed_reload",
+   "database"
+  ],
+  "safetytokenexpander": [
+   "airBlocks",
+   "unsafeBlocks"
+  ],
+  "actionkeys": [
+   "version",
+   "alias",
+   "permission",
+   "description",
+   "placement",
+   "confinement",
+   "lifecycle",
+   "command",
+   "gate",
+   "gates",
+   "trigger",
+   "triggers",
+   "icon",
+   "title"
+  ],
+  "biomeskeys": [
+   "If",
+   "link",
+   "biomes"
+  ],
+  "bitkeys": [
+   "strictActions",
+   "strictConfig",
+   "gateOutcomeSamples",
+   "startupSweep",
+   "coverage",
+   "overrides",
+   "version"
+  ],
+  "blockskeys": [
+   "Blocks",
+   "treated",
+   "as",
+   "passable",
+   "air",
+   "for",
+   "landing",
+   "safety",
+   "checks",
+   "Accepts",
+   "Bukkit",
+   "Material",
+   "names",
+   "and",
+   "code",
+   "minecraft"
+  ],
+  "configkeys": [
+   "teleportDelay",
+   "teleportCooldown",
+   "Maximum",
+   "number",
+   "of",
+   "successful",
+   "code",
+   "rtp"
+  ],
+  "databasekeys": [
+   "database",
+   "version"
+  ],
+  "economykeys": [
+   "refundOnCancel",
+   "price",
+   "priceOther",
+   "paramsPrice",
+   "biomePrice",
+   "balanceFloor",
+   "version"
+  ],
+  "loggingkeys": [
+   "detailed_reload",
+   "detailed_region_init",
+   "command",
+   "teleport",
+   "event_changeworld",
+   "event_join",
+   "event_respawn",
+   "event_move",
+   "event_teleport",
+   "selection_failure",
+   "system_memory_tracker",
+   "system_database",
+   "Plugin",
+   "scoped",
+   "minimum",
+   "log"
+  ],
+  "metricskeys": [
+   "Whether",
+   "code",
+   "MetricsSnapshot",
+   "foliaRegions"
+  ],
+  "performancekeys": [
+   "autoTune",
+   "maxAttempts",
+   "period",
+   "syncAllottedTime",
+   "asyncAllottedTime",
+   "minTPS",
+   "maxMSPT",
+   "maxHeapPercent",
+   "viewDistanceSelect",
+   "viewDistanceTeleport",
+   "viewDistanceRestoreInterval",
+   "postTeleportQueueing",
+   "syncLoading",
+   "checkOnChunkLoads",
+   "onEventParsing",
+   "effectParsing"
+  ],
+  "regionkeys": [
+   "displayName",
+   "world",
+   "worldBorderOverride",
+   "shape",
+   "vert",
+   "requirePermission",
+   "cacheCap",
+   "backlogCacheCap",
+   "networkReserveSize",
+   "activeChunkCap",
+   "price",
+   "spatialResolution",
+   "override",
+   "cooldown",
+   "delay",
+   "version"
+  ],
+  "safetykeys": [
+   "invulnerabilityTime",
+   "safetyRadius",
+   "staleChunkRetryLimit",
+   "platformRadius",
+   "platformAirHeight",
+   "platformDepth",
+   "platformMaterial",
+   "Footprint",
+   "restoration",
+   "timeout",
+   "in",
+   "seconds",
+   "for",
+   "emergency",
+   "landing",
+   "platforms"
+  ],
+  "ttlkeys": [
+   "causes",
+   "verifiers",
+   "version"
+  ],
+  "worldkeys": [
+   "region",
+   "requirePermission",
+   "override",
+   "version"
+  ],
+  "databaseaccessor": [
+   "system_database"
+  ],
+  "economygate": [
+   "price",
+   "priceOther",
+   "paramsPrice",
+   "biomePrice",
+   "balanceFloor"
+  ],
+  "anvilbatchprefilterprovider": [
+   "anvilPrefilterEnabled",
+   "unsafeBlocks"
+  ],
+  "configreloadcoordinator": [
+   "detailed_region_init"
+  ],
+  "configsearchresultsbuilder": [
+   "shape"
+  ],
+  "coremetrics": [
+   "slowPipelineThresholdMs",
+   "queueGrowthWarnThreshold"
+  ],
+  "rtpbstatscatalogue": [
+   "shape",
+   "anvilPrefilterEnabled",
+   "biomeWhitelist"
+  ],
+  "placeholderprovider": [
+   "teleportDelay",
+   "teleportCooldown",
+   "lockAfterUses",
+   "lockAfterResetSeconds",
+   "requirePermission",
+   "override",
+   "worldBorderOverride"
+  ],
+  "pvpgate": [
+   "pvpCheckEnabled",
+   "pvpSource",
+   "pvpOnCombat",
+   "pvpTagVictim",
+   "pvpTagAggressor",
+   "pvpCombatTagSeconds"
+  ],
+  "selectionapi": [
+   "checkOnChunkLoads",
+   "world",
+   "shape",
+   "vert",
+   "worldBorderOverride",
+   "requirePermission",
+   "cacheCap",
+   "backlogCacheCap",
+   "networkReserveSize",
+   "activeChunkCap",
+   "price",
+   "spatialResolution",
+   "override",
+   "maxY",
+   "minY",
+   "direction"
+  ],
+  "failtypes": [
+   "pregeneratedPreference"
+  ],
+  "locationgenerator": [
+   "platformDepth"
+  ],
+  "pregenstate": [
+   "biomeWhitelist",
+   "biomes",
+   "selection_failure",
+   "unsafeBlocks",
+   "safetyRadius",
+   "staleChunkRetryLimit",
+   "maxAttempts",
+   "biomeRecall",
+   "biomeRecallForced",
+   "biomeWeighted",
+   "biomeWeights"
+  ],
+  "pregentask": [
+   "pregeneratedPreference",
+   "viewDistanceSelect"
+  ],
+  "queuetask": [
+   "unsafeBlocks",
+   "safetyRadius",
+   "platformDepth"
+  ],
+  "region": [
+   "spatialResolution",
+   "shape",
+   "biomeWhitelist",
+   "biomes",
+   "safetyRadius",
+   "unsafeBlocks",
+   "maxHeapPercent",
+   "backlogRefillThreshold",
+   "backlogGenerationStrategy",
+   "pregeneratedPreference",
+   "visitorEnabled",
+   "displayName"
+  ],
+  "regioncachekey": [
+   "safetyRadius",
+   "platformRadius",
+   "platformAirHeight",
+   "platformDepth",
+   "platformMaterial",
+   "airBlocks",
+   "unsafeBlocks",
+   "anvilPrefilterEnabled",
+   "biomeWhitelist",
+   "biomes"
+  ],
+  "regioncachetask": [
+   "viewDistanceSelect"
+  ],
+  "regioncandidatevalidator": [
+   "safetyRadius",
+   "unsafeBlocks"
+  ],
+  "regionconfigloader": [
+   "detailed_region_init",
+   "world",
+   "shape",
+   "vert",
+   "worldBorderOverride",
+   "requirePermission",
+   "cacheCap",
+   "backlogCacheCap",
+   "networkReserveSize",
+   "activeChunkCap",
+   "price",
+   "spatialResolution",
+   "override",
+   "cooldown",
+   "delay"
+  ],
+  "regionqueuemanager": [
+   "loginCacheEnabled"
+  ],
+  "ttlconfig": [
+   "causes",
+   "verifiers"
+  ],
+  "memoryshape": [
+   "viewDistanceSelect"
+  ],
+  "abstractverticaladjustor": [
+   "maxSlope",
+   "slopeRadius",
+   "maxHillAngle"
+  ],
+  "genericverticaladjustorkeys": [
+   "minY",
+   "maxY",
+   "direction",
+   "requireSkyLight",
+   "Largest",
+   "floor",
+   "height",
+   "difference",
+   "in",
+   "blocks",
+   "allowed",
+   "between",
+   "the",
+   "landing",
+   "spot",
+   "and"
+  ],
+  "fixedadjustorkeys": [
+   "The",
+   "exact",
+   "level",
+   "at",
+   "which",
+   "the",
+   "player",
+   "shall",
+   "be",
+   "placed",
+   "destination",
+   "cell",
+   "code"
+  ],
+  "jumpadjustor": [
+   "unsafeBlocks",
+   "airBlocks",
+   "safetyRadius",
+   "platformDepth",
+   "maxY",
+   "minY",
+   "step",
+   "requireSkyLight"
+  ],
+  "jumpadjustorkeys": [
+   "minY",
+   "maxY",
+   "step",
+   "requireSkyLight",
+   "Largest",
+   "floor",
+   "height",
+   "difference",
+   "in",
+   "blocks",
+   "allowed",
+   "between",
+   "the",
+   "landing",
+   "spot",
+   "and"
+  ],
+  "linearadjustor": [
+   "unsafeBlocks",
+   "safetyRadius",
+   "platformDepth",
+   "maxY",
+   "minY",
+   "direction",
+   "requireSkyLight"
+  ],
+  "scantask": [
+   "biomeWhitelist",
+   "biomes",
+   "unsafeBlocks",
+   "safetyRadius",
+   "biomeRecall"
+  ],
+  "rtpteleportcancel": [
+   "refundOnCancel"
+  ],
+  "teleportpipelinetask": [
+   "viewDistanceTeleport",
+   "viewDistanceRestoreInterval",
+   "postTeleportQueueing",
+   "setRespawnOnTeleport",
+   "lockAfterUses",
+   "lockAfterResetSeconds",
+   "invulnerabilityTime",
+   "platformRadius",
+   "unsafeBlocks"
+  ],
+  "runtimesignalsource": [
+   "minTPS",
+   "maxMSPT",
+   "maxHeapPercent",
+   "viewDistanceSelect"
+  ],
+  "tickbudget": [
+   "syncAllottedTime",
+   "asyncAllottedTime",
+   "period",
+   "autoTune"
+  ],
+  "heappressuremonitor": [
+   "maxHeapPercent"
+  ],
+  "memorytracker": [
+   "system_memory_tracker"
+  ],
+  "serverhealthgate": [
+   "minTPS",
+   "maxMSPT"
+  ],
+  "effectsresolver": [
+   "when",
+   "inherit",
+   "effects",
+   "permission",
+   "players"
+  ],
+  "rtpbukkitplugin": [
+   "loginCacheEnabled",
+   "loginCacheCap",
+   "onEventParsing",
+   "checkOnChunkLoads"
+  ],
+  "onchunkload": [
+   "checkOnChunkLoads"
+  ],
+  "oneventteleports": [
+   "event_join",
+   "event_respawn",
+   "loginCacheEnabled",
+   "cancelDistance",
+   "event_move",
+   "event_teleport"
+  ],
+  "onplayerdamage": [
+   "invulnerabilityTime"
+  ],
+  "onplayermove": [
+   "cancelDistance"
+  ],
+  "onplayerteleport": [
+   "cancelDistance"
+  ],
+  "safetyverifiertestjob": [
+   "unsafeBlocks"
+  ],
+  "testchunkprobeperfcmd": [
+   "anvilPrefilterEnabled"
+  ],
+  "bukkiteffectshandler": [
+   "effectParsing",
+   "consoleCommands",
+   "playerCommands"
+  ],
+  "rtpfabricmod": [
+   "consoleCommands",
+   "playerCommands"
+  ],
+  "fabriceffectshandler": [
+   "effectParsing"
+  ],
+  "bukkitrtpcommandsender": [
+   "teleportCooldown",
+   "teleportDelay"
+  ],
+  "teleportpathselector": [
+   "teleportPath"
+  ],
+  "abstractserveraccessor": [
+   "shape"
+  ],
+  "sendmessage": [
+   "min_level"
+  ],
+  "bukkitrtpchunk": [
+   "Blocks",
+   "treated",
+   "as",
+   "passable",
+   "air",
+   "for",
+   "landing",
+   "safety",
+   "checks",
+   "Accepts",
+   "Bukkit",
+   "Material",
+   "names",
+   "and",
+   "code",
+   "minecraft"
+  ],
+  "bukkitrtpworld": [
+   "anvilPrefilterEnabled",
+   "unsafeBlocks",
+   "platformRadius",
+   "platformAirHeight",
+   "platformDepth",
+   "platformRestoreSeconds",
+   "platformMaterial"
+  ],
+  "fabricdatabasehandler": [
+   "database"
+  ],
+  "fabriceventbridge": [
+   "loginCacheEnabled",
+   "loginCacheCap"
+  ],
+  "fabriconeventteleports": [
+   "event_join"
+  ],
+  "fabricserveraccessor": [
+   "min_level"
+  ],
+  "fabricrtpworld": [
+   "unsafeBlocks",
+   "anvilPrefilterEnabled"
+  ],
+  "fabriceffectshandlerunobf": [
+   "effectParsing"
+  ],
+  "fabricrtpworldunobf": [
+   "unsafeBlocks",
+   "anvilPrefilterEnabled"
+  ],
+  "v26_1_r1fabricrtpworld": [
+   "anvilPrefilterEnabled"
+  ],
+  "v26_2_r1fabricrtpworld": [
+   "anvilPrefilterEnabled"
+  ],
+  "v26_3_r1fabricrtpworld": [
+   "anvilPrefilterEnabled"
+  ],
+  "v26_4_r1fabricrtpworld": [
+   "anvilPrefilterEnabled"
+  ],
+  "foliartpcommandsender": [
+   "teleportCooldown",
+   "teleportDelay"
+  ],
+  "foliametricsbinding": [
+   "foliaAggregationMspt",
+   "foliaAggregationTps",
+   "foliaIncludeRegions"
+  ],
+  "foliartpchunk": [
+   "Blocks",
+   "treated",
+   "as",
+   "passable",
+   "air",
+   "for",
+   "landing",
+   "safety",
+   "checks",
+   "Accepts",
+   "Bukkit",
+   "Material",
+   "names",
+   "and",
+   "code",
+   "minecraft"
+  ],
+  "foliartpworld": [
+   "anvilPrefilterEnabled",
+   "unsafeBlocks",
+   "platformRadius",
+   "platformAirHeight",
+   "platformDepth",
+   "platformRestoreSeconds",
+   "platformMaterial"
+  ],
+  "rtpneoforgemod": [
+   "loginCacheEnabled"
+  ],
+  "neoforgedatabasehandler": [
+   "database"
+  ],
+  "neoforgeeffectshandler": [
+   "effectParsing"
+  ],
+  "neoforgeparticleeffect": [
+   "TYPE",
+   "COUNT",
+   "DX",
+   "DY",
+   "DZ",
+   "SPEED"
+  ],
+  "neoforgeparticlekeys": [
+   "TYPE",
+   "COUNT",
+   "DX",
+   "DY",
+   "DZ",
+   "SPEED"
+  ],
+  "neoforgepotioneffect": [
+   "TYPE",
+   "DURATION",
+   "AMPLIFIER",
+   "AMBIENT",
+   "PARTICLES",
+   "ICON"
+  ],
+  "neoforgepotionkeys": [
+   "TYPE",
+   "DURATION",
+   "AMPLIFIER",
+   "AMBIENT",
+   "PARTICLES",
+   "ICON"
+  ],
+  "neoforgesoundeffect": [
+   "TYPE",
+   "VOLUME",
+   "PITCH",
+   "DX",
+   "DY",
+   "DZ"
+  ],
+  "neoforgesoundkeys": [
+   "TYPE",
+   "VOLUME",
+   "PITCH",
+   "DX",
+   "DY",
+   "DZ"
+  ],
+  "neoforgetitleeffect": [
+   "TITLE",
+   "SUBTITLE",
+   "FADE_IN",
+   "STAY",
+   "FADE_OUT"
+  ],
+  "neoforgetitlekeys": [
+   "TITLE",
+   "SUBTITLE",
+   "FADE_IN",
+   "STAY",
+   "FADE_OUT"
+  ],
+  "neoforgeeventbridge": [
+   "loginCacheEnabled",
+   "loginCacheCap"
+  ],
+  "neoforgeoneventteleports": [
+   "event_join"
+  ],
+  "neoforgeserveraccessor": [
+   "min_level"
+  ],
+  "neoforgertpworld": [
+   "unsafeBlocks",
+   "anvilPrefilterEnabled"
+  ],
+  "actionsetupbit": [
+   "triggers",
+   "gates",
+   "command",
+   "alias",
+   "placement"
+  ],
+  "claimintegrations": [
+   "rerollSaberFactions",
+   "rerollFactionsBridge",
+   "rerollGriefDefender",
+   "rerollGriefPrevention",
+   "rerollLands",
+   "rerollRedProtect",
+   "rerollResidence",
+   "rerollCrashClaim",
+   "rerollHuskClaims",
+   "rerollHuskTowns",
+   "rerollPlotSquared",
+   "rerollKingdomsX",
+   "rerollTownyAdvanced",
+   "rerollWorldGuard",
+   "rerollUltimateClaims",
+   "rerollMinePlots"
+  ],
+  "claimsetupbit": [
+   "rerollWorldGuard",
+   "rerollGriefDefender",
+   "rerollGriefPrevention",
+   "rerollTownyAdvanced",
+   "rerollSaberFactions",
+   "rerollFactionsBridge",
+   "rerollLands",
+   "rerollRedProtect",
+   "rerollResidence",
+   "rerollCrashClaim",
+   "rerollHuskClaims",
+   "rerollHuskTowns",
+   "rerollPlotSquared",
+   "rerollKingdomsX",
+   "rerollUltimateClaims",
+   "rerollMinePlots"
+  ],
+  "integrationskeys": [
+   "rerollWorldGuard",
+   "rerollGriefDefender",
+   "rerollGriefPrevention",
+   "rerollTownyAdvanced",
+   "rerollSaberFactions",
+   "rerollFactionsBridge",
+   "rerollLands",
+   "rerollRedProtect",
+   "rerollResidence",
+   "rerollCrashClaim",
+   "rerollHuskClaims",
+   "rerollHuskTowns",
+   "rerollPlotSquared",
+   "rerollKingdomsX",
+   "rerollUltimateClaims",
+   "rerollMinePlots"
+  ],
+  "countdownhooks": [
+   "delayCountdown",
+   "queueCountdown"
+  ],
+  "countdownkeys": [
+   "When",
+   "the",
+   "addon",
+   "registers",
+   "code",
+   "GlobalRegionVerifier"
+  ],
+  "rtpcountdownaddon": [
+   "rejectInClaim"
+  ],
+  "guimenuconfig": [
+   "menuStyle",
+   "openOnBareRtp",
+   "menuTitle",
+   "regionIcons",
+   "menuRows",
+   "menuFiller",
+   "showDashboard",
+   "showActions",
+   "titleActionsMenu",
+   "titleActionsSelector",
+   "iconActionsSelector",
+   "iconActionDefault",
+   "showOperatorTools",
+   "permissionOperatorTools",
+   "titleOperatorMenu",
+   "titleOperatorSelector"
+  ],
+  "guimenukeys": [
+   "When",
+   "default",
+   "link",
+   "Boolean",
+   "TRUE"
+  ],
+  "anvilprobesupport": [
+   "unsafeBlocks"
+  ],
+  "effectstage": [
+   "version",
+   "when",
+   "permission",
+   "players",
+   "inherit",
+   "effects"
+  ],
+  "effectsgroupkeys": [
+   "version",
+   "when",
+   "permission",
+   "players",
+   "inherit",
+   "effects"
+  ],
+  "commandeffect": [
+   "MODE",
+   "COMMAND"
+  ],
+  "deatheffect": [
+   "SET_BED"
+  ],
+  "fireworkeffect": [
+   "TYPE",
+   "NUMBER",
+   "POWER",
+   "DX",
+   "DY",
+   "DZ",
+   "COLOR",
+   "FADE",
+   "FLICKER",
+   "TRAIL",
+   "SAFE"
+  ],
+  "glideeffect": [
+   "SHUTDOWNPLATFORMMATERIAL",
+   "RELATIVE",
+   "MAX",
+   "LANDINGTIMEOUT",
+   "ALLOWFIREWORKS",
+   "PLACEONSHUTDOWN",
+   "WORLD"
+  ],
+  "noteeffect": [
+   "TYPE",
+   "TONE"
+  ],
+  "particleeffect": [
+   "TYPE",
+   "NUMBER",
+   "DX",
+   "DY",
+   "DZ",
+   "SPEED"
+  ],
+  "potioneffect": [
+   "TYPE",
+   "DURATION",
+   "AMPLIFIER",
+   "AMBIENT",
+   "PARTICLES",
+   "ICON"
+  ],
+  "soundeffect": [
+   "TYPE",
+   "VOLUME",
+   "PITCH",
+   "DX",
+   "DY",
+   "DZ"
+  ],
+  "titleeffect": [
+   "TITLE",
+   "SUBTITLE",
+   "FADE_IN",
+   "STAY",
+   "FADE_OUT"
+  ],
+  "action-2001": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_unknown_lifecycle_stage": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2002": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_unknown_step_key": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2003": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_unknown_action_name": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2004": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_unknown_gate_type": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2005": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_unknown_trigger_type": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2006": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_placeholder_out_of_scope": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2007": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_placeholder_unknown": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2008": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_scoreboard_managed_typo": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2009": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_scoreboard_objective_missing": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2010": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_gate_expression_invalid": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2011": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_unknown_gate_subkey": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2012": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_missing_gate_subkey": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2013": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_unknown_region": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2014": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_schematic_unresolved": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2015": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_payload_unbalanced": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2016": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_payload_json_invalid": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2101": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_cbit_objective_missing": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2102": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_cbit_gate_never_passed": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2103": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_cbit_gate_always_passed": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2104": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_cbit_placeholder_unresolved": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2105": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_cbit_unknown_action": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2106": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_cbit_session_orphaned": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2107": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_selftest_mismatch": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action-2108": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "action_selftest_case_invalid": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "rtp-1812": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "rtp_cbit_action_dispatch_degraded": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-0001": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-1": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon_not_registered": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-0002": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-2": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon_command_register_failed": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-0003": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-3": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon_trigger_inactive": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-0004": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon-4": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "actaddon_name_collision": [
+   "strictActions",
+   "action-setup",
+   "triggers",
+   "gates",
+   "alias"
+  ],
+  "claim-0001": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim-1": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim_plugin_not_integrated": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim-0002": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim-2": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim_integration_failed": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim-0003": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim-3": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim_integration_inactive": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim-0004": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim-4": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "claim_plugin_absent": [
+   "integrations",
+   "rerollWorldGuard",
+   "rerollGriefPrevention",
+   "claim-integrations"
+  ],
+  "stalk_delay": [
+   "teleportDelay"
+  ],
+  "too_far_to_chase": [
+   "cancelDistance"
+  ],
+  "nap_time": [
+   "teleportCooldown"
+  ],
+  "tall_human_tricks": [
+   "consoleCommands"
+  ],
+  "human_tricks": [
+   "playerCommands"
+  ],
+  "treat_cost": [
+   "price"
+  ],
+  "treat_cost_for_friend": [
+   "priceOther"
+  ],
+  "fancy_treat_cost": [
+   "paramsPrice"
+  ],
+  "territory_treat_cost": [
+   "biomePrice"
+  ],
+  "treats_back_if_napping": [
+   "refundOnCancel"
+  ],
+  "empty_bowl": [
+   "balanceFloor"
+  ],
+  "nine_lives_buffer": [
+   "invulnerabilityTime"
+  ],
+  "soft_landing_radius": [
+   "safetyRadius"
+  ],
+  "paw_platform_radius": [
+   "platformRadius"
+  ],
+  "paw_platform_depth": [
+   "platformDepth"
+  ],
+  "paw_platform_headroom": [
+   "platformAirHeight"
+  ],
+  "paw_platform_material": [
+   "platformMaterial"
+  ],
+  "friendly_smells": [
+   "biomeWhitelist"
+  ],
+  "smells": [
+   "biomes"
+  ],
+  "biome_favoritism": [
+   "biomeWeighted"
+  ],
+  "biome_favor_amounts": [
+   "biomeWeights"
+  ],
+  "empty_air_for_zoomies": [
+   "airBlocks"
+  ],
+  "scary_blocks": [
+   "unsafeBlocks"
+  ],
+  "minimum_meow_volume": [
+   "min_level"
+  ],
+  "human_trick": [
+   "command"
+  ],
+  "pounce": [
+   "teleport"
+  ],
+  "missed_the_pounce": [
+   "selection_failure"
+  ],
+  "hopped_to_new_box": [
+   "event_changeworld"
+  ],
+  "new_kitty_arrived": [
+   "event_join"
+  ],
+  "nine_lives_used": [
+   "event_respawn"
+  ],
+  "prowl": [
+   "event_move"
+  ],
+  "pounce_event": [
+   "event_teleport"
+  ],
+  "long_grooming_session": [
+   "detailed_reload"
+  ],
+  "territory_marking": [
+   "detailed_region_init"
+  ],
+  "snack_inventory": [
+   "system_memory_tracker"
+  ],
+  "scratching_post": [
+   "system_database"
+  ],
+  "auto_purr_tune": [
+   "autoTune"
+  ],
+  "minimum_purrs_per_second": [
+   "minTPS"
+  ],
+  "maxheappurrcent": [
+   "maxHeapPercent"
+  ],
+  "max_pounces": [
+   "maxAttempts"
+  ],
+  "tail_swish_period": [
+   "period"
+  ],
+  "sync_nap_time": [
+   "syncAllottedTime"
+  ],
+  "async_nap_time": [
+   "asyncAllottedTime"
+  ],
+  "stalking_distance": [
+   "viewDistanceSelect"
+  ],
+  "pounce_distance": [
+   "viewDistanceTeleport"
+  ],
+  "pounce_recovery_naps": [
+   "viewDistanceRestoreInterval"
+  ],
+  "line_up_after_pounce": [
+   "postTeleportQueueing"
+  ],
+  "check_when_kibble_arrives": [
+   "checkOnChunkLoads"
+  ],
+  "backlog_refill_threshold": [
+   "backlogRefillThreshold"
+  ],
+  "backlog_generation_strategy": [
+   "backlogGenerationStrategy"
+  ],
+  "prefers_explored_land": [
+   "pregeneratedPreference"
+  ],
+  "login_warmspot_enabled": [
+   "loginCacheEnabled"
+  ],
+  "login_warmspot_cap": [
+   "loginCacheCap"
+  ],
+  "smell_memory": [
+   "biomeRecall"
+  ],
+  "forced_smell_memory": [
+   "biomeRecallForced"
+  ],
+  "slow_pounce_threshold_ms": [
+   "slowPipelineThresholdMs"
+  ],
+  "queue_growth_warn_threshold": [
+   "queueGrowthWarnThreshold"
+  ],
+  "synced_kibble": [
+   "syncLoading"
+  ],
+  "pounce_path": [
+   "teleportPath"
+  ],
+  "sniff_on_event": [
+   "onEventParsing"
+  ],
+  "sparkle_parsing": [
+   "effectParsing"
+  ],
+  "visitor_kitty_enabled": [
+   "visitorEnabled"
+  ],
+  "prefab_blanket": [
+   "prefab"
+  ],
+  "fence_override": [
+   "worldBorderOverride"
+  ],
+  "pounce_shape": [
+   "shape"
+  ],
+  "vertical_pounce": [
+   "vert"
+  ],
+  "requires_pets": [
+   "requirePermission"
+  ],
+  "kibble_jar_lid": [
+   "cacheCap"
+  ],
+  "kibble_stash_lid": [
+   "backlogCacheCap"
+  ],
+  "active_kibble_jar_lid": [
+   "activeChunkCap"
+  ],
+  "whisker_resolution": [
+   "spatialResolution"
+  ],
+  "paw_over": [
+   "override"
+  ],
+  "territory": [
+   "region"
+  ],
+  "teleportverzoegerung": [
+   "teleportDelay"
+  ],
+  "distanzabbruch": [
+   "cancelDistance"
+  ],
+  "teleportabkuehlung": [
+   "teleportCooldown"
+  ],
+  "konsolenbefehle": [
+   "consoleCommands"
+  ],
+  "spielerbefehle": [
+   "playerCommands"
+  ],
+  "preis": [
+   "price"
+  ],
+  "preisanderer": [
+   "priceOther"
+  ],
+  "preisparameter": [
+   "paramsPrice"
+  ],
+  "preisbiom": [
+   "biomePrice"
+  ],
+  "erstattungbeiabbruch": [
+   "refundOnCancel"
+  ],
+  "mindestkontostand": [
+   "balanceFloor"
+  ],
+  "minlevel": [
+   "min_level"
+  ],
+  "befehl": [
+   "command"
+  ],
+  "teleportierung": [
+   "teleport"
+  ],
+  "auswahlfehlschlag": [
+   "selection_failure"
+  ],
+  "ereignisweltwechsel": [
+   "event_changeworld"
+  ],
+  "ereignisbeitritt": [
+   "event_join"
+  ],
+  "ereignisrespawn": [
+   "event_respawn"
+  ],
+  "ereignisbewegung": [
+   "event_move"
+  ],
+  "ereignisteleport": [
+   "event_teleport"
+  ],
+  "detailliertesneuladen": [
+   "detailed_reload"
+  ],
+  "detaillierteregionsinitialisierung": [
+   "detailed_region_init"
+  ],
+  "systemspeichertracker": [
+   "system_memory_tracker"
+  ],
+  "systemdatenbank": [
+   "system_database"
+  ],
+  "automatischeanpassung": [
+   "autoTune"
+  ],
+  "minimaletps": [
+   "minTPS"
+  ],
+  "maxheapprozent": [
+   "maxHeapPercent"
+  ],
+  "maxversuche": [
+   "maxAttempts"
+  ],
+  "intervall": [
+   "period"
+  ],
+  "synczugeteiltezeit": [
+   "syncAllottedTime"
+  ],
+  "asynczugeteiltezeit": [
+   "asyncAllottedTime"
+  ],
+  "sichtweiteauswahl": [
+   "viewDistanceSelect"
+  ],
+  "sichtweiteteleport": [
+   "viewDistanceTeleport"
+  ],
+  "sichtweitewiederherstellungsintervall": [
+   "viewDistanceRestoreInterval"
+  ],
+  "nachteleporteinreihung": [
+   "postTeleportQueueing"
+  ],
+  "beichunkladenpruefen": [
+   "checkOnChunkLoads"
+  ],
+  "rueckstauauffuellschwelle": [
+   "backlogRefillThreshold"
+  ],
+  "rueckstaugenerierungsstrategie": [
+   "backlogGenerationStrategy"
+  ],
+  "vorgeneriertbevorzugung": [
+   "pregeneratedPreference"
+  ],
+  "logincacheaktiviert": [
+   "loginCacheEnabled"
+  ],
+  "logincacheobergrenze": [
+   "loginCacheCap"
+  ],
+  "biomwiederverwendung": [
+   "biomeRecall"
+  ],
+  "biomwiederverwendungerzwungen": [
+   "biomeRecallForced"
+  ],
+  "langsamepipelineschwellems": [
+   "slowPipelineThresholdMs"
+  ],
+  "warteschlangenwachstumwarnschwelle": [
+   "queueGrowthWarnThreshold"
+  ],
+  "syncladen": [
+   "syncLoading"
+  ],
+  "teleportpfad": [
+   "teleportPath"
+  ],
+  "ereignisauswertung": [
+   "onEventParsing"
+  ],
+  "effektauswertung": [
+   "effectParsing"
+  ],
+  "besucheraktiviert": [
+   "visitorEnabled"
+  ],
+  "vorlage": [
+   "prefab"
+  ],
+  "modo": [
+   "mode"
+  ],
+  "radiocentro": [
+   "centerRadius"
+  ],
+  "centrox": [
+   "centerX"
+  ],
+  "centroz": [
+   "centerZ"
+  ],
+  "peso": [
+   "weight"
+  ],
+  "colocacionesunicas": [
+   "uniquePlacements"
+  ],
+  "expandir": [
+   "expand"
+  ],
+  "media": [
+   "mean"
+  ],
+  "desviacion": [
+   "deviation"
+  ],
+  "anchura": [
+   "width"
+  ],
+  "rotacion": [
+   "rotation"
+  ],
+  "paso": [
+   "step"
+  ],
+  "requerirluzcielo": [
+   "requireSkyLight"
+  ],
+  "direccion": [
+   "direction"
+  ],
+  "retrasoteletransporte": [
+   "teleportDelay"
+  ],
+  "distanciacancelar": [
+   "cancelDistance"
+  ],
+  "enfriamientoteletransporte": [
+   "teleportCooldown"
+  ],
+  "comandosconsola": [
+   "consoleCommands"
+  ],
+  "comandosjugador": [
+   "playerCommands"
+  ],
+  "preciootro": [
+   "priceOther"
+  ],
+  "precioparametros": [
+   "paramsPrice"
+  ],
+  "preciobioma": [
+   "biomePrice"
+  ],
+  "reembolsoalcancelar": [
+   "refundOnCancel"
+  ],
+  "saldominimo": [
+   "balanceFloor"
+  ],
+  "tiempoinvulnerabilidad": [
+   "invulnerabilityTime"
+  ],
+  "radioseguridad": [
+   "safetyRadius"
+  ],
+  "radioplataforma": [
+   "platformRadius"
+  ],
+  "profundidadplataforma": [
+   "platformDepth"
+  ],
+  "alturaaireplataforma": [
+   "platformAirHeight"
+  ],
+  "materialplataforma": [
+   "platformMaterial"
+  ],
+  "listapermitidabiomas": [
+   "biomeWhitelist"
+  ],
+  "biomas": [
+   "biomes"
+  ],
+  "biomaponderado": [
+   "biomeWeighted"
+  ],
+  "pesosbioma": [
+   "biomeWeights"
+  ],
+  "bloquesaire": [
+   "airBlocks"
+  ],
+  "bloquesinseguros": [
+   "unsafeBlocks"
+  ],
+  "nivel_minimo": [
+   "min_level"
+  ],
+  "comando": [
+   "command"
+  ],
+  "teletransporte": [
+   "teleport"
+  ],
+  "fallo_seleccion": [
+   "selection_failure"
+  ],
+  "evento_cambiomundo": [
+   "event_changeworld"
+  ],
+  "evento_union": [
+   "event_join"
+  ],
+  "evento_reaparicion": [
+   "event_respawn"
+  ],
+  "evento_movimiento": [
+   "event_move"
+  ],
+  "evento_teletransporte": [
+   "event_teleport"
+  ],
+  "recarga_detallada": [
+   "detailed_reload"
+  ],
+  "inicio_region_detallado": [
+   "detailed_region_init"
+  ],
+  "sistema_rastreomemoria": [
+   "system_memory_tracker"
+  ],
+  "sistema_basededatos": [
+   "system_database"
+  ],
+  "ajusteautomatico": [
+   "autoTune"
+  ],
+  "tpsminimo": [
+   "minTPS"
+  ],
+  "maxheapporcentaje": [
+   "maxHeapPercent"
+  ],
+  "intentosmaximos": [
+   "maxAttempts"
+  ],
+  "periodo": [
+   "period"
+  ],
+  "tiempoasignadosincrono": [
+   "syncAllottedTime"
+  ],
+  "tiempoasignadoasincrono": [
+   "asyncAllottedTime"
+  ],
+  "distanciavistaseleccion": [
+   "viewDistanceSelect"
+  ],
+  "distanciavistateletransporte": [
+   "viewDistanceTeleport"
+  ],
+  "intervalorestauracionvista": [
+   "viewDistanceRestoreInterval"
+  ],
+  "encolarpostteletransporte": [
+   "postTeleportQueueing"
+  ],
+  "verificarencargachunk": [
+   "checkOnChunkLoads"
+  ],
+  "umbralrellenobacklog": [
+   "backlogRefillThreshold"
+  ],
+  "estrategiageneracionbacklog": [
+   "backlogGenerationStrategy"
+  ],
+  "preferenciapregenerado": [
+   "pregeneratedPreference"
+  ],
+  "cacheloginactivada": [
+   "loginCacheEnabled"
+  ],
+  "limitecachelogin": [
+   "loginCacheCap"
+  ],
+  "recuerdobioma": [
+   "biomeRecall"
+  ],
+  "recuerdobiomaforzado": [
+   "biomeRecallForced"
+  ],
+  "umbralpipelinelentams": [
+   "slowPipelineThresholdMs"
+  ],
+  "umbralavisocrecimientocola": [
+   "queueGrowthWarnThreshold"
+  ],
+  "cargasincrona": [
+   "syncLoading"
+  ],
+  "rutateletransporte": [
+   "teleportPath"
+  ],
+  "analisisalevento": [
+   "onEventParsing"
+  ],
+  "analisisefectos": [
+   "effectParsing"
+  ],
+  "visitanteactivado": [
+   "visitorEnabled"
+  ],
+  "prefabricado": [
+   "prefab"
+  ],
+  "mundo": [
+   "world"
+  ],
+  "sobrescribirbordemundo": [
+   "worldBorderOverride"
+  ],
+  "forma": [
+   "shape"
+  ],
+  "requerirpermiso": [
+   "requirePermission"
+  ],
+  "limitecache": [
+   "cacheCap"
+  ],
+  "limitecacheacumulada": [
+   "backlogCacheCap"
+  ],
+  "limitechunkactivo": [
+   "activeChunkCap"
+  ],
+  "resolucionespacial": [
+   "spatialResolution"
+  ],
+  "sobrescribir": [
+   "override"
+  ],
+  "delaiteleportation": [
+   "teleportDelay"
+  ],
+  "distanceannulation": [
+   "cancelDistance"
+  ],
+  "refroidissementteleportation": [
+   "teleportCooldown"
+  ],
+  "commandesconsole": [
+   "consoleCommands"
+  ],
+  "commandesjoueur": [
+   "playerCommands"
+  ],
+  "prixautre": [
+   "priceOther"
+  ],
+  "prixparametres": [
+   "paramsPrice"
+  ],
+  "prixbiome": [
+   "biomePrice"
+  ],
+  "remboursementannulation": [
+   "refundOnCancel"
+  ],
+  "soldeminimum": [
+   "balanceFloor"
+  ],
+  "niveauminimum": [
+   "min_level"
+  ],
+  "commande": [
+   "command"
+  ],
+  "teleportation": [
+   "teleport"
+  ],
+  "echecselection": [
+   "selection_failure"
+  ],
+  "evenementchangementmonde": [
+   "event_changeworld"
+  ],
+  "evenementconnexion": [
+   "event_join"
+  ],
+  "evenementreapparition": [
+   "event_respawn"
+  ],
+  "evenementmouvement": [
+   "event_move"
+  ],
+  "evenementteleport": [
+   "event_teleport"
+  ],
+  "rechargementdetaille": [
+   "detailed_reload"
+  ],
+  "initialisationregiondetaillee": [
+   "detailed_region_init"
+  ],
+  "systemetraceurmemoire": [
+   "system_memory_tracker"
+  ],
+  "systemebasedonnees": [
+   "system_database"
+  ],
+  "reglageautomatique": [
+   "autoTune"
+  ],
+  "tpsmin": [
+   "minTPS"
+  ],
+  "maxheappourcentage": [
+   "maxHeapPercent"
+  ],
+  "tentativesmax": [
+   "maxAttempts"
+  ],
+  "periode": [
+   "period"
+  ],
+  "tempsallouesync": [
+   "syncAllottedTime"
+  ],
+  "tempsalloueasync": [
+   "asyncAllottedTime"
+  ],
+  "distancevueselection": [
+   "viewDistanceSelect"
+  ],
+  "distancevueteleport": [
+   "viewDistanceTeleport"
+  ],
+  "intervallerestaurationvue": [
+   "viewDistanceRestoreInterval"
+  ],
+  "miseenfilepostteleport": [
+   "postTeleportQueueing"
+  ],
+  "verifierauchargementchunk": [
+   "checkOnChunkLoads"
+  ],
+  "seuilremplissagebacklog": [
+   "backlogRefillThreshold"
+  ],
+  "strategiegenerationbacklog": [
+   "backlogGenerationStrategy"
+  ],
+  "preferencepregenere": [
+   "pregeneratedPreference"
+  ],
+  "cacheconnexionactive": [
+   "loginCacheEnabled"
+  ],
+  "limitecacheconnexion": [
+   "loginCacheCap"
+  ],
+  "rappelbiome": [
+   "biomeRecall"
+  ],
+  "rappelbiomeforce": [
+   "biomeRecallForced"
+  ],
+  "seuilpipelinelentems": [
+   "slowPipelineThresholdMs"
+  ],
+  "seuilalertecroissancefile": [
+   "queueGrowthWarnThreshold"
+  ],
+  "chargementsync": [
+   "syncLoading"
+  ],
+  "cheminteleportation": [
+   "teleportPath"
+  ],
+  "analysesurevenement": [
+   "onEventParsing"
+  ],
+  "analyseeffets": [
+   "effectParsing"
+  ],
+  "visiteuractive": [
+   "visitorEnabled"
+  ],
+  "prefabrique": [
+   "prefab"
+  ],
+  "ritardoteletrasporto": [
+   "teleportDelay"
+  ],
+  "distanzaannullamento": [
+   "cancelDistance"
+  ],
+  "raffreddamentoteletrasporto": [
+   "teleportCooldown"
+  ],
+  "comandiconsole": [
+   "consoleCommands"
+  ],
+  "comandigiocatore": [
+   "playerCommands"
+  ],
+  "prezzo": [
+   "price"
+  ],
+  "prezzoaltro": [
+   "priceOther"
+  ],
+  "prezzoparametri": [
+   "paramsPrice"
+  ],
+  "prezzobioma": [
+   "biomePrice"
+  ],
+  "rimborsoannullamento": [
+   "refundOnCancel"
+  ],
+  "tempoinvulnerabilita": [
+   "invulnerabilityTime"
+  ],
+  "raggiosicurezza": [
+   "safetyRadius"
+  ],
+  "raggiopiattaforma": [
+   "platformRadius"
+  ],
+  "profonditapiattaforma": [
+   "platformDepth"
+  ],
+  "altezzaariapiattaforma": [
+   "platformAirHeight"
+  ],
+  "materialepiattaforma": [
+   "platformMaterial"
+  ],
+  "limiteripetizionichunkobsoleti": [
+   "staleChunkRetryLimit"
+  ],
+  "prefiltroanvilattivo": [
+   "anvilPrefilterEnabled"
+  ],
+  "whitelistbiomi": [
+   "biomeWhitelist"
+  ],
+  "biomi": [
+   "biomes"
+  ],
+  "biomapesato": [
+   "biomeWeighted"
+  ],
+  "pesibioma": [
+   "biomeWeights"
+  ],
+  "blocchiaria": [
+   "airBlocks"
+  ],
+  "blocchipericolosi": [
+   "unsafeBlocks"
+  ],
+  "livello_minimo": [
+   "min_level"
+  ],
+  "teletrasporto": [
+   "teleport"
+  ],
+  "fallimento_selezione": [
+   "selection_failure"
+  ],
+  "evento_cambiomondo": [
+   "event_changeworld"
+  ],
+  "evento_accesso": [
+   "event_join"
+  ],
+  "evento_respawn": [
+   "event_respawn"
+  ],
+  "evento_movimento": [
+   "event_move"
+  ],
+  "evento_teletrasporto": [
+   "event_teleport"
+  ],
+  "ricarica_dettagliata": [
+   "detailed_reload"
+  ],
+  "init_regione_dettagliato": [
+   "detailed_region_init"
+  ],
+  "sistema_tracciamentomemoria": [
+   "system_memory_tracker"
+  ],
+  "sistema_database": [
+   "system_database"
+  ],
+  "regolazioneautomatica": [
+   "autoTune"
+  ],
+  "maxheappercentuale": [
+   "maxHeapPercent"
+  ],
+  "tentativimassimi": [
+   "maxAttempts"
+  ],
+  "tempoassegnatosinc": [
+   "syncAllottedTime"
+  ],
+  "tempoassegnatoasinc": [
+   "asyncAllottedTime"
+  ],
+  "distanzavisualeselezione": [
+   "viewDistanceSelect"
+  ],
+  "distanzavisualeteletrasporto": [
+   "viewDistanceTeleport"
+  ],
+  "intervalloripristinovisuale": [
+   "viewDistanceRestoreInterval"
+  ],
+  "accodamentopostteletrasporto": [
+   "postTeleportQueueing"
+  ],
+  "controllocaricamentochunk": [
+   "checkOnChunkLoads"
+  ],
+  "sogliariempimentoarretrato": [
+   "backlogRefillThreshold"
+  ],
+  "strategiagenerazionearretrato": [
+   "backlogGenerationStrategy"
+  ],
+  "preferenzapregenerati": [
+   "pregeneratedPreference"
+  ],
+  "cacheloginattiva": [
+   "loginCacheEnabled"
+  ],
+  "richiamobioma": [
+   "biomeRecall"
+  ],
+  "richiamobiomaforzato": [
+   "biomeRecallForced"
+  ],
+  "sogliapipelinelentams": [
+   "slowPipelineThresholdMs"
+  ],
+  "sogliaavvisocrescitacoda": [
+   "queueGrowthWarnThreshold"
+  ],
+  "caricamentosinc": [
+   "syncLoading"
+  ],
+  "percorsoteletrasporto": [
+   "teleportPath"
+  ],
+  "parsingsuevento": [
+   "onEventParsing"
+  ],
+  "parsingeffetti": [
+   "effectParsing"
+  ],
+  "visitatoreattivo": [
+   "visitorEnabled"
+  ],
+  "prefabbricato": [
+   "prefab"
+  ],
+  "テレポート遅延": [
+   "teleportDelay"
+  ],
+  "キャンセル距離": [
+   "cancelDistance"
+  ],
+  "テレポートクールダウン": [
+   "teleportCooldown"
+  ],
+  "コンソールコマンド": [
+   "consoleCommands"
+  ],
+  "プレイヤーコマンド": [
+   "playerCommands"
+  ],
+  "他者への価格": [
+   "priceOther"
+  ],
+  "パラメータ価格": [
+   "paramsPrice"
+  ],
+  "バイオーム価格": [
+   "biomePrice"
+  ],
+  "キャンセル時返金": [
+   "refundOnCancel"
+  ],
+  "最低残高": [
+   "balanceFloor"
+  ],
+  "無敵時間": [
+   "invulnerabilityTime"
+  ],
+  "安全半径": [
+   "safetyRadius"
+  ],
+  "プラットフォーム半径": [
+   "platformRadius"
+  ],
+  "プラットフォーム深さ": [
+   "platformDepth"
+  ],
+  "プラットフォーム空気高さ": [
+   "platformAirHeight"
+  ],
+  "プラットフォーム素材": [
+   "platformMaterial"
+  ],
+  "バイオームホワイトリスト": [
+   "biomeWhitelist"
+  ],
+  "バイオーム": [
+   "biomes"
+  ],
+  "バイオーム重み付け": [
+   "biomeWeighted"
+  ],
+  "バイオーム重み": [
+   "biomeWeights"
+  ],
+  "空気ブロック": [
+   "airBlocks"
+  ],
+  "危険ブロック": [
+   "unsafeBlocks"
+  ],
+  "最低レベル": [
+   "min_level"
+  ],
+  "コマンド": [
+   "command"
+  ],
+  "テレポート": [
+   "teleport"
+  ],
+  "選択失敗": [
+   "selection_failure"
+  ],
+  "イベント_ワールド変更": [
+   "event_changeworld"
+  ],
+  "イベント_参加": [
+   "event_join"
+  ],
+  "イベント_リスポーン": [
+   "event_respawn"
+  ],
+  "イベント_移動": [
+   "event_move"
+  ],
+  "イベント_テレポート": [
+   "event_teleport"
+  ],
+  "詳細_リロード": [
+   "detailed_reload"
+  ],
+  "詳細_リージョン初期化": [
+   "detailed_region_init"
+  ],
+  "システム_メモリトラッカ": [
+   "system_memory_tracker"
+  ],
+  "システム_データベース": [
+   "system_database"
+  ],
+  "自動調整": [
+   "autoTune"
+  ],
+  "最低tps": [
+   "minTPS"
+  ],
+  "maxheapパーセント": [
+   "maxHeapPercent"
+  ],
+  "最大試行回数": [
+   "maxAttempts"
+  ],
+  "割当時間_同期": [
+   "syncAllottedTime"
+  ],
+  "割当時間_非同期": [
+   "asyncAllottedTime"
+  ],
+  "視距離_選択": [
+   "viewDistanceSelect"
+  ],
+  "視距離_テレポート": [
+   "viewDistanceTeleport"
+  ],
+  "視距離_復元間隔": [
+   "viewDistanceRestoreInterval"
+  ],
+  "テレポート後キューイング": [
+   "postTeleportQueueing"
+  ],
+  "チャンクロード時チェック": [
+   "checkOnChunkLoads"
+  ],
+  "バックログ補充しきい値": [
+   "backlogRefillThreshold"
+  ],
+  "バックログ生成戦略": [
+   "backlogGenerationStrategy"
+  ],
+  "事前生成優先度": [
+   "pregeneratedPreference"
+  ],
+  "ログインキャッシュ有効": [
+   "loginCacheEnabled"
+  ],
+  "ログインキャッシュ上限": [
+   "loginCacheCap"
+  ],
+  "バイオーム記憶": [
+   "biomeRecall"
+  ],
+  "バイオーム記憶_強制": [
+   "biomeRecallForced"
+  ],
+  "低速パイプラインしきい値ms": [
+   "slowPipelineThresholdMs"
+  ],
+  "キュー増加警告しきい値": [
+   "queueGrowthWarnThreshold"
+  ],
+  "同期ロード": [
+   "syncLoading"
+  ],
+  "テレポート経路": [
+   "teleportPath"
+  ],
+  "イベント時解析": [
+   "onEventParsing"
+  ],
+  "エフェクト解析": [
+   "effectParsing"
+  ],
+  "ビジター有効": [
+   "visitorEnabled"
+  ],
+  "プリセット": [
+   "prefab"
+  ],
+  "ワールド": [
+   "world"
+  ],
+  "ワールドボーダー上書き": [
+   "worldBorderOverride"
+  ],
+  "権限要求": [
+   "requirePermission"
+  ],
+  "キャッシュ上限": [
+   "cacheCap"
+  ],
+  "バックログキャッシュ上限": [
+   "backlogCacheCap"
+  ],
+  "アクティブチャンク上限": [
+   "activeChunkCap"
+  ],
+  "空間解像度": [
+   "spatialResolution"
+  ],
+  "リージョン": [
+   "region"
+  ],
+  "텔레포트지연": [
+   "teleportDelay"
+  ],
+  "취소거리": [
+   "cancelDistance"
+  ],
+  "텔레포트쿨다운": [
+   "teleportCooldown"
+  ],
+  "콘솔명령어": [
+   "consoleCommands"
+  ],
+  "플레이어명령어": [
+   "playerCommands"
+  ],
+  "타인가격": [
+   "priceOther"
+  ],
+  "매개변수가격": [
+   "paramsPrice"
+  ],
+  "바이옴가격": [
+   "biomePrice"
+  ],
+  "취소시환불": [
+   "refundOnCancel"
+  ],
+  "최소잔액": [
+   "balanceFloor"
+  ],
+  "무적시간": [
+   "invulnerabilityTime"
+  ],
+  "안전반경": [
+   "safetyRadius"
+  ],
+  "플랫폼반경": [
+   "platformRadius"
+  ],
+  "플랫폼깊이": [
+   "platformDepth"
+  ],
+  "플랫폼공기높이": [
+   "platformAirHeight"
+  ],
+  "플랫폼재질": [
+   "platformMaterial"
+  ],
+  "바이옥화이트리스트": [
+   "biomeWhitelist"
+  ],
+  "바이옴가중치": [
+   "biomeWeighted"
+  ],
+  "바이옴가중치맵": [
+   "biomeWeights"
+  ],
+  "공기블록": [
+   "airBlocks"
+  ],
+  "위험블록": [
+   "unsafeBlocks"
+  ],
+  "최소레벨": [
+   "min_level"
+  ],
+  "텔레포트": [
+   "teleport"
+  ],
+  "선택실패": [
+   "selection_failure"
+  ],
+  "이벤트_월드변경": [
+   "event_changeworld"
+  ],
+  "이벤트_접속": [
+   "event_join"
+  ],
+  "이벤트_리스폰": [
+   "event_respawn"
+  ],
+  "이벤트_이동": [
+   "event_move"
+  ],
+  "이벤트_텔레포트": [
+   "event_teleport"
+  ],
+  "상세_리로드": [
+   "detailed_reload"
+  ],
+  "상세_리전초기화": [
+   "detailed_region_init"
+  ],
+  "시스템_메모리추적기": [
+   "system_memory_tracker"
+  ],
+  "시스템_데이터베이스": [
+   "system_database"
+  ],
+  "자동조정": [
+   "autoTune"
+  ],
+  "최소tps": [
+   "minTPS"
+  ],
+  "maxheap백분율": [
+   "maxHeapPercent"
+  ],
+  "최대시도횟수": [
+   "maxAttempts"
+  ],
+  "할당시간_동기": [
+   "syncAllottedTime"
+  ],
+  "할당시간_비동기": [
+   "asyncAllottedTime"
+  ],
+  "시야거리_선택": [
+   "viewDistanceSelect"
+  ],
+  "시야거리_텔레포트": [
+   "viewDistanceTeleport"
+  ],
+  "시야거리_복원간격": [
+   "viewDistanceRestoreInterval"
+  ],
+  "텔레포트후큐잉": [
+   "postTeleportQueueing"
+  ],
+  "청크로드시검사": [
+   "checkOnChunkLoads"
+  ],
+  "백로그보충임계값": [
+   "backlogRefillThreshold"
+  ],
+  "백로그생성전략": [
+   "backlogGenerationStrategy"
+  ],
+  "사전생성선호도": [
+   "pregeneratedPreference"
+  ],
+  "로그인캐시활성화": [
+   "loginCacheEnabled"
+  ],
+  "로그인캐시상한": [
+   "loginCacheCap"
+  ],
+  "바이옴기억": [
+   "biomeRecall"
+  ],
+  "바이옴기억_강제": [
+   "biomeRecallForced"
+  ],
+  "느린파이프라인임계값ms": [
+   "slowPipelineThresholdMs"
+  ],
+  "대기열증가경고임계값": [
+   "queueGrowthWarnThreshold"
+  ],
+  "동기로딩": [
+   "syncLoading"
+  ],
+  "텔레포트경로": [
+   "teleportPath"
+  ],
+  "이벤트시파싱": [
+   "onEventParsing"
+  ],
+  "이펙트파싱": [
+   "effectParsing"
+  ],
+  "방문자활성화": [
+   "visitorEnabled"
+  ],
+  "월드보더오버라이드": [
+   "worldBorderOverride"
+  ],
+  "권한요구": [
+   "requirePermission"
+  ],
+  "캐시한도": [
+   "cacheCap"
+  ],
+  "백로그캐시한도": [
+   "backlogCacheCap"
+  ],
+  "활성청크한도": [
+   "activeChunkCap"
+  ],
+  "공간해상도": [
+   "spatialResolution"
+  ],
+  "오버라이드": [
+   "override"
+  ],
+  "teletransportvertraging": [
+   "teleportDelay"
+  ],
+  "annuleerafstand": [
+   "cancelDistance"
+  ],
+  "teletransportwachttijd": [
+   "teleportCooldown"
+  ],
+  "consoleopdrachten": [
+   "consoleCommands"
+  ],
+  "speleropdrachten": [
+   "playerCommands"
+  ],
+  "prijs": [
+   "price"
+  ],
+  "prijsander": [
+   "priceOther"
+  ],
+  "parametersprijs": [
+   "paramsPrice"
+  ],
+  "bioomprijs": [
+   "biomePrice"
+  ],
+  "terugbetalingbijannulering": [
+   "refundOnCancel"
+  ],
+  "minimumsaldo": [
+   "balanceFloor"
+  ],
+  "onkwetsbaarheidstijd": [
+   "invulnerabilityTime"
+  ],
+  "veiligheidsstraal": [
+   "safetyRadius"
+  ],
+  "platformstraal": [
+   "platformRadius"
+  ],
+  "platformdiepte": [
+   "platformDepth"
+  ],
+  "platformluchthoogte": [
+   "platformAirHeight"
+  ],
+  "platformmateriaal": [
+   "platformMaterial"
+  ],
+  "bioomwitlijst": [
+   "biomeWhitelist"
+  ],
+  "biomen": [
+   "biomes"
+  ],
+  "bioomgewogen": [
+   "biomeWeighted"
+  ],
+  "bioomgewichten": [
+   "biomeWeights"
+  ],
+  "luchtblokken": [
+   "airBlocks"
+  ],
+  "onveiligblokken": [
+   "unsafeBlocks"
+  ],
+  "min_niveau": [
+   "min_level"
+  ],
+  "opdracht": [
+   "command"
+  ],
+  "teletransport": [
+   "teleport"
+  ],
+  "selectie_mislukking": [
+   "selection_failure"
+  ],
+  "gebeurtenis_wereldwisseling": [
+   "event_changeworld"
+  ],
+  "gebeurtenis_deelnemen": [
+   "event_join"
+  ],
+  "gebeurtenis_herspawn": [
+   "event_respawn"
+  ],
+  "gebeurtenis_bewegen": [
+   "event_move"
+  ],
+  "gebeurtenis_teletransport": [
+   "event_teleport"
+  ],
+  "gedetailleerd_herladen": [
+   "detailed_reload"
+  ],
+  "gedetailleerd_regioinit": [
+   "detailed_region_init"
+  ],
+  "systeem_geheugentracker": [
+   "system_memory_tracker"
+  ],
+  "systeem_database": [
+   "system_database"
+  ],
+  "automatischafstemmen": [
+   "autoTune"
+  ],
+  "minimaaltps": [
+   "minTPS"
+  ],
+  "maxheappercentage": [
+   "maxHeapPercent"
+  ],
+  "maximaalpogingen": [
+   "maxAttempts"
+  ],
+  "synchroontoegewezentijd": [
+   "syncAllottedTime"
+  ],
+  "asynchroontoegewezentijd": [
+   "asyncAllottedTime"
+  ],
+  "zichtafstandselectie": [
+   "viewDistanceSelect"
+  ],
+  "zichtafstandteletransport": [
+   "viewDistanceTeleport"
+  ],
+  "zichtafstandherstelinterval": [
+   "viewDistanceRestoreInterval"
+  ],
+  "wachtrij_nateletransport": [
+   "postTeleportQueueing"
+  ],
+  "controleer_bijchunkladen": [
+   "checkOnChunkLoads"
+  ],
+  "backlogbijvuldrempel": [
+   "backlogRefillThreshold"
+  ],
+  "backloggeneratiestrategie": [
+   "backlogGenerationStrategy"
+  ],
+  "voorgegenereerdvoorkeur": [
+   "pregeneratedPreference"
+  ],
+  "logincacheingeschakeld": [
+   "loginCacheEnabled"
+  ],
+  "logincachelimiet": [
+   "loginCacheCap"
+  ],
+  "bioomherinnering": [
+   "biomeRecall"
+  ],
+  "bioomherinnering_geforceerd": [
+   "biomeRecallForced"
+  ],
+  "traagpipelinedrempelms": [
+   "slowPipelineThresholdMs"
+  ],
+  "wachtrijgroeiwaarschuwdrempel": [
+   "queueGrowthWarnThreshold"
+  ],
+  "synchroonladen": [
+   "syncLoading"
+  ],
+  "teleportpad": [
+   "teleportPath"
+  ],
+  "verwerking_bijgebeurtenis": [
+   "onEventParsing"
+  ],
+  "effectverwerking": [
+   "effectParsing"
+  ],
+  "bezoeker_ingeschakeld": [
+   "visitorEnabled"
+  ],
+  "voorgevormd": [
+   "prefab"
+  ],
+  "wereld": [
+   "world"
+  ],
+  "wereldgrensoverschrijving": [
+   "worldBorderOverride"
+  ],
+  "vorm": [
+   "shape"
+  ],
+  "verticaal": [
+   "vert"
+  ],
+  "toestemmingvereist": [
+   "requirePermission"
+  ],
+  "cachelimiet": [
+   "cacheCap"
+  ],
+  "achterstandcachelimiet": [
+   "backlogCacheCap"
+  ],
+  "actiefchunklimiet": [
+   "activeChunkCap"
+  ],
+  "ruimtelijkeresolutie": [
+   "spatialResolution"
+  ],
+  "overschrijven": [
+   "override"
+  ],
+  "regio": [
+   "region"
+  ],
+  "modus": [
+   "mode"
+  ],
+  "straal": [
+   "radius"
+  ],
+  "middenstraal": [
+   "centerRadius"
+  ],
+  "middenx": [
+   "centerX"
+  ],
+  "middenz": [
+   "centerZ"
+  ],
+  "gewicht": [
+   "weight"
+  ],
+  "uniekeplaatsingen": [
+   "uniquePlacements"
+  ],
+  "uitbreiden": [
+   "expand"
+  ],
+  "gemiddelde": [
+   "mean"
+  ],
+  "afwijking": [
+   "deviation"
+  ],
+  "breedte": [
+   "width"
+  ],
+  "hoogte": [
+   "height"
+  ],
+  "rotatie": [
+   "rotation"
+  ],
+  "stap": [
+   "step"
+  ],
+  "daglichtvereist": [
+   "requireSkyLight"
+  ],
+  "richting": [
+   "direction"
+  ],
+  "min_poziom": [
+   "min_level"
+  ],
+  "polecenie": [
+   "command"
+  ],
+  "teleportacja": [
+   "teleport"
+  ],
+  "niepowodzenie_wyboru": [
+   "selection_failure"
+  ],
+  "zdarzenie_zmianaswiata": [
+   "event_changeworld"
+  ],
+  "zdarzenie_dolaczenie": [
+   "event_join"
+  ],
+  "zdarzenie_odrodzenie": [
+   "event_respawn"
+  ],
+  "zdarzenie_ruch": [
+   "event_move"
+  ],
+  "zdarzenie_teleportacja": [
+   "event_teleport"
+  ],
+  "szczegolowe_przeladowanie": [
+   "detailed_reload"
+  ],
+  "szczegolowa_inicjalizacjaregionu": [
+   "detailed_region_init"
+  ],
+  "system_sledzeniepamieci": [
+   "system_memory_tracker"
+  ],
+  "system_bazadanych": [
+   "system_database"
+  ],
+  "automatycznedostrajanie": [
+   "autoTune"
+  ],
+  "maxheapprocent": [
+   "maxHeapPercent"
+  ],
+  "maksproby": [
+   "maxAttempts"
+  ],
+  "okres": [
+   "period"
+  ],
+  "przydzielonyczassync": [
+   "syncAllottedTime"
+  ],
+  "przydzielonyczasasync": [
+   "asyncAllottedTime"
+  ],
+  "zasiegwidokuwybor": [
+   "viewDistanceSelect"
+  ],
+  "zasiegwidokuteleport": [
+   "viewDistanceTeleport"
+  ],
+  "zasiegwidokuprzywracanieinterwal": [
+   "viewDistanceRestoreInterval"
+  ],
+  "kolejkowaniepoteleporcie": [
+   "postTeleportQueueing"
+  ],
+  "sprawdzprzyzaladowaniuchunka": [
+   "checkOnChunkLoads"
+  ],
+  "proguzupelnieniabacklog": [
+   "backlogRefillThreshold"
+  ],
+  "strategiagenerowaniabacklog": [
+   "backlogGenerationStrategy"
+  ],
+  "preferencjapregenerowane": [
+   "pregeneratedPreference"
+  ],
+  "cachelogowaniawlaczona": [
+   "loginCacheEnabled"
+  ],
+  "limitcachelogowania": [
+   "loginCacheCap"
+  ],
+  "pamiecbiomu": [
+   "biomeRecall"
+  ],
+  "pamiecbiomuwymuszona": [
+   "biomeRecallForced"
+  ],
+  "progwolnegopipelinems": [
+   "slowPipelineThresholdMs"
+  ],
+  "progostrzezeniawzrostukolejki": [
+   "queueGrowthWarnThreshold"
+  ],
+  "ladowaniesync": [
+   "syncLoading"
+  ],
+  "sciezkateleportu": [
+   "teleportPath"
+  ],
+  "analizaprzyzdarzeniu": [
+   "onEventParsing"
+  ],
+  "analizaefektow": [
+   "effectParsing"
+  ],
+  "goscwlaczony": [
+   "visitorEnabled"
+  ],
+  "prefabrykat": [
+   "prefab"
+  ],
+  "atrasoteletransporte": [
+   "teleportDelay"
+  ],
+  "distanciacancelamento": [
+   "cancelDistance"
+  ],
+  "tempodeesperateletransporte": [
+   "teleportCooldown"
+  ],
+  "comandosconsole": [
+   "consoleCommands"
+  ],
+  "comandosjogador": [
+   "playerCommands"
+  ],
+  "preco": [
+   "price"
+  ],
+  "precooutro": [
+   "priceOther"
+  ],
+  "precoparametros": [
+   "paramsPrice"
+  ],
+  "precobioma": [
+   "biomePrice"
+  ],
+  "reembolsoaocancelar": [
+   "refundOnCancel"
+  ],
+  "tempoinvulnerabilidade": [
+   "invulnerabilityTime"
+  ],
+  "raioseguranca": [
+   "safetyRadius"
+  ],
+  "raioplataforma": [
+   "platformRadius"
+  ],
+  "profundidadeplataforma": [
+   "platformDepth"
+  ],
+  "alturaarplataforma": [
+   "platformAirHeight"
+  ],
+  "blocosar": [
+   "airBlocks"
+  ],
+  "blocosinseguros": [
+   "unsafeBlocks"
+  ],
+  "falha_selecao": [
+   "selection_failure"
+  ],
+  "evento_mudancamundo": [
+   "event_changeworld"
+  ],
+  "evento_entrada": [
+   "event_join"
+  ],
+  "evento_renascimento": [
+   "event_respawn"
+  ],
+  "recarga_detalhada": [
+   "detailed_reload"
+  ],
+  "inicio_regiao_detalhado": [
+   "detailed_region_init"
+  ],
+  "sistema_rastreiomemoria": [
+   "system_memory_tracker"
+  ],
+  "sistema_bancodedados": [
+   "system_database"
+  ],
+  "maxheapporcentagem": [
+   "maxHeapPercent"
+  ],
+  "tentativasmaximas": [
+   "maxAttempts"
+  ],
+  "tempoalocadosincrono": [
+   "syncAllottedTime"
+  ],
+  "tempoalocadoassincrono": [
+   "asyncAllottedTime"
+  ],
+  "distanciavisaoselecao": [
+   "viewDistanceSelect"
+  ],
+  "distanciavisaoteletransporte": [
+   "viewDistanceTeleport"
+  ],
+  "intervalorestauracaovisao": [
+   "viewDistanceRestoreInterval"
+  ],
+  "enfileirarposteletransporte": [
+   "postTeleportQueueing"
+  ],
+  "verificarnocarregamentochunk": [
+   "checkOnChunkLoads"
+  ],
+  "limitereabastecimentobacklog": [
+   "backlogRefillThreshold"
+  ],
+  "estrategiageracaobacklog": [
+   "backlogGenerationStrategy"
+  ],
+  "preferenciapregerado": [
+   "pregeneratedPreference"
+  ],
+  "cacheloginativado": [
+   "loginCacheEnabled"
+  ],
+  "lembrancabioma": [
+   "biomeRecall"
+  ],
+  "lembrancabiomaforcada": [
+   "biomeRecallForced"
+  ],
+  "limitepipelinelentams": [
+   "slowPipelineThresholdMs"
+  ],
+  "limiteavisocrescimentofila": [
+   "queueGrowthWarnThreshold"
+  ],
+  "carregamentosincrono": [
+   "syncLoading"
+  ],
+  "caminhoteleporte": [
+   "teleportPath"
+  ],
+  "analiseaoevento": [
+   "onEventParsing"
+  ],
+  "analiseefeitos": [
+   "effectParsing"
+  ],
+  "visitanteativado": [
+   "visitorEnabled"
+  ],
+  "sobrescreverbordamundo": [
+   "worldBorderOverride"
+  ],
+  "exigirpermissao": [
+   "requirePermission"
+  ],
+  "limitechunkativo": [
+   "activeChunkCap"
+  ],
+  "resolucaoespacial": [
+   "spatialResolution"
+  ],
+  "sobrescrever": [
+   "override"
+  ],
+  "regiao": [
+   "region"
+  ],
+  "raio": [
+   "radius"
+  ],
+  "raiocentro": [
+   "centerRadius"
+  ],
+  "posicoesunicas": [
+   "uniquePlacements"
+  ],
+  "desvio": [
+   "deviation"
+  ],
+  "largura": [
+   "width"
+  ],
+  "rotacao": [
+   "rotation"
+  ],
+  "passo": [
+   "step"
+  ],
+  "exigirluzceu": [
+   "requireSkyLight"
+  ],
+  "direcao": [
+   "direction"
+  ],
+  "отсрочкателепорта": [
+   "teleportDelay"
+  ],
+  "дистанцияотмены": [
+   "cancelDistance"
+  ],
+  "задержкателепорта": [
+   "teleportCooldown"
+  ],
+  "командыконсоли": [
+   "consoleCommands"
+  ],
+  "командыигрока": [
+   "playerCommands"
+  ],
+  "цена": [
+   "price"
+  ],
+  "ценадругого": [
+   "priceOther"
+  ],
+  "ценапараметров": [
+   "paramsPrice"
+  ],
+  "ценабиома": [
+   "biomePrice"
+  ],
+  "возвратприотмене": [
+   "refundOnCancel"
+  ],
+  "минимальныйбаланс": [
+   "balanceFloor"
+  ],
+  "времянеуязвимости": [
+   "invulnerabilityTime"
+  ],
+  "радиусбезопасности": [
+   "safetyRadius"
+  ],
+  "радиусплатформы": [
+   "platformRadius"
+  ],
+  "глубинаплатформы": [
+   "platformDepth"
+  ],
+  "высотавоздухаплатформы": [
+   "platformAirHeight"
+  ],
+  "материалплатформы": [
+   "platformMaterial"
+  ],
+  "белыйсписокбиомов": [
+   "biomeWhitelist"
+  ],
+  "биомы": [
+   "biomes"
+  ],
+  "взвешиваниебиома": [
+   "biomeWeighted"
+  ],
+  "весабиома": [
+   "biomeWeights"
+  ],
+  "блокивоздуха": [
+   "airBlocks"
+  ],
+  "небезопасныеблоки": [
+   "unsafeBlocks"
+  ],
+  "мин_уровень": [
+   "min_level"
+  ],
+  "команда": [
+   "command"
+  ],
+  "телепорт": [
+   "teleport"
+  ],
+  "ошибка_выбора": [
+   "selection_failure"
+  ],
+  "событие_сменамира": [
+   "event_changeworld"
+  ],
+  "событие_вход": [
+   "event_join"
+  ],
+  "событие_возрождение": [
+   "event_respawn"
+  ],
+  "событие_движение": [
+   "event_move"
+  ],
+  "событие_телепорт": [
+   "event_teleport"
+  ],
+  "подробная_перезагрузка": [
+   "detailed_reload"
+  ],
+  "подробная_инициализация_региона": [
+   "detailed_region_init"
+  ],
+  "система_отслеживаниепамяти": [
+   "system_memory_tracker"
+  ],
+  "система_базаданных": [
+   "system_database"
+  ],
+  "автонастройка": [
+   "autoTune"
+  ],
+  "минtps": [
+   "minTPS"
+  ],
+  "maxheapпроцент": [
+   "maxHeapPercent"
+  ],
+  "макспопыток": [
+   "maxAttempts"
+  ],
+  "период": [
+   "period"
+  ],
+  "выделенноевремясинхр": [
+   "syncAllottedTime"
+  ],
+  "выделенноевремяасинхр": [
+   "asyncAllottedTime"
+  ],
+  "дистанциявидимостивыбор": [
+   "viewDistanceSelect"
+  ],
+  "дистанциявидимостителепорт": [
+   "viewDistanceTeleport"
+  ],
+  "интервалвосстановлениявидимости": [
+   "viewDistanceRestoreInterval"
+  ],
+  "очередьпослетелепорта": [
+   "postTeleportQueueing"
+  ],
+  "проверкапризагрузкечанка": [
+   "checkOnChunkLoads"
+  ],
+  "порогпополненияbacklog": [
+   "backlogRefillThreshold"
+  ],
+  "стратегиягенерацииbacklog": [
+   "backlogGenerationStrategy"
+  ],
+  "предпочтениепредген": [
+   "pregeneratedPreference"
+  ],
+  "кэшвходавключен": [
+   "loginCacheEnabled"
+  ],
+  "пределкэшавхода": [
+   "loginCacheCap"
+  ],
+  "запоминаниебиома": [
+   "biomeRecall"
+  ],
+  "запоминаниебиомапринуд": [
+   "biomeRecallForced"
+  ],
+  "порогмедленногоpipelinems": [
+   "slowPipelineThresholdMs"
+  ],
+  "порогпредупрежденияростаочереди": [
+   "queueGrowthWarnThreshold"
+  ],
+  "синхроннаязагрузка": [
+   "syncLoading"
+  ],
+  "путьтелепорта": [
+   "teleportPath"
+  ],
+  "разборнасобытие": [
+   "onEventParsing"
+  ],
+  "разборэффектов": [
+   "effectParsing"
+  ],
+  "посетительвключен": [
+   "visitorEnabled"
+  ],
+  "шаблон": [
+   "prefab"
+  ],
+  "переопределениеграницымира": [
+   "worldBorderOverride"
+  ],
+  "форма": [
+   "shape"
+  ],
+  "вертикаль": [
+   "vert"
+  ],
+  "требуетсяправо": [
+   "requirePermission"
+  ],
+  "размеркэша": [
+   "cacheCap"
+  ],
+  "размеркэшанакопленного": [
+   "backlogCacheCap"
+  ],
+  "размерактивныхчанков": [
+   "activeChunkCap"
+  ],
+  "пространственноеразрешение": [
+   "spatialResolution"
+  ],
+  "переопределение": [
+   "override"
+  ],
+  "регион": [
+   "region"
+  ],
+  "режим": [
+   "mode"
+  ],
+  "радиус": [
+   "radius"
+  ],
+  "радиусцентра": [
+   "centerRadius"
+  ],
+  "центрx": [
+   "centerX"
+  ],
+  "центрz": [
+   "centerZ"
+  ],
+  "уникальныепозиции": [
+   "uniquePlacements"
+  ],
+  "расширить": [
+   "expand"
+  ],
+  "среднее": [
+   "mean"
+  ],
+  "отклонение": [
+   "deviation"
+  ],
+  "ширина": [
+   "width"
+  ],
+  "высота": [
+   "height"
+  ],
+  "поворот": [
+   "rotation"
+  ],
+  "требоватьнебесныйсвет": [
+   "requireSkyLight"
+  ],
+  "направление": [
+   "direction"
+  ],
+  "传送延迟": [
+   "teleportDelay"
+  ],
+  "取消距离": [
+   "cancelDistance"
+  ],
+  "传送冷却": [
+   "teleportCooldown"
+  ],
+  "控制台命令": [
+   "consoleCommands"
+  ],
+  "玩家命令": [
+   "playerCommands"
+  ],
+  "价格其他": [
+   "priceOther"
+  ],
+  "参数价格": [
+   "paramsPrice"
+  ],
+  "生物群系价格": [
+   "biomePrice"
+  ],
+  "取消时退款": [
+   "refundOnCancel"
+  ],
+  "最低余额": [
+   "balanceFloor"
+  ],
+  "无敌时间": [
+   "invulnerabilityTime"
+  ],
+  "平台半径": [
+   "platformRadius"
+  ],
+  "平台深度": [
+   "platformDepth"
+  ],
+  "平台空气高度": [
+   "platformAirHeight"
+  ],
+  "平台材质": [
+   "platformMaterial"
+  ],
+  "生物群系白名单": [
+   "biomeWhitelist"
+  ],
+  "生物群系": [
+   "biomes"
+  ],
+  "生物群系加权": [
+   "biomeWeighted"
+  ],
+  "生物群系权重": [
+   "biomeWeights"
+  ],
+  "空气方块": [
+   "airBlocks"
+  ],
+  "不安全方块": [
+   "unsafeBlocks"
+  ],
+  "最低级别": [
+   "min_level"
+  ],
+  "选择失败": [
+   "selection_failure"
+  ],
+  "事件_切换世界": [
+   "event_changeworld"
+  ],
+  "事件_加入": [
+   "event_join"
+  ],
+  "事件_重生": [
+   "event_respawn"
+  ],
+  "事件_移动": [
+   "event_move"
+  ],
+  "事件_传送": [
+   "event_teleport"
+  ],
+  "详细_重载": [
+   "detailed_reload"
+  ],
+  "详细_区域初始化": [
+   "detailed_region_init"
+  ],
+  "系统_内存追踪": [
+   "system_memory_tracker"
+  ],
+  "系统_数据库": [
+   "system_database"
+  ],
+  "自动调节": [
+   "autoTune"
+  ],
+  "maxheap百分比": [
+   "maxHeapPercent"
+  ],
+  "最大尝试次数": [
+   "maxAttempts"
+  ],
+  "分配时间_同步": [
+   "syncAllottedTime"
+  ],
+  "分配时间_异步": [
+   "asyncAllottedTime"
+  ],
+  "视距_选择": [
+   "viewDistanceSelect"
+  ],
+  "视距_传送": [
+   "viewDistanceTeleport"
+  ],
+  "视距_恢复间隔": [
+   "viewDistanceRestoreInterval"
+  ],
+  "传送后排队": [
+   "postTeleportQueueing"
+  ],
+  "区块加载时检查": [
+   "checkOnChunkLoads"
+  ],
+  "积压补充阈值": [
+   "backlogRefillThreshold"
+  ],
+  "积压生成策略": [
+   "backlogGenerationStrategy"
+  ],
+  "预生成偏好": [
+   "pregeneratedPreference"
+  ],
+  "登录缓存启用": [
+   "loginCacheEnabled"
+  ],
+  "登录缓存上限": [
+   "loginCacheCap"
+  ],
+  "生物群系记忆": [
+   "biomeRecall"
+  ],
+  "生物群系记忆_强制": [
+   "biomeRecallForced"
+  ],
+  "慢管线阈值ms": [
+   "slowPipelineThresholdMs"
+  ],
+  "队列增长警告阈值": [
+   "queueGrowthWarnThreshold"
+  ],
+  "同步加载": [
+   "syncLoading"
+  ],
+  "传送路径": [
+   "teleportPath"
+  ],
+  "事件时解析": [
+   "onEventParsing"
+  ],
+  "效果解析": [
+   "effectParsing"
+  ],
+  "访客启用": [
+   "visitorEnabled"
+  ],
+  "覆盖世界边界": [
+   "worldBorderOverride"
+  ],
+  "需要权限": [
+   "requirePermission"
+  ],
+  "缓存上限": [
+   "cacheCap"
+  ],
+  "积压缓存上限": [
+   "backlogCacheCap"
+  ],
+  "活动区块上限": [
+   "activeChunkCap"
+  ],
+  "空间分辨率": [
+   "spatialResolution"
   ]
  }
 }

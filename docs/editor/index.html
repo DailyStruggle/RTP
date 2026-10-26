@@ -3914,7 +3914,7 @@ function toggleRegionDocDrawer() {
 function renderRegionDocContent() {
   const el = document.getElementById('region-doc-content');
   const pill = document.getElementById('region-doc-source-pill');
-  const k = Object.keys(docs).find(k => k.toLowerCase().includes('region')) || Object.keys(docs)[0];
+  const k = Object.keys(docs).find(k => k.toLowerCase().includes('region')) || Object.keys(docs)[0] || 'admin/configuration/REGIONS.md';
   updateDocDisplayContent(k, el, pill);
 }
 
@@ -4466,7 +4466,7 @@ const BYTEBIN_KEY_RE = /^[A-Za-z0-9_\-]{1,64}$/;
 
 // A plugin hand-off by key: fetched from bytebin, kept only when its SHA-256 matches the signed frame
 async function fetchBytebinVerified(key, sha256, maxChars) {
-  const base = (new URLSearchParams(window.location.search).get('bytebin') || 'https://bytebin.lucko.me').replace(/\/+$/, '');
+  const base = (window.__activeBytebinUrl || new URLSearchParams(window.location.search).get('bytebin') || 'https://bytebin.lucko.me').replace(/\/+$/, '');
   const res = await fetch(base + '/' + encodeURIComponent(key), { headers: { 'Accept': 'application/json' } });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const text = await res.text();
@@ -8494,7 +8494,9 @@ var EditorChannelClient = (() => {
     }
     stop();
     st.stopped = false;
-    st.cfg = { relay: cfg.relay, id: cfg.id, pluginKey: cfg.pluginKey };
+    const pageLimit = Number.isInteger(cfg.pageFramesPerWindow) && cfg.pageFramesPerWindow >= CHANNEL_PAGE_FRAMES
+      ? Math.min(300, cfg.pageFramesPerWindow) : CHANNEL_PAGE_FRAMES;
+    st.cfg = { relay: cfg.relay, id: cfg.id, pluginKey: cfg.pluginKey, pageFramesPerWindow: pageLimit };
     st.pluginSeq = 0;
     setStatus('connecting');
     try {
@@ -8593,12 +8595,17 @@ var EditorChannelClient = (() => {
     if (lost.some(q => q.type === 'apply')) applyNotSent(reason);
   }
 
+  function pageFramesLimit() {
+    return (st.cfg && st.cfg.pageFramesPerWindow) || CHANNEL_PAGE_FRAMES;
+  }
+
   // Queued sends in order, as far as the frame share allows; seq and challenge are bound at send time
   function pump() {
     clearTimeout(st.pumpTimer);
     st.pumpTimer = null;
     const now = pruneSent();
-    while (st.outQueue.length && (!paced() || st.sentAt.length < CHANNEL_PAGE_FRAMES)) {
+    const limit = pageFramesLimit();
+    while (st.outQueue.length && (!paced() || st.sentAt.length < limit)) {
       if (st.status !== 'connected' || !st.ws || !st.challenge) { discardQueue('live link lost'); return; }
       const q = st.outQueue.shift();
       const obj = frameFields(q.type, q.body);
@@ -8634,10 +8641,11 @@ var EditorChannelClient = (() => {
     const i = st.outQueue.findIndex(q => q.type === type);
     if (i < 0 || !paced()) return 0;
     const now = pruneSent();
-    const expire = st.sentAt.length + i + 1 - CHANNEL_PAGE_FRAMES;
+    const limit = pageFramesLimit();
+    const expire = st.sentAt.length + i + 1 - limit;
     if (expire <= 0) return 0;
     if (expire <= st.sentAt.length) return Math.max(0, st.sentAt[expire - 1] + CHANNEL_FRAME_WINDOW_MS - now);
-    return Math.ceil(expire / CHANNEL_PAGE_FRAMES) * CHANNEL_FRAME_WINDOW_MS;
+    return Math.ceil(expire / limit) * CHANNEL_FRAME_WINDOW_MS;
   }
 
   // ADR-106 §5.10: HMAC-SHA256 keyed with the link secret over context, channel and this key's
@@ -8739,7 +8747,8 @@ var EditorChannelClient = (() => {
         const last = st.sentAt.length ? st.sentAt[st.sentAt.length - 1] : 0;
         const helloDue = st.status === 'awaiting-trust' && st.nonceExpiresAt && Date.now() > st.nonceExpiresAt;
         if (!helloDue && now - last < CHANNEL_QUIET_PING_MS) return;
-        if (st.sentAt.length >= CHANNEL_PAGE_FRAMES) return;
+        const pageLimit = (st.cfg && st.cfg.pageFramesPerWindow) || CHANNEL_PAGE_FRAMES;
+        if (st.sentAt.length >= pageLimit) { if (st.sentAt.length >= CHANNEL_PAGE_FRAMES) return; }
       }
       if (++st.missedPongs > 3) { try { ws.close(4000, 'no pong'); } catch (e) { /* closing */ } return; }
       // An expired trust code is useless to the operator: ask for a fresh one
@@ -8799,7 +8808,8 @@ var EditorChannelClient = (() => {
     status: () => st.status,
     isConnected: () => st.status === 'connected',
     info: () => ({ status: st.status, reason: st.reason, nonce: st.nonce, fingerprint: st.myFp, persistent: st.persistent,
-      pluginFingerprint: st.pluginFp, dropped: st.dropped, lastDrop: st.lastDrop, ignored: st.ignored })
+      pluginFingerprint: st.pluginFp, dropped: st.dropped, lastDrop: st.lastDrop, ignored: st.ignored,
+      pageFramesPerWindow: (st.cfg && st.cfg.pageFramesPerWindow) || CHANNEL_PAGE_FRAMES })
   };
 })();
 
@@ -9273,16 +9283,21 @@ function getMatchingSynonyms(tokens) {
     const tok = (rawTok || '').trim().toLowerCase();
     if (!tok) continue;
 
+    if (Array.isArray(CONFIG_SYNONYMS[tok])) {
+      matched.add(tok);
+      CONFIG_SYNONYMS[tok].forEach(s => matched.add(s.toLowerCase()));
+    }
+
     for (const [conceptKey, synList] of Object.entries(CONFIG_SYNONYMS)) {
       const ck = conceptKey.toLowerCase();
       // 1. Direct or substring match on concept key (e.g. "rad" in "radius")
-      if (ck === tok || ck.includes(tok) || tok.includes(ck)) {
+      if (ck === tok || ck.includes(tok) || (ck.length >= 5 && tok.includes(ck))) {
         matched.add(ck);
         synList.forEach(s => matched.add(s.toLowerCase()));
       }
 
       // 2. Fuzzy match on concept key (e.g. typos like "raduis" -> "radius")
-      if (tok.length >= 3) {
+      if (tok.length >= 3 && Math.abs(tok.length - ck.length) <= 2) {
         const maxDist = tok.length >= 5 ? 2 : 1;
         if (computeLevenshtein(tok, ck) <= maxDist) {
           matched.add(ck);
@@ -9293,13 +9308,13 @@ function getMatchingSynonyms(tokens) {
       // 3. Match against items in the synonym list
       for (const syn of synList) {
         const sl = syn.toLowerCase();
-        if (sl === tok || sl.includes(tok) || tok.includes(sl)) {
+        if (sl === tok || sl.includes(tok) || (sl.length >= 5 && tok.includes(sl))) {
           matched.add(sl);
           matched.add(ck);
           synList.forEach(s => matched.add(s.toLowerCase()));
           break;
         }
-        if (tok.length >= 3) {
+        if (tok.length >= 3 && Math.abs(tok.length - sl.length) <= 2) {
           const maxDist = tok.length >= 5 ? 2 : 1;
           if (computeLevenshtein(tok, sl) <= maxDist) {
             matched.add(sl);
@@ -9345,6 +9360,7 @@ const remoteSynonymCache = new Map();
 
 function buildConfigSearchIndex() {
   const index = [];
+  const seenNormKeys = new Set();
   for (const [filename, content] of Object.entries(configs)) {
     if (!content) continue;
     const lines = content.split('\n');
@@ -9360,6 +9376,7 @@ function buildConfigSearchIndex() {
         if (/^[a-zA-Z0-9_.-]+$/.test(key)) {
           const lk = key.toLowerCase().replace(/[^a-z0-9]/g, '');
           const doc = docTrackerDb[lk];
+          seenNormKeys.add(key.toLowerCase());
           index.push({
             file: filename,
             key: key,
@@ -9375,6 +9392,25 @@ function buildConfigSearchIndex() {
       }
     }
   }
+  for (const [lk, doc] of Object.entries(docTrackerDb)) {
+    if (!doc || typeof doc.title !== 'string' || doc.title.includes('.')) continue;
+    const nk = doc.title.toLowerCase();
+    if (seenNormKeys.has(nk)) continue;
+    seenNormKeys.add(nk);
+    const meta = doc.meta || '';
+    const targetFile = meta.includes('REGIONS') ? 'definitions/regions/default.yml' : 'config.yml';
+    index.push({
+      file: targetFile,
+      key: doc.title,
+      normKey: nk,
+      lineNum: 1,
+      val: doc.defaultVal || '',
+      snippet: doc.defaultSnippet || `${doc.title}: ${doc.defaultVal || ''}`,
+      docTitle: doc.title,
+      docDesc: doc.desc || '',
+      docMeta: meta
+    });
+  }
   return index;
 }
 
@@ -9388,6 +9424,9 @@ function executeConfigSearch(rawQuery, remoteExpandedWords = []) {
   // Gather synonyms and similar phrases for query tokens using getMatchingSynonyms
   const queryTokens = query.split(/\s+/).filter(Boolean);
   const matchedSynonyms = getMatchingSynonyms(queryTokens);
+  const exactSynonymTargets = new Set(
+    (Array.isArray(CONFIG_SYNONYMS[query]) ? CONFIG_SYNONYMS[query] : []).map(s => String(s).toLowerCase())
+  );
   
   remoteExpandedWords.forEach(w => {
     matchedSynonyms.add(w.toLowerCase());
@@ -9422,12 +9461,17 @@ function executeConfigSearch(rawQuery, remoteExpandedWords = []) {
       reasons.push({ type: 'file', text: 'File Match' });
     }
 
-    // 3. Thesaurus / Similar Phrase Match
-    for (const syn of matchedSynonyms) {
-      if (k === syn || k.includes(syn) || syn.includes(k)) {
-        score += 65;
-        reasons.push({ type: 'synonym', text: `Similar: ${syn}` });
-        break;
+    // 3. Thesaurus / AST / Locale Alias Match
+    if (exactSynonymTargets.has(k) || Array.from(exactSynonymTargets).some(t => t.length >= 4 && f.includes(t))) {
+      score += 110;
+      reasons.push({ type: 'synonym', text: `AST / Alias: ${query}` });
+    } else {
+      for (const syn of matchedSynonyms) {
+        if (k === syn || (syn.length >= 4 && (k.includes(syn) || syn.includes(k)))) {
+          score += 65;
+          reasons.push({ type: 'synonym', text: `Similar: ${syn}` });
+          break;
+        }
       }
     }
 
@@ -10170,6 +10214,224 @@ window.__rtpLivePathTile = function (r, tx, tz, tile) {
   }
 })();
 
+async function fetchStaticEditorData(refUrl) {
+  if (window.location.protocol === 'file:') return null;
+  const target = (typeof refUrl === 'string' && refUrl.startsWith('./')) ? refUrl : './editor-data.json';
+  if (window.location.search && /(?:[?&])(?:file|key|search|intent)=/i.test(window.location.search)) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', target, false);
+      xhr.send(null);
+      if (xhr.status >= 200 && xhr.status < 300 && xhr.responseText) {
+        return JSON.parse(xhr.responseText);
+      }
+    } catch (e) {}
+  }
+  try {
+    const res = await fetch(target, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+function applyUrlIntentSpotlight(paramsObj) {
+  const params = paramsObj instanceof URLSearchParams ? paramsObj : new URLSearchParams(window.location.search);
+  const fileParam = (params.get('file') || '').trim();
+  const keyParam = (params.get('key') || '').trim();
+  const valueParam = (params.get('value') || '').trim();
+  const searchParam = (params.get('search') || '').trim();
+  const intentParam = (params.get('intent') || '').trim();
+  if (!fileParam && !keyParam && !searchParam && !intentParam) return null;
+
+  let resolvedFile = fileParam;
+  if (resolvedFile && configs[resolvedFile] === undefined) {
+    const matchKey = Object.keys(configs).find(f => f.toLowerCase() === resolvedFile.toLowerCase() || f.toLowerCase().endsWith('/' + resolvedFile.toLowerCase()));
+    if (matchKey) resolvedFile = matchKey;
+  }
+  if (!resolvedFile && (keyParam || searchParam)) {
+    const hits = executeConfigSearch(keyParam || searchParam);
+    if (hits && hits.length > 0) {
+      resolvedFile = hits[0].file;
+    }
+  }
+
+  let highlightedLine = 0;
+  let previousValue = '';
+  if (resolvedFile && configs[resolvedFile] !== undefined) {
+    document.querySelectorAll('.nav-tab').forEach(t => { t.style.transition = 'none'; });
+    switchPanel('panel-configs', document.querySelectorAll('.nav-tab')[2]);
+    selectConfig(resolvedFile);
+    if (keyParam && cfgEditor) {
+      const leaf = keyParam.split('.').pop();
+      const findKeyLine = () => {
+        const curLines = (cfgEditor.value || '').split('\n');
+        let cPos = 0;
+        for (let i = 0; i < curLines.length; i++) {
+          const m = curLines[i].match(/^(\s*)([A-Za-z0-9_.-]+)(\s*:\s*)([^#\r\n]*)(.*)$/);
+          if (m && m[2].toLowerCase() === leaf.toLowerCase()) {
+            return { lineIdx: i, charPos: cPos, match: m, lines: curLines };
+          }
+          cPos += curLines[i].length + 1;
+        }
+        return null;
+      };
+
+      let found = findKeyLine();
+      if (!found) {
+        // If targeting a shape.* or vert.* key inside a region file where `shape: "@config"` or `vert: "@config"` is unmaterialized, unpack it automatically
+        for (const blockKey of ['shape', 'vert']) {
+          const refRe = new RegExp('^(' + blockKey + '\\s*:\\s*)(["\']?)(@[a-zA-Z0-9_.-]+)\\2.*$', 'm');
+          const refM = (cfgEditor.value || '').match(refRe);
+          if (refM) {
+            const unpacked = referencedDefaultBlock(refM[3], blockKey);
+            if (unpacked) {
+              cfgEditor.value = cfgEditor.value.replace(refRe, unpacked);
+              configs[resolvedFile] = cfgEditor.value;
+              updateGutterAndDiagnostics();
+              found = findKeyLine();
+              if (found) break;
+            }
+          }
+        }
+      }
+
+      if (found) {
+        previousValue = (found.match[4] || '').trim();
+        if (valueParam !== '' && previousValue !== valueParam) {
+          const commentSuffix = found.match[5] || '';
+          found.lines[found.lineIdx] = found.match[1] + found.match[2] + found.match[3] + valueParam + (commentSuffix ? ' ' + commentSuffix.trim() : '');
+          cfgEditor.value = found.lines.join('\n');
+          configs[resolvedFile] = cfgEditor.value;
+          syncRegionProfiles();
+          updateStagingDiff();
+          updateGutterAndDiagnostics();
+          found = findKeyLine() || found;
+        }
+        highlightedLine = found.lineIdx + 1;
+        const lineText = found.lines[found.lineIdx] || '';
+        cfgEditor.focus();
+        cfgEditor.setSelectionRange(found.charPos, found.charPos + lineText.length);
+        const cs = getComputedStyle(cfgEditor);
+        const lh = parseFloat(cs.lineHeight) || 20.3;
+        const padTop = parseFloat(cs.paddingTop) || 16;
+        const targetScroll = Math.max(0, Math.round((highlightedLine - 7) * lh));
+        cfgEditor.scrollTop = targetScroll;
+        const gutter = document.getElementById('cfg-gutter');
+        if (gutter) gutter.scrollTop = targetScroll;
+        trackCurrentConfigLine();
+
+        const wrap = document.getElementById('cfg-editor-wrap');
+        if (wrap) {
+          let hlBox = document.getElementById('rtp-spotlight-line-highlight');
+          if (!hlBox) {
+            hlBox = document.createElement('div');
+            hlBox.id = 'rtp-spotlight-line-highlight';
+            wrap.appendChild(hlBox);
+          }
+          const lineTop = Math.round(padTop + (highlightedLine - 1) * lh - cfgEditor.scrollTop);
+          hlBox.style.cssText = (
+            'position:absolute;left:42px;right:14px;top:' + (lineTop - 2) + 'px;height:' + Math.round(lh + 4) + 'px;' +
+            'background:rgba(166, 227, 161, 0.16);border:2px solid #a6e3a1;border-radius:5px;' +
+            'box-shadow:0 0 18px rgba(166, 227, 161, 0.35);pointer-events:none;z-index:40;' +
+            'display:flex;align-items:center;justify-content:flex-end;padding-right:10px;'
+          );
+          const actionText = valueParam !== ''
+            ? ('⬅ Set ' + leaf + ': ' + valueParam + (previousValue && previousValue !== valueParam ? ' (default: ' + previousValue + ')' : '') + ' here')
+            : ('⬅ Edit ' + leaf + ' on line ' + highlightedLine);
+          hlBox.innerHTML = (
+            '<span style="background:#11111b;color:#a6e3a1;border:1px solid #a6e3a1;border-radius:4px;' +
+            'padding:2px 8px;font-size:12px;font-weight:700;font-family:ui-sans-serif,system-ui,sans-serif;' +
+            'box-shadow:0 4px 12px rgba(0,0,0,0.6);white-space:nowrap;">' +
+            escapeHtml(actionText) +
+            '</span>'
+          );
+        }
+      }
+    }
+  }
+
+  if (searchParam && !highlightedLine) {
+    const input = document.getElementById('palette-query-input');
+    if (input) {
+      input.value = searchParam;
+      handleSearchInput(searchParam);
+    }
+  }
+
+  let banner = document.getElementById('rtp-intent-spotlight-banner');
+  if (!banner && document.body) {
+    banner = document.createElement('div');
+    banner.id = 'rtp-intent-spotlight-banner';
+    banner.style.cssText = 'position:fixed;bottom:14px;left:14px;z-index:9950;background:#181825;border:1px solid #89b4fa;border-radius:8px;padding:8px 12px;color:#cdd6f4;font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,0.45);';
+    document.body.appendChild(banner);
+  }
+  if (banner) {
+    banner.dataset.file = resolvedFile || '';
+    banner.dataset.key = keyParam || '';
+    banner.dataset.line = String(highlightedLine || 0);
+    banner.dataset.intent = intentParam || '';
+    const valNote = valueParam !== '' ? (' = ' + valueParam) : '';
+    banner.textContent = `🧭 Web Editor Guide: ${resolvedFile || 'config'} → ${keyParam || searchParam || intentParam}${valNote}` + (highlightedLine ? ` (line ${highlightedLine})` : '');
+  }
+  return { file: resolvedFile, key: keyParam, value: valueParam, line: highlightedLine, intent: intentParam };
+}
+
+window.RTPIntentCapture = {
+  applyDeepLink: function (opts) {
+    const p = new URLSearchParams();
+    if (opts && typeof opts === 'object') {
+      for (const [k, v] of Object.entries(opts)) {
+        if (v !== undefined && v !== null && String(v) !== '') p.set(k, String(v));
+      }
+    }
+    return applyUrlIntentSpotlight(p);
+  },
+  captureSequence: function (steps) {
+    const frames = [];
+    for (let i = 0; i < (steps || []).length; i++) {
+      const s = steps[i] || {};
+      if (s.action === 'search' && s.query) {
+        openSearchModal();
+        const inp = document.getElementById('palette-query-input');
+        if (inp) { inp.value = s.query; handleSearchInput(s.query); }
+      } else if (s.action === 'focusKey') {
+        closeSearchModal();
+        this.applyDeepLink({ file: s.file, key: s.key, intent: s.intent || s.label });
+      } else if (s.action === 'editKey' && s.file && s.key) {
+        closeSearchModal();
+        this.applyDeepLink({ file: s.file, key: s.key, intent: s.intent || s.label });
+        if (cfgEditor && configs[currentConfigFile] !== undefined) {
+          const leaf = String(s.key).split('.').pop();
+          const re = new RegExp('^(\\s*' + leaf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*)([^#\\r\\n]*)(.*)$', 'm');
+          if (re.test(cfgEditor.value)) {
+            cfgEditor.value = cfgEditor.value.replace(re, '$1' + String(s.value) + '$3');
+            configs[currentConfigFile] = cfgEditor.value;
+            syncRegionProfiles();
+            updateStagingDiff();
+          }
+        }
+      }
+      const diffEl = document.getElementById('staging-diff');
+      const mapEl = document.getElementById('map-canvas');
+      let dataUrl = '';
+      try {
+        if (mapEl && typeof mapEl.toDataURL === 'function') dataUrl = mapEl.toDataURL('image/png');
+      } catch (e) {}
+      frames.push({
+        step: i + 1,
+        label: s.label || s.action || ('step-' + (i + 1)),
+        activeFile: currentConfigFile || '',
+        searchHits: Array.isArray(activeSearchResults) ? activeSearchResults.length : 0,
+        stagingDiff: diffEl ? (diffEl.textContent || '').trim() : '',
+        canvasDataUrlPrefix: dataUrl ? dataUrl.slice(0, 64) : ''
+      });
+    }
+    return frames;
+  }
+};
+
 // ADR-104: Auto-detect session token in URL (?token=XYZ or #XYZ) and fetch live payload
 (async function autoLoadSessionFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -10189,7 +10451,15 @@ window.__rtpLivePathTile = function (r, tx, tz, tile) {
     if (h && !h.includes('/')) token = h;
   }
   const bytebinParam = params.get('bytebin') || 'https://bytebin.lucko.me';
-  if (!token) return;
+  window.__activeBytebinUrl = bytebinParam.replace(/\/+$/, '');
+  if (!token) {
+    if (!document.getElementById('rtp-embedded-payload')) {
+      const staticData = await fetchStaticEditorData('./editor-data.json');
+      if (staticData && typeof staticData === 'object') ingestSessionPayload(staticData);
+    }
+    applyUrlIntentSpotlight(params);
+    return;
+  }
 
   currentSessionToken = token;
   const tokenLabel = document.getElementById('token-label');
@@ -10201,13 +10471,22 @@ window.__rtpLivePathTile = function (r, tx, tz, tile) {
   if (hudMsg) hudMsg.textContent = `Loading ${token}...`;
 
   try {
-    const res = await fetch(`${bytebinParam.replace(/\/+$/, '')}/${token}`, {
-      headers: { 'Accept': 'application/json' }
-    });
+    const [res, staticData] = await Promise.all([
+      fetch(`${bytebinParam.replace(/\/+$/, '')}/${token}`, {
+        headers: { 'Accept': 'application/json' }
+      }),
+      fetchStaticEditorData('./editor-data.json')
+    ]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
+    if (staticData && typeof staticData === 'object') {
+      if (!payload.shipped && staticData.shipped) payload.shipped = staticData.shipped;
+      if (!payload.docTracker && staticData.docTracker) payload.docTracker = staticData.docTracker;
+      if (!payload.synonyms && staticData.synonyms) payload.synonyms = staticData.synonyms;
+    }
 
     ingestSessionPayload(payload);
+    applyUrlIntentSpotlight(params);
 
     const badge = document.getElementById('conn-badge');
     if (badge) {

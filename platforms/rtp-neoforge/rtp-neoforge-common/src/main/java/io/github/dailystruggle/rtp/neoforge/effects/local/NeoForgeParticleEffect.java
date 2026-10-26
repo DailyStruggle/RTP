@@ -24,7 +24,7 @@ public class NeoForgeParticleEffect extends Effect<NeoForgeParticleKeys> {
     public NeoForgeParticleEffect() throws IllegalArgumentException {
         super(new EnumMap<>(NeoForgeParticleKeys.class));
         EnumMap<NeoForgeParticleKeys, Object> d = getData();
-        d.put(NeoForgeParticleKeys.TYPE, ParticleTypes.HAPPY_VILLAGER);
+        d.put(NeoForgeParticleKeys.TYPE, defaultParticle());
         d.put(NeoForgeParticleKeys.COUNT, 32);
         d.put(NeoForgeParticleKeys.DX, 1.0);
         d.put(NeoForgeParticleKeys.DY, 1.0);
@@ -32,6 +32,14 @@ public class NeoForgeParticleEffect extends Effect<NeoForgeParticleKeys> {
         d.put(NeoForgeParticleKeys.SPEED, 0.0);
         this.data = d;
         this.defaults = d.clone();
+    }
+
+    private static Object defaultParticle() {
+        try {
+            return ParticleTypes.HAPPY_VILLAGER;
+        } catch (Throwable ignored) {
+            return "minecraft:happy_villager";
+        }
     }
 
     @Override
@@ -51,13 +59,13 @@ public class NeoForgeParticleEffect extends Effect<NeoForgeParticleKeys> {
 
     static ParticleOptions resolveParticleOptions(Object typeObj) {
         if (typeObj instanceof ParticleOptions opts) return opts;
-        if (typeObj instanceof ParticleType<?>) return ParticleTypes.HAPPY_VILLAGER;
+        if (typeObj instanceof ParticleType<?>) return (ParticleOptions) defaultParticle();
         if (typeObj != null) {
             try {
                 ParticleType<?> resolved = NeoForgeRegistryResolver.resolve(
                         net.minecraft.core.registries.BuiltInRegistries.PARTICLE_TYPE, typeObj.toString());
                 if (resolved instanceof ParticleOptions opts) return opts;
-                if (resolved != null) return ParticleTypes.HAPPY_VILLAGER;
+                if (resolved != null) return (ParticleOptions) defaultParticle();
             } catch (Throwable ignored) {
                 return null;
             }

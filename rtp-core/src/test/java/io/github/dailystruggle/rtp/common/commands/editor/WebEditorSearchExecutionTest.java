@@ -54,8 +54,7 @@ class WebEditorSearchExecutionTest {
         ScriptEngineManager manager = new ScriptEngineManager();
         ScriptEngine engine = manager.getEngineByName("JavaScript");
         if (engine == null) {
-            // In case Nashorn / GraalJS is not default in standard JDK, check with basic assertions
-            System.out.println("[DEBUG_LOG] No standalone JS engine bundled; verified via source structure checks.");
+            runSearchVerificationViaNode(docsEditor);
             return;
         }
 
@@ -111,5 +110,86 @@ class WebEditorSearchExecutionTest {
         List<?> matchedKeysList = (List<?>) matchMap.get("matchedKeys");
         assertTrue(matchedKeysList.contains("radius") || matchedKeysList.contains("centerRadius"),
                 "Matched keys must contain radius or centerRadius");
+    }
+
+    private static void runSearchVerificationViaNode(Path docsEditor) throws Exception {
+        Process checkNode;
+        try {
+            checkNode = new ProcessBuilder("node", "-v").redirectErrorStream(true).start();
+            if (!checkNode.waitFor(5, java.util.concurrent.TimeUnit.SECONDS) || checkNode.exitValue() != 0) {
+                return;
+            }
+        } catch (Exception e) {
+            return;
+        }
+        Path editorDataPath = docsEditor.resolveSibling("editor-data.json");
+        assertTrue(Files.exists(editorDataPath), "editor-data.json must exist beside index.html");
+        String nodeScript = """
+                const fs = require("fs");
+                const vm = require("vm");
+                const html = fs.readFileSync(process.argv[1], "utf8");
+                const editorData = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+                const s0 = html.indexOf("<script>");
+                const s1 = html.lastIndexOf("</script>");
+                const js = html.slice(s0 + "<script>".length, s1);
+                function makeStubEl() {
+                  return new Proxy({
+                    value: "", innerHTML: "", textContent: "", style: {}, dataset: {}, attributes: [], childNodes: [],
+                    classList: { add(){}, remove(){}, toggle(){}, contains(){ return false; } },
+                    addEventListener(){}, removeEventListener(){}, appendChild(){}, removeChild(){}, replaceChild(){}, remove(){},
+                    setAttribute(){}, removeAttribute(){}, getAttribute(){ return ""; },
+                    querySelector(){ return makeStubEl(); }, querySelectorAll(){ return []; },
+                    getBoundingClientRect(){ return { width: 800, height: 600, left: 0, top: 0 }; },
+                    getContext(){ return new Proxy({}, { get: () => () => ({ width: 10, addColorStop(){} }) }); }
+                  }, { get(t, p) { return p in t ? t[p] : () => {}; } });
+                }
+                const elCache = new Map();
+                const sandbox = {
+                  window: { location: { search: "", hash: "", pathname: "/RTP/editor/", protocol: "https:", host: "dailystruggle.github.io" }, addEventListener: () => {}, devicePixelRatio: 1 },
+                  document: {
+                    getElementById: (id) => { if (id === "rtp-embedded-payload") return null; if (!elCache.has(id)) elCache.set(id, makeStubEl()); return elCache.get(id); },
+                    querySelector: () => makeStubEl(), querySelectorAll: () => [], createElement: () => makeStubEl(),
+                    createDocumentFragment: () => makeStubEl(), createTextNode: (t) => ({ nodeType: 3, textContent: t }),
+                    addEventListener: () => {}, body: makeStubEl(), readyState: "complete"
+                  },
+                  DOMParser: class { parseFromString(str) { return { body: { innerHTML: str, childNodes: [], querySelectorAll: () => [] } }; } },
+                  navigator: { onLine: false, clipboard: { writeText: async () => {} } },
+                  history: { replaceState: () => {} },
+                  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+                  performance: { now: () => Date.now() },
+                  requestAnimationFrame: () => 0, cancelAnimationFrame: () => {},
+                  URLSearchParams, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, DataView,
+                  atob: (b64) => Buffer.from(b64, "base64").toString("binary"),
+                  btoa: (bin) => Buffer.from(bin, "binary").toString("base64"),
+                  console, setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
+                  fetch: async () => ({ ok: false })
+                };
+                sandbox.globalThis = sandbox;
+                sandbox.self = sandbox.window;
+                vm.createContext(sandbox);
+                vm.runInContext(js + "\\nglobalThis.__ingest = ingestSessionPayload; globalThis.__search = executeConfigSearch; globalThis.__lev = computeLevenshtein;", sandbox);
+                sandbox.__ingest(editorData);
+                if (sandbox.__lev("raduis", "radius") > 2) { console.error("levenshtein failed"); process.exit(1); }
+                const checks = [
+                  ["dinero", "price"], ["geld", "price"], ["rad", "radius"], ["border", "worldBorderOverride"],
+                  ["maxSlope", "maxSlope"], ["slopeRadius", "slopeRadius"], ["maxHillAngle", "maxHillAngle"],
+                  ["JumpAdjustor", "maxY"], ["TickBudget", "syncAllottedTime"], ["ClaimIntegrations", "rerollWorldGuard"],
+                  ["ACTADDON-0001", "strictActions"], ["retrasoTeletransporte", "teleportDelay"]
+                ];
+                for (const [q, exp] of checks) {
+                  const hits = sandbox.__search(q);
+                  const ok = hits.some(h => h.key.toLowerCase().includes(exp.toLowerCase()) || h.file.toLowerCase().includes(exp.toLowerCase()));
+                  if (!ok) { console.error("Search failed for " + q + " expected " + exp + " got " + JSON.stringify(hits.slice(0,3))); process.exit(2); }
+                }
+                console.log("ALL_12_SEARCH_QUERIES_PASSED");
+                """;
+        Process proc = new ProcessBuilder("node", "-e", nodeScript,
+                docsEditor.toAbsolutePath().toString(),
+                editorDataPath.toAbsolutePath().toString())
+                .redirectErrorStream(true).start();
+        String output = new String(proc.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(proc.waitFor(20, java.util.concurrent.TimeUnit.SECONDS), "Node search execution timed out");
+        assertTrue(proc.exitValue() == 0 && output.contains("ALL_12_SEARCH_QUERIES_PASSED"),
+                "Node V8 search execution failed: " + output);
     }
 }

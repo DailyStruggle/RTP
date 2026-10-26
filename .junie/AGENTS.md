@@ -57,7 +57,7 @@ Before generating code or terminal commands, explicitly state and verify:
 1. **Target platform** - Folia, Paper, Spigot, Fabric, or NeoForge.
 2. **Thread context** - on Folia, `Bukkit.isOwnedByCurrentRegion` before scheduling.
 3. **Chunk I/O** - zero synchronous chunk loads or blocking `.get()` on the main thread.
-4. **Governing ADR** - identify active ADR(s) from `docs/adr/README.md` and confirm alignment before planning.
+4. **Governing ADR & AST Context** - run `python3 scripts/repo_ast.py context <Class|REQ|ADR|key>` (and `python3 scripts/repo_ast.py search "<capability>"` before writing any new helper/SPI) to resolve the `ADR-115` `Gov(c)` neighborhood and confirm alignment with `docs/adr/README.md` before planning.
 5. **Terminal** - run Gradle via wrapper; one command per line with correctly-escaped quotes.
 6. **Safety rule** - name the S-00x rule(s) that apply (see table below).
 7. **Backups** - `.bak` copy required only for uncommitted **code** files. Skip for clean files and docs/markdown.
@@ -111,9 +111,10 @@ Long sessions and multi-step tasks suffer from context drift and silent premise 
 
 ### 1. Autonomous ADR Discovery
 Before formulating a plan or modifying code:
-1. **Catalog Scan:** Inspect `docs/adr/README.md` (and `<subproject>/docs/adr/` if touching a subproject/addon).
-2. **Identification:** Match the task against indexed ADR topics and identify governing records and their status (Accepted vs Proposed vs Superseded).
-3. **Pre-Read:** Read the *Context*, *Decision*, and *Consequences* of active governing ADRs before drafting proposals or checklists.
+1. **AST `Gov(c)` Query (`< 30 ms`):** Run `python3 scripts/repo_ast.py context <Class|REQ|ADR|config_key>` to retrieve the target's `ADR-115` decision-preservation neighborhood (`Gov(c)` ADRs, `REQ-*` rows, `S-00x` prohibitions, 2-hop co-coupled classes, and exact Gradle test command) and `python3 scripts/repo_ast.py search "<capability>"` to discover existing Tier 1/2 SPIs before proposing new classes.
+2. **Catalog Scan:** Inspect `docs/adr/README.md` (and `<subproject>/docs/adr/` if touching a subproject/addon).
+3. **Identification:** Match the task against indexed ADR topics and identify governing records and their status (Accepted vs Proposed vs Superseded).
+4. **Pre-Read:** Read the *Context*, *Decision*, and *Consequences* of active governing ADRs before drafting proposals or checklists.
 
 ### 2. Autonomous Context Refresh
 Context compresses and degrades over extended tool calls. Re-read the governing ADR(s) under any of the following triggers:
@@ -288,6 +289,7 @@ Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use
 - **Bounded algorithms:** Use Archimedean spiral mapping (ADR-001); no unbounded `while` loops.
 - **Fail-closed contract:** Public `rtp-api` methods throw `IllegalStateException` when called pre-init (S-006).
 - **Traceable tests:** Reference `REQ-*` IDs in test class names or `@DisplayName`; update `TRACEABILITY.md`.
+- **AST & corpus searchability (Rule D-010, ADR-115):** Every new or modified `TIER_1_SPI_PURE` (`api/*`, `rtp-api`) or `TIER_2_CORE_DOMAIN` (`rtp-core`) interface/class shall include a concise class-level Javadoc capability summary and `@governedBy` / `@trace` tags naming its active `ADR-*`, `REQ-*`, and `S-00x` invariants; wrap Java class and test names in backticks in `TRACEABILITY.md` and ADRs, and verify discoverability with `python3 scripts/repo_ast.py search "<capability>"` and `python3 scripts/repo_ast.py audit`.
 - **Test tier selection:** Consult [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md). Unit tests are preferred for fast local verification; headless devstack acceptance (`devstack/run-acceptance.ps1` / `devstack/run-acceptance.sh`) is scriptable and available for cross-server network, platform parity, and runtime-attested coverage.
 - **No process notes:** Never commit development shorthand (`Slice X`, `Phase 2e`, `Phase M2`, `Step 3`, `row C4`, `Section C/F rows`) or planning-doc references (`CHECKLIST-*.md`, `*_PLAN.md` such as `METRICS_PLAN.md`) in source comments, Javadoc, test `@DisplayName`s, or config comments. State the invariant itself; cite an ADR or `REQ-*` ID if provenance is needed. Enforced on added lines by the `.git/hooks/pre-commit` hook.
 - **Telegraphic comments:** Prioritize information density over exposition. State *why* and non-obvious invariants in <=8 lines. Do not narrate obvious code.
@@ -313,7 +315,9 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
   - Targeted tests: `.\gradlew.bat :<module>:test --tests "<pattern>"` (or `./gradlew :<module>:test --tests "<pattern>"`)
   - Acceptance devstack: `.\devstack\run-acceptance.ps1 -Scenario <scenario>` (or `./devstack/run-acceptance.sh --scenario <scenario>`). Headless and scriptable via Mineflayer bot; see [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md) for when to run unit tests vs devstack acceptance.
 - **Pre-commit gate:** Before handing off staged work, run `sh .git/hooks/pre-commit` (native `sh` on Linux/macOS; Git Bash `sh.exe` on Windows) against the index and fix every violation (process references, mojibake, BOM, CRLF, forbidden `.bak`/scratch files). Trailing whitespace on added lines is autofixed in the index (and in the working tree unless the file is partially staged). Recoverable mojibake is autofixed in the index and working tree via `scripts/mojibake.py` (repo-wide: `python scripts/check-mojibake.py --fix`); only lossy residue aborts. Put intentional marker mentions in a Markdown code span or on a line tagged `mojibake-ok`.
-- **Search:** Use `search_project` tool with targeted keywords when it is in the session toolset. Never `grep`/`find`. If it is not available, use `grep_search` and `glob_search`, or the IDE search commands (`search_text`, `search_regex`, `search_file`, `search_symbol`) through the IDE command bridge.
+- **Search & Repository AST (`corpus-atlas/` MCP + `scripts/repo_ast.py` CLI):**
+  - Prefer the `corpus-atlas` MCP tools (`repo_ast_context`, `repo_ast_search`, `repo_ast_impact`, `repo_ast_audit`, `repo_ast_sync`; enable via `enable_mcp` if filtered) or `python3 scripts/repo_ast.py {context,search,impact,audit,sync}` for symbol/ADR/requirement orientation, anti-redundancy SPI discovery, and downstream test impact (auto-syncs working-tree edits in `< 25 ms`; benchmarked via `python3 scripts/bench_repo_ast.py --gate`).
+  - Use `search_project` tool with targeted keywords when it is in the session toolset. Never `grep`/`find`. If it is not available, use `grep_search` and `glob_search`, or the IDE search commands (`search_text`, `search_regex`, `search_file`, `search_symbol`) through the IDE command bridge.
 - **Toolset varies by session:** Verify a tool is available before relying on it; do not assume a tool listed in this file is present.
 - **Symbol rename fallback:** If `rename_element` is unavailable, use the IDE command bridge with `rename_refactoring --pathInProject <path> --symbolName <current name> --line <n> --column <n> --newName <new name>`. `--symbolName` is required; omitting it fails. If the call fails with an index-not-ready error, wait about 30 seconds and retry.
 - **IDE command bridge:** Commands are dispatched by name. `help` and `--help` are not commands; an unknown name returns the list of available tool names. Other names available in the session include `build_project`, `get_file_problems`, `lint_files`, `reformat_file`, `get_symbol_info`, `get_project_modules`, `get_run_configurations`, `execute_run_configuration` and `git_status`.

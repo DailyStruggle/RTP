@@ -360,3 +360,24 @@ Unlike static support bots that try to compensate for documentation gaps by bloa
        --llm-endpoint http://127.0.0.1:11434/v1/chat/completions \
        --listen --interval 10 --settle-seconds 5
      ```
+
+---
+
+### 5.5 4-Tool Verification Workbench, 5-Minute AST Planner & Discord Server Versioned Cache (`RTP-98`, `RTP-99`, `RTP-100`)
+
+Implemented in [`discord-support-bot/bot_verification_tools.py`](bot_verification_tools.py) and wired into `SupportBotEngine`, `DiscordForumPoller` (`discord_support_bot.py`), `WebRelayAndTriageServer` (`web_relay_and_triage.py`), `docs/editor/index.html`, and `docs/assets/javascripts/rtp-support-doctor.js`:
+
+1. **Customer Setup Reconstructor (`reconstruct_customer_setup` — `definite` vs. `best_approximation`):**
+   - Inspects customer post text, `mclo.gs` / console logs, pasted YAML snippets, `[RTP bit]` codes, and AST class links overlaid onto the shipped baseline YAML (`rtp-plugin/src/main/resources/`).
+   - Labels the profile as **`definite`** when explicit version/platform, YAML overrides, console logs, or `[RTP bit]` findings are present, and **`best_approximation`** when inferred from partial symptoms onto the shipped baseline.
+2. **AST Cross-Reference Map & 5-Minute (`300s`) Repo Tool Budget Planner (`resolve_ast_cross_reference_map` & `RepoToolBudgetPlanner`):**
+   - Traverses `ast_symbols`, `ast_edges`, `ast_conflicts`, and `ast_config_tree` in `doc-index.sqlite` and cross-references linked Java classes directly to their executable Gradle `*Test.java` targets (`_build_repo_test_index`) and repository scripts (`scripts/editor_curve_probe.py`, `devstack/clients/mineflayer-bot.js`, `scripts/gif-bots.js`).
+   - Budgets which repository tools to run within the 5-minute (`DEFAULT_DEEP_WINDOW_SECONDS = 300.0`) deep-search window.
+3. **The 4 Execution & Verification Tools (`BotVerificationWorkbench`):**
+   - **Tool 1 — Console & Log Tool (`gather_console_and_logs`):** Simulates/executes `/rtp` commands and config patches against the `definite` or `best_approximation` setup, verifies `commands-api` grammar and cross-key BIT/AST invariants (`centerRadius < radius`, `nearRadius < radius`, `minY < maxY`, `S-005` `syncLoading: false`, `maxSlope` + `slopeRadius`), auto-injects prerequisite companion fixes, and gathers realistic server console & `[RTP bit]` log transcripts.
+   - **Tool 2 — Local Webpage Operations Tool (`run_local_webpage_operations` & `docs/editor/index.html`):** Searches `docs/editor/editor-data.json`, computes `#staging-diff` lines, simulates `#map-canvas` region geometry curves (`CIRCLE`, `SQUARE`, `RADIAL`, `SPIRAL`, `HILBERT`), and generates Web Editor spotlight deep links (`?file=<file>&key=<key>&search=<query>&intent=<slug>`) handled by `applyUrlIntentSpotlight` and `window.RTPIntentCapture.captureSequence(steps)`.
+   - **Tool 3 — Multi-Format Screenshotting Tool (`capture_verification_visuals`):** Pure-stdlib renderer producing a 3-step dark-theme storyboard contact sheet in **`PNG` (`image/png`)**, multi-frame **`APNG` (`image/apng` with `acTL`/`fcTL`/`fdAT`)**, and looping **`GIF89a` (`image/gif`)**, tagged with `image_tag` (`rtp-cache:v<version>:<schema_hash8>:<intent_slug>`) and `image_description`.
+   - **Tool 4 — Mineflayer Protocol Bot Tool (`run_mineflayer_probe`):** Invokes `node devstack/clients/mineflayer-bot.js` when a live test server is configured/reachable, or executes a deterministic setup-grounded Mineflayer protocol trace (`spawn` -> `/rtp` -> warmup `actionBar` -> `forcedMove` arrival within `[centerRadius..radius]`).
+4. **Discord Server as a Versioned Cache (`DiscordVersionedArtifactCache`):**
+   - Bot replies tag uploaded images and embeds with `[rtp-cache:v<version>:<schema_hash8>:<intent_slug>]` and a structured `image_description` (in `attachments[].description` and `embeds[].footer.text`).
+   - `DiscordForumPoller` harvests tagged Discord CDN image links (`https://cdn.discordapp.com/attachments/...`) from thread/channel messages and `bot-state.json`, reuses matching images by link on subsequent threads without re-rendering or re-uploading, and automatically invalidates cached entries when the plugin version or AST/schema hash changes.

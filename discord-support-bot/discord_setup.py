@@ -233,6 +233,15 @@ def validate_rule_d006_copy(spec: dict[str, Any], layout_doc_path: pathlib.Path 
             if m:
                 violations.append(f"{label}: contains sales hype word {m.group(0)!r}")
 
+    bot_profile = spec.get("bot_profile")
+    if isinstance(bot_profile, dict):
+        for field_name in ("username", "bio", "footer"):
+            val = str(bot_profile.get(field_name, "")).strip()
+            if not val:
+                violations.append(f"bot_profile.{field_name}: must be non-empty")
+            else:
+                check_text(f"bot_profile.{field_name}", val)
+
     for ch_name, embeds in spec.get("channel_embeds", {}).items():
         for idx, emb in enumerate(embeds):
             label = f"channel_embeds.{ch_name}[{idx}]"

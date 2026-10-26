@@ -45,6 +45,12 @@ class DiscordSetupTest(unittest.TestCase):
         violations = validate_rule_d006_copy(self.spec)
         self.assertEqual([], violations, f"Rule D-006 violations found: {violations}")
 
+        # Verify bot_profile frames the bot as a deterministic schema/docs index
+        bot_profile = self.spec.get("bot_profile", {})
+        self.assertEqual("LeafRTP Docs & Schema Index", bot_profile.get("username"))
+        self.assertIn("verified against the shipped RTP schema", bot_profile.get("bio", ""))
+        self.assertIn("verified against the RTP schema", bot_profile.get("footer", ""))
+
         # Verify that em-dash or hype buzzword is caught mechanically
         bad_spec = copy.deepcopy(self.spec)
         bad_spec["channel_embeds"]["start-here"][0]["description"] += " — blazingly fast!"

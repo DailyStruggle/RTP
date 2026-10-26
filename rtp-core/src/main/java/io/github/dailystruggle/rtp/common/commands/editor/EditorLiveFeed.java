@@ -630,6 +630,7 @@ public final class EditorLiveFeed {
                 return false;
             }
             seq++;
+            if (own != null) own.deferBundleFlush(true);
             handleClientMessages();
             if (regionSource != null && (seq == 1 || seq % REGION_CHECK_TICKS == 0)) syncRegions();
             publishCurves();
@@ -673,8 +674,9 @@ public final class EditorLiveFeed {
                 // Only a visible change, or the heartbeat, costs a relay frame (bytesocks counts per IP)
                 FeedSignature sig = FeedSignature.of(head);
                 long gap = now - lastPushedAt;
+                long minHeadGap = hostedHeadMinMillis(own);
                 boolean changed = sig.changedFrom(lastPushed)
-                        && (files || lastPushed == null || gap >= HOSTED_HEAD_MIN_MILLIS);
+                        && (files || lastPushed == null || gap >= minHeadGap);
                 if (changed || gap >= FEED_HEARTBEAT_MILLIS) {
                     lastPushed = sig;
                     lastPushedAt = now;
@@ -707,6 +709,8 @@ public final class EditorLiveFeed {
             stop("internal error: " + e.getMessage(), false);
             return false;
         } finally {
+            EditorChannel own = ownChannel;
+            if (own != null) own.deferBundleFlush(false);
             ticking.set(false);
         }
     }
@@ -878,7 +882,8 @@ public final class EditorLiveFeed {
             if (done.refJson() == null) done.marked().forEach(landHeld::remove);
         }
         Focus f = focus;
-        if (f == null || landUploadBusy || now - lastLandUploadAt < LAND_UPLOAD_MILLIS) return;
+        long uploadInterval = landUploadMillis(ch);
+        if (f == null || landUploadBusy || now - lastLandUploadAt < uploadInterval) return;
         WorldBiomeStore store = storeOf(f.world());
         if (store == null) return;
         int x0 = f.minRx() - LAND_PAD_BINS, x1 = f.maxRx() + LAND_PAD_BINS;
@@ -942,6 +947,26 @@ public final class EditorLiveFeed {
     private WorldBiomeStore storeOf(String world) {
         for (WorldLandSurvey s : surveys) if (s.world().equals(world)) return s.store();
         return null;
+    }
+
+    static long hostedHeadMinMillis(EditorChannel ch) {
+        if (ch == null) return HOSTED_HEAD_MIN_MILLIS;
+        int fpw = ch.framesPerWindow();
+        if (fpw <= io.github.dailystruggle.rtp.common.commands.editor.channel.BytesocksTransport.FRAMES_PER_WINDOW) {
+            return HOSTED_HEAD_MIN_MILLIS;
+        }
+        return Math.max(PERIOD_MILLIS,
+                HOSTED_HEAD_MIN_MILLIS * io.github.dailystruggle.rtp.common.commands.editor.channel.BytesocksTransport.FRAMES_PER_WINDOW / fpw);
+    }
+
+    static long landUploadMillis(EditorChannel ch) {
+        if (ch == null) return LAND_UPLOAD_MILLIS;
+        int fpw = ch.framesPerWindow();
+        if (fpw <= io.github.dailystruggle.rtp.common.commands.editor.channel.BytesocksTransport.FRAMES_PER_WINDOW) {
+            return LAND_UPLOAD_MILLIS;
+        }
+        return Math.max(4_000L,
+                LAND_UPLOAD_MILLIS * io.github.dailystruggle.rtp.common.commands.editor.channel.BytesocksTransport.FRAMES_PER_WINDOW / fpw);
     }
 
     /**

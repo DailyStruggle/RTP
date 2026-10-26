@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
+import io.github.dailystruggle.rtp.api.DownloadInfo;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
@@ -17,8 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -56,6 +59,10 @@ public class EditorHttpTransport {
     private final String bytebinUrl;
     private final String editorBaseUrl;
     private final String relayUrl;
+    private final String fallbackBytebinUrl;
+    private final String fallbackRelayUrl;
+    private final String serviceToken;
+    private volatile String activeBytebinUrl;
 
     public EditorHttpTransport() {
         this(DEFAULT_BYTEBIN_URL, DEFAULT_EDITOR_URL);
@@ -78,12 +85,26 @@ public class EditorHttpTransport {
 
     /** As the 3-argument form with the relay ({@code http(s)://host[:port]}) the hosted channel joins. */
     public EditorHttpTransport(HttpClient httpClient, String bytebinUrl, String editorBaseUrl, String relayUrl) {
+        this(httpClient, bytebinUrl, editorBaseUrl, relayUrl, null, null, null);
+    }
+
+    /**
+     * Full constructor with optional fallback endpoints and Pro / hosted service token (ADR-108).
+     */
+    public EditorHttpTransport(HttpClient httpClient, String bytebinUrl, String editorBaseUrl, String relayUrl,
+                               String fallbackBytebinUrl, String fallbackRelayUrl, String serviceToken) {
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         String bytebin = url(bytebinUrl, "bytebinUrl");
         String relay = url(relayUrl, "relayUrl");
+        String fbBytebin = url(fallbackBytebinUrl, "fallbackBytebinUrl");
+        String fbRelay = url(fallbackRelayUrl, "fallbackRelayUrl");
         this.bytebinUrl = bytebin != null ? stripTrailingSlashes(bytebin) : DEFAULT_BYTEBIN_URL;
         this.editorBaseUrl = (editorBaseUrl != null && !editorBaseUrl.isBlank()) ? stripTrailingSlashes(editorBaseUrl) : DEFAULT_EDITOR_URL;
         this.relayUrl = relay != null ? stripTrailingSlashes(relay) : DEFAULT_RELAY_URL;
+        this.fallbackBytebinUrl = fbBytebin != null ? stripTrailingSlashes(fbBytebin) : null;
+        this.fallbackRelayUrl = fbRelay != null ? stripTrailingSlashes(fbRelay) : null;
+        this.serviceToken = (serviceToken != null && !serviceToken.isBlank()) ? serviceToken.trim() : null;
+        this.activeBytebinUrl = this.bytebinUrl;
     }
 
     /**
@@ -104,6 +125,9 @@ public class EditorHttpTransport {
                     block = new HashMap<>();
                     block.put("bytebinUrl", sec.getString("bytebinUrl"));
                     block.put("relayUrl", sec.getString("relayUrl"));
+                    block.put("fallbackBytebinUrl", sec.getString("fallbackBytebinUrl"));
+                    block.put("fallbackRelayUrl", sec.getString("fallbackRelayUrl"));
+                    block.put("serviceToken", sec.getString("serviceToken"));
                 }
             }
         } catch (IOException | RuntimeException e) {
@@ -111,25 +135,56 @@ public class EditorHttpTransport {
                     + e.getMessage(), e);
         }
         String[] urls = settingsUrls(block);
+        String fbBytebin = block == null ? null : url(block.get("fallbackBytebinUrl"), "fallbackBytebinUrl");
+        String fbRelay = block == null ? null : url(block.get("fallbackRelayUrl"), "fallbackRelayUrl");
+        String token = extractServiceToken(block);
+        if (fbBytebin == null && !DEFAULT_BYTEBIN_URL.equals(urls[0])) fbBytebin = DEFAULT_BYTEBIN_URL;
+        if (fbRelay == null && !DEFAULT_RELAY_URL.equals(urls[1])) fbRelay = DEFAULT_RELAY_URL;
         EditorHttpTransport last = configured;
-        if (last != null && last.bytebinUrl.equals(urls[0]) && last.relayUrl.equals(urls[1])) return last;
-        EditorHttpTransport fresh = build(urls);
+        if (last != null
+                && last.bytebinUrl.equals(urls[0])
+                && last.relayUrl.equals(urls[1])
+                && Objects.equals(last.fallbackBytebinUrl, fbBytebin != null ? stripTrailingSlashes(fbBytebin) : null)
+                && Objects.equals(last.fallbackRelayUrl, fbRelay != null ? stripTrailingSlashes(fbRelay) : null)
+                && Objects.equals(last.serviceToken, token)) {
+            return last;
+        }
+        EditorHttpTransport fresh = new EditorHttpTransport(
+                HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .followRedirects(HttpClient.Redirect.NORMAL)
+                        .build(),
+                urls[0], DEFAULT_EDITOR_URL, urls[1], fbBytebin, fbRelay, token);
         configured = fresh;
         return fresh;
     }
 
     /** A transport for one {@code editor} config block (a map, or anything else for all defaults). */
     static EditorHttpTransport fromSettings(Object block) {
-        return build(settingsUrls(block));
-    }
-
-    private static EditorHttpTransport build(String[] urls) {
+        String[] urls = settingsUrls(block);
+        String fbBytebin = null;
+        String fbRelay = null;
+        if (block instanceof Map<?, ?> m) {
+            fbBytebin = url(m.get("fallbackBytebinUrl"), "fallbackBytebinUrl");
+            fbRelay = url(m.get("fallbackRelayUrl"), "fallbackRelayUrl");
+        }
         return new EditorHttpTransport(
                 HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(10))
                         .followRedirects(HttpClient.Redirect.NORMAL)
                         .build(),
-                urls[0], DEFAULT_EDITOR_URL, urls[1]);
+                urls[0], DEFAULT_EDITOR_URL, urls[1], fbBytebin, fbRelay, extractServiceToken(block));
+    }
+
+    private static String extractServiceToken(Object block) {
+        if (block instanceof Map<?, ?> m) {
+            Object raw = m.get("serviceToken");
+            if (raw != null && !String.valueOf(raw).isBlank()) {
+                return String.valueOf(raw).trim();
+            }
+        }
+        String env = System.getenv("RTP_EDITOR_SERVICE_TOKEN");
+        return (env != null && !env.isBlank()) ? env.trim() : null;
     }
 
     /** {bytebin, relay} of an {@code editor} block, normalised as the constructor does. */
@@ -171,6 +226,31 @@ public class EditorHttpTransport {
 
     public String getRelayUrl() {
         return relayUrl;
+    }
+
+    public String getFallbackBytebinUrl() {
+        return fallbackBytebinUrl;
+    }
+
+    public String getFallbackRelayUrl() {
+        return fallbackRelayUrl;
+    }
+
+    public String getServiceToken() {
+        return serviceToken;
+    }
+
+    /**
+     * Headers identifying the server's distribution platform and optional service token for
+     * hosted relay/bytebin rate-limit negotiation (ADR-100, ADR-108).
+     */
+    public Map<String, String> serviceHeaders() {
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("X-RTP-Edition", DownloadInfo.source().name());
+        if (serviceToken != null && !serviceToken.isBlank()) {
+            headers.put("Authorization", "Bearer " + serviceToken);
+        }
+        return Collections.unmodifiableMap(headers);
     }
 
     /** The shared client: bytebin uploads and the relay's WebSocket use the same one. */
@@ -256,7 +336,8 @@ public class EditorHttpTransport {
     }
 
     /**
-     * Posts a JSON payload asynchronously to the configured bytebin store.
+     * Posts a JSON payload asynchronously to the configured bytebin store, falling back to
+     * {@link #fallbackBytebinUrl} when configured and the primary endpoint fails (S-004).
      *
      * @param jsonPayload raw JSON payload string
      * @return CompletableFuture resolving to the created session token/key
@@ -266,45 +347,65 @@ public class EditorHttpTransport {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                byte[] compressed = gzipCompress(jsonPayload);
-                return compressed;
+                return gzipCompress(jsonPayload);
             } catch (IOException e) {
                 throw new RuntimeException("Failed to compress JSON payload: " + e.getMessage(), e);
             }
-        }).thenCompose(compressed -> {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(bytebinUrl + "/post"))
-                    .header("Content-Type", "application/json; charset=utf-8")
-                    .header("Content-Encoding", "gzip")
-                    .header("User-Agent", "RTP-Plugin-Editor/1.0")
-                    .timeout(Duration.ofSeconds(15))
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(compressed))
-                    .build();
+        }).thenCompose(compressed -> postCompressedTo(bytebinUrl, compressed).handle((key, err) -> {
+            if (err == null) {
+                activeBytebinUrl = bytebinUrl;
+                return CompletableFuture.completedFuture(key);
+            }
+            if (fallbackBytebinUrl != null && !fallbackBytebinUrl.equals(bytebinUrl)) {
+                RTPRuntime.log(Level.WARNING, "[editor] primary byte-store " + bytebinUrl
+                        + " failed; retrying fallback " + fallbackBytebinUrl + ": " + err.getMessage());
+                return postCompressedTo(fallbackBytebinUrl, compressed).thenApply(fbKey -> {
+                    activeBytebinUrl = fallbackBytebinUrl;
+                    return fbKey;
+                });
+            }
+            Throwable cause = err.getCause() != null ? err.getCause() : err;
+            return CompletableFuture.<String>failedFuture(cause);
+        }).thenCompose(f -> f));
+    }
 
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                    .thenApply(response -> {
-                        int statusCode = response.statusCode();
-                        if (statusCode < 200 || statusCode >= 300) {
-                            String err = "Bytebin POST failed with status code " + statusCode + ": " + response.body();
-                            RTPRuntime.log(Level.WARNING, err);
-                            throw new RuntimeException(err);
-                        }
+    private CompletableFuture<String> postCompressedTo(String baseUrl, byte[] compressed) {
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/post"))
+                .header("Content-Type", "application/json; charset=utf-8")
+                .header("Content-Encoding", "gzip")
+                .header("User-Agent", "RTP-Plugin-Editor/1.0")
+                .timeout(Duration.ofSeconds(15))
+                .POST(HttpRequest.BodyPublishers.ofByteArray(compressed));
+        for (Map.Entry<String, String> h : serviceHeaders().entrySet()) {
+            reqBuilder.header(h.getKey(), h.getValue());
+        }
+        HttpRequest request = reqBuilder.build();
 
-                        // Bytebin returns {"key":"xxxx"} or plain key depending on endpoint / response
-                        String body = response.body().trim();
-                        String key = extractKeyFromJsonOrPlain(body);
-                        if (key == null || key.isBlank()) {
-                            String err = "Bytebin returned empty or unparseable key: " + body;
-                            RTPRuntime.log(Level.WARNING, err);
-                            throw new RuntimeException(err);
-                        }
-                        return key;
-                    });
-        });
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                .thenApply(response -> {
+                    int statusCode = response.statusCode();
+                    if (statusCode < 200 || statusCode >= 300) {
+                        String err = "Bytebin POST failed with status code " + statusCode + ": " + response.body();
+                        RTPRuntime.log(Level.WARNING, err);
+                        throw new RuntimeException(err);
+                    }
+
+                    // Bytebin returns {"key":"xxxx"} or plain key depending on endpoint / response
+                    String body = response.body().trim();
+                    String key = extractKeyFromJsonOrPlain(body);
+                    if (key == null || key.isBlank()) {
+                        String err = "Bytebin returned empty or unparseable key: " + body;
+                        RTPRuntime.log(Level.WARNING, err);
+                        throw new RuntimeException(err);
+                    }
+                    return key;
+                });
     }
 
     /**
-     * Fetches a session payload asynchronously by token from the configured bytebin store.
+     * Fetches a session payload asynchronously by token from the configured bytebin store,
+     * falling back to {@link #fallbackBytebinUrl} when configured (S-004).
      *
      * @param token session token / bytebin key
      * @return CompletableFuture resolving to decompressed JSON payload string
@@ -318,12 +419,30 @@ public class EditorHttpTransport {
         }
         String shown = EditorSecurity.tokenPrefix(token);
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(bytebinUrl + "/" + token))
+        return fetchFrom(bytebinUrl, token, shown).handle((body, err) -> {
+            if (err == null) {
+                return CompletableFuture.completedFuture(body);
+            }
+            if (fallbackBytebinUrl != null && !fallbackBytebinUrl.equals(bytebinUrl)) {
+                RTPRuntime.log(Level.WARNING, "[editor] primary byte-store fetch at " + bytebinUrl
+                        + " failed for token '" + shown + "'; retrying fallback " + fallbackBytebinUrl);
+                return fetchFrom(fallbackBytebinUrl, token, shown);
+            }
+            Throwable cause = err.getCause() != null ? err.getCause() : err;
+            return CompletableFuture.<String>failedFuture(cause);
+        }).thenCompose(f -> f);
+    }
+
+    private CompletableFuture<String> fetchFrom(String baseUrl, String token, String shown) {
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/" + token))
                 .header("User-Agent", "RTP-Plugin-Editor/1.0")
                 .timeout(Duration.ofSeconds(15))
-                .GET()
-                .build();
+                .GET();
+        for (Map.Entry<String, String> h : serviceHeaders().entrySet()) {
+            reqBuilder.header(h.getKey(), h.getValue());
+        }
+        HttpRequest request = reqBuilder.build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
                 .thenApply(response -> {
@@ -353,7 +472,14 @@ public class EditorHttpTransport {
      */
     public String buildEditorUrl(String token) {
         Objects.requireNonNull(token, "token");
-        return editorBaseUrl + "?token=" + token;
+        String url = editorBaseUrl + "?token=" + token;
+        String active = activeBytebinUrl != null ? activeBytebinUrl : bytebinUrl;
+        if (editorBaseUrl.equals(stripTrailingSlashes(DEFAULT_EDITOR_URL))
+                && active != null
+                && !active.equals(DEFAULT_BYTEBIN_URL)) {
+            url += "&bytebin=" + java.net.URLEncoder.encode(active, StandardCharsets.UTF_8);
+        }
+        return url;
     }
 
     /**
