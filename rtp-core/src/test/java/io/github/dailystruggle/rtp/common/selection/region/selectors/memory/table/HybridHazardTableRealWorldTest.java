@@ -4,10 +4,12 @@ import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.benchmark.RealWorldVerdictMask;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,12 +20,21 @@ public class HybridHazardTableRealWorldTest {
   @Test
   public void testRealWorldMcaHybridTable() throws Exception {
     Path regionDir = Path.of("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\world\\dimensions\\minecraft\\overworld\\region");
+    if (!Files.isDirectory(regionDir)) {
+      regionDir = Path.of("testdata-world/overworld/region");
+    }
+    Assumptions.assumeTrue(
+        Files.isDirectory(regionDir),
+        "No real MCA save directory available at " + regionDir);
     int regionFileCap = 256;
 
     System.out.println("\n[DEBUG_LOG] === LOADING REAL MCA DATA FOR HYBRID HAZARD TABLE ===");
     long startLoad = System.currentTimeMillis();
     RealWorldVerdictMask mask = RealWorldVerdictMask.load(regionDir, RealWorldVerdictMask.SHIPPED_UNSAFE_BLOCKS, regionFileCap);
     long loadTime = System.currentTimeMillis() - startLoad;
+    Assumptions.assumeTrue(
+        mask.regionFilesRead() > 0 && mask.inscribedRadius() > 0,
+        "No usable MCA region files found in " + regionDir);
 
     System.out.printf("[DEBUG_LOG] Loaded %d real MCA files in %.2f seconds%n", mask.regionFilesRead(), loadTime / 1000.0);
 

@@ -15,7 +15,12 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   private Connection connection;
 
   public SQLiteDatabaseAccessor(String url) {
-    if (RTPRuntime.serverAccessor() != null
+    if (url != null
+        && url.startsWith("jdbc:sqlite:")
+        && !url.equals("jdbc:sqlite:ignored")
+        && !url.endsWith(File.separator + "RTP.db")) {
+      this.sqliteUrl = url;
+    } else if (RTPRuntime.serverAccessor() != null
         && RTPRuntime.serverAccessor().getPluginDirectory() != null) {
       File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
       File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");

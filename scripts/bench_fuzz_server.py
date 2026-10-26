@@ -6172,7 +6172,7 @@ def evaluate_server_trace(
 # --- Passive local server audit (`--mode server`, ADR-125) -------------------
 
 LOCAL_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1"})
-ALLOWED_BENCH_HOSTNAMES: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1", "leaf26", "bamboo"})
+ALLOWED_BENCH_HOSTNAMES: frozenset[str] = LOCAL_LOOPBACK_HOSTS
 ALLOWED_BENCH_SUFFIXES: tuple[str, ...] = (".local", ".lan", ".internal", ".home", ".ts.net")
 RFC1918_AND_TAILSCALE_NETS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
     ipaddress.ip_network("10.0.0.0/8"),
@@ -6204,8 +6204,21 @@ SERVER_ACTIVE_PROHIBITED_FLAGS: dict[str, tuple[str, str]] = {
 }
 
 
+def _env_allowed_bench_hosts() -> set[str]:
+    extra: set[str] = set()
+    for env_key in ("BENCH_HOST", "BENCH_SSH_HOST", "FUZZ_SSH_HOST", "BENCH_ALLOWED_HOSTS"):
+        val = os.environ.get(env_key, "")
+        for tok in val.split(","):
+            s = tok.strip().lower()
+            if "@" in s:
+                s = s.rpartition("@")[2].strip()
+            if s:
+                extra.add(s)
+    return extra
+
+
 def is_allowed_bench_host(host: str | None) -> tuple[bool, str]:
-    """Validate that `host` is loopback, private RFC1918 LAN, Tailscale CGNAT (`100.64.0.0/10`), or a local bench hostname (`leaf26`, `bamboo`, `*.local`, `*.lan`).
+    """Validate that `host` is loopback, private RFC1918 LAN, Tailscale CGNAT (`100.64.0.0/10`), or a local bench hostname (single-label LAN alias, `$BENCH_HOST`, `*.local`, `*.lan`).
 
     Rejects public WAN IP addresses and public internet domain names so the harness
     cannot be repurposed against third-party servers.
@@ -6215,12 +6228,12 @@ def is_allowed_bench_host(host: str | None) -> tuple[bool, str]:
         return False, "host must not be empty"
     if raw.startswith("[") and raw.endswith("]"):
         raw = raw[1:-1]
-    if raw in ALLOWED_BENCH_HOSTNAMES:
+    if raw in ALLOWED_BENCH_HOSTNAMES or raw in _env_allowed_bench_hosts():
         return True, "ok"
     try:
         addr = ipaddress.ip_address(raw)
     except ValueError:
-        # Hostname check: allow single-label local bench hostnames (e.g. leaf26, bamboo) or local suffixes
+        # Hostname check: allow single-label local bench hostnames or local suffixes
         if re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", raw):
             return True, "ok"
         if any(raw.endswith(sfx) for sfx in ALLOWED_BENCH_SUFFIXES) and re.fullmatch(
@@ -6230,7 +6243,8 @@ def is_allowed_bench_host(host: str | None) -> tuple[bool, str]:
         return (
             False,
             f"refusing public or external hostname {host!r}; --mode server --active only permits "
-            "loopback (127.0.0.1, localhost, ::1), RFC1918 LAN / Tailscale IPs, or local bench hostnames (leaf26, bamboo, *.local, *.lan)",
+            "loopback (127.0.0.1, localhost, ::1), RFC1918 LAN / Tailscale IPs, or local bench hostnames "
+            "(single-label LAN alias, $BENCH_HOST, *.local, *.lan)",
         )
 
     if addr.is_loopback or addr.is_link_local or any(addr in net for net in RFC1918_AND_TAILSCALE_NETS):
@@ -6500,19 +6514,31 @@ def validate_active_server_mode_args(
             f"(e.g. 'default' or 'default,op'); got {raw_tiers!r}"
         )
 
-    host = (getattr(args, "host", None) or "127.0.0.1").strip()
+    env_host = (os.environ.get("BENCH_HOST") or "").strip()
+    raw_host = getattr(args, "host", None)
+    if (not raw_host or (raw_host == "127.0.0.1" and "--host" not in opt_tokens)) and env_host:
+        host = env_host
+        setattr(args, "host", host)
+    else:
+        host = (raw_host or "127.0.0.1").strip()
     ok_host, host_reason = is_allowed_bench_host(host)
     if not ok_host:
         _fail(f"--mode server --active invalid --host: {host_reason}")
 
-    mc_host = getattr(args, "mc_host", None)
+    mc_host = getattr(args, "mc_host", None) or (os.environ.get("BENCH_MC_HOST") or "").strip() or None
     if mc_host is not None:
+        setattr(args, "mc_host", mc_host)
         ok_mc, mc_reason = is_allowed_bench_host(str(mc_host).strip())
         if not ok_mc:
             _fail(f"--mode server --active invalid --mc-host: {mc_reason}")
 
-    ssh_target = getattr(args, "ssh", None)
+    ssh_target = (
+        getattr(args, "ssh", None)
+        or (os.environ.get("BENCH_SSH_HOST") or os.environ.get("FUZZ_SSH_HOST") or "").strip()
+        or None
+    )
     if ssh_target is not None:
+        setattr(args, "ssh", ssh_target)
         ssh_str = str(ssh_target).strip()
         if not ssh_str or ssh_str.startswith("-"):
             _fail(f"--mode server --active invalid --ssh target: {ssh_target!r}")
@@ -6520,6 +6546,14 @@ def validate_active_server_mode_args(
         ok_ssh, ssh_reason = is_allowed_bench_host(ssh_host)
         if not ok_ssh:
             _fail(f"--mode server --active invalid --ssh host: {ssh_reason}")
+
+    remote_server_dir = (
+        getattr(args, "remote_server_dir", None)
+        or (os.environ.get("BENCH_REMOTE_SERVER_DIR") or "").strip()
+        or None
+    )
+    if remote_server_dir is not None:
+        setattr(args, "remote_server_dir", remote_server_dir)
 
     server_dir = getattr(args, "server_dir", None)
     ok_disp, disp_reason = is_disposable_server_dir(server_dir)

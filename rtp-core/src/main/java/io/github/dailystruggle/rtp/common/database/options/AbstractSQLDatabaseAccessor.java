@@ -305,6 +305,11 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
    * @return SQL index DDL statement
    */
   public String getMetricBucketIndexDdl() {
+    String n = name() == null ? "" : name().toLowerCase(Locale.ROOT);
+    if (n.contains("mysql") && !n.startsWith("jdbc:h2:")) {
+      return "CREATE INDEX idx_rtp_metric_bucket_key_epoch "
+          + "ON rtp_metric_bucket (metric_key, window_start_epoch);";
+    }
     return "CREATE INDEX IF NOT EXISTS idx_rtp_metric_bucket_key_epoch "
         + "ON rtp_metric_bucket (metric_key, window_start_epoch);";
   }
@@ -350,10 +355,13 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         try {
           statement.execute(indexDdl);
         } catch (SQLException indexEx) {
-          // MySQL 8.0 error 1061 (Duplicate key name) when CREATE INDEX IF NOT EXISTS is unsupported
+          // MySQL 8.0 error 1061 (Duplicate key name) or H2 MySQL-mode "already exists"
+          // when CREATE INDEX IF NOT EXISTS is unsupported
+          String msg =
+              indexEx.getMessage() == null ? "" : indexEx.getMessage().toLowerCase(Locale.ROOT);
           if (indexEx.getErrorCode() != 1061
-              && (indexEx.getMessage() == null
-                  || !indexEx.getMessage().toLowerCase(Locale.ROOT).contains("duplicate"))) {
+              && !msg.contains("duplicate")
+              && !msg.contains("already exists")) {
             throw indexEx;
           }
         }
