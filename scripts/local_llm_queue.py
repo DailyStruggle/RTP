@@ -939,7 +939,10 @@ class StagedFunnelRunner:
 
         forward_msgs = handler.build_forward_messages(chunk)
         raw_forward = self.client.chat_forward(forward_msgs)
-        drafts = handler.parse_forward_response(chunk, raw_forward)
+        try:
+            drafts = handler.parse_forward_response(chunk, raw_forward)
+        except ValueError:
+            drafts = [{} for _ in chunk]
         while len(drafts) < len(chunk):
             drafts.append({})
 
@@ -977,7 +980,10 @@ class StagedFunnelRunner:
             if self.max_retries >= 1:
                 repair_msgs = handler.build_repair_messages(item, draft, f"[{failure_stage}] {failure_reason}")
                 raw_repair = self.client.chat_repair(repair_msgs)
-                repaired_draft = handler.parse_repair_response(item, raw_repair)
+                try:
+                    repaired_draft = handler.parse_repair_response(item, raw_repair)
+                except ValueError:
+                    repaired_draft = {}
                 draft = repaired_draft
 
                 det2_ok, det2_reason = handler.verify_deterministic(item, repaired_draft)

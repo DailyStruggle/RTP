@@ -3884,7 +3884,7 @@ async function fetchOfficialSitePage(siteUrl) {
 }
 
 async function updateDocDisplayContent(docKey, targetEl, pillEl) {
-  const content = docs[docKey] || '';
+  const content = docs[docKey] || docs[Object.keys(docs)[0]] || '';
   const u = resolveSiteUrlForDoc(docKey);
   if (u) {
     if (pillEl) { pillEl.textContent = 'FETCHING SITE...'; }
@@ -3914,7 +3914,7 @@ function toggleRegionDocDrawer() {
 function renderRegionDocContent() {
   const el = document.getElementById('region-doc-content');
   const pill = document.getElementById('region-doc-source-pill');
-  const k = Object.keys(docs).find(k => k.toLowerCase().includes('region')) || Object.keys(docs)[0] || 'admin/configuration/REGIONS.md';
+  const k = Object.keys(docs).find(k => k.toLowerCase().includes('region')) || 'admin/configuration/REGIONS.md';
   updateDocDisplayContent(k, el, pill);
 }
 
