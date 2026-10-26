@@ -60,11 +60,11 @@ public class NeoForgeTitleEffect extends Effect<NeoForgeTitleKeys> {
                 new ClientboundSetTitlesAnimationPacket(fadeIn, stay, fadeOut));
         if (!safeTitle.isEmpty()) {
             sent &= NeoForgeConnection.send(player,
-                    new ClientboundSetTitleTextPacket(Component.literal(safeTitle)));
+                    new ClientboundSetTitleTextPacket(literalComponent(safeTitle)));
         }
         if (!safeSub.isEmpty()) {
             sent &= NeoForgeConnection.send(player,
-                    new ClientboundSetSubtitleTextPacket(Component.literal(safeSub)));
+                    new ClientboundSetSubtitleTextPacket(literalComponent(safeSub)));
         }
         // S-004: surface a connection-resolution miss once instead of dropping
         // the title silently (cosmetic only; teleport already completed).
@@ -75,6 +75,11 @@ public class NeoForgeTitleEffect extends Effect<NeoForgeTitleKeys> {
                     "NeoForge", "TITLE", reason == null ? "player connection unavailable" : reason);
         }
         return sent;
+    }
+
+    private static Component literalComponent(String text) {
+        Object raw = Component.literal(text);
+        return (Component) raw;
     }
 
     private static volatile boolean WARNED;

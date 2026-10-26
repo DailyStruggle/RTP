@@ -254,6 +254,13 @@ class AnvilPrefilterTest {
     assertEquals(Verdict.REJECT, AnvilPrefilter.probeSync(customWorld2, "", 0, 0, Set.of("LAVA")));
   }
 
+  @Test
+  @DisplayName("RuntimeException during region resolution ⇒ UNKNOWN without NullPointerException")
+  void runtimeExceptionDuringResolveReturnsUnknown(@TempDir Path worldFolder) {
+    Verdict v = AnvilPrefilter.probeSync(worldFolder, "invalid\0subpath", 0, 0, Set.of("LAVA"));
+    assertEquals(Verdict.UNKNOWN, v);
+  }
+
   // ---------------------------------------------------------------------------- helpers
 
   /**

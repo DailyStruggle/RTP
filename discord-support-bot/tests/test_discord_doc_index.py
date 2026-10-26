@@ -31,6 +31,7 @@ from build_doc_index import (
     search_config_keys,
     search_docs,
     select_best_translation,
+    sync_dirty_files,
 )
 
 
@@ -529,6 +530,105 @@ class DiscordDocIndexTest(unittest.TestCase):
         assert lin_row is not None
         self.assertIn("maxY", str(lin_row[0]))
         self.assertIn("unsafeBlocks", str(lin_row[0]))
+
+    def test_split_plane_dev_sections_code_class_meta_and_incremental_sync(self) -> None:
+        # 1. dev_sections indexes internal engineering docs while doc_sections stays REQ-DISC-003 isolated
+        dev_paths = {
+            r["path"]
+            for r in self.conn.execute("SELECT DISTINCT path FROM dev_sections").fetchall()
+        }
+        self.assertIn("docs/dev/TRACEABILITY.md", dev_paths)
+        self.assertIn("docs/dev/RULES.md", dev_paths)
+        self.assertIn("docs/dev/LESSONS_LEARNED.md", dev_paths)
+
+        # 2. code_class_meta captures DAG tiers, SPIs, governance tags, and Gradle test commands
+        ewma_meta = self.conn.execute(
+            "SELECT module_name, dag_tier, kind FROM code_class_meta WHERE class_name = 'EwmaEstimator' LIMIT 1"
+        ).fetchone()
+        self.assertIsNotNone(ewma_meta)
+        assert ewma_meta is not None
+        self.assertEqual(":predict-api", ewma_meta["module_name"])
+        self.assertEqual("TIER_1_SPI_PURE", ewma_meta["dag_tier"])
+
+        tpt_meta = self.conn.execute(
+            "SELECT module_name, dag_tier, governed_by_json, gradle_test_cmd FROM code_class_meta WHERE class_name = 'TeleportPipelineTask' LIMIT 1"
+        ).fetchone()
+        self.assertIsNotNone(tpt_meta)
+        assert tpt_meta is not None
+        self.assertEqual(":rtp-core", tpt_meta["module_name"])
+        self.assertEqual("TIER_2_CORE_DOMAIN", tpt_meta["dag_tier"])
+        self.assertIn("REQ-RTP-", tpt_meta["governed_by_json"])
+        self.assertIn("./gradlew :rtp-core:test", tpt_meta["gradle_test_cmd"])
+
+        # 3. file_manifest + sync_dirty_files incremental single-file refresh in < 150 ms
+        with tempfile.TemporaryDirectory() as tmp:
+            fix_root = pathlib.Path(tmp)
+            (fix_root / "docs" / "admin").mkdir(parents=True)
+            (fix_root / "docs" / "dev").mkdir(parents=True)
+            (fix_root / "api" / "predict-api" / "src" / "main" / "java" / "pkg").mkdir(parents=True)
+            (fix_root / "rtp-core" / "src" / "main" / "java" / "pkg").mkdir(parents=True)
+            (fix_root / "rtp-core" / "src" / "test" / "java" / "pkg").mkdir(parents=True)
+
+            (fix_root / "docs" / "admin" / "QUICK_START.md").write_text(
+                "# Quick Start\n## Radius\nSet `shape.radius` in default.yml.\n",
+                encoding="utf-8",
+            )
+            (fix_root / "docs" / "dev" / "TRACEABILITY.md").write_text(
+                "# Traceability\n| Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |\n"
+                "|---|---|---|---|---|\n"
+                "| REQ-RTP-S-005 | No sync chunk loads | ADR-015, S-005 | `SampleWorker` | `SampleWorkerTest` |\n",
+                encoding="utf-8",
+            )
+            spi_file = fix_root / "api" / "predict-api" / "src" / "main" / "java" / "pkg" / "CostSpi.java"
+            spi_file.write_text(
+                "package pkg;\n/** @governedBy ADR-115 */\npublic interface CostSpi { double estimate(); }\n",
+                encoding="utf-8",
+            )
+            worker_file = fix_root / "rtp-core" / "src" / "main" / "java" / "pkg" / "SampleWorker.java"
+            worker_file.write_text(
+                "package pkg;\n/** @governedBy ADR-015 REQ-RTP-S-005 */\n"
+                "public class SampleWorker implements CostSpi { public double estimate() { return 1.0; } }\n",
+                encoding="utf-8",
+            )
+            test_file = fix_root / "rtp-core" / "src" / "test" / "java" / "pkg" / "SampleWorkerTest.java"
+            test_file.write_text(
+                "package pkg;\npublic class SampleWorkerTest { void testWorker() { new SampleWorker(); } }\n",
+                encoding="utf-8",
+            )
+
+            fix_db = fix_root / "index.sqlite"
+            fconn = build_index(fix_root, fix_db)
+            try:
+                clean_sync = sync_dirty_files(fconn, fix_root)
+                self.assertEqual(0, clean_sync["dirty_count"])
+
+                # Modify SampleWorker.java and verify incremental sync < 150 ms updates AST & metadata
+                worker_file.write_text(
+                    "package pkg;\n/** @governedBy ADR-015 ADR-115 REQ-RTP-S-005 */\n"
+                    "public class SampleWorker implements CostSpi { public double estimate() { return 2.0; } }\n",
+                    encoding="utf-8",
+                )
+                inc_sync = sync_dirty_files(fconn, fix_root)
+                self.assertEqual(1, inc_sync["dirty_count"])
+                self.assertEqual(1, inc_sync["reindexed"])
+                self.assertLess(inc_sync["elapsed_ms"], 150.0)
+
+                gov_row = fconn.execute(
+                    "SELECT governed_by_json FROM code_class_meta WHERE class_name = 'SampleWorker'"
+                ).fetchone()
+                self.assertIsNotNone(gov_row)
+                self.assertIn("ADR-115", gov_row["governed_by_json"])
+
+                # Delete SampleWorker.java and verify stale entries are removed
+                worker_file.unlink()
+                del_sync = sync_dirty_files(fconn, fix_root)
+                self.assertEqual(1, del_sync["dirty_count"])
+                gone = fconn.execute(
+                    "SELECT count(*) FROM code_class_meta WHERE class_name = 'SampleWorker'"
+                ).fetchone()[0]
+                self.assertEqual(0, gone)
+            finally:
+                fconn.close()
 
 
 if __name__ == "__main__":

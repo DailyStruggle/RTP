@@ -25,13 +25,10 @@ import java.util.EnumMap;
  */
 public class NeoForgeSoundEffect extends Effect<NeoForgeSoundKeys> {
 
-    private static final SoundEvent DEFAULT_SOUND =
-            NeoForgeRegistryResolver.resolve(BuiltInRegistries.SOUND_EVENT, "minecraft:entity.player.levelup");
-
     public NeoForgeSoundEffect() throws IllegalArgumentException {
         super(new EnumMap<>(NeoForgeSoundKeys.class));
         EnumMap<NeoForgeSoundKeys, Object> d = getData();
-        d.put(NeoForgeSoundKeys.TYPE, DEFAULT_SOUND);
+        d.put(NeoForgeSoundKeys.TYPE, defaultSound());
         d.put(NeoForgeSoundKeys.VOLUME, 100);
         d.put(NeoForgeSoundKeys.PITCH, 100);
         d.put(NeoForgeSoundKeys.DX, 0.0);
@@ -39,6 +36,17 @@ public class NeoForgeSoundEffect extends Effect<NeoForgeSoundKeys> {
         d.put(NeoForgeSoundKeys.DZ, 0.0);
         this.data = d;
         this.defaults = d.clone();
+    }
+
+    private static Object defaultSound() {
+        try {
+            SoundEvent resolved = NeoForgeRegistryResolver.resolve(
+                    BuiltInRegistries.SOUND_EVENT, "minecraft:entity.player.levelup");
+            if (resolved != null) return resolved;
+        } catch (Throwable ignored) {
+            // Minecraft registries are absent in unit tests outside a booted server.
+        }
+        return "minecraft:entity.player.levelup";
     }
 
     @Override

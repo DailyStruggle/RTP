@@ -22,13 +22,10 @@ import java.util.logging.Level;
  */
 public class NeoForgePotionEffect extends Effect<NeoForgePotionKeys> {
 
-    private static final MobEffect DEFAULT_POTION =
-            NeoForgeRegistryResolver.resolve(BuiltInRegistries.MOB_EFFECT, "minecraft:speed");
-
     public NeoForgePotionEffect() throws IllegalArgumentException {
         super(new EnumMap<>(NeoForgePotionKeys.class));
         EnumMap<NeoForgePotionKeys, Object> d = getData();
-        d.put(NeoForgePotionKeys.TYPE, DEFAULT_POTION);
+        d.put(NeoForgePotionKeys.TYPE, defaultPotion());
         d.put(NeoForgePotionKeys.DURATION, 200);
         d.put(NeoForgePotionKeys.AMPLIFIER, 0);
         d.put(NeoForgePotionKeys.AMBIENT, false);
@@ -36,6 +33,17 @@ public class NeoForgePotionEffect extends Effect<NeoForgePotionKeys> {
         d.put(NeoForgePotionKeys.ICON, true);
         this.data = d;
         this.defaults = d.clone();
+    }
+
+    private static Object defaultPotion() {
+        try {
+            MobEffect resolved = NeoForgeRegistryResolver.resolve(
+                    BuiltInRegistries.MOB_EFFECT, "minecraft:speed");
+            if (resolved != null) return resolved;
+        } catch (Throwable ignored) {
+            // Minecraft registries are absent in unit tests outside a booted server.
+        }
+        return "minecraft:speed";
     }
 
     @Override

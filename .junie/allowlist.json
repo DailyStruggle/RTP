@@ -1,1 +1,1 @@
-{"defaultBehavior":"deny","allowReadonlyCommands":false,"rules":{"mcpTools":{"rules":[{"prefix":"agentbridge","action":"allow"}]},"terminal":{"defaultBehavior":"deny"},"fileEditing":{"defaultBehavior":"deny"}}}
+{"defaultBehavior":"deny","allowReadonlyCommands":false,"rules":{"mcpTools":{"rules":[{"prefix":"agentbridge","action":"allow"},{"prefix":"corpus-atlas","action":"allow"},{"prefix":"corpus_atlas","action":"allow"}]},"terminal":{"defaultBehavior":"deny"},"fileEditing":{"defaultBehavior":"deny"}}}

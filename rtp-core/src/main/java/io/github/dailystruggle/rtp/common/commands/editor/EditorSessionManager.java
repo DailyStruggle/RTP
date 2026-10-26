@@ -608,10 +608,12 @@ public final class EditorSessionManager {
     /**
      * Hosted snapshot (ADR-106 §5.2): {@link #createPayloadJson()} plus the signed channel's
      * {@code channel: {relay, id, pluginKey}} block, or without it ({@code channel == null}: a
-     * snapshot-only session).
+     * snapshot-only session). Omits inline {@code editor-data.json} in favour of
+     * {@code "editorDataRef":"./editor-data.json"} so the hosted page hydrates static defaults and
+     * field docs from its own origin instead of uploading them on every session.
      */
     public String createPayloadJson(Map<String, String> configFiles, Map<String, Object> channel) {
-        return withChannel(createPayloadJson(configFiles), channel);
+        return withChannel(createPayloadJson(configFiles, false, false), channel);
     }
 
     /** {@code payloadJson} with a top-level {@code channel} member appended; unchanged for {@code null}. */
@@ -627,7 +629,7 @@ public final class EditorSessionManager {
      * @return JSON payload string
      */
     public String createPayloadJson(Map<String, String> configFiles) {
-        return createPayloadJson(configFiles, false);
+        return createPayloadJson(configFiles, false, true);
     }
 
     /**
@@ -635,6 +637,16 @@ public final class EditorSessionManager {
      * stored detail (local exports), otherwise one run per bin (online byte-store sessions).
      */
     public String createPayloadJson(Map<String, String> configFiles, boolean fullLand) {
+        return createPayloadJson(configFiles, fullLand, true);
+    }
+
+    /**
+     * As {@link #createPayloadJson(Map, boolean)}; when {@code embedEditorData} is {@code false}
+     * (hosted sessions), static {@code editor-data.json} members ({@code shipped}, {@code docTracker},
+     * {@code synonyms}) are replaced with {@code "editorDataRef":"./editor-data.json"} so the browser
+     * fetches them from the static site origin rather than re-uploading ~300 KB to the byte store.
+     */
+    public String createPayloadJson(Map<String, String> configFiles, boolean fullLand, boolean embedEditorData) {
         Objects.requireNonNull(configFiles, "configFiles");
 
         java.util.List<String> sortedKeys = new java.util.ArrayList<>(configFiles.keySet());
@@ -679,7 +691,7 @@ public final class EditorSessionManager {
         } catch (IllegalStateException notReady) {
             RTPRuntime.log(Level.WARNING, "[editor] docs registry not ready; the session carries no docs");
         }
-        String editorData = editorDataMembers();
+        String editorData = embedEditorData ? editorDataMembers() : "\"editorDataRef\":\"./editor-data.json\"";
         // protocol + addon extension descriptors (ADR-107 §5.2); extension calls are guarded inside
         String extensions = EditorExtensions.payloadMembers();
 

@@ -28,6 +28,7 @@ Scan this table first. Read the detailed rule below only if you are touching cod
 | D-007 | Doc    | New subsystem updates scope (REQUIREMENTS section 0) in the same change | `REQUIREMENTS.md` section 0      |
 | D-008 | Code   | Large deduplicated classes delegate to package-private helpers | self-contained                     |
 | D-009 | Doc    | Operator docs and CHANGELOG travel with operator-visible changes | self-contained                   |
+| D-010 | Doc    | Maintain AST & corpus searchability (`@governedBy`, capability Javadoc, backticked symbols) | `ADR-115` |
 
 ## Core Development Rules
 
@@ -101,6 +102,9 @@ These rules govern how project documentation, requirements, and design specifica
 
 - **Rule D-009: Operator Docs Travel With the Change**
   - **Description**: A change that adds, renames or removes an operator-visible config key, command, permission or message key, or changes its default, shall update the operator documentation (`docs/admin/`) and `CHANGELOG.md` in the same change set. Message keys also follow *Locale Parity Maintenance* in `AGENTS.md`. This is the contributor-side form of a release invariant (every shipped key is documented); that invariant becomes a requirement once a mechanical check compares the shipped `.yml` keys, commands and permissions with `docs/admin/`.
+
+- **Rule D-010: Maintain AST and Corpus Searchability**
+  - **Description**: Because the repository's SQLite FTS5 and AST knowledge graph (`corpus-atlas/`, `scripts/repo_ast.py`) is both the search engine and the corpus, every new or modified `TIER_1_SPI_PURE` (`api/*`, `rtp-api`) or `TIER_2_CORE_DOMAIN` (`rtp-core`) interface and class shall include a concise class-level Javadoc capability summary (stating its domain purpose in standard terminology) and `@governedBy` / `@trace` tags naming its active `ADR-*`, `REQ-*`, and `S-00x` invariants (`ADR-115`). ADRs (`docs/adr/`, `<subproject>/docs/adr/`) and `docs/dev/TRACEABILITY.md` rows shall wrap exact Java class and JUnit test identifiers in backticks (`` `ClassName` ``, `` `ClassNameTest` ``) so the AST baker links them deterministically. When introducing or refactoring a shared SPI or utility, run `python3 scripts/repo_ast.py search "<capability>"` and `python3 scripts/repo_ast.py audit` to verify the symbol ranks in the top 3 for its capability and carries non-empty `Gov(c)` links.
 
 ## Maintenance Protocol
 

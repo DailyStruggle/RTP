@@ -67,21 +67,22 @@ final class EditorChannelWiring {
     static CompletableFuture<EditorChannel> openHosted(UUID creator, EditorHttpTransport http, Supplier<EditorLiveFeed> feed) {
         OperatorNotices notices = new OperatorNotices(creator);
         String relay = http.getRelayUrl();
-        CompletableFuture<String> created;
+        CompletableFuture<BytesocksTransport.CreatedChannel> created;
         try {
-            created = BytesocksTransport.createChannel(http.httpClient(), relay);
+            created = BytesocksTransport.createChannelNegotiated(
+                    http.httpClient(), relay, http.getFallbackRelayUrl(), http.serviceHeaders());
         } catch (RuntimeException e) {
             created = CompletableFuture.failedFuture(e);
         }
         return created
                 .orTimeout(BytesocksTransport.CREATE_TIMEOUT_MILLIS + 5_000L, TimeUnit.MILLISECONDS)
-                .thenCompose(id -> {
+                .thenCompose(desc -> {
                     try {
                         Path editorDir = editorDir();
-                        BytesocksTransport transport = new BytesocksTransport(http.httpClient(), relay, id,
-                                BytesocksTransport.DEFAULT_TTL_MILLIS, System::currentTimeMillis,
+                        BytesocksTransport transport = new BytesocksTransport(http.httpClient(), desc.relayUrl(), desc.id(),
+                                desc.ttlMillis(), desc.framesPerWindow(), System::currentTimeMillis,
                                 BytesocksTransport.schedulerTimer());
-                        EditorChannel ch = new EditorChannel(id, pluginKeys(editorDir),
+                        EditorChannel ch = new EditorChannel(desc.id(), pluginKeys(editorDir),
                                 trusted(editorDir), transport, notices, System::currentTimeMillis);
                         register(ch, feed, EditorLoopbackApply.forChannel(http));
                         return ch.start();

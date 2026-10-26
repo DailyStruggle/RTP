@@ -13,6 +13,7 @@ novelty, and delta-debugging shrinking with k of n reproduction.
 """
 from __future__ import annotations
 
+import argparse
 import contextlib
 import io
 import itertools

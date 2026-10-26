@@ -330,17 +330,32 @@ public final class AnvilPrefilter {
   private static ProbeResult probeIn(
       RegionProbeSession session, Path worldFolder, String dimensionSubpath, int cx, int cz,
       Set<String> reconciledUnsafe, UnaryOperator<String> r) {
-    RegionFileResolver.ResolvedRegion resolved = null;
+    final RegionFileResolver.ResolvedRegion resolved;
     try {
       resolved = session.resolve(cx, cz);
-      if (resolved == null) {
-        // Chunk has never been generated and persisted; the live load path will generate
-        // it if needed. The pre-filter cannot reject what does not exist on disk.
-        diagLog("UNKNOWN:no-region-file(" + RegionFileResolver.regionDirectoryFor(worldFolder, dimensionSubpath)
-                .resolve("r." + (cx >> 5) + "." + (cz >> 5) + ".mca") + ")",
-            worldFolder, dimensionSubpath, cx, cz);
-        return new ProbeResult(Verdict.UNKNOWN, null);
-      }
+    } catch (RuntimeException e) {
+      Path fallback = worldFolder.resolve("r." + (cx >> 5) + "." + (cz >> 5) + ".mca");
+      AnvilPrefilterMetrics.recordUnparseableSection(
+          fallback,
+          cx,
+          cz,
+          e.getClass().getSimpleName() + ": " + e.getMessage());
+      LOG.log(Level.WARNING,
+          "[RTP] Anvil probe failed for world=" + worldFolder
+              + " dim=\"" + dimensionSubpath + "\" chunk=(" + cx + "," + cz
+              + ") — falling through to live chunk load",
+          e);
+      return new ProbeResult(Verdict.UNKNOWN, null);
+    }
+    if (resolved == null) {
+      // Chunk has never been generated and persisted; the live load path will generate
+      // it if needed. The pre-filter cannot reject what does not exist on disk.
+      diagLog("UNKNOWN:no-region-file(" + RegionFileResolver.regionDirectoryFor(worldFolder, dimensionSubpath)
+              .resolve("r." + (cx >> 5) + "." + (cz >> 5) + ".mca") + ")",
+          worldFolder, dimensionSubpath, cx, cz);
+      return new ProbeResult(Verdict.UNKNOWN, null);
+    }
+    try {
       AnvilReader.ChunkEntry entry;
       try {
         entry = session.readEntry(cx, cz);

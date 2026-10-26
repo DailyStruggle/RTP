@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NeoForgeHandleEffectsRegistrationTest {
@@ -62,6 +63,15 @@ class NeoForgeHandleEffectsRegistrationTest {
         loc.playSound("minecraft:entity.player.levelup", 1.0f, 1.0f);
         assertTrue(EffectFactory.unsupportedPrimitives().contains("NEOFORGE:SOUND"),
                 "Sound without bound level must report unsupported/unavailable primitive once");
+
+        loc.spawnParticle("minecraft:happy_villager", 1, 0.0, 0.0, 0.0, 0.0);
+        assertTrue(EffectFactory.unsupportedPrimitives().contains("NEOFORGE:PARTICLE"),
+                "Particle without bound level must report unsupported/unavailable primitive once");
         EffectFactory.clearUnsupportedPrimitives();
+
+        assertNotNull(new NeoForgeSoundEffect().toPermission());
+        assertNotNull(new NeoForgeParticleEffect().toPermission());
+        assertNotNull(new NeoForgePotionEffect().toPermission());
+        assertNotNull(new NeoForgeTitleEffect().toPermission());
     }
 }

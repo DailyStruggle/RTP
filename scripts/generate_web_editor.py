@@ -661,17 +661,76 @@ SEARCH_SYNONYMS = DOCS_DIR / "editor" / "search-synonyms.json"
 
 
 def load_synonyms(path: Path = SEARCH_SYNONYMS) -> dict[str, list[str]]:
-    """Search thesaurus {concept: [config keys]}; lower-case concepts, string lists only."""
+    """Search thesaurus {concept: [config keys]}; lower-case concepts, string lists only, enriched with AST & locale aliases."""
     if not path.is_file():
         return {}
     raw = json.loads(path.read_bytes().decode("utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{path} must be a JSON object of concept -> [config keys]")
     out: dict[str, list[str]] = {}
+    legacy_norm = {
+        "teleport-delay": "teleportDelay",
+        "unsafe-blocks": "unsafeBlocks",
+        "blocked-biomes": "biomes",
+    }
     for concept, keys in raw.items():
         if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
             raise ValueError(f"{path}: '{concept}' must map to a list of strings")
-        out[concept.lower()] = keys
+        norm_keys: list[str] = []
+        for k in keys:
+            if k not in norm_keys:
+                norm_keys.append(k)
+            mapped = legacy_norm.get(k.lower())
+            if mapped and mapped not in norm_keys:
+                norm_keys.append(mapped)
+        out[concept.lower()] = norm_keys
+
+    # Enrich with Java AST (`code_sections`), BIT codes (`bit_codes`), and 12-locale aliases (`locale_aliases`)
+    bot_dir = REPO_ROOT / "discord-support-bot"
+    if path == SEARCH_SYNONYMS and bot_dir.is_dir():
+        try:
+            if str(bot_dir) not in sys.path:
+                sys.path.insert(0, str(bot_dir))
+            from build_doc_index import (  # type: ignore[import-not-found]
+                parse_bit_codes,
+                parse_java_code_sections,
+                parse_locale_key_aliases,
+            )
+
+            for cs in parse_java_code_sections(REPO_ROOT, project="leafrtp"):
+                refs = [r.strip() for r in (cs.config_refs or "").split() if len(r.strip()) >= 2]
+                if refs and cs.class_name:
+                    out[cs.class_name.lower()] = list(dict.fromkeys(out.get(cs.class_name.lower(), []) + refs))[:16]
+
+            for bm in parse_bit_codes(REPO_ROOT, project="leafrtp"):
+                code_str = f"{bm.namespace}-{int(bm.id):04d}".lower()
+                short_code = f"{bm.namespace}-{int(bm.id)}".lower()
+                targets: list[str] = []
+                if bm.namespace == "ACTADDON" or bm.subsystem.startswith("action"):
+                    targets.extend(["strictActions", "action-setup", "triggers", "gates", "alias"])
+                elif bm.namespace == "CLAIM" or bm.subsystem.startswith("claim"):
+                    targets.extend(["integrations", "rerollWorldGuard", "rerollGriefPrevention", "claim-integrations"])
+                for tok in re.findall(r"`([A-Za-z0-9_.-]{3,40})`", f"{bm.summary} {bm.remediation}"):
+                    clean_t = tok.split("=")[0].split(":")[-1].split(".")[-1]
+                    if clean_t and clean_t not in targets and clean_t not in ("true", "false", "command", "region"):
+                        targets.append(clean_t)
+                if targets:
+                    out[code_str] = targets[:10]
+                    out[short_code] = targets[:10]
+                    out[bm.key.lower()] = targets[:10]
+
+            for la in parse_locale_key_aliases(REPO_ROOT, project="leafrtp"):
+                if la.locale.endswith("_comment"):
+                    continue
+                lk = (la.localized_key or "").strip().lower()
+                ck = (la.canonical_key or "").strip()
+                if len(lk) >= 4 and ck and lk != ck.lower():
+                    cur = out.get(lk, [])
+                    if ck not in cur:
+                        out[lk] = ([ck] + cur)[:6]
+        except Exception:
+            pass
+
     return out
 
 
