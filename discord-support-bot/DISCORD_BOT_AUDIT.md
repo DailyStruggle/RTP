@@ -1,7 +1,7 @@
 # Discord Support Bot Pre-Release Adversarial Audit & Operational Limits
 
 Scope: `discord-support-bot/` (`build_doc_index.py`, `discord_support_bot.py`, `discord_setup.py`, `support-bot.yml`, `embeds.json`), audited 2026-10-25.
-Test harness: [`tests/test_discord_bot_adversarial_audit.py`](tests/test_discord_bot_adversarial_audit.py) (25 adversarial, boundary, concurrency, and stress tests added alongside the 41 baseline tests; all 66 tests execute and verify the findings below).
+Test harness: [`tests/test_discord_bot_adversarial_audit.py`](tests/test_discord_bot_adversarial_audit.py) (26 adversarial, boundary, concurrency, and stress tests added alongside the 43 baseline and Personal Intelligence tests; all 69 tests and 163 live Discord parity turns execute and pass — see [`DISCORD_BOT_TEST_RESULTS.md`](DISCORD_BOT_TEST_RESULTS.md)).
 
 ---
 

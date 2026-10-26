@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.metrics.MetricBucketRow;
@@ -15,6 +16,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -86,6 +88,9 @@ class MetricBucketSchemaBootstrapTest {
                   + ");");
       mysqlDialect.ensureMetricBucketSchema();
       mysqlDialect.ensureMetricBucketSchema();
+      assertFalse(
+          mysqlDialect.getMetricBucketIndexDdl().toUpperCase(Locale.ROOT).contains("IF NOT EXISTS"),
+          "MySQL 8.0 CREATE INDEX DDL must not include IF NOT EXISTS");
       assertTrue(
           mysqlDialect.getMetricBucketInsertStatement().contains("INSERT IGNORE INTO rtp_metric_bucket"));
       MetricBucketRow row =

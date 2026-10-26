@@ -3536,9 +3536,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--active", action="store_true",
                    help="enable live active discovery fuzzing in --mode server (ADR-125)")
     p.add_argument("--ssh", default=None,
-                   help="remote SSH target ([user@]host, e.g. bamboo) for jcmd in --mode server --active")
+                   help="remote SSH target ([user@]host, or $BENCH_SSH_HOST) for jcmd in --mode server --active")
     p.add_argument("--remote-server-dir", default=None,
-                   help="server directory path on --ssh host when different from local --server-dir mount")
+                   help="server directory path on --ssh host when different from local --server-dir mount (or $BENCH_REMOTE_SERVER_DIR)")
     p.add_argument("--baseline-episodes", type=int, default=None,
                    help="idle baseline episodes before active exploration in --mode server --active (default 4)")
     p.add_argument("--target-players", type=int, default=None,

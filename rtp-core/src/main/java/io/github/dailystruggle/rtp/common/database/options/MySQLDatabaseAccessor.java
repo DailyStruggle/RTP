@@ -102,6 +102,12 @@ public class MySQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   }
 
   @Override
+  public String getMetricBucketIndexDdl() {
+    return "CREATE INDEX idx_rtp_metric_bucket_key_epoch "
+        + "ON rtp_metric_bucket (metric_key, window_start_epoch);";
+  }
+
+  @Override
   public String getMetricBucketInsertStatement() {
     return "INSERT IGNORE INTO rtp_metric_bucket "
         + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "

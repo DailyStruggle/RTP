@@ -1037,20 +1037,29 @@ def reset_test_server(
 
     deleted_triage_msgs = 0
     if triage_ch_id:
-        try:
-            msgs = client.request("GET", f"/channels/{triage_ch_id}/messages?limit=50") or []
-            for m in msgs:
-                if not isinstance(m, dict):
-                    continue
-                msg_id = str(m.get("id", "")).strip()
-                if msg_id:
-                    try:
-                        client.request("DELETE", f"/channels/{triage_ch_id}/messages/{msg_id}")
-                        deleted_triage_msgs += 1
-                    except OSError:
-                        pass
-        except OSError:
-            pass
+        seen_triage_ids: set[str] = set()
+        for _ in range(10):
+            try:
+                msgs = client.request("GET", f"/channels/{triage_ch_id}/messages?limit=50") or []
+                if not msgs:
+                    break
+                batch_deleted = 0
+                for m in msgs:
+                    if not isinstance(m, dict):
+                        continue
+                    msg_id = str(m.get("id", "")).strip()
+                    if msg_id and msg_id not in seen_triage_ids:
+                        seen_triage_ids.add(msg_id)
+                        try:
+                            client.request("DELETE", f"/channels/{triage_ch_id}/messages/{msg_id}")
+                            deleted_triage_msgs += 1
+                            batch_deleted += 1
+                        except OSError:
+                            pass
+                if batch_deleted == 0 or len(msgs) < 50:
+                    break
+            except OSError:
+                break
 
     target_state = state_path or (BOT_DIR / "generated" / "bot-state.json")
     removed_state = 0

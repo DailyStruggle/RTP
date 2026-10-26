@@ -5,7 +5,7 @@
 - **Governing decision:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (**Accepted** under Rule D-005; ADR `Accepted` status records architectural design approval, not implementation completeness). It amends [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) section 2.2 for server mode only, and extends the platform profile of [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md) with a server-mode carve-out from its decision 6 (isolation and `--plugin-packages` attribution). ADR-122 is Proposed.
 - **Status (passive CLI audit + `--active` live runner + offline callback-driven library):**
   - **Passive local audit (`scripts/bench_fuzz.py --mode server`, default):** runs the read-only passive local audit described in [Passive local audit (`--mode server`)](#passive-local-audit---mode-server) below (`status: "passive_only"`).
-  - **Live active discovery fuzzing (`scripts/bench_fuzz.py --mode server --active`):** executes the active ADR-125 discovery, baseline, tier-stratified bandit exploration (including player-taxonomy bot archetypes `homesteader_reroll`, `explorer_wander`, and `coop_group`), `JcmdObserver` (`GC.class_histogram` and `Thread.print` locally, via `--ssh bamboo` / `leaf26`, or `--container`), live action shrinking (`shrink_bots`), numeric argument bisection (`bisect_numeric_arg`), and dependency-closed jar `ddmin` (`ddmin_jars`), guarded by four anti-abuse gates (disposable `--server-dir` + RCON password proof-of-ownership, RFC1918/Tailscale/local-hostname allow-list, offline-only `fz*` bots, and `DEFAULT_DENYLIST`).
+  - **Live active discovery fuzzing (`scripts/bench_fuzz.py --mode server --active`):** executes the active ADR-125 discovery, baseline, tier-stratified bandit exploration (including player-taxonomy bot archetypes `homesteader_reroll`, `explorer_wander`, and `coop_group`), `JcmdObserver` (`GC.class_histogram` and `Thread.print` locally, via `--ssh <host>` / `$BENCH_SSH_HOST`, or `--container`), live action shrinking (`shrink_bots`), numeric argument bisection (`bisect_numeric_arg`), and dependency-closed jar `ddmin` (`ddmin_jars`), guarded by four anti-abuse gates (disposable `--server-dir` + RCON password proof-of-ownership, RFC1918/Tailscale/local-hostname allow-list, offline-only `fz*` bots, and `DEFAULT_DENYLIST`).
   - **Offline & callback-driven Python library (`scripts/bench_fuzz_server.py`):** implements the pure, deterministic schema, scheduling, reduction, and trace-evaluation algorithms tested in `scripts/tests/test_bench_fuzz.py`: Brigadier boundary-ladder argument sampling (`numeric_ladder`, `gen_args`, `build_arm_program`), tier-stratified UCB1 arm scheduling (`NodeBandit`, `SCENARIO_SHAPES`), callback-driven parameter threshold bisection (`bisect_numeric_arg`), pre-`ddmin` guardrails and dependency-closed jar delta debugging (`run_pre_ddmin_probes`, `ddmin_jars`), and offline trace evaluation and report formatting (`evaluate_server_trace`, `build_finding_verdict`, `format_server_findings_report`). Every live-server result below that is not explicitly attributed to a recorded target-mode run remains a validation target, not recorded live evidence.
 - **Target mode** (one named plugin per restart, `--cmd`): unchanged; see [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) and [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md).
 
@@ -24,19 +24,19 @@ The implemented `--mode server` CLI runs a single defensive, non-executing audit
 
 ## Live active whole-server fuzzing (`--mode server --active`)
 
-Passing `--active` switches `ServerRun` from passive audit mode to live discovery fuzzing against a disposable server copy (either locally or on a LAN bench host such as `leaf26` / `bamboo`):
+Passing `--active` switches `ServerRun` from passive audit mode to live discovery fuzzing against a disposable server copy (either locally or on a LAN bench host configured via `--host` / `--ssh` or `BENCH_HOST` / `BENCH_SSH_HOST`):
 
 ```bash
 # 1. Prepare a disposable bench server copy on the target host / shared mount:
-python3 scripts/bench_setup.py /path/to/source-server /mnt/bamboo/bench-26.2 --port 25566 --rcon-port 25576
+python3 scripts/bench_setup.py "$BENCH_SOURCE_DIR" "$BENCH_SERVER_DIR" --port 25566 --rcon-port 25576
 
-# 2. Run live whole-server discovery fuzzing from desktop against bamboo (or leaf26):
+# 2. Run live whole-server discovery fuzzing against the configured bench host:
 python3 scripts/bench_fuzz.py --mode server --active \
     --profile paper \
-    --server-dir /mnt/bamboo/bench-26.2 \
-    --host bamboo \
-    --ssh bamboo \
-    --remote-server-dir /srv/mc/bench-26.2 \
+    --server-dir "$BENCH_SERVER_DIR" \
+    --host "$BENCH_HOST" \
+    --ssh "$BENCH_SSH_HOST" \
+    --remote-server-dir "$BENCH_REMOTE_SERVER_DIR" \
     --tiers default,op \
     --episodes 40
 ```
@@ -47,7 +47,7 @@ python3 scripts/bench_fuzz.py --mode server --active \
   - `coop_group` (*Mode 8 Cooperative Group Settle*): joins multiple bots that coordinate commands and movement together.
 - **Anti-abuse safeguards:**
   1. **Proof-of-ownership gate:** requires both filesystem access to a disposable `--server-dir` (`server.properties` with `online-mode=false`, a disposable marker file, and `rcon.password`) and a live authenticated RCON `list` handshake before opening any bot connection.
-  2. **Private/local host gate (`is_allowed_bench_host`):** permits only loopback (`127.0.0.1`, `localhost`, `::1`), RFC1918 LAN (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Tailscale CGNAT (`100.64.0.0/10`), or local bench hostnames (`leaf26`, `bamboo`, `*.local`, `*.lan`); rejects public WAN IPs and internet domains.
+  2. **Private/local host gate (`is_allowed_bench_host`):** permits only loopback (`127.0.0.1`, `localhost`, `::1`), RFC1918 LAN (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Tailscale CGNAT (`100.64.0.0/10`), or local bench hostnames (single-label LAN aliases, `$BENCH_HOST`, `*.local`, `*.lan`); rejects public WAN IPs and internet domains.
   3. **Offline-only self-identifying bots:** `bench-swarm.js` connects strictly with `auth: 'offline'` and `fz*` / `bench_*` bot names from the single runner IP.
   4. **Mandatory command denylist:** enforces `DEFAULT_DENYLIST` (plus `--deny`) across generation, shrinking, numeric bisection, and replay.
 
@@ -265,13 +265,13 @@ A small fixture with a neutral core, a Paper plugin (`plugin.yml`, namespace `ff
 
 | Run | Server | Jars | Expected | Status |
 |---|---|---|---|---|
-| Paper (`fuzz-20261024-173142`) | Paper 26.2 on `leaf26` / `bamboo` (`bench_setup.py --preset smp-sample`) | Prerequisites (`ViaVersion`, `ViaBackwards`, `Vault`, `LuckPerms`), SMP controls (`EssentialsX`, `GriefPrevention`, `CoreProtect`), `BetterRTP 3.6.13` (`Queue.Enabled: true` cache + 2 s warmup), `FuzzFixturePaper.jar` (`LeafRTP` excluded) | Fixture leak (`/ff:queue`) and stall (`/ff:scan` > 48) found and attributed to `FuzzFixturePaper.jar`; BetterRTP session retention found and `ddmin` to `BetterRTP-3.6.13.jar`; zero false blame on `LuckPerms`, `EssentialsX`, `GriefPrevention`, or `CoreProtect` | **Confirmed (`FAIL`, 3/3 findings isolated)** |
+| Paper (`fuzz-20261024-173142`) | Paper 26.2 on Threadripper bench host (`bench_setup.py --preset smp-sample`) | Prerequisites (`ViaVersion`, `ViaBackwards`, `Vault`, `LuckPerms`), SMP controls (`EssentialsX`, `GriefPrevention`, `CoreProtect`), `BetterRTP 3.6.13` (`Queue.Enabled: true` cache + 2 s warmup), `FuzzFixturePaper.jar` (`LeafRTP` excluded) | Fixture leak (`/ff:queue`) and stall (`/ff:scan` > 48) found and attributed to `FuzzFixturePaper.jar`; BetterRTP session retention found and `ddmin` to `BetterRTP-3.6.13.jar`; zero false blame on `LuckPerms`, `EssentialsX`, `GriefPrevention`, or `CoreProtect` | **Confirmed (`FAIL`, 3/3 findings isolated)** |
 | Fabric | Fabric 1.21.11 devstack (`docker-compose.fabric.yml`-based) | Fixture mod, Fabric API | Both planted bugs found and attributed | Not run |
 
-Provisioning the Paper sample server on `leaf26` / `bamboo`:
+Provisioning the Paper sample server on the bench host:
 
 ```bash
-python3 scripts/bench_setup.py /home/leaf26/minecraft/26.2 /home/leaf26/minecraft/26.2-smp-sample \
+python3 scripts/bench_setup.py "$BENCH_SOURCE_DIR" "$BENCH_SERVER_DIR" \
   --preset smp-sample --port 25568 --rcon-port 25578 --heap 12G
 ```
 

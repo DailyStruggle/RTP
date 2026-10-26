@@ -159,8 +159,7 @@ public record MetricBucketRow(
   }
 
   /** @return optional 95th percentile */
-  @Nullable
-  public Double getP95() {
+  public @Nullable Double getP95() {
     return p95;
   }
 

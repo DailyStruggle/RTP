@@ -6086,7 +6086,7 @@ class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
                 self.assertIn("close_window", actions)
 
     def test_anti_abuse_host_and_ownership_validation_in_active_mode(self):
-        # Allowed bench hosts: loopback, RFC1918 LAN, Tailscale CGNAT, leaf26, bamboo, *.local / *.lan
+        # Allowed bench hosts: loopback, RFC1918 LAN, Tailscale CGNAT, single-label LAN alias, *.local / *.lan
         for allowed in (
             "127.0.0.1",
             "localhost",
@@ -6095,10 +6095,9 @@ class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
             "192.168.1.50",
             "172.16.4.2",
             "100.111.32.47",
-            "leaf26",
-            "bamboo",
-            "bamboo.local",
-            "leaf26.lan",
+            "bench-host",
+            "bench-host.local",
+            "bench-host.lan",
         ):
             ok, reason = bfs.is_allowed_bench_host(allowed)
             self.assertTrue(ok, f"expected {allowed!r} to be allowed, got: {reason}")
@@ -6117,24 +6116,44 @@ class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
             with open(os.path.join(tmp, "server.properties"), "w", encoding="utf-8") as fh:
                 fh.write("server-port=25565\nonline-mode=false\n")
             parser = bf.build_parser()
-            argv = ["--mode", "server", "--active", "--profile", "paper", "--server-dir", tmp, "--host", "bamboo"]
+            argv = ["--mode", "server", "--active", "--profile", "paper", "--server-dir", tmp, "--host", "bench-host"]
             args = parser.parse_args(argv)
             with self.assertRaisesRegex(SystemExit, "2"):
                 with contextlib.redirect_stderr(io.StringIO()):
                     bfs.validate_server_mode_args(args, parser=parser, argv=argv)
 
-            # With rcon.password present, bamboo + --tiers default,op + --episodes 8 is accepted
+            # With rcon.password present, bench-host + --tiers default,op + --episodes 8 is accepted
             with open(os.path.join(tmp, "server.properties"), "w", encoding="utf-8") as fh:
                 fh.write("server-port=25565\nrcon.port=25575\nrcon.password=secret\nonline-mode=false\n")
             argv_ok = [
                 "--mode", "server", "--active", "--profile", "paper",
-                "--server-dir", tmp, "--host", "bamboo", "--ssh", "bamboo",
+                "--server-dir", tmp, "--host", "bench-host", "--ssh", "bench-host",
                 "--tiers", "default,op", "--episodes", "8",
             ]
             args_ok = parser.parse_args(argv_ok)
             prof, deny = bfs.validate_server_mode_args(args_ok, parser=parser, argv=argv_ok)
             self.assertEqual(prof.name, "paper")
             self.assertIn("stop", deny.entries)
+
+            # Environment variable fallbacks (BENCH_HOST, BENCH_SSH_HOST, BENCH_REMOTE_SERVER_DIR)
+            with unittest.mock.patch.dict(
+                os.environ,
+                {
+                    "BENCH_HOST": "192.168.4.2",
+                    "BENCH_SSH_HOST": "bench-host",
+                    "BENCH_REMOTE_SERVER_DIR": "/srv/mc-bench",
+                },
+                clear=False,
+            ):
+                argv_env = [
+                    "--mode", "server", "--active", "--profile", "paper",
+                    "--server-dir", tmp, "--tiers", "default,op", "--episodes", "8",
+                ]
+                args_env = parser.parse_args(argv_env)
+                bfs.validate_server_mode_args(args_env, parser=parser, argv=argv_env)
+                self.assertEqual(args_env.host, "192.168.4.2")
+                self.assertEqual(args_env.ssh, "bench-host")
+                self.assertEqual(args_env.remote_server_dir, "/srv/mc-bench")
 
             # Public WAN IP is rejected even when rcon.password is present
             argv_wan = [
@@ -6158,21 +6177,21 @@ class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
         def fake_runner(cmd, timeout_s):
             calls.append(cmd)
             if cmd[-1] == "-l":
-                return subprocess.CompletedProcess(cmd, 0, stdout="7788 /srv/bamboo/paper.jar\n", stderr="")
+                return subprocess.CompletedProcess(cmd, 0, stdout="7788 /srv/mc-bench/paper.jar\n", stderr="")
             if cmd[-1] == "GC.class_histogram":
                 return subprocess.CompletedProcess(cmd, 0, stdout=histo_out, stderr="")
             raise AssertionError(f"unexpected ssh jcmd: {cmd}")
 
         obs = bfs.JcmdObserver(
-            ssh="bamboo",
-            remote_server_dir="/srv/bamboo",
+            ssh="bench-host",
+            remote_server_dir="/srv/mc-bench",
             runner=fake_runner,
         )
         self.assertEqual(obs.resolve_pid(), 7788)
         histo = obs.class_histogram()
         self.assertEqual(histo["com.example.scan.RadiusScanner"], (50, 4000))
-        self.assertEqual(calls[0][:4], ["ssh", "-o", "BatchMode=yes", "bamboo"])
-        self.assertEqual(calls[1], ["ssh", "-o", "BatchMode=yes", "bamboo", "jcmd", "7788", "GC.class_histogram"])
+        self.assertEqual(calls[0][:4], ["ssh", "-o", "BatchMode=yes", "bench-host"])
+        self.assertEqual(calls[1], ["ssh", "-o", "BatchMode=yes", "bench-host", "jcmd", "7788", "GC.class_histogram"])
 
     def test_active_server_run_discovers_tiers_runs_bandit_and_isolates_culprit_jar(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -6265,7 +6284,7 @@ class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
             )
 
             obs = bfs.JcmdObserver(
-                ssh="bamboo",
+                ssh="bench-host",
                 remote_server_dir=tmp,
                 clock_ms=lambda: 1000,
                 runner=lambda cmd, timeout_s: subprocess.CompletedProcess(
@@ -6285,8 +6304,8 @@ class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
                 "--active",
                 "--profile", "paper",
                 "--server-dir", tmp,
-                "--host", "bamboo",
-                "--ssh", "bamboo",
+                "--host", "bench-host",
+                "--ssh", "bench-host",
                 "--tiers", "default,op",
                 "--episodes", "6",
                 "--baseline-episodes", "2",

@@ -2851,6 +2851,21 @@ SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_:-]{1,64}$")
 SAFE_VERSION_RE = re.compile(r"^v?\d+\.\d+(?:\.\d+)?$")
 
 
+def _is_valid_corpus_facet_token(
+    conn: sqlite3.Connection,
+    token: str,
+    project: str = DEFAULT_PROJECT,
+) -> bool:
+    """
+    Returns True iff `token` is a single atomic alphanumeric/dotted token
+    verified in `doc-index.sqlite` (`is_schema_or_heading_facet`).
+    """
+    s = str(token).strip().lower()
+    if not s or " " in s or len(s) > 64 or not re.match(r"^[a-z0-9_.-]+$", s):
+        return False
+    return is_schema_or_heading_facet(conn, s, project=project)
+
+
 def validate_prose_free_training_record(
     conn: sqlite3.Connection,
     record: dict[str, Any],
@@ -2883,14 +2898,13 @@ def validate_prose_free_training_record(
     if not re.match(r"^[A-Z0-9_]{3,40}$", detected_intent):
         return False, {}, f"invalid detected_intent: {detected_intent}"
 
-    vocab = corpus_vocab(conn)
     raw_facets = record.get("corpus_facets") or ()
     clean_facets: list[str] = []
     for tok in raw_facets:
         s_tok = str(tok).strip().lower()
         if not s_tok or " " in s_tok or len(s_tok) > 64:
             return False, {}, f"non-atomic or oversized facet token: {s_tok!r}"
-        if s_tok in vocab and s_tok not in clean_facets:
+        if _is_valid_corpus_facet_token(conn, s_tok, project=project) and s_tok not in clean_facets:
             clean_facets.append(s_tok)
 
     valid_cfg_rows = conn.execute(
@@ -2982,7 +2996,7 @@ def validate_prose_free_training_record(
         sdt = str(dt).strip().lower()
         if " " in sdt or len(sdt) > 64:
             return False, {}, f"non-atomic convergence delta token: {sdt!r}"
-        if sdt in vocab and sdt not in clean_delta:
+        if _is_valid_corpus_facet_token(conn, sdt, project=project) and sdt not in clean_delta:
             clean_delta.append(sdt)
 
     clean_platforms = [
@@ -3146,7 +3160,6 @@ def verify_and_apply_research_attunement(
         if bad_key in attunement_data:
             return False, {}, f"forbidden prose/instruction field in attunement_data: {bad_key}"
 
-    vocab = corpus_vocab(conn)
     valid_cfg_rows = conn.execute(
         "SELECT file_path, key_path FROM config_keys WHERE project = ?",
         (project,),
@@ -3222,7 +3235,7 @@ def verify_and_apply_research_attunement(
         b_facets: list[str] = []
         for f_tok in raw_facets:
             sf = str(f_tok).strip().lower()
-            if sf not in vocab or " " in sf:
+            if not _is_valid_corpus_facet_token(conn, sf, project=project):
                 return False, {}, f"unverified or non-corpus facet {sf!r} in facet_config_boost"
             if sf not in b_facets:
                 b_facets.append(sf)
@@ -3346,9 +3359,17 @@ class SupportBotEngine:
             return ""
         chunks: list[str] = []
         for att in list(attachments)[:MAX_IMAGE_ATTACHMENTS_PER_POST]:
-            if not att or any(str(att).lower().endswith(ext) for ext in TEXT_ATTACHMENT_EXTENSIONS):
+            raw_att = str(att or "").strip()
+            if not raw_att:
                 continue
-            raw_ocr = self.ocr_extractor(att)
+            att_path = (
+                (urllib.parse.urlparse(raw_att).path or "").lower()
+                if raw_att.lower().startswith(("http://", "https://"))
+                else raw_att.lower()
+            )
+            if any(att_path.endswith(ext) for ext in TEXT_ATTACHMENT_EXTENSIONS):
+                continue
+            raw_ocr = self.ocr_extractor(raw_att)
             if raw_ocr and raw_ocr.strip():
                 decompounded = decompound_ocr_text(self.conn, raw_ocr.strip(), project=project)
                 chunks.append(decompounded)
@@ -3367,15 +3388,20 @@ class SupportBotEngine:
         log_chunks: list[str] = []
         yaml_chunks: list[str] = []
         for att in list(attachments)[:3]:
-            if not att:
+            raw_att = str(att or "").strip()
+            if not raw_att:
                 continue
-            low = str(att).strip().lower()
-            if not any(low.endswith(ext) for ext in TEXT_ATTACHMENT_EXTENSIONS):
+            att_path = (
+                (urllib.parse.urlparse(raw_att).path or "").lower()
+                if raw_att.lower().startswith(("http://", "https://"))
+                else raw_att.lower()
+            )
+            if not any(att_path.endswith(ext) for ext in TEXT_ATTACHMENT_EXTENSIONS):
                 continue
-            content = self.text_attachment_fetcher(str(att))
+            content = self.text_attachment_fetcher(raw_att)
             if not content or not content.strip():
                 continue
-            if low.endswith((".yml", ".yaml")):
+            if att_path.endswith((".yml", ".yaml")):
                 yaml_chunks.append(content.strip())
             else:
                 log_chunks.append(unwrap_console_paste(content.strip()))
@@ -3539,13 +3565,12 @@ class SupportBotEngine:
         clean_tid = str(thread_id).strip()
         if not SAFE_ID_RE.match(clean_tid):
             return
-        vocab = corpus_vocab(self.conn)
         clean_facets = tuple(
             sorted(
                 {
                     str(f).strip().lower()
                     for f in corpus_facets
-                    if str(f).strip().lower() in vocab and " " not in str(f).strip()
+                    if _is_valid_corpus_facet_token(self.conn, str(f), project=project)
                 }
             )
         )
@@ -3686,6 +3711,8 @@ class SupportBotEngine:
             shared_urls = sorted(cur_url_set & ent_urls)
             shared_facets = cur_facet_set & ent_facets
 
+            if cur_cfg_set and ent_cfg and not shared_cfg and not shared_bits:
+                continue
             if not shared_cfg and not shared_bits:
                 if not (shared_urls and len(shared_facets) >= 2):
                     continue
@@ -3739,7 +3766,7 @@ class SupportBotEngine:
             kp = str(rule.get("key_path", ""))
             row = self.conn.execute(
                 """
-                SELECT file_path, key_path, default_value, value_type, description, range_spec, options_spec
+                SELECT *
                 FROM config_keys
                 WHERE project = ? AND file_path = ? AND (key_path = ? OR key_path = ?)
                 LIMIT 1
@@ -4517,16 +4544,17 @@ class SupportBotEngine:
             self.investigative_threads.add(post.thread_id)
             if TAG_NEEDS_INFO not in tags and TAG_SOLVED not in tags:
                 tags.append(TAG_NEEDS_INFO)
-            sections.append(
-                self._build_abstention_reply(
-                    combined_text=combined_user_text,
-                    normalized_text=normalized_user_text,
-                    diag=diag,
-                    missing_diag=missing_diag,
-                    is_startup_crash=is_startup_crash,
-                    project=project,
-                )
+            abs_reply = self._build_abstention_reply(
+                combined_text=combined_user_text,
+                normalized_text=normalized_user_text,
+                diag=diag,
+                missing_diag=missing_diag,
+                is_startup_crash=is_startup_crash,
+                project=project,
             )
+            if recalled_env_note:
+                abs_reply = f"{recalled_env_note} - {abs_reply}"
+            sections.append(abs_reply)
             refrained_status = self._format_refrain_status(
                 post=ForumPostContext(
                     thread_id=post.thread_id,
@@ -4808,9 +4836,16 @@ class SupportBotEngine:
             is_hostile=hostile,
         )
 
-        surfaced_cfg_keys = [
+        all_surfaced_cfg = [
             f"{c['file_path']} -> {c['key_path'].replace('defaults.', '')}"
             for c in select_diverse_config_hits(cfg_hits, max_hits=3, max_per_file=3)
+            if c.get("confidence") == "high"
+        ]
+        norm_low = normalized_user_text.lower()
+        surfaced_cfg_keys = [
+            k
+            for idx, k in enumerate(all_surfaced_cfg)
+            if idx == 0 or k.rsplit(".", 1)[-1].rsplit("-> ", 1)[-1].lower() in norm_low
         ]
         surfaced_doc_urls = [
             str(d["url"])

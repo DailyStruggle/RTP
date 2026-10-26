@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,7 @@ class SqliteAndSqlDialectEdgeCasesTest {
                 sqliteAccessor.close();
             } catch (Throwable ignored) {}
         }
+        RTPRuntime.setServerAccessor(null);
     }
 
     @Test
