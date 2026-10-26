@@ -61,7 +61,8 @@ class DocsRegistryRebuildEntryPointTest {
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws IOException {
+        DocsRegistry.getInstance().rebuild(dataFolder.resolve("absent"), DocsLoweringOptions.defaults());
         RTPRuntime.setServerAccessor(previousAccessor);
         RTPRuntime.setScheduler(previousScheduler);
     }

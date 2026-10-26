@@ -4,14 +4,14 @@ Project-Neutral Model Context Protocol (`stdio` JSON-RPC 2.0) Server for `corpus
 
 Exposes the repository's split-plane SQLite FTS5 + solidified AST hypergraph (`doc-index.sqlite`)
 as persistent, low-latency MCP tools (`repo_ast_context`, `repo_ast_search`, `repo_ast_impact`,
-`repo_ast_audit`, `repo_ast_sync`) for AI coding agents and read-only `EXPLORE` subagents.
+`repo_ast_audit`, `repo_ast_sync`, `repo_ast_offload`) for AI coding agents and read-only `EXPLORE` subagents.
 
 Design invariants:
   - Zero external Python dependencies (Python 3.12+ stdlib + `sqlite3` only).
   - Persistent in-memory `sqlite3.Connection` and pre-warmed FTS/IDF caches (`~1-5 ms` warm latency
     vs `~140-820 ms` cold CLI subprocess invocations).
   - Automatic `file_manifest` incremental dirty-file sync (`0` stale reads after working-tree edits).
-  - Compact tool schema (`5` tools, `< 600` tokens total) to avoid prompt-declaration bloat.
+  - Compact tool schema (`6` tools, `< 650` tokens total) to avoid prompt-declaration bloat.
   - Strictly preserves `REQ-DISC-003` public/developer split-plane isolation.
 """
 from __future__ import annotations
