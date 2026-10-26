@@ -6165,6 +6165,29 @@ class ActiveServerModeAndPlayerTaxonomyTest(unittest.TestCase):
                 with contextlib.redirect_stderr(io.StringIO()):
                     bfs.validate_server_mode_args(args_wan, parser=parser, argv=argv_wan)
 
+            # Env vars only supply the host value and cannot bypass IP/suffix validation
+            with unittest.mock.patch.dict(
+                os.environ,
+                {
+                    "BENCH_HOST": "8.8.8.8",
+                    "BENCH_SSH_HOST": "play.example.com",
+                    "FUZZ_SSH_HOST": "mc.hypixel.net",
+                    "BENCH_ALLOWED_HOSTS": "8.8.8.8,play.example.com",
+                },
+                clear=False,
+            ):
+                for public_target in ("8.8.8.8", "play.example.com", "mc.hypixel.net"):
+                    ok_env, reason_env = bfs.is_allowed_bench_host(public_target)
+                    self.assertFalse(ok_env, f"env vars must not allow public host {public_target!r}: {reason_env}")
+                argv_env_wan = [
+                    "--mode", "server", "--active", "--profile", "paper",
+                    "--server-dir", tmp, "--tiers", "default,op", "--episodes", "8",
+                ]
+                args_env_wan = parser.parse_args(argv_env_wan)
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        bfs.validate_server_mode_args(args_env_wan, parser=parser, argv=argv_env_wan)
+
     def test_ssh_jcmd_observer_resolves_remote_pid_and_collects_histogram(self):
         calls: list[list[str]] = []
         histo_out = (

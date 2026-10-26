@@ -157,6 +157,8 @@ The `vert` block controls how the Y coordinate (height) is chosen once a horizon
 | `maxY` | Integer | `255` | Maximum Y level a player can land at. |
 | `requireSkyLight` | Boolean | `false` | If `true`, only accept locations with direct sky access (above-ground only). |
 | `maxHillAngle` | `"off"` or degrees | `"off"` | `LINEAR` and `JUMP` only. Refuse landings on hillsides or cliff edges this steep or steeper. Suggested values: `"off"` (fastest), `30`, `45`, `60`. See [REGIONS.md](REGIONS.md#hillside-and-cliff-check-maxhillangle). |
+| `maxSlope` | Integer | `-1` | `LINEAR` and `JUMP` only. Largest floor-Y step (in blocks) allowed between the landing spot and the floor `slopeRadius` blocks away (`-1` or omitted = disabled, `0` = flat ground only). See [REGIONS.md](REGIONS.md#slope-check-details-maxslope). |
+| `slopeRadius` | Integer | `2` | `LINEAR` and `JUMP` only. Horizontal distance (in blocks, `1` to `8`) from the landing spot where `maxSlope` samples the floor. |
 
 #### `JUMP` — additional keys
 

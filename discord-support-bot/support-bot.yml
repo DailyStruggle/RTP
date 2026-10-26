@@ -69,7 +69,7 @@ projects:
     diagnostics:
       version_pattern: "(?i)(?:/rtp\\s+version|leafrtp\\s+v?\\d+\\.\\d+|rtp\\s+version\\s*[:=]?\\s*\\d+\\.\\d+)"
       runtime_pattern: "(?i)\\b(?:paper|folia|purpur|spigot|pufferfish|fabric|neoforge|velocity|bungeecord)\\b[^\\n]{0,40}\\b(?:1\\.\\d+(?:\\.\\d+)?|26\\.\\d+)"
-      test_pattern: "(?i)(?:/rtp\\s+test\\b|\\[rtp\\s+bit\\]|\\b(?:ACTION|BIT|HEATMAP|PROBE|RTP|TEST)[-_]\\d{1,4}\\b)|(?<!%)(?-i:\\bRTP_[A-Z0-9_]+\\b)"
+      test_pattern: "(?i)(?:/rtp\\s+test\\b|\\[rtp\\s+bit\\]|\\b(?:ACTADDON|ACTION|BIT|CLAIM|GOVERNOR|HEATMAP|PROBE|RTP|TEST)[-_]\\d{1,4}\\b)|(?<!%)(?-i:\\b(?:RTP|ACTADDON|CLAIM)_[A-Z0-9_]+\\b)"
       version_missing: "`/rtp version` output"
       version_present: "`/rtp version`"
       runtime_missing: "server `/version` output (Paper, Folia, Spigot, Fabric, or NeoForge version)"

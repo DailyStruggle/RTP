@@ -490,6 +490,46 @@ class DiscordDocIndexTest(unittest.TestCase):
         for forbidden in ("ignore", "instructions", "pirate", "jailbreak", "forget", "everyone"):
             self.assertNotIn(forbidden, str(sig_cum_inj).lower())
 
+    def test_331_corpus_sync_vert_slope_addon_bit_and_java_keys(self) -> None:
+        # 1. ADR-119 vert.maxSlope and vert.slopeRadius are synthesized into config_keys
+        slope_hits = search_config_keys(self.conn, "vert.maxSlope slopeRadius", limit=5)
+        slope_key_paths = {(c["file_path"], c["key_path"]) for c in slope_hits}
+        self.assertIn(("definitions/regions/default.yml", "vert.maxSlope"), slope_key_paths)
+        self.assertIn(("definitions/regions/default.yml", "vert.slopeRadius"), slope_key_paths)
+
+        # 2. ADR-121 addon BIT catalogs (ACTADDON and CLAIM) are indexed and extractable
+        act_code = lookup_bit_code(self.conn, "ACTADDON_NOT_REGISTERED")
+        self.assertIsNotNone(act_code)
+        assert act_code is not None
+        self.assertEqual("ACTADDON", act_code["namespace"])
+        self.assertEqual(1, act_code["id"])
+
+        claim_code = lookup_bit_code(self.conn, "CLAIM-0001")
+        self.assertIsNotNone(claim_code)
+        assert claim_code is not None
+        self.assertEqual("CLAIM_PLUGIN_NOT_INTEGRATED", claim_code["key"])
+
+        addon_log = "[12:00:01 WARN]: [RTP bit] ACTADDON-0001 ACTADDON_NOT_REGISTERED and CLAIM_PLUGIN_NOT_INTEGRATED"
+        extracted = [e["key"] for e in extract_bit_codes(self.conn, addon_log)]
+        self.assertEqual(["ACTADDON_NOT_REGISTERED", "CLAIM_PLUGIN_NOT_INTEGRATED"], extracted)
+
+        # 3. JAVA_KEY_REF_RE captures newer *Keys enum references in code_sections
+        row = self.conn.execute(
+            "SELECT config_refs FROM code_sections WHERE class_name = 'BitSeverityPolicy' LIMIT 1"
+        ).fetchone()
+        self.assertIsNotNone(row)
+        assert row is not None
+        self.assertIn("strictActions", str(row[0]))
+        self.assertIn("strictConfig", str(row[0]))
+
+        lin_row = self.conn.execute(
+            "SELECT config_refs FROM code_sections WHERE class_name = 'LinearAdjustor' LIMIT 1"
+        ).fetchone()
+        self.assertIsNotNone(lin_row)
+        assert lin_row is not None
+        self.assertIn("maxY", str(lin_row[0]))
+        self.assertIn("unsafeBlocks", str(lin_row[0]))
+
 
 if __name__ == "__main__":
     unittest.main()

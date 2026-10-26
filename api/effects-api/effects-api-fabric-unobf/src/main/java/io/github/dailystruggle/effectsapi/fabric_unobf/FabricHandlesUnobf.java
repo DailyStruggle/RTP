@@ -42,6 +42,7 @@ import java.util.Map;
  * {@link ServerAccessors} by {@link FabricEffectsInitializer#registerAll()} in
  * place of the intermediary {@code FabricHandles}.
  */
+@SuppressWarnings({"deprecation", "resource"})
 public final class FabricHandlesUnobf implements HandleProvider {
     private static final FabricHandlesUnobf INSTANCE = new FabricHandlesUnobf();
 
@@ -292,7 +293,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
         @Override
         public void spawnFirework(Map<String, Object> data) {
             try {
-                ServerLevel level = (ServerLevel) player.level();
+                ServerLevel level = player.level();
                 if (!spawnFireworkAt(level, player.getX(), player.getY(), player.getZ(), data)) {
                     io.github.dailystruggle.effectsapi.common.EffectFactory.reportUnsupportedPrimitive(
                             "Fabric-26.x", "FIREWORK", "firework spawn unavailable on active Fabric 26.x runtime");

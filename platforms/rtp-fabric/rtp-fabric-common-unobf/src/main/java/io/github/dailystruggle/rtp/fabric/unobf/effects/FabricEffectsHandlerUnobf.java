@@ -156,6 +156,14 @@ public final class FabricEffectsHandlerUnobf {
                     afterDeathCallback.getClassLoader(),
                     new Class<?>[]{afterDeathCallback},
                     (p, method, args) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return switch (method.getName()) {
+                                case "equals" -> p == (args != null && args.length > 0 ? args[0] : null);
+                                case "hashCode" -> System.identityHashCode(p);
+                                case "toString" -> "AfterDeathEffectProxy";
+                                default -> null;
+                            };
+                        }
                         if (args != null && args.length >= 1 && args[0] instanceof ServerPlayer sp
                                 && effectParsingEnabled(parser)) {
                             try {

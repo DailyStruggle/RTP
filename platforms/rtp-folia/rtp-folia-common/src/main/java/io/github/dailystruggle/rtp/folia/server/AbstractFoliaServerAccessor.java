@@ -68,6 +68,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
         log(Level.WARNING, "[RTP] (Folia) Failed to resolve native WorldBorder for world " + s + ": " + t.getMessage(), t);
         return null;
       }
+      //noinspection ConstantValue
       if (worldBorder == null) {
         io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
             s, "world.getWorldBorder() returned null");

@@ -37,10 +37,10 @@ public final class SafetyToken {
     this.identifier = Objects.requireNonNull(identifier, "identifier");
     this.predicates = predicates == null || predicates.isEmpty()
         ? Collections.emptyList()
-        : Collections.unmodifiableList(List.copyOf(predicates));
+        : List.copyOf(predicates);
     this.subtractions = subtractions == null || subtractions.isEmpty()
         ? Collections.emptyList()
-        : Collections.unmodifiableList(List.copyOf(subtractions));
+        : List.copyOf(subtractions);
     this.sourceToken = Objects.requireNonNull(sourceToken, "sourceToken");
   }
 
@@ -77,7 +77,7 @@ public final class SafetyToken {
     if (wildcard && noPredicates) {
       throw new IllegalArgumentException(
           "bare wildcard '*' is not a valid safety token; it must carry at least one "
-              + "state predicate (e.g. '*[waterlogged=true]'). See ADR-017 \u00a71.");
+              + "state predicate (e.g. '*[waterlogged=true]'). See ADR-017 §1.");
     }
     return new SafetyToken(Kind.MATERIAL, identifier, predicates, subtractions, sourceToken);
   }

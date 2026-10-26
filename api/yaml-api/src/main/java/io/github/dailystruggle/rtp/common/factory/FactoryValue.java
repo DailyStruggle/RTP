@@ -8,7 +8,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -32,18 +31,6 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   private static volatile Supplier<File> pluginDirectorySupplier =
       DEFAULT_PLUGIN_DIRECTORY_SUPPLIER;
 
-  private static final Map<Class<? extends Number>, Function<String, Number>> numberParsers =
-      new ConcurrentHashMap<>();
-
-  static {
-    numberParsers.put(Double.class, Double::parseDouble);
-    numberParsers.put(Float.class, Float::parseFloat);
-    numberParsers.put(Long.class, Long::parseLong);
-    numberParsers.put(Integer.class, Integer::parseInt);
-    numberParsers.put(Short.class, Short::parseShort);
-    numberParsers.put(Byte.class, Byte::parseByte);
-  }
-
   /**
    * Installs a custom root plugin directory supplier used by {@link #loadLangFile(String)} and
    * {@code ConfigParser#saveResource}. Passing {@code null} restores the default supplier backed by
@@ -65,7 +52,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     return pluginDirectorySupplier;
   }
 
-  private static void log(Level level, String message) {
+  private static void log(@SuppressWarnings("SameParameterValue") Level level, String message) {
     ServerAccessors.log(level, message);
   }
 
@@ -511,7 +498,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     if (!(this.getClass().isAssignableFrom(other.getClass()))) return false;
     if (!(((FactoryValue<?>) other).myClass.equals(myClass))) return false;
     EnumMap<E, Object> otherData = (EnumMap<E, Object>) ((FactoryValue<?>) other).getData();
-    for (Map.Entry<? extends Enum<?>, Object> e : this.data.entrySet()) {
+    for (Map.Entry<E, Object> e : this.data.entrySet()) {
       Object mine = e.getValue();
       Object theirs = otherData.get(e.getKey());
       if (mine.getClass().equals(theirs.getClass())) {
@@ -524,7 +511,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   @Override
   public int hashCode() {
     int result = Objects.hash(myClass, name);
-    for (Map.Entry<? extends Enum<?>, Object> e : this.data.entrySet()) {
+    for (Map.Entry<E, Object> e : this.data.entrySet()) {
       Object mine = e.getValue();
       if (mine != null) {
         result = 31 * result + mine.toString().toLowerCase(Locale.ROOT).hashCode();

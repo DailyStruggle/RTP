@@ -320,19 +320,18 @@ class TeleportPipelineTaskBranchTest {
 
         String oldMessage = TeleportPipelineTask.ConfigCache.teleportMessage;
         boolean oldRespawn = TeleportPipelineTask.ConfigCache.setRespawnOnTeleport;
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        RTPCoords target = new RTPCoords(world.name(), 120, 65, 120);
+        java.util.List<CompletableFuture<Long>> chunks = new ArrayList<>();
+        chunks.add(CompletableFuture.completedFuture(0L));
+        io.github.dailystruggle.rtp.api.world.ChunkSet set =
+                new io.github.dailystruggle.rtp.api.world.ChunkSet(
+                        world, 120 >> 4, 120 >> 4, chunks, CompletableFuture.completedFuture(true));
+        io.github.dailystruggle.rtp.api.world.ChunkReservation res =
+                new io.github.dailystruggle.rtp.api.world.ChunkReservation(set, world);
         try {
             TeleportPipelineTask.ConfigCache.teleportMessage = "Generation-1 arrival";
             TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
-
-            GenerationContext ctx = new GenerationContext(player, player, null);
-            RTPCoords target = new RTPCoords(world.name(), 120, 65, 120);
-            java.util.List<CompletableFuture<Long>> chunks = new ArrayList<>();
-            chunks.add(CompletableFuture.completedFuture(0L));
-            io.github.dailystruggle.rtp.api.world.ChunkSet set =
-                    new io.github.dailystruggle.rtp.api.world.ChunkSet(
-                            world, 120 >> 4, 120 >> 4, chunks, CompletableFuture.completedFuture(true));
-            io.github.dailystruggle.rtp.api.world.ChunkReservation res =
-                    new io.github.dailystruggle.rtp.api.world.ChunkReservation(set, world);
 
             TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target, res);
             TeleportData data = new TeleportData();

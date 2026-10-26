@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
  * @deprecated Retired in favor of {@link ServerAccessors} and {@link EffectTarget}
  *             static resolution methods (ADR-116 Decision 2).
  */
-@Deprecated
+@Deprecated(since = "3.3.1")
 public final class HandleRegistry {
     private HandleRegistry() {}
 

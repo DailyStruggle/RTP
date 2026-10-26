@@ -48,7 +48,7 @@ public class BaseDistanceParameter extends CommandParameter {
         });
 
     Set<String> values = new LinkedHashSet<>();
-    if (options != null && options.length > 0) {
+    if (options != null) {
       for (Object opt : options) {
         if (opt != null) {
           values.add(String.valueOf(opt));

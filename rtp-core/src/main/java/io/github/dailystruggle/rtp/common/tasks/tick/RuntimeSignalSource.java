@@ -223,7 +223,7 @@ public final class RuntimeSignalSource implements SignalSource {
         int totalTickets = 0;
         int cellsPerHot = (2 * viewDistanceSelect + 1) * (2 * viewDistanceSelect + 1);
         SelectionAPI sel = ActiveSelection.get();
-        if (sel != null && sel.permRegionLookup != null) {
+        if (sel != null) {
             for (Region region : sel.permRegionLookup.values()) {
                 if (region == null || region.getWorld() == null) continue;
                 int curHot = region.queueManager != null ? region.queueManager.keptLocations.size() : 0;

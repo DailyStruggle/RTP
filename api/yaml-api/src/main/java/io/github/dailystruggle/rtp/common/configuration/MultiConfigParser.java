@@ -215,6 +215,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     this.fileDatabase.disconnect(connect);
 
     try {
+      //noinspection ResultOfMethodCallIgnored
       myDirectory.listFiles();
     } catch (Throwable T) {
       log(Level.WARNING, "Error scanning directory for multi config " + name, T);

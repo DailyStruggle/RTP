@@ -2,8 +2,10 @@ package io.github.dailystruggle.rtp.common.metrics;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.metrics.MetricBucketRow;
 import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
@@ -106,6 +108,27 @@ class MetricBucketReaderRangeScanTest {
       assertArrayEquals(new double[] {8.0, 10.0, 12.0}, series.mins(), 1e-6);
       assertArrayEquals(new double[] {19.0, 24.0, 28.0}, series.maxes(), 1e-6);
       assertArrayEquals(new double[] {17.0, 22.0, 25.0}, series.p95s(), 1e-6);
+
+      ChartSeriesSnapshot seriesCopy =
+          assembler.assemble("surv-1", "mspt", 1_900_000_000L, 1_900_000_200L);
+      assertEquals(series, series);
+      assertEquals(series, seriesCopy);
+      assertEquals(series.hashCode(), seriesCopy.hashCode());
+      assertNotEquals(series, null);
+      assertNotEquals(
+          series,
+          new ChartSeriesSnapshot(
+              "surv-2",
+              series.metricKey(),
+              series.fromEpochInclusive(),
+              series.toEpochInclusive(),
+              series.buckets(),
+              series.timestamps(),
+              series.means(),
+              series.mins(),
+              series.maxes(),
+              series.p95s()));
+      assertTrue(series.toString().contains("ChartSeriesSnapshot[backendId=surv-1"));
 
       // Cluster-wide (--backend all) range scan returns all backends ordered by window_start_epoch
       List<MetricBucketRow> allRows =

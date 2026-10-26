@@ -160,7 +160,7 @@ public class Factory<T extends FactoryValue<?>> {
     if (value == null) {
       if (map.containsKey("DEFAULT.YML")) {
         String baseName =
-            rawName != null && rawName.toUpperCase().endsWith(".YML")
+            rawName.toUpperCase().endsWith(".YML")
                 ? rawName.substring(0, rawName.length() - 4)
                 : rawName;
         value = (T) construct(baseName);

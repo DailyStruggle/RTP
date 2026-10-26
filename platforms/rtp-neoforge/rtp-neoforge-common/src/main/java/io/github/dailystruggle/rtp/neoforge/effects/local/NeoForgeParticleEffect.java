@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -52,7 +51,6 @@ public class NeoForgeParticleEffect extends Effect<NeoForgeParticleKeys> {
 
     static ParticleOptions resolveParticleOptions(Object typeObj) {
         if (typeObj instanceof ParticleOptions opts) return opts;
-        if (typeObj instanceof SimpleParticleType spt) return spt;
         if (typeObj instanceof ParticleType<?>) return ParticleTypes.HAPPY_VILLAGER;
         if (typeObj != null) {
             try {

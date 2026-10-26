@@ -130,6 +130,7 @@ public final class BacklogLocationBuffer {
       Object bin = this.pinnedBinList;
       this.pinnedBinList = null;
       if (bin instanceof List<?> list) {
+        //noinspection SynchronizationOnLocalVariableOrMethodParameter
         synchronized (list) {
           list.remove(this);
         }

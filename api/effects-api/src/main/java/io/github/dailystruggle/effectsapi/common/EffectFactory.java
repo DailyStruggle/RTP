@@ -218,6 +218,7 @@ public class EffectFactory {
     }
 
     @Nullable
+    @SuppressWarnings("unchecked")
     public static <T extends Enum<T>> Effect<T> buildEffect(String name) {
         Effect<T> effect;
         try {

@@ -163,7 +163,7 @@ public final class CountdownHooks {
     if (pipeline.getPhase() == TeleportPipelineTask.Phase.CLEANUP) return true;
     if (id != null && TeleportSessions.current() != null) {
       TeleportData data = TeleportSessions.current().latestTeleportData.get(id);
-      if (data != null && data.completed) return true;
+      return data != null && data.completed;
     }
     return false;
   }

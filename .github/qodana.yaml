@@ -18,8 +18,20 @@ profile:
     - group: ALL
       ignore:
         - "helpers/StressTestRTP"
+        - "helpers/stresstest-core"
+        - "helpers/stresstest-bukkit"
+        - "helpers/stresstest-fabric"
+    # ADR-115 invariant and traceability Javadoc tags (@governedBy, @trace, @invariant, @prohibition).
+    - inspection: JavadocDeclaration
+      ignore:
+        - "api"
+        - "rtp-core"
+        - "platforms"
     # Reflection across platform bridges and NMS accessors is audited under ADR-026.
     - inspection: JavaReflectionMemberAccess
+      ignore:
+        - "platforms"
+    - inspection: JavaReflectionInvocation
       ignore:
         - "platforms"
     # Bukkit MapPalette/MapView calls in maps-api.

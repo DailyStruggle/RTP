@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -231,7 +230,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         LanguageBootstrap.DEFAULT_LOCALE);
   }
 
-  /** Compatibility constructor for {@link YamlFileCache.Provider} (e.g. {@code YamlFileDatabase}). */
+  /** Compatibility constructor for {@link FileCacheProvider} (e.g. {@code YamlFileDatabase}). */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -274,7 +273,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     check(version, pluginDirectory, langFile);
   }
 
-  /** Compatibility locale-aware constructor for {@link YamlFileCache.Provider}. */
+  /** Compatibility locale-aware constructor for {@link FileCacheProvider}. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -307,7 +306,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         LanguageBootstrap.DEFAULT_LOCALE);
   }
 
-  /** Compatibility constructor without custom class loader for {@link YamlFileCache.Provider}. */
+  /** Compatibility constructor without custom class loader for {@link FileCacheProvider}. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -337,7 +336,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     this(eClass, name, version, pluginDirectory, langFile, fileDatabase, locale, null);
   }
 
-  /** Compatibility locale-aware constructor without custom class loader for {@link YamlFileCache.Provider}. */
+  /** Compatibility locale-aware constructor without custom class loader for {@link FileCacheProvider}. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -381,7 +380,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     check(version, pluginDirectory, langFile);
   }
 
-  /** Compatibility constructor with explicit JAR resource sub-directory override for {@link YamlFileCache.Provider}. */
+  /** Compatibility constructor with explicit JAR resource sub-directory override for {@link FileCacheProvider}. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -412,7 +411,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     this(eClass, name, version, pluginDirectory, fileDatabase, LanguageBootstrap.DEFAULT_LOCALE);
   }
 
-  /** Compatibility constructor with default language file, class loader, and English locale for {@link YamlFileCache.Provider}. */
+  /** Compatibility constructor with default language file, class loader, and English locale for {@link FileCacheProvider}. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -445,7 +444,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     check(version, pluginDirectory, null);
   }
 
-  /** Compatibility locale-aware constructor with default language file and class loader for {@link YamlFileCache.Provider}. */
+  /** Compatibility locale-aware constructor with default language file and class loader for {@link FileCacheProvider}. */
   public ConfigParser(
       Class<E> eClass,
       final String name,
@@ -515,7 +514,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       StringBuilder sb = new StringBuilder();
       for (String seg : norm.substring(0, idx).split("/")) {
         if (seg.isEmpty()) continue;
-        if (sb.length() > 0) sb.append('/');
+        if (!sb.isEmpty()) sb.append('/');
         sb.append(sanitizeName(seg));
       }
       this.subDir = sb.toString();
@@ -557,7 +556,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     StringBuilder sb = new StringBuilder();
     for (String seg : norm.split("/")) {
       if (seg.isEmpty()) continue;
-      if (sb.length() > 0) sb.append('/');
+      if (!sb.isEmpty()) sb.append('/');
       sb.append(sanitizeName(seg));
     }
     return sb.toString();
@@ -667,6 +666,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         }
         if (in != null) {
           File parent = langFile.getParentFile();
+          //noinspection ResultOfMethodCallIgnored
           if (parent != null && !parent.exists()) parent.mkdirs();
           try (java.io.InputStream src = in;
               java.io.FileOutputStream out = new java.io.FileOutputStream(langFile)) {
@@ -1047,6 +1047,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     if (!seeded.exists()) {
       try {
         File parent = seeded.getParentFile();
+        //noinspection ResultOfMethodCallIgnored
         if (parent != null && !parent.exists()) parent.mkdirs();
         if (seeded.createNewFile()) {
           try (FileOutputStream out = new FileOutputStream(seeded)) {
@@ -1268,6 +1269,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     try (java.io.InputStream in = effectiveClassLoader().getResourceAsStream(jarPath)) {
       if (in == null) return false;
       File parent = target.getParentFile();
+      //noinspection ResultOfMethodCallIgnored
       if (parent != null && !parent.exists()) parent.mkdirs();
       try (java.io.FileOutputStream out = new java.io.FileOutputStream(target)) {
         byte[] buf = new byte[1024];
@@ -1337,7 +1339,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       File corrupt = new File(configDir(), this.name);
       if (corrupt.exists()) {
         String parseError =
-            (fileDatabase != null && fileDatabase.lastParseErrors != null)
+            (fileDatabase.lastParseErrors != null)
                 ? fileDatabase.lastParseErrors.get(this.name)
                 : null;
         if (parseError == null || parseError.isBlank()) {
@@ -1376,7 +1378,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     boolean update = false;
     String[] split = version.split("\\.");
     List<Integer> parsedVersion =
-        Arrays.stream(split).map(Integer::parseUnsignedInt).collect(Collectors.toList());
+        Arrays.stream(split).map(Integer::parseUnsignedInt).toList();
 
     if (versionArr.length != parsedVersion.size()) {
       update = true;
@@ -1545,7 +1547,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       if (parsed == null) {
         return defSeconds;
       }
-      long totalSeconds = (long) Math.round(parsed.toSeconds());
+      long totalSeconds = Math.round(parsed.toSeconds());
       return totalSeconds <= 0 ? -1L : totalSeconds;
     } catch (Exception e) {
       return defSeconds;
@@ -1575,7 +1577,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       if (parsed == null) {
         return defTicks;
       }
-      long totalTicks = (long) Math.round(parsed.toTicks());
+      long totalTicks = Math.round(parsed.toTicks());
       return totalTicks <= 0 ? -1L : totalTicks;
     } catch (Exception e) {
       return defTicks;
@@ -1605,7 +1607,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       if (parsed == null) {
         return defMillis;
       }
-      long totalMillis = (long) Math.round(parsed.toMillis());
+      long totalMillis = Math.round(parsed.toMillis());
       return totalMillis <= 0 ? -1L : totalMillis;
     } catch (Exception e) {
       return defMillis;
@@ -1912,6 +1914,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     }
   }
 
+  @NotNull
   @Override
   public ConfigParser<E> clone() {
     ConfigParser<E> clone = (ConfigParser<E>) super.clone();

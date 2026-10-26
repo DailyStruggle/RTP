@@ -509,8 +509,8 @@ A: Open a GitHub issue with your server version, LeafRTP version, platform, the 
 <!-- not: bbb-pro -->
 Support is me, in my spare time, so it's best effort.
 
-- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`) or check the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/). I help with bugs and anything still unclear after that.
-- A bug report in GitHub Issues needs: `/version`, `/rtp version`, `/rtp test` output, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the server log uploaded to `mclo.gs`. If something's missing I'll ask for it.
+- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`), check the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/), or open a thread in the `LeafCraft Plugin Support` Discord `#support` Forum (or GitHub Discussions). I help with bugs and anything still unclear after that.
+- A bug report in GitHub Issues or the `#support` Forum needs: `/version`, `/rtp version`, `/rtp test` output, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the server log uploaded to `mclo.gs`. If something's missing I'll ask for it.
 - "It doesn't work" isn't something I can act on. Tell me what you did, what you expected, and what happened instead.
 - There's no guaranteed response time. Safety bugs (bad landings, chunk leaks, claim bypasses) get looked at first.
 - Feature requests go in GitHub Discussions first.
@@ -519,9 +519,9 @@ Support is me, in my spare time, so it's best effort.
 <!-- kind: promo -->
 Support comes from me, the person who wrote the code.
 
-- Tickets from this listing go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
+- Tickets from this listing (BuiltByBit tickets or `#support` Forum threads opened with the `@Pro Supporter` role in `LeafCraft Plugin Support`) go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
 - Response time: 24-72 h on weekdays. Safety bugs go first regardless.
-- Bug reports with `/version`, `/rtp version`, `/rtp test` output, configs and an `mclo.gs` log link get fixed fastest. Most setup questions are answered right away in the [web workspace](../admin/WEB_EDITOR_GUIDE.md) (`/rtp editor`) or the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).
+- Bug reports with `/version`, `/rtp version`, `/rtp test` output, configs and an `mclo.gs` log link get fixed fastest. Most setup questions are answered right away in the [web workspace](../admin/WEB_EDITOR_GUIDE.md) (`/rtp editor`), the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/), or the `#support` Forum.
 - Feature requests go in GitHub Discussions.
 <!-- /kind -->
 <!-- /only -->

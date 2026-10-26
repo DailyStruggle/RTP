@@ -329,7 +329,7 @@ public final class FuzzySearchEngine {
         if (query.length() >= MIN_FUZZY_LENGTH) {
             int maxAllowed = query.length() >= LENGTH_THRESHOLD_TWO_EDITS ? 2 : 1;
             int dist = levenshtein(query, normKey, maxAllowed);
-            if (dist <= maxAllowed && !reasons.stream().anyMatch(r -> "reason".equals(r.type()) || "synonym".equals(r.type()))) {
+            if (dist <= maxAllowed && reasons.stream().noneMatch(r -> "reason".equals(r.type()) || "synonym".equals(r.type()))) {
                 int fuzzyScore = Math.max(45 - dist * 10, 20);
                 score += fuzzyScore;
                 reasons.add(new MatchReason("fuzzy", "Fuzzy ~" + keyName));

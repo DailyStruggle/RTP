@@ -74,10 +74,9 @@ public final class SafetyTokenParser {
       rejected.add(new Rejection("", "token is null"));
       return;
     }
-    String source = raw;
     String token = raw.trim();
     if (token.isEmpty()) {
-      rejected.add(new Rejection(source, "token is empty or whitespace-only"));
+      rejected.add(new Rejection(raw, "token is empty or whitespace-only"));
       return;
     }
 
@@ -86,11 +85,11 @@ public final class SafetyTokenParser {
     if (segments.size() > 1) {
       String basePart = segments.get(0).trim();
       if (basePart.isEmpty()) {
-        rejected.add(new Rejection(source, "base token before subtraction '-' is empty"));
+        rejected.add(new Rejection(raw, "base token before subtraction '-' is empty"));
         return;
       }
       List<SafetyToken> baseTokens = new ArrayList<>(1);
-      parseSimpleToken(source, basePart, baseTokens, rejected);
+      parseSimpleToken(raw, basePart, baseTokens, rejected);
       if (baseTokens.isEmpty()) {
         return;
       }
@@ -100,11 +99,11 @@ public final class SafetyTokenParser {
       for (int i = 1; i < segments.size(); i++) {
         String subPart = segments.get(i).trim();
         if (subPart.isEmpty()) {
-          rejected.add(new Rejection(source, "subtraction segment #" + i + " is empty"));
+          rejected.add(new Rejection(raw, "subtraction segment #" + i + " is empty"));
           return;
         }
         List<SafetyToken> subTokens = new ArrayList<>(1);
-        parseSimpleToken(source, subPart, subTokens, rejected);
+        parseSimpleToken(raw, subPart, subTokens, rejected);
         if (subTokens.isEmpty()) {
           // parseSimpleToken already added rejection
           return;
@@ -114,14 +113,14 @@ public final class SafetyTokenParser {
 
       // Construct combined SafetyToken with subtractions
       if (baseToken.kind() == SafetyToken.Kind.TAG) {
-        out.add(SafetyToken.tag(baseToken.identifier(), baseToken.predicates(), subtractions, source));
+        out.add(SafetyToken.tag(baseToken.identifier(), baseToken.predicates(), subtractions, raw));
       } else {
-        out.add(SafetyToken.material(baseToken.identifier(), baseToken.predicates(), subtractions, source));
+        out.add(SafetyToken.material(baseToken.identifier(), baseToken.predicates(), subtractions, raw));
       }
       return;
     }
 
-    parseSimpleToken(source, token, out, rejected);
+    parseSimpleToken(raw, token, out, rejected);
   }
 
   /**
