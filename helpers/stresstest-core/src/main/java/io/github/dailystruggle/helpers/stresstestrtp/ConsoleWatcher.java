@@ -93,8 +93,8 @@ public final class ConsoleWatcher {
                 if (!matched) return;
                 handleMatch(stripped);
             }
-            @Override public void flush() {}
-            @Override public void close() throws SecurityException {}
+            @Override public void flush() { /* no-op: in-memory log tap */ }
+            @Override public void close() throws SecurityException { /* no-op: in-memory log tap */ }
         };
         Logger root = Logger.getLogger("");
         root.addHandler(handler);

@@ -596,7 +596,7 @@ public final class ComputeGovernor {
         evaluationsTotal.incrementAndGet();
         if (sumDeliverableDemand > 0.0 && rStar + 1e-9 < sumDeliverableDemand) {
             constrainedEvaluationsTotal.incrementAndGet();
-            if (regionsWithDemand > 0 && minConsumersWithDemand > 0 && minConsumersWithDemand != Integer.MAX_VALUE) {
+            if (regionsWithDemand > 0 && minConsumersWithDemand != Integer.MAX_VALUE) {
                 double skew = (double) maxConsumersWithDemand / (double) minConsumersWithDemand;
                 maxConsumerSkewBits.updateAndGet(prevBits -> {
                     double prev = Double.longBitsToDouble(prevBits);

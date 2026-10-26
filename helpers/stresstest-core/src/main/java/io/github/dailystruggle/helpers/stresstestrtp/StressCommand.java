@@ -60,7 +60,8 @@ public final class StressCommand {
     }
 
     private boolean doStart(StressSender sender, String[] args) throws IOException {
-        if (plugin.runner().isRunning()) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner != null && existingRunner.isRunning()) {
             sender.sendMessage("StressTestRTP: a run is already in progress. /rtpstress stop first.");
             return true;
         }
@@ -79,7 +80,8 @@ public final class StressCommand {
         int concurrency = args.length >= 3 ? safeInt(args[2], (int) cfg.getLong("default-concurrency", 4))
                                             : (int) cfg.getLong("default-concurrency", 4);
         plugin.beginRun();
-        if (!plugin.runner().startTimed(sender, seconds, concurrency)) {
+        Runner activeRunner = plugin.runner();
+        if (activeRunner == null || !activeRunner.startTimed(sender, seconds, concurrency)) {
             sender.sendMessage("StressTestRTP: failed to start (already running?).");
             return true;
         }
@@ -92,14 +94,16 @@ public final class StressCommand {
     }
 
     private boolean doBurst(StressSender sender, String[] args) throws IOException {
-        if (plugin.runner().isRunning()) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner != null && existingRunner.isRunning()) {
             sender.sendMessage("StressTestRTP: a run is already in progress. /rtpstress stop first.");
             return true;
         }
         int n = args.length >= 2 ? safeInt(args[1], (int) plugin.config().getLong("default-burst", 10))
                                   : (int) plugin.config().getLong("default-burst", 10);
         plugin.beginRun();
-        if (!plugin.runner().startBurst(sender, n)) {
+        Runner activeRunner = plugin.runner();
+        if (activeRunner == null || !activeRunner.startBurst(sender, n)) {
             sender.sendMessage("StressTestRTP: failed to start burst.");
             return true;
         }
@@ -109,7 +113,8 @@ public final class StressCommand {
     }
 
     private boolean doSequence(StressSender sender, String[] args) throws IOException {
-        if (plugin.runner().isRunning()) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner != null && existingRunner.isRunning()) {
             sender.sendMessage("StressTestRTP: a run is already in progress. /rtpstress stop first.");
             return true;
         }
@@ -127,7 +132,8 @@ public final class StressCommand {
         int warmupCycles = (int) cfg.getLong("sequence.warmup-target-cycles", 1);
         var targets = Targets.load(cfg, plugin.getLogger());
         plugin.beginRun();
-        if (!plugin.runner().startSequence(sender, perTarget, gap, concurrency,
+        Runner activeRunner = plugin.runner();
+        if (activeRunner == null || !activeRunner.startSequence(sender, perTarget, gap, concurrency,
                 warmupSeconds, warmupCycles)) {
             sender.sendMessage("StressTestRTP: failed to start sequence (already running?).");
             return true;
@@ -146,7 +152,8 @@ public final class StressCommand {
     }
 
     private boolean doRamp(StressSender sender, String[] args) throws IOException {
-        if (plugin.runner().isRunning()) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner != null && existingRunner.isRunning()) {
             sender.sendMessage("StressTestRTP: a run is already in progress. /rtpstress stop first.");
             return true;
         }
@@ -170,7 +177,8 @@ public final class StressCommand {
             }
         }
         plugin.beginRun();
-        if (!plugin.runner().startRamp(sender, target, stageSeconds, override)) {
+        Runner activeRunner = plugin.runner();
+        if (activeRunner == null || !activeRunner.startRamp(sender, target, stageSeconds, override)) {
             sender.sendMessage("StressTestRTP: failed to start ramp (already running?).");
             return true;
         }
@@ -223,7 +231,8 @@ public final class StressCommand {
             sender.sendMessage("StressTestRTP: ticket-footprint probe is disabled in config.");
             return true;
         }
-        if (plugin.runner().isRunning()) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner != null && existingRunner.isRunning()) {
             sender.sendMessage("StressTestRTP: refusing to probe during a run; /rtpstress stop first.");
             return true;
         }
@@ -254,12 +263,15 @@ public final class StressCommand {
             else if ("dump".equalsIgnoreCase(args[i])) dump = true;
             else if ("quick".equalsIgnoreCase(args[i])) quick = true;
         }
-        if (plugin.runner().isRunning() && !force) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner != null && existingRunner.isRunning() && !force) {
             sender.sendMessage("StressTestRTP: refusing leakcheck during a run (full GC would pause the "
                     + "measured window); /rtpstress stop first or append 'force'.");
             return true;
         }
-        plugin.runner().releaseRosterRefs();
+        if (existingRunner != null) {
+            existingRunner.releaseRosterRefs();
+        }
         if (!leak.checkpoint(label, new LeakProbe.Options(dump, quick),
                 msg -> Sched.runGlobal(plugin, () -> sender.sendMessage("StressTestRTP: " + msg)))) {
             sender.sendMessage("StressTestRTP: a leakcheck is already running; poll /rtpstress leakcheck status.");
@@ -275,7 +287,7 @@ public final class StressCommand {
     @SuppressWarnings("java:S3516")
     private boolean doCoverage(StressSender sender, String[] args) throws IOException {
         CoverageProbe probe = plugin.coverageProbe();
-        if (!CoverageProbe.agentAttached()) {
+        if (probe == null || !CoverageProbe.agentAttached()) {
             sender.sendMessage("StressTestRTP: coverage unavailable; start the server with the JaCoCo "
                     + "-javaagent (see devstack/docker-compose.coverage.yml).");
             return true;
@@ -315,7 +327,8 @@ public final class StressCommand {
             sender.sendMessage("StressTestRTP: leak probe unavailable.");
             return true;
         }
-        if (plugin.runner().isRunning()) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner != null && existingRunner.isRunning()) {
             sender.sendMessage("StressTestRTP: refusing churn during a run; /rtpstress stop first.");
             return true;
         }
@@ -331,11 +344,12 @@ public final class StressCommand {
 
     @SuppressWarnings("java:S3516")
     private boolean doStop(StressSender sender) {
-        if (!plugin.runner().isRunning()) {
+        Runner existingRunner = plugin.runner();
+        if (existingRunner == null || !existingRunner.isRunning()) {
             sender.sendMessage("StressTestRTP: no run is in progress.");
             return true;
         }
-        plugin.runner().stop();
+        existingRunner.stop();
         sender.sendMessage("StressTestRTP: run stopped.");
         return true;
     }

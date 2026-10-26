@@ -79,7 +79,7 @@ public final class TickBudget {
       refresh();
       st = autoTuneState;
     }
-    return st < 0 ? false : (st == 1);
+    return st == 1;
   }
 
   /** Test seam: overrides cached {@code autoTune} state until next {@link #refresh()} or {@link #clear()}. */

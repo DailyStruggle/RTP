@@ -213,7 +213,7 @@ public final class Runner {
         this.kickstartCount = 0;
         this.rosterCursor.set(0);
         this.roundRobinTargets = Targets.load(config, plugin.getLogger());
-        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        long timerPeriodMs = Math.max(5L, config != null ? config.getLong("runner-tick-ms", 20L) : 20L);
         this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
         spark.startPhase("timed");
         recorder.beginPhase("timed");
@@ -234,7 +234,7 @@ public final class Runner {
         this.seqIndex = 0;
         this.seqPerTargetMs = Math.max(1L, perTargetSeconds) * 1000L;
         this.seqGapMs = Math.max(0L, gapSeconds) * 1000L;
-        this.seqPerTargetCount = Math.max(0L, config.getLong("per-target-count", 0L));
+        this.seqPerTargetCount = Math.max(0L, config != null ? config.getLong("per-target-count", 0L) : 0L);
         this.seqPhaseDispatched.set(0);
         long now = System.currentTimeMillis();
         this.seqPhaseEndMs = now + seqPerTargetMs;

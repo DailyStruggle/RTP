@@ -32,10 +32,7 @@ public interface UnitCurve extends DoubleUnaryOperator {
         if (Double.isNaN(t) || t <= 0.0) {
             return 0.0;
         }
-        if (t >= 1.0) {
-            return 1.0;
-        }
-        return t;
+        return Math.min(1.0, t);
     }
 
     /**

@@ -30,7 +30,7 @@ public final class ProbedShareAllocator {
     public static final long POPULATED_GROWTH_COOLDOWN_NANOS = TimeUnit.SECONDS.toNanos(60);
     public static final long LOAN_NO_BREACH_NANOS = TimeUnit.SECONDS.toNanos(10);
     public static final long OVERLOAD_VETO_WINDOW_NANOS = TimeUnit.SECONDS.toNanos(5);
-    public static final long CANDIDATE_AGING_NANOS = TimeUnit.SECONDS.toNanos(60);
+    public static final long CANDIDATE_AGING_NANOS = 60_000_000_000L;
     public static final int CANDIDATE_MAX_DEFERRALS = 8;
     public static final double HEADROOM_STEERING_THRESHOLD = 0.5;
     public static final double FULL_RECOVERY_SECONDS = 50.0;
@@ -167,7 +167,6 @@ public final class ProbedShareAllocator {
             double backgroundNanosPerTick
     ) {}
 
-    private final long defaultConfiguredSyncNanos;
     private final AllocationSnapshot emptySnapshot;
     private final ConcurrentHashMap<String, GroupState> groupStates = new ConcurrentHashMap<>();
     private final AtomicLong lastAnyOverloadNanos = new AtomicLong(Long.MIN_VALUE);
@@ -181,11 +180,11 @@ public final class ProbedShareAllocator {
     }
 
     public ProbedShareAllocator(long defaultConfiguredSyncNanos) {
-        this.defaultConfiguredSyncNanos = Math.max(1_000L, defaultConfiguredSyncNanos);
-        this.emptySnapshot = (this.defaultConfiguredSyncNanos == DEFAULT_CONFIGURED_SYNC_NANOS)
+        long resolvedDefaultSyncNanos = Math.max(1_000L, defaultConfiguredSyncNanos);
+        this.emptySnapshot = (resolvedDefaultSyncNanos == DEFAULT_CONFIGURED_SYNC_NANOS)
                 ? AllocationSnapshot.EMPTY
                 : new AllocationSnapshot(
-                        this.defaultConfiguredSyncNanos,
+                        resolvedDefaultSyncNanos,
                         0, 0, 0L, 0L, 0L, 0.5, 1.0, 0.0, 0L, Collections.emptyMap());
         this.latestSnapshot = this.emptySnapshot;
     }
@@ -241,9 +240,9 @@ public final class ProbedShareAllocator {
     ) {
         long sCfg = Math.max(1_000L, configuredSyncNanos);
         long sMin = Math.max(1L, Math.min(minShareNanos, sCfg));
-        double newGroupPrior = Math.max((double) sMin, 0.5 * (double) sCfg);
-        double contributionThreshold = Math.max((double) HALF_MILLI_NANOS, (double) sCfg / 10.0);
-        double stdRatePerSec = Math.max(0.0, (double) (sCfg - sMin) / FULL_RECOVERY_SECONDS);
+        double newGroupPrior = Math.max(sMin, 0.5 * sCfg);
+        double contributionThreshold = Math.max(HALF_MILLI_NANOS, sCfg / 10.0);
+        double stdRatePerSec = Math.max(0.0, (sCfg - sMin) / FULL_RECOVERY_SECONDS);
 
         evictExpiredGroups(nowNanos);
 
@@ -327,7 +326,7 @@ public final class ProbedShareAllocator {
 
         int kCount = signalById.size();
         int theta = Math.max(0, distinctThreads);
-        long poolPi = sCfg * (long) Math.min(kCount, theta);
+        long poolPi = sCfg * Math.min(kCount, theta);
 
         Map<String, Long> effectiveShares = new LinkedHashMap<>();
         Map<String, Long> effectiveBgShares = new LinkedHashMap<>();
@@ -388,8 +387,8 @@ public final class ProbedShareAllocator {
                             st.lastEvaluatedNanos(), st.lastActiveNanos(),
                             st.interactiveNanosPerTick(), st.backgroundNanosPerTick()));
                     double cap25 = Math.max(0.0, (double) (MAX_BORROWED_TOTAL_NANOS - sK));
-                    double qExcess = Math.max(0.0, sig.queuedBackgroundNanos() - (double) sKb);
-                    double req = Math.min(Math.min((double) sCfg, cap25), Math.min(nextLoanLimit, qExcess));
+                    double qExcess = Math.max(0.0, sig.queuedBackgroundNanos() - sKb);
+                    double req = Math.min(Math.min(sCfg, cap25), Math.min(nextLoanLimit, qExcess));
                     if (req > 0.0) {
                         loanRequests.put(id, req);
                         sumLoanRequests += req;

@@ -114,7 +114,7 @@ public final class WaterFillingAllocator {
                 if (capped[i]) continue;
                 K k = keys.get(i);
                 double d = sanitize(deliverableDemands.get(k));
-                double w = sanitize(weights.get(k));
+                double w = weights != null ? sanitize(weights.get(k)) : 0.0;
                 if (theta * w >= d - EPSILON) {
                     out.put(k, d);
                     remainingRate = Math.max(0.0, remainingRate - d);
@@ -127,7 +127,7 @@ public final class WaterFillingAllocator {
                     if (capped[i]) continue;
                     K k = keys.get(i);
                     double d = sanitize(deliverableDemands.get(k));
-                    double w = sanitize(weights.get(k));
+                    double w = weights != null ? sanitize(weights.get(k)) : 0.0;
                     out.put(k, Math.min(d, theta * w));
                 }
                 break;

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.metrics.networkTimeSeries;
 
 import io.github.dailystruggle.rtp.api.metrics.MetricBucketRow;
 import io.github.dailystruggle.rtp.api.metrics.MetricTimeSeriesPublisher;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -39,7 +40,61 @@ public final class ChartSnapshotAssembler {
       double[] means,
       double[] mins,
       double[] maxes,
-      double[] p95s) {}
+      double[] p95s) {
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) return true;
+      if (!(other instanceof ChartSeriesSnapshot that)) return false;
+      return fromEpochInclusive == that.fromEpochInclusive
+          && toEpochInclusive == that.toEpochInclusive
+          && Objects.equals(backendId, that.backendId)
+          && Objects.equals(metricKey, that.metricKey)
+          && Objects.equals(buckets, that.buckets)
+          && Arrays.equals(timestamps, that.timestamps)
+          && Arrays.equals(means, that.means)
+          && Arrays.equals(mins, that.mins)
+          && Arrays.equals(maxes, that.maxes)
+          && Arrays.equals(p95s, that.p95s);
+    }
+
+    @Override
+    public int hashCode() {
+      int result =
+          Objects.hash(backendId, metricKey, fromEpochInclusive, toEpochInclusive, buckets);
+      result = 31 * result + Arrays.hashCode(timestamps);
+      result = 31 * result + Arrays.hashCode(means);
+      result = 31 * result + Arrays.hashCode(mins);
+      result = 31 * result + Arrays.hashCode(maxes);
+      result = 31 * result + Arrays.hashCode(p95s);
+      return result;
+    }
+
+    @Override
+    public String toString() {
+      return "ChartSeriesSnapshot[backendId="
+          + backendId
+          + ", metricKey="
+          + metricKey
+          + ", fromEpochInclusive="
+          + fromEpochInclusive
+          + ", toEpochInclusive="
+          + toEpochInclusive
+          + ", buckets="
+          + buckets
+          + ", timestamps="
+          + Arrays.toString(timestamps)
+          + ", means="
+          + Arrays.toString(means)
+          + ", mins="
+          + Arrays.toString(mins)
+          + ", maxes="
+          + Arrays.toString(maxes)
+          + ", p95s="
+          + Arrays.toString(p95s)
+          + "]";
+    }
+  }
 
   private final MetricTimeSeriesPublisher publisher;
   private final BooleanSupplier mainThreadDetector;

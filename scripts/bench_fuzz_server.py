@@ -6204,21 +6204,8 @@ SERVER_ACTIVE_PROHIBITED_FLAGS: dict[str, tuple[str, str]] = {
 }
 
 
-def _env_allowed_bench_hosts() -> set[str]:
-    extra: set[str] = set()
-    for env_key in ("BENCH_HOST", "BENCH_SSH_HOST", "FUZZ_SSH_HOST", "BENCH_ALLOWED_HOSTS"):
-        val = os.environ.get(env_key, "")
-        for tok in val.split(","):
-            s = tok.strip().lower()
-            if "@" in s:
-                s = s.rpartition("@")[2].strip()
-            if s:
-                extra.add(s)
-    return extra
-
-
 def is_allowed_bench_host(host: str | None) -> tuple[bool, str]:
-    """Validate that `host` is loopback, private RFC1918 LAN, Tailscale CGNAT (`100.64.0.0/10`), or a local bench hostname (single-label LAN alias, `$BENCH_HOST`, `*.local`, `*.lan`).
+    """Validate that `host` is loopback, private RFC1918 LAN, Tailscale CGNAT (`100.64.0.0/10`), or a local bench hostname (single-label LAN alias, `*.local`, `*.lan`).
 
     Rejects public WAN IP addresses and public internet domain names so the harness
     cannot be repurposed against third-party servers.
@@ -6228,7 +6215,7 @@ def is_allowed_bench_host(host: str | None) -> tuple[bool, str]:
         return False, "host must not be empty"
     if raw.startswith("[") and raw.endswith("]"):
         raw = raw[1:-1]
-    if raw in ALLOWED_BENCH_HOSTNAMES or raw in _env_allowed_bench_hosts():
+    if raw in ALLOWED_BENCH_HOSTNAMES:
         return True, "ok"
     try:
         addr = ipaddress.ip_address(raw)
@@ -6244,7 +6231,7 @@ def is_allowed_bench_host(host: str | None) -> tuple[bool, str]:
             False,
             f"refusing public or external hostname {host!r}; --mode server --active only permits "
             "loopback (127.0.0.1, localhost, ::1), RFC1918 LAN / Tailscale IPs, or local bench hostnames "
-            "(single-label LAN alias, $BENCH_HOST, *.local, *.lan)",
+            "(single-label LAN alias, *.local, *.lan)",
         )
 
     if addr.is_loopback or addr.is_link_local or any(addr in net for net in RFC1918_AND_TAILSCALE_NETS):

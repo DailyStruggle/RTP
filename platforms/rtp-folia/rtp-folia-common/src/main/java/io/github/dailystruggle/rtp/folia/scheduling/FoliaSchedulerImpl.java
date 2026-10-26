@@ -507,9 +507,8 @@ public class FoliaSchedulerImpl implements RTPScheduler {
       // Off a region thread (tests) ownership is unknowable; on one, strays are re-routed.
       boolean onAnchor = Bukkit.isOwnedByCurrentRegion(world, anchor.cx(), anchor.cz());
       ComputeBudget curBudget = ComputeGovernor.currentBudget();
-      if (world != null
-          && ((curBudget != null && (curBudget.autoTune() || curBudget.observeOnly()))
-              || ComputeGovernor.isObservePropertyEnabled())) {
+      if ((curBudget != null && (curBudget.autoTune() || curBudget.observeOnly()))
+          || ComputeGovernor.isObservePropertyEnabled()) {
         budget.beginSliceGroup(
             world.getUID(),
             anchor.cx(),

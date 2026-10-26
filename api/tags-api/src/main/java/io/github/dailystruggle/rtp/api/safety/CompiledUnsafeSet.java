@@ -317,7 +317,7 @@ public final class CompiledUnsafeSet {
 
     // 3. Material-scoped state predicates.
     List<StatePredicate> matPreds = materialStatePredicates.get(materialName);
-    if (matPreds != null && matchesAny(matPreds, liveProperties)) return true;
+    if (matchesAny(matPreds, liveProperties)) return true;
 
     // 4. Tag-scoped state predicates.
     if (!tagStatePredicates.isEmpty()
@@ -325,18 +325,14 @@ public final class CompiledUnsafeSet {
       for (String tag : liveTagMembership) {
         if (!isSubtractedFromTag(tag, materialName, liveTagMembership, liveProperties)) {
           List<StatePredicate> tagPreds = tagStatePredicates.get(tag);
-          if (tagPreds != null && matchesAny(tagPreds, liveProperties)) return true;
+          if (matchesAny(tagPreds, liveProperties)) return true;
         }
       }
     }
 
     // 5. Wildcard state predicates.
-    if (!wildcardStatePredicates.isEmpty()
-        && matchesAny(wildcardStatePredicates, liveProperties)) {
-      return true;
-    }
-
-    return false;
+    return !wildcardStatePredicates.isEmpty()
+        && matchesAny(wildcardStatePredicates, liveProperties);
   }
 
   private boolean isSubtractedFromTag(String tag, String materialName,

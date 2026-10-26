@@ -253,13 +253,13 @@ Bug fixes, translations, docs and addons are all welcome. Read [CONTRIBUTING.md]
 
 ## Support
 
-- Questions: [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions)
+- Questions and setup help: [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) or the `#support` Forum in the `LeafCraft Plugin Support` Discord
 - Bugs: [open an issue](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md) with `/rtp version`, `/version`, `/rtp test` output, and an `mclo.gs` log link, after checking the [FAQ](docs/admin/FAQ.md)
 - Security problems: see [SECURITY.md](SECURITY.md); please don't open a public issue
 
 The full guide is in [SUPPORT.md](SUPPORT.md).
 
-**[RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** buys priority support, including fixes for the problems you report, and funds development. It's the same MIT-licensed code as the free build.
+**[RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** buys priority support (via BuiltByBit tickets or `@Pro Supporter` priority in the Discord `#support` Forum), including fixes for the problems you report, and funds development. It's the same MIT-licensed code as the free build.
 
 ---
 

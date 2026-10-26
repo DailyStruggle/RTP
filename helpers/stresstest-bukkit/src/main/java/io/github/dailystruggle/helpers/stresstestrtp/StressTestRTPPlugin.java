@@ -768,7 +768,7 @@ public final class StressTestRTPPlugin extends JavaPlugin implements StressHost,
             for (Plugin p : Bukkit.getPluginManager().getPlugins()) {
                 if (p == null) continue;
                 ArrayList<RegisteredListener> list = HandlerList.getRegisteredListeners(p);
-                counts.put(p.getName(), list != null ? list.size() : 0);
+                counts.put(p.getName(), list.size());
             }
             return Census.measured(counts);
         } catch (Throwable t) {
@@ -869,7 +869,7 @@ public final class StressTestRTPPlugin extends JavaPlugin implements StressHost,
                         wrapPlayer(e.getPlayer()),
                         toStressLocation(e.getFrom()),
                         toStressLocation(e.getTo()),
-                        e.getCause() != null ? e.getCause().name() : ""));
+                        e.getCause().name()));
             }
         };
         Bukkit.getPluginManager().registerEvents(l, this);

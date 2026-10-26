@@ -159,6 +159,7 @@ public class RegionClaimTracker {
     }
     state.touch(nowMillis);
 
+    //noinspection SynchronizationOnLocalVariableOrMethodParameter
     synchronized (state) {
       boolean centerInside = boundary.contains(state.getPinnedCenterX(), state.getPinnedCenterZ());
       long elapsed = nowMillis - state.getLastRecomputeEpochMillis();
@@ -328,7 +329,7 @@ public class RegionClaimTracker {
           marked++;
         }
         long[] preimages = shape.chunkToLocations(cx, cz);
-        if (preimages != null && preimages.length > 0) {
+        if (preimages != null) {
           for (long p : preimages) {
             if (p >= 0 && p < shape.getEffectiveRange() && p != representative && !shape.isKnownBad(p)) {
               shape.addBadLocation(p, FailTypes.safetyExternal, effectiveTtl);

@@ -454,7 +454,7 @@ public final class AnvilPrefilter {
       return new ProbeResult(Verdict.ACCEPT, view);
     } catch (UnsupportedAnvilFormatException e) {
       AnvilPrefilterMetrics.recordUnsupportedCompression(
-          resolved != null ? resolved.path() : RegionFileResolver.regionDirectoryFor(worldFolder, dimensionSubpath),
+          resolved.path(),
           cx,
           cz,
           e.getMessage());
@@ -468,7 +468,7 @@ public final class AnvilPrefilter {
       // transparently, so log it at INFO via the same rate-limited diag channel used
       // for other UNKNOWN:* outcomes - no stacktrace needed.
       AnvilPrefilterMetrics.recordUnparseableSection(
-          resolved != null ? resolved.path() : RegionFileResolver.regionDirectoryFor(worldFolder, dimensionSubpath),
+          resolved.path(),
           cx,
           cz,
           "corrupt-region-entry: " + e.getMessage());
@@ -482,7 +482,7 @@ public final class AnvilPrefilter {
       // legitimate "chunk not yet persisted" UNKNOWN (see rtp-anvil/AGENTS notes on
       // S-004 spirit).
       AnvilPrefilterMetrics.recordUnparseableSection(
-          resolved != null ? resolved.path() : RegionFileResolver.regionDirectoryFor(worldFolder, dimensionSubpath),
+          resolved.path(),
           cx,
           cz,
           e.getClass().getSimpleName() + ": " + e.getMessage());

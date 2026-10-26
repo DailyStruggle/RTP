@@ -32,13 +32,13 @@ Check these first. Most questions are already answered:
 
 | Intent | Channel |
 |---|---|
-| "How do I configure / use X?" (not a bug) | [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) |
-| Community discussion | SpigotMC resource discussion thread |
-| Suspected bug (crash, stack trace, broken behavior) | [New bug report](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md) (with `/rtp version`, `/version`, `/rtp test`, and an `mclo.gs` log) |
-| LeafRTP Pro priority support | BuiltByBit ticket |
+| "How do I configure / use X?" (not a bug) | [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) or the `#support` Forum in the `LeafCraft Plugin Support` Discord |
+| Community discussion | SpigotMC resource discussion thread or `#general` in `LeafCraft Plugin Support` |
+| Suspected bug (crash, stack trace, broken behavior) | [New bug report](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md) or `#support` Forum thread (with `/rtp version`, `/version`, `/rtp test`, and an `mclo.gs` log) |
+| LeafRTP Pro priority support | BuiltByBit ticket or `#support` Forum thread with the `@Pro Supporter` role (`💎 Pro Priority`) |
 | Feature idea | Open a **Discussion** first; issues only after triage |
 | **Security vulnerability** | **Do not open a public issue.** See [`SECURITY.md`](SECURITY.md) and use [private advisories](https://github.com/DailyStruggle/RTP/security/advisories/new) |
-| Addon development help | [Addon developer guide](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/) first, then [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) |
+| Addon development help | [Addon developer guide](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/) first, then [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) or `#development` in `LeafCraft Plugin Support` |
 
 **Do not** use the GitHub issue tracker for questions, "how do I" requests, or
 plugin-conflict debugging without first reproducing with RTP alone. Those
@@ -99,7 +99,7 @@ RTP is actively maintained by an open-source team. While we do not offer commerc
 - **Initial Triage & Acknowledgement:** Typically within **3 to 7 business days** for well-formed reports containing complete logs and reproduction steps.
 - **Bug Fix Delivery:** Confirmed defects on tested platforms are typically addressed in the next patch release (typically **2 to 4 weeks**), or an intermediate snapshot build if critical.
 - **Critical Security Hazards:** Handled on an expedited track via [`SECURITY.md`](SECURITY.md) (acknowledgement within **72 hours**, triage within **7 days**).
-- **Pro Support Priority:** Operators running LeafRTP Pro on BuiltByBit receive priority support via BuiltByBit tickets, routing confirmed issues to the front of the queue (24-72 h weekday target).
+- **Pro Support Priority:** Operators running LeafRTP Pro on BuiltByBit receive priority support via BuiltByBit tickets or the `#support` Forum in `LeafCraft Plugin Support` (where the `@Pro Supporter` role attaches the `💎 Pro Priority` tag), routing confirmed issues to the front of the queue (24-72 h weekday target).
 - **Incomplete Reports:** Reports missing required reproduction steps, configuration diffs, or `latest.log` links may be flagged or closed until the required context is provided.
 - Pinging the maintainer in DMs, other repositories, or unrelated threads will not speed anything up and is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
 

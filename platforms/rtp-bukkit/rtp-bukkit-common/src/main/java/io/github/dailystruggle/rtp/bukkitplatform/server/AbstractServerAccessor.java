@@ -80,6 +80,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         log(Level.WARNING, "[RTP] Failed to resolve native WorldBorder for world " + s + ": " + t.getMessage(), t);
         return null;
       }
+      //noinspection ConstantValue
       if (worldBorder == null) {
         io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
             s, "world.getWorldBorder() returned null");

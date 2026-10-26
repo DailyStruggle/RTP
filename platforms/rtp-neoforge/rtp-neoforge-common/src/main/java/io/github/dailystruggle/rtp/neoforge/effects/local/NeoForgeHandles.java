@@ -461,7 +461,7 @@ public final class NeoForgeHandles implements HandleProvider {
         @Override
         public void playSound(Object type, float volume, float pitch) {
             ServerLevel level = resolveLevel(worldName);
-            if (level == null || !NeoForgeSoundEffect.playAtLevel(level, lx, ly, lz, type, volume, pitch)) {
+            if (!NeoForgeSoundEffect.playAtLevel(level, lx, ly, lz, type, volume, pitch)) {
                 EffectFactory.reportUnsupportedPrimitive(
                         "NeoForge", "SOUND", "location sound playback unavailable for world=" + worldName);
             }
@@ -470,7 +470,7 @@ public final class NeoForgeHandles implements HandleProvider {
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
             ServerLevel level = resolveLevel(worldName);
-            if (level == null || !NeoForgeParticleEffect.spawnAtLevel(
+            if (!NeoForgeParticleEffect.spawnAtLevel(
                     level, lx, ly, lz, type, count, dx, dy, dz, speed)) {
                 EffectFactory.reportUnsupportedPrimitive(
                         "NeoForge", "PARTICLE", "location particle spawn unavailable for world=" + worldName);

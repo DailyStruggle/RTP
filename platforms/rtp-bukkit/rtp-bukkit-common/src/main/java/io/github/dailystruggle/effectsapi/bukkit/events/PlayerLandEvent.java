@@ -3,6 +3,7 @@ package io.github.dailystruggle.effectsapi.bukkit.events;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Fired by {@code GlideEffect} when a gliding player lands (touches ground,
@@ -44,6 +45,7 @@ public class PlayerLandEvent extends Event {
         return reason;
     }
 
+    @NotNull
     @Override
     public HandlerList getHandlers() {
         return HANDLERS_LIST;

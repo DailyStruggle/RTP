@@ -216,6 +216,7 @@ public final class ComparativeCostGovernor<T extends Enum<T>> {
         if (config == null) {
             throw new IllegalArgumentException("HysteresisConfig cannot be null");
         }
+        @SuppressWarnings("unchecked")
         final ComparativeCostGovernor<T>[] holder = new ComparativeCostGovernor[1];
         Function<CostContext, T> defaultPolicy = ctx -> holder[0].evaluateVarianceGated(
                 ctx.get("costA"),

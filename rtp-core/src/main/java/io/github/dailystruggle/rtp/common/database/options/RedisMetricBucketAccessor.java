@@ -112,7 +112,7 @@ public final class RedisMetricBucketAccessor {
           executor.execute("EXPIRE", key, String.valueOf(retentionSeconds));
         }
         if (zaddRes instanceof Number n) {
-          inserted += n.intValue() > 0 ? n.intValue() : 0;
+          inserted += Math.max(0, n.intValue());
         } else {
           inserted++;
         }

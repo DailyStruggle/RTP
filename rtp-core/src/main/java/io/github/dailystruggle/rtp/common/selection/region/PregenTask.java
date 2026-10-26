@@ -108,7 +108,7 @@ final class PregenTask implements Runnable {
             boolean pausedOrZeroQuota,
             long nowNanos
     ) {
-        if (!speculative() || state == null || state.region == null) {
+        if (state == null || !speculative() || state.region == null) {
             return false;
         }
         return state.region.shouldDeferBackgroundCandidate(cx, cz, weight, pausedOrZeroQuota, nowNanos);
@@ -964,8 +964,11 @@ final class PregenTask implements Runnable {
         if (hillAngle < 0) return false;
         double tan = TerrainShapeCheck.tanOf(hillAngle);
         int radius = TerrainShapeCheck.SQUARE_RADIUS;
-        int y = picked.y(), lx = picked.x() & 15, lz = picked.z() & 15;
-        int minY = probe.minY() + 1, maxY = probe.maxY();
+        int y = picked.y();
+        int lx = picked.x() & 15;
+        int lz = picked.z() & 15;
+        int minY = probe.minY() + 1;
+        int maxY = probe.maxY();
         // Neighbours hold only the floor search window (feet-Y +-LAYER_WINDOW, plus y-1).
         int wMin = Math.max(probe.minY(), y - TerrainShapeCheck.LAYER_WINDOW - 1);
         int wMax = Math.min(maxY, y + TerrainShapeCheck.LAYER_WINDOW);

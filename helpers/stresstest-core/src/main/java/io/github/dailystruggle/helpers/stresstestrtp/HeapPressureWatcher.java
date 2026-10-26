@@ -99,8 +99,8 @@ public final class HeapPressureWatcher {
                     }
                 }
             }
-            @Override public void flush() {}
-            @Override public void close() throws SecurityException {}
+            @Override public void flush() { /* no-op: in-memory log tap */ }
+            @Override public void close() throws SecurityException { /* no-op: in-memory log tap */ }
         };
         java.util.logging.Logger.getLogger("").addHandler(handler);
     }

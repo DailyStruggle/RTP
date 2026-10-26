@@ -3,6 +3,7 @@ package io.github.dailystruggle.effectsapi.bukkit.events;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Fired by {@code GlideEffect} when a player is placed into glide mode after
@@ -20,6 +21,7 @@ public class PlayerGlideEvent extends Event {
         return player;
     }
 
+    @NotNull
     @Override
     public HandlerList getHandlers() {
         return HANDLERS_LIST;

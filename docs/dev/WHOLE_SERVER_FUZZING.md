@@ -47,7 +47,7 @@ python3 scripts/bench_fuzz.py --mode server --active \
   - `coop_group` (*Mode 8 Cooperative Group Settle*): joins multiple bots that coordinate commands and movement together.
 - **Anti-abuse safeguards:**
   1. **Proof-of-ownership gate:** requires both filesystem access to a disposable `--server-dir` (`server.properties` with `online-mode=false`, a disposable marker file, and `rcon.password`) and a live authenticated RCON `list` handshake before opening any bot connection.
-  2. **Private/local host gate (`is_allowed_bench_host`):** permits only loopback (`127.0.0.1`, `localhost`, `::1`), RFC1918 LAN (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Tailscale CGNAT (`100.64.0.0/10`), or local bench hostnames (single-label LAN aliases, `$BENCH_HOST`, `*.local`, `*.lan`); rejects public WAN IPs and internet domains.
+  2. **Private/local host gate (`is_allowed_bench_host`):** permits only loopback (`127.0.0.1`, `localhost`, `::1`), RFC1918 LAN (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Tailscale CGNAT (`100.64.0.0/10`), or local bench hostnames (single-label LAN aliases, `*.local`, `*.lan`); rejects public WAN IPs and internet domains even when supplied via `BENCH_HOST` or `BENCH_SSH_HOST`.
   3. **Offline-only self-identifying bots:** `bench-swarm.js` connects strictly with `auth: 'offline'` and `fz*` / `bench_*` bot names from the single runner IP.
   4. **Mandatory command denylist:** enforces `DEFAULT_DENYLIST` (plus `--deny`) across generation, shrinking, numeric bisection, and replay.
 

@@ -1122,6 +1122,9 @@ sonar {
         // - java:S2925: Thread.sleep in asynchronous, transport, and benchmark stress tests.
         // - java:S3516: onCommand and command handlers intentionally returning boolean flag.
         // - java:S1845: command permission constants and static factory methods.
+        // - javaarchitecture:S7788: package/class slice disentanglement is governed by ArchUnit Rules 11-32 (ADR-115).
+        // - java:S9395: explicit long-to-double cast suggestion conflicts with java:S1905 and Qodana RedundantCast.
+        // - java:S107: immutable telemetry/snapshot records and multi-parameter constructors.
         def ignoredRuleExceptions = [
                 s3077: [rule: 'java:S3077'],
                 s2975: [rule: 'java:S2975'],
@@ -1139,7 +1142,10 @@ sonar {
                 s5778test: [rule: 'java:S5778', resource: '**/src/test/**/*'],
                 s2925test: [rule: 'java:S2925', resource: '**/src/test/**/*'],
                 s3516: [rule: 'java:S3516'],
-                s1845: [rule: 'java:S1845']
+                s1845: [rule: 'java:S1845'],
+                s7788: [rule: 'javaarchitecture:S7788'],
+                s9395: [rule: 'java:S9395'],
+                s107: [rule: 'java:S107']
         ]
         property 'sonar.issue.ignore.multicriteria', ignoredRuleExceptions.keySet().join(',')
         ignoredRuleExceptions.each { key, cfg ->

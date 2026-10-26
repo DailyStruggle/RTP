@@ -55,7 +55,7 @@ public final class BukkitEffectsInitializer {
      */
     public static void runEffect(@NotNull Plugin plugin, @NotNull Effect<?> effect) {
         try {
-            Bukkit.getScheduler().runTask(plugin, (Runnable) effect);
+            Bukkit.getScheduler().runTask(plugin, effect);
         } catch (RuntimeException failure) {
             Effect.warn("Could not schedule effect " + effect.getClass().getSimpleName()
                     + " on the Bukkit scheduler; dropping it ("

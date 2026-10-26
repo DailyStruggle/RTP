@@ -398,7 +398,7 @@ JAVA_LOG_RE = re.compile(
 )
 JAVA_BIT_FINDING_RE = re.compile(r"BitFinding\.(?:warn|fail|error|of)\s*\(([^;]{1,220})\)", re.DOTALL)
 JAVA_KEY_REF_RE = re.compile(
-    r"\b(?:ConfigKeys|RegionKeys|PerformanceKeys|SafetyKeys|WorldKeys|LoggingKeys|EconomyKeys|MessagesKeys)\.([A-Za-z0-9_]+)\b"
+    r"\b(?:[A-Z][A-Za-z0-9_]*Keys)\.([A-Za-z0-9_]+)\b"
 )
 JAVA_JAVADOC_RE = re.compile(r"/\*\*(.*?)\*/", re.DOTALL)
 
@@ -891,7 +891,7 @@ def enrich_config_keys_from_docs(
             s in heading_low for s in ("rectangle", "ellipse", "polygon", "circle_normal")
         )
         is_vert_table = d.path.endswith("CONFIGURATION.md") and any(
-            s in heading_low for s in ("jump", "fixed")
+            s in heading_low for s in ("jump", "fixed", "vert adjustors")
         )
         engine_prefix = "shape." if is_shape_table else ("vert." if is_vert_table else "")
         engine_label = d.heading.split("—")[0].split("-")[0].replace("`", "").strip()
@@ -921,6 +921,27 @@ def enrich_config_keys_from_docs(
                                     default_value=default_col,
                                     directives="@type: integer",
                                     description=f"(RECTANGLE shape setting) {cols[-1]}".strip(),
+                                    project=d.project,
+                                )
+                            )
+            elif is_vert_table:
+                for key_part in key_parts:
+                    if key_part in ("maxSlope", "slopeRadius"):
+                        full_kp = f"vert.{key_part}"
+                        if (d.project, full_kp.lower()) not in existing_region_keys:
+                            existing_region_keys.add((d.project, full_kp.lower()))
+                            vert_directives = (
+                                "@type: integer; @range: [-1, null]"
+                                if key_part == "maxSlope"
+                                else "@type: integer; @range: [1, 8]"
+                            )
+                            synthesized_engine_keys.append(
+                                ConfigKeyEntry(
+                                    file_path="definitions/regions/default.yml",
+                                    key_path=full_kp,
+                                    default_value=default_col,
+                                    directives=vert_directives,
+                                    description=f"(LINEAR/JUMP vert setting) {cols[-1]}".strip(),
                                     project=d.project,
                                 )
                             )
@@ -975,9 +996,18 @@ def parse_bit_codes(
     lock_path = repo_root / lock_rel
     md_path = repo_root / doc_rel
 
+    lock_paths = [lock_path]
+    md_paths = [md_path]
+    if lock_rel == "docs/dev/bit-codes.lock" and (repo_root / "addons").is_dir():
+        lock_paths.extend(sorted((repo_root / "addons").glob("*/docs/bit-codes.lock")))
+    if doc_rel == "docs/dev/BIT_CODES.md" and (repo_root / "addons").is_dir():
+        md_paths.extend(sorted((repo_root / "addons").glob("*/docs/BIT_CODES.md")))
+
     md_details: dict[str, tuple[str, str, str]] = {}
-    if md_path.is_file():
-        for line in md_path.read_text(encoding="utf-8").splitlines():
+    for mp in md_paths:
+        if not mp.is_file():
+            continue
+        for line in mp.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if not stripped.startswith("|") or stripped.startswith("| ID ") or stripped.startswith("|---"):
                 continue
@@ -994,33 +1024,40 @@ def parse_bit_codes(
     if not lock_path.is_file():
         return results
 
-    for line in lock_path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
+    seen_codes: set[tuple[str, int]] = set()
+    for lp in lock_paths:
+        if not lp.is_file():
             continue
-        parts = stripped.split()
-        if len(parts) < 4:
-            continue
-        namespace, id_str, key, severity = parts[0], parts[1], parts[2], parts[3]
-        code_id = int(id_str)
-        tier, subsystem, remediation = md_details.get(
-            key,
-            ("PBIT", namespace.lower(), "Inspect the BIT finding details and configuration."),
-        )
-        summary = f"{namespace}-{code_id:04d} {key} ({severity}, {tier}, subsystem: {subsystem})"
-        results.append(
-            BitCodeEntry(
-                namespace=namespace,
-                id=code_id,
-                key=key,
-                severity=severity,
-                tier=tier,
-                subsystem=subsystem,
-                summary=summary,
-                remediation=remediation,
-                project=project,
+        for line in lp.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            parts = stripped.split()
+            if len(parts) < 4:
+                continue
+            namespace, id_str, key, severity = parts[0], parts[1], parts[2], parts[3]
+            code_id = int(id_str)
+            if (namespace, code_id) in seen_codes:
+                continue
+            seen_codes.add((namespace, code_id))
+            tier, subsystem, remediation = md_details.get(
+                key,
+                ("PBIT", namespace.lower(), "Inspect the BIT finding details and configuration."),
             )
-        )
+            summary = f"{namespace}-{code_id:04d} {key} ({severity}, {tier}, subsystem: {subsystem})"
+            results.append(
+                BitCodeEntry(
+                    namespace=namespace,
+                    id=code_id,
+                    key=key,
+                    severity=severity,
+                    tier=tier,
+                    subsystem=subsystem,
+                    summary=summary,
+                    remediation=remediation,
+                    project=project,
+                )
+            )
     return results
 
 

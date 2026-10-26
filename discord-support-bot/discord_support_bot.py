@@ -1252,8 +1252,8 @@ def inspect_diagnostics(
     tst_pat = prompts.get("test_pattern") or (
         rf"(?i)(?:/(?:rtp|ops|sleep|treegen|{re.escape(proj)})\s+test\b|"
         r"\[(?:rtp|ops|treegen)\s+bit\]|"
-        r"\b(?:ACTION|BIT|HEATMAP|PROBE|RTP|TEST|OPS|TREEGEN)[-_]\d{1,4}\b)|"
-        r"(?<!%)(?-i:\b(?:RTP|OPS|TREEGEN)_[A-Z0-9_]+\b)"
+        r"\b(?:ACTADDON|ACTION|BIT|CLAIM|GOVERNOR|HEATMAP|PROBE|RTP|TEST|OPS|TREEGEN)[-_]\d{1,4}\b)|"
+        r"(?<!%)(?-i:\b(?:RTP|ACTADDON|CLAIM|OPS|TREEGEN)_[A-Z0-9_]+\b)"
     )
 
     has_rtp_version = bool(re.search(ver_pat, combined))
