@@ -167,7 +167,7 @@ class FactoryValueCoverageTest {
 
         cloned.set(KeysWithName.radius, 999);
         assertNotEquals(a, cloned);
-        assertNotEquals(a, "not a FactoryValue");
+        assertFalse(a.equals("not a FactoryValue"));
         assertNotEquals(a, child);
 
         EnumMap<KeysWithoutName, Object> replaced = new EnumMap<>(KeysWithoutName.class);

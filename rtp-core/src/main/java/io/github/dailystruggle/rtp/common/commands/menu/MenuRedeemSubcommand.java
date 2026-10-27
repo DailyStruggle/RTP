@@ -291,12 +291,13 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      * Must be S-005 async safe (use EntityScheduler on Folia).
      */
     @FunctionalInterface
-    public interface AnvilInputOpener {
+    public interface AnvilInputOpener extends io.github.dailystruggle.menu.api.AnvilInputOpener {
         /**
          * RUN-only entrypoint. Simple test scaffolds can target this 4-arg SAM shape.
          *
          * @return {@code true} if opened, {@code false} if refused (S-004 reject path).
          */
+        @Override
         boolean open(UUID viewer,
                      java.util.List<String> parentPath,
                      String paramName,
@@ -316,6 +317,21 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return open(viewer, parentPath, paramName, prefill);
         }
 
+        @Override
+        default boolean open(UUID viewer,
+                             java.util.List<String> parentPath,
+                             String paramName,
+                             String prefill,
+                             io.github.dailystruggle.menu.api.MenuAction.Mode mode,
+                             @Nullable io.github.dailystruggle.menu.api.AnvilInputOpener.StagingSink sink) {
+            MenuAction.Mode mappedMode =
+                    (mode == io.github.dailystruggle.menu.api.MenuAction.Mode.STAGE)
+                            ? MenuAction.Mode.STAGE
+                            : MenuAction.Mode.RUN;
+            CartSink mappedSink = (sink != null) ? sink::stage : null;
+            return open(viewer, parentPath, paramName, prefill, mappedMode, mappedSink);
+        }
+
         /**
          * Bind the {@link CartSink} this opener should invoke on STAGE-mode
          * confirm. Wiring code (e.g. {@code RTPCmdBukkit#selectAnvilOpener})
@@ -327,6 +343,12 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         default void setCartSink(@Nullable CartSink sink) {
             // no-op; override on implementations that support STAGE mode.
         }
+
+        @Override
+        default void setStagingSink(
+                @Nullable io.github.dailystruggle.menu.api.AnvilInputOpener.StagingSink sink) {
+            setCartSink(sink != null ? sink::stage : null);
+        }
     }
 
     /**
@@ -337,7 +359,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
      * reference to the platform {@link AnvilInputOpener} at plugin enable.
      */
     @FunctionalInterface
-    public interface CartSink {
+    public interface CartSink extends io.github.dailystruggle.menu.api.AnvilInputOpener.StagingSink {
         /**
          * Add (or replace) a staged {@code paramName=value} entry in
          * {@code viewer}'s cart for {@code fileName}. Replaces the cart
@@ -345,6 +367,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
          * record (cart is scoped to one file at a time, per the staging-cart
          * design). Safe to call from any thread.
          */
+        @Override
         void stage(UUID viewer, String fileName, String paramName, String value);
     }
 
@@ -1686,7 +1709,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         }
         if (keys == null || keys.isEmpty()) return java.util.List.of();
         java.util.List<String> out = new java.util.ArrayList<>(keys);
-        java.util.Collections.sort(out);
+        out.sort(null);
         return out;
     }
 

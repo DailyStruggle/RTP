@@ -9,6 +9,9 @@ package io.github.dailystruggle.mapsapi;
  * subsequent calls are no-ops. {@link #cancelled()} shall return {@code true}
  * immediately after the first {@code cancel()} call regardless of whether the
  * underlying release has completed.
+ *
+ * @governedBy ADR-053
+ * @governedBy ADR-115
  */
 public interface Cancellation {
 

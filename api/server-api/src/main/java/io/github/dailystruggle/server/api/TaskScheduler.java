@@ -4,6 +4,9 @@ import java.util.Objects;
 
 /**
  * Platform-neutral scheduling and region-thread ownership contract (ADR-116).
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
  */
 public interface TaskScheduler {
   /**

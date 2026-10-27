@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Test;
  * stays authoritative; this layer can only skip candidates).
  */
 @Tag("slow")
-public class MountainsideDetectionMeasurementTest {
+class MountainsideDetectionMeasurementTest {
 
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$");
   private static final Path REGION_DIR = Path.of(System.getProperty("rtp.elevation.regionDir",
@@ -84,7 +84,7 @@ public class MountainsideDetectionMeasurementTest {
 
   @Test
   @DisplayName("ADR-119: mountainside (>=30 deg in >=4 of 8 directions) detection from sparse chunk floors")
-  public void measureMountainsideDetection() throws Exception {
+  void measureMountainsideDetection() throws Exception {
     Assumptions.assumeTrue(Files.isDirectory(REGION_DIR), "reference save not present");
     long t0 = System.nanoTime();
     Grid truthGrid = scan();
@@ -449,7 +449,8 @@ public class MountainsideDetectionMeasurementTest {
     }
     double loadsBase = n / (double) Math.max(1, neg);
     double loadsWith = (neg - negRej) == 0 ? Double.POSITIVE_INFINITY : (n - rej) / (double) (neg - negRej);
-    System.out.printf("[DEBUG_LOG] %-" + nameWidth + "s %7.2f%% %7.1f%% %8.1f%% %8.2f%% %8.2f%% %9.1f%% %9.1f%%%n", name,
+    String format = "[DEBUG_LOG] %-" + nameWidth + "s %7.2f%% %7.1f%% %8.1f%% %8.2f%% %8.2f%% %9.1f%% %9.1f%%%n";
+    System.out.printf(format, name,
         100.0 * rej / n, 100.0 * caught / Math.max(1, pos), 100.0 * caught / Math.max(1, rej),
         100.0 * negRej / Math.max(1, neg), 100.0 * (1 - loadsWith / loadsBase),
         100.0 * fpFlat / Math.max(1, negRej), 100.0 * fpNear / Math.max(1, negRej));

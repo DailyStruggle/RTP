@@ -13,6 +13,10 @@ import java.util.function.Consumer;
  * Common abstract base command for Setup Wizard steps.
  * Encapsulates session registry, book builder, and menu renderer dependencies,
  * standard permission checking, and stage update execution.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-050
+ * @governedBy ADR-115
  */
 public abstract class AbstractSetupStepCmd extends BaseRTPCmdImpl {
 

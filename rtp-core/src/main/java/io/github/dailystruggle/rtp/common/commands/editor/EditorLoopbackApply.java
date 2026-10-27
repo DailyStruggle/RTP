@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopback
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -203,7 +202,7 @@ public final class EditorLoopbackApply implements EditorLoopbackChannel.ApplyHan
      */
     public static String payloadJson(Map<String, String> files, Long timestamp) {
         List<String> keys = new ArrayList<>(files.keySet());
-        Collections.sort(keys);
+        keys.sort(null);
         StringBuilder sb = new StringBuilder("{\"version\":1,\"pluginVersion\":\"loopback\",\"sha256\":\"")
                 .append(EditorSessionManager.computeCanonicalFilesSha256(files)).append("\",\"timestamp\":")
                 .append(timestamp == null ? 0L : timestamp).append(",\"files\":{");

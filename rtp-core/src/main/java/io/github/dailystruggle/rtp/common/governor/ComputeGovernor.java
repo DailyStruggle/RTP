@@ -242,7 +242,7 @@ public final class ComputeGovernor {
     }
 
     /**
-     * Counts the number of driving telemetry signals currently in {@link ComputeSignals.SignalHealth#STALE}
+     * Counts the number of driving telemetry signals currently in {@link SignalState#STALE}
      * state (ADR-087 Section 6.3 {@code rtp_governor_stale_signals}).
      */
     public int staleSignalsCount() {
@@ -359,13 +359,19 @@ public final class ComputeGovernor {
      */
     public void recordEvaluationFailure(long nowNanos, Throwable t) {
         evaluationFailures.incrementAndGet();
-        String msg = t != null && t.getMessage() != null ? t.getMessage() : (t != null ? t.getClass().getSimpleName() : "unknown");
+        String msg;
+        if (t == null) {
+            msg = "unknown";
+        } else if (t.getMessage() != null) {
+            msg = t.getMessage();
+        } else {
+            msg = t.getClass().getSimpleName();
+        }
         lastFailureMessage.set(msg);
         long lastLog = lastEvalFailureLogNanos.get();
-        if (lastLog == Long.MIN_VALUE || nowNanos - lastLog >= LOG_COOLDOWN_NANOS) {
-            if (lastEvalFailureLogNanos.compareAndSet(lastLog, nowNanos)) {
-                RTPRuntime.log(Level.WARNING, "[RTP] ComputeGovernor evaluation failed; keeping previous budget snapshot: " + msg, t);
-            }
+        if ((lastLog == Long.MIN_VALUE || nowNanos - lastLog >= LOG_COOLDOWN_NANOS)
+                && lastEvalFailureLogNanos.compareAndSet(lastLog, nowNanos)) {
+            RTPRuntime.log(Level.WARNING, "[RTP] ComputeGovernor evaluation failed; keeping previous budget snapshot: " + msg, t);
         }
     }
 
@@ -504,7 +510,7 @@ public final class ComputeGovernor {
         boolean asyncStale = signals.processCpuLoad().isStale() || signals.rtpAsyncCpuShare().isStale();
         boolean asyncNeverSampled = signals.processCpuLoad().isNeverSampled() && !tickStall;
         asyncLimiter.evaluate(aCfg, asyncBreach, asyncLag, asyncStale, asyncNeverSampled, nowNanos);
-        double fA = clamp(asyncLimiter.rawLimit() / (double) aCfg,
+        double fA = clamp(asyncLimiter.rawLimit() / aCfg,
                 (double) Math.min(ONE_MS_NANOS, aCfg) / (double) aCfg,
                 1.0);
 
@@ -525,7 +531,7 @@ public final class ComputeGovernor {
             } else {
                 double syncModelTarget = Double.isNaN(bCpuMs)
                         ? (double) sCfg
-                        : clamp(bCpuMs * 1_000_000.0, (double) Math.min(ONE_MS_NANOS, sCfg), (double) sCfg);
+                        : clamp(bCpuMs * 1_000_000.0, Math.min(ONE_MS_NANOS, sCfg), sCfg);
                 double pubSync = syncLimiter.evaluate(syncModelTarget, syncBreach, syncLag, tickStale, syncNeverSampled, nowNanos);
                 sEff = clampLong(Math.round(pubSync), Math.min(ONE_MS_NANOS, sCfg), sCfg);
                 if (sEff >= sCfg) {
@@ -541,9 +547,9 @@ public final class ComputeGovernor {
         }
 
         // 6. Deliverable demand d_bar_r, target unit rate r*, water-filling x_r, and credit c_r (Section 4.3 item 1)
-        double deltaTAsync = Math.max(1_000.0, resolveDeltaTAsyncNanos(aCfg, promCfg));
-        double deltaTTick = resolveDeltaTTickNanos();
-        int uMax = Math.max(1, (int) Math.floor((double) aCfg / deltaTAsync));
+        double deltaTAsyncNanos = Math.max(1_000.0, resolveDeltaTAsyncNanos(aCfg, promCfg));
+        double deltaTTickNanos = resolveDeltaTTickNanos();
+        int uMax = Math.max(1, (int) Math.floor(aCfg / deltaTAsyncNanos));
 
         Map<String, Double> deliverableDemands = new LinkedHashMap<>();
         Map<String, Double> weights = new LinkedHashMap<>();
@@ -558,7 +564,7 @@ public final class ComputeGovernor {
         boolean effectiveAttribution = useConsumerAttribution();
 
         for (ComputeSignals.RegionDemand rd : signals.regions().values()) {
-            double dBar = Math.min(rd.consumptionRatePerTick() + ((double) rd.deficit() / (double) periodCfg), (double) uMax);
+            double dBar = Math.min(rd.consumptionRatePerTick() + ((double) rd.deficit() / (double) periodCfg), uMax);
             if (Double.isNaN(dBar) || dBar < 0.0) dBar = 0.0;
             deliverableDemands.put(rd.region(), dBar);
             sumDeliverableDemand += dBar;
@@ -577,10 +583,10 @@ public final class ComputeGovernor {
         }
 
         double aHatBg = resolveEstimatedBgAsyncNanos(aCfg);
-        double asyncRateCap = aHatBg / deltaTAsync;
+        double asyncRateCap = aHatBg / deltaTAsyncNanos;
         double tickRateCap = Double.POSITIVE_INFINITY;
-        if (!signals.regionalTicking() && !Double.isNaN(bCpuMs) && deltaTTick >= 1_000.0) {
-            tickRateCap = (bCpuMs < 1.0) ? 0.0 : ((bCpuMs * 1_000_000.0) / deltaTTick);
+        if (!signals.regionalTicking() && !Double.isNaN(bCpuMs) && deltaTTickNanos >= 1_000.0) {
+            tickRateCap = (bCpuMs < 1.0) ? 0.0 : ((bCpuMs * 1_000_000.0) / deltaTTickNanos);
         }
 
         double rStar;
@@ -618,7 +624,7 @@ public final class ComputeGovernor {
         for (ComputeSignals.RegionDemand rd : signals.regions().values()) {
             String rName = rd.region();
             double xR = plannedRates.getOrDefault(rName, 0.0);
-            double bR = (xR > 0.0) ? Math.max(1.0, xR * (double) periodCfg) : 0.0;
+            double bR = (xR > 0.0) ? Math.max(1.0, xR * periodCfg) : 0.0;
             RegionState prev = regionStates.get(rName);
             double cR;
             int prevHotCap;
@@ -660,8 +666,8 @@ public final class ComputeGovernor {
             publishedAsyncNanos.set(aEff);
             asyncWasIdle.set(true);
         } else {
-            double rawTarget = Math.min((double) aCfg,
-                    Math.max((double) floorAsync, ASYNC_PLAN_MARGIN * Math.ceil(rStar) * deltaTAsync));
+            double rawTarget = Math.min(aCfg,
+                    Math.max(floorAsync, ASYNC_PLAN_MARGIN * Math.ceil(rStar) * deltaTAsyncNanos));
             long targetNanos = clampLong(Math.round(rawTarget), floorAsync, aCfg);
             boolean wasIdle = asyncWasIdle.getAndSet(false);
             long prevPub = publishedAsyncNanos.get();
@@ -699,8 +705,8 @@ public final class ComputeGovernor {
             pEff = 0;
             promotionsReason = syncReason;
         } else {
-            double deltaTProm = Math.max(1_000.0, resolveDeltaTPromNanos(sCfg, promCfg));
-            long rawP = (long) Math.floor((double) sEff / ((double) Math.max(1, regionsWithDemand) * deltaTProm));
+            double deltaTPromNanos = Math.max(1_000.0, resolveDeltaTPromNanos(sCfg, promCfg));
+            long rawP = (long) Math.floor(sEff / (Math.max(1, regionsWithDemand) * deltaTPromNanos));
             pEff = (int) clampLong(rawP, 1L, promCfg);
             promotionsReason = (pEff >= promCfg) ? GovernorReason.CONFIGURED : syncReason;
         }
@@ -845,11 +851,11 @@ public final class ComputeGovernor {
         double deltaMUnit = Math.max(1024.0, nChunks * mChunk);
 
         double headroomBytes = Math.max(0.0, (tHeapFrac * signals.maxHeapBytes()) - postGc.value());
-        double bMem = headroomBytes + ((double) totalCurrentHot * deltaMUnit);
+        double bMem = headroomBytes + (totalCurrentHot * deltaMUnit);
         int nTotal = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, (long) Math.floor(bMem / deltaMUnit)));
 
         double scale = hotScaleLimiter.evaluate(1.0, heapBreach, heapLag, heapStale, false, nowNanos);
-        int effectiveTotal = (int) Math.floor(Math.min((double) totalCfgHot, (double) nTotal) * scale);
+        int effectiveTotal = (int) Math.floor(Math.min(totalCfgHot, (double) nTotal) * scale);
 
         // Allocate effectiveTotal across regions honoring floor min(1, cfgCap) and idle ceiling ceil(cfgCap / 4)
         Map<String, Integer> ceilings = new LinkedHashMap<>();
@@ -876,14 +882,14 @@ public final class ComputeGovernor {
                         : rd.distinctConsumers();
                 w = (cappedPlan > 0.0) ? cappedPlan : (double) Math.max(1, nR);
             } else {
-                w = rd.consumptionRatePerTick() + ((double) rd.deficit() / 600.0);
+                w = rd.consumptionRatePerTick() + (rd.deficit() / 600.0);
             }
             weights.put(rd.region(), Math.max(0.0, w));
         }
 
         int remaining = Math.max(0, effectiveTotal - sumFloors);
         Map<String, Double> waterFilledExtras = effectiveAttribution
-                ? computeWaterFilling(extraHeadrooms, weights, (double) remaining)
+                ? computeWaterFilling(extraHeadrooms, weights, remaining)
                 : Collections.emptyMap();
         double totalWeight = 0.0;
         for (double w : weights.values()) totalWeight += w;
@@ -986,7 +992,7 @@ public final class ComputeGovernor {
         ComputeBudget cur = this.currentBudget;
         long aCfg = cur.configuredAsyncNanos();
         int promCfg = cur.configuredPromotionsPerTurn();
-        int uMax = Math.max(1, (int) Math.floor((double) aCfg / Math.max(1_000.0, resolveDeltaTAsyncNanos(aCfg, promCfg))));
+        int uMax = Math.max(1, (int) Math.floor(aCfg / Math.max(1_000.0, resolveDeltaTAsyncNanos(aCfg, promCfg))));
         int nextU = Math.min((int) Math.floor(nextCredit), uMax);
         Map<String, Integer> nextUnits = new LinkedHashMap<>(cur.regionUnitsPerTurn());
         nextUnits.put(region, Math.max(0, nextU));
@@ -1042,7 +1048,7 @@ public final class ComputeGovernor {
      * @return available nanoseconds for background async work in this pulse (0 if exhausted or in debt)
      */
     public long beginBackgroundAsyncPhase(long remainderOfConfiguredNanos) {
-        double sample = Math.max(0.0, (double) remainderOfConfiguredNanos);
+        double sample = Math.max(0.0, remainderOfConfiguredNanos);
         bgAsyncRemainder.recordSample(sample);
         ComputeBudget b = this.currentBudget;
         long aEff = b.backgroundAsyncNanos();
@@ -1176,12 +1182,12 @@ public final class ComputeGovernor {
      */
     public void recordPromotionTickCost(long tickDurationNanos) {
         if (tickDurationNanos < 0L) return;
-        deltaTProm.recordSample((double) tickDurationNanos);
+        deltaTProm.recordSample(tickDurationNanos);
         double curTick = deltaTTick.mean();
         if (Double.isNaN(curTick) || curTick <= 0.0) {
-            deltaTTick.recordSample((double) tickDurationNanos);
+            deltaTTick.recordSample(tickDurationNanos);
         } else {
-            deltaTTick.recordSample(0.5 * (double) tickDurationNanos);
+            deltaTTick.recordSample(0.5 * tickDurationNanos);
         }
     }
 
@@ -1378,9 +1384,9 @@ public final class ComputeGovernor {
     private double resolveEstimatedBgAsyncNanos(long aCfg) {
         double v = bgAsyncRemainder.mean();
         if (Double.isNaN(v) || v < 0.0) {
-            return (double) aCfg;
+            return aCfg;
         }
-        return Math.min((double) aCfg, v);
+        return Math.min(aCfg, v);
     }
 
     private static double clamp(double v, double min, double max) {

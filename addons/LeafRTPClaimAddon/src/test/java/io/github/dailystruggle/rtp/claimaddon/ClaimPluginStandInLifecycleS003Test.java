@@ -147,7 +147,8 @@ class ClaimPluginStandInLifecycleS003Test {
     when(server.getServicesManager()).thenReturn(servicesManager);
     when(server.getWorld(WORLD)).thenReturn(world);
     // Lands registers its API against the host plugin.
-    when(pluginManager.getPlugin("RTP")).thenReturn(mock(Plugin.class));
+    Plugin rtpPlugin = mock(Plugin.class);
+    when(pluginManager.getPlugin("RTP")).thenReturn(rtpPlugin);
     setStatic(Bukkit.class, "server", server);
   }
 
@@ -390,7 +391,8 @@ class ClaimPluginStandInLifecycleS003Test {
 
   private void installWorldGuard() throws Exception {
     setStatic(WorldEditPlugin.class, "INSTANCE", mock(WorldEditPlugin.class));
-    when(pluginManager.getPlugin("WorldGuard")).thenReturn(mock(WorldGuardPlugin.class));
+    WorldGuardPlugin wgPlugin = mock(WorldGuardPlugin.class);
+    when(pluginManager.getPlugin("WorldGuard")).thenReturn(wgPlugin);
     WorldGuardPlatform platform = mock(WorldGuardPlatform.class);
     RegionContainer container = mock(RegionContainer.class);
     RegionManager regions = mock(RegionManager.class);

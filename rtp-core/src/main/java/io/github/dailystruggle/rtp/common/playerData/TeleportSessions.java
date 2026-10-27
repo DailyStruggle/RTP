@@ -23,6 +23,7 @@ public final class TeleportSessions {
       new TimeBinnedCache<>(60_000L, 120_000L);
   public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
   public final Set<UUID> queuedPlayers = ConcurrentHashMap.newKeySet();
+  @SuppressWarnings("java:S1319") // Public field type retained for binary compatibility
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
   public final ConcurrentMap<UUID, Map<String, Long>> regionTeleportTimes = new ConcurrentHashMap<>();
   /**

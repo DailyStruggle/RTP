@@ -303,11 +303,10 @@ public final class EntitySchedulerSampler {
                 probe.overruns++;
                 overrunsTotal.incrementAndGet();
             }
-            if (gap > SEVERE_BREACH_GAP_NANOS || probe.overruns >= OVERRUNS_FOR_BREACH) {
-                if (!probe.breached) {
-                    probe.breached = true;
-                    breachesTotal.incrementAndGet();
-                }
+            if ((gap > SEVERE_BREACH_GAP_NANOS || probe.overruns >= OVERRUNS_FOR_BREACH)
+                    && !probe.breached) {
+                probe.breached = true;
+                breachesTotal.incrementAndGet();
             }
         }
 

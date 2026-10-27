@@ -12,6 +12,9 @@ import java.util.function.Predicate;
 
 /**
  * a general and interchangeable command type, requiring tab completion and command execution
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
  */
 public interface CommandsAPICommand {
     String name();

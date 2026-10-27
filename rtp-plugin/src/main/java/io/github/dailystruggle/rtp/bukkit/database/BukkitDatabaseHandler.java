@@ -16,6 +16,7 @@ public class BukkitDatabaseHandler {
     private BukkitDatabaseHandler() {
     }
 
+    @SuppressWarnings("java:S1172") // rtp retained for signature compatibility
     public static void setupDatabase(RTP rtp) throws FileSystemException {
         File databaseDirectory = ActiveConfigs.get().pluginDirectory;
         databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");

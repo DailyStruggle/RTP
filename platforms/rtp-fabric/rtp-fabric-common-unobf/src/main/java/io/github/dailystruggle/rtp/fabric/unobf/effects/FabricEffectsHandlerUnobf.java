@@ -180,7 +180,7 @@ public final class FabricEffectsHandlerUnobf {
                         return null;
                     });
             register.invoke(afterDeathEvent, proxy);
-        } catch (Throwable t) {
+        } catch (Throwable _) {
             RTP.log(Level.FINE, "[RTP][Fabric] ServerLivingEntityEvents.AFTER_DEATH not available for effects");
         }
     }
@@ -304,8 +304,8 @@ public final class FabricEffectsHandlerUnobf {
                 }
                 target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
                         io.github.dailystruggle.effectsapi.fabric_unobf.FabricHandlesUnobf.wrap(handle),
-                        io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(explicitLocation),
-                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.EffectTarget.wrapLocation(destHandle) : null);
+                        explicitLocation,
+                        destHandle);
             } else {
                 target = handle;
             }

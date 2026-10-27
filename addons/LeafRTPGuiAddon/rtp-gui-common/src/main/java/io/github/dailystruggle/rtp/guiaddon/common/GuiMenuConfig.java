@@ -68,12 +68,9 @@ public final class GuiMenuConfig {
    * {@link #menuStyle()} is {@code "none"} or {@code "off"}.
    */
   public boolean openOnBareRtp() {
-    String style = menuStyle();
-    if (style != null) {
-      String trimmed = style.trim();
-      if ("none".equalsIgnoreCase(trimmed) || "off".equalsIgnoreCase(trimmed)) {
-        return false;
-      }
+    String trimmed = menuStyle().trim();
+    if ("none".equalsIgnoreCase(trimmed) || "off".equalsIgnoreCase(trimmed)) {
+      return false;
     }
     return bool(GuiMenuKeys.openOnBareRtp, Boolean.TRUE);
   }

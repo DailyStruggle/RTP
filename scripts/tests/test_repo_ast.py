@@ -127,6 +127,34 @@ class TestRepoAstCli(unittest.TestCase):
         ewma_md = repo_ast.format_search_markdown(ewma_res)
         self.assertIn("12. **`", ewma_md)
 
+        # Member-level Javadoc/comment/field harvesting surfaces inline EWMA implementations
+        # (`ScanTask`, `Region`) and collaborator consumers (`BudgetPacer`, `ComputeGovernor`).
+        ewma_all = repo_ast.query_search(self.conn, "ewma", limit=20)
+        ewma_all_names = [r["class_name"] for r in ewma_all["results"]]
+        for expected_ewma_cls in ("EwmaEstimator", "ScanTask", "Region", "BudgetPacer", "ComputeGovernor"):
+            self.assertIn(expected_ewma_cls, ewma_all_names)
+
+        # IDF-weighted query coordination demotes partial generic matches (`WeightedAverageBackendSelector`)
+        # below anchor-term EWMA classes and surfaces deduplicated `dev_sections` + `arch_sections` docs.
+        ewma_full = repo_ast.query_search(self.conn, "ewma exponential weighted moving average", limit=12)
+        full_names = [r["class_name"] for r in ewma_full["results"]]
+        if "WeightedAverageBackendSelector" in full_names:
+            w_idx = full_names.index("WeightedAverageBackendSelector")
+            for core_ewma in ("EwmaEstimator", "WorkAttributionLedger", "EwmaLinearFit", "ImmediateLoadGovernor"):
+                self.assertLess(full_names.index(core_ewma), w_idx)
+        doc_paths = [d["path"] for d in ewma_full["doc_hits"]]
+        self.assertEqual(len(doc_paths), len(set(doc_paths)), "doc_hits must be deduplicated by file path")
+        self.assertIn("api/predict-api/README.md", doc_paths)
+
+        # Call-site line numbers & invoked method hints are captured on `ast_edges` and rendered in context.
+        ctx_ewma = repo_ast.query_context(self.conn, "EwmaEstimator")
+        caller_sites = ctx_ewma["dependencies"]["inbound_caller_sites"]
+        self.assertTrue(any(s.startswith("`BudgetPacer:") and "ofTaskPipe" in s for s in caller_sites))
+        self.assertTrue(any(s.startswith("`ComputeGovernor:") and "ofAlpha" in s for s in caller_sites))
+        ctx_ewma_md = repo_ast.format_context_markdown(ctx_ewma)
+        self.assertIn("`BudgetPacer:", ctx_ewma_md)
+        self.assertIn("standardErrorSquared", ctx_ewma_md)
+
     def test_impact_analysis_and_cli_json_and_zero_stale_reads(self) -> None:
         imp = repo_ast.query_impact(self.conn, "EwmaEstimator")
         self.assertTrue(imp["found"])

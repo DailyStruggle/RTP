@@ -12,6 +12,10 @@ import java.util.Set;
  * <p>Registration takes effect at the next editor session: a session's extension list is fixed
  * when its snapshot is built. Unregistering closes the extension's part of any open session and
  * drops its inbound types from then on. Thread-safe.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface EditorExtensionRegistry {

@@ -11,6 +11,9 @@ import java.util.regex.Pattern;
 /**
  * Converts MiniMessage color/format markup (named colors, hex, tags, gradients)
  * into legacy {@code &}-prefixed codes for platforms without native Adventure support.
+ *
+ * @governedBy ADR-020
+ * @governedBy ADR-115
  */
 public final class MiniMessageColorExpander {
 

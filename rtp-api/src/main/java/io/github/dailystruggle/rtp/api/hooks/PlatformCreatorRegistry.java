@@ -7,6 +7,10 @@ import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 /**
  * Single-binding registry for the arrival {@linkplain PlatformCreator platform creator} (ADR-058).
  * Allows addons to override arrival structure generation. Thread-safe.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface PlatformCreatorRegistry {

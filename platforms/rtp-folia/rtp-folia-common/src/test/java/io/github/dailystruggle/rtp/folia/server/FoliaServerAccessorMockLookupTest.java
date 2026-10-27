@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
@@ -22,7 +23,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 /** {@link AbstractFoliaServerAccessor} resolves registered BIT mocks before native lookup (ADR-121). */
 class FoliaServerAccessorMockLookupTest {
@@ -39,7 +39,7 @@ class FoliaServerAccessorMockLookupTest {
     Field serverField = Bukkit.class.getDeclaredField("server");
     serverField.setAccessible(true);
     previousServer = (Server) serverField.get(null);
-    server = Mockito.mock(Server.class);
+    server = mock(Server.class);
     serverField.set(null, server);
     accessor = new AbstractFoliaServerAccessor() {};
   }
@@ -69,7 +69,7 @@ class FoliaServerAccessorMockLookupTest {
   @Test
   @DisplayName("ADR-121: native players still resolve natively while a mock is registered")
   void nativePlayerUnaffectedByRegisteredMock() {
-    Player alice = Mockito.mock(Player.class);
+    Player alice = mock(Player.class);
     UUID aliceId = UUID.randomUUID();
     when(alice.getUniqueId()).thenReturn(aliceId);
     when(alice.getName()).thenReturn("Alice");

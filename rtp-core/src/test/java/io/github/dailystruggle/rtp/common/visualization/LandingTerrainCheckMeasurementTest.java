@@ -49,7 +49,7 @@ import org.junit.jupiter.api.Test;
  * a partial square; directions and plane points outside the file are left out, never guessed.
  */
 @Tag("slow")
-public class LandingTerrainCheckMeasurementTest {
+class LandingTerrainCheckMeasurementTest {
 
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$");
   private static final Path REGION_DIR = Path.of(System.getProperty("rtp.elevation.regionDir",
@@ -195,7 +195,7 @@ public class LandingTerrainCheckMeasurementTest {
 
   @Test
   @DisplayName("ADR-119: block-based landing terrain checks on the pinned 5x5 chunk square")
-  public void measureLandingTerrainChecks() throws Exception {
+  void measureLandingTerrainChecks() throws Exception {
     Assumptions.assumeTrue(Files.isDirectory(REGION_DIR), "reference save not present");
     List<int[]> regions = listRegions();
     Assumptions.assumeTrue(!regions.isEmpty(), "reference save has no region files");

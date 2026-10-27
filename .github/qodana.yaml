@@ -17,28 +17,29 @@ profile:
     # Not shipped: stress/fuzz harness. Test source sets are already outside qodana.recommended.
     - group: ALL
       ignore:
-        - "helpers/StressTestRTP"
-        - "helpers/stresstest-core"
-        - "helpers/stresstest-bukkit"
-        - "helpers/stresstest-fabric"
+        - "helpers/StressTestRTP/**"
+        - "helpers/stresstest-core/**"
+        - "helpers/stresstest-bukkit/**"
+        - "helpers/stresstest-fabric/**"
     # ADR-115 invariant and traceability Javadoc tags (@governedBy, @trace, @invariant, @prohibition).
     - inspection: JavadocDeclaration
       ignore:
-        - "api"
-        - "rtp-core"
-        - "platforms"
+        - "api/**"
+        - "rtp-api/**"
+        - "rtp-core/**"
+        - "platforms/**"
     # Reflection across platform bridges and NMS accessors is audited under ADR-026.
     - inspection: JavaReflectionMemberAccess
       ignore:
-        - "platforms"
+        - "platforms/**"
     - inspection: JavaReflectionInvocation
       ignore:
-        - "platforms"
+        - "platforms/**"
     # Bukkit MapPalette/MapView calls in maps-api.
     - inspection: Deprecation
       ignore:
-        - "api/maps-api/src"
+        - "api/maps-api/src/**"
     # Optional parameters in the proxy SPI. rtp-core hits remain visible.
     - inspection: OptionalUsedAsFieldOrParameterType
       ignore:
-        - "platforms/rtp-proxy"
+        - "platforms/rtp-proxy/**"

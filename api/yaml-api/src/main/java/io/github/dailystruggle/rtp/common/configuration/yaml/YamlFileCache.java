@@ -22,20 +22,17 @@ import org.jetbrains.annotations.Nullable;
 public class YamlFileCache implements ConfigParser.FileCacheProvider {
 
     /** Container for map reference access so {@code set()} propagates changes across holders. */
-    public final AtomicReference<Map<String, RtpYamlConfig>> cachedLookup = new AtomicReference<>();
+    public final AtomicReference<Map<String, RtpYamlConfig>> cachedLookup =
+            new AtomicReference<>(new ConcurrentHashMap<>());
 
     /** Last-observed file modification timestamps keyed by file name. */
-    public final AtomicReference<Map<String, Long>> cachedLookupLastModified = new AtomicReference<>();
+    public final AtomicReference<Map<String, Long>> cachedLookupLastModified =
+            new AtomicReference<>(new ConcurrentHashMap<>());
 
     /** Last parse error message recorded per file name when {@link #connect()} fails to load a file. */
     public final Map<String, String> lastParseErrors = new ConcurrentHashMap<>();
 
     private final File directory;
-
-    {
-        cachedLookup.set(new ConcurrentHashMap<>());
-        cachedLookupLastModified.set(new ConcurrentHashMap<>());
-    }
 
     /**
      * Constructs a file cache rooted at {@code directory}.

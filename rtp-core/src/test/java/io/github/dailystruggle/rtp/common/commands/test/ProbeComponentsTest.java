@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitHealth;
 import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.bit.BitSideEffect;
@@ -18,11 +19,18 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("REQ-API-F-009 runtime probe components")
 class ProbeComponentsTest {
+  @BeforeEach
+  void initialiseProbeOwners() {
+    RtpBitCodes.initialiseOwners(
+        List.of(TestApiCompatCmd.class, TestSchedulerCmd.class, TestEventsCmd.class));
+  }
+
   @Test
   void componentsAreRegisteredSafeAndCodesUseTheTestNamespace() throws Exception {
     assertComponent(TestApiCompatCmd.class, "api-compat");
@@ -40,7 +48,7 @@ class ProbeComponentsTest {
 
     assertEquals(BitHealth.FAILED, report.health());
     assertEquals(List.of("TEST_API_COMPAT_MISSING_METHOD", "TEST_API_COMPAT_RESOLUTION_ERROR"),
-        report.findings().stream().map(finding -> finding.code()).sorted().toList());
+        report.findings().stream().map(BitFinding::code).sorted().toList());
   }
 
   @Test
@@ -60,7 +68,7 @@ class ProbeComponentsTest {
 
     assertEquals(BitHealth.FAILED, report.health());
     assertEquals(List.of("TEST_SCHEDULER_UNAVAILABLE"),
-        report.findings().stream().map(finding -> finding.code()).toList());
+        report.findings().stream().map(BitFinding::code).toList());
   }
 
   @Test
@@ -97,7 +105,7 @@ class ProbeComponentsTest {
         .map(BitCode::id)
         .sorted()
         .toList();
-    List<Integer> actual = report.findings().stream().map(finding -> finding.codeId()).sorted().toList();
+    List<Integer> actual = report.findings().stream().map(BitFinding::codeId).sorted().toList();
     assertEquals(BitHealth.FAILED, report.health(), owner.getSimpleName());
     assertEquals(expected, actual, owner.getSimpleName());
   }
@@ -110,7 +118,7 @@ class ProbeComponentsTest {
     return (BitComponent) component;
   }
 
-  private static List<BitCode> codes(Class<?> owner) throws IllegalAccessException {
+  private static List<BitCode> codes(Class<?> owner) {
     return Arrays.stream(owner.getDeclaredFields())
         .filter(field -> field.getType() == BitCode.class)
         .map(

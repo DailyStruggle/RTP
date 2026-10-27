@@ -13,6 +13,12 @@ import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Abstract base command for {@code /rtp scan} subcommands resolving target regions.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
+ */
 public abstract class ScanSubCmd extends BaseRTPCmdImpl {
   public ScanSubCmd(@Nullable CommandsAPICommand parent) {
     super(parent);

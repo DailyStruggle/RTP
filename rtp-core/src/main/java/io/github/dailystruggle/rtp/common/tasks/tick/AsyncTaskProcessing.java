@@ -244,17 +244,17 @@ public final class AsyncTaskProcessing extends RTPRunnable {
           Region region = ActiveSelection.get().permRegionLookup.get(regionName);
           if (region == null) continue;
           try {
-            long regionBudget = (!ranAnyBg.get() && bgAvailable > 0L) ? Math.max(1L, remBg) : Math.max(0L, remBg);
+            long regionBudget = !ranAnyBg.get() ? Math.max(1L, remBg) : Math.max(0L, remBg);
             region.execute(regionBudget, ranAnyBg);
           } catch (Exception e) {
             RTPRuntime.log(Level.SEVERE, "Error executing processing for region: " + region.name, e);
           }
         }
       } else {
-        long period = Math.max(TickBudget.backgroundPeriodTicks(), (long) size);
+        long period = Math.max(TickBudget.backgroundPeriodTicks(), size);
         long interval = Math.max(period / size, 1L);
-        long turn;
-        long regionIndex;
+        long turn = -1L;
+        long regionIndex = 0L;
         try {
           stepSemaphore.acquire();
           turn = betweenStep.get() % interval;
@@ -265,7 +265,6 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           RTPRuntime.log(Level.WARNING, e.getMessage(), e);
-          return;
         } finally {
           stepSemaphore.release();
         }
@@ -282,7 +281,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
             }
             if (region != null) {
               try {
-                long regionBudget = (!ranAnyBg.get() && bgAvailable > 0L) ? Math.max(1L, remBg) : Math.max(0L, remBg);
+                long regionBudget = !ranAnyBg.get() ? Math.max(1L, remBg) : Math.max(0L, remBg);
                 region.execute(regionBudget, ranAnyBg);
               } catch (Exception e) {
                 RTPRuntime.log(Level.SEVERE, "Error executing processing for region: " + region.name, e);

@@ -8,6 +8,10 @@ import org.jetbrains.annotations.Nullable;
  * Platform-neutral representation of a command sender (player or server console).
  *
  * <p>Thread safety: calls must execute on the platform's primary command thread.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-API-F-004
  */
 public interface RTPCommandSender extends Cloneable {
   /**

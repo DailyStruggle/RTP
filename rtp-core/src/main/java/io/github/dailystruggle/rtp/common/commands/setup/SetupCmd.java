@@ -93,13 +93,11 @@ public class SetupCmd extends BaseRTPCmdImpl {
         }
 
         String radius = SetupHandlerSupport.getFirstParam(parameterValues, "radius").trim();
-        if (!radius.isEmpty()) {
-            if (!SetupSession.isValidRadius(radius)) {
-                RTPRuntime.log(Level.WARNING, "[setup] Rejected invalid radius input '" + radius + "' from caller=" + callerId);
-                SetupHandlerSupport.sendMessage(callerId,
-                        "&cInvalid radius distance: '" + radius + "'. Use a positive distance such as 2.5km, 5km, 10km, 25km, 4096b, or 500c.");
-                return false;
-            }
+        if (!radius.isEmpty() && !SetupSession.isValidRadius(radius)) {
+            RTPRuntime.log(Level.WARNING, "[setup] Rejected invalid radius input '" + radius + "' from caller=" + callerId);
+            SetupHandlerSupport.sendMessage(callerId,
+                    "&cInvalid radius distance: '" + radius + "'. Use a positive distance such as 2.5km, 5km, 10km, 25km, 4096b, or 500c.");
+            return false;
         }
 
         SetupSession session = SetupHandlerSupport.resolveSession(callerId, sessionRegistry);

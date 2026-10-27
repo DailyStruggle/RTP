@@ -1,6 +1,11 @@
 package io.github.dailystruggle.bit;
 
-/** JSON string escaping shared by the report and catalog writers. */
+/**
+ * JSON string escaping shared by the report and catalog writers.
+ *
+ * @governedBy ADR-073
+ * @governedBy ADR-115
+ */
 final class BitJson {
     private BitJson() {}
 

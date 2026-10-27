@@ -10,6 +10,9 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
  * {@link EditorExtension#pushTypes()}, the body is not a JSON object, exceeds a cap, or the
  * extension's budget refuses it. Core logs each refusal; the caller decides whether to retry.
  * Safe from any thread; never blocks.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface EditorSession {

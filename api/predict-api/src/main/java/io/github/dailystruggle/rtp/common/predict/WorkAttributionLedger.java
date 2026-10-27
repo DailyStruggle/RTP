@@ -34,7 +34,7 @@ public final class WorkAttributionLedger<K> {
     public static final long DEFAULT_LONG_HALF_LIFE_NANOS = TimeUnit.MINUTES.toNanos(10);
 
     private static final double LN2 = Math.log(2.0);
-    private static final double NANOS_PER_MINUTE = (double) TimeUnit.MINUTES.toNanos(1);
+    private static final double NANOS_PER_MINUTE = TimeUnit.MINUTES.toNanos(1);
 
     /**
      * Immutable telemetry snapshot for a single actor's attributed cost in milliseconds per minute.
@@ -128,8 +128,8 @@ public final class WorkAttributionLedger<K> {
         this.idleExpiryNanos = idleExpiryNanos;
         this.shortHalfLifeNanos = shortHalfLifeNanos;
         this.longHalfLifeNanos = longHalfLifeNanos;
-        this.shortRateGain = LN2 / ((double) shortHalfLifeNanos / NANOS_PER_MINUTE);
-        this.longRateGain = LN2 / ((double) longHalfLifeNanos / NANOS_PER_MINUTE);
+        this.shortRateGain = LN2 / (shortHalfLifeNanos / NANOS_PER_MINUTE);
+        this.longRateGain = LN2 / (longHalfLifeNanos / NANOS_PER_MINUTE);
         this.comparatorTieBreaker = comparatorTieBreaker != null
                 ? comparatorTieBreaker
                 : Comparator.comparing(String::valueOf);
@@ -194,7 +194,7 @@ public final class WorkAttributionLedger<K> {
         if (actorId == null) {
             return;
         }
-        double costMs = Math.max(0.0, (double) costNanos / 1_000_000.0);
+        double costMs = Math.max(0.0, costNanos / 1_000_000.0);
         AtomicReference<ActorState> slot = actorCosts.get(actorId);
         if (slot == null) {
             evictExpiredActors(nowNanos);
@@ -203,11 +203,7 @@ public final class WorkAttributionLedger<K> {
                     break;
                 }
             }
-            ActorState initial = new ActorState(
-                    costMs * shortRateGain,
-                    costMs * longRateGain,
-                    nowNanos
-            );
+            ActorState initial = newInitialActorState(costMs, nowNanos);
             AtomicReference<ActorState> created = new AtomicReference<>(initial);
             AtomicReference<ActorState> existing = actorCosts.putIfAbsent(actorId, created);
             if (existing == null) {
@@ -219,27 +215,33 @@ public final class WorkAttributionLedger<K> {
 
         while (true) {
             ActorState prev = slot.get();
-            ActorState next;
-            if (prev == null || (nowNanos >= prev.lastUpdatedNanos()
-                    && (nowNanos - prev.lastUpdatedNanos()) > idleExpiryNanos)) {
-                next = new ActorState(
-                        costMs * shortRateGain,
-                        costMs * longRateGain,
-                        nowNanos
-                );
-            } else {
-                long dtNanos = Math.max(0L, nowNanos - prev.lastUpdatedNanos());
-                double decayShort = (dtNanos == 0L) ? 1.0 : Math.pow(0.5, (double) dtNanos / (double) shortHalfLifeNanos);
-                double decayLong = (dtNanos == 0L) ? 1.0 : Math.pow(0.5, (double) dtNanos / (double) longHalfLifeNanos);
-                double nextShort = prev.shortEwmaMsPerMin() * decayShort + costMs * shortRateGain;
-                double nextLong = prev.longEwmaMsPerMin() * decayLong + costMs * longRateGain;
-                long nextTime = Math.max(prev.lastUpdatedNanos(), nowNanos);
-                next = new ActorState(nextShort, nextLong, nextTime);
-            }
+            ActorState next = computeNextActorState(prev, costMs, nowNanos);
             if (slot.compareAndSet(prev, next)) {
                 break;
             }
         }
+    }
+
+    private ActorState newInitialActorState(double costMs, long nowNanos) {
+        return new ActorState(
+                costMs * shortRateGain,
+                costMs * longRateGain,
+                nowNanos
+        );
+    }
+
+    private ActorState computeNextActorState(ActorState prev, double costMs, long nowNanos) {
+        if (prev == null || (nowNanos >= prev.lastUpdatedNanos()
+                && (nowNanos - prev.lastUpdatedNanos()) > idleExpiryNanos)) {
+            return newInitialActorState(costMs, nowNanos);
+        }
+        long dtNanos = Math.max(0L, nowNanos - prev.lastUpdatedNanos());
+        double decayShort = (dtNanos == 0L) ? 1.0 : Math.pow(0.5, (double) dtNanos / (double) shortHalfLifeNanos);
+        double decayLong = (dtNanos == 0L) ? 1.0 : Math.pow(0.5, (double) dtNanos / (double) longHalfLifeNanos);
+        double nextShort = prev.shortEwmaMsPerMin() * decayShort + costMs * shortRateGain;
+        double nextLong = prev.longEwmaMsPerMin() * decayLong + costMs * longRateGain;
+        long nextTime = Math.max(prev.lastUpdatedNanos(), nowNanos);
+        return new ActorState(nextShort, nextLong, nextTime);
     }
 
     /**
@@ -293,7 +295,7 @@ public final class WorkAttributionLedger<K> {
         if (active.isEmpty()) {
             return Collections.emptyList();
         }
-        active.sort(Comparator.comparingDouble((AttributionEntry<K> e) -> e.costMsPerMin()).reversed()
+        active.sort(Comparator.comparingDouble(AttributionEntry<K>::costMsPerMin).reversed()
                 .thenComparing(AttributionEntry::actorId, comparatorTieBreaker));
         int count = Math.min(limit, active.size());
         List<R> out = new ArrayList<>(count);
@@ -313,7 +315,7 @@ public final class WorkAttributionLedger<K> {
         }
         active.sort(Comparator.comparingDouble(AttributionEntry::costMsPerMin));
         long rank = (long) Math.ceil(0.99 * active.size()) - 1L;
-        int idx = (int) Math.min((long) active.size() - 1L, Math.max(0L, rank));
+        int idx = (int) Math.min(active.size() - 1L, Math.max(0L, rank));
         return active.get(idx).costMsPerMin();
     }
 

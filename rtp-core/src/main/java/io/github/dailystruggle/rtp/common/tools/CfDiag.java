@@ -10,6 +10,9 @@ import java.util.logging.Level;
 /**
  * Diagnostic allocation and dispatch counters for CompletableFuture pipeline profiling.
  * Thread-safe {@link LongAdder} counters with periodic async logging under {@code [RTP][CFDIAG]}.
+ *
+ * @governedBy ADR-087
+ * @governedBy ADR-115
  */
 public final class CfDiag {
 

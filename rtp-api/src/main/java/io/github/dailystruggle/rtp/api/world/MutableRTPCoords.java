@@ -7,6 +7,8 @@ package io.github.dailystruggle.rtp.api.world;
  * Thread safety: not thread-safe; confine to generation thread until {@link #toImmutable()}.
  *
  * @see RTPCoords
+ * @governedBy ADR-001
+ * @governedBy ADR-115
  */
 public class MutableRTPCoords {
     public String worldName;

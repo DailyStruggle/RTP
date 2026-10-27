@@ -6,6 +6,10 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
  * Platform-agnostic lifecycle contract for RTP addons loaded via {@link java.util.ServiceLoader}.
  * {@link #onLoad} is invoked after core delegates are fully initialised.
  * Non-blocking off-thread execution (S-004, S-005).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface RTPAddon {

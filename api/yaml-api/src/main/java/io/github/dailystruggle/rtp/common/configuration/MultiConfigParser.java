@@ -52,10 +52,6 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     return defaultCanCreateDynamicParser;
   }
 
-  private static void log(Level level, String message) {
-    ServerAccessors.log(level, message);
-  }
-
   private static void log(Level level, String message, Throwable throwable) {
     ServerAccessors.log(level, message, throwable);
   }

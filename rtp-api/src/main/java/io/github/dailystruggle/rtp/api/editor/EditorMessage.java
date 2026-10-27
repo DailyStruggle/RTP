@@ -7,6 +7,9 @@ import java.util.Map;
 /**
  * A verified page message for one extension (ADR-107 §5.5): signed by a trusted browser key,
  * of a type the extension declared in {@link EditorExtension#inboundTypes()}.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface EditorMessage {

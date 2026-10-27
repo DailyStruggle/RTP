@@ -28,6 +28,9 @@ import java.util.UUID;
  * propagating; the registry in {@code MapDispatch} additionally catches and
  * logs any unexpected throwable so one misbehaving binding never poisons
  * another's notification.
+ *
+ * @governedBy ADR-053
+ * @governedBy ADR-115
  */
 public interface MapBindingLifecycle {
 

@@ -7,6 +7,10 @@ import java.util.OptionalInt;
  *
  * <p>Implements {@link io.github.dailystruggle.rtp.anvil.ChunkColumnProbe} from {@code anvil-api}
  * for seamless compatibility across platform-neutral anvil readers and RTP world APIs.
+ *
+ * @governedBy ADR-016
+ * @governedBy ADR-115
+ * @invariant S-005: Offline column inspection without main-thread chunk loads
  */
 public interface ChunkColumnProbe extends io.github.dailystruggle.rtp.anvil.ChunkColumnProbe {
 

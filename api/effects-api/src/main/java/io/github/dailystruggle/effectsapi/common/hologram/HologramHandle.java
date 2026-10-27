@@ -6,6 +6,9 @@ import java.util.List;
 
 /**
  * Handle to an active platform-rendered hologram / floating text display entity.
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
  */
 public interface HologramHandle extends AutoCloseable {
 

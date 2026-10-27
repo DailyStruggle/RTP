@@ -55,9 +55,14 @@ public final class TickBudget {
           TemporalUnit.TICK, TemporalUnit.TICK, DEFAULT_PERIOD_TICKS);
       periodTicks = Math.max(1L, p);
       Object rawAutoTune = perf.getConfigValue(PerformanceKeys.autoTune, DEFAULT_AUTO_TUNE);
-      boolean at = (rawAutoTune instanceof Boolean b)
-          ? b
-          : (rawAutoTune == null ? DEFAULT_AUTO_TUNE : Boolean.parseBoolean(rawAutoTune.toString()));
+      boolean at;
+      if (rawAutoTune instanceof Boolean b) {
+        at = b;
+      } else if (rawAutoTune == null) {
+        at = DEFAULT_AUTO_TUNE;
+      } else {
+        at = Boolean.parseBoolean(rawAutoTune.toString());
+      }
       autoTuneState = at ? 1 : 0;
     } catch (Throwable t) {
       clear();

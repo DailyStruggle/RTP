@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -123,7 +122,7 @@ public final class RegionCacheKey {
       for (Object o : (Iterable<?>) value) {
         items.add(o == null ? "" : o.toString().trim().toLowerCase());
       }
-      Collections.sort(items);
+      items.sort(null);
       return "[" + String.join(",", items) + "]";
     }
     return value.toString().trim().toLowerCase();
@@ -135,7 +134,7 @@ public final class RegionCacheKey {
     if (data == null || data.isEmpty()) return;
     List<String> keys = new ArrayList<>(data.size());
     for (E key : data.keySet()) keys.add(key.name());
-    Collections.sort(keys);
+    keys.sort(null);
     for (String k : keys) {
       // Round-trip through name() to look up the enum in a type-safe way without exposing E.
       Object value = null;

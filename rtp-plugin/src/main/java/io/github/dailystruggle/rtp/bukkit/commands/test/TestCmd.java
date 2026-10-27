@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.bit.BitComponent;
 import io.github.dailystruggle.bit.BitSelector;
 import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
@@ -92,7 +93,7 @@ public class TestCmd extends BaseRTPCmdImpl {
           @Override
           public Set<String> values() {
             return RtpBit.RUNNER.components().stream()
-                .map(component -> component.subsystem())
+                .map(BitComponent::subsystem)
                 .filter(value -> !value.isBlank())
                 .collect(Collectors.toSet());
           }
@@ -131,9 +132,9 @@ public class TestCmd extends BaseRTPCmdImpl {
     // platform, so Fabric and NeoForge list them in status/all without class-load side effects.
     RtpBitCodes.initialiseOwners(
         getCommandLookup().values().stream()
-            .<Class<?>>map(child -> child.getClass())
+            .<Class<?>>map(Object::getClass)
             .distinct()
-            .collect(Collectors.toList()));
+            .toList());
   }
 
   /**

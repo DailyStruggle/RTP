@@ -9,6 +9,10 @@ import java.util.Objects;
  * <p>Structure: a book has a {@link #title()} plus an ordered list of
  * {@link Page pages}; each page is an ordered list of {@link Line lines};
  * each line is an ordered list of {@link Fragment fragments}.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-044
+ * @governedBy ADR-115
  */
 public class BookSpec {
 

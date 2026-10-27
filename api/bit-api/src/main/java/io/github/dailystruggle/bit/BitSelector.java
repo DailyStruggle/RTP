@@ -3,7 +3,12 @@ package io.github.dailystruggle.bit;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Parsed component, tier, subsystem, or safe-component selector. */
+/**
+ * Parsed component, tier, subsystem, or safe-component selector.
+ *
+ * @governedBy ADR-073
+ * @governedBy ADR-115
+ */
 public record BitSelector(Kind kind, String value) {
     public enum Kind {
         ALL,

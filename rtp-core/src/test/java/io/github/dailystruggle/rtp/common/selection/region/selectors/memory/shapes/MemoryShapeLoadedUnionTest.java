@@ -35,7 +35,7 @@ class MemoryShapeLoadedUnionTest {
         RTPTestSetup.install(tempDir.toFile());
     }
 
-    private YamlFileDatabase wireDatabaseAccessor() throws Exception {
+    private YamlFileDatabase wireDatabaseAccessor() {
         YamlFileDatabase db = new YamlFileDatabase(tempDir.toFile());
         io.github.dailystruggle.rtp.common.database.ActiveDatabase.setAccessor(db);
         return db;

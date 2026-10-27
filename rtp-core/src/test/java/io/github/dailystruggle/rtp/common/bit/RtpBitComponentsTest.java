@@ -149,7 +149,7 @@ class RtpBitComponentsTest {
         RTPScheduler previousScheduler = RTPRuntime.scheduler();
         RTPServerAccessor previousAccessor = RTPRuntime.serverAccessor();
         Logger logger = Logger.getLogger("RTP");
-        Handler previousHandlers[] = logger.getHandlers();
+        Handler[] previousHandlers = logger.getHandlers();
         boolean useParentHandlers = logger.getUseParentHandlers();
         java.util.logging.Level previousLevel = logger.getLevel();
         CapturingHandler handler = new CapturingHandler();

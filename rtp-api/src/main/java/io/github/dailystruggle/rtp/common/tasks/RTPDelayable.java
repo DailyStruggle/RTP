@@ -6,6 +6,8 @@ package io.github.dailystruggle.rtp.common.tasks;
  * <p>Thread safety: {@link #getDelay()} and {@link #setDelay(long)} are safe from any thread.
  *
  * @see RTPRunnable
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 public interface RTPDelayable extends Runnable {
   /**

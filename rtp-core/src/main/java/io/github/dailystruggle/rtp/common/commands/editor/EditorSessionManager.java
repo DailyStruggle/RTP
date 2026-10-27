@@ -583,7 +583,7 @@ public final class EditorSessionManager {
             return EditorHttpTransport.computeSha256("{}");
         }
         java.util.List<String> sortedKeys = new java.util.ArrayList<>(files.keySet());
-        java.util.Collections.sort(sortedKeys);
+        sortedKeys.sort(null);
         StringBuilder sb = new StringBuilder("{");
         boolean first = true;
         for (String k : sortedKeys) {
@@ -650,7 +650,7 @@ public final class EditorSessionManager {
         Objects.requireNonNull(configFiles, "configFiles");
 
         java.util.List<String> sortedKeys = new java.util.ArrayList<>(configFiles.keySet());
-        java.util.Collections.sort(sortedKeys);
+        sortedKeys.sort(null);
 
         StringBuilder filesJson = new StringBuilder("{");
         boolean first = true;

@@ -24,6 +24,10 @@ import java.util.logging.Level;
 
 /**
  * Common handler utility for Setup commands to render book or console fallback.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-050
+ * @governedBy ADR-115
  */
 public final class SetupHandlerSupport {
 

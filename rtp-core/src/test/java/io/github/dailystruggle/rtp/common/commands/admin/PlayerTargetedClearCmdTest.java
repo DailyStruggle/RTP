@@ -54,7 +54,7 @@ class PlayerTargetedClearCmdTest {
     void unknownPlayer_skippedNoClear() {
         UUID known = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(known, "alice", null));
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().invulnerablePlayers.put(known, 1L);
 
         boolean handled = cmd.onCommand(RTPAPI.serverId, players("ghost"), null);
@@ -71,7 +71,7 @@ class PlayerTargetedClearCmdTest {
         UUID bId = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(aId, "alice", null));
         accessor.addPlayer(new MockRTPPlayer(bId, "bob", null));
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().invulnerablePlayers.put(aId, 1L);
         TeleportSessions.current().invulnerablePlayers.put(bId, 2L);
 
@@ -87,7 +87,7 @@ class PlayerTargetedClearCmdTest {
     void blankEntries_treatedAsGlobalFromConsole() {
         UUID a = UUID.randomUUID();
         UUID b = UUID.randomUUID();
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().invulnerablePlayers.put(a, 1L);
         TeleportSessions.current().invulnerablePlayers.put(b, 2L);
 
@@ -101,7 +101,7 @@ class PlayerTargetedClearCmdTest {
     @DisplayName("nextCommand delegation short-circuits the clear")
     void delegatesToNextCommand() {
         UUID caller = UUID.randomUUID();
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().invulnerablePlayers.put(caller, 1L);
 
         AtomicBoolean delegated = new AtomicBoolean(false);

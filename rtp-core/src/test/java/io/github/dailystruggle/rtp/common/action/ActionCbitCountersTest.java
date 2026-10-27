@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.action;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -53,7 +52,7 @@ class ActionCbitCountersTest {
   void missingExternalObjectiveReadIsCountedPerObjective() {
     UUID participant = UUID.randomUUID();
     RTPServerAccessor accessor = mock(RTPServerAccessor.class);
-    when(accessor.getScoreboardScore(eq(participant), eq("missing_objective"))).thenReturn(null);
+    when(accessor.getScoreboardScore(participant, "missing_objective")).thenReturn(null);
     RTPRuntime.setServerAccessor(accessor);
     ActionGateContext context = new ActionGateContext(
         UUID.randomUUID(), "objective_counter_test", participant, 0L, 10L, 0, true, 0.0);

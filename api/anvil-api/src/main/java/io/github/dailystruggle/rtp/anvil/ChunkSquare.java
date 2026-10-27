@@ -4,6 +4,9 @@ package io.github.dailystruggle.rtp.anvil;
  * Chunks around a centre chunk that share its region file, decoded the first time they are asked
  * for (ADR-120 terrain square). Handed to a job run by
  * {@link AnvilPrefilter#squareJobAsync}; valid only while that job runs.
+ *
+ * @governedBy ADR-016
+ * @governedBy ADR-115
  */
 public interface ChunkSquare {
 

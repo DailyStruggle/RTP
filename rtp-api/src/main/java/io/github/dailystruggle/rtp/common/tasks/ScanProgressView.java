@@ -3,6 +3,9 @@ package io.github.dailystruggle.rtp.common.tasks;
 /**
  * Tier 1 read-only interface (ADR-115 section 1) exposing scan and pregen task progress metrics
  * to tools, diagnostics, and placeholders without coupling to {@code tasks.ScanTask}.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 public interface ScanProgressView {
   /**

@@ -10,6 +10,10 @@ import java.util.concurrent.CompletableFuture;
  * <p>Abstracts over native player handles to decouple core logic from platform APIs.
  *
  * <p><b>Thread safety:</b> Main server thread only, except {@link #isOnline()}.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-API-F-004
  */
 public interface RTPPlayer extends RTPCommandSender {
   /**

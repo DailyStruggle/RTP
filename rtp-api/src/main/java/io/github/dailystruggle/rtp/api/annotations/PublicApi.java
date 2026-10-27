@@ -9,6 +9,9 @@ import java.lang.annotation.Target;
 /**
  * Marks an element as public API consumed externally (addons/adapters)
  * to document intent and prevent false-positive unused declaration warnings.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

@@ -18,6 +18,10 @@ import java.util.function.BiFunction;
 
 /**
  * Reusable validator for ADR-073 {@code @<file>} cross-file setting references (ADR-121 section 6).
+ *
+ * @governedBy ADR-073
+ * @governedBy ADR-115
+ * @governedBy ADR-121
  */
 public final class ReferenceSettingCheck {
     public static final BitCode CFG_UNKNOWN_FILE = DirectiveCodes.CFG.register(1201,
@@ -61,6 +65,7 @@ public final class ReferenceSettingCheck {
         this(referenceFiles, codes, ReferenceSettingCheck::defaultExpectedDescription);
     }
 
+    @SuppressWarnings("java:S4276") // Public API constructor accepts BiFunction<String, String, String>
     public ReferenceSettingCheck(
             Vocabulary referenceFiles,
             Codes codes,
@@ -86,7 +91,7 @@ public final class ReferenceSettingCheck {
     public static String referencedFile(Object value) {
         if (!(value instanceof String text)) return null;
         String trimmed = text.trim();
-        if (!trimmed.startsWith("@") || trimmed.length() <= 1) return null;
+        if (!trimmed.startsWith("@") || trimmed.length() == 1) return null;
         String target = trimmed.substring(1).trim().toLowerCase(Locale.ROOT);
         return target.isEmpty() ? null : target;
     }

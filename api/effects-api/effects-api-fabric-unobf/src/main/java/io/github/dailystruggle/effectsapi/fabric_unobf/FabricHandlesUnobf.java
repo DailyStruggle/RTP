@@ -187,7 +187,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
                         "Fabric-26.x", "NOTE", "unknown note instrument: " + instrument);
                 return;
             }
-            int clamped = Math.max(0, Math.min(24, tone));
+            int clamped = Math.clamp(tone, 0, 24);
             float pitch = (float) Math.pow(2.0D, (clamped - 12) / 12.0D);
             playSound(sound, 3.0f, pitch, 0.0, 0.0, 0.0);
         }
@@ -408,7 +408,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
                         "Fabric-26.x", "PARTICLE", "location particle spawn unavailable for world=" + worldName);
                 return;
             }
-            int clampedCount = Math.max(1, Math.min(256, count));
+            int clampedCount = Math.clamp(count, 1, 256);
             level.sendParticles(opts, location.x, location.y, location.z, clampedCount, dx, dy, dz, speed);
         }
 
@@ -429,7 +429,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
                         "Fabric-26.x", "NOTE", "unknown note instrument: " + instrument);
                 return;
             }
-            int clamped = Math.max(0, Math.min(24, tone));
+            int clamped = Math.clamp(tone, 0, 24);
             float pitch = (float) Math.pow(2.0D, (clamped - 12) / 12.0D);
             playSound(sound, 3.0f, pitch);
         }
@@ -479,7 +479,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
             return FabricRegistryCompat.resolve(
                     net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT,
                     net.minecraft.resources.Identifier.tryParse(id));
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return null;
         }
     }
@@ -492,9 +492,9 @@ public final class FabricHandlesUnobf implements HandleProvider {
         double dx = 0.0, dy = 1.0, dz = 0.0;
         if (data != null) {
             Object o = data.get("NUMBER");
-            if (o instanceof Number n) numFireworks = Math.max(1, Math.min(8, n.intValue()));
+            if (o instanceof Number n) numFireworks = Math.clamp(n.intValue(), 1, 8);
             o = data.get("POWER");
-            if (o instanceof Number n) power = Math.max(0, Math.min(3, n.intValue()));
+            if (o instanceof Number n) power = Math.clamp(n.intValue(), 0, 3);
             o = data.get("DX");
             if (o instanceof Number n) dx = n.doubleValue();
             o = data.get("DY");
@@ -515,13 +515,13 @@ public final class FabricHandlesUnobf implements HandleProvider {
                 if (level.addFreshEntity(rocket)) {
                     anyAdded = true;
                 }
-                if (power <= 0) {
+                if (power == 0) {
                     level.broadcastEntityEvent(rocket, (byte) 17);
                     rocket.discard();
                 }
             }
             return anyAdded;
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             return false;
         }
     }

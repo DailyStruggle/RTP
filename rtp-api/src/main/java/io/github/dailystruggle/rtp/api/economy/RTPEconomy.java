@@ -7,6 +7,9 @@ import java.util.UUID;
 /**
  * Platform-agnostic economy SPI for charges and refunds (REQ-API-ARCH-001).
  * Methods must be safe to call off the main server thread.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface RTPEconomy {

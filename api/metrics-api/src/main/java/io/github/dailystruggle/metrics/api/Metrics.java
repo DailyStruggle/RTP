@@ -25,6 +25,9 @@ import java.util.logging.Logger;
  * {@link MetricsExtension} suppliers) via the static registry methods below. The host
  * plugin's metrics aggregator (e.g. RTP's {@code CoreMetrics}) is expected to mirror its
  * own binding into this registry so cross-plugin readers see live values.
+ *
+ * @governedBy ADR-039
+ * @governedBy ADR-115
  */
 public interface Metrics {
 

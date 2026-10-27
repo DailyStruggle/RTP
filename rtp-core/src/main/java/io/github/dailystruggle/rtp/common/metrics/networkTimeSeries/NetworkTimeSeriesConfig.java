@@ -163,7 +163,7 @@ public record NetworkTimeSeriesConfig(
 
   /** @return retention horizon in seconds ({@code retentionDays * 86400L}) */
   public long retentionSeconds() {
-    return (long) retentionDays * 86_400L;
+    return retentionDays * 86_400L;
   }
 
   /** @return bucket width in seconds for {@link #tier()} (e.g. {@code 60} for {@code "24h@1m"}) */
@@ -205,17 +205,15 @@ public record NetworkTimeSeriesConfig(
     String lower = token.toLowerCase(Locale.ROOT).trim();
     long multiplier = 1L;
     String numPart = lower;
-    if (lower.endsWith("d")) {
-      multiplier = 86_400L;
-      numPart = lower.substring(0, lower.length() - 1).trim();
-    } else if (lower.endsWith("h")) {
-      multiplier = 3_600L;
-      numPart = lower.substring(0, lower.length() - 1).trim();
-    } else if (lower.endsWith("m")) {
-      multiplier = 60L;
-      numPart = lower.substring(0, lower.length() - 1).trim();
-    } else if (lower.endsWith("s")) {
-      multiplier = 1L;
+    if (lower.endsWith("d") || lower.endsWith("h") || lower.endsWith("m") || lower.endsWith("s")) {
+      char unit = lower.charAt(lower.length() - 1);
+      if (unit == 'd') {
+        multiplier = 86_400L;
+      } else if (unit == 'h') {
+        multiplier = 3_600L;
+      } else if (unit == 'm') {
+        multiplier = 60L;
+      }
       numPart = lower.substring(0, lower.length() - 1).trim();
     }
     try {

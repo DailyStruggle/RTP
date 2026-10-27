@@ -10,6 +10,9 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p>Enforces a two-phase split: asynchronous off-thread file decode ({@link #load}),
  * followed by region-thread block placement ({@link #paste}).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 public interface SchematicPaster extends PlatformCreator {
   /**

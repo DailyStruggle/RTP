@@ -13,6 +13,9 @@ import org.jetbrains.annotations.Nullable;
  * <p>All static entry points and the {@link #UNINITIALIZED} sentinel enforce the REQ-RTP-S-006
  * pre-init guard by throwing {@link IllegalStateException} when invoked before {@code rtp-core}
  * loads and registers the active publisher.
+ *
+ * @governedBy ADR-039
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface MetricTimeSeriesPublisher {

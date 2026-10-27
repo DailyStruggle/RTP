@@ -6,6 +6,10 @@ import java.util.OptionalInt;
  * Lean point-query view of a single chunk's column data (ADR-016).
  * Answers block and biome queries across a {@code [minY, maxY]} window
  * without materialising a full chunk object or triggering chunk loads.
+ *
+ * @governedBy ADR-016
+ * @governedBy ADR-115
+ * @invariant S-005: Offline region prefiltering without synchronous chunk loads
  */
 public interface ChunkColumnProbe {
 

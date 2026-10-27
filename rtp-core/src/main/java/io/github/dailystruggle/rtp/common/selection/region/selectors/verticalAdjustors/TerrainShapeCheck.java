@@ -150,21 +150,21 @@ public final class TerrainShapeCheck {
    * grid covers the square.
    */
   public static CompletableFuture<RTPChunk<?>[]> residentSquare(
-      RTPWorld<?> world, int ccx, int ccz, RTPChunk<?>[] local, int L) {
-    return residentSquare(world, ccx, ccz, local, L, 2);
+      RTPWorld<?> world, int ccx, int ccz, RTPChunk<?>[] local, int sideLen) {
+    return residentSquare(world, ccx, ccz, local, sideLen, 2);
   }
 
   /** As above, looking up only chunks within {@code radius} ({@link #SQUARE_RADIUS}). */
   public static CompletableFuture<RTPChunk<?>[]> residentSquare(
-      RTPWorld<?> world, int ccx, int ccz, RTPChunk<?>[] local, int L, int radius) {
+      RTPWorld<?> world, int ccx, int ccz, RTPChunk<?>[] local, int sideLen, int radius) {
     RTPChunk<?>[] grid = new RTPChunk<?>[SQUARE_CHUNKS * SQUARE_CHUNKS];
-    int r = (L - 1) / 2;
+    int r = (sideLen - 1) / 2;
     List<CompletableFuture<Void>> pending = new ArrayList<>();
     for (int dz = -2; dz <= 2; dz++) {
       for (int dx = -2; dx <= 2; dx++) {
         int slot = gridIndex(dx, dz);
         if (Math.abs(dx) <= r && Math.abs(dz) <= r && local != null) {
-          grid[slot] = local[(dx + r) * L + (dz + r)];
+          grid[slot] = local[(dx + r) * sideLen + (dz + r)];
         }
         if (grid[slot] == null && !(dx == 0 && dz == 0)
             && Math.abs(dx) <= radius && Math.abs(dz) <= radius) {

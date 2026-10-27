@@ -7,6 +7,10 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 /**
  * Single-binding registry for platform-agnostic {@link RTPEconomy} (ADR-026).
  * Manages active economy provider used to charge/refund teleport requests.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface EconomyProviderRegistry {

@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  * a memory table would hold: one centre floor Y per chunk, or one per-chunk relief value.
  */
 @Tag("slow")
-public class SlopeQuickRejectMeasurementTest {
+class SlopeQuickRejectMeasurementTest {
 
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$");
   private static final Path REGION_DIR = Path.of(System.getProperty("rtp.elevation.regionDir",
@@ -48,7 +48,7 @@ public class SlopeQuickRejectMeasurementTest {
 
   @Test
   @DisplayName("ADR-119: share of slope failures a chunk elevation table rejects before load, and time saved")
-  public void measureQuickReject() throws IOException {
+  void measureQuickReject() throws IOException {
     Assumptions.assumeTrue(Files.isDirectory(REGION_DIR), "reference save not present");
     AnvilReader reader = AnvilReader.INSTANCE;
     List<Sample> samples = new ArrayList<>();

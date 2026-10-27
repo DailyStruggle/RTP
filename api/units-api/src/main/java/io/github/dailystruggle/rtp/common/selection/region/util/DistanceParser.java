@@ -9,6 +9,9 @@ import java.util.regex.Pattern;
 
 /**
  * Robust parser for spatial distance values with optional unit suffixes and auto-interpretation.
+ *
+ * @governedBy ADR-027
+ * @governedBy ADR-115
  */
 public final class DistanceParser {
 

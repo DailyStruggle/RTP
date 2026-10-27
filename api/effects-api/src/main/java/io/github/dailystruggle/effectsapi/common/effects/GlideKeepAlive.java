@@ -21,6 +21,9 @@ import java.util.logging.Logger;
  * <p>Platform-neutral: each carrier wraps its player in a {@link Glider} and drives {@link #tick()}
  * from its server-tick hook. {@link #tick()} must run on the server thread; {@link #track} may run
  * on any thread.
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
  */
 public final class GlideKeepAlive {
 

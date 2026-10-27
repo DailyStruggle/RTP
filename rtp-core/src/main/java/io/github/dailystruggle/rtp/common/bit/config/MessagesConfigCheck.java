@@ -88,6 +88,7 @@ public final class MessagesConfigCheck implements ConfigOwnerCheck {
     }
 
     /** Operator file findings: canonical keys missing from, or unknown to, each on-disk message file. */
+    @SuppressWarnings("java:S1075") // Resource-snapshot paths are normalized with '/'
     public static List<BitFinding> operatorFindings(ConfigSnapshot snapshot, MessageKeyParity.ResourceReader bundled) {
         List<BitFinding> findings = new ArrayList<>();
         for (String file : MessageKeyParity.MESSAGE_FILES) {

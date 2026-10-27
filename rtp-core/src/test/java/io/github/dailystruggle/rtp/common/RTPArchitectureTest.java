@@ -34,6 +34,22 @@ public class RTPArchitectureTest {
     private static final String API_PACKAGE = "io.github.dailystruggle.rtp.api..";
 
     /**
+     * Isolates {@code rtp-core} bytecode from sibling {@code api/*} modules
+     * (such as {@code yaml-api} and {@code units-api}) that share the
+     * {@code io.github.dailystruggle.rtp.common.*} package namespace on the
+     * combined test classpath (ADR-115).
+     */
+    private static final com.tngtech.archunit.base.DescribedPredicate<JavaClass> RESIDE_IN_RTP_CORE =
+            new com.tngtech.archunit.base.DescribedPredicate<>("reside in rtp-core") {
+                @Override
+                public boolean test(JavaClass input) {
+                    return input.getSource()
+                            .map(s -> s.getUri().toString().contains("rtp-core"))
+                            .orElse(true);
+                }
+            };
+
+    /**
      * Rule 1 - Platform Decoupling (core and api).
      *
      * <p>Classes in {@code rtp-core} and {@code rtp-api} must remain strictly
@@ -306,7 +322,7 @@ public class RTPArchitectureTest {
                 .matching("io.github.dailystruggle.rtp.common.(*)..")
                 .should().beFreeOfCycles();
         try {
-            rule.check(classes);
+            rule.check(classes.that(RESIDE_IN_RTP_CORE));
             REPORT_LOG.info("[ADR-115] rtp.common package slices are cycle-free.");
         } catch (AssertionError e) {
             REPORT_LOG.info("[ADR-115 report-only] " + e.getMessage());
@@ -627,7 +643,7 @@ public class RTPArchitectureTest {
     static final ArchRule configuration_must_not_depend_on_selection_region_util =
             noClasses()
                     .that().resideInAPackage("io.github.dailystruggle.rtp.common.configuration..")
-                    .and().doNotHaveSimpleName("ConfigParser")
+                    .and(RESIDE_IN_RTP_CORE)
                     .should().dependOnClassesThat()
                     .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region.util..")
                     .because("ADR-115: selection depends on configuration in rtp-core, so core configuration must not depend back on selection.region.util.");
@@ -644,7 +660,7 @@ public class RTPArchitectureTest {
     static final ArchRule factory_must_not_depend_on_selection_or_configuration =
             noClasses()
                     .that().resideInAPackage("io.github.dailystruggle.rtp.common.factory..")
-                    .and().doNotHaveSimpleName("FactoryValue")
+                    .and(RESIDE_IN_RTP_CORE)
                     .should().dependOnClassesThat()
                     .resideInAnyPackage(
                             "io.github.dailystruggle.rtp.common.selection..",

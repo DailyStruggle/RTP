@@ -8,6 +8,9 @@ import java.util.Optional;
  *
  * <p>Preserves curated menu order across performance profiles, platform tunings,
  * and game-mode overlays.
+ *
+ * @governedBy ADR-064
+ * @governedBy ADR-115
  */
 public final class PrefabRegistry {
 

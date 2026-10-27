@@ -59,8 +59,10 @@ public class FireworkSafetyListener implements Listener {
 
         fireworkDetonations.remove(fireworkId); //remove from map to prevent recursion
         Location location = event.getEntity().getLocation();
+        org.bukkit.World world = location.getWorld();
+        if (world == null) return;
         for (int i = 1; i < fireworkDetonation.numExplosions; i++) { //one already ran to trigger this, so start from 1
-            Firework firework = (Firework) location.getWorld().spawnEntity(location, event.getEntityType());
+            Firework firework = (Firework) world.spawnEntity(location, event.getEntityType());
             firework.setFireworkMeta(event.getEntity().getFireworkMeta());
             firework.detonate();
         }

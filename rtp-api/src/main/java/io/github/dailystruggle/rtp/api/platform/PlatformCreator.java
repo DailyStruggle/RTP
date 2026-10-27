@@ -10,6 +10,10 @@ import java.util.concurrent.CompletableFuture;
  * Registered via {@code RTPHooks#platformCreator()} (ADR-026, ADR-058).
  * Two-phase lifecycle: async {@link #prepare} off-region, synchronous block writes
  * on the region-owning thread in {@link #createPlatform} (S-004, S-005).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface PlatformCreator {

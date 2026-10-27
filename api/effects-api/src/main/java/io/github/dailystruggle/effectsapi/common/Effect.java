@@ -81,6 +81,7 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
      * mistyped permission tokens (see AGENTS.md: "Zero
      * {@code printStackTrace()}").
      */
+    @SuppressWarnings("java:S106") // Intentional stderr fallback when no ServerAccessor is installed
     private static final Consumer<String> FALLBACK_WARN = msg -> {
         io.github.dailystruggle.server.api.ServerAccessor accessor =
                 io.github.dailystruggle.server.api.ServerAccessors.get();

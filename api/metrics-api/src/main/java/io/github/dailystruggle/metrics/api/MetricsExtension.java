@@ -16,6 +16,8 @@ package io.github.dailystruggle.metrics.api;
  *
  * @param <SELF> the concrete extension type, used as the key for type-safe lookup
  *               via {@link MetricsSnapshot#extension(Class)}.
+ * @governedBy ADR-039
+ * @governedBy ADR-115
  */
 public interface MetricsExtension<SELF extends MetricsExtension<SELF>> {
 }

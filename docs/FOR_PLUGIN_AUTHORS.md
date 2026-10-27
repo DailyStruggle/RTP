@@ -28,7 +28,7 @@ Pick only the SDK modules that match your plugin's requirements. Full module cat
 
 | Plugin Need | SDK Module(s) | Key Entry Points |
 |---|---|---|
-| Platform detection, version gating & Folia regional scheduling | `server-api` | `ServerAccessor`, `ServerAccessors`, `PlatformFamily`, `TaskScheduler`, `TaskHandle` |
+| Platform detection, version gating & Folia regional scheduling (`ServerAccessor` is composed of focused capability sub-interfaces `ScoreboardAccessor`, `WorldBorderAccessor`, `PaletteTagAccessor`, `EffectHandleBridge`, `MenuContextAccessor`, and `CommandDispatchAccessor` with safe default implementations) | `server-api` | `ServerAccessor`, `ServerAccessors`, `PlatformFamily`, `TaskScheduler`, `TaskHandle`, `ScoreboardAccessor`, `WorldBorderAccessor`, `PaletteTagAccessor`, `EffectHandleBridge`, `MenuContextAccessor`, `CommandDispatchAccessor` |
 | Brigadier command trees, `key=value` parameters & regex (`reg:`) tab completion | `commands-api` | `TreeCommand`, `CommandsAPICommand`, `CommandParameter`, `BrigadierCommandAdapter` |
 | Comment-preserving YAML + `@type` / `@range` / `@options` self-tests & unit parsing | `yaml-api` + `units-api` + `bit-api` + `config-bit-api` | `RtpYamlConfig`, `DistanceParser`, `DurationParser`, `DataSizeParser`, `BitRunner`, `DirectiveValidator`, `MessageKeyParity` |
 | Declarative chest GUIs, written-book menus, chat click tokens & anvil text prompts | `menu-api` | `MenuDescriptor`, `MenuRenderer`, `MenuSession`, `MenuTokenService`, `AnvilInputOpener` |
@@ -42,20 +42,20 @@ Pick only the SDK modules that match your plugin's requirements. Full module cat
 
 | Module | Maven Central Coordinate | Inter-Module Dependencies |
 |---|---|---|
-| `server-api` | `io.github.dailystruggle:server-api:3.2.1` | *(none)* |
-| `units-api` | `io.github.dailystruggle:units-api:3.2.1` | *(none)* |
-| `tags-api` | `io.github.dailystruggle:tags-api:3.2.1` | *(none)* |
-| `yaml-api` | `io.github.dailystruggle:yaml-api:3.2.1` | *(none)* |
-| `bit-api` | `io.github.dailystruggle:bit-api:3.2.1` | *(none)* |
-| `config-bit-api` | `io.github.dailystruggle:config-bit-api:3.2.1` | `yaml-api`, `bit-api`, `units-api` |
-| `commands-api` | `io.github.dailystruggle:commands-api:3.2.1` | *(none)* |
-| `menu-api` | `io.github.dailystruggle:menu-api:3.2.1` | `server-api`, `commands-api` |
-| `effects-api` | `io.github.dailystruggle:effects-api:3.2.1` | `server-api` |
-| `maps-api` | `io.github.dailystruggle:maps-api:3.2.1` | *(none)* |
-| `metrics-api` | `io.github.dailystruggle:metrics-api:3.2.1` | *(none)* |
-| `bstats-api` | `io.github.dailystruggle:bstats-api:3.2.1` | *(none)* |
-| `predict-api` | `io.github.dailystruggle:predict-api:3.2.1` | *(none)* |
-| `anvil-api` | `io.github.dailystruggle:anvil-api:3.2.1` | `bit-api` |
+| `server-api` | `io.github.dailystruggle:server-api:3.3.1` | *(none)* |
+| `units-api` | `io.github.dailystruggle:units-api:3.3.1` | *(none)* |
+| `tags-api` | `io.github.dailystruggle:tags-api:3.3.1` | *(none)* |
+| `yaml-api` | `io.github.dailystruggle:yaml-api:3.3.1` | *(none)* |
+| `bit-api` | `io.github.dailystruggle:bit-api:3.3.1` | *(none)* |
+| `config-bit-api` | `io.github.dailystruggle:config-bit-api:3.3.1` | `yaml-api`, `bit-api`, `units-api` |
+| `commands-api` | `io.github.dailystruggle:commands-api:3.3.1` | *(none)* |
+| `menu-api` | `io.github.dailystruggle:menu-api:3.3.1` | `server-api`, `commands-api` |
+| `effects-api` | `io.github.dailystruggle:effects-api:3.3.1` | `server-api` |
+| `maps-api` | `io.github.dailystruggle:maps-api:3.3.1` | *(none)* |
+| `metrics-api` | `io.github.dailystruggle:metrics-api:3.3.1` | *(none)* |
+| `bstats-api` | `io.github.dailystruggle:bstats-api:3.3.1` | *(none)* |
+| `predict-api` | `io.github.dailystruggle:predict-api:3.3.1` | *(none)* |
+| `anvil-api` | `io.github.dailystruggle:anvil-api:3.3.1` | `bit-api` |
 
 ---
 
@@ -85,7 +85,7 @@ repositories {
 }
 
 ext {
-    leafSdkVersion = '3.2.1'
+    leafSdkVersion = '3.3.1'
 }
 
 dependencies {

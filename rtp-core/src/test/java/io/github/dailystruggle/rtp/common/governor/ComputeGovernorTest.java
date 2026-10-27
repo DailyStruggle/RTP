@@ -37,7 +37,6 @@ class ComputeGovernorTest {
 
     private static final long MS = TimeUnit.MILLISECONDS.toNanos(1);
     private static final long SEC = TimeUnit.SECONDS.toNanos(1);
-    private static final long MIN = TimeUnit.MINUTES.toNanos(1);
 
     private ComputeGovernor governor;
 

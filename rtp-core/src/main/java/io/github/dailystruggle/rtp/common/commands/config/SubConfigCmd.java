@@ -317,10 +317,15 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
     if (parser.fileDatabase == null) return;
     RtpYamlConfig yaml = parser.fileDatabase.cachedLookup.get() == null
             ? null : parser.fileDatabase.cachedLookup.get().get(parser.name);
-    java.io.File target = yaml == null
-            ? new java.io.File(parser.pluginDirectory, parser.subDir.isEmpty()
-                    ? parser.name : parser.subDir + java.io.File.separator + parser.name)
-            : yaml.getConfigurationFile();
+    java.io.File target;
+    if (yaml != null) {
+      target = yaml.getConfigurationFile();
+    } else {
+      String relPath = parser.subDir.isEmpty()
+          ? parser.name
+          : parser.subDir + java.io.File.separator + parser.name;
+      target = new java.io.File(parser.pluginDirectory, relPath);
+    }
     if (target != null) {
       String cacheKey = target.getName();
       Map<String, RtpYamlConfig> cache = parser.fileDatabase.cachedLookup.get();

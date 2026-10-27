@@ -1,5 +1,11 @@
 package io.github.dailystruggle.rtp.common.configuration.enums;
 
+/**
+ * Configuration keys for {@code logging.yml} controlling diagnostic verbosity and log-level gates.
+ *
+ * @governedBy ADR-020
+ * @governedBy ADR-115
+ */
 public enum LoggingKeys {
   detailed_reload,
   detailed_region_init,

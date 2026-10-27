@@ -8,7 +8,13 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Interface for loading configuration files */
+/**
+ * Interface for loading configuration files
+ *
+ * @governedBy ADR-020
+ * @governedBy ADR-064
+ * @governedBy ADR-115
+ */
 public interface ConfigLoader {
   /**
    * Get the main directory for configuration files
@@ -31,6 +37,7 @@ public interface ConfigLoader {
    * @return the input stream, or null if not found
    */
   @Nullable
+  @SuppressWarnings("NullableProblems")
   default InputStream getResourceFromJar(@NotNull String filename) {
     try {
       ClassLoader cl = getClassLoader();

@@ -48,7 +48,7 @@ class RTPTest {
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
         // Clear any leftover player-data state from previous tests
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         ActiveDatabase.setAccessor(null);
         TeleportSessions.current().latestTeleportData.clear();
         TeleportSessions.current().priorTeleportData.clear();
@@ -96,7 +96,7 @@ class RTPTest {
 
     @Test
     void taskPipes_afterInstall_areInitialized() {
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         assertNotNull(MiscTasks.sync());
         assertNotNull(MiscTasks.async());
         assertNotNull(MiscTasks.startup());
@@ -472,7 +472,7 @@ class RTPTest {
 
     @Test
     void stop_clearsProcessingPlayers() {
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         UUID id = UUID.randomUUID();
         TeleportSessions.current().processingPlayers.add(id);
 
@@ -486,7 +486,7 @@ class RTPTest {
 
     @Test
     void stop_completedTeleportData_doesNotCancelThem() {
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         UUID id = UUID.randomUUID();
         TeleportData data = new TeleportData();
         data.sender = new MockRTPCommandSender(id, "Player");
@@ -502,7 +502,7 @@ class RTPTest {
 
     @Test
     void stop_withMockDatabaseAccessor_doesNotThrowNPE() {
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         ActiveDatabase.setAccessor(org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class));
 
         assertDoesNotThrow(RTP::stop);

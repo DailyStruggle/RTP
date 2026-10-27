@@ -1125,6 +1125,27 @@ sonar {
         // - javaarchitecture:S7788: package/class slice disentanglement is governed by ArchUnit Rules 11-32 (ADR-115).
         // - java:S9395: explicit long-to-double cast suggestion conflicts with java:S1905 and Qodana RedundantCast.
         // - java:S107: immutable telemetry/snapshot records and multi-parameter constructors.
+        // - java:S108: empty catch (... ignored) blocks on multi-version reflection probes and best-effort fallbacks.
+        // - java:S135: guard-clause break/continue in bounded hot-cache, Anvil scan, and water-filling loops.
+        // - java:S1659: paired coordinate and least-squares accumulator declarations on one line.
+        // - java:S6213: domain methods and parameters named record (EwmaLinearFit#record, LogRecord record).
+        // - java:S5961: comprehensive unit test methods with more than 25 assertions.
+        // - java:S1172: third-party claim-plugin stand-in test stubs retaining external method signatures.
+        // - java:S9435: != 0 lexicographical comparator ternary idiom.
+        // - java:S3398: outer-class private static helpers shared with nested classes.
+        // - java:S9149: static forwarding methods on ClaimAnchoredRegionTracker and DistanceParameter.
+        // - java:S1185: rtp-api Javadoc and binary-compatibility bridge overrides (ProgressBar, DispatchingPlayerLifecycleHook).
+        // - java:S125: prose explanatory comments falsely flagged as commented-out code.
+        // - java:S2629: pre-formatted console log strings across platform bridges.
+        // - java:S6206: non-record public API classes (StoredLocation, GenericConstraintCheck).
+        // - java:S120: camelCase package naming (networkTimeSeries).
+        // - java:S1133: deprecated transitional SPI bridges (HandleProvider, HandleRegistry; ADR-116).
+        // - java:S9358: explicit per-branch call expressions in ternaries.
+        // - java:S2160: AbstractMap view (GroupAllocationMapView) and AbstractVerticalAdjustor inheriting super equals.
+        // - java:S9398: lazy initialization Holder class inside MetricTimeSeriesPublisher SPI interface.
+        // - java:S1119: labeled break (outer:) in bounded 2D grid and stress loops.
+        // - java:S9439: explicit new T[]{...} array initializer syntax.
+        // - java:S9412: Collections.sort(list) vs list.sort(null) stylistic preference.
         def ignoredRuleExceptions = [
                 s3077: [rule: 'java:S3077'],
                 s2975: [rule: 'java:S2975'],
@@ -1145,7 +1166,28 @@ sonar {
                 s1845: [rule: 'java:S1845'],
                 s7788: [rule: 'javaarchitecture:S7788'],
                 s9395: [rule: 'java:S9395'],
-                s107: [rule: 'java:S107']
+                s107: [rule: 'java:S107'],
+                s108: [rule: 'java:S108'],
+                s135: [rule: 'java:S135'],
+                s1659: [rule: 'java:S1659'],
+                s6213: [rule: 'java:S6213'],
+                s5961test: [rule: 'java:S5961', resource: '**/src/test/**/*'],
+                s1172test: [rule: 'java:S1172', resource: '**/src/test/**/*'],
+                s9435: [rule: 'java:S9435'],
+                s3398: [rule: 'java:S3398'],
+                s9149: [rule: 'java:S9149'],
+                s1185: [rule: 'java:S1185'],
+                s125: [rule: 'java:S125'],
+                s2629: [rule: 'java:S2629'],
+                s6206: [rule: 'java:S6206'],
+                s120: [rule: 'java:S120'],
+                s1133: [rule: 'java:S1133'],
+                s9358: [rule: 'java:S9358'],
+                s2160: [rule: 'java:S2160'],
+                s9398: [rule: 'java:S9398'],
+                s1119: [rule: 'java:S1119'],
+                s9439: [rule: 'java:S9439'],
+                s9412: [rule: 'java:S9412']
         ]
         property 'sonar.issue.ignore.multicriteria', ignoredRuleExceptions.keySet().join(',')
         ignoredRuleExceptions.each { key, cfg ->
@@ -1158,7 +1200,9 @@ sonar {
 subprojects {
     sonar {
         properties {
-            if (sourceSets.main.allJava.isEmpty() && sourceSets.test.allJava.isEmpty()) {
+            if ((sourceSets.main.allJava.isEmpty() && sourceSets.test.allJava.isEmpty()) ||
+                    project.path.startsWith(':helpers:stresstest-') ||
+                    project.path == ':helpers:StressTestRTP') {
                 property 'sonar.skip', 'true'
             }
 

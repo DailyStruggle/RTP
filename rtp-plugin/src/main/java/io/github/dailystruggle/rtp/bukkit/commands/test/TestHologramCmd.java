@@ -252,7 +252,7 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
     BiConsumer<Boolean, String> finish =
         (timedOut, detail) ->
             finishHologram(
-                callerId, handle, holoId, closed, updateFailed, closeFailed, schedulerFailed,
+                handle, holoId, closed, updateFailed, closeFailed, schedulerFailed,
                 cancelled, taskHolder,
                 watchdogHolder, reportFuture, timedOut, detail);
     Runnable unregister =
@@ -308,7 +308,7 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
     }
     try {
       taskHolder.set(RTPRuntime.scheduler().runTaskTimerAsynchronously(ticker, 20L, 20L));
-      long watchdogTicks = (long) (totalSec + 10) * 20L;
+      long watchdogTicks = (totalSec + 10) * 20L;
       watchdogHolder.set(
           RTPRuntime.scheduler()
               .runTaskTimerAsynchronously(
@@ -334,7 +334,6 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
   }
 
   private void finishHologram(
-      UUID callerId,
       HologramHandle handle,
       String holoId,
       AtomicBoolean closed,

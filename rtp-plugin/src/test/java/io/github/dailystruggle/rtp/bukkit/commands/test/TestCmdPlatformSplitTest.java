@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.dailystruggle.bit.BitComponent;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
 import io.github.dailystruggle.rtp.common.commands.test.TestAllCmd;
@@ -91,7 +92,7 @@ class TestCmdPlatformSplitTest {
     new TestCmd(null);
 
     Set<String> registered = RtpBit.RUNNER.components().stream()
-        .map(component -> component.id()).collect(java.util.stream.Collectors.toSet());
+        .map(BitComponent::id).collect(java.util.stream.Collectors.toSet());
     assertTrue(registered.containsAll(pluginComponents), "registered components: " + registered);
   }
 

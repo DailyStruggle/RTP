@@ -3,6 +3,9 @@ package io.github.dailystruggle.bstats.api;
 /**
  * Host scheduler the client runs on, so it never creates its own threads.
  * Delays are in ticks (1 tick = 50 ms); hosts without a tick clock convert.
+ *
+ * @governedBy ADR-039
+ * @governedBy ADR-115
  */
 public interface BStatsScheduler {
 

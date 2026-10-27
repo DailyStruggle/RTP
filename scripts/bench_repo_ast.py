@@ -546,10 +546,12 @@ def benchmark_offload_cost_benefit(
         handlers = llq.build_default_handlers(out_dir=out_dir, repo_root=repo_root, ast_conn=conn)
 
         # Build a 16-item fault-injection corpus (4 items per task family:
-        #   0=clean, 1=det_defect_repairable, 2=critic_drift_repairable, 3=persistent_unrepairable)
+        #   0=clean, 1=det_repairable, 2=critic_repairable, 3=det_unrepairable)
+        corpus_labels = ("clean", "det_repairable", "critic_repairable", "det_unrepairable")
         bundle_items = [
             {
                 "item_id": f"de:lang/de/messages.yml::messages.teleport_{i}[0]",
+                "corpus_label": corpus_labels[i],
                 "locale": "de",
                 "relpath": "lang/de/messages.yml",
                 "parent_path": "messages",
@@ -621,6 +623,7 @@ def benchmark_offload_cost_benefit(
         doc_items = [
             {
                 "item_id": f"de:docs/admin/FAQ.md#sec{i}",
+                "corpus_label": corpus_labels[i],
                 "locale": "de",
                 "doc_path": "docs/admin/FAQ.md",
                 "output_path": str(out_dir / "docs-de" / "FAQ.md"),
@@ -668,6 +671,7 @@ def benchmark_offload_cost_benefit(
             handlers["critique-diff"]._enrich_item_with_gov_c(
                 {
                     "item_id": f"diff:LocationGenerator_{i}",
+                    "corpus_label": corpus_labels[i],
                     "class_name": "LocationGenerator",
                     "path": "rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/LocationGenerator.java",
                     "diff_hunk": (
@@ -747,7 +751,7 @@ def benchmark_offload_cost_benefit(
 
         jdoc_base = handlers["backfill-javadoc"]._enrich_class_item({"class_name": "EwmaEstimator"})
         jdoc_items = [
-            dict(jdoc_base, item_id=f"javadoc:EwmaEstimator_{i}")
+            dict(jdoc_base, item_id=f"javadoc:EwmaEstimator_{i}", corpus_label=corpus_labels[i])
             for i in range(4)
         ]
         jdoc_fwd = [
@@ -820,11 +824,49 @@ def benchmark_offload_cost_benefit(
                     h_obj.verify_deterministic(it_obj, dr_obj)
                     det_latencies_ms.append((time.perf_counter() - t0) * 1000.0)
 
-        # Evaluate the 3 Verification Regimes across the 16 items (4 clean, 12 defective: 4 det-repairable, 4 critic-repairable, 4 unrepairable)
-        total_items = 16
-        total_defective_initial = 12
-        regime_unverified_escapes = total_defective_initial  # 12/12 defects applied blindly
-        regime_det_only_escapes = 4  # catches 8 det failures, but 4 semantic/critic drift defects escape
+        # Derive corpus totals & denominators from corpus_label tags and measure Regime A (no gate) & Regime B (det gate only)
+        total_items = sum(len(items_list) for _t, _h, items_list, _f, _r in families)
+        total_defective_initial = sum(
+            1
+            for _t, _h, items_list, _f, _r in families
+            for it_obj in items_list
+            if it_obj.get("corpus_label", "clean") != "clean"
+        )
+        corpus_det_defects_total = sum(
+            1
+            for _t, _h, items_list, _f, _r in families
+            for it_obj in items_list
+            if it_obj.get("corpus_label") in ("det_repairable", "det_unrepairable")
+        )
+        repairable_defects_total = sum(
+            1
+            for _t, _h, items_list, _f, _r in families
+            for it_obj in items_list
+            if it_obj.get("corpus_label") in ("det_repairable", "critic_repairable")
+        )
+
+        regime_a_gpu_calls = 0
+        regime_b_gpu_calls = 0
+        regime_a_clean_applied = 0
+        regime_b_clean_applied = 0
+        regime_det_only_escapes = 0
+        regime_unverified_escapes = 0
+        det_defects_total = 0
+        for _t, h_obj, items_list, fwd_list, _r in families:
+            regime_a_gpu_calls += 1
+            regime_b_gpu_calls += 1
+            for idx, (it_obj, dr_obj) in enumerate(zip(items_list, fwd_list)):
+                ok_det, _ = h_obj.verify_deterministic(it_obj, dr_obj)
+                if idx != 0:
+                    regime_unverified_escapes += 1
+                    if ok_det:
+                        regime_det_only_escapes += 1
+                else:
+                    regime_a_clean_applied += 1
+                    if ok_det:
+                        regime_b_clean_applied += 1
+                if not ok_det:
+                    det_defects_total += 1
 
         staged_gpu_calls = 0
         naive_two_opinion_gpu_calls = 0
@@ -864,12 +906,15 @@ def benchmark_offload_cost_benefit(
                 return {"choices": [{"message": {"content": json.dumps(fwd_list)}}]}
 
             # Count how many initial drafts fail deterministic gate (saving Critic GPU calls)
+            family_defective = 0
             for it_obj, dr_obj in zip(items_list, fwd_list):
+                if it_obj.get("corpus_label", "clean") != "clean":
+                    family_defective += 1
                 ok_det, _ = h_obj.verify_deterministic(it_obj, dr_obj)
                 if not ok_det:
                     det_gate_short_circuits += 1
-            # Naive 2-opinion without early deterministic short-circuit would run 1 forward + 4 critic + repairs
-            naive_two_opinion_gpu_calls += 1 + len(items_list) + 3 * 2
+            # Naive 2-opinion without early deterministic short-circuit would run 1 forward + len(items_list) critic + repairs
+            naive_two_opinion_gpu_calls += 1 + len(items_list) + family_defective * 2
 
             broker = llq.LlmQueueBroker(tmp_path / f"queue-{t_name}.sqlite")
             client = llq.LocalLlmClient(http_post=_mock_http)
@@ -953,15 +998,18 @@ def benchmark_offload_cost_benefit(
         if javadoc_state1_bytes == 0:
             javadoc_state1_bytes = 36_000
 
-        bundle_state1_bytes = len(json.dumps(bundle_items * 5, indent=2).encode("utf-8")) + len(
-            json.dumps(bundle_fwd * 5, indent=2).encode("utf-8")
+        bundle_chunks = 5
+        bundle_state1_bytes = len(json.dumps(bundle_items * bundle_chunks, indent=2).encode("utf-8")) + len(
+            json.dumps(bundle_fwd * bundle_chunks, indent=2).encode("utf-8")
         )
         doc_state1_bytes = faq_bytes * 2  # Read full Markdown + generate full translated Markdown in remote context
+        critique_classes = ("LocationGenerator", "TeleportPipelineTask", "MemoryTracker")
         diff_ctx_bytes = sum(
             len(repo_ast.format_context_markdown(repo_ast.query_context(conn, cls)).encode("utf-8"))
-            for cls in ("LocationGenerator", "TeleportPipelineTask", "MemoryTracker")
+            for cls in critique_classes
         )
         diff_state1_bytes = diff_ctx_bytes + 4_800  # 3 Gov(c) contexts + git diff + remote self-review reasoning
+        n_javadoc_classes = len(high_fan_in_classes) if high_fan_in_classes else 15
 
         digest_sample = preempt_broker.get_status_digest(job_id=p2_job_id, max_lines=40)["markdown"]
         offload_roundtrip_bytes = 180 + len(digest_sample.encode("utf-8"))  # MCP enqueue args + <=40-line status digest
@@ -974,8 +1022,9 @@ def benchmark_offload_cost_benefit(
 
         workflows_comparison = [
             {
-                "task_type": "translate-bundle (20 locale rows)",
-                "state1_remote_calls": 6,
+                "task_type": f"translate-bundle ({len(bundle_items) * bundle_chunks} locale rows)",
+                "state1_remote_calls": 1 + bundle_chunks,
+                "state1_call_count_basis": "modeled_estimate",
                 "state2_remote_calls": 2,
                 "state1_remote_bytes": bundle_state1_bytes,
                 "state2_remote_bytes": offload_roundtrip_bytes,
@@ -983,23 +1032,26 @@ def benchmark_offload_cost_benefit(
             },
             {
                 "task_type": "translate-doc (docs/admin/FAQ.md)",
-                "state1_remote_calls": 4,
+                "state1_remote_calls": len(doc_items),
+                "state1_call_count_basis": "modeled_estimate",
                 "state2_remote_calls": 2,
                 "state1_remote_bytes": doc_state1_bytes,
                 "state2_remote_bytes": offload_roundtrip_bytes,
                 "remote_token_reduction_pct": round((1.0 - offload_roundtrip_bytes / max(1, doc_state1_bytes)) * 100.0, 2),
             },
             {
-                "task_type": "critique-diff (3 Tier-2 classes + Gov(c))",
-                "state1_remote_calls": 5,
+                "task_type": f"critique-diff ({len(critique_classes)} Tier-2 classes + Gov(c))",
+                "state1_remote_calls": len(critique_classes) + 2,
+                "state1_call_count_basis": "modeled_estimate",
                 "state2_remote_calls": 1,
                 "state1_remote_bytes": diff_state1_bytes,
                 "state2_remote_bytes": critique_digest_bytes,
                 "remote_token_reduction_pct": round((1.0 - critique_digest_bytes / max(1, diff_state1_bytes)) * 100.0, 2),
             },
             {
-                "task_type": "backfill-javadoc (15 audited classes)",
-                "state1_remote_calls": 16,
+                "task_type": f"backfill-javadoc ({n_javadoc_classes} audited classes)",
+                "state1_remote_calls": 1 + n_javadoc_classes,
+                "state1_call_count_basis": "modeled_estimate",
                 "state2_remote_calls": 2,
                 "state1_remote_bytes": javadoc_state1_bytes,
                 "state2_remote_bytes": offload_roundtrip_bytes,
@@ -1019,22 +1071,26 @@ def benchmark_offload_cost_benefit(
         )
 
         det_stats = _summarize_dist(det_latencies_ms)
-        critic_saved_pct = round((det_gate_short_circuits / max(1, 8)) * 100.0, 2)
+        critic_saved_pct = round((det_gate_short_circuits / max(1, corpus_det_defects_total)) * 100.0, 2)
+        total_p2_chunks = max(1, (len(p2_items) + 1) // 2)
 
         return {
             "items_evaluated": total_items,
             "initial_defective_items": total_defective_initial,
+            "corpus_det_defects_total": corpus_det_defects_total,
+            "det_defects_total": det_defects_total,
+            "repairable_defects_total": repairable_defects_total,
             "regime_a_unverified_1pass": {
-                "gpu_calls_total": 4,
+                "gpu_calls_total": regime_a_gpu_calls,
                 "defect_escapes": regime_unverified_escapes,
-                "defect_escape_rate_pct": round((regime_unverified_escapes / total_defective_initial) * 100.0, 2),
-                "clean_yield_pct": 25.0,
+                "defect_escape_rate_pct": round((regime_unverified_escapes / max(1, total_defective_initial)) * 100.0, 2),
+                "clean_yield_pct": round((regime_a_clean_applied / max(1, total_items)) * 100.0, 2),
             },
             "regime_b_det_gate_only": {
-                "gpu_calls_total": 4,
+                "gpu_calls_total": regime_b_gpu_calls,
                 "defect_escapes": regime_det_only_escapes,
-                "defect_escape_rate_pct": round((regime_det_only_escapes / total_defective_initial) * 100.0, 2),
-                "clean_yield_pct": 25.0,
+                "defect_escape_rate_pct": round((regime_det_only_escapes / max(1, total_defective_initial)) * 100.0, 2),
+                "clean_yield_pct": round((regime_b_clean_applied / max(1, total_items)) * 100.0, 2),
             },
             "regime_c_staged_funnel": {
                 "gpu_calls_total": staged_gpu_calls,
@@ -1045,18 +1101,19 @@ def benchmark_offload_cost_benefit(
                 "retried_ok": staged_retried_ok,
                 "quarantined": staged_quarantined,
                 "defect_escapes": staged_defect_escapes,
-                "defect_escape_rate_pct": round((staged_defect_escapes / total_defective_initial) * 100.0, 2),
-                "repairable_salvage_rate_pct": round((staged_retried_ok / 8) * 100.0, 2),
-                "clean_yield_pct": round((staged_auto_applied / total_items) * 100.0, 2),
+                "defect_escape_rate_pct": round((staged_defect_escapes / max(1, total_defective_initial)) * 100.0, 2),
+                "repairable_salvage_rate_pct": round((staged_retried_ok / max(1, repairable_defects_total)) * 100.0, 2),
+                "clean_yield_pct": round((staged_auto_applied / max(1, total_items)) * 100.0, 2),
             },
             "deterministic_gate_latency_ms": det_stats,
             "p0_preemption": {
-                "total_p2_chunks": 5,
+                "total_p2_chunks": total_p2_chunks,
                 "chunks_waited_before_p0_yield": chunks_before_p0_yield,
-                "wait_reduction_pct": round((1.0 - chunks_before_p0_yield / 5.0) * 100.0, 2),
+                "wait_reduction_pct": round((1.0 - chunks_before_p0_yield / float(total_p2_chunks)) * 100.0, 2),
             },
             "remote_context_savings": {
                 "state1_remote_calls_total": state1_total_calls,
+                "state1_call_count_basis": "modeled_estimate",
                 "state2_remote_calls_total": state2_total_calls,
                 "remote_call_reduction_pct": overall_remote_call_reduction_pct,
                 "state1_remote_bytes_total": state1_total_bytes,
@@ -1208,8 +1265,8 @@ def format_report_markdown(report: BenchmarkGateReport) -> str:
         det_lat = off_cb.get("deterministic_gate_latency_ms", {})
         p0_pre = off_cb.get("p0_preemption", {})
         lines.extend([
-            f"| **Front 5: Offload Token Savings** | State 2 vs State 1 Remote Bytes (`{rem_sav.get('state2_remote_bytes_total', 0):,}` vs `{rem_sav.get('state1_remote_bytes_total', 0):,}` B) | `{rem_sav.get('remote_token_reduction_pct', 0.0):.1f}%` | `>= 85.0%` | `{'PASS' if rem_sav.get('remote_token_reduction_pct', 0.0) >= 85.0 else 'FAIL'}` |",
-            f"| **Front 5: Staged Funnel Quality** | Defect Escapes (`{reg_c.get('defect_escapes', 0)}` vs `{reg_a.get('defect_escapes', 12)}` unverified / `{reg_b.get('defect_escapes', 4)}` det-only) | `{reg_c.get('defect_escapes', 0)}` (`{reg_c.get('repairable_salvage_rate_pct', 0.0):.0f}%` salvaged) | `== 0` | `{'PASS' if reg_c.get('defect_escapes', 0) == 0 else 'FAIL'}` |",
+            f"| **Front 5: Offload Token Savings** | State 2 vs State 1 Remote Bytes (`{rem_sav.get('state2_remote_bytes_total', 0):,}` vs `{rem_sav.get('state1_remote_bytes_total', 0):,}` B; `{rem_sav.get('state2_remote_calls_total', 0)}` measured vs `{rem_sav.get('state1_remote_calls_total', 0)}` modeled-estimate calls) | `{rem_sav.get('remote_token_reduction_pct', 0.0):.1f}%` | `>= 85.0%` | `{'PASS' if rem_sav.get('remote_token_reduction_pct', 0.0) >= 85.0 else 'FAIL'}` |",
+            f"| **Front 5: Staged Funnel Quality** | Defect Escapes (`{reg_c.get('defect_escapes', 0)}` vs `{reg_a.get('defect_escapes', 0)}` unverified / `{reg_b.get('defect_escapes', 0)}` det-only) | `{reg_c.get('defect_escapes', 0)}` (`{reg_c.get('repairable_salvage_rate_pct', 0.0):.0f}%` salvaged) | `== 0` | `{'PASS' if reg_c.get('defect_escapes', 0) == 0 else 'FAIL'}` |",
             f"| **Front 5: Local Gate Latency** | `< 5 ms` Deterministic Gate p95 (`mean={det_lat.get('mean', 0)}ms`, `{reg_c.get('first_pass_critic_calls_saved_pct', 0.0):.0f}%` critic saved) | `{det_lat.get('p95', 0.0):.3f} ms` | `< 5.0 ms` | `{'PASS' if det_lat.get('p95', 0.0) < 5.0 else 'FAIL'}` |",
             f"| **Front 5: P0 Preemption Yield** | P0 Wait Chunks (`{p0_pre.get('chunks_waited_before_p0_yield', 1)}` vs `{p0_pre.get('total_p2_chunks', 5)}` unpreempted chunks) | `{p0_pre.get('wait_reduction_pct', 0.0):.1f}%` reduction | `<= 1 chunk` | `{'PASS' if p0_pre.get('chunks_waited_before_p0_yield', 99) <= 1 else 'FAIL'}` |",
         ])

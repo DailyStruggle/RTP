@@ -13,6 +13,11 @@ import java.util.function.Predicate;
  *
  * <p><b>Threading:</b> Sync verifiers must not block. Async verifiers must return
  * a future and never block a tick thread (S-005). Throwing vetoes the location (S-004).
+ *
+ * @governedBy ADR-026
+ * @governedBy ADR-115
+ * @invariant S-003: No teleport into claim-protected land
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface RegionVerifierRegistry {

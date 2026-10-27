@@ -327,9 +327,8 @@ class TeleportPipelineTaskBranchTest {
         io.github.dailystruggle.rtp.api.world.ChunkSet set =
                 new io.github.dailystruggle.rtp.api.world.ChunkSet(
                         world, 120 >> 4, 120 >> 4, chunks, CompletableFuture.completedFuture(true));
-        io.github.dailystruggle.rtp.api.world.ChunkReservation res =
-                new io.github.dailystruggle.rtp.api.world.ChunkReservation(set, world);
-        try {
+        try (io.github.dailystruggle.rtp.api.world.ChunkReservation res =
+                new io.github.dailystruggle.rtp.api.world.ChunkReservation(set, world)) {
             TeleportPipelineTask.ConfigCache.teleportMessage = "Generation-1 arrival";
             TeleportPipelineTask.ConfigCache.setRespawnOnTeleport = true;
 

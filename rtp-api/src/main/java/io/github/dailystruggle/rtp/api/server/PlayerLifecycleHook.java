@@ -8,6 +8,8 @@ import java.util.function.Consumer;
  * Subscriptions return an {@link AutoCloseable} unregistration handle.
  *
  * @since 3.0.0-beta.4
+ * @governedBy ADR-049
+ * @governedBy ADR-115
  */
 public interface PlayerLifecycleHook extends io.github.dailystruggle.server.api.PlayerLifecycleHook {
 

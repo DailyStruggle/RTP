@@ -51,8 +51,12 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
 
   public TestCommandsCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
-    treeAnchor = findRoot(parent == null ? this : parent);
+    updateTreeAnchor(findRoot(parent == null ? this : parent));
     addParameter("json", new BooleanParameter("rtp.test", "emit the BIT report as JSON", (uuid, value) -> true));
+  }
+
+  private static void updateTreeAnchor(@Nullable CommandsAPICommand root) {
+    treeAnchor = root;
   }
 
   @Override

@@ -6,6 +6,7 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -146,7 +147,7 @@ class TreeCommandTabCompleteBranchTest {
 
         CompletableFuture<Boolean> result = root.onCommand(
                 CALLER,
-                permission -> permission == null,
+                Objects::isNull,
                 message -> { },
                 new String[]{"parent=valid", "outside=value", "child=ok"});
 

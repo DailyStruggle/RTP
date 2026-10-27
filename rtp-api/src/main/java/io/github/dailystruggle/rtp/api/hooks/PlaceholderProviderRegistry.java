@@ -8,6 +8,10 @@ import java.util.function.BiFunction;
 /**
  * Registry of named placeholder resolvers exposed by RTP to chat/scoreboard plugins (ADR-026).
  * Resolvers may be invoked from any thread and must not block.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface PlaceholderProviderRegistry {

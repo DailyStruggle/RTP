@@ -1031,13 +1031,6 @@ public class PlaceholderProvider {
             if (world != null) return world.name();
             Region region = RegionContext.region().get();
             if (region != null) return region.getWorld().name();
-            RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
-            if (sender != null) {
-                RTPWorld senderWorld = RTPRuntime.serverAccessor().getRTPWorld(sender.uuid()); // This is wrong, sender uuid is player uuid.
-                // Wait, RTPWorld getRTPWorld(UUID) might be world UID or player UID depending on implementation.
-                // Usually it's world UID.
-                // Let's use a better way if possible.
-            }
             return "";
         });
 

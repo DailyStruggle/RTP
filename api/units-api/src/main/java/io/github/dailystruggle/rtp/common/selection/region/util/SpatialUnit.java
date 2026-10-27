@@ -11,6 +11,9 @@ import java.util.Map;
  * <p>In Minecraft, 1 block = 1 meter.
  * 1 chunk = 16 blocks.
  * 1 region (Anvil / Linear) = 32 chunks = 512 blocks.
+ *
+ * @governedBy ADR-027
+ * @governedBy ADR-115
  */
 public enum SpatialUnit {
   // Minecraft native units

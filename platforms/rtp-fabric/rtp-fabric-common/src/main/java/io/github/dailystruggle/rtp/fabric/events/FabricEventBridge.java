@@ -681,6 +681,7 @@ public final class FabricEventBridge {
         }
     }
 
+    @SuppressWarnings("java:S1144") // invoked reflectively via ServerWorldEvents proxy
     private void onWorldLoad(MinecraftServer server, ServerLevel level) {
         try {
             accessor.registerWorld(level);
@@ -690,6 +691,7 @@ public final class FabricEventBridge {
         }
     }
 
+    @SuppressWarnings("java:S1144") // invoked reflectively via ServerWorldEvents proxy
     private void onWorldUnload(MinecraftServer server, ServerLevel level) {
         try {
             accessor.unregisterWorld(level);

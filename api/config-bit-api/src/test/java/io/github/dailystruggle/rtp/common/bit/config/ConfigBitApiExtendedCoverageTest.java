@@ -246,7 +246,7 @@ class ConfigBitApiExtendedCoverageTest {
 
     @Test
     @DisplayName("ConfigSnapshot handles unparsable documents, unparsable lang maps, shared parent lang maps, and accessors")
-    void configSnapshotEdgeCases() throws IOException {
+    void configSnapshotEdgeCases() {
         ConfigSnapshot empty = ConfigSnapshot.read(tempDir.resolve("does-not-exist"));
         assertTrue(empty.documents().isEmpty());
 

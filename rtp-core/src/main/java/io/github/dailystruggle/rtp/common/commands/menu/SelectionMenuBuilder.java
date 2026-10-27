@@ -10,7 +10,6 @@ import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 /**
@@ -73,7 +72,7 @@ public final class SelectionMenuBuilder {
         List<MenuLine> valueLines = new ArrayList<>();
         if (entries != null) {
             List<String> sorted = new ArrayList<>(entries);
-            Collections.sort(sorted);
+            sorted.sort(null);
             for (String value : sorted) {
                 if (value == null) continue;
                 String[] openArgs = new String[parentPath.size() + 1];

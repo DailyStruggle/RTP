@@ -87,7 +87,7 @@ public final class NetworkQueueEntryReaper {
             }
             long ticks = Math.max(1L, periodTicks);
             timerTaskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(
-                    () -> sweepOnce(), ticks, ticks);
+                    this::sweepOnce, ticks, ticks);
         }
     }
 

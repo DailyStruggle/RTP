@@ -8,6 +8,10 @@ import java.util.Map;
  *
  * <p>Implemented by {@code rtp-api}'s {@code RTPLocation} and platform-specific
  * wrappers in {@code effects-api}.</p>
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
+ * @governedBy ADR-116
  */
 public interface LocationHandle {
     /** @return x-coordinate (block/integer precision) */

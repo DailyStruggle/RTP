@@ -8,6 +8,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Per-caller serialization permit for {@code rtp test *} subcommand dispatch.
  *
  * <p>Ensures at most one test is in flight per caller UUID at a time.
+ *
+ * @governedBy ADR-073
+ * @governedBy ADR-115
  */
 public final class TestSemaphore {
 

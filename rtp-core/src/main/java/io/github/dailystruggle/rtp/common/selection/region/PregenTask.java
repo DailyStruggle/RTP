@@ -1597,13 +1597,13 @@ final class PregenTask implements Runnable {
      * scan ran: inline when the safety grid covers the square, else after the resident lookups,
      * on the centre's region on Folia. Missing chunks count as unmeasured.
      */
-    private void recheckTerrain(SafetyCandidate candidate, RTPChunk<?>[] localChunks, int L,
+    private void recheckTerrain(SafetyCandidate candidate, RTPChunk<?>[] localChunks, int sideLen,
                                 int centerChunkX, int centerChunkZ,
                                 @org.jetbrains.annotations.Nullable ChunkReservation reservation,
                                 double hillAngle) {
         CompletableFuture<RTPChunk<?>[]> square;
         try {
-            square = TerrainShapeCheck.residentSquare(state.world, centerChunkX, centerChunkZ, localChunks, L,
+            square = TerrainShapeCheck.residentSquare(state.world, centerChunkX, centerChunkZ, localChunks, sideLen,
                     TerrainShapeCheck.SQUARE_RADIUS);
         } catch (RuntimeException e) {
             RTPRuntime.log(Level.WARNING, "[RTP] Terrain recheck setup failed: " + e, e);

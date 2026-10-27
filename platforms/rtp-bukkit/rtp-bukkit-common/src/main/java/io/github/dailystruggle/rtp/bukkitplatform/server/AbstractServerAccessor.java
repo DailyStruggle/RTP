@@ -569,16 +569,17 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       for (Tag<Material> tag : tags) {
         totalTags++;
         NamespacedKey key = tag.getKey();
+        String tagId = key.getNamespace() + ":" + key.getKey();
         Set<Material> values;
         try {
           values = tag.getValues();
         } catch (Throwable t) {
           io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
-              key.getNamespace() + ":" + key.getKey(),
+              tagId,
               t.getClass().getSimpleName() + ": " + t.getMessage());
           log(Level.WARNING,
               "[RTP] tag.getValues() threw for key="
-                  + key.getNamespace() + ":" + key.getKey()
+                  + tagId
                   + " (" + t.getClass().getName() + ": " + t.getMessage() + ")");
           totalEmpty++;
           continue;
@@ -590,7 +591,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         Set<String> members = new HashSet<>(values.size());
         for (Material m : values) members.add(m.name());
         out.put(
-            key.getNamespace() + ":" + key.getKey(),
+            tagId,
             Collections.unmodifiableSet(members));
       }
     } catch (Throwable e) {

@@ -124,13 +124,15 @@ public final class RtpBitCodeCatalog {
         int depth = 0;
         boolean inString = false;
         boolean escaped = false;
-        for (int index = 0; index < compact.length(); index++) {
+        int index = 0;
+        while (index < compact.length()) {
             char character = compact.charAt(index);
             if (inString) {
                 pretty.append(character);
                 if (escaped) escaped = false;
                 else if (character == '\\') escaped = true;
                 else if (character == '"') inString = false;
+                index++;
                 continue;
             }
             switch (character) {
@@ -142,7 +144,7 @@ public final class RtpBitCodeCatalog {
                     char close = character == '{' ? '}' : ']';
                     if (index + 1 < compact.length() && compact.charAt(index + 1) == close) {
                         pretty.append(character).append(close);
-                        index++;
+                        index += 2;
                         continue;
                     }
                     pretty.append(character).append('\n');
@@ -159,6 +161,7 @@ public final class RtpBitCodeCatalog {
                 case ':' -> pretty.append(": ");
                 default -> pretty.append(character);
             }
+            index++;
         }
         return pretty.append('\n').toString();
     }

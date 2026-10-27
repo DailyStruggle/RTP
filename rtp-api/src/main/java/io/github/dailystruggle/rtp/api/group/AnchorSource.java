@@ -13,6 +13,9 @@ import java.util.function.Supplier;
  * <p>Every subspace placement (whether a standard group RTP, a proximity placement near a player
  * or entity, or a placement near a claim perimeter) is anchored at a base coordinate. Implementations
  * resolve this coordinate asynchronously without blocking the main thread (S-005).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 @PublicApi
 @FunctionalInterface

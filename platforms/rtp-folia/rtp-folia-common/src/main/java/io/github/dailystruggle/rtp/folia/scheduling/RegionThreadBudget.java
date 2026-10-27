@@ -5,10 +5,8 @@ import io.github.dailystruggle.rtp.common.predict.TickTokenBucket;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -246,11 +244,10 @@ final class RegionThreadBudget {
   private void evictIdleGroups(long nowNanos) {
     for (Map.Entry<String, LiveGroup> e : liveGroups.entrySet()) {
       LiveGroup g = e.getValue();
-      if (g != null && nowNanos >= g.lastActiveNanos && (nowNanos - g.lastActiveNanos) > GROUP_IDLE_NANOS) {
-        if (liveGroups.remove(e.getKey(), g)) {
-          cellToGroup.entrySet().removeIf(ce -> e.getKey().equals(ce.getValue()));
-          groupChargedNanos.remove(e.getKey());
-        }
+      if (g != null && nowNanos >= g.lastActiveNanos && (nowNanos - g.lastActiveNanos) > GROUP_IDLE_NANOS
+          && liveGroups.remove(e.getKey(), g)) {
+        cellToGroup.entrySet().removeIf(ce -> e.getKey().equals(ce.getValue()));
+        groupChargedNanos.remove(e.getKey());
       }
     }
   }
@@ -306,8 +303,7 @@ final class RegionThreadBudget {
    * Opens a measured span for the global region ({@code k = "global"}, ADR-123 Section 2 & 11).
    */
   long beginGlobal() {
-    ThreadBucketState s = state.get();
-    return (s.nestingDepth++ == 0L) ? clock.getAsLong() : NESTED;
+    return begin();
   }
 
   /**
@@ -391,10 +387,9 @@ final class RegionThreadBudget {
     if (act == null) return true;
     for (Map.Entry<String, Long> e : act.groupLastRunNanos.entrySet()) {
       Long last = e.getValue();
-      if (last != null && nowNanos >= last && (nowNanos - last) <= ONE_SECOND_NANOS) {
-        if (!groupId.equals(e.getKey())) {
-          return false;
-        }
+      if (last != null && nowNanos >= last && (nowNanos - last) <= ONE_SECOND_NANOS
+          && !groupId.equals(e.getKey())) {
+        return false;
       }
     }
     return true;

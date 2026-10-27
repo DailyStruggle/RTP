@@ -4,6 +4,8 @@ package io.github.dailystruggle.rtp.common.tasks;
  * Marks a task as cancellable. Implementations must be thread-safe.
  *
  * @see RTPRunnable
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 public interface RTPCancellable {
   /**

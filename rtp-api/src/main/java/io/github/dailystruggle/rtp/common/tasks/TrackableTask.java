@@ -7,6 +7,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
  * teleport tasks without importing {@code tasks.teleport}. Implementations must be thread-safe.
  *
  * @see RTPCancellable
+ * @governedBy ADR-008
+ * @governedBy ADR-115
  */
 public interface TrackableTask extends RTPCancellable, Runnable {
   /**

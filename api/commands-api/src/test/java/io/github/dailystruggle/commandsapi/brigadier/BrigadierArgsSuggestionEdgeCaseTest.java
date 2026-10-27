@@ -20,7 +20,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -118,7 +117,7 @@ class BrigadierArgsSuggestionEdgeCaseTest {
     }
 
     private static List<String> suggestionTexts(Suggestions suggestions) {
-        return suggestions.getList().stream().map(Suggestion::getText).collect(Collectors.toList());
+        return suggestions.getList().stream().map(Suggestion::getText).toList();
     }
 
     private static final class Source {

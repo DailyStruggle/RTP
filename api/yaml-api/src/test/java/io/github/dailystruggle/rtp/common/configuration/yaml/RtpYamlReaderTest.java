@@ -312,50 +312,52 @@ class RtpYamlReaderTest {
     @Test
     @DisplayName("Block scalars parse with literal, folded, chomping and indentation semantics")
     void blockScalarAndMergeKey() {
-        String source = "literal: | # header comment\n"
-                + "  first\n"
-                + "  ---\n"
-                + "  # body comment\n"
-                + "  \tdata\n"
-                + "folded: >-\n"
-                + "  one\n"
-                + "  two\n"
-                + "\n"
-                + "  three\n"
-                + "foldedLeadingBlankLines: >-\n"
-                + "\n"
-                + "\n"
-                + "  start\n"
-                + "foldedIndented: >-\n"
-                + "  normal\n"
-                + "   indented\n"
-                + "  final\n"
-                + "stripped: |-\n"
-                + "  last\n"
-                + "clipped: |\n"
-                + "  last\n"
-                + "kept: |+2\n"
-                + "  last\n"
-                + "\n"
-                + "foldedBlankLines: >-\n"
-                + "  alpha\n"
-                + "\n"
-                + "\n"
-                + "  beta\n"
-                + "foldedKeep: >+\n"
-                + "  red\n"
-                + "  blue\n"
-                + "\n"
-                + "\n"
-                + "explicit: |2-\n"
-                + "  exact\n"
-                + "items:\n"
-                + "  - |\n"
-                + "    sequence\n"
-                + "    value\n"
-                + "  - key: >-\n"
-                + "      map\n"
-                + "      value\n";
+        String source = """
+                literal: | # header comment
+                  first
+                  ---
+                  # body comment
+                  \tdata
+                folded: >-
+                  one
+                  two
+
+                  three
+                foldedLeadingBlankLines: >-
+
+
+                  start
+                foldedIndented: >-
+                  normal
+                   indented
+                  final
+                stripped: |-
+                  last
+                clipped: |
+                  last
+                kept: |+2
+                  last
+
+                foldedBlankLines: >-
+                  alpha
+
+
+                  beta
+                foldedKeep: >+
+                  red
+                  blue
+
+
+                explicit: |2-
+                  exact
+                items:
+                  - |
+                    sequence
+                    value
+                  - key: >-
+                      map
+                      value
+                """;
         RtpYamlMapping root = RtpYamlReader.parse(source);
         assertEquals("first\n---\n# body comment\n\tdata\n",
                 ((RtpYamlScalar) root.get("literal")).rawValue());

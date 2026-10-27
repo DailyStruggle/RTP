@@ -9,6 +9,9 @@ package io.github.dailystruggle.mapsapi.model;
  *
  * <p>New chart shapes shall be added to the {@code permits} clause and
  * documented in {@code maps-api-ADR-001} section Chart models.
+ *
+ * @governedBy ADR-053
+ * @governedBy ADR-115
  */
 public sealed interface ChartModel
         permits Heatmap2D, CategoryDistribution, TimeSeries, RegionCoverage,

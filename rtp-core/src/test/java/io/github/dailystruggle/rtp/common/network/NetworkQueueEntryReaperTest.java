@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -44,7 +45,7 @@ class NetworkQueueEntryReaperTest {
 
         assertEquals(1, reaper.sweepOnce());
         verify(queue).cancel(staleId, CancelReason.TTL_EXPIRED);
-        verify(queue, org.mockito.Mockito.never()).cancel(freshId, CancelReason.TTL_EXPIRED);
+        verify(queue, never()).cancel(freshId, CancelReason.TTL_EXPIRED);
     }
 
     @Test

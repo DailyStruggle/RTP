@@ -274,6 +274,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
   @NotNull
   @Override
+  @SuppressWarnings("NullableProblems")
   public FactoryValue<E> clone() {
     try {
       FactoryValue<E> clone = (FactoryValue<E>) super.clone();
@@ -438,23 +439,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     // ADR-076: the shared catalog rename map is a co-located dotfile sibling under the
     // catalog directory itself (e.g. definitions/regions/.shape/.CIRCLE.lang.yml), not
     // lang/<subDir>/<name>.lang.yml.
-    String subPart = subDir.replace('/', File.separatorChar);
-    String langDirStr =
-        rootPluginDir.getAbsolutePath()
-            + File.separator
-            + subPart;
-    File langDir = new File(langDirStr);
-    if (!langDir.exists()) {
-      boolean mkdir = langDir.mkdirs();
-      if (!mkdir && !langDir.exists()) {
-        throw new IllegalStateException(
-            "Failed to create lang directory: " + langDir.getAbsolutePath()
-                + " (check filesystem permissions for the plugin process)");
-      }
-    }
-
-    String mapFileName = langDir + File.separator + "." + fileName.replace(".yml", ".lang.yml");
-    langFile = new File(mapFileName);
+    langFile = resolveLangFile(rootPluginDir, subDir, fileName);
 
     RtpYamlConfig langYaml = new RtpYamlConfig(langFile);
     if (!langFile.exists()) {
@@ -490,6 +475,20 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     for (Map.Entry<String, Object> e : language_mapping.entrySet()) {
       reverse_language_mapping.put(e.getValue().toString(), e.getKey());
     }
+  }
+
+  private static File resolveLangFile(File rootPluginDir, String subDir, String fileName) {
+    String subPart = subDir.replace('/', File.separatorChar);
+    File langDir = new File(rootPluginDir.getAbsolutePath() + File.separator + subPart);
+    if (!langDir.exists()) {
+      boolean mkdir = langDir.mkdirs();
+      if (!mkdir && !langDir.exists()) {
+        throw new IllegalStateException(
+            "Failed to create lang directory: " + langDir.getAbsolutePath()
+                + " (check filesystem permissions for the plugin process)");
+      }
+    }
+    return new File(langDir + File.separator + "." + fileName.replace(".yml", ".lang.yml"));
   }
 
   @Override

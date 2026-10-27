@@ -9,6 +9,10 @@ import java.util.UUID;
  *
  * <p>Implemented by claim integrations (e.g. Factions, Towny, Lands, WorldGuard) and registered
  * via {@code RTPAPI.hooks().claimBoundaries().register(provider)}.
+ *
+ * @governedBy ADR-026
+ * @governedBy ADR-115
+ * @invariant S-003: No teleport into claim-protected land
  */
 @PublicApi
 public interface ClaimBoundaryProvider {

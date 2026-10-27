@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
  *             static resolution methods (ADR-116 Decision 2).
  */
 @Deprecated(since = "3.3.1")
+@SuppressWarnings("DeprecatedIsStillUsed")
 public final class HandleRegistry {
     private HandleRegistry() {}
 

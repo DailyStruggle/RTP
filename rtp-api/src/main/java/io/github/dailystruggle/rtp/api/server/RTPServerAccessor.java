@@ -12,7 +12,6 @@ import io.github.dailystruggle.server.api.ServerAccessor;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +26,11 @@ import org.jetbrains.annotations.Nullable;
  * Only layer allowed to touch platform-specific APIs (REQ-API-F-004, REQ-API-NF-002).
  *
  * <p>{@link #activeTasks} tracks active {@link TrackedRTPTask} instances thread-safely.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-API-F-004
+ * @trace REQ-API-NF-002
  */
 @PublicApi
 public interface RTPServerAccessor extends ServerAccessor {
@@ -72,16 +76,6 @@ public interface RTPServerAccessor extends ServerAccessor {
   String getPluginVersion();
 
   /**
-   * Returns the server name or network identity if configured, or {@code null}.
-   *
-   * @return server name or {@code null}
-   */
-  @Override
-  default String getServerName() {
-    return null;
-  }
-
-  /**
    * Looks up a world by its canonical name.
    *
    * @param name the world name; must not be {@code null}
@@ -123,16 +117,6 @@ public interface RTPServerAccessor extends ServerAccessor {
   RTPPlayer getPlayer(String name);
 
   /**
-   * Returns names of online players for tab completion without platform coupling.
-   *
-   * @return immutable snapshot of online player names; never {@code null}
-   */
-  @Override
-  default Set<String> getOnlinePlayerNames() {
-    return java.util.Collections.emptySet();
-  }
-
-  /**
    * Returns a synthetic {@link RTPPlayer} representing the server console, used
    * when an admin command targets the console as the teleport destination.
    *
@@ -159,16 +143,6 @@ public interface RTPServerAccessor extends ServerAccessor {
   @Override
   default PlayerLifecycleHook getPlayerLifecycleHook() {
     return NoopPlayerLifecycleHook.INSTANCE;
-  }
-
-  /**
-   * Returns milliseconds current tick has exceeded its 50ms budget.
-   *
-   * @return over-time in ms; 0 if on time
-   */
-  @Override
-  default long overTime() {
-    return 0L;
   }
 
   /**
@@ -289,18 +263,6 @@ public interface RTPServerAccessor extends ServerAccessor {
   @Override
   default Integer getScoreboardScore(UUID playerId, String objective) {
     return null;
-  }
-
-  /**
-   * Returns whether the host exposes a scoreboard objective.
-   *
-   * @param objective the objective name; must not be {@code null}
-   * @return {@link Optional#of(Object)} containing {@code true} when present or {@code false} when
-   *     absent, or {@link Optional#empty()} when the host cannot determine whether it is present
-   */
-  @Override
-  default Optional<Boolean> hasScoreboardObjective(String objective) {
-    return Optional.empty();
   }
 
   /**
@@ -655,17 +617,6 @@ public interface RTPServerAccessor extends ServerAccessor {
   }
 
   /**
-   * Returns descriptor for player's current region/world (ADR-048).
-   *
-   * @param player player UUID
-   * @return region descriptor; empty string if unknown
-   */
-  @Override
-  default String menuRegionDescriptor(UUID player) {
-    return "";
-  }
-
-  /**
    * Returns a snapshot collection of currently online RTPPlayer entities.
    *
    * @return collection of online players
@@ -864,14 +815,6 @@ public interface RTPServerAccessor extends ServerAccessor {
    */
   @Override
   default void damagePlayer(UUID playerId, double amount) {}
-
-  /**
-   * Resets the player's clientbound world border to match the world's actual border.
-   *
-   * @param playerId player UUID whose world border is to be restored
-   */
-  @Override
-  default void resetWorldBorder(UUID playerId) {}
 
   // ---------------------------------------------------------------------------
   // Palette identifier normalization & reconciliation SPI
