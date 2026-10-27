@@ -540,4 +540,24 @@ class RTPTest {
     void minRTPExecutions_defaultOne() {
         assertEquals(1, RTP.minRTPExecutions);
     }
+
+    @Test
+    void getWorld_nullPlayerOrOfflinePureDataLocation_returnsNullWithoutNpe() {
+        assertNull(RTP.getWorld(null));
+
+        io.github.dailystruggle.rtp.common.playerData.PureDataRTPPlayer offlinePure =
+                new io.github.dailystruggle.rtp.common.playerData.PureDataRTPPlayer(
+                        UUID.randomUUID(), "Offline", 0L, 0L, java.util.Set.of());
+        assertNull(RTP.getWorld(offlinePure));
+
+        MockRTPPlayer nullWorldPlayer =
+                new MockRTPPlayer(UUID.randomUUID(), "NoWorld", new RTPLocation(null, 0, 0, 0));
+        assertNull(RTP.getWorld(nullWorldPlayer));
+
+        MockRTPWorld defaultWorld = new MockRTPWorld("default");
+        accessor.addWorld(defaultWorld);
+        MockRTPPlayer onlinePlayer =
+                new MockRTPPlayer(UUID.randomUUID(), "Online", new RTPLocation(defaultWorld, 0, 0, 0));
+        assertSame(defaultWorld, RTP.getWorld(onlinePlayer));
+    }
 }
