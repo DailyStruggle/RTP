@@ -97,7 +97,7 @@ class FabricBookMenuRendererTest {
         MenuRenderer fallback = (id, m) -> calls.incrementAndGet();
         FabricBookMenuRenderer renderer = newRenderer(fallback);
         renderer.render(null, sampleModel());
-        renderer.render(VIEWER, null);
+        renderer.render(VIEWER, (MenuModel) null);
         assertEquals(0, calls.get());
         assertFalse(calls.get() > 0);
     }

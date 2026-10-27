@@ -60,12 +60,12 @@ public class BaseDistanceParameter extends CommandParameter {
     this.allValues = Collections.unmodifiableSet(values);
   }
 
-  @SuppressWarnings("java:S4276") // BiFunction<UUID, String, Boolean> matches DistanceParameter super signature
+  @SuppressWarnings({"java:S4276", "java:S3878"}) // BiFunction<UUID, String, Boolean> matches DistanceParameter super signature; empty array disambiguates varargs overload
   public BaseDistanceParameter(
       String permission,
       String description,
       BiFunction<UUID, String, Boolean> isRelevant) {
-    this(permission, description, isRelevant, (Object[]) new Object[0]);
+    this(permission, description, isRelevant, new Object[0]);
   }
 
   @Override
