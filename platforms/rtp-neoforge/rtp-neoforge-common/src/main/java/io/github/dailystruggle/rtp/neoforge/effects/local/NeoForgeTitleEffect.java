@@ -77,7 +77,10 @@ public class NeoForgeTitleEffect extends Effect<NeoForgeTitleKeys> {
         return sent;
     }
 
+    @SuppressWarnings("CastCanBeRemovedNarrowingVariableType")
     private static Component literalComponent(String text) {
+        // Keep Object local so JVM bytecode verification of NeoForgeTitleEffect does not
+        // eagerly load MutableComponent -> Component when instantiated in unit tests.
         Object raw = Component.literal(text);
         return (Component) raw;
     }

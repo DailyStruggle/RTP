@@ -401,6 +401,7 @@ class CodeClassMeta:
     gradle_test_cmd: str
     kind: str = "CLASS"
     project: str = DEFAULT_PROJECT
+    import_cites_json: str = "{}"
 
 
 @dataclass(frozen=True)
@@ -437,6 +438,7 @@ class FileManifestEntry:
 
 _JAVA_CODE_SECTIONS_CACHE: dict[tuple[str, str], list[CodeSection]] = {}
 _JAVA_CLASS_META_CACHE: dict[tuple[str, str], list[CodeClassMeta]] = {}
+_JAVA_IMPORT_CITES_CACHE: dict[tuple[str, str], dict[str, str]] = {}
 _TEST_CLASSES_CACHE: dict[tuple[str, str], list[TestClassMeta]] = {}
 _TRACEABILITY_CACHE: dict[tuple[str, str], list[TraceabilityRow]] = {}
 _FILE_MANIFEST_CACHE: dict[tuple[str, str], list[FileManifestEntry]] = {}
@@ -493,6 +495,139 @@ JAVA_CONSTANT_NAMED_RE = re.compile(
     r'\bconstantNamed\s*\(\s*[A-Za-z0-9_.]+\s*,\s*"([A-Za-z0-9_]+)"\s*\)'
 )
 JAVA_JAVADOC_RE = re.compile(r"/\*\*(.*?)\*/", re.DOTALL)
+JAVA_FIELD_RE = re.compile(
+    r"^\s*(?:private|protected|public)\s+(?:static\s+)?(?:final\s+)?(?:volatile\s+)?(?:transient\s+)?"
+    r"[A-Za-z0-9_<>\[\].,\s?]+?\s+([a-zA-Z_][A-Za-z0-9_]{2,})\s*(?:=|;)",
+    re.MULTILINE,
+)
+JAVA_LINE_COMMENT_RE = re.compile(r"^\s*//\s*([^\n]+)", re.MULTILINE)
+_JAVA_FIELD_STOP_NAMES = frozenset({
+    "log", "logger", "msg", "key", "val", "value", "values", "map", "set", "list",
+    "out", "err", "res", "result", "results", "idx", "len", "max", "min", "name",
+    "type", "id", "instance", "lock", "state", "data", "config", "plugin",
+})
+
+
+def _extract_java_methods_and_summary(
+    raw_text: str,
+    class_name: str,
+    pkg_name: str,
+) -> tuple[list[str], str]:
+    """
+    Extracts up to 32 method names and builds a composite `summary` preserving:
+      1. Class-level Javadoc (`javadoc_blocks[:2]`, up to 320 chars) for display & `repo_ast_audit`.
+      2. In-file `@governedBy` / `@trace` / `@invariant` / `@prohibition` tags (`Gov: ...`), never truncated.
+      3. Member-level Javadocs (`javadoc_blocks[2:]`), technical `//` comments, and distinctive field
+         identifiers (up to 760 chars total) so inline algorithms (e.g. `Region`, `ScanTask`, `BudgetPacer`)
+         are indexed in `code_sections`.
+    """
+    methods = [
+        m
+        for m in dict.fromkeys(JAVA_METHOD_RE.findall(raw_text))
+        if m not in ("if", "for", "while", "switch", "catch", "synchronized", "return", "throw", "new", "super", "this")
+    ][:32]
+
+    javadoc_blocks = JAVA_JAVADOC_RE.findall(raw_text)
+    lead_parts: list[str] = []
+    for jb in javadoc_blocks[:2]:
+        cleaned_jb = re.sub(r"(?m)^\s*\*\s?", " ", jb)
+        cleaned_jb = " ".join(cleaned_jb.split()).strip()
+        if cleaned_jb:
+            lead_parts.append(cleaned_jb)
+    lead_summary = " ".join(lead_parts)[:320].strip()
+
+    gov_tags = [
+        " ".join(m.split()).strip()
+        for m in JAVA_GOV_TAG_RE.findall(raw_text)
+        if m.strip()
+    ]
+    gov_part = ("Gov: " + "; ".join(gov_tags[:4])) if gov_tags else ""
+
+    header_no_comments = re.sub(r"/\*.*?\*/|//[^\n]*", " ", raw_text[:4500], flags=re.DOTALL)
+    is_interface = bool(re.search(rf"\binterface\s+{re.escape(class_name)}\b", header_no_comments))
+
+    # Preserve `has_real_javadoc` == False for undocumented interfaces in `audit_corpus_searchability`
+    if is_interface and not lead_summary:
+        base_str = f"{pkg_name}.{class_name}" if pkg_name else class_name
+        return methods, f"{base_str} {gov_part}".strip()[:480]
+
+    extra_parts: list[str] = []
+    fields = [
+        f
+        for f in dict.fromkeys(JAVA_FIELD_RE.findall(raw_text))
+        if f.lower() not in _JAVA_FIELD_STOP_NAMES and f not in methods and len(f) >= 3
+    ][:18]
+    if fields:
+        extra_parts.append("fields: " + " ".join(fields))
+
+    seen_member_words: set[str] = {
+        w.lower() for w in re.findall(r"[A-Za-z0-9_]{3,}", f"{class_name} {lead_summary} {' '.join(methods)} {' '.join(fields)}")
+    }
+    _member_prose_stop = {
+        "the", "and", "for", "with", "from", "into", "that", "this", "when", "where",
+        "which", "while", "after", "before", "under", "over", "between", "through",
+        "returns", "return", "true", "false", "null", "value", "values", "given",
+        "used", "uses", "using", "only", "also", "each", "more", "than", "such",
+        "will", "must", "shall", "should", "may", "can", "not", "are", "was", "were",
+        "has", "have", "had", "been", "being", "does", "did", "all", "any", "some",
+    }
+    acronym_terms: list[str] = []
+    camel_terms: list[str] = []
+    lower_terms: list[str] = []
+    for jb in javadoc_blocks[2:]:
+        cleaned_jb = re.sub(r"(?m)^\s*\*\s?", " ", jb)
+        cleaned_jb = re.sub(r"@(?:param|return|throws|see|since)\b", " ", cleaned_jb)
+        for tok in re.findall(r"[A-Za-z][A-Za-z0-9_]{2,}", cleaned_jb):
+            t_low = tok.lower()
+            if t_low in _member_prose_stop or t_low in seen_member_words:
+                continue
+            seen_member_words.add(t_low)
+            if tok.isupper():
+                if len(acronym_terms) < 25:
+                    acronym_terms.append(tok)
+            elif any(c.isupper() or c.isdigit() or c == "_" for c in tok[1:]):
+                if len(camel_terms) < 30:
+                    camel_terms.append(tok)
+            elif len(lower_terms) < 30:
+                lower_terms.append(tok)
+
+    for lc in JAVA_LINE_COMMENT_RE.findall(raw_text):
+        clean_lc = " ".join(lc.split()).strip(" -*=/")
+        if len(clean_lc) < 8:
+            continue
+        low_lc = clean_lc.lower()
+        if low_lc.startswith(("noinspection", "fallthrough", "todo", "fixme", "http", "copyright", "spdx", "checkstyle", "pmd", "sonar")):
+            continue
+        for tok in re.findall(r"[A-Za-z][A-Za-z0-9_]{2,}", clean_lc):
+            t_low = tok.lower()
+            if t_low in _member_prose_stop or t_low in seen_member_words:
+                continue
+            seen_member_words.add(t_low)
+            if tok.isupper():
+                if len(acronym_terms) < 30:
+                    acronym_terms.append(tok)
+            elif any(c.isupper() or c.isdigit() or c == "_" for c in tok[1:]):
+                if len(camel_terms) < 35:
+                    camel_terms.append(tok)
+            elif len(lower_terms) < 35:
+                lower_terms.append(tok)
+
+    member_terms = (acronym_terms + camel_terms + lower_terms)[:80]
+    if member_terms:
+        extra_parts.append("terms: " + " ".join(member_terms))
+
+    summary_segments: list[str] = []
+    if lead_summary:
+        summary_segments.append(lead_summary)
+    if gov_part:
+        summary_segments.append(gov_part)
+    if extra_parts:
+        summary_segments.append(" | ".join(extra_parts))
+
+    summary = " ".join(summary_segments)[:1100].strip()
+    if not summary:
+        summary = f"{pkg_name}.{class_name}" if pkg_name else class_name
+    return methods, summary
 
 
 def get_manifest_tag_map(
@@ -1417,11 +1552,7 @@ def parse_java_code_sections(
         seen_classes.add(dedup_key)
 
         rel_path = jf.relative_to(repo_root).as_posix()
-        methods = [
-            m
-            for m in dict.fromkeys(JAVA_METHOD_RE.findall(raw_text))
-            if m not in ("if", "for", "while", "switch", "catch", "synchronized", "return", "throw", "new", "super", "this")
-        ][:18]
+        methods, summary = _extract_java_methods_and_summary(raw_text, class_name, pkg_name)
 
         diag_items: list[str] = []
         for exc_type, exc_arg in JAVA_THROW_RE.findall(raw_text):
@@ -1461,24 +1592,6 @@ def parse_java_code_sections(
             for k in dict.fromkeys(raw_key_refs)
             if k not in ("class", "values", "valueOf", "name")
         ][:18]
-
-        javadoc_blocks = JAVA_JAVADOC_RE.findall(raw_text)
-        summary_parts: list[str] = []
-        for jb in javadoc_blocks[:2]:
-            cleaned_jb = re.sub(r"(?m)^\s*\*\s?", " ", jb)
-            cleaned_jb = " ".join(cleaned_jb.split()).strip()
-            if cleaned_jb:
-                summary_parts.append(cleaned_jb)
-        gov_tags = [
-            " ".join(m.split()).strip()
-            for m in JAVA_GOV_TAG_RE.findall(raw_text)
-            if m.strip()
-        ]
-        if gov_tags:
-            summary_parts.append("Gov: " + "; ".join(gov_tags[:4]))
-        summary = " ".join(summary_parts)[:480]
-        if not summary:
-            summary = f"{pkg_name}.{class_name}" if pkg_name else class_name
 
         results.append(
             CodeSection(
@@ -1960,6 +2073,53 @@ def _parse_single_java_class_meta(
         k for k, _v in sorted(import_scores.items(), key=lambda item: (-item[1], item[0]))[:32]
     ]
 
+    # Single-pass call-site line number & method hint extraction for `imports[:32]`
+    import_set = set(imports)
+    cite_lines: dict[str, list[int]] = {}
+    cite_methods: dict[str, list[str]] = {}
+    var_to_cls: dict[str, str] = {}
+    if import_set:
+        for line_no, raw_line in enumerate(raw_text.splitlines(), 1):
+            s_ln = raw_line.strip()
+            if not s_ln or s_ln.startswith(("package ", "import ", "//", "/*", "*")):
+                continue
+            code_ln = raw_line.split("//", 1)[0]
+            for tok in re.findall(r"\b([A-Z][A-Za-z0-9_]{2,})\b", code_ln):
+                if tok not in import_set:
+                    continue
+                l_bucket = cite_lines.setdefault(tok, [])
+                if line_no not in l_bucket and len(l_bucket) < 2:
+                    l_bucket.append(line_no)
+                for m_call in re.findall(rf"\b{re.escape(tok)}(?:\s*\.\s*|\s*::\s*)([a-z][A-Za-z0-9_]*)", code_ln):
+                    m_bucket = cite_methods.setdefault(tok, [])
+                    if m_call not in m_bucket and len(m_bucket) < 2:
+                        m_bucket.append(m_call)
+                for v_decl in re.findall(rf"\b{re.escape(tok)}(?:<[^>;]*>)?\s+([a-z][A-Za-z0-9_]*)\b", code_ln):
+                    if v_decl not in ("if", "for", "while", "return", "throw", "new"):
+                        var_to_cls[v_decl] = tok
+            if var_to_cls and "." in code_ln:
+                for v_name, m_call in re.findall(r"\b([a-z][A-Za-z0-9_]*)\s*\.\s*([a-z][A-Za-z0-9_]*)\s*\(", code_ln):
+                    owner_cls = var_to_cls.get(v_name)
+                    if owner_cls:
+                        l_bucket = cite_lines.setdefault(owner_cls, [])
+                        if line_no not in l_bucket and len(l_bucket) < 2:
+                            l_bucket.append(line_no)
+                        m_bucket = cite_methods.setdefault(owner_cls, [])
+                        if m_call not in m_bucket and len(m_bucket) < 2:
+                            m_bucket.append(m_call)
+
+    import_cites: dict[str, str] = {}
+    for imp_cls in imports:
+        lns = cite_lines.get(imp_cls, [])
+        mths = cite_methods.get(imp_cls, [])
+        if lns:
+            ln_str = ",".join(str(n) for n in lns[:2])
+            m_str = f" ({','.join(mths[:2])})" if mths else ""
+            import_cites[imp_cls] = f"{rel_path}:{ln_str}{m_str}"
+        else:
+            import_cites[imp_cls] = rel_path
+    _JAVA_IMPORT_CITES_CACHE[(project.strip().lower(), rel_path)] = import_cites
+
     raw_gov_candidates: list[str] = []
     for tag_line in JAVA_GOV_TAG_RE.findall(raw_text):
         for nid in NORMATIVE_ID_RE.findall(tag_line):
@@ -2037,6 +2197,7 @@ def _parse_single_java_class_meta(
         gradle_test_cmd=gradle_test_cmd,
         kind=kind,
         project=project,
+        import_cites_json=json.dumps(import_cites),
     )
 
 
@@ -2838,7 +2999,7 @@ def build_index(
 
         _populate_corpus_vocab_and_associations(conn, doc_rows, config_rows, bit_rows)
         from corpus_atlas import bake_project_ast
-        bake_project_ast(conn, project=None)
+        bake_project_ast(conn, project=None, import_cites_by_path=_JAVA_IMPORT_CITES_CACHE)
 
     conn_id = id(conn)
     for k in [k for k in _ASSOC_CACHE if k[0] == conn_id]:
@@ -2869,11 +3030,7 @@ def _parse_single_java_code_section(
     pkg_m = JAVA_PACKAGE_RE.search(raw_text)
     pkg_name = pkg_m.group(1) if pkg_m else ""
     rel_path = jf.relative_to(repo_root).as_posix()
-    methods = [
-        m
-        for m in dict.fromkeys(JAVA_METHOD_RE.findall(raw_text))
-        if m not in ("if", "for", "while", "switch", "catch", "synchronized")
-    ][:18]
+    methods, summary = _extract_java_methods_and_summary(raw_text, class_name, pkg_name)
     diag_items: list[str] = []
     for exc_type, exc_arg in JAVA_THROW_RE.findall(raw_text):
         clean_arg = " ".join(exc_arg.split()).strip()[:140]
@@ -2898,23 +3055,6 @@ def _parse_single_java_code_section(
         for k in dict.fromkeys(raw_key_refs)
         if k not in ("class", "values", "valueOf", "name")
     ][:18]
-    javadoc_blocks = JAVA_JAVADOC_RE.findall(raw_text)
-    summary_parts: list[str] = []
-    for jb in javadoc_blocks[:2]:
-        cleaned_jb = re.sub(r"(?m)^\s*\*\s?", " ", jb)
-        cleaned_jb = " ".join(cleaned_jb.split()).strip()
-        if cleaned_jb:
-            summary_parts.append(cleaned_jb)
-    gov_tags = [
-        " ".join(m.split()).strip()
-        for m in JAVA_GOV_TAG_RE.findall(raw_text)
-        if m.strip()
-    ]
-    if gov_tags:
-        summary_parts.append("Gov: " + "; ".join(gov_tags[:4]))
-    summary = " ".join(summary_parts)[:480]
-    if not summary:
-        summary = f"{pkg_name}.{class_name}" if pkg_name else class_name
     return CodeSection(
         class_name=class_name,
         package_name=pkg_name,

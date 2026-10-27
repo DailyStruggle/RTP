@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Platform-neutral handle to a scheduled task (ADR-116).
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
  */
 public interface TaskHandle {
   /** Cancels the scheduled task if it has not yet completed or been cancelled. */

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitHealth;
 import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.bit.BitSelector;
@@ -88,7 +89,7 @@ class PluginProbeComponentsTest {
             "TEST_COMMANDS_MISSING_PERMISSION",
             "TEST_COMMANDS_NULL_CHILD",
             "TEST_COMMANDS_TRAVERSAL_ERROR"),
-        report.findings().stream().map(finding -> finding.code()).sorted().toList());
+        report.findings().stream().map(BitFinding::code).sorted().toList());
   }
 
   @Test
@@ -113,7 +114,7 @@ class PluginProbeComponentsTest {
             "TEST_ECONOMY_ISOLATION_FAILED",
             "TEST_ECONOMY_ISOLATION_REGION_THREAD",
             "TEST_ECONOMY_ISOLATION_TIMEOUT"),
-        failureReport.findings().stream().map(finding -> finding.code()).sorted().toList());
+        failureReport.findings().stream().map(BitFinding::code).sorted().toList());
 
     EconomyIsolationTestJob.Result skipped = new EconomyIsolationTestJob.Result();
     skipped.notApplicable = true;
@@ -122,7 +123,7 @@ class PluginProbeComponentsTest {
     assertEquals(BitHealth.HEALTHY, skippedReport.health());
     assertEquals(
         List.of("TEST_ECONOMY_ISOLATION_NOT_APPLICABLE"),
-        skippedReport.findings().stream().map(finding -> finding.code()).toList());
+        skippedReport.findings().stream().map(BitFinding::code).toList());
   }
 
   @Test
@@ -137,7 +138,7 @@ class PluginProbeComponentsTest {
     assertEquals(BitHealth.HEALTHY, report.health());
     assertEquals(
         List.of("TEST_NETWORK_NOT_CONFIGURED"),
-        report.findings().stream().map(finding -> finding.code()).toList());
+        report.findings().stream().map(BitFinding::code).toList());
   }
 
   @Test
@@ -146,13 +147,13 @@ class PluginProbeComponentsTest {
         new NetworkSimulationTestJob.Result(NetworkProbeTarget.ProbeKind.TOKENS);
     BitReport tokenReport = NetworkSimulationTestJob.toBitReport(tokenFailure);
     assertEquals(BitHealth.FAILED, tokenReport.health());
-    assertEquals(List.of("TEST_NETWORK_TOKENS"), tokenReport.findings().stream().map(finding -> finding.code()).toList());
+    assertEquals(List.of("TEST_NETWORK_TOKENS"), tokenReport.findings().stream().map(BitFinding::code).toList());
 
     NetworkSimulationTestJob.Result heartbeatFailure =
         new NetworkSimulationTestJob.Result(NetworkProbeTarget.ProbeKind.HEARTBEAT);
     BitReport heartbeatReport = NetworkSimulationTestJob.toBitReport(heartbeatFailure);
     assertEquals(BitHealth.FAILED, heartbeatReport.health());
-    assertEquals(List.of("TEST_NETWORK_HEARTBEAT"), heartbeatReport.findings().stream().map(finding -> finding.code()).toList());
+    assertEquals(List.of("TEST_NETWORK_HEARTBEAT"), heartbeatReport.findings().stream().map(BitFinding::code).toList());
   }
 
   @Test
@@ -185,7 +186,7 @@ class PluginProbeComponentsTest {
     Object probe = probeResult(resultType);
     BitReport report = toBitReport(owner, probe);
     List<Integer> expected = codes(owner).stream().map(BitCode::id).sorted().toList();
-    List<Integer> actual = report.findings().stream().map(finding -> finding.codeId()).sorted().toList();
+    List<Integer> actual = report.findings().stream().map(BitFinding::codeId).sorted().toList();
     assertEquals(BitHealth.FAILED, report.health(), owner.getSimpleName());
     assertEquals(expected, actual, owner.getSimpleName());
   }

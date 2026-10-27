@@ -94,14 +94,16 @@ class StandaloneConfigFrameworkTest {
         File configFile = new File(dir, "myconfig.yml");
         Files.writeString(
                 configFile.toPath(),
-                "teleportDelay: 2m30s\n"
-                        + "maxCacheSize: 64MB\n"
-                        + "inheritedRadius: \"@defaults\"\n"
-                        + "shape:\n"
-                        + "  name: CIRCLE\n"
-                        + "  mode: ACCUMULATED\n"
-                        + "  radius: 100\n"
-                        + "version: 1.0\n");
+                """
+                        teleportDelay: 2m30s
+                        maxCacheSize: 64MB
+                        inheritedRadius: "@defaults"
+                        shape:
+                          name: CIRCLE
+                          mode: ACCUMULATED
+                          radius: 100
+                        version: 1.0
+                        """);
 
         ConfigParser.setDefaultReferenceResolver(
                 (raw, settingName, fallback) ->

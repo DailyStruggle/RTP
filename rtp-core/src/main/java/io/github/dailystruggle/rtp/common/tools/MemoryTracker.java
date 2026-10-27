@@ -239,7 +239,12 @@ public class MemoryTracker {
     }
     if (magnitude < 0) return -1L;
     String suffix = s.substring(unitStart).trim();
-    double scale = switch (suffix) {
+    double scale = resolveDataSizeScale(suffix);
+    return scale < 0 ? -1L : Math.round(magnitude * scale);
+  }
+
+  private static double resolveDataSizeScale(String suffix) {
+    return switch (suffix) {
       case "", "b", "byte", "bytes" -> 1.0;
       case "kb", "kilobyte", "kilobytes" -> 1_000.0;
       case "kib", "kibibyte", "kibibytes" -> 1_024.0;
@@ -249,7 +254,6 @@ public class MemoryTracker {
       case "gib", "gibibyte", "gibibytes" -> 1_073_741_824.0;
       default -> -1.0;
     };
-    return scale < 0 ? -1L : Math.round(magnitude * scale);
   }
 
   /**

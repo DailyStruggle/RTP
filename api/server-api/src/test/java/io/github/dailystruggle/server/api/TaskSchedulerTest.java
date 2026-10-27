@@ -20,13 +20,8 @@ import org.junit.jupiter.api.Test;
 class TaskSchedulerTest {
 
   @BeforeEach
-  void clearAccessors() {
-    ServerAccessors.set(null);
-    ServerAccessors.setScheduler(null);
-  }
-
   @AfterEach
-  void resetAccessors() {
+  void clearAccessors() {
     ServerAccessors.set(null);
     ServerAccessors.setScheduler(null);
   }

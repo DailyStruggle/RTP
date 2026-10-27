@@ -75,8 +75,8 @@ class ResidenceRegionVerifierTest {
   @Test
   @DisplayName("verify returns FALSE when location is within a ClaimedResidence (Rule S-003)")
   void testVerifyInsideResidenceClaimReturnsFalse() {
-    ClaimedResidence mockResidence = mock(ClaimedResidence.class);
-    when(mockResidenceManager.getByLoc(any(Location.class))).thenReturn(mockResidence);
+    ClaimedResidence claimedResidence = mock(ClaimedResidence.class);
+    when(mockResidenceManager.getByLoc(any(Location.class))).thenReturn(claimedResidence);
 
     RTPLocation loc = new RTPLocation(mockRtpWorld, 100, 64, 100);
     boolean result = verifier.verify(loc);

@@ -14,6 +14,10 @@ import java.util.concurrent.CompletableFuture;
  * <p>The returned future completes off-tick and must never be blocked on the main thread (S-005).
  * Implementations fail closed: a request is always answered with a result, never silently dropped
  * (S-004).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface GroupPlacementService {

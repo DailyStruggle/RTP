@@ -38,7 +38,7 @@ class ClearVerbsTest {
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().queuedPlayers.clear();
         TeleportSessions.current().processingPlayers.clear();
         TeleportSessions.current().invulnerablePlayers.clear();
@@ -61,7 +61,7 @@ class ClearVerbsTest {
         ClearQueueCmd cmd = new ClearQueueCmd(null);
         UUID caller = UUID.randomUUID();
         UUID other = UUID.randomUUID();
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().queuedPlayers.add(caller);
         TeleportSessions.current().processingPlayers.add(caller);
         TeleportSessions.current().queuedPlayers.add(other);
@@ -77,7 +77,7 @@ class ClearVerbsTest {
     @DisplayName("clear queue (console) drains every player's queue markers")
     void queue_globalClearsAll() {
         ClearQueueCmd cmd = new ClearQueueCmd(null);
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().queuedPlayers.add(UUID.randomUUID());
         TeleportSessions.current().processingPlayers.add(UUID.randomUUID());
         TeleportSessions.current().invulnerablePlayers.put(UUID.randomUUID(), 1L);
@@ -100,7 +100,7 @@ class ClearVerbsTest {
         accessor.addPlayer(new MockRTPPlayer(bId, "bob", null));
         accessor.addPlayer(new MockRTPPlayer(cId, "carol", null));
         long now = System.currentTimeMillis();
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().usageCaps.recordSuccess(aId, 3, 0, now);
         TeleportSessions.current().usageCaps.recordSuccess(bId, 3, 0, now);
         TeleportSessions.current().usageCaps.recordSuccess(cId, 3, 0, now);
@@ -117,7 +117,7 @@ class ClearVerbsTest {
     @DisplayName("clear invuln (console) clears every invulnerability marker")
     void invuln_globalClearsAll() {
         ClearInvulnCmd cmd = new ClearInvulnCmd(null);
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().invulnerablePlayers.put(UUID.randomUUID(), 1L);
         TeleportSessions.current().invulnerablePlayers.put(UUID.randomUUID(), 2L);
 
@@ -132,7 +132,7 @@ class ClearVerbsTest {
         ClearInvulnCmd cmd = new ClearInvulnCmd(null);
         UUID caller = UUID.randomUUID();
         UUID other = UUID.randomUUID();
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().invulnerablePlayers.put(caller, 1L);
         TeleportSessions.current().invulnerablePlayers.put(other, 2L);
 

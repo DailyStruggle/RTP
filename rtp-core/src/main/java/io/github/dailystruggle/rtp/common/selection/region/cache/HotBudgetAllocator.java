@@ -70,7 +70,7 @@ public class HotBudgetAllocator {
             }
 
             EwmaEstimator estimator = smoothedDemand.computeIfAbsent(name, k -> EwmaEstimator.ofAlpha(alpha));
-            estimator.recordSample((double) observed);
+            estimator.recordSample(observed);
             weights.put(name, estimator.mean());
         }
         return weights;
@@ -155,13 +155,13 @@ public class HotBudgetAllocator {
             costs.put(name, cost);
             totalFloorChunks += floor * cost;
 
-            double demand = resolveSmoothedDemandOrFallback(name, (double) sink.demandWeight());
+            double demand = resolveSmoothedDemandOrFallback(name, sink.demandWeight());
             normalizedDemands.put(name, demand / cost);
         }
 
         // 2. Bound floors: sum(floors * cost) <= maxCachedChunks
         double floorScale = 1.0;
-        if (totalFloorChunks > maxCachedChunks && totalFloorChunks > 0) {
+        if (totalFloorChunks > maxCachedChunks) {
             floorScale = (double) maxCachedChunks / (double) totalFloorChunks;
         }
 
@@ -294,13 +294,13 @@ public class HotBudgetAllocator {
             if (consumerWeights != null && consumerWeights.containsKey(name)) {
                 rawWeight = Math.max(0.0, consumerWeights.get(name));
             } else {
-                rawWeight = Math.max(0.0, resolveSmoothedDemandOrFallback(name, (double) sink.demandWeight())) / cost;
+                rawWeight = Math.max(0.0, resolveSmoothedDemandOrFallback(name, sink.demandWeight())) / cost;
             }
             weights.put(name, rawWeight);
         }
 
         double floorScale = 1.0;
-        if (totalFloorChunks > maxCachedChunks && totalFloorChunks > 0) {
+        if (totalFloorChunks > maxCachedChunks) {
             floorScale = (double) maxCachedChunks / (double) totalFloorChunks;
         }
 
@@ -320,14 +320,14 @@ public class HotBudgetAllocator {
             long maxExtraEntries = Math.max(0L, (long) cap - (long) target);
             double maxExtraChunks = (cap == Integer.MAX_VALUE)
                     ? (double) maxCachedChunks
-                    : Math.min((double) maxCachedChunks, (double) maxExtraEntries * (double) cost);
+                    : Math.min(maxCachedChunks, (double) maxExtraEntries * (double) cost);
             extraChunkDemands.put(name, Math.max(0.0, maxExtraChunks));
         }
         remainingChunks = Math.max(0, remainingChunks);
 
         if (remainingChunks > 0) {
             Map<String, Double> allocatedExtraChunks = computeWaterFilling(
-                    extraChunkDemands, weights, (double) remainingChunks);
+                    extraChunkDemands, weights, remainingChunks);
             for (HotSink<T> sink : sinks) {
                 if (sink == null) continue;
                 String name = sink.name();
@@ -336,7 +336,7 @@ public class HotBudgetAllocator {
                 int cap = caps.get(name);
                 double chunkShare = allocatedExtraChunks.getOrDefault(name, 0.0);
                 int additionalEntries = (int) Math.floor((chunkShare + 1e-9) / cost);
-                int newTarget = (int) Math.min((long) cap, (long) currentTarget + Math.max(0, additionalEntries));
+                int newTarget = (int) Math.min(cap, (long) currentTarget + Math.max(0, additionalEntries));
                 targets.put(name, newTarget);
             }
         }

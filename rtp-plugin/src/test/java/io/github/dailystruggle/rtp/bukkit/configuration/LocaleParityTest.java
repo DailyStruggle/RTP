@@ -399,7 +399,7 @@ public class LocaleParityTest {
 
         @TestFactory
         @DisplayName("baseline <file>.yml keys all have a row in baseline lang/<file>.lang.yml")
-        Iterable<DynamicTest> baselineLangMapCoversEveryBaselineKey() throws IOException {
+        Iterable<DynamicTest> baselineLangMapCoversEveryBaselineKey() {
             List<DynamicTest> tests = new ArrayList<>();
             for (String category : discoverBaselineCategories()) {
                 tests.add(DynamicTest.dynamicTest(category, () -> {
@@ -418,7 +418,7 @@ public class LocaleParityTest {
 
         @TestFactory
         @DisplayName("each locale ships every baseline key under its translated name (all categories)")
-        Iterable<DynamicTest> everyLocaleShipsEveryBaselineKey() throws IOException {
+        Iterable<DynamicTest> everyLocaleShipsEveryBaselineKey() {
             List<DynamicTest> tests = new ArrayList<>();
             List<String> categories = discoverBaselineCategories();
             List<Path> locales = discoverLocaleDirs();
@@ -467,7 +467,7 @@ public class LocaleParityTest {
 
         @TestFactory
         @DisplayName("each locale's <file>.lang.yml keys exist in the baseline <file>.yml (no stale rows)")
-        Iterable<DynamicTest> localeLangMapsHaveNoStaleRows() throws IOException {
+        Iterable<DynamicTest> localeLangMapsHaveNoStaleRows() {
             List<DynamicTest> tests = new ArrayList<>();
             List<String> categories = discoverBaselineCategories();
             List<Path> locales = discoverLocaleDirs();
@@ -512,7 +512,7 @@ public class LocaleParityTest {
 
         @Test
         @DisplayName("at least one locale subdirectory is discovered under lang/")
-        void atLeastOneLocaleDiscovered() throws IOException {
+        void atLeastOneLocaleDiscovered() {
             if (!Files.isDirectory(LANG_ROOT)) return;
             assertTrue(!discoverLocaleDirs().isEmpty(),
                     "No locale subdirectories found under " + LANG_ROOT.toAbsolutePath()

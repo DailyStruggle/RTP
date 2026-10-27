@@ -276,14 +276,14 @@ public final class ProbedShareAllocator {
             double loanLimit = (prev != null) ? clamp(prev.loanLimitNanos(), 0.0, sCfg) : 0.0;
             long lastBreach = (prev != null) ? prev.lastBreachNanos() : Long.MIN_VALUE;
             double dtSec = (prev != null && nowNanos > prev.lastEvaluatedNanos())
-                    ? (double) (nowNanos - prev.lastEvaluatedNanos()) / 1_000_000_000.0
+                    ? (nowNanos - prev.lastEvaluatedNanos()) / 1_000_000_000.0
                     : 0.25;
 
             if (sig.breached()) {
                 lastAnyOverloadNanos.set(nowNanos);
                 loanLimit = 0.5 * loanLimit;
                 if (sig.recentTwoSecAttributedNanosPerTick() >= contributionThreshold) {
-                    limit = Math.max((double) sMin, 0.5 * limit);
+                    limit = Math.max(sMin, 0.5 * limit);
                     lastBreach = nowNanos;
                 } else {
                     breachesNotAttributedTotal.incrementAndGet();
@@ -291,15 +291,15 @@ public final class ProbedShareAllocator {
             } else if (prev != null) {
                 boolean canGrowFullRate = sig.population() <= 1 || sig.queuedInteractiveWork();
                 if (canGrowFullRate) {
-                    limit = Math.min((double) sCfg, limit + stdRatePerSec * dtSec);
+                    limit = Math.min(sCfg, limit + stdRatePerSec * dtSec);
                 } else {
                     long cooldownEndNanos = (lastBreach != Long.MIN_VALUE)
                             ? (lastBreach + POPULATED_GROWTH_COOLDOWN_NANOS)
                             : Long.MIN_VALUE;
                     long growthStartNanos = Math.max(prev.lastEvaluatedNanos(), cooldownEndNanos);
                     if (nowNanos > growthStartNanos) {
-                        double eligibleDtSec = (double) (nowNanos - growthStartNanos) / 1_000_000_000.0;
-                        limit = Math.min((double) sCfg, limit + 0.25 * stdRatePerSec * eligibleDtSec);
+                        double eligibleDtSec = (nowNanos - growthStartNanos) / 1_000_000_000.0;
+                        limit = Math.min(sCfg, limit + 0.25 * stdRatePerSec * eligibleDtSec);
                     }
                 }
             }
@@ -368,7 +368,7 @@ public final class ProbedShareAllocator {
                 long sK = effectiveShares.get(id);
                 long sKb = effectiveBgShares.get(id);
 
-                boolean hasQueuedExcess = sig.queuedBackgroundNanos() > (double) sKb;
+                boolean hasQueuedExcess = sig.queuedBackgroundNanos() > sKb;
                 boolean atCeiling = sK >= sCfg;
                 boolean noRecentBreach = st.lastBreachNanos() == Long.MIN_VALUE
                         || (nowNanos >= st.lastBreachNanos() && (nowNanos - st.lastBreachNanos()) >= LOAN_NO_BREACH_NANOS);
@@ -381,12 +381,12 @@ public final class ProbedShareAllocator {
                         && !permitsSaturated;
 
                 if (eligible) {
-                    double nextLoanLimit = Math.min((double) sCfg, st.loanLimitNanos() + Math.max((double) sMin, stdRatePerSec));
+                    double nextLoanLimit = Math.min(sCfg, st.loanLimitNanos() + Math.max(sMin, stdRatePerSec));
                     groupStates.put(id, new GroupState(
                             st.limitNanos(), nextLoanLimit, st.lastBreachNanos(),
                             st.lastEvaluatedNanos(), st.lastActiveNanos(),
                             st.interactiveNanosPerTick(), st.backgroundNanosPerTick()));
-                    double cap25 = Math.max(0.0, (double) (MAX_BORROWED_TOTAL_NANOS - sK));
+                    double cap25 = Math.max(0.0, MAX_BORROWED_TOTAL_NANOS - sK);
                     double qExcess = Math.max(0.0, sig.queuedBackgroundNanos() - sKb);
                     double req = Math.min(Math.min(sCfg, cap25), Math.min(nextLoanLimit, qExcess));
                     if (req > 0.0) {
@@ -399,7 +399,7 @@ public final class ProbedShareAllocator {
             }
 
             double loanScale = (sumLoanRequests > 0.0)
-                    ? Math.min(1.0, (double) lendablePoolL / sumLoanRequests)
+                    ? Math.min(1.0, lendablePoolL / sumLoanRequests)
                     : 0.0;
 
             for (String id : signalById.keySet()) {
@@ -437,7 +437,7 @@ public final class ProbedShareAllocator {
                     : sCfg;
 
             double wK = clamp(((double) (sKb + eK)) / (double) sCfg, 0.0, 2.0);
-            double wPrimeK = wK / (1.0 + ((double) sig.population() / 4.0));
+            double wPrimeK = wK / (1.0 + (sig.population() / 4.0));
             maxAdjWeightAny = Math.max(maxAdjWeightAny, wPrimeK);
             if (sig.queuedBackgroundNanos() > 0.0) {
                 maxAdjWeightQueued = Math.max(maxAdjWeightQueued, wPrimeK);
@@ -445,7 +445,7 @@ public final class ProbedShareAllocator {
 
             double cK = sig.interactiveNanosPerTick() + sig.backgroundNanosPerTick();
             if (cK > 0.0) {
-                double xK = cK / Math.max(1.0, (double) limitK);
+                double xK = cK / Math.max(1.0, limitK);
                 sumXk += xK;
                 sumXkSq += xK * xK;
                 activeWorkRegions++;
@@ -453,7 +453,7 @@ public final class ProbedShareAllocator {
 
             if (sig.population() > 0) {
                 double bgMs = sig.backgroundNanosPerTick() / 1_000_000.0;
-                sumWeightedBgMs += (double) sig.population() * bgMs;
+                sumWeightedBgMs += sig.population() * bgMs;
                 sumPopulation += sig.population();
             }
 
@@ -476,10 +476,10 @@ public final class ProbedShareAllocator {
 
         double effectiveMaxWPrime = (maxAdjWeightQueued > 0.0) ? maxAdjWeightQueued : maxAdjWeightAny;
         double jainJ = (activeWorkRegions > 0 && sumXkSq > 0.0)
-                ? ((sumXk * sumXk) / ((double) activeWorkRegions * sumXkSq))
+                ? ((sumXk * sumXk) / (activeWorkRegions * sumXkSq))
                 : 1.0;
         double exposureE = (sumPopulation > 0L)
-                ? (sumWeightedBgMs / (double) sumPopulation)
+                ? (sumWeightedBgMs / sumPopulation)
                 : 0.0;
 
         AllocationSnapshot snapshot = new AllocationSnapshot(
@@ -520,27 +520,27 @@ public final class ProbedShareAllocator {
         if (survivingGroupId == null || absorbedGroupId == null || survivingGroupId.equals(absorbedGroupId)) {
             return;
         }
-        GroupState a = groupStates.get(survivingGroupId);
         GroupState b = groupStates.remove(absorbedGroupId);
         if (b == null) return;
-        if (a == null) {
-            groupStates.put(survivingGroupId, new GroupState(
-                    b.limitNanos(), b.loanLimitNanos(), b.lastBreachNanos(),
-                    nowNanos, nowNanos, b.interactiveNanosPerTick(), b.backgroundNanosPerTick()));
-            return;
-        }
-        double mergedLimit = Math.min(a.limitNanos(), b.limitNanos());
-        double mergedLoanLimit = Math.min(a.loanLimitNanos(), b.loanLimitNanos());
-        long mergedBreach = Math.max(a.lastBreachNanos(), b.lastBreachNanos());
-        groupStates.put(survivingGroupId, new GroupState(
-                mergedLimit,
-                mergedLoanLimit,
-                mergedBreach,
-                nowNanos,
-                nowNanos,
-                a.interactiveNanosPerTick() + b.interactiveNanosPerTick(),
-                a.backgroundNanosPerTick() + b.backgroundNanosPerTick()
-        ));
+        groupStates.compute(survivingGroupId, (k, a) -> {
+            if (a == null) {
+                return new GroupState(
+                        b.limitNanos(), b.loanLimitNanos(), b.lastBreachNanos(),
+                        nowNanos, nowNanos, b.interactiveNanosPerTick(), b.backgroundNanosPerTick());
+            }
+            double mergedLimit = Math.min(a.limitNanos(), b.limitNanos());
+            double mergedLoanLimit = Math.min(a.loanLimitNanos(), b.loanLimitNanos());
+            long mergedBreach = Math.max(a.lastBreachNanos(), b.lastBreachNanos());
+            return new GroupState(
+                    mergedLimit,
+                    mergedLoanLimit,
+                    mergedBreach,
+                    nowNanos,
+                    nowNanos,
+                    a.interactiveNanosPerTick() + b.interactiveNanosPerTick(),
+                    a.backgroundNanosPerTick() + b.backgroundNanosPerTick()
+            );
+        });
     }
 
     /**

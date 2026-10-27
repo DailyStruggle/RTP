@@ -13,7 +13,6 @@ import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.server.api.PlatformFamily;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -336,16 +335,16 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
 
   private static boolean hasField(Class<?> declaring, String name) {
     try {
-      Field f = declaring.getField(name);
-      return f != null;
+      declaring.getField(name);
+      return true;
     } catch (NoSuchFieldException ignored) {
       // fall through to declared-field walk
     }
     Class<?> c = declaring;
     while (c != null) {
       try {
-        Field f = c.getDeclaredField(name);
-        return f != null;
+        c.getDeclaredField(name);
+        return true;
       } catch (NoSuchFieldException ignored) {
         c = c.getSuperclass();
       }

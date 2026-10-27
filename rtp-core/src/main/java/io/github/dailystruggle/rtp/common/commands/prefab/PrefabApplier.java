@@ -11,6 +11,9 @@ import java.util.TreeMap;
  * Pure-function applier that merges a {@link Prefab} into current parsed YAML trees
  * and produces the updated trees alongside a per-file diff.
  * Inputs are treated as read-only; maps are deep-copied.
+ *
+ * @governedBy ADR-064
+ * @governedBy ADR-115
  */
 public final class PrefabApplier {
 

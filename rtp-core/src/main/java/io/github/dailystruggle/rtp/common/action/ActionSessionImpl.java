@@ -216,6 +216,7 @@ public final class ActionSessionImpl implements ActionSession {
     tick(currentTimeMillis());
   }
 
+  @SuppressWarnings("java:S1172") // package-private test hook accepting simulated timestamp
   void tick(long nowMillis) {
     if (!active.get()) return;
     checkContinuousConfinement();
@@ -868,11 +869,6 @@ public final class ActionSessionImpl implements ActionSession {
 
   private void executeLifecycleSteps(List<ActionDefinition.LifecycleStep> steps, ActionGateContext gateCtx) {
     executeLifecycleStepsWithTokens(steps, gateCtx, Collections.emptyMap(), false);
-  }
-
-  private void executeLifecycleSteps(
-      List<ActionDefinition.LifecycleStep> steps, ActionGateContext gateCtx, boolean terminal) {
-    executeLifecycleStepsWithTokens(steps, gateCtx, Collections.emptyMap(), terminal);
   }
 
   private void executeLifecycleStepsWithTokens(

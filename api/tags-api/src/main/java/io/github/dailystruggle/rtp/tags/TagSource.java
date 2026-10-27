@@ -9,6 +9,9 @@ import java.util.List;
  * The resolver computes the union of all sources.
  *
  * <p>Implementations should be thread-safe.
+ *
+ * @governedBy ADR-017
+ * @governedBy ADR-115
  */
 public interface TagSource {
 

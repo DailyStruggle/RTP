@@ -9,6 +9,9 @@ import java.util.Objects;
 /**
  * Synthesises per-world region overlays for {@link Prefab}s with {@link Prefab#expandPerWorld()}.
  * Clones the {@code default} region template for unmapped worlds in an idempotent, pure manner.
+ *
+ * @governedBy ADR-064
+ * @governedBy ADR-115
  */
 public final class MultiWorldExpander {
 

@@ -9,6 +9,10 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Thread-safe registry for {@link SetupSession} instances with automatic TTL eviction.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-050
+ * @governedBy ADR-115
  */
 public final class SetupSessionRegistry {
 

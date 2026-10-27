@@ -57,7 +57,7 @@ public final class ProbeBitReport {
   public static boolean isJson(Map<String, List<String>> parameterValues) {
     if (parameterValues == null) return false;
     List<String> values = parameterValues.get("json");
-    return values != null && values.stream().anyMatch(value -> Boolean.parseBoolean(value));
+    return values != null && values.stream().anyMatch(Boolean::parseBoolean);
   }
 
   public static void emit(

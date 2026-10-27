@@ -34,6 +34,10 @@ import org.jetbrains.annotations.NotNull;
  * shall use the entity / region scheduler; on Fabric, it shall use
  * {@code MinecraftServer#execute}. Callers shall not assume any particular
  * thread.</p>
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
+ * @governedBy ADR-116
  */
 public interface EffectRuntime {
 

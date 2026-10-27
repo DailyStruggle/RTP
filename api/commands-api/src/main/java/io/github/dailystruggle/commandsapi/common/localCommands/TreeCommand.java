@@ -20,6 +20,9 @@ import java.util.stream.Stream;
 /**
  * a command layer that can call a number of sub-commands, hence creating a tree structure.
  * This enables a typical command chain, where one command has a number of sub-commands
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
  */
 public interface TreeCommand extends CommandsAPICommand {
     default void addParameter(String name, CommandParameter parameter) {

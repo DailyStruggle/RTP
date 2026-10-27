@@ -82,7 +82,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     x -= cx;
     z -= cz;
 
-    int[] input = new int[] {(int) x, (int) z};
+    int[] input = {(int) x, (int) z};
 
     input = rotate(input, -degrees);
     input[0] += (int) (width / 2);
@@ -110,7 +110,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     int dx = (int) (x - cx);
     int dz = (int) (z - cz);
 
-    int[] input = new int[] {dx, dz};
+    int[] input = {dx, dz};
     input = rotate(input, -degrees);
 
     return Math.abs(input[0]) <= width / 2 && Math.abs(input[1]) <= height / 2;
@@ -130,7 +130,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     long x = coords.x - cx;
     long z = coords.z - cz;
 
-    int[] input = new int[] {(int) x, (int) z};
+    int[] input = {(int) x, (int) z};
 
     input = rotate(input, -degrees);
     input[0] += (int) (width / 2);

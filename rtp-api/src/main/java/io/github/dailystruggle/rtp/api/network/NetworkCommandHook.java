@@ -13,6 +13,9 @@ import java.util.UUID;
  * fallback to {@link RoutingResult.Local} or return {@link RoutingResult.Reject}.
  *
  * <p>Threading: invoked on command dispatch thread; must be non-blocking.
+ *
+ * @governedBy ADR-036
+ * @governedBy ADR-115
  */
 @FunctionalInterface
 public interface NetworkCommandHook {

@@ -2,6 +2,9 @@ package io.github.dailystruggle.rtp.api.server;
 
 /**
  * Platform-neutral description of an on-screen progress bar (e.g. Bukkit BossBar).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 public final class ProgressBar extends io.github.dailystruggle.server.api.ProgressBar {
 

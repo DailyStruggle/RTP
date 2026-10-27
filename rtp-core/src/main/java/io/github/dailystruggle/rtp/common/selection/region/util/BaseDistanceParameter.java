@@ -22,6 +22,7 @@ public class BaseDistanceParameter extends CommandParameter {
 
   private final Set<String> allValues;
 
+  @SuppressWarnings("java:S4276") // BiFunction<UUID, String, Boolean> matches DistanceParameter super signature
   public BaseDistanceParameter(
       String permission,
       String description,
@@ -59,11 +60,12 @@ public class BaseDistanceParameter extends CommandParameter {
     this.allValues = Collections.unmodifiableSet(values);
   }
 
+  @SuppressWarnings("java:S4276") // BiFunction<UUID, String, Boolean> matches DistanceParameter super signature
   public BaseDistanceParameter(
       String permission,
       String description,
       BiFunction<UUID, String, Boolean> isRelevant) {
-    this(permission, description, isRelevant, new Object[0]);
+    this(permission, description, isRelevant, (Object[]) new Object[0]);
   }
 
   @Override

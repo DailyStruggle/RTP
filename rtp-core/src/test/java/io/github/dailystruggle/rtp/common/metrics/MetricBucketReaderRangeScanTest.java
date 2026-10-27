@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.metrics;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -111,10 +112,10 @@ class MetricBucketReaderRangeScanTest {
 
       ChartSeriesSnapshot seriesCopy =
           assembler.assemble("surv-1", "mspt", 1_900_000_000L, 1_900_000_200L);
-      assertEquals(series, series);
+      assertTrue(series.equals(series));
       assertEquals(series, seriesCopy);
       assertEquals(series.hashCode(), seriesCopy.hashCode());
-      assertNotEquals(series, null);
+      assertFalse(series.equals(null));
       assertNotEquals(
           series,
           new ChartSeriesSnapshot(

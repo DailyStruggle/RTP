@@ -394,6 +394,7 @@ def query_context(
         "TESTS_CLASS": 1,
     }
     edges.sort(key=lambda item: (edge_priority.get(str(item["edge_kind"]), 2), -float(item["weight"] or 0.0)))
+    caller_site_hints: dict[str, str] = {}
     for e in edges:
         src = str(e["src_symbol_id"])
         dst = str(e["dst_symbol_id"])
@@ -411,10 +412,21 @@ def query_context(
             _add_unique(implemented_spis, other_clean)
         elif kind == "IMPORTS_CLASS" and src in focal_set:
             _add_unique(outbound_imports, other_clean)
-        elif kind == "IMPORTED_BY_CLASS" and src in focal_set:
-            _add_unique(inbound_callers, other_clean)
-        elif kind == "IMPORTS_CLASS" and dst in focal_set:
-            _add_unique(inbound_callers, src.split(":", 1)[-1])
+        elif (kind == "IMPORTED_BY_CLASS" and src in focal_set) or (kind == "IMPORTS_CLASS" and dst in focal_set):
+            caller_cls = other_clean if (kind == "IMPORTED_BY_CLASS" and src in focal_set) else src.split(":", 1)[-1]
+            _add_unique(inbound_callers, caller_cls)
+            if caller_cls not in caller_site_hints and e.get("evidence_json"):
+                try:
+                    ev_list = json.loads(str(e["evidence_json"]))
+                except (ValueError, TypeError):
+                    ev_list = []
+                for ev in ev_list:
+                    m_ev = re.search(r":(\d+(?:,\d+)?)(?:\s*\(([^)]+)\))?$", str(ev).strip())
+                    if m_ev:
+                        ln_p = m_ev.group(1)
+                        m_p = m_ev.group(2)
+                        caller_site_hints[caller_cls] = f"`{caller_cls}:{ln_p}` (`{m_p}`)" if m_p else f"`{caller_cls}:{ln_p}`"
+                        break
         elif kind in ("SATISFIES_REQ", "REQ_SATISFIED_BY"):
             if other.startswith("req:"):
                 _add_unique(governing_reqs, other_clean)
@@ -605,6 +617,7 @@ def query_context(
         "dependencies": {
             "outbound_imports": outbound_imports[:14],
             "inbound_callers": inbound_callers[:14],
+            "inbound_caller_sites": [caller_site_hints.get(c, f"`{c}`") for c in inbound_callers[:14]],
         },
         "config_keys": config_keys[:10],
         "bit_codes": bit_codes[:8],
@@ -631,7 +644,7 @@ def format_context_markdown(ctx: dict[str, Any]) -> str:
         lines.append(f"### AST Context: `{pc['class_name']}` ({pc['kind']}) {badge}")
         lines.append(f"- **Path / Module:** `{pc['path']}` (`{pc['module_name']}`, `{pc['package_name']}`)")
         if pc.get("methods"):
-            lines.append(f"- **Methods:** `{', '.join(pc['methods'].split()[:12])}`")
+            lines.append(f"- **Methods:** `{', '.join(pc['methods'].split()[:16])}`")
     elif tr is not None:
         lines.append(f"### AST Context: `{tr['req_id']}` (Requirement Traceability)")
         lines.append(f"- **Summary:** {tr['summary'][:200]}")
@@ -672,7 +685,8 @@ def format_context_markdown(ctx: dict[str, Any]) -> str:
     if deps["outbound_imports"]:
         lines.append("- **Depends On (Imports):** " + ", ".join(f"`{d}`" for d in deps["outbound_imports"][:10]))
     if deps["inbound_callers"]:
-        lines.append("- **Referenced By (Callers):** " + ", ".join(f"`{c}`" for c in deps["inbound_callers"][:10]))
+        caller_items = deps.get("inbound_caller_sites") or [f"`{c}`" for c in deps["inbound_callers"]]
+        lines.append("- **Referenced By (Callers):** " + ", ".join(caller_items[:10]))
 
     if ctx["config_keys"]:
         lines.append("- **Config Keys:** " + ", ".join(f"`{k}`" for k in ctx["config_keys"][:8]))
@@ -732,7 +746,7 @@ def _get_prepared_search_corpus(
     rows = conn.execute(
         """
         SELECT class_name, package_name, path, module_name, dag_tier,
-               super_class, interfaces_json, governed_by_json, gradle_test_cmd, kind
+               super_class, interfaces_json, imports_json, governed_by_json, gradle_test_cmd, kind
         FROM code_class_meta
         WHERE lower(project) = ?
         """,
@@ -750,12 +764,19 @@ def _get_prepared_search_corpus(
         methods_str, summary_str = cs_by_path.get(str(r["path"]), ("", ""))
         method_words = set(_split_camel_tokens(methods_str))
         ifaces = json.loads(str(r["interfaces_json"] or "[]"))
+        imps = json.loads(str(r["imports_json"] or "[]"))[:12]
+        import_words = set(_split_camel_tokens(" ".join(imps)))
         govs = json.loads(str(r["governed_by_json"] or "[]"))
         impls_str = " ".join(impl_by_spi.get(cls_name, [])[:10])
         hay_low = f"{cls_low} {pkg_low} {mod_low} {methods_str.lower()} {summary_str.lower()} {' '.join(ifaces).lower()} {' '.join(govs).lower()} {impls_str.lower()}"
-        hay_words = set(re.findall(r"[a-z0-9_.-]{2,}", hay_low)) | method_words | set(_split_camel_tokens(impls_str))
+        hay_words = (
+            set(re.findall(r"[a-z0-9_.-]{2,}", hay_low))
+            | method_words
+            | set(_split_camel_tokens(summary_str))
+            | set(_split_camel_tokens(impls_str))
+        )
         hay_stems = {porter_stem_word(w) for w in hay_words if len(w) >= 3}
-        prepared_rows.append((r, cls_name, cls_low, cls_words, cls_stems, method_words, pkg_low, mod_low, methods_str, summary_str, ifaces, govs, hay_low, hay_words, hay_stems))
+        prepared_rows.append((r, cls_name, cls_low, cls_words, cls_stems, method_words, import_words, pkg_low, mod_low, methods_str, summary_str, ifaces, govs, hay_low, hay_words, hay_stems))
 
     if len(_SEARCH_CORPUS_CACHE) > 16:
         _SEARCH_CORPUS_CACHE.clear()
@@ -793,7 +814,7 @@ def query_search(
 
     n_docs = max(1, len(prepared_rows))
     tok_df: dict[str, int] = {t: 0 for t in all_tokens}
-    for _r, _cn, _cl, cls_words, cls_stems, _mw, _pl, _ml, _ms, _ss, _if, _gv, _hl, hay_words, hay_stems in prepared_rows:
+    for _r, _cn, _cl, cls_words, cls_stems, _mw, _iw, _pl, _ml, _ms, _ss, _if, _gv, _hl, hay_words, hay_stems in prepared_rows:
         for tok in all_tokens:
             st = porter_stem_word(tok)
             if tok in cls_words or tok in hay_words or (len(st) >= 4 and (st in cls_stems or st in hay_stems)):
@@ -804,8 +825,10 @@ def query_search(
         tok: max(0.55, min(2.2, _math.log(1.0 + n_docs / (1.0 + df)) / 3.2))
         for tok, df in tok_df.items()
     }
+    total_query_idf = sum(tok_idf.values()) or 1.0
+    max_query_idf = max(tok_idf.values()) if tok_idf else 1.0
 
-    for r, cls_name, cls_low, cls_words, cls_stems, method_words, pkg_low, mod_low, methods_str, summary_str, ifaces, govs, hay_low, hay_words, hay_stems in prepared_rows:
+    for r, cls_name, cls_low, cls_words, cls_stems, method_words, import_words, pkg_low, mod_low, methods_str, summary_str, ifaces, govs, hay_low, hay_words, hay_stems in prepared_rows:
         base_score = 0.0
         matched_terms: list[str] = []
         cls_word_hits = 0
@@ -847,6 +870,9 @@ def query_search(
             elif len(st) >= 4 and st in hay_stems:
                 base_score += 3.0 * idf_w
                 matched_terms.append(tok)
+            elif tok in import_words and idf_w >= 1.25:
+                base_score += 2.4 * idf_w
+                matched_terms.append(tok)
             elif len(tok) >= 4 and tok in hay_low:
                 base_score += 1.8 * idf_w
                 matched_terms.append(tok)
@@ -856,13 +882,24 @@ def query_search(
 
         if cls_word_hits >= 2:
             base_score += 7.5 * (cls_word_hits - 1)
+            if len(cls_words) >= 2 and cls_words.issubset(set(all_tokens)):
+                base_score += 10.0
 
-        # Multi-term coverage bonus; damp single-token stem-only collisions on multi-term queries
-        uniq_matched = len(set(matched_terms))
+        # Multi-term & IDF-weighted query coverage coordination; damp partial generic collisions
+        uniq_matched_set = set(matched_terms)
+        uniq_matched = len(uniq_matched_set)
         if uniq_matched >= 2:
             base_score *= 1.0 + 0.22 * min(uniq_matched, 5)
         elif len(all_tokens) >= 2 and exact_hits == 0:
             base_score *= 0.45
+
+        if len(all_tokens) >= 3 and max_query_idf >= 1.35:
+            matched_idf = sum(tok_idf.get(t, 1.0) for t in uniq_matched_set)
+            idf_cov = matched_idf / total_query_idf
+            base_score *= 0.45 + 0.55 * idf_cov
+            max_matched_idf = max((tok_idf.get(t, 0.0) for t in uniq_matched_set), default=0.0)
+            if max_matched_idf < max_query_idf - 0.25 and all_tokens[0] not in uniq_matched_set:
+                base_score *= 0.35
 
         tier = str(r["dag_tier"] or "TIER_2_CORE_DOMAIN")
         kind = str(r["kind"] or "CLASS")
@@ -905,32 +942,85 @@ def query_search(
         )
     )
 
-    # 2. Search `arch_sections` and `dev_sections` via FTS5 for matching ADRs / dev docs
+    # 2. Search `arch_sections` and `dev_sections` via FTS5 for matching ADRs / dev docs (deduplicated & IDF-ranked)
     doc_hits: list[dict[str, Any]] = []
-    fts_terms = [re.sub(r"[^a-z0-9]", "", t) for t in all_tokens if len(re.sub(r"[^a-z0-9]", "", t)) >= 3][:6]
+    ranked_fts_tokens = sorted(
+        [t for t in all_tokens if len(re.sub(r"[^a-z0-9]", "", t)) >= 3],
+        key=lambda t: (-tok_idf.get(t, 1.0), t),
+    )
+    fts_terms = [re.sub(r"[^a-z0-9]", "", t) for t in ranked_fts_tokens][:6]
     if fts_terms:
+        top_gov_adrs = {
+            str(g).upper()
+            for c in scored_classes[:4]
+            for g in c.get("governed_by", [])
+            if "ADR-" in str(g).upper()
+        }
+        top_mod_dirs = {
+            c["path"].split("/src/", 1)[0].lower()
+            for c in scored_classes[:4]
+            if "/src/" in str(c.get("path") or "")
+        }
         fts_expr = " OR ".join(f'"{t}"' for t in fts_terms)
+        best_doc_by_path: dict[str, dict[str, Any]] = {}
         for plane_tbl in ("arch_sections", "dev_sections"):
             try:
                 d_rows = conn.execute(
                     f"""
-                    SELECT title, heading, path, substr(body, 1, 180) AS snippet, bm25({plane_tbl}) AS rank
+                    SELECT title, heading, path, substr(body, 1, 240) AS snippet, bm25({plane_tbl}) AS rank
                     FROM {plane_tbl}
                     WHERE {plane_tbl} MATCH ? AND lower(project) = ?
                     ORDER BY rank ASC
-                    LIMIT 4
+                    LIMIT 30
                     """,
                     (fts_expr, proj),
                 ).fetchall()
                 for dr in d_rows:
-                    doc_hits.append({
+                    d_path = str(dr["path"])
+                    d_title = str(dr["title"] or "")
+                    d_heading = str(dr["heading"] or d_title)
+                    d_snip = " ".join(str(dr["snippet"] or "").split())[:150]
+                    hdr_blob = f"{d_path} {d_title} {d_heading}".lower()
+                    body_blob = f"{hdr_blob} {d_snip}".lower()
+                    body_stems = {porter_stem_word(w) for w in re.findall(r"[a-z0-9]{3,}", body_blob)}
+                    d_score = max(0.0, -float(dr["rank"] or 0.0)) * 0.35
+                    doc_matched_idf = 0.0
+                    doc_max_idf = 0.0
+                    for tok in all_tokens:
+                        idf_w = tok_idf.get(tok, 1.0)
+                        st = porter_stem_word(tok)
+                        if tok in hdr_blob:
+                            d_score += 4.2 * idf_w
+                            doc_matched_idf += idf_w
+                            doc_max_idf = max(doc_max_idf, idf_w)
+                        elif tok in body_blob or (len(st) >= 4 and st in body_stems):
+                            d_score += 2.0 * idf_w
+                            doc_matched_idf += idf_w
+                            doc_max_idf = max(doc_max_idf, idf_w)
+                    path_up = d_path.upper()
+                    if any(adr_id in path_up for adr_id in top_gov_adrs):
+                        d_score += 6.0
+                    path_low = d_path.lower()
+                    if path_low.endswith("/readme.md") and any(path_low.startswith(md + "/") for md in top_mod_dirs):
+                        d_score += 6.5
+                    if len(all_tokens) >= 3:
+                        d_cov = doc_matched_idf / total_query_idf
+                        d_score *= 0.35 + 0.65 * (d_cov ** 1.15)
+                        if max_query_idf >= 1.35 and doc_max_idf < max_query_idf - 0.25 and all_tokens[0] not in body_blob:
+                            d_score *= 0.12
+                    cand_doc = {
                         "plane": plane_tbl,
-                        "path": str(dr["path"]),
-                        "heading": str(dr["heading"] or dr["title"]),
-                        "snippet": " ".join(str(dr["snippet"] or "").split())[:150],
-                    })
+                        "path": d_path,
+                        "heading": d_heading,
+                        "snippet": d_snip,
+                        "score": round(d_score, 3),
+                    }
+                    prev_doc = best_doc_by_path.get(d_path)
+                    if prev_doc is None or cand_doc["score"] > prev_doc["score"]:
+                        best_doc_by_path[d_path] = cand_doc
             except sqlite3.OperationalError:
                 pass
+        doc_hits = sorted(best_doc_by_path.values(), key=lambda x: (-x["score"], x["path"]))
 
     elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 3)
     return {

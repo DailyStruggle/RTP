@@ -8,6 +8,10 @@ import java.util.Objects;
  *
  * <p>Controls chat suggestion prefix building ({@link #suggestPrefix}) and
  * YAML comment hover resolution ({@link #commentLookup}).
+ *
+ * @governedBy ADR-044
+ * @governedBy ADR-048
+ * @governedBy ADR-115
  */
 public interface MenuConsumerProfile {
 

@@ -27,6 +27,9 @@ import java.util.Set;
  * <p><b>S-004 (no silent failures):</b> {@link #parse(TypeKey, String)} must
  * either return a non-null result or throw {@link IllegalArgumentException}
  * with a human-readable diagnostic. It must not return {@code null}.
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
  */
 public interface ValueCoercer {
 
@@ -63,16 +66,14 @@ public interface ValueCoercer {
                     String upper = raw.toUpperCase(Locale.ROOT);
                     return upper.equals("TRUE") || upper.equals("FALSE");
                 }
-                case INT:
-                case LONG:
+                case INT, LONG:
                     try {
                         Long.parseLong(raw);
                         return true;
                     } catch (NumberFormatException nfe) {
                         return false;
                     }
-                case DOUBLE:
-                case FLOAT:
+                case DOUBLE, FLOAT:
                     try {
                         float f = Float.parseFloat(raw);
                         return !Float.isNaN(f) && !Float.isInfinite(f);
@@ -91,13 +92,9 @@ public interface ValueCoercer {
                         return false;
                     }
                 }
-                case SOUND:
-                case PARTICLE:
-                case POTION_EFFECT:
-                case MATERIAL:
+                case SOUND, PARTICLE, POTION_EFFECT, MATERIAL:
                     return !raw.isBlank();
-                case WORLD:
-                case UNKNOWN:
+                case WORLD, UNKNOWN:
                 default:
                     return false;
             }
@@ -113,16 +110,14 @@ public interface ValueCoercer {
                     return raw.toUpperCase(Locale.ROOT);
                 case BOOLEAN:
                     return Boolean.parseBoolean(raw.toUpperCase(Locale.ROOT));
-                case INT:
-                case LONG:
+                case INT, LONG:
                     try {
                         return Integer.parseInt(raw.toUpperCase(Locale.ROOT));
                     } catch (NumberFormatException nfe) {
                         throw new IllegalArgumentException(
                                 "[effects-api] expected integer but got \"" + raw + "\"", nfe);
                     }
-                case DOUBLE:
-                case FLOAT:
+                case DOUBLE, FLOAT:
                     try {
                         return Float.parseFloat(raw.toUpperCase(Locale.ROOT)) / 100f;
                     } catch (NumberFormatException nfe) {
@@ -144,16 +139,12 @@ public interface ValueCoercer {
                             "[effects-api] expected Color (named constant or 6-digit hex RRGGBB) but got \""
                                     + raw + "\"");
                 }
-                case SOUND:
-                case PARTICLE:
-                case POTION_EFFECT:
-                case MATERIAL:
+                case SOUND, PARTICLE, POTION_EFFECT, MATERIAL:
                     if (raw.isBlank()) {
                         throw new IllegalArgumentException("[effects-api] empty token for " + type);
                     }
                     return raw.toUpperCase(Locale.ROOT);
-                case WORLD:
-                case UNKNOWN:
+                case WORLD, UNKNOWN:
                 default:
                     throw new IllegalArgumentException(
                             "[effects-api] cannot parse \"" + raw + "\" — type "

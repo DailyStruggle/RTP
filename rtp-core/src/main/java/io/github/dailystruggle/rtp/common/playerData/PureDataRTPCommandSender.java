@@ -13,6 +13,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A platform-agnostic, pure Java representation of {@link RTPCommandSender}.
  * Holds zero platform handles, making it safe for long-term retention and file caching.
+ *
+ * @governedBy ADR-008
+ * @governedBy ADR-115
  */
 public class PureDataRTPCommandSender implements RTPCommandSender, Cloneable {
   protected final UUID uuid;

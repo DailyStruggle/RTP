@@ -149,13 +149,15 @@ class ConfigParserAndMultiConfigParserTest {
     void constructorsGettersSetSaveAndClone() throws IOException {
         File cfgFile = new File(pluginDir, "sample.yml");
         Files.writeString(cfgFile.toPath(),
-                "version: \"1.0\"\n"
-                        + "alpha: \"10\"\n"
-                        + "beta: true\n"
-                        + "delay: \"2m\"\n"
-                        + "cacheCap: \"128MB\"\n"
-                        + "subSection:\n"
-                        + "  k1: v1\n",
+                """
+                        version: "1.0"
+                        alpha: "10"
+                        beta: true
+                        delay: "2m"
+                        cacheCap: "128MB"
+                        subSection:
+                          k1: v1
+                        """,
                 StandardCharsets.UTF_8);
 
         // Exercise FileCacheProvider constructors
@@ -203,10 +205,12 @@ class ConfigParserAndMultiConfigParserTest {
     void versionUpgradeRotationAndQuarantine() throws IOException {
         File cfgFile = new File(pluginDir, "upgrade.yml");
         Files.writeString(cfgFile.toPath(),
-                "version: \"1.0\"\n"
-                        + "# Custom user comment\n"
-                        + "alpha: 777\n"
-                        + "vert: \"@config\"\n",
+                """
+                        version: "1.0"
+                        # Custom user comment
+                        alpha: 777
+                        vert: "@config"
+                        """,
                 StandardCharsets.UTF_8);
         Files.writeString(new File(pluginDir, "upgrade.yml.old1").toPath(), "old1\n", StandardCharsets.UTF_8);
 
@@ -216,12 +220,14 @@ class ConfigParserAndMultiConfigParserTest {
             public InputStream getResourceFromJar(String filename) {
                 if (filename.endsWith("upgrade.yml")) {
                     return new ByteArrayInputStream(
-                            ("version: \"2.0\"\n"
-                                    + "# Default alpha comment\n"
-                                    + "alpha: 1\n"
-                                    + "# Default beta comment\n"
-                                    + "beta: 2\n"
-                                    + "vert: \"@config\"\n").getBytes(StandardCharsets.UTF_8));
+                            """
+                                    version: "2.0"
+                                    # Default alpha comment
+                                    alpha: 1
+                                    # Default beta comment
+                                    beta: 2
+                                    vert: "@config"
+                                    """.getBytes(StandardCharsets.UTF_8));
                 }
                 return null;
             }

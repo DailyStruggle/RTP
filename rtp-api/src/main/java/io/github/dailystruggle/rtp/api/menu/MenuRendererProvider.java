@@ -5,8 +5,11 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Service-discovery provider for a {@link MenuRenderer} via {@link java.util.ServiceLoader}.
+ *
+ * @governedBy ADR-070
+ * @governedBy ADR-115
  */
-public interface MenuRendererProvider {
+public interface MenuRendererProvider extends io.github.dailystruggle.menu.api.MenuRendererProvider {
 
     /**
      * The lowercase identifier matched against the {@code menu.renderer}
@@ -14,6 +17,7 @@ public interface MenuRendererProvider {
      *
      * @return the renderer id this provider supplies
      */
+    @Override
     String id();
 
     /**
@@ -23,6 +27,7 @@ public interface MenuRendererProvider {
      *
      * @return a ready-to-use renderer; must not be {@code null}
      */
+    @Override
     MenuRenderer create();
 
     /**
@@ -31,6 +36,7 @@ public interface MenuRendererProvider {
      *
      * @return platform family this renderer serves, or {@code null} for any
      */
+    @Override
     default @Nullable PlatformFamily platformFamily() {
         return null;
     }

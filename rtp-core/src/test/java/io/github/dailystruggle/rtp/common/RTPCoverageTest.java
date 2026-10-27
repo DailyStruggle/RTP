@@ -46,7 +46,7 @@ class RTPCoverageTest {
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         ActiveDatabase.setAccessor(null);
         TeleportSessions.current().latestTeleportData.clear();
         TeleportSessions.current().priorTeleportData.clear();

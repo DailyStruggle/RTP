@@ -635,4 +635,156 @@ class MenuModelSurfaceTest {
         assertEquals("", emptyFrag.hover());
         assertNull(emptyFrag.runCommand());
     }
+
+    @Test
+    @DisplayName("MenuAction converts round-trip with menu-api descriptor actions and maps RTP-specific variants")
+    void menuActionDescriptorConversion() {
+        assertNull(MenuAction.fromDescriptorAction(null));
+
+        List<MenuAction> roundTripActions = List.of(
+                new MenuAction.RunRtpCommand(new String[]{"config", "performance"}),
+                new MenuAction.OpenMenu(new String[]{"config", "performance"}),
+                new MenuAction.OpenMenu(new String[0]),
+                new MenuAction.ChangePage(3),
+                new MenuAction.SuggestInput("/rtp config performance ASYNC="),
+                new MenuAction.PromptAnvilInput(new String[]{"regions"}, "add", "default", MenuAction.Mode.RUN),
+                new MenuAction.PromptAnvilInput(new String[]{"regions"}, "add", "default", MenuAction.Mode.STAGE),
+                new MenuAction.OpenExternalUrl(URI.create("https://example.invalid/help")),
+                new MenuAction.StageConfigValue("performance", "teleportDelay", "5"),
+                new MenuAction.UnstageConfigValue("safety", "checkRadius"),
+                new MenuAction.ApplyStagedConfig("performance"),
+                new MenuAction.DiscardStagedConfig("performance")
+        );
+
+        for (MenuAction original : roundTripActions) {
+            io.github.dailystruggle.menu.api.MenuAction descriptorAction = original.toDescriptorAction();
+            assertNotNull(descriptorAction);
+            MenuAction reconstructed = MenuAction.fromDescriptorAction(descriptorAction);
+            assertEquals(original, reconstructed);
+        }
+
+        // Empty SuggestInput prefix normalizes to non-empty descriptor SuggestInput
+        io.github.dailystruggle.menu.api.MenuAction emptySuggest =
+                new MenuAction.SuggestInput("").toDescriptorAction();
+        assertEquals(new io.github.dailystruggle.menu.api.MenuAction.SuggestInput("/"), emptySuggest);
+
+        // RTP-specific variants map to non-null OpenSubmenu or RunCommand descriptor actions
+        List<MenuAction> rtpSpecificActions = List.of(
+                new MenuAction.OpenParamPicker(new String[]{"config", "performance"}, "ASYNC"),
+                new MenuAction.OpenConfigSelector(),
+                new MenuAction.OpenConfigSelector("worlds"),
+                new MenuAction.OpenConfigFile("config.yml"),
+                new MenuAction.OpenConfigKey("config.yml", "teleportDelay"),
+                new MenuAction.OpenConfigSearchPrompt(),
+                new MenuAction.OpenConfigSearchResults("delay", 1),
+                new MenuAction.OpenConfigSubParamPage("shapes.yml", "circle", "CIRCLE"),
+                new MenuAction.OpenAdminPanel(),
+                new MenuAction.OpenVisualizations(),
+                new MenuAction.OpenFrontPage(),
+                new MenuAction.OpenInfo(MenuAction.InfoScopeToken.global()),
+                new MenuAction.OpenInfo(MenuAction.InfoScopeToken.world("world")),
+                new MenuAction.OpenInfo(MenuAction.InfoScopeToken.region("default")),
+                new MenuAction.SwitchInfoToText(MenuAction.InfoScopeToken.global()),
+                new MenuAction.SwitchInfoToText(MenuAction.InfoScopeToken.world("world")),
+                new MenuAction.OpenMap(io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BIOMES, "default"),
+                new MenuAction.OpenMultiConfigSelector("regions"),
+                new MenuAction.OpenMultiConfigEntry("regions", "default"),
+                new MenuAction.MultiConfigMutate("regions", "default", MenuAction.MultiConfigMutate.Op.ADD),
+                new MenuAction.MultiConfigMutate("regions", "default", MenuAction.MultiConfigMutate.Op.REMOVE)
+        );
+
+        for (MenuAction rtpAction : rtpSpecificActions) {
+            io.github.dailystruggle.menu.api.MenuAction descriptorAction = rtpAction.toDescriptorAction();
+            assertNotNull(descriptorAction);
+            assertTrue(
+                    descriptorAction instanceof io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu
+                            || descriptorAction instanceof io.github.dailystruggle.menu.api.MenuAction.RunCommand);
+            assertNotNull(MenuAction.fromDescriptorAction(descriptorAction));
+        }
+    }
+
+    @Test
+    @DisplayName("MenuFragment, MenuLine, MenuPage, and MenuModel round-trip with MenuDescriptor")
+    void menuModelDescriptorRoundTrip() {
+        MenuFragment clickable = new MenuFragment(
+                "Click",
+                "Tooltip",
+                new MenuAction.RunRtpCommand(new String[]{"world"}));
+        MenuFragment decorative = MenuFragment.plain("Plain");
+
+        assertEquals(clickable, MenuFragment.fromDescriptorFragment(clickable.toDescriptorFragment()));
+        assertEquals(decorative, MenuFragment.fromDescriptorFragment(decorative.toDescriptorFragment()));
+        assertThrows(NullPointerException.class, () -> MenuFragment.fromDescriptorFragment(null));
+
+        MenuLine line = new MenuLine(List.of(clickable, decorative));
+        assertEquals(line, MenuLine.fromDescriptorLine(line.toDescriptorLine()));
+        assertThrows(NullPointerException.class, () -> MenuLine.fromDescriptorLine(null));
+
+        MenuPage page = new MenuPage(List.of(line, MenuLine.of(MenuFragment.plain("Footer"))));
+        assertEquals(page, MenuPage.fromDescriptorPage(page.toDescriptorPage()));
+        assertThrows(NullPointerException.class, () -> MenuPage.fromDescriptorPage(null));
+
+        MenuModel model = new MenuModel("RTP Menu", List.of(page));
+        io.github.dailystruggle.menu.api.MenuDescriptor descriptor = model.toMenuDescriptor();
+        assertEquals("RTP Menu", descriptor.title());
+        assertEquals(1, descriptor.pages().size());
+        assertEquals(model, MenuModel.fromMenuDescriptor(descriptor));
+        assertThrows(NullPointerException.class, () -> MenuModel.fromMenuDescriptor(null));
+    }
+
+    @Test
+    @DisplayName("MenuRenderer bridges MenuDescriptor and MenuModel; MenuRendererProvider narrows create() covariantly")
+    void menuRendererBridgeAndProviderCovariance() {
+        UUID viewer = UUID.randomUUID();
+        MenuModel sampleModel = new MenuModel(
+                "Bridge Menu",
+                List.of(new MenuPage(List.of(MenuLine.of(
+                        new MenuFragment("Go", "Hover", new MenuAction.ChangePage(1)))))));
+
+        List<UUID> capturedViewers = new ArrayList<>();
+        List<MenuModel> capturedModels = new ArrayList<>();
+        MenuRenderer rtpRenderer = (playerId, model) -> {
+            capturedViewers.add(playerId);
+            capturedModels.add(model);
+        };
+
+        // Calling through the menu-api superinterface converts MenuDescriptor -> MenuModel
+        io.github.dailystruggle.menu.api.MenuRenderer asBaseRenderer = rtpRenderer;
+        asBaseRenderer.render(viewer, sampleModel.toMenuDescriptor());
+        assertEquals(List.of(viewer), capturedViewers);
+        assertEquals(List.of(sampleModel), capturedModels);
+
+        // Adapting a menu-api renderer via fromDescriptorRenderer converts MenuModel -> MenuDescriptor
+        List<UUID> descriptorViewers = new ArrayList<>();
+        List<io.github.dailystruggle.menu.api.MenuDescriptor> capturedDescriptors = new ArrayList<>();
+        io.github.dailystruggle.menu.api.MenuRenderer descriptorRenderer = (v, d) -> {
+            descriptorViewers.add(v);
+            capturedDescriptors.add(d);
+        };
+
+        MenuRenderer adapted = MenuRenderer.fromDescriptorRenderer(descriptorRenderer);
+        adapted.render(viewer, sampleModel);
+        assertEquals(List.of(viewer), descriptorViewers);
+        assertEquals(List.of(sampleModel.toMenuDescriptor()), capturedDescriptors);
+        assertThrows(NullPointerException.class, () -> MenuRenderer.fromDescriptorRenderer(null));
+        assertThrows(NullPointerException.class, () -> adapted.render(viewer, (MenuModel) null));
+
+        // MenuRendererProvider covariance with io.github.dailystruggle.menu.api.MenuRendererProvider
+        MenuRendererProvider provider = new MenuRendererProvider() {
+            @Override
+            public String id() {
+                return "book";
+            }
+
+            @Override
+            public MenuRenderer create() {
+                return rtpRenderer;
+            }
+        };
+        io.github.dailystruggle.menu.api.MenuRendererProvider baseProvider = provider;
+        assertEquals("book", baseProvider.id());
+        assertNull(baseProvider.platformFamily());
+        assertEquals(rtpRenderer, provider.create());
+        assertEquals(rtpRenderer, baseProvider.create());
+    }
 }

@@ -179,7 +179,7 @@ class CountdownHooksTest {
     assertEquals(1, scheduledTimers.size());
 
     scheduledTimers.get(0).run();
-    verify(player).showProgressBar(eq(DELAY_BAR), eq("&aTeleporting in 4..."), eq(1.0));
+    verify(player).showProgressBar(DELAY_BAR, "&aTeleporting in 4...", 1.0);
 
     data.completed = true;
     scheduledTimers.get(0).run();

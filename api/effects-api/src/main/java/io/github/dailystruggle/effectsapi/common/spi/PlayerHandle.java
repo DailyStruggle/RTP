@@ -9,6 +9,10 @@ import java.util.Map;
  *
  * <p>Implemented by {@code rtp-api}'s {@code RTPPlayer} and platform-specific
  * wrappers in {@code effects-api}.</p>
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
+ * @governedBy ADR-116
  */
 public interface PlayerHandle {
     /**

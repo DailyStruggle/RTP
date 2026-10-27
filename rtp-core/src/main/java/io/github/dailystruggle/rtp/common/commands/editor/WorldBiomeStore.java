@@ -301,7 +301,7 @@ public final class WorldBiomeStore {
     /** Every bin, nearest region file (0, 0) first. */
     public List<BinView> binsNearestFirst() {
         List<Long> keys = new ArrayList<>(bins.keySet());
-        Collections.sort(keys);
+        keys.sort(null);
         List<BinView> out = new ArrayList<>(keys.size());
         for (Long k : keys) {
             Bin b = bins.get(k);

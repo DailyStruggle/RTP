@@ -20,6 +20,8 @@ import io.github.dailystruggle.mapsapi.model.ChartModel;
  * {@code io.github.dailystruggle.mapsapi.render.*}.
  *
  * @param <M> the {@link ChartModel} shape this renderer consumes
+ * @governedBy ADR-053
+ * @governedBy ADR-115
  */
 @FunctionalInterface
 public interface ChartRenderer<M extends ChartModel> {

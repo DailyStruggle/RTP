@@ -4,6 +4,10 @@ import java.util.UUID;
 
 /**
  * Platform-neutral SPI for rendering a {@link MenuDescriptor} to a viewer (ADR-048, ADR-050).
+ *
+ * @governedBy ADR-048
+ * @governedBy ADR-050
+ * @governedBy ADR-115
  */
 @FunctionalInterface
 public interface MenuRenderer {

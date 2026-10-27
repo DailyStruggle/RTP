@@ -9,6 +9,9 @@ import java.util.function.Function;
  * {@code RTPServerAccessor#setBiomeGetter}. Fabric and NeoForge world adapters
  * consult it before the vanilla registry lookup, mirroring the Bukkit/Folia
  * static getter. Platform-neutral: no Minecraft types.
+ *
+ * @governedBy ADR-026
+ * @governedBy ADR-115
  */
 public final class BiomeOverride {
 

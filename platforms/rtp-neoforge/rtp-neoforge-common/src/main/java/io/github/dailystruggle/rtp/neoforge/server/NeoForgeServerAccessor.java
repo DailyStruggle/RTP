@@ -300,11 +300,6 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public long overTime() {
-        return 0L;
-    }
-
-    @Override
     public File getPluginDirectory() {
         File dir = net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get().resolve("rtp").toFile();
         if (!dir.exists() && !dir.mkdirs() && !dir.exists()) {

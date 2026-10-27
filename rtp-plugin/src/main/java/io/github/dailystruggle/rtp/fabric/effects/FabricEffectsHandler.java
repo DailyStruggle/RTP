@@ -228,8 +228,8 @@ public final class FabricEffectsHandler {
                 }
                 target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
                         FabricHandles.wrap(handle),
-                        io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
-                        destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destHandle) : null);
+                        explicitLocation,
+                        destHandle);
             } else {
                 target = handle;
             }

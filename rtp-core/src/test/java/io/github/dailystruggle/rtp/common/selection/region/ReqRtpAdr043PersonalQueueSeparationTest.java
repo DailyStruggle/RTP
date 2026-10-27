@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -195,7 +196,7 @@ class ReqRtpAdr043PersonalQueueSeparationTest {
                 "late personal fill must NOT re-open PartitionCacheStage for an offline player");
         assertEquals(unkeptBefore + 1, qm.unkeptLocations.size(),
                 "late personal fill must demote its coordinate to unkeptLocations");
-        org.mockito.Mockito.verify(reservation).close();
+        verify(reservation).close();
     }
 
     /** Mock {@link Region} with the minimum {@link RegionSettings} fields {@code RegionQueueManager} reads. */

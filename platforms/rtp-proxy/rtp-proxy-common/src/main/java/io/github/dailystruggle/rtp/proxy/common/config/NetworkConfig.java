@@ -384,14 +384,6 @@ public final class NetworkConfig {
         catch (NumberFormatException e) { throw new NetworkConfigException(key + ": expected integer, got '" + v + "'"); }
     }
 
-    private static long asLong(Map<String, Object> m, String key, long def) {
-        Object v = m.get(key);
-        if (v instanceof Number) return ((Number) v).longValue();
-        if (v == null) return def;
-        try { return Long.parseLong(String.valueOf(v)); }
-        catch (NumberFormatException e) { throw new NetworkConfigException(key + ": expected long, got '" + v + "'"); }
-    }
-
     private static long asDurationMs(Map<String, Object> m, String key, long def) {
         Object v = m.get(key);
         if (v == null) return def;

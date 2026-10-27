@@ -25,6 +25,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * chunk I/O (REQ-RTP-S-005). Returning {@code 0} or any negative value
  * signals "no native colour for this biome" and triggers the categorical
  * fallback in the resolver.
+ *
+ * @governedBy ADR-053
+ * @governedBy ADR-115
  */
 @FunctionalInterface
 public interface BiomeColorSource {

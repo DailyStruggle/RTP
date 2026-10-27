@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.dailystruggle.bit.BitCodes;
 import io.github.dailystruggle.bit.BitComponent;
+import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.bit.BitResult;
 import io.github.dailystruggle.bit.BitSideEffect;
@@ -86,7 +87,7 @@ class MockProbeComponentsTest {
 
       assertEquals(
           List.of(BitCodes.COMPONENT_TIMEOUT.key()),
-          result.report().findings().stream().map(finding -> finding.code()).toList());
+          result.report().findings().stream().map(BitFinding::code).toList());
       assertSame(result, RtpBit.RUNNER.last(component.id()));
     } finally {
       RtpBit.RUNNER.unregister(component.id());
@@ -104,7 +105,7 @@ class MockProbeComponentsTest {
 
     List<String> codes =
         TestDisconnectMidflightCmd.toBitReport(failed).findings().stream()
-            .map(finding -> finding.code())
+            .map(BitFinding::code)
             .toList();
 
     assertTrue(codes.contains(TestDisconnectMidflightCmd.PROCESSING.key()));
@@ -126,7 +127,7 @@ class MockProbeComponentsTest {
 
       assertEquals(
           List.of(BitCodes.COMPONENT_THROWN.key()),
-          result.report().findings().stream().map(finding -> finding.code()).toList());
+          result.report().findings().stream().map(BitFinding::code).toList());
       assertSame(result, RtpBit.RUNNER.last(component.id()));
     } finally {
       RtpBit.RUNNER.unregister(component.id());
@@ -137,7 +138,7 @@ class MockProbeComponentsTest {
   void asyncReplyMockTimeoutUsesTheGlobalTimeoutCode() {
     List<String> codes =
         AsyncReplyTestJob.timeoutReport("mock teleport timed out").findings().stream()
-            .map(finding -> finding.code())
+            .map(BitFinding::code)
             .toList();
 
     assertEquals(List.of(BitCodes.COMPONENT_TIMEOUT.key()), codes);

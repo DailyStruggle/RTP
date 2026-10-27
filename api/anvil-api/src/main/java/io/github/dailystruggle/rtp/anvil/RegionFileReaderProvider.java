@@ -5,6 +5,10 @@ package io.github.dailystruggle.rtp.anvil;
  *
  * <p>Implementations can be discovered via {@link java.util.ServiceLoader} or registered
  * directly with {@link RegionFormatRegistry}.</p>
+ *
+ * @governedBy ADR-016
+ * @governedBy ADR-077
+ * @governedBy ADR-115
  */
 public interface RegionFileReaderProvider {
 

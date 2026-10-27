@@ -6,6 +6,9 @@ import java.util.UUID;
 
 /**
  * Handle to an active scripted action session (ADR-093).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface ActionSession {

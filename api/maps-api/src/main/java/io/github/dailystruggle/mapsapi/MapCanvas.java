@@ -23,6 +23,8 @@ package io.github.dailystruggle.mapsapi;
  *
  * @see io.github.dailystruggle.mapsapi.render.ChartRenderer
  * @see io.github.dailystruggle.mapsapi.MapBinding
+ * @governedBy ADR-053
+ * @governedBy ADR-115
  */
 public interface MapCanvas {
 

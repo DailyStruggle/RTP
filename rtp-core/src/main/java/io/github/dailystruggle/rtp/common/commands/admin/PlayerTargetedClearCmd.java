@@ -22,6 +22,9 @@ import org.jetbrains.annotations.Nullable;
  * (cooldown, queue, limit, invuln).
  *
  * <p>Supports targeting self, explicit player lists, or all players (console).
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
  */
 @SuppressWarnings("java:S1845") // PERMISSION constant matches convention alongside permission() method
 public abstract class PlayerTargetedClearCmd extends BaseRTPCmdImpl {

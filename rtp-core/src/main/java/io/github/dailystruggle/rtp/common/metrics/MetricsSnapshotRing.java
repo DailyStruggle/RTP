@@ -118,7 +118,7 @@ public final class MetricsSnapshotRing {
             recordSample("mspt", mspt, epochSeconds);
         }
         if (heap >= 0L) {
-            recordSample("heap_used_bytes", (double) heap, epochSeconds);
+            recordSample("heap_used_bytes", heap, epochSeconds);
         }
         if (Double.isFinite(snapshot.tps1m)) {
             recordSample("tps_1m", snapshot.tps1m, epochSeconds);
@@ -232,11 +232,13 @@ public final class MetricsSnapshotRing {
         map.put(TIER_5M_1S, new TierState(TIER_5M_1S, 1, 300));
         map.put(TIER_1H_10S, new TierState(TIER_1H_10S, 10, 360));
         map.put(TIER_24H_1M, new TierState(TIER_24H_1M, 60, 1440));
-        if (publishedTier != null && !map.containsKey(publishedTier)) {
-            int winSec = NetworkTimeSeriesConfig.parseWindowSeconds(publishedTier);
-            long retSec = NetworkTimeSeriesConfig.parseRetentionSeconds(publishedTier);
-            int cap = (int) Math.max(1L, retSec / Math.max(1, winSec));
-            map.put(publishedTier, new TierState(publishedTier, winSec, cap));
+        if (publishedTier != null) {
+            map.computeIfAbsent(publishedTier, tier -> {
+                int winSec = NetworkTimeSeriesConfig.parseWindowSeconds(tier);
+                long retSec = NetworkTimeSeriesConfig.parseRetentionSeconds(tier);
+                int cap = (int) Math.max(1L, retSec / Math.max(1, winSec));
+                return new TierState(tier, winSec, cap);
+            });
         }
         return map;
     }

@@ -11,7 +11,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -519,7 +518,7 @@ public final class StrideGroupResidencyManager {
   public void saveBatchShards(File file, long stride) throws IOException {
     long t0 = System.nanoTime();
     List<Long> groupIds = new ArrayList<>(groups.keySet());
-    Collections.sort(groupIds);
+    groupIds.sort(null);
     int groupCount = groupIds.size();
 
     File parent = file.getParentFile();

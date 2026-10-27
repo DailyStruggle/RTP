@@ -10,6 +10,10 @@ import io.github.dailystruggle.server.api.TaskScheduler;
 
 /**
  * Platform-agnostic scheduler SPI for synchronous, asynchronous, and region-bound tasks.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-087
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface RTPScheduler extends TaskScheduler {

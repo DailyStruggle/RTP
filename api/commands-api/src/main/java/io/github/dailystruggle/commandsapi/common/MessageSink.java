@@ -16,6 +16,9 @@ import java.util.UUID;
  * <p>Implementations are responsible for any platform-specific formatting
  * (placeholders, colour codes) and auditing (e.g. REQ-RTP-S-004 interception)
  * required for the message to reach the caller and the console exactly once.</p>
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
  */
 public interface MessageSink {
 

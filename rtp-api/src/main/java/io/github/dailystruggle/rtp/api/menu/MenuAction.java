@@ -1,7 +1,10 @@
 package io.github.dailystruggle.rtp.api.menu;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -9,6 +12,11 @@ import java.util.Objects;
  *
  * <p>Renderers translate each variant to the appropriate click event.
  * Raw command strings are not embedded directly (ADR-035).
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-044
+ * @governedBy ADR-045
+ * @governedBy ADR-115
  */
 public sealed interface MenuAction
         permits MenuAction.RunRtpCommand,
@@ -587,5 +595,185 @@ public sealed interface MenuAction
                                 + " (got '" + entryName + "')");
             }
         }
+    }
+
+    /**
+     * Converts this RTP menu action to its platform-neutral {@link
+     * io.github.dailystruggle.menu.api.MenuAction} counterpart.
+     *
+     * @return descriptor action; never {@code null}
+     */
+    default io.github.dailystruggle.menu.api.MenuAction toDescriptorAction() {
+        if (this instanceof RunRtpCommand r) {
+            return new io.github.dailystruggle.menu.api.MenuAction.RunCommand(List.of(r.args()));
+        }
+        if (this instanceof OpenMenu o) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(List.of(o.path()));
+        }
+        if (this instanceof OpenParamPicker p) {
+            List<String> path = new ArrayList<>(p.parentPath().length + 1);
+            Collections.addAll(path, p.parentPath());
+            path.add(p.paramName());
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(path);
+        }
+        if (this instanceof ChangePage c) {
+            return new io.github.dailystruggle.menu.api.MenuAction.ChangePage(c.pageIndex());
+        }
+        if (this instanceof SuggestInput s) {
+            return new io.github.dailystruggle.menu.api.MenuAction.SuggestInput(
+                    s.prefix().isEmpty() ? "/" : s.prefix());
+        }
+        if (this instanceof PromptAnvilInput pa) {
+            return new io.github.dailystruggle.menu.api.MenuAction.PromptAnvilInput(
+                    List.of(pa.parentPath()),
+                    pa.paramName(),
+                    pa.prefill(),
+                    pa.mode() == Mode.STAGE
+                            ? io.github.dailystruggle.menu.api.MenuAction.Mode.STAGE
+                            : io.github.dailystruggle.menu.api.MenuAction.Mode.RUN);
+        }
+        if (this instanceof OpenExternalUrl u) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenExternalUri(u.uri());
+        }
+        if (this instanceof OpenConfigSelector cs) {
+            return cs.subDir().isEmpty()
+                    ? new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu("config")
+                    : new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                            "config", cs.subDir());
+        }
+        if (this instanceof OpenConfigFile cf) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "config", cf.fileName());
+        }
+        if (this instanceof OpenConfigKey ck) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "config", ck.fileName(), ck.paramName());
+        }
+        if (this instanceof OpenConfigSearchPrompt) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu("config", "search");
+        }
+        if (this instanceof OpenConfigSearchResults sr) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "config", "search", sr.query(), Integer.toString(sr.page()));
+        }
+        if (this instanceof OpenConfigSubParamPage sp) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "config", sp.fileName(), sp.paramName(), sp.typeName());
+        }
+        if (this instanceof OpenAdminPanel) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu("admin");
+        }
+        if (this instanceof OpenVisualizations) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "admin", "visualizations");
+        }
+        if (this instanceof OpenFrontPage) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu();
+        }
+        if (this instanceof OpenInfo oi) {
+            return oi.scope().kind() == InfoScopeToken.Kind.GLOBAL
+                    ? new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu("info")
+                    : new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                            "info",
+                            oi.scope().kind().name().toLowerCase(java.util.Locale.ROOT)
+                                    + ":"
+                                    + oi.scope().name());
+        }
+        if (this instanceof SwitchInfoToText sit) {
+            return sit.scope().kind() == InfoScopeToken.Kind.GLOBAL
+                    ? new io.github.dailystruggle.menu.api.MenuAction.RunCommand("info")
+                    : new io.github.dailystruggle.menu.api.MenuAction.RunCommand(
+                            "info",
+                            sit.scope().kind().name().toLowerCase(java.util.Locale.ROOT)
+                                    + ":"
+                                    + sit.scope().name());
+        }
+        if (this instanceof StageConfigValue sv) {
+            return new io.github.dailystruggle.menu.api.MenuAction.StageValue(
+                    sv.fileName(), sv.paramName(), sv.value());
+        }
+        if (this instanceof UnstageConfigValue uv) {
+            return new io.github.dailystruggle.menu.api.MenuAction.UnstageValue(
+                    uv.fileName(), uv.paramName());
+        }
+        if (this instanceof ApplyStagedConfig ac) {
+            return new io.github.dailystruggle.menu.api.MenuAction.ApplyStagedValues(
+                    ac.fileName());
+        }
+        if (this instanceof DiscardStagedConfig dc) {
+            return new io.github.dailystruggle.menu.api.MenuAction.DiscardStagedValues(
+                    dc.fileName());
+        }
+        if (this instanceof OpenMap om) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "map", om.kind().name(), om.regionName());
+        }
+        if (this instanceof OpenMultiConfigSelector mcs) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "config", mcs.parserKind());
+        }
+        if (this instanceof OpenMultiConfigEntry mce) {
+            return new io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu(
+                    "config", mce.parserKind(), mce.entryName());
+        }
+        if (this instanceof MultiConfigMutate mcm) {
+            return new io.github.dailystruggle.menu.api.MenuAction.RunCommand(
+                    "config",
+                    mcm.parserKind(),
+                    mcm.op().name().toLowerCase(java.util.Locale.ROOT),
+                    mcm.entryName());
+        }
+        throw new IllegalStateException("Unhandled MenuAction variant: " + getClass().getName());
+    }
+
+    /**
+     * Converts a platform-neutral {@link io.github.dailystruggle.menu.api.MenuAction} to its
+     * {@link MenuAction} counterpart.
+     *
+     * @param action descriptor action, or {@code null}
+     * @return converted {@link MenuAction}, or {@code null} if {@code action} is {@code null}
+     */
+    static MenuAction fromDescriptorAction(io.github.dailystruggle.menu.api.MenuAction action) {
+        if (action == null) {
+            return null;
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.RunCommand r) {
+            return new RunRtpCommand(r.args().toArray(String[]::new));
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.OpenSubmenu o) {
+            return new OpenMenu(o.path().toArray(String[]::new));
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.ChangePage c) {
+            return new ChangePage(c.pageIndex());
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.SuggestInput s) {
+            return new SuggestInput(s.prefix());
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.PromptAnvilInput pa) {
+            return new PromptAnvilInput(
+                    pa.parentPath().toArray(String[]::new),
+                    pa.paramName(),
+                    pa.prefill(),
+                    pa.mode() == io.github.dailystruggle.menu.api.MenuAction.Mode.STAGE
+                            ? Mode.STAGE
+                            : Mode.RUN);
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.OpenExternalUri u) {
+            return new OpenExternalUrl(u.uri());
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.StageValue sv) {
+            return new StageConfigValue(sv.scopeName(), sv.key(), sv.value());
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.UnstageValue uv) {
+            return new UnstageConfigValue(uv.scopeName(), uv.key());
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.ApplyStagedValues ac) {
+            return new ApplyStagedConfig(ac.scopeName());
+        }
+        if (action instanceof io.github.dailystruggle.menu.api.MenuAction.DiscardStagedValues dc) {
+            return new DiscardStagedConfig(dc.scopeName());
+        }
+        throw new IllegalArgumentException(
+                "Unhandled descriptor MenuAction variant: " + action.getClass().getName());
     }
 }

@@ -2424,6 +2424,7 @@ def bake_project_ast(
     conn: sqlite3.Connection,
     project: str | None = None,
     llm_scanner_fn: Any = None,
+    import_cites_by_path: dict[tuple[str, str], dict[str, str]] | None = None,
 ) -> dict[str, int]:
     """
     Universal, domain-agnostic 2-Stage AST Baker (`Scan -> Solidify AST & Conflicts`).
@@ -3139,6 +3140,18 @@ def bake_project_ast(
             spi_to_implementors: dict[str, list[tuple[str, float, str]]] = collections.defaultdict(list)
             rare_dep_to_consumers: dict[str, list[tuple[str, float, str]]] = collections.defaultdict(list)
 
+            cites_lookup = import_cites_by_path
+            if not cites_lookup:
+                import sys as _sys
+                for _mod_name in ("build_doc_index", "__main__"):
+                    _mod = _sys.modules.get(_mod_name)
+                    _cand = getattr(_mod, "_JAVA_IMPORT_CITES_CACHE", None) if _mod is not None else None
+                    if isinstance(_cand, dict) and _cand:
+                        cites_lookup = _cand
+                        break
+            if cites_lookup is None:
+                cites_lookup = {}
+
             for cm in class_meta_rows:
                 cls_name = str(cm["class_name"] or "").strip()
                 if not cls_name:
@@ -3146,6 +3159,7 @@ def bake_project_ast(
                 cls_sym = f"cls:{cls_name}"
                 c_path = str(cm["path"] or "")
                 c_pkg = str(cm["package_name"] or "")
+                c_import_cites = cites_lookup.get((dom, c_path), {})
                 super_cls = str(cm["super_class"] or "").strip()
                 if super_cls and super_cls in seen_classes:
                     sup_sym = f"cls:{super_cls}"
@@ -3172,8 +3186,9 @@ def bake_project_ast(
                         target_cm = cm_by_name.get(imp_cls)
                         same_pkg = target_cm is not None and str(target_cm["package_name"] or "") == c_pkg and bool(c_pkg)
                         w_imp = round((6.8 if idx_imp < 4 else 4.8) * rank_factor * (0.35 + 0.65 * idf_imp) + (1.0 if same_pkg else 0.0), 2)
-                        add_edge(cls_sym, f"cls:{imp_cls}", "IMPORTS_CLASS", w_imp, c_path)
-                        add_edge(f"cls:{imp_cls}", cls_sym, "IMPORTED_BY_CLASS", w_imp, c_path)
+                        cite_imp = c_import_cites.get(imp_cls, c_path)
+                        add_edge(cls_sym, f"cls:{imp_cls}", "IMPORTS_CLASS", w_imp, cite_imp)
+                        add_edge(f"cls:{imp_cls}", cls_sym, "IMPORTED_BY_CLASS", w_imp, cite_imp)
                         if 2 <= class_fan_in.get(imp_cls, 0) <= 10 and idx_imp < 6:
                             rare_dep_to_consumers[imp_cls].append((cls_name, w_imp, c_path))
 
@@ -3854,9 +3869,11 @@ def sync_ast_incremental_for_files(
             _upsert_edge(spi_sym, cls_sym, "SPI_IMPLEMENTED_BY", 4.5, c_path)
             _upsert_edge(cls_sym, f"cls:{iface}", "IMPLEMENTS_SPI", 4.5, c_path)
             _upsert_edge(f"cls:{iface}", cls_sym, "SPI_IMPLEMENTED_BY", 4.5, c_path)
+        c_import_cites = json.loads(getattr(cm, "import_cites_json", "{}") or "{}")
         for imp_cls in imps:
-            _upsert_edge(cls_sym, f"cls:{imp_cls}", "IMPORTS_CLASS", 2.0, c_path)
-            _upsert_edge(f"cls:{imp_cls}", cls_sym, "IMPORTED_BY_CLASS", 2.0, c_path)
+            cite_imp = c_import_cites.get(imp_cls, c_path)
+            _upsert_edge(cls_sym, f"cls:{imp_cls}", "IMPORTS_CLASS", 2.0, cite_imp)
+            _upsert_edge(f"cls:{imp_cls}", cls_sym, "IMPORTED_BY_CLASS", 2.0, cite_imp)
         for gov in govs:
             gov_up = str(gov).strip().upper()
             if gov_up.startswith("REQ-"):

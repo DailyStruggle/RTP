@@ -7,6 +7,10 @@ import java.util.UUID;
 /**
  * Single-binding SPI describing whether a player is in combat for PvP pre-flight checks.
  * Providers must be thread-safe and non-blocking. Exceptions are logged and fail-open (REQ-RTP-S-004).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface PvPCombatStateRegistry {

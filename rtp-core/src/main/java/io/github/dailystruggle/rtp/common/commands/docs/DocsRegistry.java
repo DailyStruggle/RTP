@@ -276,7 +276,7 @@ public final class DocsRegistry {
         lines.add(new MenuLine(List.of()));
 
         List<String> sorted = new ArrayList<>(models.keySet());
-        Collections.sort(sorted);
+        sorted.sort(null);
 
         for (String key : sorted) {
             if ("index".equals(key)) continue;

@@ -9,6 +9,10 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Implementations must remain asynchronous-safe (S-005), scheduling entity/UI operations onto
  * the owning thread when required by the platform.
+ *
+ * @governedBy ADR-045
+ * @governedBy ADR-115
+ * @invariant S-005: Async-safe prompt opening
  */
 @FunctionalInterface
 public interface AnvilInputOpener {

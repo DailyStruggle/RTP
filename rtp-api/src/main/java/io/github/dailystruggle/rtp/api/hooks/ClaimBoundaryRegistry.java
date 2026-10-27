@@ -12,6 +12,11 @@ import java.util.UUID;
  *
  * <p>Allows multiple claim integrations (Factions, Towny, Lands, etc.) to register territory
  * lookup services without collision.
+ *
+ * @governedBy ADR-026
+ * @governedBy ADR-115
+ * @invariant S-003: No teleport into claim-protected land
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface ClaimBoundaryRegistry {

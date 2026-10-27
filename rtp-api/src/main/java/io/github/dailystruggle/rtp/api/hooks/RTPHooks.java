@@ -7,6 +7,11 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
  *
  * <p>Obtain singleton via {@code RTPAPI.hooks()}. Throws {@link IllegalStateException}
  * if accessed before core loads (REQ-RTP-S-006).
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-026
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface RTPHooks {

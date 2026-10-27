@@ -10,6 +10,9 @@ import java.util.function.Supplier;
  * Represents a world's border, providing a way to get its shape and check if a
  * location is inside it. This class is a simple container for the functions that
  * define the border's behavior, allowing for different border implementations.
+ *
+ * @governedBy ADR-001
+ * @governedBy ADR-115
  */
 public final class WorldBorder {
   private final Supplier<Shape<?>> getShape;

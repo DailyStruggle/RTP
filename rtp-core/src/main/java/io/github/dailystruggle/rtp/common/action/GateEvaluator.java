@@ -244,7 +244,7 @@ public final class GateEvaluator {
     return switch (objective.toLowerCase(java.util.Locale.ROOT)) {
       case "rtp_violations" -> context.violations();
       case "rtp_in_bounds" -> context.inBounds() ? 1.0 : 0.0;
-      case "rtp_time_left" -> (double) context.remainingSeconds();
+      case "rtp_time_left" -> context.remainingSeconds();
       case "rtp_dist_sq" -> context.distanceSqFromAnchor();
       case "rtp_session_id" -> sessionIdScore(context);
       case "rtp_alive" -> aliveScore(context, trace);
@@ -407,9 +407,9 @@ public final class GateEvaluator {
   private static boolean evaluateTimeGate(Object value, ActionGateContext context) {
     if (!(value instanceof Map<?, ?> map)) return false;
     if (map.containsKey(ELAPSED_KEY)
-        && !GateExpressionParser.matches(map.get(ELAPSED_KEY).toString(), (double) context.elapsedSeconds())) return false;
+        && !GateExpressionParser.matches(map.get(ELAPSED_KEY).toString(), context.elapsedSeconds())) return false;
     return !map.containsKey(REMAINING_KEY)
-        || GateExpressionParser.matches(map.get(REMAINING_KEY).toString(), (double) context.remainingSeconds());
+        || GateExpressionParser.matches(map.get(REMAINING_KEY).toString(), context.remainingSeconds());
   }
 
   private static boolean evaluatePredicateGate(

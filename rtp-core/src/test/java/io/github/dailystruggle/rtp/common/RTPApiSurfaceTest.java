@@ -64,7 +64,7 @@ class RTPApiSurfaceTest {
         // created by Configs.reloadConfigs(); getWorld / region.getWorld() then
         // resolve to a concrete world rather than null.
         accessor.addWorld(new MockRTPWorld("default"));
-        RTP rtp = RTP.getInstance();
+        RTP.getInstance();
         TeleportSessions.current().latestTeleportData.clear();
         TeleportSessions.current().priorTeleportData.clear();
         TeleportSessions.current().queuedPlayers.clear();

@@ -6,6 +6,9 @@ import java.util.function.Consumer;
 /**
  * Platform SPI for subscribing to player join and quit events (ADR-049).
  * Subscriptions return an {@link AutoCloseable} unregistration handle.
+ *
+ * @governedBy ADR-049
+ * @governedBy ADR-115
  */
 public interface PlayerLifecycleHook {
 

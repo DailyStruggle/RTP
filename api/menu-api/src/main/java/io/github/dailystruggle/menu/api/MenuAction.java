@@ -10,6 +10,11 @@ import java.util.Objects;
  *
  * <p>Renderers translate each variant to the appropriate platform click event or server-side
  * token callback without embedding raw command strings directly into client views.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-044
+ * @governedBy ADR-045
+ * @governedBy ADR-115
  */
 public sealed interface MenuAction
     permits MenuAction.RunCommand,

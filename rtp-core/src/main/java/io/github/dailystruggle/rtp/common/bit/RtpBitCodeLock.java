@@ -12,10 +12,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /** Reads and verifies the append-only release lock for BIT code identities. */
 public final class RtpBitCodeLock {
     private static final String HEADER = "# namespace id key defaultSeverity\n";
+    private static final Pattern NAMESPACE_PATTERN = Pattern.compile("[A-Z][A-Z0-9]*");
+    private static final Pattern LINE_SPLIT = Pattern.compile("\\R");
+    private static final Pattern WHITESPACE_SPLIT = Pattern.compile("\\s+");
 
     private RtpBitCodeLock() {}
 
@@ -23,7 +27,7 @@ public final class RtpBitCodeLock {
         public Entry {
             namespace = Objects.requireNonNull(namespace, "namespace must not be null").trim();
             key = Objects.requireNonNull(key, "key must not be null").trim();
-            if (!namespace.matches("[A-Z][A-Z0-9]*") || id < 1 || !key.startsWith(namespace + "_")
+            if (!NAMESPACE_PATTERN.matcher(namespace).matches() || id < 1 || !key.startsWith(namespace + "_")
                     || !isUpperSnake(key)) {
                 throw new IllegalArgumentException("invalid BIT lock identity: " + namespace + " " + id + " " + key);
             }
@@ -42,10 +46,10 @@ public final class RtpBitCodeLock {
     public static List<Entry> parse(String content) {
         Objects.requireNonNull(content, "content must not be null");
         List<Entry> entries = new ArrayList<>();
-        for (String line : content.split("\\R")) {
+        for (String line : LINE_SPLIT.split(content)) {
             String value = line.trim();
             if (value.isEmpty() || value.startsWith("#")) continue;
-            String[] fields = value.split("\\s+");
+            String[] fields = WHITESPACE_SPLIT.split(value);
             if (fields.length != 4) throw new IllegalArgumentException("invalid BIT lock row: " + line);
             try {
                 entries.add(new Entry(fields[0], Integer.parseInt(fields[1]), fields[2], Level.valueOf(fields[3])));

@@ -12,6 +12,10 @@ import java.util.function.Consumer;
  * a custom action (e.g. GUI picker) and restore defaults with {@link #clear()}.
  *
  * <p>Subcommands are resolved before this hook and remain unaffected.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface RootActionRegistry {

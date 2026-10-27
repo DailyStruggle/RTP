@@ -7,6 +7,10 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 /**
  * Single-binding registry for world-border integrations (ADR-026).
  * Constrains candidate coordinate generation to inside border bounds.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface WorldBorderProviderRegistry {

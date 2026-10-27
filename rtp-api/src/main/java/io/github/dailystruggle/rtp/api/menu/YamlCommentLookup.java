@@ -6,6 +6,10 @@ import java.util.Optional;
  * SPI for retrieving block comments associated with YAML configuration keys (ADR-044).
  *
  * <p>Decouples menu reflection from YAML substrate types.
+ *
+ * @governedBy ADR-044
+ * @governedBy ADR-064
+ * @governedBy ADR-115
  */
 @FunctionalInterface
 public interface YamlCommentLookup {

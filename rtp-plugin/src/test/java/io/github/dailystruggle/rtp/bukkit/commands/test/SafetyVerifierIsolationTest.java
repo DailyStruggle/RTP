@@ -33,7 +33,7 @@ class SafetyVerifierIsolationTest {
 
   @Test
   @DisplayName("probe cleanup preserves a previously registered claim verifier")
-  void preservesExistingClaimVerifier() throws Exception {
+  void preservesExistingClaimVerifier() {
     AtomicBoolean invoked = new AtomicBoolean();
     claimVerifier =
         GlobalRegionVerifiers.addGlobalRegionVerifierAsync(

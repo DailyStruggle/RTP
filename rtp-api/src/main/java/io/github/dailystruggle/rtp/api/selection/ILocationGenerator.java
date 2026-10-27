@@ -9,6 +9,8 @@ import java.util.concurrent.CompletableFuture;
  *
  * @see GenerationContext
  * @see GenerationResult
+ * @governedBy ADR-001
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface ILocationGenerator {

@@ -263,6 +263,7 @@ public final class ImmediateLoadGovernor {
      * @param currentMspt current MSPT (retained for signature compatibility)
      * @return permit if acquired, or {@code null} if slots are occupied
      */
+    @SuppressWarnings("java:S1172") // currentMspt retained for signature compatibility
     public GenerationPermit tryAcquirePermit(double currentMspt) {
         int maxGlobal = effectiveGlobalPermitCap();
 
@@ -324,6 +325,7 @@ public final class ImmediateLoadGovernor {
         return future;
     }
 
+    @SuppressWarnings("java:S1172") // currentMspt retained for signature compatibility
     public int permitsAvailable(double currentMspt) {
         int maxGlobal = effectiveGlobalPermitCap();
         if (regionalInFlight.get() >= MAX_REGIONAL_PERMITS || GLOBAL_IN_FLIGHT.get() >= maxGlobal) {

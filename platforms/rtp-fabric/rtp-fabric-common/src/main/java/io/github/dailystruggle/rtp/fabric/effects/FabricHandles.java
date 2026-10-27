@@ -30,6 +30,7 @@ import java.util.logging.Level;
 /**
  * Fabric implementations of {@link PlayerHandle} and {@link LocationHandle}.
  */
+@SuppressWarnings({"deprecation", "resource"})
 public final class FabricHandles implements HandleProvider {
     private static final FabricHandles INSTANCE = new FabricHandles();
 
@@ -711,7 +712,7 @@ public final class FabricHandles implements HandleProvider {
                 if (level.addFreshEntity(rocket)) {
                     anyAdded = true;
                 }
-                if (power <= 0) {
+                if (power == 0) {
                     level.broadcastEntityEvent(rocket, (byte) 17);
                     rocket.discard();
                 }

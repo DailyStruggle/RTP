@@ -4,6 +4,9 @@ import java.util.Objects;
 
 /**
  * Immutable 3D vector for platform-neutral particle and geometry calculations.
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
  */
 public record Vector3d(double x, double y, double z) {
 

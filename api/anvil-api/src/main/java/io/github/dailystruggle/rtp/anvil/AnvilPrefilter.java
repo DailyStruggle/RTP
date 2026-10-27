@@ -340,11 +340,10 @@ public final class AnvilPrefilter {
           cx,
           cz,
           e.getClass().getSimpleName() + ": " + e.getMessage());
-      LOG.log(Level.WARNING,
-          "[RTP] Anvil probe failed for world=" + worldFolder
+      LOG.log(Level.WARNING, e,
+          () -> "[RTP] Anvil probe failed for world=" + worldFolder
               + " dim=\"" + dimensionSubpath + "\" chunk=(" + cx + "," + cz
-              + ") — falling through to live chunk load",
-          e);
+              + ") — falling through to live chunk load");
       return new ProbeResult(Verdict.UNKNOWN, null);
     }
     if (resolved == null) {
@@ -501,11 +500,10 @@ public final class AnvilPrefilter {
           cx,
           cz,
           e.getClass().getSimpleName() + ": " + e.getMessage());
-      LOG.log(Level.WARNING,
-          "[RTP] Anvil probe failed for world=" + worldFolder
+      LOG.log(Level.WARNING, e,
+          () -> "[RTP] Anvil probe failed for world=" + worldFolder
               + " dim=\"" + dimensionSubpath + "\" chunk=(" + cx + "," + cz
-              + ") — falling through to live chunk load",
-          e);
+              + ") — falling through to live chunk load");
       return new ProbeResult(Verdict.UNKNOWN, null);
     }
   }

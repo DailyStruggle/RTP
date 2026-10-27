@@ -28,10 +28,12 @@ class ConfigDirectivesTest {
 
     @Test
     void parse_optionsFlowList_doubleQuoted() {
-        String comment = "# Storage backend.\n"
-                + "# @type: enum\n"
-                + "# @options: [\"yaml\", \"sqlite\", \"mysql\", \"postgres\"]\n"
-                + "# @default: \"sqlite\"";
+        String comment = """
+                # Storage backend.
+                # @type: enum
+                # @options: ["yaml", "sqlite", "mysql", "postgres"]
+                # @default: "sqlite"\
+                """;
         ConfigDirectives d = ConfigDirectives.parse(comment);
         assertEquals("enum", d.type());
         assertEquals(List.of("yaml", "sqlite", "mysql", "postgres"), d.options());

@@ -13,7 +13,7 @@ All 14 modules uphold four shared architectural guarantees:
 ## Architecture Overview (5 Functional Layers)
 
 ### 1. Runtime & Platform Abstraction
-- [`server-api`](server-api/README.md) - Platform-neutral server identity (`PlatformFamily`), version compatibility checks, logging, and regionalized/async task scheduling (`ServerAccessor`, `ServerAccessors`, `TaskScheduler`, `TaskHandle`).
+- [`server-api`](server-api/README.md) - Platform-neutral server identity (`PlatformFamily`), version compatibility checks, logging, regionalized/async task scheduling (`ServerAccessor`, `ServerAccessors`, `TaskScheduler`, `TaskHandle`), and focused capability sub-interfaces (`ScoreboardAccessor`, `WorldBorderAccessor`, `PaletteTagAccessor`, `EffectHandleBridge`, `MenuContextAccessor`, `CommandDispatchAccessor`) with safe default implementations.
 - [`commands-api`](commands-api/README.md) - Permission-filtered command tree (`TreeCommand`), `key=value` parameter validation, tick-budgeted execution pipeline (`CommandsAPI`), and Brigadier bridge (`BrigadierCommandAdapter`).
 - [`menu-api`](menu-api/README.md) - Declarative multi-page menu model (`MenuDescriptor`), click actions (`MenuAction`), session history and key-value staging cart (`MenuSession`), expiring click tokens (`MenuTokenService`), anvil text prompts (`AnvilInputOpener`), and `ServiceLoader` renderer discovery (`MenuBindingSupport`).
 - [`effects-api`](effects-api/README.md) - Prototype-cloned visual and audio effects (`Effect`, `EffectFactory`), permission-node effect builders, hologram handles, and volumetric wireframe particle rendering.

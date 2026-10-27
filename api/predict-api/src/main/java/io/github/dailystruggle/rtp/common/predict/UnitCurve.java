@@ -17,6 +17,9 @@ import java.util.function.DoubleUnaryOperator;
  * {@link PolarCurve#spiralOffset(double, double, double, double, DoubleUnaryOperator)}.
  *
  * <p>Zero external dependencies (REQ-PRED-NF-001, REQ-PRED-NF-002, ADR-115).
+ *
+ * @governedBy ADR-087
+ * @governedBy ADR-115
  */
 @FunctionalInterface
 public interface UnitCurve extends DoubleUnaryOperator {

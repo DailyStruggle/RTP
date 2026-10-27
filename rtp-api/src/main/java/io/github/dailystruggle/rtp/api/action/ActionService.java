@@ -12,6 +12,10 @@ import java.util.function.Predicate;
  *
  * <p>Callers invoke {@link #trigger(String, java.util.List, ActionContext)} to place, confine,
  * and orchestrate participants through the action lifecycle.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface ActionService {

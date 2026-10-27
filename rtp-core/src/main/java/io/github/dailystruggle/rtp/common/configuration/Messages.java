@@ -53,7 +53,7 @@ public final class Messages {
    * @param def  the fallback value
    * @return the resolved value, or {@code def}
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
+  @SuppressWarnings({"unchecked", "rawtypes", "java:S1905"})
   public static Object valueByName(String name, Object def) {
     Enum<?> key = byName(name);
     if (key == null || ActiveConfigs.get() == null) return def;

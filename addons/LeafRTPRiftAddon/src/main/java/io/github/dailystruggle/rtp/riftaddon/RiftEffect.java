@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.riftaddon;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
+import io.github.dailystruggle.effectsapi.common.spi.EffectTarget;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
@@ -119,10 +119,10 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
   public void run() {
     RTP.log(Level.FINE, "[LeafRTPRiftAddon] RIFT.run() invoked; target=" + target);
     // Resolve a platform-neutral player handle for the target (same pattern as GlideEffect).
-    PlayerHandle ph = HandleRegistry.wrapPlayer(target);
+    PlayerHandle ph = EffectTarget.wrapPlayer(target);
     if (ph == null) {
-      LocationHandle lh = HandleRegistry.wrapLocation(target);
-      if (lh != null) ph = HandleRegistry.playerAt(lh);
+      LocationHandle lh = EffectTarget.wrapLocation(target);
+      if (lh != null) ph = EffectTarget.playerAt(lh);
     }
     if (ph == null) {
       RTP.log(Level.WARNING,

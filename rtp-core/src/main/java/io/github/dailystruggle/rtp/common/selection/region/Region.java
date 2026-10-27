@@ -154,14 +154,12 @@ public class Region extends FactoryValue<RegionKeys> {
       long nowNanos
   ) {
     long key = chunkCoordKey(cx, cz);
-    CandidateDeferralState prev = candidateDeferrals.get(key);
     if (pausedOrZeroQuota) {
-      if (prev != null) {
-        candidateDeferrals.put(key, new CandidateDeferralState(
-            prev.deferralCount(), prev.unpausedDeferredNanos(), nowNanos, prev.aged()));
-      }
+      candidateDeferrals.computeIfPresent(key, (k, prev) -> new CandidateDeferralState(
+          prev.deferralCount(), prev.unpausedDeferredNanos(), nowNanos, prev.aged()));
       return true;
     }
+    CandidateDeferralState prev = candidateDeferrals.get(key);
     if (prev != null && prev.aged()) {
       return false;
     }
@@ -343,7 +341,7 @@ public class Region extends FactoryValue<RegionKeys> {
       settings = this.settings;
     }
 
-    if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(settings.spatialResolution());
+    if (this.shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(settings.spatialResolution());
 
     // Lobby backends never serve teleports to local coords -
     // peers see regions=[] / acceptingRequests=false (BukkitBackendStateSampler)
@@ -693,9 +691,10 @@ public class Region extends FactoryValue<RegionKeys> {
       RTPLocation hot = queueManager.keptLocations.pollSilently();
       if (hot == null) break;
       RTPLocation cold = hot;
-      if (hot.reservation() != null) {
-        hot.reservation().close();
-        cold = new RTPLocation(hot.coords(), hot.attempts());
+      try (ChunkReservation reservation = hot.reservation()) {
+        if (reservation != null) {
+          cold = new RTPLocation(hot.coords(), hot.attempts());
+        }
       }
       queueManager.unkeptLocations.offerSilently(cold);
       shed++;
@@ -726,9 +725,10 @@ public class Region extends FactoryValue<RegionKeys> {
       RTPLocation hot = queueManager.keptLocations.pollSilently();
       if (hot == null) break;
       RTPLocation cold = hot;
-      if (hot.reservation() != null) {
-        hot.reservation().close();
-        cold = new RTPLocation(hot.coords(), hot.attempts());
+      try (ChunkReservation reservation = hot.reservation()) {
+        if (reservation != null) {
+          cold = new RTPLocation(hot.coords(), hot.attempts());
+        }
       }
       queueManager.unkeptLocations.offerSilently(cold);
       shed++;
@@ -756,8 +756,8 @@ public class Region extends FactoryValue<RegionKeys> {
     if (prevTime == Long.MIN_VALUE || nowNanos <= prevTime) {
       return Double.longBitsToDouble(consumptionRatePerTickBits.get());
     }
-    double dtTicks = Math.max(1e-3, (double) (nowNanos - prevTime) / (double) ComputeGovernor.NANOS_PER_TICK);
-    double instantRate = Math.max(0.0, (double) (total - prevCount) / dtTicks);
+    double dtTicks = Math.max(1e-3, (double) (nowNanos - prevTime) / ComputeGovernor.NANOS_PER_TICK);
+    double instantRate = Math.max(0.0, (total - prevCount) / dtTicks);
     while (true) {
       long curBits = consumptionRatePerTickBits.get();
       double cur = Double.longBitsToDouble(curBits);
@@ -786,7 +786,7 @@ public class Region extends FactoryValue<RegionKeys> {
     ComputeBudget budget = ComputeGovernor.currentBudget();
     boolean governed = budget != null && budget.isActuating();
     long activeCap = governed
-        ? budget.hotCap(name, (int) Math.min(Integer.MAX_VALUE, settings.activeChunkCap()))
+        ? budget.hotCap(name, settings.activeChunkCap())
         : settings.activeChunkCap();
     long kept = queueManager.keptLocations.size();
     long unkept = queueManager.unkeptLocations.size();
@@ -991,6 +991,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * promotion checks; the candidate ends in kept, back in cold, or dropped. Holds one
    * {@code inFlightCalculations} slot until the outcome is known.
    */
+  @SuppressWarnings("java:S1144") // invoked reflectively by RegionLifecycleAndBranchTest
   private void promoteCold(
       RTPLocation coldLoc,
       int cx,
@@ -999,6 +1000,7 @@ public class Region extends FactoryValue<RegionKeys> {
     promoteCold(coldLoc, cx, cz, generationSlot, false);
   }
 
+  @SuppressWarnings("java:S1172") // forWaitingPlayer retained for reflective test parity
   private void promoteCold(
       RTPLocation coldLoc,
       int cx,
@@ -1217,7 +1219,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     drainWaitingPlayers();
     int waitingCount = queueManager.playerQueue.size();
-    if (waitingCount <= 0) {
+    if (waitingCount == 0) {
       return;
     }
 
@@ -1233,7 +1235,7 @@ public class Region extends FactoryValue<RegionKeys> {
         + pendingKeptPromotions.get()
         + inFlightCalculations.get();
     long shortfall = Math.max(0L, (long) waitingCount - hotCovered);
-    if (shortfall <= 0L) {
+    if (shortfall == 0L) {
       return;
     }
 
@@ -1241,7 +1243,7 @@ public class Region extends FactoryValue<RegionKeys> {
       drainValidatedToCold(queueManager.backlogLocations, (int) Math.min(MAX_PROMOTIONS_PER_PULSE, shortfall));
     }
 
-    long maxPromote = Math.min(shortfall, (long) MAX_PROMOTIONS_PER_PULSE);
+    long maxPromote = Math.min(shortfall, MAX_PROMOTIONS_PER_PULSE);
     for (int i = 0; i < maxPromote; i++) {
       boolean outOfTime = i > 0 && System.nanoTime() - start >= availableTime;
       RTPLocation coldLoc = outOfTime ? null : queueManager.unkeptLocations.pollSilently();
@@ -1266,7 +1268,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     drainWaitingPlayers();
     waitingCount = queueManager.playerQueue.size();
-    if (waitingCount <= 0) {
+    if (waitingCount == 0) {
       return;
     }
 
@@ -1276,7 +1278,7 @@ public class Region extends FactoryValue<RegionKeys> {
         + inFlightCalculations.get()
         + pendingKeptPromotions.get();
     long fillShortfall = Math.max(0L, (long) waitingCount - totalCovered);
-    if (fillShortfall <= 0L) {
+    if (fillShortfall == 0L) {
       return;
     }
     if (RTPRuntime.scheduler() != null && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
@@ -1286,7 +1288,7 @@ public class Region extends FactoryValue<RegionKeys> {
       return;
     }
     try {
-      long maxFill = Math.min(fillShortfall, (long) MAX_PROMOTIONS_PER_PULSE);
+      long maxFill = Math.min(fillShortfall, MAX_PROMOTIONS_PER_PULSE);
       for (long i = 0; i < maxFill; i++) {
         if (RTPRuntime.scheduler() != null && RTPRuntime.scheduler().isGenerationSaturated(getWorld())) {
           break;
@@ -1347,7 +1349,7 @@ public class Region extends FactoryValue<RegionKeys> {
     java.util.concurrent.atomic.AtomicBoolean bgRan =
         (pulseRanAnyBg != null) ? pulseRanAnyBg : new java.util.concurrent.atomic.AtomicBoolean(false);
     long activeCap = governed
-        ? budget.hotCap(name, (int) Math.min(Integer.MAX_VALUE, settings.activeChunkCap()))
+        ? budget.hotCap(name, settings.activeChunkCap())
         : settings.activeChunkCap();
     int maxPromotions = governed ? budget.promotionsPerTurn() : MAX_PROMOTIONS_PER_PULSE;
     int unitQuota = governed ? budget.unitsPerTurn(name) : Integer.MAX_VALUE;
@@ -1389,12 +1391,18 @@ public class Region extends FactoryValue<RegionKeys> {
       shedHotCacheToGovernedCap(activeCap);
     }
     boolean shedCooldown = pauseAfterHeapShed(heapUnderPressure, System.nanoTime());
-    long promotionAllowance = Math.min((long) maxPromotions, Math.max(0L, (long) unitQuota));
+    long promotionAllowance = Math.min(maxPromotions, Math.max(0L, unitQuota));
     long fillDeficit = (heapUnderPressure || tickUnhealthy || shedCooldown || (governed && availableTime <= 0L))
         ? 0 : Math.min(deficit, promotionAllowance);
     if ((heapUnderPressure || tickUnhealthy || shedCooldown) && deficit > 0) {
-      String reason = heapUnderPressure ? "heap pressure"
-          : tickUnhealthy ? "tick health" : "post-shed refill cooldown";
+      String reason;
+      if (heapUnderPressure) {
+        reason = "heap pressure";
+      } else if (tickUnhealthy) {
+        reason = "tick health";
+      } else {
+        reason = "post-shed refill cooldown";
+      }
       RTPRuntime.log(Level.FINE,
           "[Region:" + name + "] hot-cache fill paused (" + reason + "); deficit=" + deficit);
     }
@@ -1459,7 +1467,7 @@ public class Region extends FactoryValue<RegionKeys> {
       return;
     }
     long remainingColdQuota = Math.max(0L, (long) unitQuota - coldFills);
-    if (governed && (remainingColdQuota <= 0L || availableTime <= 0L || (bgRan.get() && System.nanoTime() - start >= availableTime))) {
+    if (governed && (remainingColdQuota == 0L || availableTime <= 0L || (bgRan.get() && System.nanoTime() - start >= availableTime))) {
       finishGovernedTurn(true, start, Math.max(coldFills, promotionsStarted), promotionsStarted);
       return;
     }
@@ -1522,7 +1530,7 @@ public class Region extends FactoryValue<RegionKeys> {
       long beforePipe = cachePipeline.size();
       if (governed) {
         long remForCache = availableTime - (System.nanoTime() - start);
-        long pipeBudget = (!bgRan.get() && availableTime > 0L) ? Math.max(1L, remForCache) : Math.max(0L, remForCache);
+        long pipeBudget = !bgRan.get() ? Math.max(1L, remForCache) : Math.max(0L, remForCache);
         cachePipeline.execute(pipeBudget, bgRan);
         if (cacheTasksAdmitted > 0) {
           bgRan.set(true);
@@ -1531,8 +1539,8 @@ public class Region extends FactoryValue<RegionKeys> {
         cachePipeline.execute(Math.max(1L, availableTime - (System.nanoTime() - start)));
       }
       long pipeRan = Math.max(0L, beforePipe - cachePipeline.size());
-      long coldAddedThisTurn = Math.max((long) cacheTasksAdmitted, pipeRan);
-      coldFills = (int) Math.min((long) unitQuota, (long) coldFills + Math.min(remainingColdQuota, coldAddedThisTurn));
+      long coldAddedThisTurn = Math.max(cacheTasksAdmitted, pipeRan);
+      coldFills = (int) Math.min(unitQuota, (long) coldFills + Math.min(remainingColdQuota, coldAddedThisTurn));
     } finally {
       isScanningCache.set(false);
       finishGovernedTurn(governed, start, Math.max(coldFills, promotionsStarted), promotionsStarted);
@@ -1721,6 +1729,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param availableTime original pulse budget (ns)
    * @param startNanos    {@code System.nanoTime()} captured at pulse start
    */
+  @SuppressWarnings("java:S1144") // invoked reflectively by BacklogRefillThresholdTest
   private void processBacklog(long availableTime, long startNanos) {
     processBacklog(availableTime, startNanos, Integer.MAX_VALUE, false, new java.util.concurrent.atomic.AtomicBoolean(false));
   }
@@ -1791,7 +1800,7 @@ public class Region extends FactoryValue<RegionKeys> {
         long now = System.nanoTime();
         if (pickStart != 0L) recordPickCost(now - pickStart);
         pickStart = now;
-        boolean canPick = (governed && !bgRan.get() && availableTime > 0L)
+        boolean canPick = (governed && !bgRan.get())
             || (now + backlogPacer.predictedCostNanos() < deadline);
         boolean budgetLeft = backlog.size() < backlog.capacity() && canPick;
         int[] sel = budgetLeft ? pickBacklogCell(currentShape, binnedStrategy) : NO_CELL;
@@ -1883,7 +1892,7 @@ public class Region extends FactoryValue<RegionKeys> {
     if (maxDrain <= 0) return 0;
     long room = settings.cacheCap() - queueManager.unkeptLocations.size();
     if (room <= 0L) return 0;
-    int n = (int) Math.min((long) maxDrain, Math.min((long) Integer.MAX_VALUE, room));
+    int n = (int) Math.min(maxDrain, Math.min(Integer.MAX_VALUE, room));
     List<BacklogLocationBuffer.BacklogEntry> out =
         "BINNED_AMORTIZED".equalsIgnoreCase(readBacklogGenerationStrategy())
             ? backlog.pollRandomValidated(n)

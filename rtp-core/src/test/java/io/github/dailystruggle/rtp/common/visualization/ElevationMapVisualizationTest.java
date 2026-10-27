@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
  * if no world data is found.
  */
 @Tag("drawing")
-public class ElevationMapVisualizationTest {
+class ElevationMapVisualizationTest {
 
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$");
 
@@ -117,7 +117,7 @@ public class ElevationMapVisualizationTest {
 
   @Test
   @DisplayName("ADR-119: contour map with defined Y ranges and its compression against raw heights")
-  public void testDrawContourMap() throws Exception {
+  void testDrawContourMap() throws Exception {
     System.out.println("\n[DEBUG_LOG] === CONTOUR MAP (ADR-119) ===");
     List<ChunkElevation> elevations = loadElevations();
 
@@ -362,7 +362,7 @@ public class ElevationMapVisualizationTest {
 
   @Test
   @DisplayName("ADR-119: visualize Y-band elevation map with sparse sampling and interpolation")
-  public void testDrawElevationMap() throws Exception {
+  void testDrawElevationMap() throws Exception {
     System.out.println("\n[DEBUG_LOG] === ELEVATION MAP VISUALIZATION (ADR-119) ===");
 
     // 1. Load real world data
@@ -418,17 +418,13 @@ public class ElevationMapVisualizationTest {
     g.setColor(Color.BLACK);
     g.fillRect(0, 0, IMG_WIDTH, IMG_HEIGHT);
 
-    int margin = 40;
-    int panelW = (PANEL_SIZE - margin * 2);
-    int panelH = (PANEL_SIZE - margin * 2);
-
     // Panel 1: Raw elevation heatmap
     renderPanel(g, 0, 0, "Raw Elevation (floor Y)",
-        elevationGrid, hasData, minFloorY, maxFloorY, false);
+        elevationGrid, hasData, minFloorY, maxFloorY);
 
     // Panel 2: Y-band quantization
     renderPanel(g, 1, 0, "Y-Band Quantization (bandHeight=" + BAND_HEIGHT + ")",
-        bandGrid, hasData, minBand, maxBand, false);
+        bandGrid, hasData, minBand, maxBand);
 
     // Panel 3: Sparse sampling at 5% density
     renderSparsePanel(g, 2, 0, "Sparse Sampling (5%%)",
@@ -441,7 +437,7 @@ public class ElevationMapVisualizationTest {
 
     // Panel 5: Interpolation error map
     renderErrorPanel(g, 1, 1, "Interpolation Error (blocks)",
-        interpolated, elevationGrid, hasData, minFloorY, maxFloorY);
+        interpolated, elevationGrid, hasData);
 
     // Panel 6: Band height comparison
     renderBandHeightComparison(g, 2, 1, "Band Height Comparison",
@@ -596,12 +592,9 @@ public class ElevationMapVisualizationTest {
   private double[][] generateNoise(int w, int h, int octaves, Random rng) {
     double[][] result = new double[h][w];
     for (int octave = 0; octave < octaves; octave++) {
-      double freq = Math.pow(2, octave);
       double amp = 1.0 / Math.pow(2, octave);
       for (int z = 0; z < h; z++) {
         for (int x = 0; x < w; x++) {
-          double nx = x / (double) w * freq;
-          double nz = z / (double) h * freq;
           double v = rng.nextDouble() * amp;
           result[z][x] += v;
         }
@@ -611,7 +604,7 @@ public class ElevationMapVisualizationTest {
   }
 
   private void renderPanel(Graphics2D g, int px, int py, String title,
-      int[][] grid, boolean[][] hasData, int minVal, int maxVal, boolean showSamples) {
+      int[][] grid, boolean[][] hasData, int minVal, int maxVal) {
     int ox = px * PANEL_SIZE + 40;
     int oy = py * PANEL_SIZE + 40;
     int w = PANEL_SIZE - 80;
@@ -725,8 +718,7 @@ public class ElevationMapVisualizationTest {
   }
 
   private void renderErrorPanel(Graphics2D g, int px, int py, String title,
-      double[][] interpolated, int[][] original, boolean[][] hasData,
-      int minVal, int maxVal) {
+      double[][] interpolated, int[][] original, boolean[][] hasData) {
     int ox = px * PANEL_SIZE + 40;
     int oy = py * PANEL_SIZE + 40;
     int w = PANEL_SIZE - 80;

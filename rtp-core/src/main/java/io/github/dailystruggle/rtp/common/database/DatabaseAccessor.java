@@ -563,6 +563,8 @@ public abstract class DatabaseAccessor<D> implements RegionLocationStore {
    * @param regionName the name of the region
    * @return a list of stored locations for that region
    */
+  @Override
+  @SuppressWarnings("java:S3038") // Covariant return type narrows StoredEntry to StoredLocation
   public abstract List<StoredLocation> loadCachedLocations(String regionName);
 
   /**

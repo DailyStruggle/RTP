@@ -410,7 +410,7 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
             if (suggestions != null) {
                 // Sort for stable ordering (Set may be unordered).
                 List<String> sorted = new ArrayList<>(suggestions);
-                Collections.sort(sorted);
+                sorted.sort(null);
                 for (String value : sorted) {
                     if (value == null) continue;
                     String[] openArgs = new String[parentPath.size() + 1];

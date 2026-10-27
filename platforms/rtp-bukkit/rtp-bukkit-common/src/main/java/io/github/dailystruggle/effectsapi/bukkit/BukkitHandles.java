@@ -28,6 +28,7 @@ import java.util.UUID;
 /**
  * Bukkit implementations of {@link PlayerHandle} and {@link LocationHandle}.
  */
+@SuppressWarnings("deprecation")
 public final class BukkitHandles implements HandleProvider {
     private static final BukkitHandles INSTANCE = new BukkitHandles();
 
@@ -232,11 +233,6 @@ public final class BukkitHandles implements HandleProvider {
             return;
         }
         org.bukkit.Bukkit.dispatchCommand(org.bukkit.Bukkit.getConsoleSender(), command);
-    }
-
-    @Override
-    public void dispatchPlayerCommand(@NotNull PlayerHandle player, @NotNull String command) {
-        player.performCommand(command);
     }
 
     public static PlayerHandle wrap(@NotNull Player player) {
@@ -560,17 +556,7 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void spawnFirework(Map<String, Object> data) {
-            org.bukkit.plugin.Plugin caller = null;
-            FireworkSafetyListener fsl = io.github.dailystruggle.effectsapi.EffectsAPI.getFireworkSafetyListener();
-            if (fsl != null) {
-                caller = fsl.caller;
-            } else {
-                try {
-                    caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
-                } catch (IllegalStateException ignored) {
-                    // EffectsAPI not yet initialized; caller remains null
-                }
-            }
+            org.bukkit.plugin.Plugin caller = resolvePluginCaller();
 
             if (regionDispatcher.dispatch(caller, location, () -> BukkitHandles.spawnFirework(location, data))) {
                 return;
@@ -600,6 +586,18 @@ public final class BukkitHandles implements HandleProvider {
         @Override
         public String toString() {
             return "BukkitLocationHandle{world=" + worldName() + ", x=" + x() + ", y=" + y() + ", z=" + z() + "}";
+        }
+    }
+
+    private static @Nullable org.bukkit.plugin.Plugin resolvePluginCaller() {
+        FireworkSafetyListener fsl = io.github.dailystruggle.effectsapi.EffectsAPI.getFireworkSafetyListener();
+        if (fsl != null) {
+            return fsl.caller;
+        }
+        try {
+            return io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+        } catch (IllegalStateException ignored) {
+            return null;
         }
     }
 

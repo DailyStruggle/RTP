@@ -6,6 +6,10 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Service-discovery provider for an {@link AnvilInputOpener} via {@link java.util.ServiceLoader}
  * (ADR-070).
+ *
+ * @governedBy ADR-045
+ * @governedBy ADR-070
+ * @governedBy ADR-115
  */
 public interface AnvilInputOpenerProvider {
 

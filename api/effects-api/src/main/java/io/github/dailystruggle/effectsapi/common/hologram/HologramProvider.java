@@ -10,6 +10,9 @@ import java.util.List;
  *
  * <p>Supports modern Display Entities (TextDisplay) and armor stand or virtual packet-based
  * fallback providers.</p>
+ *
+ * @governedBy ADR-034
+ * @governedBy ADR-115
  */
 public interface HologramProvider {
 

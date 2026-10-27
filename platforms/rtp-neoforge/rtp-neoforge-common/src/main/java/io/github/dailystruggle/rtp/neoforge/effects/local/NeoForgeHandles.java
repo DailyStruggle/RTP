@@ -30,9 +30,10 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * NeoForge implementation of {@link HandleProvider} and {@link PlayerHandle}
+ * NeoForge implementation of {@link PlayerHandle} and {@link LocationHandle}
  * (effects-api-ADR-007).
  */
+@SuppressWarnings("deprecation")
 public final class NeoForgeHandles implements HandleProvider {
     private static final NeoForgeHandles INSTANCE = new NeoForgeHandles();
 
@@ -335,7 +336,7 @@ public final class NeoForgeHandles implements HandleProvider {
                 if (Boolean.TRUE.equals(addFreshEntity.invoke(level, rocket))) {
                     anyAdded = true;
                 }
-                if (power <= 0) {
+                if (power == 0) {
                     broadcastEntityEvent.invoke(level, rocket, (byte) 17);
                     discard.invoke(rocket);
                 }

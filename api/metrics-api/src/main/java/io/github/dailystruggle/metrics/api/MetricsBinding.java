@@ -19,6 +19,9 @@ import java.util.UUID;
  *
  * <p>The {@link #NOOP} binding is the default; it is what {@link Metrics#currentBinding()}
  * returns when no platform has registered.
+ *
+ * @governedBy ADR-039
+ * @governedBy ADR-115
  */
 public interface MetricsBinding {
 

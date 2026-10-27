@@ -211,14 +211,16 @@ class NetworkModeBootstrapComprehensiveTest {
     @DisplayName("configured queue entry TTL starts a backend reaper")
     void configuredQueueEntryTtlStartsReaper() throws IOException {
         File file = new File(tempDir, "queue-ttl.yml");
-        Files.writeString(file.toPath(), "network:\n"
-                + "  enabled: true\n"
-                + "  serverId: backend-main\n"
-                + "transport:\n"
-                + "  type: in-memory\n"
-                + "queue:\n"
-                + "  entryTtlMs: 2s\n"
-                + "  pollIntervalMs: 1s\n");
+        Files.writeString(file.toPath(), """
+                network:
+                  enabled: true
+                  serverId: backend-main
+                transport:
+                  type: in-memory
+                queue:
+                  entryTtlMs: 2s
+                  pollIntervalMs: 1s
+                """);
         NetworkHooks.setBackendStateSamplerFactory(lobby -> sid -> new BackendHeartbeat(
                 sid, 1, BackendHeartbeat.PluginState.READY, true, System.currentTimeMillis(),
                 20.0, 0, 100, 0L, 1L, 0, List.of(), List.of(), false

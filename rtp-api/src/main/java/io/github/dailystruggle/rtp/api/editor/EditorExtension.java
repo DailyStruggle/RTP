@@ -22,6 +22,9 @@ import java.util.Set;
  * three failures mark the extension failed for that session.
  *
  * <p>JSON strings are JSON texts; a value that does not parse is refused and logged.
+ *
+ * @governedBy ADR-021
+ * @governedBy ADR-115
  */
 @PublicApi
 public interface EditorExtension {

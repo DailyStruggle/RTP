@@ -7,6 +7,9 @@ import java.util.function.Consumer;
  * Producer-side abstraction for RTP trigger events.
  *
  * <p>Platform- and proxy-neutral source that emits {@link Trigger} events to a registered consumer.
+ *
+ * @governedBy ADR-036
+ * @governedBy ADR-115
  */
 public interface RtpTriggerSource {
 

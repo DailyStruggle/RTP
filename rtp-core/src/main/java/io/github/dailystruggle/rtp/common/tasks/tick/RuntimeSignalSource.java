@@ -208,7 +208,7 @@ public final class RuntimeSignalSource implements SignalSource {
         long postGcBytes = HeapSampler.postGcTenuredUsedBytes();
         long maxHeapBytes = HeapSampler.tenuredMaxBytes();
         ComputeSignals.SampledSignal postGcSignal = (postGcBytes > 0L)
-                ? ComputeSignals.SampledSignal.fresh((double) postGcBytes, HEAP_LAG_NANOS)
+                ? ComputeSignals.SampledSignal.fresh(postGcBytes, HEAP_LAG_NANOS)
                 : ComputeSignals.SampledSignal.neverSampled();
 
         // 4. Chunk-system latency & in-flight

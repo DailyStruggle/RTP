@@ -7,6 +7,10 @@ import io.github.dailystruggle.rtp.api.annotations.PublicApi;
  *
  * <p>Exposes spatial containment, current centroid, and bounding chunk coordinates
  * without coupling callers or addons to specific platform or claim implementations.
+ *
+ * @governedBy ADR-026
+ * @governedBy ADR-115
+ * @invariant S-003: No teleport into claim-protected land
  */
 @PublicApi
 public interface ClaimBoundary {

@@ -15,8 +15,12 @@ import java.util.logging.Level;
  *             {@link ServerAccessor#resolveEffectPlayerAt(Object)}, and
  *             {@link ServerAccessor#dispatchConsoleCommand(String)} (or install via
  *             {@link io.github.dailystruggle.server.api.ServerAccessors#setEffectAccessor(ServerAccessor)}).
+ * @governedBy ADR-034
+ * @governedBy ADR-115
+ * @governedBy ADR-116
  */
 @Deprecated(since = "3.3.1")
+@SuppressWarnings("DeprecatedIsStillUsed")
 public interface HandleProvider extends ServerAccessor {
     /**
      * Wrap a platform-specific player object.

@@ -10,6 +10,10 @@ import java.io.IOException;
  * and return the decoded chunk entry containing the uncompressed NBT root compound. Readers receive
  * untrusted on-disk bytes and shall fail closed: bound every length and offset, cap decompressed
  * sizes, and throw {@link CorruptRegionEntryException} rather than read out of range.</p>
+ *
+ * @governedBy ADR-016
+ * @governedBy ADR-077
+ * @governedBy ADR-115
  */
 public interface RegionFileReader {
 

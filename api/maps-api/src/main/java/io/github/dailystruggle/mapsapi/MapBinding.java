@@ -35,6 +35,9 @@ import java.util.function.Supplier;
  *       Scheduler ({@code MapView} has no region affinity); per-viewer pixel
  *       commits dispatch via the Entity Scheduler.</li>
  * </ul>
+ *
+ * @governedBy ADR-053
+ * @governedBy ADR-115
  */
 public interface MapBinding {
 

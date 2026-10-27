@@ -6,6 +6,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Service-discovery provider for a {@link MenuRenderer} via {@link java.util.ServiceLoader}
  * (ADR-070).
+ *
+ * @governedBy ADR-070
+ * @governedBy ADR-115
  */
 public interface MenuRendererProvider {
 

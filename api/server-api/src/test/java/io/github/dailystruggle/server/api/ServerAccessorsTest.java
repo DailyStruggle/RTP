@@ -2,7 +2,9 @@ package io.github.dailystruggle.server.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,13 +34,8 @@ class ServerAccessorsTest {
   private static final Logger LOGGER = Logger.getLogger("Server");
 
   @BeforeEach
-  void clearInstalledAccessor() {
-    ServerAccessors.set(null);
-    ServerAccessors.setEffectAccessor(null);
-  }
-
   @AfterEach
-  void clearAccessor() {
+  void clearInstalledAccessor() {
     ServerAccessors.set(null);
     ServerAccessors.setEffectAccessor(null);
   }
@@ -92,6 +89,12 @@ class ServerAccessorsTest {
   void commonApiTypesDoNotExposeRtpTypes() {
     Class<?>[] apiTypes = {
       ServerAccessor.class,
+      ScoreboardAccessor.class,
+      WorldBorderAccessor.class,
+      PaletteTagAccessor.class,
+      EffectHandleBridge.class,
+      MenuContextAccessor.class,
+      CommandDispatchAccessor.class,
       PlatformFamily.class,
       ServerAccessors.class,
       TaskHandle.class,
@@ -243,6 +246,90 @@ class ServerAccessorsTest {
     accessor.dispatchConsoleCommand("say test");
     accessor.dispatchConsoleCommand("");
     accessor.dispatchConsoleCommand(null);
+  }
+
+  @Test
+  void serverAccessorIsAssignableToCapabilitySubInterfacesAndDefaultsBehaveAsExpected() {
+    ServerAccessor accessor = new StubAccessor("paper", 21);
+    UUID player = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+    assertTrue(ScoreboardAccessor.class.isAssignableFrom(ServerAccessor.class));
+    assertTrue(WorldBorderAccessor.class.isAssignableFrom(ServerAccessor.class));
+    assertTrue(PaletteTagAccessor.class.isAssignableFrom(ServerAccessor.class));
+    assertTrue(EffectHandleBridge.class.isAssignableFrom(ServerAccessor.class));
+    assertTrue(MenuContextAccessor.class.isAssignableFrom(ServerAccessor.class));
+    assertTrue(CommandDispatchAccessor.class.isAssignableFrom(ServerAccessor.class));
+
+    assertInstanceOf(ScoreboardAccessor.class, accessor);
+    assertInstanceOf(WorldBorderAccessor.class, accessor);
+    assertInstanceOf(PaletteTagAccessor.class, accessor);
+    assertInstanceOf(EffectHandleBridge.class, accessor);
+    assertInstanceOf(MenuContextAccessor.class, accessor);
+    assertInstanceOf(CommandDispatchAccessor.class, accessor);
+
+    ScoreboardAccessor scoreboard = accessor;
+    assertTrue(scoreboard.getScoreboardTags(player).isEmpty());
+    assertFalse(scoreboard.addScoreboardTag(player, "tag"));
+    assertFalse(scoreboard.removeScoreboardTag(player, "tag"));
+    assertNull(scoreboard.getScoreboardScore(player, "obj"));
+    scoreboard.setScoreboardScore(player, "obj", 7);
+    scoreboard.resetScoreboardScore(player, "obj");
+    scoreboard.resetScoreboardScores(player, "obj");
+    assertTrue(scoreboard.hasScoreboardObjective("obj").isEmpty());
+    scoreboard.ensureScoreboardObjective("obj", "dummy");
+
+    WorldBorderAccessor worldBorder = accessor;
+    worldBorder.sendWorldBorder(player, 0.0, 0.0, 64.0);
+    worldBorder.sendWorldBorder(player, 0.0, 0.0, 64.0, 32.0, 2L);
+    worldBorder.sendWorldBorder(player, 0.0, 0.0, 64.0, 32.0, 2L, 0.5, 2.0);
+    worldBorder.damagePlayer(player, 1.0);
+    worldBorder.resetWorldBorder(player);
+
+    PaletteTagAccessor palette = accessor;
+    assertTrue(palette.materials().isEmpty());
+    assertTrue(palette.blockTagSnapshot().isEmpty());
+    palette.rebuildBlockTagSnapshot();
+    assertEquals("OAK_LOG", palette.reconcilePaletteIdentifier("minecraft:oak_log"));
+    Set<String> reconciled =
+        palette.reconcilePaletteIdentifiers(List.of("minecraft:oak_log", "birch_log"));
+    assertEquals(Set.of("OAK_LOG", "BIRCH_LOG"), reconciled);
+    assertTrue(palette.matchesPaletteIdentifier("minecraft:oak_log", reconciled));
+    assertFalse(palette.matchesPaletteIdentifier("minecraft:lava", reconciled));
+
+    EffectHandleBridge effects = accessor;
+    assertNull(effects.wrapEffectPlayer(new Object()));
+    assertNull(effects.wrapEffectLocation(new Object()));
+    assertNull(effects.resolveEffectPlayerAt(new Object()));
+    effects.dispatchConsoleCommand("say effect");
+
+    MenuContextAccessor menuContext = accessor;
+    assertFalse(menuContext.menuPermissionProbe(player).test("rtp.use"));
+    assertNotNull(menuContext.menuPermissionProbeFactory());
+    assertFalse(menuContext.menuPermissionProbeFactory().apply(player).test("rtp.use"));
+    assertTrue(menuContext.menuEffectivePermissions(player).isEmpty());
+    assertEquals("en_us", menuContext.menuLocale(player));
+    assertEquals("", menuContext.menuRegionDescriptor(player));
+
+    CommandDispatchAccessor commands = accessor;
+    commands.registerCommands(new Object(), "rtp");
+    assertFalse(commands.executeCommand(player, "rtp"));
+    assertFalse(commands.executeCommandWithCapture("rtp", line -> {}));
+    assertTrue(commands.executeCommandWithCapture("rtp").join().isEmpty());
+    commands.dispatchConsoleCommand("say command");
+
+    List<String> dispatched = new ArrayList<>();
+    CommandDispatchAccessor recordingCommands =
+        new CommandDispatchAccessor() {
+          @Override
+          public boolean executeCommand(UUID senderId, String commandLine) {
+            dispatched.add(senderId + ":" + commandLine);
+            return true;
+          }
+        };
+    recordingCommands.dispatchConsoleCommand("say console");
+    recordingCommands.dispatchConsoleCommand("");
+    recordingCommands.dispatchConsoleCommand(null);
+    assertEquals(List.of("null:say console"), dispatched);
   }
 
   @Test

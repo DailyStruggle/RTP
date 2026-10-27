@@ -13,6 +13,10 @@ import java.util.Map;
  *
  * <p>When bound, provides fast NBT-based chunk rejection before chunk loading.
  * Thread safety: {@link Provider} implementations must be thread-safe.
+ *
+ * @governedBy ADR-016
+ * @governedBy ADR-115
+ * @trace REQ-RTP-S-006
  */
 @PublicApi
 public interface AnvilPrefilterRegistry {

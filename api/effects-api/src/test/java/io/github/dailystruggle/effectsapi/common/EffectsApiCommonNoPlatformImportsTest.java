@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -72,18 +73,15 @@ class EffectsApiCommonNoPlatformImportsTest {
         try (Stream<Path> walk = Files.walk(sourceRoot)) {
             walk.filter(p -> p.toString().endsWith(".java"))
                 .forEach(p -> {
-                    try {
-                        for (String line : Files.readAllLines(p)) {
-                            String trimmed = line.trim();
-                            if (!trimmed.startsWith("import ")) continue;
-                            for (String forbidden : FORBIDDEN_IMPORT_PREFIXES) {
-                                if (trimmed.contains(forbidden)) {
-                                    violations.add(sourceRoot.relativize(p) + " -> " + trimmed);
-                                }
+                    List<String> lines = assertDoesNotThrow(() -> Files.readAllLines(p), "Failed to read " + p);
+                    for (String line : lines) {
+                        String trimmed = line.trim();
+                        if (!trimmed.startsWith("import ")) continue;
+                        for (String forbidden : FORBIDDEN_IMPORT_PREFIXES) {
+                            if (trimmed.contains(forbidden)) {
+                                violations.add(sourceRoot.relativize(p) + " -> " + trimmed);
                             }
                         }
-                    } catch (IOException e) {
-                        fail("Failed to read " + p + ": " + e.getMessage());
                     }
                 });
         }
@@ -101,13 +99,9 @@ class EffectsApiCommonNoPlatformImportsTest {
 
         try (Stream<Path> walk = Files.walk(moduleClassRoot)) {
             walk.filter(p -> p.toString().endsWith(".class"))
-                .forEach(p -> {
-                    try {
-                        scanClassFile(p, moduleClassRoot, violations);
-                    } catch (IOException e) {
-                        fail("Failed to read " + p + ": " + e.getMessage());
-                    }
-                });
+                .forEach(p -> assertDoesNotThrow(
+                        () -> scanClassFile(p, moduleClassRoot, violations),
+                        "Failed to read " + p));
         }
 
         Path projectRoot = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
@@ -117,18 +111,15 @@ class EffectsApiCommonNoPlatformImportsTest {
             try (Stream<Path> walk = Files.walk(srcDir)) {
                 walk.filter(p -> p.toString().endsWith(".java"))
                     .forEach(p -> {
-                        try {
-                            for (String line : Files.readAllLines(p)) {
-                                String trimmed = line.trim();
-                                if (!trimmed.startsWith("import ")) continue;
-                                for (String forbidden : FORBIDDEN_IMPORT_PREFIXES) {
-                                    if (trimmed.contains(forbidden)) {
-                                        violations.add(projectRoot.relativize(p) + " -> " + trimmed);
-                                    }
+                        List<String> lines = assertDoesNotThrow(() -> Files.readAllLines(p), "Failed to read " + p);
+                        for (String line : lines) {
+                            String trimmed = line.trim();
+                            if (!trimmed.startsWith("import ")) continue;
+                            for (String forbidden : FORBIDDEN_IMPORT_PREFIXES) {
+                                if (trimmed.contains(forbidden)) {
+                                    violations.add(projectRoot.relativize(p) + " -> " + trimmed);
                                 }
                             }
-                        } catch (IOException e) {
-                            fail("Failed to read " + p + ": " + e.getMessage());
                         }
                     });
             }

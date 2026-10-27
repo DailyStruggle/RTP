@@ -4,6 +4,8 @@ import java.util.Objects;
 
 /**
  * Platform-neutral description of an on-screen progress bar (e.g. Bukkit BossBar).
+ *
+ * @governedBy ADR-115
  */
 public class ProgressBar {
   private final String title;

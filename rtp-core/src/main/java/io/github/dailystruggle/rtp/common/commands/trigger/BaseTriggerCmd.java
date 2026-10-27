@@ -13,6 +13,9 @@ import java.util.UUID;
 /**
  * Shared base command implementation for physical trigger commands.
  * Eliminates duplicate forward command routing and player resolution boilerplate.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-115
  */
 public abstract class BaseTriggerCmd extends BaseRTPCmdImpl {
 

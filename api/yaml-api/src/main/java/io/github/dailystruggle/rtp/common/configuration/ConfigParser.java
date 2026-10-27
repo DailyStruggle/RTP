@@ -666,8 +666,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         }
         if (in != null) {
           File parent = langFile.getParentFile();
-          //noinspection ResultOfMethodCallIgnored
-          if (parent != null && !parent.exists()) parent.mkdirs();
+          if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) {
+            log(Level.FINE, "[RTP] Could not create parent directory " + parent, null);
+          }
           try (java.io.InputStream src = in;
               java.io.FileOutputStream out = new java.io.FileOutputStream(langFile)) {
             byte[] buf = new byte[1024];
@@ -1047,8 +1048,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     if (!seeded.exists()) {
       try {
         File parent = seeded.getParentFile();
-        //noinspection ResultOfMethodCallIgnored
-        if (parent != null && !parent.exists()) parent.mkdirs();
+        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) {
+          log(Level.FINE, "[RTP] Could not create parent directory " + parent, null);
+        }
         if (seeded.createNewFile()) {
           try (FileOutputStream out = new FileOutputStream(seeded)) {
             out.write(("version: " + version + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -1269,8 +1271,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     try (java.io.InputStream in = effectiveClassLoader().getResourceAsStream(jarPath)) {
       if (in == null) return false;
       File parent = target.getParentFile();
-      //noinspection ResultOfMethodCallIgnored
-      if (parent != null && !parent.exists()) parent.mkdirs();
+      if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) {
+        log(Level.FINE, "[RTP] Could not create parent directory " + parent, null);
+      }
       try (java.io.FileOutputStream out = new java.io.FileOutputStream(target)) {
         byte[] buf = new byte[1024];
         int len;

@@ -246,7 +246,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       }
 
       String subName = SHIPPED_SUBCOMMAND_NAMES.get(index);
-      String skipReason = shouldSkip(subName, callerId);
+      String skipReason = shouldSkip(subName);
       if (skipReason != null) {
         String msg = "[RTP test/full] " + subName + " skipped: " + skipReason;
         if (!callerId.equals(RTPAPI.serverId)) {
@@ -660,7 +660,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    * for {@code callerId} on the current platform, or {@code null} to proceed.
    * Encapsulates the platform-dependent gates the sweep applies to probes.
    */
-  private String shouldSkip(String subName, UUID callerId) {
+  private String shouldSkip(String subName) {
     switch (subName) {
       case "folia-ownership":
         return (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia"))

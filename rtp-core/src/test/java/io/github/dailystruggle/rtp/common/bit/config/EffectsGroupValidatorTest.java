@@ -52,8 +52,15 @@ class EffectsGroupValidatorTest {
     void cleanGroup() {
         List<BitFinding> findings = run(WITH_EFFECTS,
                 "default.yml", "when: postteleport\neffects:\n  - SOUND.X.1\n",
-                "vip.yml", "when: postteleport\npermission: rtp.vip\nplayers: [Steve]\ninherit: [default]\n"
-                        + "effects:\n  - particle.portal.3\nversion: \"1.0\"\n");
+                "vip.yml", """
+                        when: postteleport
+                        permission: rtp.vip
+                        players: [Steve]
+                        inherit: [default]
+                        effects:
+                          - particle.portal.3
+                        version: "1.0"
+                        """);
         assertEquals(List.of(), findings);
     }
 
@@ -107,8 +114,17 @@ class EffectsGroupValidatorTest {
     @Test
     @DisplayName("ADR-121 RTP_EFFECTS_BAD_TYPE fires for list when, map permission and map entries")
     void badType() {
-        String text = "when:\n  - preload\n  - postload\npermission:\n  a: b\ninherit:\n  x: y\n"
-                + "effects:\n  - a: b\n";
+        String text = """
+                when:
+                  - preload
+                  - postload
+                permission:
+                  a: b
+                inherit:
+                  x: y
+                effects:
+                  - a: b
+                """;
         assertTrue(ConfigSnapshot.of(Map.of(DIR + "a.yml", text)).unparsable().isEmpty());
         List<BitFinding> all = run(null, "a.yml", text);
         List<BitFinding> findings = withCode(all, "RTP_EFFECTS_BAD_TYPE");
