@@ -3143,7 +3143,7 @@ def bake_project_ast(
             cites_lookup = import_cites_by_path
             if not cites_lookup:
                 import sys as _sys
-                for _mod_name in ("build_doc_index", "__main__"):
+                for _mod_name in ("_atlas_build_doc_index", "build_doc_index", "__main__"):
                     _mod = _sys.modules.get(_mod_name)
                     _cand = getattr(_mod, "_JAVA_IMPORT_CITES_CACHE", None) if _mod is not None else None
                     if isinstance(_cand, dict) and _cand:

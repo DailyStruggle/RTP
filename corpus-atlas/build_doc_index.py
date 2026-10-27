@@ -32,9 +32,9 @@ import time
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-ATLAS_DIR = pathlib.Path(__file__).resolve().parent.parent / "corpus-atlas"
+ATLAS_DIR = pathlib.Path(__file__).resolve().parent
 ROOT = ATLAS_DIR.parent
-BOT_DIR = globals().get("_SHIM_DIR", ROOT / "discord-support-bot")
+BOT_DIR = ROOT / "discord-support-bot"
 DEFAULT_DB_PATH = ATLAS_DIR / "generated" / "doc-index.sqlite"
 DEFAULT_MANIFEST_PATH = (
     (ATLAS_DIR / "support-bot.yml")
