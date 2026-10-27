@@ -108,33 +108,34 @@ public class TestActionCmd extends BaseRTPCmdImpl {
       return false;
     }
 
-    TestSemaphore.Holder holder = TestSemaphore.holderOf(callerId);
+    UUID owner = callerId != null ? callerId : RTPAPI.serverId;
+    TestSemaphore.Holder holder = TestSemaphore.holderOf(owner);
     boolean parentHeld = holder != null && name().equals(holder.subName);
-    if (!parentHeld && !TestSemaphore.tryAcquire(callerId, name())) {
-      report(callerId, "Another test is already running for this caller.", Level.WARNING, null);
+    if (!parentHeld && !TestSemaphore.tryAcquire(owner, name())) {
+      report(owner, "Another test is already running for this caller.", Level.WARNING, null);
       return false;
     }
     if (RTPRuntime.scheduler() == null) {
-      if (!parentHeld) TestSemaphore.release(callerId, name());
-      report(callerId, "RTP scheduler is unavailable; action simulation was not run.", Level.WARNING, null);
+      if (!parentHeld) TestSemaphore.release(owner, name());
+      report(owner, "RTP scheduler is unavailable; action simulation was not run.", Level.WARNING, null);
       return false;
     }
 
     AtomicBoolean cancelled = new AtomicBoolean();
-    Runnable unregister = ActiveTestJobs.register(callerId,
+    Runnable unregister = ActiveTestJobs.register(owner,
         new ActiveTestJobs.Job(name(), () -> cancelled.set(true)));
     try {
       List<String> requestedScript = List.copyOf(script);
       RTPRuntime.scheduler().runTaskAsynchronously(() -> {
         try {
-          if (!cancelled.get()) executeSimulation(callerId, actionId, players, requestedScript);
+          if (!cancelled.get()) executeSimulation(owner, actionId, players, requestedScript);
         } catch (RuntimeException failure) {
-          report(callerId, "Action simulation failed: " + failure.getMessage(), Level.WARNING, failure);
+          report(owner, "Action simulation failed: " + failure.getMessage(), Level.WARNING, failure);
         } finally {
           try {
             unregister.run();
           } finally {
-            if (!parentHeld) TestSemaphore.release(callerId, name());
+            if (!parentHeld) TestSemaphore.release(owner, name());
           }
         }
       });
@@ -143,9 +144,9 @@ public class TestActionCmd extends BaseRTPCmdImpl {
       try {
         unregister.run();
       } finally {
-        if (!parentHeld) TestSemaphore.release(callerId, name());
+        if (!parentHeld) TestSemaphore.release(owner, name());
       }
-      report(callerId, "Unable to schedule action simulation.", Level.WARNING, failure);
+      report(owner, "Unable to schedule action simulation.", Level.WARNING, failure);
       return false;
     }
   }

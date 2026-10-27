@@ -226,14 +226,12 @@ public final class SyncLoadAttributor {
 
     private String pluginNameOf(ClassLoader cl) {
         if (cl == null || self == null) return null;
-        String cached = loaderNames.get(cl);
-        if (cached == null) {
-            cached = NONE;
+        String cached = loaderNames.computeIfAbsent(cl, loader -> {
             for (StressHost.LoadedPlugin p : self.loadedPlugins()) {
-                if (p != null && p.classLoader() == cl) { cached = p.name(); break; }
+                if (p != null && p.classLoader() == loader) return p.name();
             }
-            loaderNames.put(cl, cached);
-        }
+            return NONE;
+        });
         return cached.isEmpty() ? null : cached;
     }
 

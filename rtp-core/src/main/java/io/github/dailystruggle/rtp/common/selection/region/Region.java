@@ -1234,7 +1234,7 @@ public class Region extends FactoryValue<RegionKeys> {
     long hotCovered = (long) queueManager.keptLocations.size()
         + pendingKeptPromotions.get()
         + inFlightCalculations.get();
-    long shortfall = Math.max(0L, (long) waitingCount - hotCovered);
+    long shortfall = Math.max(0L, waitingCount - hotCovered);
     if (shortfall == 0L) {
       return;
     }
@@ -1277,7 +1277,7 @@ public class Region extends FactoryValue<RegionKeys> {
         + queueManager.unkeptLocations.size()
         + inFlightCalculations.get()
         + pendingKeptPromotions.get();
-    long fillShortfall = Math.max(0L, (long) waitingCount - totalCovered);
+    long fillShortfall = Math.max(0L, waitingCount - totalCovered);
     if (fillShortfall == 0L) {
       return;
     }
@@ -1540,7 +1540,7 @@ public class Region extends FactoryValue<RegionKeys> {
       }
       long pipeRan = Math.max(0L, beforePipe - cachePipeline.size());
       long coldAddedThisTurn = Math.max(cacheTasksAdmitted, pipeRan);
-      coldFills = (int) Math.min(unitQuota, (long) coldFills + Math.min(remainingColdQuota, coldAddedThisTurn));
+      coldFills = (int) Math.min(unitQuota, coldFills + Math.min(remainingColdQuota, coldAddedThisTurn));
     } finally {
       isScanningCache.set(false);
       finishGovernedTurn(governed, start, Math.max(coldFills, promotionsStarted), promotionsStarted);

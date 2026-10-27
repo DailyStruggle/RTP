@@ -66,6 +66,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
 
     private static final Logger LOG = Logger.getLogger("StressTestRTP");
     private static final Pattern MC_MINOR = Pattern.compile("(?:1\\.)?(\\d+)");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private final Path dataDir;
     private volatile StressConfig config;
@@ -199,9 +200,9 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
     /**
      * Registers Brigadier {@code /rtpstress} command onto the given dispatcher.
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings("unchecked")
     public void registerBrigadierCommand(CommandDispatcher<?> dispatcher) {
-        CommandDispatcher<Object> d = (CommandDispatcher<Object>) (CommandDispatcher) dispatcher;
+        CommandDispatcher<Object> d = (CommandDispatcher<Object>) dispatcher;
         LiteralArgumentBuilder<Object> root = LiteralArgumentBuilder.literal("rtpstress")
                 .executes(ctx -> {
                     StressCommand cmd = runtime != null ? runtime.command() : null;
@@ -213,7 +214,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
                             StressCommand cmd = runtime != null ? runtime.command() : null;
                             if (cmd != null) {
                                 String rem = builder.getRemaining();
-                                String[] parts = rem.isEmpty() ? new String[]{""} : rem.split("\\s+", -1);
+                                String[] parts = rem.isEmpty() ? new String[]{""} : WHITESPACE.split(rem, -1);
                                 for (String s : cmd.tabComplete(wrapCommandSource(ctx.getSource()), parts)) {
                                     builder.suggest(s);
                                 }
@@ -224,7 +225,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
                             StressCommand cmd = runtime != null ? runtime.command() : null;
                             if (cmd != null) {
                                 String raw = StringArgumentType.getString(ctx, "args").trim();
-                                String[] args = raw.isEmpty() ? new String[0] : raw.split("\\s+");
+                                String[] args = raw.isEmpty() ? new String[0] : WHITESPACE.split(raw);
                                 cmd.execute(wrapCommandSource(ctx.getSource()), args);
                             }
                             return 1;
@@ -429,13 +430,13 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
                 }
                 Object disp = invokeAny(commands, "getDispatcher", "method_30852");
                 if (disp instanceof CommandDispatcher<?> cd) {
-                    @SuppressWarnings({"unchecked", "rawtypes"})
-                    CommandDispatcher<Object> d = (CommandDispatcher<Object>) (CommandDispatcher) cd;
+                    @SuppressWarnings("unchecked")
+                    CommandDispatcher<Object> d = (CommandDispatcher<Object>) cd;
                     d.execute(clean, source);
                 }
             }
         } catch (Throwable t) {
-            LOG.log(Level.WARNING, "[StressTestRTP] Fabric console dispatch failed: " + clean, t);
+            LOG.log(Level.WARNING, t, () -> "[StressTestRTP] Fabric console dispatch failed: " + clean);
         }
     }
 

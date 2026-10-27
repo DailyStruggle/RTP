@@ -154,6 +154,7 @@ public final class StressConfig {
         return getString(path, null);
     }
 
+    @SuppressWarnings("java:S1168")
     public List<?> getList(String path) {
         Object v = get(path);
         if (v instanceof List<?> list) return list;
@@ -228,7 +229,7 @@ public final class StressConfig {
     public static StressConfig parse(String yaml) {
         StressConfig cfg = new StressConfig();
         if (yaml == null || yaml.isEmpty()) return cfg;
-        String[] lines = yaml.split("\r?\n");
+        String[] lines = yaml.lines().toArray(String[]::new);
         record Frame(int indent, Object container, String pendingKey) {}
         List<Frame> stack = new ArrayList<>();
         stack.add(new Frame(-1, cfg.root, null));

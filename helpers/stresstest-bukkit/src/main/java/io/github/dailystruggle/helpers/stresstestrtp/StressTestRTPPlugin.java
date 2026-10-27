@@ -40,13 +40,11 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -449,8 +447,8 @@ public final class StressTestRTPPlugin extends JavaPlugin implements StressHost,
                 try {
                     CompletableFuture<Boolean> tp = (CompletableFuture<Boolean>) teleportAsync.invoke(bp, dest);
                     tp.whenComplete((ok, tpErr) -> {
-                        if (tpErr != null || !Boolean.TRUE.equals(ok)) {
-                            if (onFail != null) onFail.accept("teleportAsync returned " + ok + " err=" + tpErr);
+                        if ((tpErr != null || !Boolean.TRUE.equals(ok)) && onFail != null) {
+                            onFail.accept("teleportAsync returned " + ok + " err=" + tpErr);
                         }
                     });
                 } catch (Throwable t) {
@@ -701,6 +699,7 @@ public final class StressTestRTPPlugin extends JavaPlugin implements StressHost,
     }
 
     @Override
+    @SuppressWarnings("java:S1168")
     public double[] regionTps(String worldName, int cx, int cz) {
         if (regionTpsMethod == null || worldName == null) return null;
         World w = Bukkit.getWorld(worldName);
@@ -777,6 +776,7 @@ public final class StressTestRTPPlugin extends JavaPlugin implements StressHost,
     }
 
     @Override
+    @SuppressWarnings("java:S2589")
     public Census pendingTaskCensus() {
         if (isFolia()) {
             return Census.notMeasured();
@@ -877,6 +877,7 @@ public final class StressTestRTPPlugin extends JavaPlugin implements StressHost,
     }
 
     @Override
+    @SuppressWarnings("java:S2589")
     public Runnable onChunkLoad(Consumer<ChunkEvent> listener) {
         Listener l = new Listener() {
             @org.bukkit.event.EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

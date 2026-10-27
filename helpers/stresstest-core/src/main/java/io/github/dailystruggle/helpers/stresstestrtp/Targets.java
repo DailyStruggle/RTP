@@ -39,7 +39,8 @@ public final class Targets {
         return load(cfg, null);
     }
 
-    public static List<Entry> load(StressConfig cfg, @SuppressWarnings("unused") Logger logger) {
+    @SuppressWarnings({"unused", "java:S1172"})
+    public static List<Entry> load(StressConfig cfg, Logger logger) {
         List<Entry> out = new ArrayList<>();
         Object raw = cfg != null ? cfg.get("target-commands") : null;
         if (raw instanceof List<?> list) {

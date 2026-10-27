@@ -2357,7 +2357,11 @@ class BackfillJavadocHandler:
         limit = max(1, int(payload.get("limit", 12)))
         target_filter = str(payload.get("target") or "all").strip()
         audit = _repo_ast_mod().audit_corpus_searchability(conn, limit=limit)
-        candidates = list(audit.get("spi_missing_javadoc_or_gov") or []) + list(
+        candidates = list(
+            audit.get("tier1_spi_missing_javadoc_or_gov")
+            or audit.get("spi_missing_javadoc_or_gov")
+            or []
+        ) + list(
             audit.get("high_fan_in_missing_gov") or []
         )
         if target_filter and target_filter not in ("all", "*"):

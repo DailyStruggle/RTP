@@ -114,11 +114,12 @@ public final class TestTeleportHeatmapCmd extends BaseRTPCmdImpl {
             Map<String, List<String>> parameterValues,
             CommandsAPICommand nextCommand) {
         if (nextCommand != null) return true;
+        UUID owner = callerId != null ? callerId : RTPAPI.serverId;
 
-        TestSemaphore.Holder holder = TestSemaphore.holderOf(callerId);
+        TestSemaphore.Holder holder = TestSemaphore.holderOf(owner);
         boolean parentHeld = holder != null && name().equals(holder.subName);
-        if (!parentHeld && !TestSemaphore.tryAcquire(callerId, name())) {
-            reportBusy(callerId);
+        if (!parentHeld && !TestSemaphore.tryAcquire(owner, name())) {
+            reportBusy(owner);
             return false;
         }
 
@@ -128,11 +129,11 @@ public final class TestTeleportHeatmapCmd extends BaseRTPCmdImpl {
         AtomicBoolean timedOut = new AtomicBoolean();
         AtomicReference<MockPlayerSession> activeSession = new AtomicReference<>();
         Runnable unregister = ActiveTestJobs.register(
-                callerId, new ActiveTestJobs.Job(name(), () -> cancelled.set(true)));
+                owner, new ActiveTestJobs.Job(name(), () -> cancelled.set(true)));
         CompletableFuture<BitReport> report = new CompletableFuture<>();
         ProbeVerdict.record(COMPONENT, report, COMPONENT_TIMEOUT_MILLIS)
                 .whenComplete((result, failure) -> finishCommand(
-                        callerId, parameterValues, result, failure, cancelled, timedOut, activeSession, unregister, parentHeld));
+                        owner, parameterValues, result, failure, cancelled, timedOut, activeSession, unregister, parentHeld));
 
         RTPScheduler scheduler = RTPRuntime.scheduler();
         if (scheduler == null) {

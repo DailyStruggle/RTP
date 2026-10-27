@@ -454,6 +454,7 @@ public final class StressCommand {
         try { return Integer.parseInt(s); } catch (NumberFormatException e) { return def; }
     }
 
+    @SuppressWarnings("java:S1172")
     public List<String> tabComplete(StressSender sender, String[] args) {
         if (args.length <= 1) {
             String p = args.length == 1 ? args[0].toLowerCase(Locale.ROOT) : "";

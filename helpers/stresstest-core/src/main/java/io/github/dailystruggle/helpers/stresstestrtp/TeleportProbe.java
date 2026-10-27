@@ -140,9 +140,7 @@ public final class TeleportProbe {
         String cause = event.cause();
         if (cause != null) {
             switch (cause.toUpperCase(java.util.Locale.ROOT)) {
-                case "ENDER_PEARL":
-                case "CHORUS_FRUIT":
-                case "SPECTATE":
+                case "ENDER_PEARL", "CHORUS_FRUIT", "SPECTATE":
                     expecting.put(playerId, attempt);
                     return;
                 default:

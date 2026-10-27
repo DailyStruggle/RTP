@@ -65,7 +65,7 @@ public final class RegionTpsSampler {
             if (tps == null || tps.length <= WINDOW_1M) continue;
             double t5 = tps[WINDOW_5S];
             double t1m = tps[WINDOW_1M];
-            if (!(t5 >= 0.0) || !(t1m >= 0.0)) continue;
+            if (Double.isNaN(t5) || t5 < 0.0 || Double.isNaN(t1m) || t1m < 0.0) continue;
             latest5s.put(p.uuid(), t5);
             phaseSamples.incrementAndGet();
             addToSum(t5);
@@ -75,6 +75,7 @@ public final class RegionTpsSampler {
         }
     }
 
+    @SuppressWarnings("java:S1168")
     private double[] readRegionTps(StressPlayer p) {
         try {
             StressLocation loc = p.location();

@@ -1491,7 +1491,7 @@ def parse_java_code_sections(
 
     module_roots = [
         repo_root / mod
-        for mod in ("rtp-core", "rtp-api", "rtp-plugin", "platforms", "addons", "api")
+        for mod in ("rtp-core", "rtp-api", "rtp-plugin", "platforms", "addons", "plugins", "api")
         if (repo_root / mod).is_dir()
     ]
     if not module_roots and (repo_root / "src" / "main" / "java").is_dir():
@@ -1617,7 +1617,7 @@ def classify_module_and_dag_tier(rel_path: str) -> tuple[str, str]:
       - `TIER_1_SPI_PURE`: `api/*` and `rtp-api`
       - `TIER_2_CORE_DOMAIN`: `rtp-core`
       - `TIER_3_PLATFORM_ADAPTER`: `platforms/*`
-      - `TIER_4_LEAF_ENTRY`: `rtp-plugin`, `addons/*`, `helpers/*`
+      - `TIER_4_LEAF_ENTRY`: `rtp-plugin`, `addons/*`, `plugins/*`, `helpers/*`
     """
     norm = rel_path.replace("\\", "/").lstrip("/")
     prefix = norm.split("/src/", 1)[0] if "/src/" in norm else norm.split("/", 1)[0]
@@ -1633,7 +1633,7 @@ def classify_module_and_dag_tier(rel_path: str) -> tuple[str, str]:
         sub = prefix[len("platforms/") :].strip("/")
         mod = ":" + sub.replace("/", ":") if sub else ":rtp-bukkit"
         return mod, "TIER_3_PLATFORM_ADAPTER"
-    if prefix.startswith("addons/"):
+    if prefix.startswith(("addons/", "plugins/", "helpers/")):
         return ":" + prefix.strip("/").replace("/", ":"), "TIER_4_LEAF_ENTRY"
     if prefix == "rtp-plugin" or prefix.startswith("rtp-plugin/"):
         return ":rtp-plugin", "TIER_4_LEAF_ENTRY"
@@ -1860,7 +1860,7 @@ def parse_test_classes(
 
     module_roots = [
         repo_root / mod
-        for mod in ("rtp-core", "rtp-api", "rtp-plugin", "platforms", "addons", "api")
+        for mod in ("rtp-core", "rtp-api", "rtp-plugin", "platforms", "addons", "plugins", "api")
         if (repo_root / mod).is_dir()
     ]
     if not module_roots and (repo_root / "src" / "test" / "java").is_dir():
@@ -3092,7 +3092,7 @@ def _iter_watched_files_fast(
 
     module_roots = [
         repo_root / mod
-        for mod in ("rtp-core", "rtp-api", "rtp-plugin", "platforms", "addons", "api")
+        for mod in ("rtp-core", "rtp-api", "rtp-plugin", "platforms", "addons", "plugins", "api")
         if (repo_root / mod).is_dir()
     ]
     if not module_roots:
