@@ -30,7 +30,7 @@ If a critical subsystem file has a behavioral change (comment-, formatting-, and
 If empirical proof is missing or incomplete:
 - Apply label: `evidence-required`
 - Report it as blocker B-EVIDENCE with the missing artifact as the clearing condition (no percentage verdicts).
-- Post the following required evidence checklist as a review comment:
+- Post the following required evidence checklist as a review comment (or update the existing `B-EVIDENCE` comment if one was already posted):
 
 ```markdown
 ### 🛑 Empirical Evidence Required (Critical Blast Radius)
@@ -44,3 +44,7 @@ Please run the verification tooling and update the pull request description with
 - [ ] **Clean Log Oracle:** Verify zero `ServerLogOracle` exceptions or unhandled pipeline errors.
 - [ ] **Devstack Regional Verification:** Execute `.\devstack\run-acceptance.ps1 -Scenario rtptest` and verify all platform backends report passing accessors.
 ```
+
+If empirical proof is present and complete (all clearing conditions for the touched critical subsystems are satisfied):
+- If the `evidence-required` label is present on the pull request, remove label: `evidence-required`
+- If a prior `B-EVIDENCE` review comment exists on the pull request, update it (or reply) to mark `B-EVIDENCE` cleared and resolved.
