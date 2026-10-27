@@ -187,24 +187,107 @@ class CorpusAtlasMcpServer:
         self.auto_sync = auto_sync
         self.sync_coalesce_ms = max(0.0, float(sync_coalesce_ms))
         self._conn: sqlite3.Connection | None = None
+        self._db_stat_key: tuple[int, int] | None = None
         self._last_sync_check_mono: float = 0.0
         self._warmed: bool = False
 
+    def _current_db_stat_key(self) -> tuple[int, int] | None:
+        try:
+            st = self.db_path.stat()
+        except OSError:
+            return None
+        if st.st_ino != 0:
+            return (int(st.st_dev), int(st.st_ino))
+        return (int(st.st_size), int(st.st_mtime_ns))
+
+    def _reset_caches(self) -> None:
+        repo_ast._CODE_SEC_BY_PATH_CACHE.clear()
+        repo_ast._SEARCH_CORPUS_CACHE.clear()
+
+    def _run_sync_with_recovery(self, check_only: bool = False) -> dict[str, Any]:
+        assert self._conn is not None
+        try:
+            res = sync_dirty_files(
+                self._conn,
+                repo_root=self.repo_root,
+                project=self.project,
+                check_only=check_only,
+            )
+            self._db_stat_key = self._current_db_stat_key()
+            return res
+        except sqlite3.OperationalError as first_exc:
+            # Handle `SQLITE_READONLY_DBMOVED` when `doc-index.sqlite` was rebuilt/replaced
+            # on disk after `self._conn` was opened, or fall back to read-only check mode
+            # when the database file/directory is read-only or locked.
+            if self.db_path.is_file():
+                try:
+                    self._conn.close()
+                except sqlite3.Error:
+                    pass
+                self._conn = sqlite3.connect(str(self.db_path))
+                self._conn.row_factory = sqlite3.Row
+                self._db_stat_key = self._current_db_stat_key()
+                self._reset_caches()
+                try:
+                    res = sync_dirty_files(
+                        self._conn,
+                        repo_root=self.repo_root,
+                        project=self.project,
+                        check_only=check_only,
+                    )
+                    self._db_stat_key = self._current_db_stat_key()
+                    return res
+                except sqlite3.OperationalError as retry_exc:
+                    first_exc = retry_exc
+            if not check_only:
+                try:
+                    res = sync_dirty_files(
+                        self._conn,
+                        repo_root=self.repo_root,
+                        project=self.project,
+                        check_only=True,
+                    )
+                except sqlite3.OperationalError:
+                    res = {"dirty_count": 0, "dirty_files": [], "actions": {}, "reindexed": 0, "elapsed_ms": 0.0}
+                res["readonly_fallback"] = True
+                res["sync_warning"] = str(first_exc)
+                return res
+            return {
+                "dirty_count": 0,
+                "dirty_files": [],
+                "actions": {},
+                "reindexed": 0,
+                "elapsed_ms": 0.0,
+                "readonly_fallback": True,
+                "sync_warning": str(first_exc),
+            }
+
     def _get_connection(self, force_sync: bool = False) -> tuple[sqlite3.Connection, dict[str, Any]]:
         sync_info: dict[str, Any] = {"dirty_count": 0, "reindexed": 0, "elapsed_ms": 0.0}
-        if self._conn is None or not self.db_path.is_file():
+        cur_stat_key = self._current_db_stat_key()
+        db_replaced = (
+            self._conn is not None
+            and cur_stat_key is not None
+            and self._db_stat_key is not None
+            and cur_stat_key != self._db_stat_key
+        )
+        if self._conn is None or cur_stat_key is None or db_replaced:
             if self._conn is not None:
                 try:
                     self._conn.close()
                 except sqlite3.Error:
                     pass
                 self._conn = None
+            if db_replaced:
+                self._reset_caches()
+                self._warmed = False
             self._conn, sync_info = repo_ast.ensure_db_connection(
                 db_path=self.db_path,
                 repo_root=self.repo_root,
                 project=self.project,
                 auto_sync=self.auto_sync,
             )
+            self._db_stat_key = self._current_db_stat_key()
             self._last_sync_check_mono = time.perf_counter()
             if not self._warmed:
                 repo_ast._get_code_sections_map(self._conn, self.project.strip().lower())
@@ -215,16 +298,10 @@ class CorpusAtlasMcpServer:
         now_mono = time.perf_counter()
         elapsed_since_check_ms = (now_mono - self._last_sync_check_mono) * 1000.0
         if self.auto_sync and (force_sync or elapsed_since_check_ms >= self.sync_coalesce_ms):
-            sync_info = sync_dirty_files(
-                self._conn,
-                repo_root=self.repo_root,
-                project=self.project,
-                check_only=False,
-            )
+            sync_info = self._run_sync_with_recovery(check_only=False)
             self._last_sync_check_mono = time.perf_counter()
-            if sync_info.get("dirty_count", 0) > 0:
-                repo_ast._CODE_SEC_BY_PATH_CACHE.clear()
-                repo_ast._SEARCH_CORPUS_CACHE.clear()
+            if sync_info.get("dirty_count", 0) > 0 and not sync_info.get("readonly_fallback"):
+                self._reset_caches()
                 repo_ast._get_code_sections_map(self._conn, self.project.strip().lower())
                 repo_ast._get_prepared_search_corpus(self._conn, self.project.strip().lower())
         return self._conn, sync_info
@@ -236,6 +313,7 @@ class CorpusAtlasMcpServer:
             except sqlite3.Error:
                 pass
             self._conn = None
+        self._db_stat_key = None
 
     def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         args = dict(arguments or {})
@@ -243,13 +321,12 @@ class CorpusAtlasMcpServer:
         t0 = time.perf_counter()
 
         if name == "repo_ast_sync":
-            conn, _ = self._get_connection(force_sync=False)
+            self._get_connection(force_sync=False)
             check_only = bool(args.get("check_only", False))
-            res = sync_dirty_files(conn, repo_root=self.repo_root, project=self.project, check_only=check_only)
+            res = self._run_sync_with_recovery(check_only=check_only)
             self._last_sync_check_mono = time.perf_counter()
-            if res.get("dirty_count", 0) > 0 and not check_only:
-                repo_ast._CODE_SEC_BY_PATH_CACHE.clear()
-                repo_ast._SEARCH_CORPUS_CACHE.clear()
+            if res.get("dirty_count", 0) > 0 and not check_only and not res.get("readonly_fallback"):
+                self._reset_caches()
             text = json.dumps(res, indent=2) if fmt == "json" else repo_ast.format_sync_markdown(res, check_only=check_only)
             return {
                 "content": [{"type": "text", "text": text}],

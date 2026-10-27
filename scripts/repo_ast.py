@@ -27,7 +27,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 ATLAS_DIR = REPO_ROOT / "corpus-atlas"
 BOT_DIR = REPO_ROOT / "discord-support-bot"
 
-for _p in (ATLAS_DIR, BOT_DIR):
+for _p in (BOT_DIR, ATLAS_DIR):
     if _p.is_dir() and str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -107,8 +107,16 @@ def ensure_db_connection(
 
     assert conn is not None
     if auto_sync:
-        sync_info = sync_dirty_files(conn, repo_root=repo_root, project=project, check_only=False)
-        if sync_info.get("dirty_count", 0) > 0:
+        try:
+            sync_info = sync_dirty_files(conn, repo_root=repo_root, project=project, check_only=False)
+        except sqlite3.OperationalError as exc:
+            try:
+                sync_info = sync_dirty_files(conn, repo_root=repo_root, project=project, check_only=True)
+            except sqlite3.OperationalError:
+                sync_info = {"dirty_count": 0, "reindexed": 0, "elapsed_ms": 0.0}
+            sync_info["readonly_fallback"] = True
+            sync_info["sync_warning"] = str(exc)
+        if sync_info.get("dirty_count", 0) > 0 and not sync_info.get("readonly_fallback"):
             _CODE_SEC_BY_PATH_CACHE.clear()
             _SEARCH_CORPUS_CACHE.clear()
     return conn, sync_info

@@ -124,17 +124,18 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
+    UUID owner = callerId != null ? callerId : RTPAPI.serverId;
 
     // TestCmd acquires the permit for this subcommand before dispatching; reuse it.
-    TestSemaphore.Holder holder = TestSemaphore.holderOf(callerId);
+    TestSemaphore.Holder holder = TestSemaphore.holderOf(owner);
     boolean parentHeld = holder != null && name().equals(holder.subName);
-    if (!parentHeld && !TestSemaphore.tryAcquire(callerId, name())) {
-      report(callerId, "&c" + LOG_PREFIX + "another test is already in flight for this caller", Level.WARNING);
+    if (!parentHeld && !TestSemaphore.tryAcquire(owner, name())) {
+      report(owner, "&c" + LOG_PREFIX + "another test is already in flight for this caller", Level.WARNING);
       return false;
     }
     if (RTPRuntime.scheduler() == null) {
-      if (!parentHeld) TestSemaphore.release(callerId, name());
-      report(callerId, "&c" + LOG_PREFIX + "RTP.scheduler is null; core not yet loaded", Level.WARNING);
+      if (!parentHeld) TestSemaphore.release(owner, name());
+      report(owner, "&c" + LOG_PREFIX + "RTP.scheduler is null; core not yet loaded", Level.WARNING);
       return false;
     }
 
@@ -143,7 +144,7 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
     boolean json = ProbeBitReport.isJson(parameterValues);
     AtomicBoolean cancelled = new AtomicBoolean();
     Runnable unregister = ActiveTestJobs.register(
-        callerId, new ActiveTestJobs.Job(name(), () -> cancelled.set(true)));
+        owner, new ActiveTestJobs.Job(name(), () -> cancelled.set(true)));
 
     // BitRunner.run blocks on the check, so it runs on an async worker only (S-005).
     RTPRuntime.scheduler().runTaskAsynchronously(() -> {
@@ -151,9 +152,9 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
         BitResult result = RtpBit.RUNNER.run(COMPONENT.withCheck(() -> runProbe(
             regionName, count, RTPAPI::teleport, AWAIT_MILLIS, cancelled::get)), Runnable::run);
         if (json) {
-          ProbeBitReport.emitJson(callerId, result);
+          ProbeBitReport.emitJson(owner, result);
         } else {
-          BitTableOutput.emit(callerId, BitTable.rows(COMPONENT, result));
+          BitTableOutput.emit(owner, BitTable.rows(COMPONENT, result));
         }
       } catch (RuntimeException e) {
         RTPRuntime.log(Level.WARNING, LOG_PREFIX + "probe failed: " + e, e);
@@ -163,7 +164,7 @@ public class TestTeleportCmd extends BaseRTPCmdImpl {
         } catch (Throwable t) {
           CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("teleport.unregisterJob", t);
         } finally {
-          if (!parentHeld) TestSemaphore.release(callerId, name());
+          if (!parentHeld) TestSemaphore.release(owner, name());
         }
       }
     });

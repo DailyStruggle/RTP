@@ -17,6 +17,7 @@ import java.util.logging.Logger;
  * Platform-neutral lifecycle wiring for {@code stresstest-core} shared by
  * {@code stresstest-bukkit} and {@code stresstest-fabric} (ADR-122 Decision 1 & 2).
  */
+@SuppressWarnings("java:S6539")
 public final class StressCoreRuntime {
 
     private final StressHost host;

@@ -386,7 +386,7 @@ public final class ProbedShareAllocator {
                             st.limitNanos(), nextLoanLimit, st.lastBreachNanos(),
                             st.lastEvaluatedNanos(), st.lastActiveNanos(),
                             st.interactiveNanosPerTick(), st.backgroundNanosPerTick()));
-                    double cap25 = Math.max(0.0, MAX_BORROWED_TOTAL_NANOS - sK);
+                    long cap25 = Math.max(0L, MAX_BORROWED_TOTAL_NANOS - sK);
                     double qExcess = Math.max(0.0, sig.queuedBackgroundNanos() - sKb);
                     double req = Math.min(Math.min(sCfg, cap25), Math.min(nextLoanLimit, qExcess));
                     if (req > 0.0) {

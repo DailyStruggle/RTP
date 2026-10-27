@@ -89,4 +89,13 @@ class TestTeleportHeatmapCmdTest {
                             && finding.severity().name().equals("INFO")), code.key());
         }
     }
+
+    @Test
+    void nullCallerIdFallsBackToServerIdWithoutThrowing() {
+        io.github.dailystruggle.rtp.common.commands.test.TestSemaphore.clearAllForTesting();
+        TestTeleportHeatmapCmd command = new TestTeleportHeatmapCmd(null);
+
+        assertTrue(command.onCommand(null, Map.of(), null));
+        io.github.dailystruggle.rtp.common.commands.test.TestSemaphore.clearAllForTesting();
+    }
 }

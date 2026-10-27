@@ -77,40 +77,41 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
+    UUID owner = callerId != null ? callerId : RTPAPI.serverId;
 
-    if (!TestSemaphore.tryAcquire(callerId, name())) {
-      report(callerId, "&c[RTP test/events] another test is already in flight for this caller", Level.WARNING, null);
+    if (!TestSemaphore.tryAcquire(owner, name())) {
+      report(owner, "&c[RTP test/events] another test is already in flight for this caller", Level.WARNING, null);
       return false;
     }
 
     if (RTPRuntime.scheduler() == null) {
-      TestSemaphore.release(callerId, name());
-      report(callerId, "&c[RTP test/events] RTP.scheduler is null; core not yet loaded", Level.WARNING, null);
+      TestSemaphore.release(owner, name());
+      report(owner, "&c[RTP test/events] RTP.scheduler is null; core not yet loaded", Level.WARNING, null);
       Result probe = new Result();
       probe.threw = "RTP.scheduler is null";
       BitResult bitResult =
           RtpBit.RUNNER.run(COMPONENT.withCheck(() -> toBitReport(probe)), Runnable::run);
-      ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
+      ProbeBitReport.emit(owner, parameterValues, COMPONENT, bitResult);
       return false;
     }
 
     final Runnable[] hookHolder = new Runnable[1];
     hookHolder[0] = ActiveTestJobs.register(
-        callerId, new ActiveTestJobs.Job("events", () -> { /* no cancel handle */ }));
+        owner, new ActiveTestJobs.Job("events", () -> { /* no cancel handle */ }));
 
     RTPRuntime.scheduler().runTaskAsynchronously(() -> {
       try {
         BitResult bitResult =
             RtpBit.RUNNER.run(
-                COMPONENT.withCheck(() -> toBitReport(runProbe(callerId, true))), Runnable::run);
-        ProbeBitReport.emit(callerId, parameterValues, COMPONENT, bitResult);
+                COMPONENT.withCheck(() -> toBitReport(runProbe(owner, true))), Runnable::run);
+        ProbeBitReport.emit(owner, parameterValues, COMPONENT, bitResult);
       } finally {
         try {
           if (hookHolder[0] != null) hookHolder[0].run();
         } catch (Throwable t) {
           CoreFallbackCbitCounters.recordTestProbeCleanupDegraded("events.unregisterJob", t);
         } finally {
-          TestSemaphore.release(callerId, name());
+          TestSemaphore.release(owner, name());
         }
       }
     });

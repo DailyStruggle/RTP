@@ -37,7 +37,9 @@ public interface StressHost extends ServerAccessor {
      */
     record Census(boolean measured, String status, Map<String, Integer> counts) {
         public Census {
-            status = status != null ? status : (measured ? "measured" : NOT_MEASURED);
+            if (status == null) {
+                status = measured ? "measured" : NOT_MEASURED;
+            }
             counts = counts != null ? Map.copyOf(counts) : Map.of();
         }
 
@@ -66,9 +68,11 @@ public interface StressHost extends ServerAccessor {
         public LoadedPlugin {
             name = name != null ? name : "unknown";
             version = version != null ? version : "unknown";
-            originPaths = originPaths != null
-                    ? List.copyOf(originPaths)
-                    : (jarPath != null ? List.of(jarPath) : List.of());
+            if (originPaths != null) {
+                originPaths = List.copyOf(originPaths);
+            } else {
+                originPaths = jarPath != null ? List.of(jarPath) : List.of();
+            }
             fallbackPackage = fallbackPackage != null ? fallbackPackage : "";
         }
 
@@ -185,6 +189,7 @@ public interface StressHost extends ServerAccessor {
     default void registerCommand(String name, StressCommand command) {
     }
 
+    @Override
     void dispatchConsoleCommand(String commandLine);
 
     default void dispatchPlayerCommand(UUID playerId, String commandLine) {
@@ -288,6 +293,7 @@ public interface StressHost extends ServerAccessor {
         return -1.0;
     }
 
+    @SuppressWarnings("java:S1168")
     default double[] regionTps(String worldName, int cx, int cz) {
         return null;
     }

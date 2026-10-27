@@ -86,10 +86,11 @@ class TestRepoAstCli(unittest.TestCase):
         # 6. Audit distinguishes in-file @governedBy tags from inferred governance and excludes @interface PublicApi
         aud = repo_ast.audit_corpus_searchability(self.conn, limit=10)
         spi_names = [item["class_name"] for item in aud["tier1_spi_missing_javadoc_or_gov"]]
-        self.assertIn("RTPPlayer", spi_names[:3])
+        self.assertEqual(0, aud["tier1_spi_missing_javadoc_or_gov_count"])
+        self.assertNotIn("RTPPlayer", spi_names)
         self.assertNotIn("PublicApi", spi_names)
         md_aud = repo_ast.format_audit_markdown(aud)
-        self.assertIn("governed_by_tag=False", md_aud)
+        self.assertIn("Tier 1 SPI Interfaces Missing Javadoc or `@governedBy`:** `0`", md_aud)
 
     def test_search_tier_1_2_anti_redundancy_ranking(self) -> None:
         cases = [
@@ -290,6 +291,35 @@ class TestRepoAstCli(unittest.TestCase):
                 self.assertEqual(1, ctx_mcp["sync"]["dirty_count"])
                 self.assertIn("ADR-121", ctx_mcp["gov_c"]["adrs"])
                 self.assertIn("runAlphaV3", ctx_mcp["primary_class"]["methods"])
+
+                # Simulate `build_doc_index.py` unlinking and rebuilding `db_file` while `srv` holds an open connection
+                from build_doc_index import build_index, classify_module_and_dag_tier
+
+                rebuilt_conn = build_index(repo_root=fix_root, db_path=db_file)
+                rebuilt_conn.close()
+                java_file.write_text(
+                    "package pkg;\n/** @governedBy ADR-015 ADR-115 ADR-121 */\npublic class AlphaService { public void runAlphaV4() {} }\n",
+                    encoding="utf-8",
+                )
+                call_after_rebuild = srv.handle_jsonrpc_message({
+                    "jsonrpc": "2.0",
+                    "id": 4,
+                    "method": "tools/call",
+                    "params": {"name": "repo_ast_context", "arguments": {"target": "AlphaService", "format": "json"}},
+                })
+                self.assertFalse(call_after_rebuild["result"]["isError"])
+                ctx_after_rebuild = json.loads(call_after_rebuild["result"]["content"][0]["text"])
+                self.assertIn("runAlphaV4", ctx_after_rebuild["primary_class"]["methods"])
+
+                # Verify `classify_module_and_dag_tier` handles `plugins/*` and `helpers/*` as `TIER_4_LEAF_ENTRY`
+                self.assertEqual(
+                    (":plugins:LeafSleep:leafsleep-common", "TIER_4_LEAF_ENTRY"),
+                    classify_module_and_dag_tier("plugins/LeafSleep/leafsleep-common/src/main/java/pkg/SleepEngine.java"),
+                )
+                self.assertEqual(
+                    (":helpers:StressTestRTP", "TIER_4_LEAF_ENTRY"),
+                    classify_module_and_dag_tier("helpers/StressTestRTP/src/main/java/pkg/SparkHook.java"),
+                )
 
                 # Verify stdio stream framing (both newline and Content-Length)
                 req_line = b'{"jsonrpc":"2.0","id":10,"method":"ping"}\n'

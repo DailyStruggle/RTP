@@ -340,6 +340,16 @@ class TestTeleportCmdTest {
     assertNotNull(TestSemaphore.holderOf(RTPAPI.serverId), "the parent owns and releases its permit");
   }
 
+  @Test
+  @DisplayName("ADR-121: null callerId falls back to RTPAPI.serverId without throwing IllegalArgumentException")
+  void nullCallerIdFallsBackToServerId() {
+    boolean ok = new TestTeleportCmd(null).onCommand(null,
+        Map.of("region", List.of("no_such_region_xyz"), "json", List.of("true")), null);
+
+    assertTrue(ok);
+    assertNull(TestSemaphore.holderOf(RTPAPI.serverId), "permit released after the async body");
+  }
+
   // --- parser-level grammar (ADR-121 section 11) ----------------------------------------------
 
   private static final class Capturing extends TestTeleportCmd {
