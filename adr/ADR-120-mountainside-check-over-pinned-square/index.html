@@ -6,19 +6,19 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-120-mountainside-check-over-pinned-square/">
       
       
-        <link rel="prev" href="../ADR-086-external-web-map-integration/">
+        <link rel="prev" href="../ADR-119-slope-detection-and-elevation-memory/">
       
       
-        <link rel="next" href="../ADR-088-configurable-downsampling-stride-filter/">
+        <link rel="next" href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -26,7 +26,7 @@
     
     
       
-        <title>ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution - LeafRTP</title>
+        <title>ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -59,7 +59,8 @@
     
     
     
-  </head>
+  <meta name="robots" content="noindex, follow">
+</head>
   
   
     
@@ -78,7 +79,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#adr-087-adaptive-tick-budget-memory-backpressure-and-dynamic-workload-regulation-for-folia-execution" class="md-skip">
+        <a href="#adr-120-mountainside-and-cliff-edge-check-over-the-resident-3x3-square" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +93,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,13 +107,13 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+              ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
             
           </span>
         </div>
@@ -365,13 +366,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -3359,196 +3360,18 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#context" class="md-nav__link">
-    <span class="md-ellipsis">
-      Context
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      Decision
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Decision">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-empirical-beforeafter-differential-telemetry-zero-static-assumptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      1. Empirical Before/After Differential Telemetry (Zero Static Assumptions)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-workload-inference-and-budget-driven-actuation" class="md-nav__link">
-    <span class="md-ellipsis">
-      2. Workload Inference and Budget-Driven Actuation
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. Workload Inference and Budget-Driven Actuation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#21-inferred-workload-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.1 Inferred Workload Model
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#22-adaptive-pulse-cadence-period-expansion" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.2 Adaptive Pulse Cadence (period Expansion)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#23-dynamic-cache-capacity-down-adjustment-cachecap-floating" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.3 Dynamic Cache Capacity Down-Adjustment (cacheCap Floating)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-anti-starvation-tracked-scheduling-multi-region-concurrency-bounding" class="md-nav__link">
-    <span class="md-ellipsis">
-      3. Anti-Starvation, Tracked Scheduling &amp; Multi-Region Concurrency Bounding
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-elastic-heap-awareness" class="md-nav__link">
-    <span class="md-ellipsis">
-      4. Elastic Heap Awareness
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-operator-visibility-and-telemetry-feedback" class="md-nav__link">
-    <span class="md-ellipsis">
-      5. Operator Visibility and Telemetry Feedback
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-mechanical-specification-implementation-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      6. Mechanical Specification &amp; Implementation Layout
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#alternatives-considered" class="md-nav__link">
-    <span class="md-ellipsis">
-      Alternatives Considered
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#consequences" class="md-nav__link">
-    <span class="md-ellipsis">
-      Consequences
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#references" class="md-nav__link">
-    <span class="md-ellipsis">
-      References
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -4170,6 +3993,259 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#measured-2026-10-21" class="md-nav__link">
+    <span class="md-ellipsis">
+      Measured (2026-10-21)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4233,105 +4309,12 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Decision">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-empirical-beforeafter-differential-telemetry-zero-static-assumptions" class="md-nav__link">
-    <span class="md-ellipsis">
-      1. Empirical Before/After Differential Telemetry (Zero Static Assumptions)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-workload-inference-and-budget-driven-actuation" class="md-nav__link">
-    <span class="md-ellipsis">
-      2. Workload Inference and Budget-Driven Actuation
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. Workload Inference and Budget-Driven Actuation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#21-inferred-workload-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.1 Inferred Workload Model
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#22-adaptive-pulse-cadence-period-expansion" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.2 Adaptive Pulse Cadence (period Expansion)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#23-dynamic-cache-capacity-down-adjustment-cachecap-floating" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.3 Dynamic Cache Capacity Down-Adjustment (cacheCap Floating)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-anti-starvation-tracked-scheduling-multi-region-concurrency-bounding" class="md-nav__link">
-    <span class="md-ellipsis">
-      3. Anti-Starvation, Tracked Scheduling &amp; Multi-Region Concurrency Bounding
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-elastic-heap-awareness" class="md-nav__link">
-    <span class="md-ellipsis">
-      4. Elastic Heap Awareness
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-operator-visibility-and-telemetry-feedback" class="md-nav__link">
-    <span class="md-ellipsis">
-      5. Operator Visibility and Telemetry Feedback
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-mechanical-specification-implementation-layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      6. Mechanical Specification &amp; Implementation Layout
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
-  <a href="#alternatives-considered" class="md-nav__link">
+  <a href="#measured-2026-10-21" class="md-nav__link">
     <span class="md-ellipsis">
-      Alternatives Considered
+      Measured (2026-10-21)
     </span>
   </a>
   
@@ -4373,235 +4356,305 @@
   
 
 
-<h1 id="adr-087-adaptive-tick-budget-memory-backpressure-and-dynamic-workload-regulation-for-folia-execution">ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution<a class="headerlink" href="#adr-087-adaptive-tick-budget-memory-backpressure-and-dynamic-workload-regulation-for-folia-execution" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Proposed
-<strong>Date:</strong> 2026-09-07  </p>
+<h1 id="adr-120-mountainside-and-cliff-edge-check-over-the-resident-3x3-square">ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square<a class="headerlink" href="#adr-120-mountainside-and-cliff-edge-check-over-the-resident-3x3-square" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-10-21
+<strong>Extends:</strong> <a href="../ADR-119-slope-detection-and-elevation-memory/">ADR-119</a> (takes up its "most promising next step"), <a href="../ADR-016-anvil-subsystem/">ADR-016</a> (one definition for probe and live). <strong>Relates to:</strong> <a href="../ADR-109-measured-cost-probe-first-gate/">ADR-109</a>, <a href="../ADR-110-purpose-gated-live-loads/">ADR-110</a>, <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/">ADR-052</a>.</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>On Folia, server execution is partitioned into independent regional threads, each responsible for ticking its own cluster of chunks, entities, and player event pipelines. Unlike monolithic single-threaded engines (Spigot / Paper) where background tasks can be pinned to off-peak ticks or serialized behind the server tick loop:</p>
-<ol>
-<li><strong>The 50ms Tick Cliff:</strong> Minecraft operates on a 50ms tick budget ($1000\text{ ms} / 20\text{ ticks}$). When player activity (mob AI, redstone, entity collisions, inventory and combat packets) consumes 40–48ms of a region's tick, any additional background work scheduled onto that region's scheduler—such as candidate vertical adjustment (<code>vert.adjust</code>), safety verification, or chunk loads—pushes that region's tick duration beyond 50ms.</li>
-<li><strong>Event Delay and Task Starvation:</strong> When a Folia region overruns 50ms, tasks queued in that region's scheduler queue cannot execute within their target tick and spill over into subsequent ticks. This introduces compounding task lag: player network packets (movement, block break/place, combat actions) face multi-tick delays, producing player-perceived rubberbanding, hit delay, and desynchronization.</li>
-<li><strong>Region Over-Instantiation and Thread Pool Saturation (The EzRTP Pitfall):</strong> </li>
-<li>Folia partitions ticking space dynamically: chunks separated by more than the region merge radius form distinct, independent ticking regions. These regions are scheduled as tasks onto a fixed-size worker thread pool sized according to available CPU cores (<code>ForkJoinPool</code> or <code>ThreadPoolExecutor</code>).</li>
-<li>When an RTP plugin scatters unconstrained chunk loads or candidate evaluations across widely dispersed coordinates simultaneously, it instantiates dozens of temporary, disjoint Folia regions—<strong>far exceeding the number of available CPU worker threads</strong>.</li>
-<li>Because the number of active regions exceeds available worker threads, regions must time-share the thread pool. If several regions block on chunk I/O or heavy generation, worker threads become saturated. The thread pool enters severe lock contention and context-switching thrash, leaving queued regions waiting in thread pool task queues without getting ticked.</li>
-<li>Under this condition, tasks in out-prioritized regions sit un-ticked for multiple seconds until Folia's thread-starvation emergency recovery / watchdog triggers. In benchmark testing of competing plugins (EzRTP on Folia 26.1 recorded in <code>docs/FRONT_PAGE_LITE.md</code>), this region over-instantiation caused <strong>7 watchdog stalls</strong>, with one region remaining unresponsive for <strong>20.4 seconds</strong> before emergency recovery intervened.</li>
-<li><strong>Dynamic Environment and Platform Drift:</strong> Server environments are rarely static. Operators frequently swap jar platforms (e.g. migrating from Paper to Folia, or changing hardware/JVM configurations) without updating existing plugin configs (<code>period</code>, <code>cacheCap</code>, <code>asyncAllottedTime</code>). A cost model hardcoded with static unit estimates will misjudge the true platform footprint.</li>
-<li><strong>Multi-Regional Allocation Churn:</strong> Background cache replenishment (<code>RegionCacheTask</code>, <code>PregenTask</code>, and <code>Region.compute()</code>) generates candidate coordinates across diverse spatial locations. On Folia, this causes concurrent task dispatch and chunk loading across multiple thread regions simultaneously. In JVMs with elastic collectors (such as G1GC on 16–32 GB heaps), this concurrent instantiation of chunk sections, voxel shapes, and light nibble arrays causes rapid young-gen (Eden) expansion (up to 8+ GB) before garbage collection occurs.</li>
-<li><strong>No Control Over Downstream Startup Flags:</strong> Plugin developers cannot dictate JVM startup flags, garbage collector tuning, or heap sizing on downstream servers. Background execution must adapt autonomously to available tick bandwidth and memory capacity out of the box.</li>
-</ol>
+<p>ADR-119's <code>maxSlope</code> measures block-scale bumps inside the landing chunk. Admins want to refuse mountainsides and cliff edges, which are slopes over 16-32 blocks. The design must:</p>
+<ul>
+<li><strong>Read blocks only, never generator noise.</strong> Custom generators (Iris, Terra, plugin generators) do not provide noise hooks, so a block-based check is the only one that behaves the same on every world.</li>
+<li><strong>Add no chunk I/O (S-005).</strong> One RTP ticket keeps the square around a pinned chunk resident: Bukkit / Paper / Folia <code>addPluginChunkTicket</code> is level 31, so the 5x5 square is FULL. Fabric / NeoForge use <code>RTP_TICKET_DISTANCE = 1</code> (level 32), so only the 3x3 is FULL.</li>
+<li><strong>Work with the probe pre-compute.</strong> A coalesced probe drain (<code>ColumnProbeCoalescer</code>) leases one region file's bytes, so it can decode any chunk of that file and none of the others.</li>
+<li><strong>Leave the reject procedure unchanged.</strong> Rejects use the existing fail-and-reschedule paths (S-004).</li>
+</ul>
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
-<p>Introduce an <strong>Adaptive Bandwidth Governor</strong> in <code>rtp-core</code> and platform adapters that uses <strong>empirical before-and-after cost differential telemetry</strong> to dynamically regulate background pulse frequency (<code>period</code>), contract/expand cache capacities (<code>cacheCap</code>), and bound multi-region concurrency to prevent thread starvation.</p>
-<h3 id="1-empirical-beforeafter-differential-telemetry-zero-static-assumptions">1. Empirical Before/After Differential Telemetry (Zero Static Assumptions)<a class="headerlink" href="#1-empirical-beforeafter-differential-telemetry-zero-static-assumptions" title="Permanent link">&para;</a></h3>
-<p>Rather than relying on static a priori unit estimates, the governor measures actual resource deltas and applies smoothing over periodic sampling windows to make low-overhead, lower-compute actuation decisions:</p>
-<ul>
-<li><strong>CPU / Execution Delta ($\Delta T_{\text{unit}}$):</strong></li>
-<li>Captured around each chunk load and verification unit:
-    $$\Delta T_{\text{sample}} = t_{\text{post}} - t_{\text{pre}}$$</li>
-<li>To prevent transient I/O spikes or individual cold chunk loads from skewing actuation, raw samples are smoothed into an Exponential Weighted Moving Average (EWMA):
-    $$\Delta T_{\text{unit}} \leftarrow \alpha \cdot \Delta T_{\text{sample}} + (1 - \alpha) \cdot \Delta T_{\text{unit}} \quad (\alpha = 0.1)$$</li>
-<li>Records the actual wall-clock / CPU execution cost on the current platform (reflecting whether chunks were warm in OS pagecache, cold on NVMe/HDD, or loaded asynchronously via Folia).</li>
-<li><strong>Periodic Memory Footprint Sampling ($\Delta M_{\text{unit}}$):</strong></li>
-<li>Evaluating memory allocation at the granularity of individual nanosecond operations introduces prohibitive CPU overhead and is distorted by concurrent allocations from other threads.</li>
-<li>Instead, memory telemetry is gathered <strong>periodically at the batch cycle / pulse level</strong>:<ul>
-<li>The governor samples tenured and total heap state periodically via <code>HeapPressureMonitor</code> (e.g. at the conclusion of each batch replenishment pulse or every $N$ completed promotions).</li>
-<li>Amortized per-unit retained footprint is calculated across the batch window:
-  $$\Delta M_{\text{unit}} \leftarrow \beta \cdot \left(\frac{\Delta \text{retainedHeap}<em _text_promotions="\text{promotions">{\text{batch}}}{N</em> \quad (\beta = 0.05)$$}}}\right) + (1 - \beta) \cdot \Delta M_{\text{unit}</li>
-<li>Negative batch deltas (induced by GC cycles occurring between pulses) are ignored for unit footprint expansion but inform immediate downward pressure relief.</li>
-</ul>
-</li>
-<li>This amortized periodic sampling ensures the governor makes reliable capacity-down-adjustment decisions with virtually zero compute overhead.</li>
-<li><strong>Regional Dispatch Canary ($\Delta t_{\text{dispatch}}$):</strong></li>
-<li>Stamped when scheduling onto a regional thread: <code>scheduledNanos = System.nanoTime()</code>.</li>
-<li>Stamped upon thread entry: $\Delta t_{\text{dispatch}} = \text{executionNanos} - \text{scheduledNanos}$.</li>
-<li>Detects scheduler backlog: $\Delta t_{\text{dispatch}} &gt; 100\text{ ms}$ signals that the target region scheduler is saturated. Raw canary readings are checked immediately for the regional circuit breaker, while a smoothed metric tracks long-term regional health.</li>
-</ul>
-<h3 id="2-workload-inference-and-budget-driven-actuation">2. Workload Inference and Budget-Driven Actuation<a class="headerlink" href="#2-workload-inference-and-budget-driven-actuation" title="Permanent link">&para;</a></h3>
-<h4 id="21-inferred-workload-model">2.1 Inferred Workload Model<a class="headerlink" href="#21-inferred-workload-model" title="Permanent link">&para;</a></h4>
-<p>In RTP's pulse architecture (<code>AsyncTaskProcessing</code> $\to$ <code>Region.execute()</code>):
-- Let $R$ be the number of active configured regions requiring replenishment over a cycle.
-- Over a baseline cycle of <code>period</code> ticks, the engine infers $R$ units of replenishment demand ($R$ regions = $R$ units per <code>period</code>, or $\frac{R}{\text{period}}$ units/tick).
-- Each unit requires on average $\Delta T_{\text{unit}}$ execution time and retains $\Delta M_{\text{unit}}$ memory.</p>
-<h4 id="22-adaptive-pulse-cadence-period-expansion">2.2 Adaptive Pulse Cadence (<code>period</code> Expansion)<a class="headerlink" href="#22-adaptive-pulse-cadence-period-expansion" title="Permanent link">&para;</a></h4>
-<p>To respect an operator or dynamically calculated CPU tick budget $B_{\text{cpu}}$ (derived from MSPT headroom: $B_{\text{cpu}} = \max(0, \text{budgetMSPT} - \text{currentMSPT}) \times \text{headroomShare}$):
-$$\text{Expected CPU Cost per Tick} = \frac{R \times \Delta T_{\text{unit}}}{\text{period}} \le B_{\text{cpu}}$$</p>
-<p>The adaptive pulse cadence scales dynamically:
-$$\text{period}<em _text_config="\text{config">{\text{adaptive}} = \max\left(\text{period}</em> \right\rceil \right)$$}}, \left\lceil \frac{R \times \Delta T_{\text{unit}}}{B_{\text{cpu}}</p>
-<ul>
-<li>When running on high-end hardware with low $\Delta T_{\text{unit}}$, <code>period</code> remains at its configured minimum.</li>
-<li>If the server platform is changed to Folia with high region thread contention, $\Delta T_{\text{unit}}$ naturally increases, automatically expanding <code>period</code> to pace work across ticks without choking the server.</li>
-</ul>
-<h4 id="23-dynamic-cache-capacity-down-adjustment-cachecap-floating">2.3 Dynamic Cache Capacity Down-Adjustment (<code>cacheCap</code> Floating)<a class="headerlink" href="#23-dynamic-cache-capacity-down-adjustment-cachecap-floating" title="Permanent link">&para;</a></h4>
-<p>Live hot locations pin chunk tickets (<code>keep(true)</code>). To prevent memory exhaustion:
-$$R \times \text{cacheCap}<em _text_unit="\text{unit">{\text{effective}} \times \Delta M</em>$$}} \le B_{\text{mem}</p>
-<p>Where $B_{\text{mem}} = \text{maxHeap} \times \text{maxHeapPercent} - \text{retainedBaseHeap}$.</p>
-<p>Each region's effective hot cap is dynamically clamped:
-$$\text{cacheCap}<em _text_config="\text{config">{\text{effective}} = \min\left(\text{cacheCap}</em> \right\rfloor \right)\right)$$}}, \max\left(1, \left\lfloor \frac{B_{\text{mem}}}{R \times \Delta M_{\text{unit}}</p>
-<ul>
-<li>When memory pressure increases (or heap headroom drops), <code>cacheCap</code> contracts automatically, shedding chunk tickets back to Folia's chunk unloader.</li>
-<li>When memory is ample, <code>cacheCap</code> floats back up to its configured ceiling.</li>
-</ul>
-<h3 id="3-anti-starvation-tracked-scheduling-multi-region-concurrency-bounding">3. Anti-Starvation, Tracked Scheduling &amp; Multi-Region Concurrency Bounding<a class="headerlink" href="#3-anti-starvation-tracked-scheduling-multi-region-concurrency-bounding" title="Permanent link">&para;</a></h3>
-<p>To prevent the EzRTP failure mode (where creating more active Folia regions than available worker threads exhausts the pool, starving un-ticked regions for tens of seconds until emergency recovery):</p>
 <ol>
-<li><strong>Zero Untracked Worker Threads (100% Server Visibility):</strong></li>
-<li>The plugin strictly avoids creating standalone background thread pools (<code>new Thread()</code>, <code>ForkJoinPool.commonPool()</code>, unmonitored <code>Executors</code>). </li>
-<li>All async and regional operations are dispatched exclusively through the server's native scheduler interfaces (<code>RTPScheduler</code> $\to$ Folia <code>AsyncScheduler</code>, <code>RegionScheduler</code>, <code>GlobalRegionScheduler</code>).</li>
-<li>General async processing (<code>AsyncTaskProcessing</code>) executes on exactly <strong>one thread at a time</strong> via Folia's <code>AsyncScheduler</code>. A region thread is only engaged when a specific chunk coordinate verification is tied in.</li>
-<li>This ensures the server watchdog, tick monitor, and profilers (Spark, Paper timings) maintain full transparency over every RTP task, and the server can manage thread lifecycles during shutdown or reload.</li>
-<li><strong>In-Scheduler Folia Active Region Tracking:</strong></li>
-<li>In <code>FoliaSchedulerImpl</code>, the scheduler differentiates between <strong>already-existing ticking regions</strong> vs <strong>new disjoint region instantiations</strong>:<ul>
-<li>Tasks scheduled onto an already-existing, active region (e.g. <code>Bukkit.isOwnedByCurrentRegion</code> or chunks already resident in an active Folia region) incur zero region-instantiation overhead and simply queue onto that region's thread.</li>
-<li>Tasks scheduled onto ungenerated or unbuffered chunks create new, temporary ticking regions in Folia's <code>ThreadedRegionizer</code>.</li>
-</ul>
-</li>
-<li>The scheduler actively tracks the set of coordinates / distinct Folia region hashes currently in flight:
-     $$\text{activeRegionCount} = \text{inFlightRegionalTasks.keySet().size()}$$</li>
-<li>When new disjoint region instantiations approach the concurrency ceiling:
-     $$C_{\text{max_regional_inflight}} \le \max\left(1, \left\lfloor \frac{\text{availableProcessors}}{2} \right\rfloor\right)$$
-     The scheduler defers new candidate regional dispatches until in-flight checks complete, preventing the creation of disjoint Folia regions faster than the server's thread pool can process them.</li>
-<li><em>Why RTP has avoided stalls historically up to ~14 TP/s:</em> RTP's single-threaded async pulse (<code>AsyncTaskProcessing</code>) combined with the Anvil/Linear off-tick prefilter (ADR-016, ADR-077; 2026-10-06: Linear reader withdrawn from core, see ADR-077, so Linear references in this ADR apply only to addon-registered readers) evaluates candidates directly from disk without touching live chunks or creating Folia regions. Live regional dispatches only occur on the final promotion path. However, when the prefilter is disabled, on custom ungenerated worlds, or under high burst loads, formalizing this in-scheduler gating ensures RTP remains immune to Folia region exhaustion across all deployments.</li>
-<li><strong>Spatial Distribution Balance and Candidate Compute Reordering:</strong></li>
-<li>In RTP's tiered pipeline (ADR-078), new Folia ticking regions are primarily instantiated at two specific transition points:<ol>
-<li><strong>L2 (Cold) $\to$ L1 (Hot) Promotion:</strong> Activating a chunk ticket (<code>keep(true)</code>) and binding coordinates to live server state.</li>
-<li><strong>L2 Secondary Live Load Path:</strong> When Anvil/Linear disk pre-filtering (ADR-016, ADR-077) returns <code>UNKNOWN</code> (e.g. ungenerated chunks or custom generator pipelines), forcing candidate evaluation to fall back to a live chunk load.</li>
+<li><strong>Vert key <code>maxHillAngle</code></strong> (degrees) on <code>linear</code> and <code>jump</code> (<code>GenericVerticalAdjustorKeys</code>, <code>JumpAdjustorKeys</code>). <code>config.yml</code> <code>defaults.vert</code> ships <code>maxHillAngle: "off"</code> with <code>@options: ["off", 30, 45, 60]</code>, so the menu offers the measured settings while any number 0-89 still parses. <code>"off"</code>, YAML <code>off</code>/<code>false</code>, absent, negative or unparsable values turn it off (<code>AbstractVerticalAdjustor.hillAngleOf</code>; an unparsable string logs one WARNING); values are clamped to 89. It has no code defaults entry, and <code>RegionCacheKey</code> drops an off value and hashes the parsed angle, so <code>"off"</code> and an absent key keep the same key (ADR-119 item 8) and <code>"45"</code> hashes like <code>45</code>. Off is the default because the check multiplies probe cost (measured below). The name says what an admin controls; it avoids "grade" (read as a percent) and stays distinct from <code>maxSlope</code> (a block delta). <code>fixed</code> does not extend <code>AbstractVerticalAdjustor</code> and ignores it.</li>
+<li><strong>One pure check, <code>TerrainShapeCheck</code></strong>, read through a <code>SquareReader</code> over block coordinates of the 5x5 square. Readers: <code>probeSquare</code> (probe + same-file neighbours), <code>chunkSquare</code> (resident <code>RTPChunk</code>s), and the measurement harness. Floor test: non-air at <code>y-1</code>, air at <code>y</code>, searched nearest <code>y</code> within +-48 blocks (layer-following, so caves and the Nether work).</li>
+<li><strong>Rule:</strong> 8 directions, floors at 16 and 32 blocks (the shipped 3x3 reads only the 16-block ones; see item 4). A direction is steep when either sample differs by <code>&gt;= tan(maxHillAngle) * distance</code> or has no floor in the window. Reject when <code>steep * 2 &gt;= measured</code>, <code>measured &gt;= 1</code>.</li>
+<li><strong>Plane fit:</strong> least squares over floors within +-8 blocks, step 2 (81 points). Reject at gradient <code>&gt;= tan(maxHillAngle)</code>, or when over a quarter of the readable points have no floor (a layer break).</li>
+<li><strong>Readable samples only.</strong> A sample the reader cannot supply is left out, never guessed. An unreadable 32-block sample falls back to the 16-block one; a direction with neither is unmeasured; 0 measured directions abstain. The plane fit abstains when fewer than half of its points are readable.</li>
+<li><strong>Provisional probe verdict, square fetched on demand.</strong> The probe request stays centre-only. Only a candidate that passes <code>adjustFromProbe</code> and the biome and block prefilters gets a terrain job (<code>PregenTask.startProbeTerrain</code> -&gt; <code>RTPWorld.probeChunkSquare</code> -&gt; <code>AnvilPrefilter.squareJobAsync</code>). The job joins the region file's coalesced drain and runs while the drain holds the file. Its <code>ChunkSquare</code> decodes a same-file chunk only when the check first reads a column in it, at most once per drain and Y window; chunks outside the file, ungenerated or undecodable read as unmeasured. A reject records <code>FailTypes.prefilterTerrain</code> and reschedules like the other probe rejects; an accept or a failed job continues to the live path. The governor sample includes the job's time.</li>
+<li><strong>Staged evaluation.</strong> <code>TerrainShapeCheck.evaluate</code> runs the plane fit first (centre plus at most 3 neighbours), then the 16-block samples (3x3), then a 32-block sample only while it can still change the rule, and stops once the verdict is decided. Its reject verdict equals the eager rule + plane fit (asserted per landing in the harness and on random terrain in <code>TerrainShapeCheckTest</code>).</li>
+<li><strong>3x3 at every limit.</strong> <code>TerrainShapeCheck.SQUARE_RADIUS = 1</code> on both the probe and the live path, so the rule uses the 16-block samples only. The 3x3 catches 94-98% of the 5x5's rejects and never rejects a landing the 5x5 accepts, at about half the neighbour decodes (measured below); the cost/benefit favours it at 30 degrees too. An earlier revision kept the 5x5 below 45 degrees.</li>
+<li><strong>Lean neighbour decode.</strong> Neighbours use <code>AnvilReader.readTerrainProbe</code>: block states of the sections in the floor window (landing Y +-48) only, with biomes and heightmaps skipped.</li>
+<li><strong>Authoritative live recheck.</strong> In <code>PregenTask.evaluateSafety</code>, after the block-safety scan passes and before <code>GlobalRegionVerifiers</code>, <code>TerrainShapeCheck.residentSquare</code> fills the square from the safety grid, then from chunks <code>isChunkLoaded</code> reports, through the read-only <code>getChunkIfReadable</code> (ADR-110) and <code>getCachedChunk</code>. It never calls <code>getChunkAt</code>. A reject reuses the safety-reject block (<code>recordOutcome</code>, <code>closeIfPresent</code>, <code>rescheduleNextAttempt</code>) with <code>FailTypes.terrain</code>. A read that throws mid-check rejects that attempt with a WARNING, never accepts it.</li>
+<li><strong>Spatial memory only for full verdicts.</strong> Rejects that measured all 8 directions call <code>MemoryShape.addBadChunk(l, FailTypes.terrain)</code> (static TTL, like <code>safety</code>), for the same reason as the safety mark: the column order within a chunk is fixed, so the same verdict repeats. A partial square never retires a chunk.</li>
+<li><strong>No neighbour cache.</strong> An earlier design decoded all 24 neighbours in the drain and kept a 128-probe cache. It hit 0-2.4% of the time, because random candidates in a 1,024-chunk file rarely share neighbours, so it was removed.</li>
 </ol>
-</li>
-<li><em>The Spatial Skew Hazard:</em> If the governor simply paused or restricted evaluations strictly to chunks that are "already loaded" whenever the regional concurrency ceiling is approached, the spatial distribution of generated teleport targets would severely distort. Teleports would cluster unnaturally around existing player clusters, spawn points, or previously loaded chunks, violating the uniform Archimedean spiral distribution guarantee (ADR-001).</li>
-<li><em>Compute Categorization and Reordering:</em> To maintain spatial distribution balance without violating the regional concurrency budget:<ul>
-<li>Candidate tasks in the pipeline are classified by operation type:</li>
-<li><strong>Type A (Zero Region Creation):</strong> Pure mathematical coordinate generation, bitmap lookups, and off-tick Anvil/Linear chunk pre-filtering (ADR-016, ADR-077).</li>
-<li><strong>Type B (Existing Region Execution):</strong> Candidate evaluations whose chunk coordinates fall within an already-active Folia ticking region (<code>Bukkit.isOwnedByCurrentRegion</code> or active region cluster).</li>
-<li><strong>Type C (New Disjoint Region Creation):</strong> Promotions (L2 $\to$ L1) or live fallback reads on unbuffered chunks that will instantiate a new ticking region in Folia's <code>ThreadedRegionizer</code>.</li>
-<li>Rather than halting pipeline progress or dropping candidate coordinates, the scheduler dynamically reorders or paces tasks:</li>
-<li>When the disjoint region ceiling ($C_{\text{max_regional_inflight}}$) is saturated, the pipeline prioritizes Type A (pre-filtering upcoming coordinates in the spiral sequence) and Type B (evaluating coordinates in existing regions), while deferring Type C transitions (leaving them in their current cache tier) until in-flight regions complete and retire.</li>
-<li>If no Type A or Type B tasks are ready and the regional ceiling remains full, the pipeline temporarily paces/pauses further Type C dispatches rather than selecting non-uniform candidate coordinates. This preserves true Archimedean spiral spatial balance without starving the worker thread pool.</li>
-</ul>
-</li>
-<li><strong>Optimized Spatial Distribution on Count-Bound Pipes:</strong></li>
-<li>Rather than naively firing tasks in arbitrary pick order onto the Count-Bound pipe, candidate precomputations are spatially dispersed and load-balanced across distinct regions.</li>
-<li>If multiple candidates map to the <em>same</em> Folia region, they are coalesced and executed sequentially on that region's thread, rather than flooding the region's task queue with competing dispatches.</li>
-<li>If candidates span different regions, the dispatcher interleaves execution across regional threads with anti-starvation aging ($t_{\text{dormant}}$) so no single region thread experiences a task pile-up.</li>
-<li><strong>Natural Bound by Cache Capacity Across Transitions (Zero New Queues):</strong></li>
-<li>The deferred generation "backlog" under compute reordering is <strong>not a new queue or data structure</strong>. It is simply the existing candidates already sitting inside the existing cache tiers:<ul>
-<li><strong>L3 $\to$ L2 (Backlog $\to$ Cold):</strong> Candidates already residing in <code>queueManager.backlogLocations</code> awaiting Anvil validation or live secondary load.</li>
-<li><strong>L2 $\to$ L1 (Cold $\to$ Hot):</strong> Validated candidates already residing in <code>queueManager.unkeptLocations</code> awaiting promotion and chunk ticket activation (<code>keep(true)</code>).</li>
-</ul>
-</li>
-<li>Because these structures are already strictly bounded by <code>backlogCacheCap</code> and <code>cacheCap</code> (ADR-028, ADR-078), <strong>the backlog is inherently capacity-bounded by design</strong>.</li>
-<li>Compute reordering simply selectively polls or paces which entries transition to the next tier:<ul>
-<li>When the disjoint Folia regional ceiling ($C_{\text{max_regional_inflight}}$) is saturated, entries requiring new disjoint region creation simply remain in their current tier (L3 or L2).</li>
-<li>They are <strong>not dropped</strong> if they are already in progress or stored in the cache buffer; they simply wait for in-flight promotions to finish and decrement the counter before their transition is processed.</li>
-<li>If the destination tier is full, the transition naturally pauses under existing deficit checks (<code>deficit = cap - (current + inFlight)</code>).</li>
-</ul>
-</li>
-<li>This eliminates any risk of unbounded memory growth or state discard without inventing synthetic queues.</li>
-<li><strong>Regional Circuit Breaker:</strong></li>
-<li>If a specific region records canary dispatch latency $\Delta t_{\text{dispatch}} &gt; 100\text{ ms}$ or region MSPT $&gt; 45\text{ ms}$, background tasks targeting <em>that specific region</em> yield immediately, while independent, unburdened regions continue processing within their allocated budget.</li>
-</ol>
-<h3 id="4-elastic-heap-awareness">4. Elastic Heap Awareness<a class="headerlink" href="#4-elastic-heap-awareness" title="Permanent link">&para;</a></h3>
-<p>In <code>HeapPressureMonitor</code>, normalize tenured heap measurements against total JVM maximum capacity (<code>Runtime.getRuntime().maxMemory()</code>) and enforce an absolute free-memory floor ($&gt; 512\text{ MB}$ or $1\text{ GB}$ free guarantees unpressured state), preventing G1GC's elastic young/old region resizing from triggering false-positive pause alarms on large heaps.</p>
-<h3 id="5-operator-visibility-and-telemetry-feedback">5. Operator Visibility and Telemetry Feedback<a class="headerlink" href="#5-operator-visibility-and-telemetry-feedback" title="Permanent link">&para;</a></h3>
-<p>Silent adaptation risks operator confusion (e.g. wondering why <code>/rtp info</code> shows reduced hot counts or longer pulse cadences under heavy server load). The governor communicates behavior changes through transparent, rate-limited operator telemetry:</p>
-<ol>
-<li><strong>Structured Console / Audit Logging:</strong></li>
-<li>When the governor initiates an adaptation state transition (e.g. <code>period</code> stretches beyond configured baseline, <code>cacheCap</code> floats down, or a regional circuit breaker triggers), it emits a structured log via <code>RTP.log(Level.INFO, ...)</code>:
-     <div class="highlight"><pre><span></span><code>[RTP][Governor] Server load detected (MSPT=46.2ms, tenured=86%). Adapting: period 20 -&gt; 38 ticks, cacheCap 10 -&gt; 4.
-[RTP][Governor] Regional dispatch lag (114ms) on world &#39;survival&#39; (cx=142, cz=-88). Circuit breaker tripped; holding regional tasks.
-</code></pre></div></li>
-<li>When conditions recover and metrics normalize, a recovery log confirms return to configured baselines (<code>[RTP][Governor] Server headroom recovered. Restoring baseline parameters.</code>).</li>
-<li>Log emission is damped by an anti-spam hysteresis cooldown (minimum 30–60 seconds between identical adaptation announcements) to prevent console spam during oscillating load.</li>
-<li><strong>Operator Command Visibility (<code>/rtp info</code> / <code>/rtp status</code>):</strong></li>
-<li>The <code>/rtp info</code> and administrative diagnostic commands display live governor status:<ul>
-<li>Configured vs. Effective <code>period</code> (e.g. <code>Period: 20 ticks (effective: 35 ticks [CPU budget])</code>).</li>
-<li>Configured vs. Effective <code>cacheCap</code> (e.g. <code>Cache Cap: 10 (effective: 5 [memory headroom])</code>).</li>
-<li>Active Folia In-Flight Regions vs. Ceiling (e.g. <code>Regional Concurrency: 3 / 6 in-flight</code>).</li>
-</ul>
-</li>
-<li>Displays clear diagnostic hints if tasks are deferred due to regional ceiling saturation.</li>
-<li><strong>Configurable Messages &amp; Metrics Export:</strong></li>
-<li>In keeping with <strong>REQ-RTP-F-013</strong> and <strong>REQ-RTP-S-007</strong>, all administrative feedback strings are configurable via <code>messages.yml</code>.</li>
-<li>Exposes governor state via <code>metrics-api</code> (<code>rtp_governor_period_ticks</code>, <code>rtp_governor_effective_cache_cap</code>, <code>rtp_governor_regional_inflight_count</code>, <code>rtp_governor_circuit_breaker_trips</code>).</li>
-</ol>
-<h3 id="6-mechanical-specification-implementation-layout">6. Mechanical Specification &amp; Implementation Layout<a class="headerlink" href="#6-mechanical-specification-implementation-layout" title="Permanent link">&para;</a></h3>
-<p>To translate these requirements into unambiguous, concrete code without architectural drift:</p>
-<ol>
-<li><strong>Component Placement:</strong></li>
-<li><strong><code>AdaptiveGovernor</code> (<code>rtp-core</code>):</strong><ul>
-<li>Sits in <code>io.github.dailystruggle.rtp.common.selection.region</code> or <code>...common.governor</code>.</li>
-<li>Maintains smoothed EWMA telemetry ($\Delta T_{\text{unit}}$, $\Delta M_{\text{unit}}$) and evaluates periodic actuation decisions.</li>
-<li>Sources MSPT headroom via <code>RTPAPI.getMetricsSnapshot().mspt</code> (or <code>MetricsSnapshotRing</code> aggregate fallback if single-region).</li>
-<li>Directly computes <code>effectivePeriod</code> and <code>effectiveCacheCap</code>.</li>
-</ul>
-</li>
-<li><strong><code>AsyncTaskProcessing</code> Actuation Point:</strong><ul>
-<li>Reads <code>governor.getEffectivePeriod()</code> on each iteration rather than re-registering timers with the scheduler, dynamically altering <code>betweenTime = (period / size) - 1</code> without scheduler churn.</li>
-</ul>
-</li>
-<li><strong><code>RegionQueueManager</code> / Promotion Actuation Point:</strong><ul>
-<li>Clamps hot target quota using <code>min(configuredCacheCap, governor.getEffectiveCacheCap())</code>.</li>
-<li>Defers Type C promotions (L2 $\to$ L1 or live fallback chunk loads) when <code>governor.isRegionalConcurrencySaturated()</code>.</li>
-</ul>
-</li>
-<li><strong>Platform Regional Concurrency Tracker (<code>FoliaSchedulerImpl</code>):</strong></li>
-<li>Coordinates in-flight regional tasks keyed by region coordinate bucket: <code>(world.getUID(), cx &gt;&gt; 3, cz &gt;&gt; 3)</code> (Folia's standard 8-chunk merge radius) to identify distinct ticking regions.</li>
-<li>Maintains an atomic permit or in-flight map: <code>ConcurrentHashMap&lt;RegionBucketKey, AtomicInteger&gt; inFlightRegionalTasks</code>.</li>
-<li>Compares active bucket count against $C_{\text{max_regional_inflight}} = \max(1, \lfloor \text{availableProcessors} / 2 \rfloor)$.</li>
-<li>Exposes <code>boolean isRegionalConcurrencySaturated()</code> and <code>boolean isRegionSaturated(world, cx, cz)</code> to <code>rtp-core</code> via <code>RTPScheduler</code> SPI methods. For non-Folia platforms, these return <code>false</code> ($C = \infty$).</li>
-<li><strong>Actuation Hysteresis &amp; Decay Rates:</strong></li>
-<li><strong>Fast Throttle:</strong> Immediately increases <code>effectivePeriod</code> and trips circuit breaker upon detecting $\Delta t_{\text{dispatch}} &gt; 100\text{ ms}$ or $\text{MSPT} &gt; 45\text{ ms}$.</li>
-<li><strong>Damped Recovery:</strong> Decays <code>effectivePeriod</code> back toward <code>period_config</code> and restores <code>cacheCap</code> gradually over a minimum 30-second stabilization window with zero active canary spikes.</li>
-<li><strong>Log Cooldown:</strong> Enforces a 60-second anti-spam cooldown between identical state transition announcements to console.</li>
-</ol>
-<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<h2 id="measured-2026-10-21">Measured (2026-10-21)<a class="headerlink" href="#measured-2026-10-21" title="Permanent link">&para;</a></h2>
+<p>Reference save: 26.3 Paper overworld, 484 region files. Host: Ryzen 9 3900X, OpenJDK 21.0.12. Timed loops, not JMH.</p>
+<p><strong>Detection</strong> (<code>LandingTerrainCheckMeasurementTest</code>, 1,962 land landings plus 1,168 oversampled edge/corner landings, through <code>TerrainShapeCheck</code>; matches the earlier private copy):</p>
 <table>
 <thead>
 <tr>
-<th>Alternative</th>
-<th>Why Rejected</th>
+<th>Check</th>
+<th>Reject</th>
+<th>Mountainside recall / FR</th>
+<th>Cliff-edge recall / FR</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Fixed Operator Configuration Knobs</strong></td>
-<td>Downstream server operators rarely tune background concurrency, and static limits cannot react to dynamic in-game events (e.g. boss fights, mob farms, raids).</td>
+<td>Rule, full square</td>
+<td>9.1%</td>
+<td>89.8% / 0.2%</td>
+<td>27.3% / 2.0%</td>
 </tr>
 <tr>
-<td><strong>Static A Priori Unit Cost Estimation</strong></td>
-<td>Breaks when platforms change (e.g. swapping Paper for Folia) or when storage I/O profiles differ (NVMe vs spinning disk vs network SAN). Measuring empirical before/after delta self-corrects immediately.</td>
+<td>Rule + plane, full square</td>
+<td>22.5%</td>
+<td>96.4% / 14.3%</td>
+<td>66.0% / 5.4%</td>
 </tr>
 <tr>
-<td><strong>Global Thread-Sleep Throttling</strong></td>
-<td>Sleeping background worker threads does not relieve backpressure on Folia region scheduler queues once tasks have already been dispatched.</td>
+<td>Rule (scaled) + plane, one region file</td>
+<td>22.5%</td>
+<td>95.9% / 14.3%</td>
+<td>65.8% / 5.5%</td>
 </tr>
 <tr>
-<td><strong>Unbounded Regional Dispatch</strong></td>
-<td>Replicates the EzRTP defect on Folia: worker thread pool exhaustion starves un-ticked regions, resulting in multi-second regional freezes and watchdog stalls.</td>
-</tr>
-<tr>
-<td><strong>Bypassing Region Schedulers Entirely</strong></td>
-<td>Violates S-005 and Folia thread-safety contracts; reading live world state or adjusting vertical coordinates off-region-thread causes race conditions or explicit <code>ThreadAccessException</code>.</td>
+<td>Same, shipped floor test (non-air below)</td>
+<td>20.5%</td>
+<td>92.3% / 12.6%</td>
+<td>61.1% / 4.6%</td>
 </tr>
 </tbody>
 </table>
+<p>The shipped floor test counts leaves and plants as floor, where the harness's truths treat trees as passable; the loss is about 4 points of recall. On interior chunks (76.6% of a file) the one-file verdict equals the full square; edge chunks measure 5 of 8 directions at local coordinate 0, corner chunks 3.</p>
+<p><strong>Angle study</strong> (same harness, full square, shipped floor test; <code>nbr</code> = neighbour chunks read per check):</p>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Reject</th>
+<th><code>nbr</code> all at once</th>
+<th><code>nbr</code> staged</th>
+<th><code>nbr</code> 3x3 only</th>
+<th>Staged rejects decided in 3x3</th>
+<th>3x3-only agrees with 5x5</th>
+<th>5x5 rejects 3x3 misses</th>
+<th>5x5 accepts 3x3 rejects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>30 deg</td>
+<td>20.6%</td>
+<td>15.3</td>
+<td>11.2</td>
+<td>5.7</td>
+<td>94.1%</td>
+<td>98.78%</td>
+<td>5.9%</td>
+<td>0</td>
+</tr>
+<tr>
+<td>45 deg</td>
+<td>8.2%</td>
+<td>15.7</td>
+<td>12.3</td>
+<td>6.0</td>
+<td>98.1%</td>
+<td>99.85%</td>
+<td>1.9%</td>
+<td>0</td>
+</tr>
+<tr>
+<td>60 deg</td>
+<td>1.7%</td>
+<td>15.9</td>
+<td>12.9</td>
+<td>6.1</td>
+<td>97.1%</td>
+<td>99.95%</td>
+<td>2.9%</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>Steeper limits are decided from the 3x3: almost every reject shows within 16 blocks, and the 3x3 never rejects a landing the 5x5 accepts. An accept still has to check the outer ring, so the staged check alone saves only about a quarter of the reads. At 30 degrees the 3x3 loses 5.9% of the 5x5's rejects (about 1.2% of landings get through) for half the reads; the shipped check accepts that trade at every limit.</p>
+<p><strong>Chunk decode</strong> (<code>ChunkDecodeCostBenchmarkTest</code>, 4,000 random chunks): decompression (zlib / LZ4) about 116 us, NBT and palette parse the rest, 215-221 us per chunk in total. Narrowing the Y window or skipping biomes and heightmaps saves about 3%, so a cheaper decode cannot remove the cost; fewer decodes do. Bulk NBT array reads and a block-copy LZ4 overlap were kept as plain wins.</p>
+<p><strong>Probe pre-compute cost</strong> (<code>TerrainSquareProbeBenchmarkTest</code>, groups of 16 random generated chunks of one file on the shipped pool, bytes resident; per candidate over all candidates, of which 48.7% passed a dry-landing stand-in prefilter):</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>us per candidate</th>
+<th>Neighbour decodes per candidate</th>
+<th>Per square job</th>
+<th>Terrain reject of passed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Check off</td>
+<td>280</td>
+<td>0</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>All 24 neighbours (earlier design, in this harness)</td>
+<td>2,829</td>
+<td>10.83</td>
+<td>22.3</td>
+<td>-</td>
+</tr>
+<tr>
+<td>On demand, 30 deg, 5x5 (earlier revision)</td>
+<td>1,484</td>
+<td>4.94</td>
+<td>10.1</td>
+<td>23.8%</td>
+</tr>
+<tr>
+<td>On demand, 30 deg, 3x3 (shipped)</td>
+<td>822</td>
+<td>2.25</td>
+<td>4.6</td>
+<td>22.5%</td>
+</tr>
+<tr>
+<td>On demand, 45 deg, 3x3 (shipped)</td>
+<td>851</td>
+<td>2.31</td>
+<td>4.8</td>
+<td>7.8%</td>
+</tr>
+<tr>
+<td>On demand, 60 deg, 3x3 (shipped)</td>
+<td>846</td>
+<td>2.32</td>
+<td>4.8</td>
+<td>2.2%</td>
+</tr>
+</tbody>
+</table>
+<p>Re-run after the 3x3 change (same seed and host, one run). The earlier design measured 3.9 ms per probe against 0.22 ms off (about 17x). Fetching after the prefilters and on demand over the 3x3 brings every shipped limit to about 3x the probe-only cost; the 5x5 at 30 degrees was about 5.3x in this run (6.6x in the first). The ADR-109 governor sees the job time and may move a region off probe-first; the live recheck still applies there.</p>
+<p><strong>Devstack A/B (2026-10-21).</strong> Paper 26.3 (<code>itzg/minecraft-server:java25</code>, 3 GiB heap, no players) on a copy of the reference save, shipped config except <code>cacheCap: 5000</code>, fresh memory per run. <code>/rtp info</code> sampled every 15 s; one run per row.</p>
+<table>
+<thead>
+<tr>
+<th><code>period</code></th>
+<th><code>maxHillAngle</code></th>
+<th>Run</th>
+<th>Cached at end</th>
+<th>Candidates tried</th>
+<th>Accepted of tried</th>
+<th><code>terrain</code> (live)</th>
+<th><code>prefilterTerrain</code></th>
+<th>RTP chunk loads</th>
+<th>Server MSPT after warm-up</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>20 (shipped)</td>
+<td>off</td>
+<td>292 s</td>
+<td>287</td>
+<td>491</td>
+<td>58.5%</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>0.17-0.38</td>
+</tr>
+<tr>
+<td>20</td>
+<td>30</td>
+<td>291 s</td>
+<td>288</td>
+<td>716</td>
+<td>40.2%</td>
+<td>49</td>
+<td>29</td>
+<td>40</td>
+<td>0.08-0.21</td>
+</tr>
+<tr>
+<td>20</td>
+<td>45</td>
+<td>290 s</td>
+<td>286</td>
+<td>634</td>
+<td>45.1%</td>
+<td>15</td>
+<td>15</td>
+<td>-</td>
+<td>0.08-0.24</td>
+</tr>
+<tr>
+<td>1</td>
+<td>off</td>
+<td>170 s</td>
+<td>3,188</td>
+<td>6,051</td>
+<td>52.7%</td>
+<td>-</td>
+<td>-</td>
+<td>26</td>
+<td>0.21-0.51</td>
+</tr>
+<tr>
+<td>1</td>
+<td>30</td>
+<td>170 s</td>
+<td>3,163</td>
+<td>7,149</td>
+<td>44.2%</td>
+<td>542</td>
+<td>85</td>
+<td>267</td>
+<td>0.24-0.35</td>
+</tr>
+<tr>
+<td>1</td>
+<td>45</td>
+<td>169 s</td>
+<td>3,188</td>
+<td>6,464</td>
+<td>49.3%</td>
+<td>194</td>
+<td>26</td>
+<td>70</td>
+<td>0.12-0.29</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Queue fill is paced by <code>period</code> (about 1 accepted spot per second at 20, about 18.7 per second at 1), and every variant kept that pace. The extra work per accepted spot fits inside the pacing on this host, so no throughput loss shows.</li>
+<li>Candidates tried per accepted spot rose by 46% (30 degrees) and 29% (45 degrees) at <code>period: 20</code>, and by 18% and 7% at <code>period: 1</code>.</li>
+<li>Most terrain rejects come from the live recheck (<code>terrain</code>), not the probe (<code>prefilterTerrain</code>): candidates that skip probe-first (ADR-109) or sit on region edges reach the live check. Each live reject was read or loaded first, which is why RTP chunk loads rose from 26 to 267 at 30 degrees. The check itself loads nothing.</li>
+<li>No warnings, errors or exceptions beyond server boilerplate; MSPT stayed below 0.6 ms after warm-up in every run.</li>
+<li>Not measured: a host where the pacing is not the limit (slower CPU, many regions), probe drain nanoseconds from the live server, and landings by a player.</li>
+</ul>
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Positive:</strong></li>
-<li>Adapts automatically when an operator changes server jar platforms (e.g. Paper to Folia) without manual config edits.</li>
-<li>Prevents background RTP generation from pushing active Folia regions over the 50ms tick cliff.</li>
-<li>Eliminates the EzRTP multi-second regional starvation and watchdog stalls by bounding concurrent regional dispatches and employing anti-starvation fair scheduling.</li>
-<li>Automatically contracts cache sizes and stretches pulse intervals during high load or tight memory, protecting server stability.</li>
+<li>Mountainsides and cliff edges are refused on any generator; the check itself loads no chunks.</li>
+<li>Unset regions behave and hash as before, and the probe requests no neighbours (one compare per path).</li>
+<li>Terrain rejects are counted apart in the fail map (<code>terrain</code>, <code>prefilterTerrain</code>) and drawn in the <code>vert</code> colour on the bad-locations map.</li>
 <li><strong>Negative / Trade-offs:</strong></li>
-<li>Cache replenishment slows down during server-wide compute or memory strain, temporarily serving teleports from cold/backlog reserves or on-demand resolution.</li>
+<li>About 1 in 5 land candidates is rejected at 30 degrees, and the probe pre-compute costs about 3x per candidate at any shipped limit. Queue filling slows in hilly worlds, which is why the shipped default is off.</li>
+<li>The 3x3 misses mountainsides whose steep part only shows at 32 blocks: 5.9% of the 5x5's rejects at 30 degrees, 2-3% at 45 and 60.</li>
+<li>The devstack A/B below ran on the earlier revision (5x5 at 30 degrees) and was not repeated for the 3x3.</li>
+<li>Every platform keeps at least the 3x3 FULL around a ticketed chunk, so Bukkit-family and Fabric / NeoForge rechecks read the same square.</li>
+<li>Probe and live verdicts can differ on region-file edge chunks (provisional vs authoritative). They agree on squares where every chunk is readable (<code>TerrainShapeCheckReadersTest</code>).</li>
+<li>Live neighbours are read on the thread that ran the safety scan, under the same assumption as the existing safety grid (see the open Folia entry in <code>POTENTIAL_BUGS.md</code>).</li>
+<li><strong>Future work:</strong></li>
+<li>Cut parse cost further with a column-only NBT reader that unpacks just the sampled columns' palette indices.</li>
+<li>Keep per-chunk floors at the 5 stencil columns from earlier drains so the rule can run without decoding again.</li>
+<li>Repeat the devstack A/B on a host where queue pacing is not the limit, and with a player bot landing.</li>
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Folia Regional Threading and RegionScheduler Contracts</li>
-<li><a href="../ADR-004-countbound-taskpipe-on-folia/">ADR-004</a>: CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads</li>
-<li><a href="../ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>: Stale-Chunk Guard for Count-Bound Pipes</li>
-<li><a href="ADR-067-automatic-prescan-and-adaptive-rate-control.md">ADR-067</a>: Automatic PRESCAN, Adaptive Scan Rate Control, and .mca-Header Generation Check</li>
-<li><a href="../ADR-078-composable-cache-pipeline-stages/">ADR-078</a>: Composable Cache Pipeline Stages and Dynamic Hot Quota Allocation</li>
-<li>Competitor Benchmark Analysis: EzRTP Folia Watchdog Stalls (7 stalls, 20.4s freeze) recorded in <code>docs/FRONT_PAGE_LITE.md</code></li>
+<li>REQ-RTP-F-015; S-001, S-004, S-005.</li>
+<li><code>rtp-core/.../verticalAdjustors/TerrainShapeCheck.java</code> (<code>evaluate</code>, <code>SQUARE_RADIUS</code>, <code>within</code>, <code>probeSquare</code>), <code>AbstractVerticalAdjustor.maxHillAngle</code> / <code>hillAngleOf</code>, <code>RegionCacheKey</code>, <code>config.yml</code> <code>defaults.vert.maxHillAngle</code>, <code>selection/region/PregenTask.java</code> (<code>startProbeTerrain</code>, <code>recheckTerrain</code>, <code>evaluateTerrain</code>), <code>selection/model/FailTypes.java</code> (<code>terrain</code>, <code>prefilterTerrain</code>).</li>
+<li><code>api/anvil-api/.../ChunkSquare.java</code>, <code>ColumnProbeCoalescer.submitSquare</code>, <code>AnvilPrefilter.squareJobAsync</code>, <code>AnvilReader.readTerrainProbe</code>, <code>AnvilSectorReader.Session.readTerrainProbe</code>; <code>rtp-api</code> <code>RTPWorld.probeChunkSquare</code>.</li>
+<li>Tests: <code>TerrainShapeCheckTest</code> (<code>stagedMatchesEager</code>, <code>stagedSkipsOuterRing</code>), <code>TerrainShapeCheckReadersTest</code>, <code>PregenTaskTerrainRecheckTest</code> (<code>liveRecheckReadsInnerSquareOnly</code>), <code>RegionCacheKeyTest.maxHillAngle_changesCacheKeyOnlyWhenSet</code> / <code>maxHillAngle_offMatchesAbsent</code>, <code>AnvilSectorReaderTest.squareJobs_decodeOnDemand</code> / <code>terrainProbe_matchesColumnProbeInWindow</code>; evidence: <code>LandingTerrainCheckMeasurementTest</code>, <code>ChunkDecodeCostBenchmarkTest</code>, <code>TerrainSquareProbeBenchmarkTest</code>.</li>
 </ul>
 
 
@@ -4640,7 +4693,7 @@ $$\text{cacheCap}<em _text_config="\text{config">{\text{effective}} = \min\left(
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -4665,6 +4718,8 @@ $$\text{cacheCap}<em _text_config="\text{config">{\text{effective}} = \min\left(
     
     
       <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

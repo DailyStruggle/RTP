@@ -1,0 +1,4988 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-123-folia-tick-region-allocation/">
+      
+      
+        <link rel="prev" href="../ADR-122-platform-neutral-stress-harness/">
+      
+      
+        <link rel="next" href="../ADR-124-consumer-attribution-for-background-refill/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  <meta name="robots" content="noindex, follow">
+</head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-123-folia-tick-region-allocation-work-placement-probed-shares-steering-and-lending" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ACTIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Actions & arenas
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Web Workspace & Editor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/shape-algorithms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtp admin setup` & Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-087-adaptive-compute-governor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-097 — Per-Action Pre-Validated Caches, Anvil Region Pre-Screening, and Bounded Subspace Placement Retries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-098 - Declarative Command Parameters, Per-Parameter Permissions, and Authoritative Defaults
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-099 — Zero-Overhead Visual Region Creation via Ecosystem Selection Bridges and Cartography Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-101 — In-House SQL Connection Pool and Retirement of HikariCP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-102 — Coverage-Guided Fuzz Testing and Parser Input Hardening
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-103 — Multi-Version Platform Adapter Deduplication and Runtime Coverage Normalization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-104 — Ephemeral Web Editor and In-Game Packed Docs Integration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-105 — Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-116-effects-through-neutral-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-117-release-cadence-contractual-pro-discretionary-lite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-117 - Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-principles-and-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Principles and invariants
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-work-placement-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Work placement classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-tick-region-state-without-region-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Tick-region state without region identity
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-fairness-rule-who-pays" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Fairness rule (who pays)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-per-region-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Per-region signals
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-per-region-share-found-by-probing" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Per-region share (found by probing)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-steering-moving-background-work-to-regions-with-headroom" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Steering: moving background work to regions with headroom
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-lending-finishing-the-work-faster" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Lending: finishing the work faster
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-fairness-measures-and-bystanders" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Fairness measures and bystanders
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-operator-surface-and-visibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Operator surface and visibility
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11-implementation-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. Implementation layout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-verification-and-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      12. Verification and evidence
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      13. Rollout
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-principles-and-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Principles and invariants
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-work-placement-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Work placement classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-tick-region-state-without-region-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Tick-region state without region identity
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-fairness-rule-who-pays" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Fairness rule (who pays)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-per-region-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Per-region signals
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-per-region-share-found-by-probing" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Per-region share (found by probing)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-steering-moving-background-work-to-regions-with-headroom" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Steering: moving background work to regions with headroom
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-lending-finishing-the-work-faster" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Lending: finishing the work faster
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-fairness-measures-and-bystanders" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Fairness measures and bystanders
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-operator-surface-and-visibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Operator surface and visibility
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#11-implementation-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. Implementation layout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-verification-and-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      12. Verification and evidence
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      13. Rollout
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-123-folia-tick-region-allocation-work-placement-probed-shares-steering-and-lending">ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending<a class="headerlink" href="#adr-123-folia-tick-region-allocation-work-placement-probed-shares-steering-and-lending" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted (2026-10-24). Builds on <a href="../ADR-087-adaptive-compute-governor/">ADR-087</a> (governor, <code>ComputeBudget</code> snapshot, AIMD limiter, observe-only mode) and <a href="../ADR-112-per-region-work-division-on-folia/">ADR-112</a>. Split out of ADR-087 (former section 4.5) on 2026-10-23. Work placement (section 2, rollout step 1) does not depend on the governor and may land first. Shares and steering are gated on go/no-go 1 and 2, lending on go/no-go 3 and the Folia differential benchmark (section 12).
+<strong>Date:</strong> 2026-10-23</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>ADR-112 caps RTP's sync work at one <code>syncAllottedTime</code> ($S_{\text{cfg}}$) per region thread per 50 ms. In its own stress run one tick region fell to about 1.4 TPS while the mean stayed at 18.9. Chunk-bound work clustering where the candidates are is one possible cause. RTP's tick-thread work also concentrates for reasons unrelated to any chunk:</p>
+<ul>
+<li><strong>Placement-free work pinned to one thread.</strong> Location-less <code>RTPScheduler#runTask</code>, <code>#runTaskLater</code> and <code>#runTaskTimer</code> go to Folia's global region scheduler (<code>FoliaSchedulerImpl</code>). That includes the per-tick <code>SyncTaskProcessing</code> pulse, the scan batch hand-off in <code>ScanTask</code>, fill deadlines and failsafes in <code>RegionCacheTask</code>, action starts, cancellations and teardown reports. However many tick regions exist, all of it lands on one serial queue.</li>
+<li><strong>Inline continuations.</strong> Non-<code>*Async</code> <code>CompletableFuture</code> stages run on the thread that completes the future. ADR-112 decision 1 hands <code>FoliaRTPWorld#getChunkAt</code> completions to the async scheduler, but two paths remain. A future completed inside a region task (for example a live-check result in <code>QueueTask</code> or <code>PregenTask</code>) runs every dependent stage inline on that region thread, so placement-free selection and bookkeeping are charged to whichever region happened to own the candidate. The hand-off also falls back to inline when the async scheduler rejects. Either way "async" work maps onto the finite set of regions that complete RTP's results.</li>
+<li><strong>New regions start from zero.</strong> <code>RegionThreadBudget</code> is a per-tick-thread bucket (<code>ThreadLocal</code>) that starts full on first use and keeps no per-region history. A newly created region has no estimator or limiter state, and Folia's rolling TPS window for it starts empty. RTP's spend and the readings are least reliable exactly when RTP is creating regions.</li>
+</ul>
+<p>Which of these produced the 1.4 TPS region is not yet established; section 12 adds the diagnostic that separates them. The ADR-112 cap applies only to work inside its spans, and it is uniform. A region at 45 ms of its own load pays the same as one at 5 ms, so its players pay for background work that idle regions could have absorbed. Those players did not request the teleports: the cost is socialised onto bystanders instead of falling on the players and RTP regions that consume it. Work clustered in one region also drains at one budget per tick while other regions have headroom and nothing to do, so it finishes later than it needs to.</p>
+<p>ADR-087 decides how much background work RTP does in total. On a single-loop host every RTP millisecond lands on the one tick thread, so that is the only question. On Folia the question is also <strong>where</strong>: tick regions run in parallel on a fixed pool of tick threads, each with its own 50 ms tick.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Put each kind of RTP tick work on the thread that should pay for it, size each tick region's share by probing, move background work towards regions that take it without lateness, and let those regions borrow budget that busy regions leave unused. Every input comes from public Folia API; no internals are read.</p>
+<p>How much of this ADR is needed depends on which Context mechanism produced the low-TPS region. The concentration diagnostic (section 12, go/no-go 1) answers that before anything beyond placement actuates (section 13).</p>
+<p>Notation: $k$ = a Folia <strong>tick region</strong> (the server's unit of parallel ticking, unrelated to RTP regions), tracked as a cell group (section 3); $S_{\text{cfg}}$ = configured <code>syncAllottedTime</code>. Other symbols are ADR-087's.</p>
+<h3 id="1-principles-and-invariants">1. Principles and invariants<a class="headerlink" href="#1-principles-and-invariants" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Never more aggressive than today, in total and per thread.</strong> RTP's sync spend per 50 ms stays within today's ADR-112 bound of one $S_{\text{cfg}}$ per tick thread running RTP work, both server-wide (the pool $\Pi$, section 8) and on each thread (the outer thread bucket, section 3). The one exception is a loan: a region may exceed its own value by borrowing pool budget that other regions left unused, up to $\min(2 \cdot S_{\text{cfg}},\; 25\text{ ms})$, and only on a tick thread that has run RTP work for no other region in the last second. Regions without RTP work that share that thread can be delayed by at most the loan itself (section 8). This refines ADR-087 principle 2 and is the only exception to ADR-087 invariant I2.</li>
+<li><strong>Background tick work prefers tick regions with headroom and few or no players.</strong> A design aim, measured by $J$ and $E$ (section 9), not a guarantee.</li>
+<li><strong>Player-facing work is untouched.</strong> ADR-087 principle 4 and invariant I4 apply unchanged: interactive work is charged but never deferred, scaled or moved.</li>
+</ol>
+<p>Invariant IDs are shared with ADR-087 so that references stay stable. This ADR owns I1 and I9; each has a mechanical check in section 12. On acceptance they are added to <code>REQUIREMENTS.md</code> (IDs assigned then, phrased with <em>shall</em>) and traced in <code>TRACEABILITY.md</code>.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Invariant</th>
+<th>Principle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I1</td>
+<td>On Folia with <code>autoTune</code> enabled, a background sync task is admitted only while RTP's sync charge in the current 50 ms (interactive and background) is within $\Pi \le S_{\text{cfg}} \cdot \Theta$ server-wide and within $S_{\text{cfg}}$ on its tick thread, or within $\min(2 \cdot S_{\text{cfg}}, 25\text{ ms})$ on a thread while it carries a loan. As today, interactive work is charged but never deferred, and the ADR-112 one-task floor is outside the bound. The bound is stated on the outer thread bucket and the pool, not on cell groups, so it holds whatever the group bookkeeping does.</td>
+<td>1</td>
+</tr>
+<tr>
+<td>I9</td>
+<td>Steering defers a background candidate for at most the aging bound (60 s or 8 deferrals); an aged candidate is then taken first in its region's next turn, within that turn's quota $u_r$ (ADR-087 I11), and none is dropped. Time during which a hard gate (ADR-087 I7) pauses background work, the circuit breaker holds the candidate's region, or the region's quota is zero does not count towards the bound.</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-work-placement-classes">2. Work placement classes<a class="headerlink" href="#2-work-placement-classes" title="Permanent link">&para;</a></h3>
+<p>Only some RTP tick work is tied to a chunk. Every stage that needs a tick thread declares one class, and the class decides where it may run:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Examples</th>
+<th>Runs on</th>
+<th>Who pays</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chunk-bound</td>
+<td>Live block checks, stale-chunk guard, ticket activation, arrival platform</td>
+<td>The region that owns the chunk (S-005, Folia threading contract). It cannot move; only <strong>when</strong> it runs is steered.</td>
+<td>That region's share (fairness rules 1-2)</td>
+</tr>
+<tr>
+<td>Entity-bound</td>
+<td>Teleport, fall-distance reset, bed spawn, player-sender commands</td>
+<td>The player's entity scheduler, which follows the player across regions</td>
+<td>The player's region, the player's own cost</td>
+</tr>
+<tr>
+<td>Global-bound</td>
+<td>Console commands, world-global state that the API places on the global region</td>
+<td>The global region scheduler</td>
+<td>A budgeted global share, charged in the ledger as region $k = \text{global}$</td>
+</tr>
+<tr>
+<td>Placement-free</td>
+<td>Future continuations, cache and queue bookkeeping, deadlines and failsafes that only complete a future or flip a flag, scan batch hand-offs, pulse stages that touch no world state</td>
+<td>Async by default. If an API requires a tick thread, the requesting player's entity scheduler, so the consumer pays. Unowned work goes to the global share.</td>
+<td>The consumer, or the shared pool</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Results leave the region thread before dependents run.</strong> A region-task body that completes a future completes it through RTP's async executor, as <code>FoliaRTPWorld</code> already does for chunk futures (ADR-112 decision 1). Dependents are placement-free unless they touch the chunk, and then re-enter through <code>RTPScheduler#runTask</code>, inside a <code>RegionThreadBudget</code> span, so they are charged.</li>
+<li><strong>Unclassified work keeps today's placement</strong> and is charged to the global share, so a missed stage is visible in the ledger rather than silent.</li>
+<li><strong>Moving placement-free work onto the consumer's thread is the only cross-thread move.</strong> Chunk-bound work can never follow the consumer (Alternatives).</li>
+<li><strong>Placement changes where work runs, not how much.</strong> It is independent of <code>autoTune</code> and of the governor (rollout step 1). Placement-free work moved onto a consumer's entity scheduler is small by construction; work that is not small belongs async.</li>
+</ul>
+<h3 id="3-tick-region-state-without-region-identity">3. Tick-region state without region identity<a class="headerlink" href="#3-tick-region-state-without-region-identity" title="Permanent link">&para;</a></h3>
+<p>Public API cannot enumerate tick regions or name the one a thread is ticking. It can only answer <code>Bukkit.isOwnedByCurrentRegion</code> on a tick thread. RTP therefore keeps per-region state (bucket, limiter, ledger, loan) per <strong>cell group</strong>: ADR-112 cells that a slice has observed on the same tick region. Every per-region quantity in this ADR, including $J$ and $E$, is per group, and $k$ denotes a group.</p>
+<ul>
+<li><strong>Resolution.</strong> At slice start, <code>RegionThreadBudget</code> tests the slice's cell first against its last group's representative, then against the other live groups in the slice's world, nearest first, and joins the first match. With no match, the cell forms a new group. Live groups are those with queued work or charges in the last 60 s, which bounds the tests. The result is cached until the slice ends.</li>
+<li><strong>Merge probe.</strong> First-match resolution never sees a second match, so merges are detected separately: after resolving, each slice tests one further live group's representative, round-robin over the live groups of its world. A match merges the two groups. A merge is therefore found within as many slices of the merged region as there are live groups, at one extra test per slice.</li>
+<li><strong>Splits and merges are conservative.</strong> A cell whose last group no longer matches has split away; its new group starts at the lower of the old group's limit and the new-group prior. Merged groups keep the lower limit and the sum of their ledgers. A representative that unloads fails its test, which only causes a split. A false split or an undetected merge leaves one tick region with two groups and two shares; the outer thread bucket (below) keeps that region's spend within $S_{\text{cfg}}$ per thread, so the error costs accuracy of the ledger, not budget.</li>
+<li><strong>Token state: group bucket inside a thread bucket.</strong> The ADR-112 bucket is a <code>ThreadLocal</code> per tick thread, and a thread ticks different regions over time. Kept per thread only, tokens earned while ticking a quiet region would be spent in a busy one, and the ledger would not be per region. With <code>autoTune: true</code> each group has its own bucket ($S_k$ plus any loan), and the per-thread bucket stays as an <strong>outer bucket</strong> of $S_{\text{cfg}}$ per 50 ms. A task runs only if both have tokens and is charged to both. The outer bucket rises to $S_k + e_k$ only while the thread has run RTP work for no group other than the borrower $k$ in the last second (section 8). This keeps today's per-thread bound (I1) whatever the group bookkeeping does. With <code>autoTune: false</code> only the per-thread bucket exists, unchanged.</li>
+<li><strong>New regions do not start from zero.</strong> A group formed for the first time starts its limiter at $S_{\text{cfg}} / 2$ and grows by the ADR-087 section 4.4 recovery rule, not from a full bucket. A region's interval readings are <code>NEVER_SAMPLED</code> until it is older than the reading's window; slice dispatch lag and the sampler's interval readings need no window and apply at once. ADR-087 section 3.2 permits still bound how many regions RTP creates.</li>
+</ul>
+<h3 id="4-fairness-rule-who-pays">4. Fairness rule (who pays)<a class="headerlink" href="#4-fairness-rule-who-pays" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>A teleport pays where it lands.</strong> Interactive work (arrival chunks, the live check for a waiting player, teleport stages) is charged to the tick region it runs on. It cannot move to another region and is never deferred (ADR-087 principle 4). It uses that region's share first, so background work there yields to it.</li>
+<li><strong>Background work is a shared cost.</strong> Background work has no requesting player. Steering (section 7) defers it in regions with little unused share, and prefers regions with few players, so the busiest region is expected to carry the least. This is a design aim measured by $J$ and $E$ (section 9), not an invariant.</li>
+<li><strong>No background candidate is starved by steering.</strong> Deferral is bounded by aging (section 7, I9), so steering delays no candidate beyond a fixed time; the hard gates and the quota still apply to it.</li>
+<li><strong>Lending redistributes and never adds.</strong> Only budget that throttled regions did not use is lent. RTP's server-wide sync spend never exceeds the pool $\Pi$ (section 8), which is today's ADR-112 bound, and each thread stays within its outer bucket (I1).</li>
+</ol>
+<h3 id="5-per-region-signals">5. Per-region signals<a class="headerlink" href="#5-per-region-signals" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Cost ledger</strong> $c_k^{i}$, $c_k^{b}$: RTP's interactive and background sync milliseconds per tick on region $k$, including the global region. This is an EWMA of <code>RegionThreadBudget</code> charges aggregated from ADR-112 cells, split by placement class. It is exact for every span, because RTP times its own work.</li>
+<li><strong>Queued work</strong> $q_k$: background milliseconds queued for $k$ (cell FIFO lengths times the EWMA of measured tick cost per background cell task).</li>
+<li><strong>Overload</strong>: <code>regionTps1m</code>, <code>regionMspt</code> (the binding's windowed mean tick interval, above 50 ms), slice dispatch lag. These use the public API and are always available.</li>
+<li><strong>Tick time by placement class</strong>: budget spans around chunk-bound, entity-bound, global-bound and placement-free tick work, including the global region. Ledger input and diagnostic.</li>
+<li><strong>Entity-scheduler sampler</strong> (<code>EntitySchedulerSampler</code>, rtp-folia). Every 2 s a <strong>sampling round</strong> picks at most 64 online players, rotating so that every online player is sampled once per <strong>rotation</strong> of $\lceil N_{\text{online}} / 64 \rceil$ rounds. RTP starts a task on each sampled player's <code>Entity#getScheduler()</code> with <code>runAtFixedRate</code> and a period of 1 tick, and cancels it after 10 runs. The task runs on whichever region owns the player. It records:</li>
+<li><strong>Population</strong> $P_k$, on the first run: for the cells with pending RTP work, <code>Bukkit.isOwnedByCurrentRegion(world, cx, cz)</code> tells whether the cell shares this player's tick region. Cells are checked in one batch. $P_k$ is the number of players found in $k$ over the last complete rotation, so it counts every online player once rather than a sample; it lags by up to one rotation (2 s per 64 players).</li>
+<li><strong>Tick intervals</strong>: <code>System.nanoTime()</code> on every run; the gap between consecutive runs is that region's tick interval. A gap above 60 ms (50 ms plus 10 ms jitter allowance) is an <strong>overrun</strong>. Two or more overruns in one 10-run window, or any single gap above 100 ms, is a breach.</li>
+</ul>
+<p>Why intervals between consecutive runs and not one delayed task: a one-tick-delayed task scheduled at an arbitrary phase of the tick runs between about 50 and 100 ms later on a <em>healthy</em> region. A 100 ms threshold on that reading has almost no margin against false positives, and misses a region that steadily overruns at 55-60 ms per tick. Consecutive runs of a period-1 task remove the phase, so the threshold can sit just above 50 ms. This is the same interval reading the existing probes use.</p>
+<p>Tasks of players who leave are retired by the scheduler's retired callback; the sampler holds no reference after that. A missed sample keeps the previous reading for one round, then becomes <code>STALE</code>. The cost is at most 640 task runs per 2 s round. Each sampler signal declares its lag (ADR-087 section 4.1); interval readings have lag 0.
+- <strong>No spare-time reading.</strong> Folia starts each region tick on a 50 ms boundary, so a task's timing looks the same whether the region used 5 ms or 45 ms. No public reading measures headroom below 50 ms, so the share is found by probing (section 6) instead of computed.</p>
+<h3 id="6-per-region-share-found-by-probing">6. Per-region share (found by probing)<a class="headerlink" href="#6-per-region-share-found-by-probing" title="Permanent link">&para;</a></h3>
+<p>$$S_k = \text{clamp}\left(\text{limit}<em _min="\min">k,\; S</em>\right)$$},\; S_{\text{cfg}}\right), \qquad S_k^{b} = \max\left(0,\; S_k - c_k^{i</p>
+<p>Here $\text{limit}_k$ is an ADR-087 section 4.4 limiter, kept on the cell group (section 3). A breach is a sampler breach (which carries the 10 ms jitter allowance), windowed <code>regionMspt</code> above 50 ms, dispatch lag above 100 ms, or <code>ServerHealthGate#regionUnhealthy</code>.</p>
+<ul>
+<li><strong>A breach cuts only if RTP contributed.</strong> It halves $\text{limit}<em _text_cfg="\text{cfg">k$ only if RTP charged at least $\max(0.5\text{ ms},\; S</em> / 10)$ per tick on $k$, averaged over the 2 s before the breach. Otherwise the breach holds the limit (no growth) and is counted as }<code>NOT_RTP</code>. <em>Why:</em> a late tick caused by a farm or a boss fight would otherwise halve RTP's share even when RTP spent nothing there. In regions with natural spikes $\text{limit}<em _text_cfg="\text{cfg">k$ would rarely return to $S</em>$ (section 8).}}$, and those regions could never borrow, because a borrower must be at $S_{\text{cfg}</li>
+<li><strong>Growth.</strong> Without a breach the limit grows additively. Regions with $P_k \le 1$ or with queued interactive work grow at the ADR-087 section 4.4 rate. A populated region ($P_k &gt; 1$) without queued interactive work grows only after 60 s without a breach, and then at a quarter of that rate. One transient breach therefore does not cap a hub permanently, and the probe's occasional late tick falls mostly on empty or sparse regions, often on the teleporting player alone. A new group in a populated region stays near $S_{\text{cfg}} / 2$ for minutes, so its background work stays near $S_{\text{cfg}} / 2 - c_k^{i}$.</li>
+<li>$S_{\min}$ is the ADR-112 one-task floor. <code>RegionThreadBudget</code> reads $S_k$ (plus any loan) as its <code>budgetNanos</code> supplier for the slice's group. The no-catch-up bucket is unchanged. The group map is bounded, and entries expire after 60 s idle.</li>
+<li>A slow tick region is handled by its own share and never cuts a global ADR-087 knob (ADR-087 section 4.3, Folia).</li>
+</ul>
+<h3 id="7-steering-moving-background-work-to-regions-with-headroom">7. Steering: moving background work to regions with headroom<a class="headerlink" href="#7-steering-moving-background-work-to-regions-with-headroom" title="Permanent link">&para;</a></h3>
+<p>Each region has a headroom weight $w_k = (S_k^{b} + e_k) / S_{\text{cfg}}$, in $[0, 1]$ without a loan and in $[0, 2]$ with one, and a bystander-adjusted weight $w'_k = w_k / (1 + P_k / 4)$ (section 9). Background stages that choose among candidates read them: cold-to-hot promotion, live fallback checks, pregeneration live scans, and the shed order for hot-cap contraction (ADR-087 section 4.3, item 6).</p>
+<ul>
+<li>Candidates are still drawn in ADR-001 order. Steering changes only <strong>when</strong> a candidate is processed, never which candidates exist (ADR-087 section 3.3).</li>
+<li>A candidate is processed now if $w_k \ge 0.5$ <strong>and</strong> $w'_k \ge \tfrac{1}{2} \max_j w'_j$, the maximum taken over tick regions with queued RTP background work. Otherwise it is deferred in its current tier (ADR-087 section 3.5), and its deferral count and first-deferral time are recorded on the entry. No new queue is created. The first condition is headroom, an absolute test. The second is the bystander preference, a relative test: a populated region is deferred only while a less populated region with work offers at least twice its adjusted weight, so when every region with work is populated, population defers nothing.</li>
+<li>A candidate in no tick region (Type C, which would create one) has $w = 1/2$, the new-group prior, and $P = 0$, while ADR-087 section 3.2 permits are free, and is deferred while they are saturated (ADR-087 section 3.3). A new region has no players, so it is a good place for work, but it has no history yet; the prior and the pool bound protect it and the other regions.</li>
+<li><strong>Aging (I9).</strong> After 60 s or 8 deferrals, whichever comes first, steering stops deferring a candidate: it is taken first in its region's next turn. An aged candidate is an ordinary unit. It counts against the turn's quota $u_r$ (ADR-087 I11) and the section 3.2 permits, and it waits like any other background work while a hard gate pauses background work, the ADR-112 circuit breaker holds its region, or the region's quota is zero; that time does not count towards the bound. Aging removes steering's delay and nothing else, so no other bound is exceeded. No candidate is dropped by deferral. The processed sequence is therefore the ADR-001 sequence with each element delayed by steering for at most the aging bound. Aging applies to background candidates only; no player request is deferred.</li>
+<li><strong>Hot-tier footprint.</strong> A kept chunk becomes part of the tick region that owns it, and adds to that region's tick and merge footprint (ADR-112 Context item 5). Contraction sheds from the lowest-$w'_k$ regions first, and steering keeps new hot entries out of busy regions while they stay busy.</li>
+<li>This replaces the binary <code>RTPScheduler#isRegionSaturated</code> skip (ADR-112 decision 5) with a graded weight. The skip stays as the backstop.</li>
+</ul>
+<p><strong>Compatibility with ADR-001.</strong> ADR-001 fixes the order in which candidates are drawn and guarantees that every drawn candidate is evaluated; steering keeps both (I9: the multiset processed equals the multiset drawn, each delayed by at most the aging bound). What it does not keep is the <em>instantaneous</em> spatial mix of the hot tier. The aging bound (60 s) is longer than the ADR-087 refill horizon (30 s), so while a load pattern persists, the hot tier's mix at any instant is skewed towards regions with headroom, and teleports served from the hot tier are skewed the same way. The skew lasts as long as the load and ends within one aging bound after it. This is accepted because it applies to background refill only: live selection for a waiting player is not steered, and cold, backlog and on-demand paths are unaffected. The Folia differential benchmark (section 12) reports the hot-tier share of teleports under load so the size of the skew is visible.</p>
+<h3 id="8-lending-finishing-the-work-faster">8. Lending: finishing the work faster<a class="headerlink" href="#8-lending-finishing-the-work-faster" title="Permanent link">&para;</a></h3>
+<p>Background throughput on Folia is $\sum_k \min(q_k, S_k^{b})$ per tick. Clustered work drains at one share per tick in its own region, whatever the other regions are doing. Steering moves work to where the headroom is; lending lets those regions drain it with budget that throttled regions did not use:</p>
+<p>$$\Pi = S_{\text{cfg}} \cdot \min(K, \Theta), \qquad L = \max\left(0,\; \Pi - \sum_k S_k\right)$$</p>
+<p>Here $K$ is the number of tick regions (groups) with RTP work in the last second, and $\Theta$ is the number of distinct tick threads that ran RTP work in that second. With one region per thread, $\Pi = K \cdot S_{\text{cfg}}$. With more regions than threads, $\Pi$ is today's per-thread total. $\Pi$ bounds the sum and the outer thread bucket bounds each thread, so neither the server nor any one thread can outspend today, except a thread carrying a loan (I1). If $\sum_k S_k &gt; \Pi$, background shares $S_k^{b}$ are scaled down proportionally and $L = 0$. Interactive work is charged but never scaled or deferred (ADR-087 principle 4, ADR-112 decision 4).</p>
+<ul>
+<li><strong>The pool depends on how spread out RTP's work already is.</strong> $\Theta$ counts threads that ran RTP work. If RTP's work is concentrated on one thread, $\Theta = 1$, $\Pi = S_{\text{cfg}}$ and there is nothing to lend. Lending therefore only helps once placement (section 2) and steering (section 7) have spread the work. This is accepted: it keeps the pool at today's bound by construction.</li>
+</ul>
+<p>A region $k$ may borrow only when all of these hold:</p>
+<ul>
+<li>it has more queued work than its share ($q_k &gt; S_k^{b}$);</li>
+<li>its limiter is at $S_{\text{cfg}}$ and it has had no breach for 10 s;</li>
+<li>its tick thread has run RTP work for no other group in the last second, so the loan cannot take time from another region where RTP also works. Folia does not pin regions to threads, and RTP cannot see regions where it has no work, so the same thread may tick such bystander regions between the borrower's ticks. A loan can delay those by at most the loan $e_k \le S_{\text{cfg}}$ per 50 ms beyond today's bound, and at most 25 ms in total RTP time on the thread. This is accepted only behind the remaining conditions and rollout step 4;</li>
+<li>no sampled region has shown an overload signal in the last 5 s;</li>
+<li>the ADR-087 section 3.2 permits are not saturated. A saturated pool time-shares tick threads, so extra time on one region would delay another region's tick.</li>
+</ul>
+<p>Each borrower has its own loan limiter $\ell_k$, probed the same way as its share: it grows additively from 0 while the conditions hold and halves on any breach in $k$. Requests</p>
+<p>$$e_k = \min\left(S_{\text{cfg}},\; 25\text{ ms} - S_k,\; \ell_k,\; q_k - S_k^{b}\right)$$</p>
+<p>are scaled by $\min\left(1,\; L / \sum e_k\right)$. Hence $S_k + e_k \le \min(2 \cdot S_{\text{cfg}},\; 25\text{ ms})$ and $\sum_k (S_k + e_k) \le \Pi$. Loans are recomputed at every evaluation. A loan lapses when the lending region recovers, any breach appears, or the borrower's thread ticks another group with RTP work; the outer thread bucket then drops back to $S_{\text{cfg}}$ at once.</p>
+<ul>
+<li><em>Why the absolute cap:</em> <code>syncAllottedTime</code> may be configured up to 25 ms (<code>MAX_ALLOTTED_MS</code>), and <code>RegionThreadBudget#budget()</code> clamps only at a full tick. A 2x loan alone would allow 50 ms, the whole tick. With the cap no region ever receives more than the largest value an operator can configure for one region.</li>
+<li>The global overload veto may hold most of the time on a busy server, which would make lending a calm-server feature. Go/no-go 3 measures how often it would hold before lending is built; if it holds most of the time, lending is not built (section 13, step 4).</li>
+</ul>
+<h3 id="9-fairness-measures-and-bystanders">9. Fairness measures and bystanders<a class="headerlink" href="#9-fairness-measures-and-bystanders" title="Permanent link">&para;</a></h3>
+<p>Without a headroom reading, fairness is measured against what each region has shown it can take. RTP's use of a region's proven capacity is $x_k = c_k / \text{limit}_k$, with $c_k = c_k^{i} + c_k^{b}$. It is reported as Jain's index over regions with RTP work:</p>
+<p>$$J = \frac{\left(\sum_k x_k\right)^2}{n \cdot \sum_k x_k^2}$$</p>
+<p>$J = 1$ means every region gives up the same fraction of its proven capacity. A second measure tracks principle 2 directly: <strong>bystander exposure</strong> $E = \sum_k P_k \, c_k^{b} / \sum_k P_k$, the background RTP milliseconds per tick that the average online player's region carries. The allocator aims to keep $E$ low, not equal. The uniform ADR-112 cap scores low on both whenever load differs between regions.</p>
+<p><strong>Bystanders.</strong> The adjusted weight $w'_k = w_k / (1 + P_k / 4)$ makes background work and new hot entries prefer empty regions over populated ones that take work equally well (section 7, relative test), and orders hot-cap shedding (lowest $w'_k$ first). It is a preference between regions, not a cap on any one region. A teleport's arrival work necessarily lands in its destination's tick region; RTP destinations are mostly in sparse areas, and that work is the teleporting player's own cost (fairness rule 1).</p>
+<h3 id="10-operator-surface-and-visibility">10. Operator surface and visibility<a class="headerlink" href="#10-operator-surface-and-visibility" title="Permanent link">&para;</a></h3>
+<p>No new key. On Folia, the ADR-087 <code>autoTune</code> key also enables this ADR's actuating steps once they ship; <code>autoTune: false</code> starts no sampler task and constructs no group bucket.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>With <code>autoTune: true</code></th>
+<th>With <code>autoTune: false</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>syncAllottedTime</code> on Folia</td>
+<td>Per-region share follows that region's headroom; once lending ships, a region with headroom, the only one with RTP work on its tick thread, may borrow unused budget up to 2x, at most 25 ms; the server-wide total never exceeds today's one value per tick thread running RTP work, and no other thread exceeds one value</td>
+<td>Fixed per region thread (ADR-112)</td>
+</tr>
+</tbody>
+</table>
+<p>When lending ships (rollout step 4), the <code>autoTune</code> comment in <code>performance.yml</code> and its locale mirrors gain one sentence: "On Folia one region may borrow budget other regions leave unused, up to 2x syncAllottedTime (at most 25 ms)."</p>
+<ul>
+<li><strong><code>/rtp info</code></strong> (all strings in <code>messages.yml</code>, REQ-RTP-F-013, REQ-RTP-S-007): the top tick regions by RTP cost (ms per tick by placement class, share, loan, deferred candidates, players), the global region's RTP cost, the total lent, the fairness index $J$, bystander exposure $E$, and sampler coverage (players per round and rotation length).</li>
+<li><strong>Metrics</strong> (<code>metrics-api</code>): <code>rtp_governor_region_sync_ms</code> (by kind and placement class; label set bounded to the top 8 tick regions by cost plus <code>global</code> and <code>other</code>), <code>rtp_governor_lent_ms</code>, <code>rtp_governor_deferred_total</code>, <code>rtp_governor_aged_total</code>, <code>rtp_governor_fairness_index</code>, <code>rtp_governor_bystander_exposure_ms</code>, <code>rtp_governor_overruns_total</code>, <code>rtp_governor_breaches_not_rtp_total</code>.</li>
+<li>Reductions of a region's share below $S_{\text{cfg}}$ are reported through ADR-087's console line and <code>compute-governor</code> BIT component (REQ-RTP-OPS-002), with reason <code>REGION_OVERLOAD</code>.</li>
+</ul>
+<h3 id="11-implementation-layout">11. Implementation layout<a class="headerlink" href="#11-implementation-layout" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Placement.</strong> Each tick-thread stage declares its placement class. Placement-free stages use <code>RTPScheduler#runTaskAsynchronously</code>; when an API needs a tick thread they use <code>RTPScheduler#runTaskForPlayer</code> with the consumer, or the global share for unowned work. Futures completed inside region-task bodies (<code>QueueTask</code>, <code>PregenTask</code>, <code>RegionCacheTask</code> live checks) complete through an executor backed by <code>RTPScheduler#runTaskAsynchronously</code> (no new threads, F-001), like <code>FoliaRTPWorld.OFF_REGION</code>; an inline fallback is counted and logged at <code>FINE</code>. Deadlines and failsafes that only complete a future move to async delayed tasks. Every global-region dispatch, including the <code>SyncTaskProcessing</code> pulse, runs inside a <code>RegionThreadBudget</code> span charged as $k = \text{global}$. In rollout step 1 that span only measures: its budget is unbounded, so wrapping changes no amount of work. The global share starts limiting with step 3.</li>
+<li><strong>Mechanical check.</strong> An architecture test fails the build when <code>rtp-core</code> selection, cache, scan or teleport code calls a location-less <code>RTPScheduler#runTask</code> / <code>#runTaskLater</code> outside an allow-list of global-bound callers (VERIFICATION_GATES gate 2).</li>
+<li><strong><code>FoliaSchedulerImpl</code>.</strong> <code>RegionThreadBudget</code> gains a group bucket with supplier <code>() -&gt; governor.regionalSyncNanos(groupOfCurrentSlice)</code> (share plus loan), and keeps its <code>ThreadLocal</code> bucket as the outer bucket with supplier <code>() -&gt; governor.threadSyncNanos()</code> ($S_{\text{cfg}}$, or $S_k + e_k$ while the thread carries a loan). A task runs only if both have tokens (section 3). <code>RegionThreadBudget</code> resolves the group at slice start, runs the merge probe, and reports each charge to the ledger with its group, tick thread and kind (interactive or background); the governor derives $\Theta$, and whether a thread ticked only the borrower, from the distinct threads.</li>
+<li><strong>Steering reads.</strong> Background candidate stages (<code>Region#execute</code> promotion, live fallback checks, <code>PregenTask</code> live scans, hot-cap shed order) read <code>budget.regionWeight(world, cx, cz)</code>, which returns $w_k$ and $w'_k$ together with the current $\max_j w'_j$. <code>RTPScheduler#isRegionSaturated</code> stays as the backstop. Deferral count and first-deferral time are two fields on the existing cache entry.</li>
+<li><strong>Allocator.</strong> Shares, steering weights and loans are computed by a pure <code>RegionShareAllocator</code> in the ADR-087 governor package (inputs: per-region ledger, queue, overload, overrun and population readings; outputs: shares, weights, loans, $J$, $E$), and published in the same <code>ComputeBudget</code> snapshot.</li>
+<li><strong>Sampler.</strong> <code>EntitySchedulerSampler</code> lives in <code>rtp-folia</code>, uses only <code>Entity#getScheduler()</code> and <code>Bukkit.isOwnedByCurrentRegion</code>, and is exposed through a new optional <code>MetricsBinding</code> default method that returns <code>NEVER_SAMPLED</code>, so other platforms are unaffected. No <code>EXTERNAL_HOOKS.md</code> row is needed (ADR-026). Sampler tasks are cancelled on shutdown, after their 10 runs, and when their player is retired.</li>
+<li><strong>Lifecycle.</strong> Per-group state is bounded and reset with the governor on reload; no chunk tickets are held, so no <code>MemoryTracker</code> registration is needed.</li>
+<li><strong>Safety rules.</strong> S-005: no signal read or actuation loads a chunk; chunk-bound work stays on its owning region. S-004: deferral leaves background candidates in their tier and never fails a teleport. F-001: no threads.</li>
+</ul>
+<h3 id="12-verification-and-evidence">12. Verification and evidence<a class="headerlink" href="#12-verification-and-evidence" title="Permanent link">&para;</a></h3>
+<p><strong>Invariant checks.</strong> Property tests run the pure <code>RegionShareAllocator</code> and simulated bucket charges over random signals, region sets and thread assignments, and assert on <strong>published</strong> values:</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I1</td>
+<td>Over random group-to-thread assignments, including more groups than threads, false splits and undetected merges: per 50 ms, charges admitted to background tasks keep the server-wide total within $\Pi$ and each thread within $S_{\text{cfg}}$, or within $\min(2 S_{\text{cfg}}, 25\text{ ms})$ only on a thread that ran RTP work for the borrower alone, including with $S_{\text{cfg}} = 25$ ms.</td>
+</tr>
+<tr>
+<td>I9</td>
+<td>Steering defers no candidate for more than 60 s or 8 deferrals of unpaused time (gate pauses, breaker holds and zero-quota turns excluded); aged candidates are taken first in the next turn and counted against $u_r$, so ADR-087 I11 holds with aging active; the multiset of processed candidates equals the multiset drawn.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Allocator tests</strong> (pure <code>RegionShareAllocator</code>): a breach halves that region's share on the same evaluation when RTP charged at least the contribution threshold, and holds it without cutting when RTP charged less; a populated region's limit does not grow within 60 s of a breach and then grows at a quarter rate; a new group starts at $S_{\text{cfg}} / 2$; a split group starts no higher than its old limit and merged groups keep the lower limit; the merge probe detects a merge within as many slices as there are live groups; tokens earned in one group are never spent in another; no loan while the borrower's limiter is below ceiling or has breached within 10 s, while its thread ticks another group, while any region is overloaded, or while section 3.2 permits are saturated; $w_k \le 1$ without a loan and $\le 2$ with one; when every region with work has 4 or more players, population alone defers nothing; an empty region is preferred over a populated one with an equal share; <code>autoTune: false</code> constructs no group bucket.</li>
+<li><strong>Placement tests</strong>: placement-free stages never run on a region thread they did not declare; dependents of a future completed inside a region task run async; global-region work is charged as $k = \text{global}$, and in step 1 the global span runs the same work as without it; the architecture test rejects a new location-less <code>runTask</code> in selection code.</li>
+<li><strong>Sampler tests</strong> (mocked entity scheduler, injected clock): population counts match <code>isOwnedByCurrentRegion</code> answers, and every online player is counted once per rotation; a region ticking every 50 ms at an arbitrary start phase produces no overrun; a region ticking steadily at 58 ms produces a breach within one window; one gap above 100 ms produces a breach; a retired player leaves no reference; a task cancels after 10 runs; at most 64 players are sampled per round; without ADR-087's observe-only property before its <code>autoTune</code> key ships, or with <code>autoTune: false</code> after, no sampler task starts.</li>
+<li><strong>Simulation</strong>: the ADR-090 <code>SimulatedFoliaRuntime</code> with injected regional MSPT and dispatch lag. A clustered scenario reproduces the ADR-112 stress shape (one tick region at high own load holding most queued work, several idle regions) and compares the uniform cap with this ADR.</li>
+<li><strong>Observe-only go/no-go</strong>, run in ADR-087's observe-only mode (its rollout step 1) and recorded in this ADR before step 3:</li>
+<li><strong>Concentration diagnostic</strong>: rerun the ADR-112 stress shape with per-region tick time split by placement class, global-region RTP time, placement-free time inside region spans, inline fallbacks of the off-region hand-off, and region age at the first late tick. It establishes which Context mechanism produced the low-TPS region, and how much of sections 3-9 is needed. If placement (step 1) alone removes the concentration, steps 3 and 4 are not built.</li>
+<li><strong>Sampler agreement</strong>: sampler breaches agree with <code>regionTps1m</code> and slice dispatch lag on each supported Folia version.</li>
+<li><strong>Lending veto</strong>: the share of time the section 8 overload veto would hold.</li>
+<li><strong>Folia differential benchmark</strong> (clustered stress run, uniform cap versus this ADR): worst-region TPS p5, spread between best and worst region MSPT, global-region MSPT, background fill time, teleport latency p99, hot-tier share of teleports, $J$ and $E$. Acceptance: worst-region TPS p5 and teleport latency p99 no worse, background fill time shorter, $J$ higher and $E$ lower.</li>
+<li><strong>Traceability</strong>: I1 and I9 are added to <code>REQUIREMENTS.md</code> and <code>TRACEABILITY.md</code> when this ADR is accepted; each check carries its REQ ID.</li>
+<li><strong>Revision rule</strong>: ADR-087's applies. Numeric constants (64 players, 10 runs, 60 ms overrun, 60 s / 8 deferrals, the $P_k / 4$ bystander factor, the quarter growth rate) are initial values, revisable under that rule.</li>
+</ul>
+<h3 id="13-rollout">13. Rollout<a class="headerlink" href="#13-rollout" title="Permanent link">&para;</a></h3>
+<p>Steps 3 and 4 are independently revertible by <code>autoTune: false</code>; steps 1 and 2 are not governed by it.</p>
+<ol>
+<li><strong>Placement.</strong> Move placement-free work off the global region and off region threads, add global-region charging (measuring only, section 11) and the architecture test. This step changes where work runs, not how much, is independent of <code>autoTune</code> and of ADR-087, and may land before ADR-087 step 1.</li>
+<li><strong>Observe.</strong> Cell groups, the ledger, the sampler, $J$ and $E$ are computed and published in ADR-087's observe-only mode. Nothing actuates. Run go/no-go 1-3.</li>
+<li><strong>Shares and steering.</strong> After ADR-087 step 2 (its <code>autoTune</code> key), actuate the per-region share with probing and steering with aging, if go/no-go 1 shows tick-region concentration that shares can fix and go/no-go 2 passes, since the shares actuate on sampler breaches. The global share starts limiting.</li>
+<li><strong>Lending.</strong> Enable only if go/no-go 3 shows the veto leaves lending a meaningful share of time, and the Folia differential benchmark passes. If the veto holds most of the time, lending is not built.</li>
+</ol>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Uniform per-region cap on Folia (ADR-112 as is)</strong></td>
+<td>A region at 45 ms of its own load pays the same as one at 5 ms, and clustered work drains at one budget per tick while other regions sit idle. Kept as the fallback while this ADR's steps are not shipped.</td>
+</tr>
+<tr>
+<td><strong>Cut a region's share on every breach</strong></td>
+<td>Farms and boss fights would cap RTP in regions where it spent nothing, and those regions could never recover to lend. Cuts require RTP's contribution (section 6).</td>
+</tr>
+<tr>
+<td><strong>One-tick-delayed sampler with a 100 ms threshold</strong></td>
+<td>A healthy region already reads 50-100 ms depending on phase, and a region steadily at 55-60 ms per tick is missed. Consecutive-run intervals remove the phase (section 5).</td>
+</tr>
+<tr>
+<td><strong>Run all of a consumer's work on the consumer's thread</strong></td>
+<td>Adopted for placement-free work only. Chunk-bound work must run on the region that owns the chunk; a task on the consumer's entity scheduler that touches a distant chunk throws <code>ThreadAccessException</code>. For chunk-bound work the consumer is billed instead (<a href="../ADR-124-consumer-attribution-for-background-refill/">ADR-124</a>).</td>
+</tr>
+<tr>
+<td><strong>Strictly avoid busy regions (no aging)</strong></td>
+<td>Starves those regions' candidates and permanently biases destinations away from populated areas (ADR-001).</td>
+</tr>
+<tr>
+<td><strong>Lending without the pool-health gate, unbounded, or capped only at 2x</strong></td>
+<td>When the pool is saturated, tick threads are time-shared, so extra time on one region delays others (ADR-087 section 3.2). A 2x cap alone allows a whole 50 ms tick at <code>syncAllottedTime: 25</code>.</td>
+</tr>
+<tr>
+<td><strong>Run chunk-bound work on another region's thread</strong></td>
+<td>Violates Folia's threading contract; only work that touches no chunk can move between threads (section 2).</td>
+</tr>
+<tr>
+<td><strong>Leave location-less work on the global region (status quo)</strong></td>
+<td>One serial queue carries every placement-free task, whatever the number of tick regions, and none of it is budgeted.</td>
+</tr>
+<tr>
+<td><strong>Reflective per-region tick report (<code>/tps</code> internals)</strong></td>
+<td>Would give spare time below 50 ms directly, but reads Folia internals that can change on any update and needs an ADR-026 hook. Probing with public interval readings finds the same limits, at the cost of an occasional late tick in sparse regions.</td>
+</tr>
+<tr>
+<td><strong>Specify this inside ADR-087</strong></td>
+<td>It is a separate decision with its own evidence gates, and its need depends on go/no-go 1. Keeping it apart lets ADR-087 be accepted or rejected on its own.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong></li>
+<li>Placement-free work no longer queues on the global region or on whichever region completed a future, and every global-region dispatch is measured.</li>
+<li>Background work is steered away from busy and populated tick regions, and clustered work can finish sooner because regions with headroom take it and may borrow unused budget. Whether this delivers is measured by the Folia differential benchmark; per-region cost, $J$ and $E$ make it visible who pays.</li>
+<li>RTP's server-wide and per-thread sync spend stays within today's ADR-112 bound, except the bounded loan (I1).</li>
+<li><strong>Negative / Trade-offs:</strong></li>
+<li>Without a public spare-time reading, each region's share is found by probing: a region occasionally gets a late tick while RTP finds its limit. Populated regions grow only after 60 s without a breach and at a quarter rate, so this mostly falls on empty regions or the teleporting player. In exchange, background work in a populated region stays near half of <code>syncAllottedTime</code> for minutes after the region forms or breaches.</li>
+<li>Tick-region state is inferred from cell groups because public API has no region identity. Resolution costs up to one <code>isOwnedByCurrentRegion</code> test per live group per slice, plus one merge-probe test. Until a merge is found, or after a false split, one tick region holds two groups and two shares; the outer thread bucket keeps its spend at today's per-thread bound, but its ledger, $J$ and $E$ are split across the two groups.</li>
+<li>The outer thread bucket means a tick thread that ticks several groups still spends at most one <code>syncAllottedTime</code> per 50 ms across them, as today; groups on a shared thread compete for it.</li>
+<li>The sampler runs up to 10 one-tick tasks per sampled player every 2 s (at most 64 players per round) and adds per-player cleanup on quit. $P_k$ lags by up to one rotation on servers with more than 64 players.</li>
+<li>Lending only helps once RTP's work is spread over several tick threads, and may rarely activate on a busy server because of the overload veto. A loan can delay bystander regions RTP cannot see by at most the loan.</li>
+<li>Placement-free work moved onto a consumer's entity scheduler runs in the consumer's region, which may be a populated hub. It is small by construction and appears in that region's ledger.</li>
+<li>Background destinations in a busy tick region are processed later, up to the aging bound (60 s), which is longer than the refill horizon. While the load lasts, the hot tier's instantaneous mix is skewed towards regions with headroom (section 7, compatibility with ADR-001). Every drawn candidate is still processed (I9).</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../ADR-087-adaptive-compute-governor/">ADR-087</a>: Adaptive Compute Governor (snapshot, limiter, observe-only mode, section 3 concurrency bounds)</li>
+<li><a href="../ADR-112-per-region-work-division-on-folia/">ADR-112</a>: Per-Region Work Division on Folia (per-thread bucket, cells, circuit breaker)</li>
+<li><a href="../ADR-124-consumer-attribution-for-background-refill/">ADR-124</a>: Consumer attribution (bills chunk-bound work to the consumer)</li>
+<li><a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>: Archimedean spiral mapping (draw order preserved under deferral)</li>
+<li><a href="../ADR-026-external-hook-api-surface/">ADR-026</a>: External hook API surface (no reflective hook is needed; public API only)</li>
+<li><a href="../ADR-090-test-driver-and-synthetic-mca-architecture/">ADR-090</a>: <code>SimulatedFoliaRuntime</code></li>
+<li>Folia regional threading, <code>RegionScheduler</code> and <code>EntityScheduler</code> contracts</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.3.1
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
+      
+    
+  </body>
+</html>

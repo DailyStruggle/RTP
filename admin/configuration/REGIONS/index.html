@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
@@ -26,7 +26,7 @@
     
     
       
-        <title>Regions - LeafRTP</title>
+        <title>Regions - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,7 +106,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -365,13 +365,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -1187,33 +1187,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#circle_optimized_dual_layer-square_optimized_dual_layer" class="md-nav__link">
-    <span class="md-ellipsis">
-      CIRCLE_OPTIMIZED_DUAL_LAYER / SQUARE_OPTIMIZED_DUAL_LAYER
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#circle_deprecated_pure_spiral-square_deprecated_pure_spiral" class="md-nav__link">
-    <span class="md-ellipsis">
-      CIRCLE_DEPRECATED_PURE_SPIRAL / SQUARE_DEPRECATED_PURE_SPIRAL
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#circle_normal-square_normal" class="md-nav__link">
-    <span class="md-ellipsis">
-      CIRCLE_NORMAL / SQUARE_NORMAL
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#ellipse" class="md-nav__link">
     <span class="md-ellipsis">
       ELLIPSE
@@ -1266,6 +1239,30 @@
       Common Vert Keys
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Common Vert Keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slope-check-details-maxslope" class="md-nav__link">
+    <span class="md-ellipsis">
+      Slope check details (maxSlope)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hillside-and-cliff-check-maxhillangle" class="md-nav__link">
+    <span class="md-ellipsis">
+      Hillside and cliff check (maxHillAngle)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -3750,11 +3747,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../../../adr/ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
@@ -4380,6 +4377,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4595,33 +4760,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#circle_optimized_dual_layer-square_optimized_dual_layer" class="md-nav__link">
-    <span class="md-ellipsis">
-      CIRCLE_OPTIMIZED_DUAL_LAYER / SQUARE_OPTIMIZED_DUAL_LAYER
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#circle_deprecated_pure_spiral-square_deprecated_pure_spiral" class="md-nav__link">
-    <span class="md-ellipsis">
-      CIRCLE_DEPRECATED_PURE_SPIRAL / SQUARE_DEPRECATED_PURE_SPIRAL
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#circle_normal-square_normal" class="md-nav__link">
-    <span class="md-ellipsis">
-      CIRCLE_NORMAL / SQUARE_NORMAL
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#ellipse" class="md-nav__link">
     <span class="md-ellipsis">
       ELLIPSE
@@ -4674,6 +4812,30 @@
       Common Vert Keys
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Common Vert Keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slope-check-details-maxslope" class="md-nav__link">
+    <span class="md-ellipsis">
+      Slope check details (maxSlope)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hillside-and-cliff-check-maxhillangle" class="md-nav__link">
+    <span class="md-ellipsis">
+      Hillside and cliff check (maxHillAngle)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4800,11 +4962,12 @@
 <hr />
 <h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
 <p>You can create and update regions through:
-1. <strong>In-game admin menu</strong>: Run <code>/rtp admin</code> or <code>/rtp menu</code> -&gt; click <strong>Regions</strong>.
-2. <strong>Command line</strong>: Use <code>/rtp config region &lt;name&gt; &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config region default shape.radius=625</code>).
-3. <strong>Direct editing</strong>: Edit <code>definitions/regions/&lt;name&gt;.yml</code> on disk and run <code>/rtp reload</code>.</p>
+1. <strong>Browser map workspace (<code>/rtp editor</code>)</strong>: The recommended first choice - drag region boundaries on a 2D map, pick the target world, and edit <code>shape</code> and <code>vert</code> settings with live validation (<a href="../../WEB_EDITOR_GUIDE/">Web Editor Guide</a>).
+2. <strong>Guided setup or in-game menu (<code>/rtp admin setup</code> / <code>/rtp admin</code>)</strong>: Run <code>/rtp admin setup</code> for the multi-world/radius wizard, or <code>/rtp admin</code> -&gt; click <strong>Regions</strong>.
+3. <strong>Command line</strong>: Use <code>/rtp config regions &lt;name&gt; &lt;key&gt;=&lt;value&gt;</code> (e.g. <code>/rtp config regions default shape.radius=5000b</code>).
+4. <strong>Direct editing</strong>: Edit <code>definitions/regions/&lt;name&gt;.yml</code> on disk and run <code>/rtp reload</code>.</p>
 <blockquote>
-<p>📎 See <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full menu and command navigation details.</p>
+<p>📎 See <a href="../../WEB_EDITOR_GUIDE/">WEB_EDITOR_GUIDE.md</a> and <a href="../IN_GAME_CONFIG/">IN_GAME_CONFIG.md</a> for full editor, menu, and command navigation details.</p>
 </blockquote>
 <hr />
 <h2 id="top-level-settings">Top-Level Settings<a class="headerlink" href="#top-level-settings" title="Permanent link">&para;</a></h2>
@@ -4822,13 +4985,13 @@
 <td><code>world</code></td>
 <td>String</td>
 <td><code>"[0]"</code></td>
-<td>The target world for this region. Supports <code>[0]</code>, <code>[1]</code>, <code>[2]</code> placeholders or exact names.</td>
+<td>The target world for this region. Supports <code>[0]</code>, <code>[1]</code>, <code>[2]</code> placeholders or exact names. To enable RTP in another dimension (like <code>world_nether</code> or <code>world_the_end</code>), create a dedicated region file in <code>definitions/regions/</code> and map the world to it in <code>definitions/worlds/&lt;world&gt;.yml</code> (via <code>/rtp editor</code> or <code>/rtp admin setup</code>) rather than changing <code>default.yml</code> to send everyone to the nether.</td>
 </tr>
 <tr>
 <td><code>worldBorderOverride</code></td>
 <td>Boolean</td>
 <td><code>false</code></td>
-<td>If true, the <code>shape</code> block is replaced by a square matching the world's vanilla <code>/worldborder</code>, and the configured <code>radius</code> / <code>centerRadius</code> / <code>centerX</code> / <code>centerZ</code> are ignored. See <a href="#region-size-radius-and-centerradius">Region Size</a>.</td>
+<td><strong>Not generally recommended.</strong> If <code>true</code>, replaces the entire <code>shape</code> block with a square matching the world's vanilla <code>/worldborder</code> and ignores <code>shape.radius</code>, <code>shape.centerRadius</code>, <code>centerX</code>, and <code>centerZ</code>. Prefer setting <code>shape.radius</code> with a unit suffix (e.g. <code>2500b</code> or <code>5km</code>) in <code>definitions/regions/&lt;name&gt;.yml</code> or <code>/rtp editor</code>. See <a href="#region-size-radius-and-centerradius">Region Size</a>.</td>
 </tr>
 <tr>
 <td><code>requirePermission</code></td>
@@ -4906,7 +5069,7 @@
 </table>
 <blockquote>
 <p><strong>Inheritance (<code>@config</code>).</strong> Most of the keys above accept the token <code>@config</code> instead of a literal value, in which case they inherit the matching global default from the <code>defaults:</code> block of <code>config.yml</code>. The type-bearing <code>shape</code>/<code>vert</code> keys inherit as a whole named block; type-free scalars (<code>requirePermission</code>, <code>cacheCap</code>, <code>backlogCacheCap</code>, <code>activeChunkCap</code>, <code>spatialResolution</code>, <code>cooldown</code>, <code>delay</code>) inherit individually; <code>price</code> may reference <code>@economy</code>. See <a href="../CORE_CONFIG/#defaults-inheritance">CORE_CONFIG.md → Defaults (inheritance)</a>.</p>
-<p><strong>"Zone"/"arena" synonym.</strong> Other plugins call a bounded random-teleport area a "zone" or "arena"; in RTP that concept <em>is</em> a region - there is no separate object to configure. A region controls <em>where a player lands</em>, not <em>whether they can walk back out</em>. To keep a teleported player confined to the area, either pair the region with a WorldGuard region whose <code>exit</code> flag is <code>deny</code> (Bukkit family only), or use the cross-platform tether addon (LeafRTPTetherAddon), which enforces confinement on RTP's own geometry with no WorldGuard dependency.</p>
+<p><strong>"Zone"/"arena" synonym.</strong> Other plugins call a bounded random-teleport area a "zone" or "arena"; in RTP that concept <em>is</em> a region - there is no separate object to configure. A region controls <em>where a player lands</em>, not <em>whether they can walk back out</em>. To keep a teleported player confined to the area, either pair the region with a WorldGuard region whose <code>exit</code> flag is <code>deny</code> (Bukkit family only), or use the bundled action addon (<code>LeafRTPActionAddon</code>), which enforces confinement (<code>confinement:</code> in <code>definitions/actions/&lt;name&gt;.yml</code>) on RTP's own geometry with no WorldGuard dependency.</p>
 </blockquote>
 <hr />
 <h2 id="teleport-cooldown-and-warmup-delay-cooldown-delay">Teleport Cooldown and Warmup Delay (<code>cooldown</code> &amp; <code>delay</code>)<a class="headerlink" href="#teleport-cooldown-and-warmup-delay-cooldown-delay" title="Permanent link">&para;</a></h2>
@@ -4949,19 +5112,19 @@
 <h2 id="shape-section"><code>shape</code> Section<a class="headerlink" href="#shape-section" title="Permanent link">&para;</a></h2>
 <p>The <code>shape</code> block defines the horizontal area where players can land.</p>
 <h3 id="region-size-radius-and-centerradius">Region Size: <code>radius</code> and <code>centerRadius</code><a class="headerlink" href="#region-size-radius-and-centerradius" title="Permanent link">&para;</a></h3>
-<p><strong>By default, numeric distances in the <code>shape</code> block are measured in chunks (1 chunk = 16 blocks).</strong>
-However, RTP supports <strong>spatial unit suffixes</strong> on any distance parameter, as well as automatic interpretation of ambiguous numbers and world-border overflow checking.</p>
+<p><strong>Write distances with explicit block or metric unit suffixes (<code>radius: 4096b</code>, <code>radius: 10km</code>, <code>centerRadius: 1024b</code>) in both YAML files and commands.</strong>
+Bare unitless numbers without a suffix default to <strong>chunks</strong> (<code>1 chunk = 16 blocks</code>) for backwards compatibility, with automatic overflow/underflow checks against the world border.</p>
 <h4 id="spatial-unit-suffixes">Spatial Unit Suffixes<a class="headerlink" href="#spatial-unit-suffixes" title="Permanent link">&para;</a></h4>
 <p>You can explicitly specify distance units in config files or command parameters:</p>
 <ul>
 <li><strong>Minecraft Native Units:</strong></li>
+<li><code>b</code>, <code>block</code>, <code>blocks</code>: Minecraft blocks (1 block = 1 meter). E.g. <code>radius: 4096b</code>, <code>centerRadius: 1024b</code> (256 and 64 chunks).</li>
 <li><code>c</code>, <code>chunk</code>, <code>chunks</code>: Chunks (1 chunk = 16 blocks). E.g. <code>radius: 256c</code> (4,096 blocks).</li>
-<li><code>b</code>, <code>block</code>, <code>blocks</code>: Minecraft blocks (1 block = 1 meter). E.g. <code>radius: 4096b</code> (256 chunks).</li>
 <li><code>nb</code>, <code>netherblock</code>, <code>netherblocks</code>: Nether coordinate blocks (8 Overworld blocks). E.g. <code>radius: 500nb</code> (4,000 blocks).</li>
 <li><code>r</code>, <code>region</code>, <code>regions</code>: Region files (1 region = 32 chunks = 512 blocks). E.g. <code>radius: 4r</code> (128 chunks = 2,048 blocks).</li>
 <li><strong>Metric Units (1 block = 1 meter):</strong></li>
+<li><code>km</code>, <code>k</code>, <code>kilo</code>, <code>kilos</code>, <code>kilometer</code>, <code>kilometers</code>, <code>kilometre</code>, <code>kilometres</code>: Kilometers. E.g. <code>radius: 10km</code> (10,000 blocks = 625 chunks).</li>
 <li><code>m</code>, <code>meter</code>, <code>meters</code>, <code>metre</code>, <code>metres</code>: Meters (1 meter = 1 block). E.g. <code>radius: 5000m</code>.</li>
-<li><code>km</code>, <code>k</code>, <code>kilo</code>, <code>kilos</code>, <code>kilometer</code>, <code>kilometers</code>, <code>kilometre</code>, <code>kilometres</code>: Kilometers. E.g. <code>radius: 5km</code> (5,000 blocks = 312.5 chunks).</li>
 <li><strong>Imperial &amp; Survey Units:</strong></li>
 <li><code>mi</code>, <code>mile</code>, <code>miles</code>: Statute miles (1,609.344 blocks). E.g. <code>radius: 3mi</code>.</li>
 <li><code>yd</code>, <code>yard</code>, <code>yards</code>: Yards (0.9144 blocks).</li>
@@ -5057,28 +5220,28 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 <li><code>centerRadius</code> must be <strong>smaller</strong> than <code>radius</code>. If the two are equal, or <code>centerRadius</code> is larger, there is no band left to pick from and the region cannot produce locations.</li>
 <li>The pickable band is <code>radius - centerRadius</code> chunks wide. Raising <code>centerRadius</code> to push players away from spawn without raising <code>radius</code> shrinks the usable land, so raise both together.</li>
 <li>Total selectable area is roughly <code>pi x (radius^2 - centerRadius^2)</code> chunks for <code>CIRCLE</code>, and <code>(2 x radius)^2 - (2 x centerRadius)^2</code> chunks for <code>SQUARE</code>.</li>
-<li>Radius is <strong>not</strong> clamped to the vanilla world border unless you ask for it. A <code>radius</code> that reaches past the border triggers a startup/reload audit warning and wastes selection attempts on unreachable land; either shrink it, use chunk-inscribed bounding, or set <code>worldBorderOverride: true</code>.</li>
-<li><code>worldBorderOverride: true</code> <strong>replaces the whole <code>shape</code> block</strong> with a square derived from the world's <code>/worldborder</code> (chunk radius = border size / 32). Your <code>radius</code>, <code>centerRadius</code>, <code>centerX</code>, and <code>centerZ</code> are ignored while it is on.</li>
+<li>Radius is <strong>not</strong> clamped to the vanilla world border unless you ask for it. A <code>radius</code> that reaches past the border triggers a startup/reload audit warning and wastes selection attempts on unreachable land; shrink <code>shape.radius</code> to fit inside your border using a distance unit suffix (e.g. <code>radius: 2500b</code> or <code>2.5km</code> for a 5,000-block wide world border).</li>
+<li><strong><code>worldBorderOverride: true</code> is generally not recommended.</strong> When enabled, it <strong>replaces the whole <code>shape</code> block</strong> with a plain square derived from the world's <code>/worldborder</code> (chunk radius = border size / 32) and discards your configured <code>shape.name</code>, <code>radius</code>, <code>centerRadius</code> (spawn exclusion hole), <code>centerX</code>, and <code>centerZ</code>. Setting <code>shape.radius</code> with a unit suffix (<code>b</code>, <code>km</code>, <code>c</code>) in <code>/rtp editor</code> or <code>definitions/regions/&lt;name&gt;.yml</code> keeps your shape and inner exclusion zone intact.</li>
 <li>Large radii cost pre-calculation time, not memory: see <em>Massive Radii</em> under <a href="#tips-for-customization">Tips for Customization</a> and the <em>Backlog Cache (L3)</em> section below.</li>
 </ul>
 <h4 id="where-to-set-the-radius">Where to set the radius<a class="headerlink" href="#where-to-set-the-radius" title="Permanent link">&para;</a></h4>
-<p>Four places, in increasing precedence:</p>
+<p>Recommended places to configure region distance and geometry:</p>
 <ol>
-<li><strong>Shared default</strong> - <code>defaults.shape.radius</code> in <code>config.yml</code>. Applies to every region whose <code>shape</code> key is the literal <code>"@config"</code>. This is the right place on a single-world server: set it once.</li>
-<li><strong>Per region</strong> - replace <code>shape: "@config"</code> in <code>regions/&lt;name&gt;.yml</code> with an inline block. An inline block wins over the shared default and must be complete (copy the <code>defaults.shape</code> block from <code>config.yml</code> and edit it).
+<li><strong>Browser map workspace (<code>/rtp editor</code>) or guided setup (<code>/rtp admin setup</code>)</strong> - The recommended first choice: drag the region border visually on the map in <code>/rtp editor</code> (or pick a distance preset in <code>/rtp admin setup</code>) and apply the diff directly to <code>definitions/regions/&lt;name&gt;.yml</code>.</li>
+<li><strong>Per region (<code>definitions/regions/&lt;name&gt;.yml</code> or <code>/rtp config regions &lt;name&gt;</code>)</strong> - Run <code>/rtp config regions &lt;region&gt; shape.radius=5000b</code> (add <code>--dry-run</code> to preview), or replace <code>shape: "@config"</code> in <code>definitions/regions/&lt;name&gt;.yml</code> with an inline <code>shape:</code> block:
    <div class="highlight"><pre><span></span><code><span class="nt">shape</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;CIRCLE&quot;</span>
 <span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ACCUMULATE&quot;</span>
-<span class="w">  </span><span class="nt">radius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">625</span><span class="w">          </span><span class="c1"># 10,000 blocks from the center</span>
-<span class="w">  </span><span class="nt">centerRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span><span class="w">     </span><span class="c1"># keep players 1,024+ blocks away from the center</span>
+<span class="w">  </span><span class="nt">radius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5000b</span><span class="w">        </span><span class="c1"># 5,000 blocks from the center (or 5km / 312c)</span>
+<span class="w">  </span><span class="nt">centerRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024b</span><span class="w">  </span><span class="c1"># keep players 1,024+ blocks away from the center</span>
 <span class="w">  </span><span class="nt">centerX</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="w">  </span><span class="nt">centerZ</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="w">  </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
 <span class="w">  </span><span class="nt">uniquePlacements</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="w">  </span><span class="nt">expand</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div></li>
-<li><strong>Persistent edit from in-game</strong> - <code>/rtp config regions &lt;region&gt; shape.radius=625</code> writes the value to the region file. Add <code>--dry-run</code> to preview it first.</li>
-<li><strong>One-off teleport</strong> - <code>/rtp region=default shape=SQUARE radius=256</code> applies to that teleport only and changes nothing on disk.</li>
+<li><strong>Starter fallback (<code>defaults.shape.radius</code> in <code>config.yml</code>)</strong> - Applies only to regions whose <code>shape</code> key is still the literal <code>"@config"</code> fallback token.</li>
+<li><strong>One-off test teleport</strong> - <code>/rtp region=default shape=SQUARE radius=256c</code> applies to that single test teleport only (<code>rtp.params</code>) and changes nothing on disk.</li>
 </ol>
 <p>Changing a radius invalidates cached locations for that region, so the first few <code>/rtp</code> calls afterwards may be slower while the cache refills.</p>
 <h3 id="common-shape-keys">Common Shape Keys<a class="headerlink" href="#common-shape-keys" title="Permanent link">&para;</a></h3>
@@ -5147,34 +5310,22 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 </blockquote>
 <h4 id="circle-square"><code>CIRCLE</code> / <code>SQUARE</code><a class="headerlink" href="#circle-square" title="Permanent link">&para;</a></h4>
 <p>Standard shapes with uniform or weighted distribution.
-- <code>radius</code>: Outer radius in <strong>chunks</strong>. For <code>CIRCLE</code> it is the disk radius; for <code>SQUARE</code> it is the half-extent, so the square spans <code>2 x radius</code> chunks per side.
-- <code>centerRadius</code>: Inner radius (donut hole) in <strong>chunks</strong>. Must be less than <code>radius</code>. <code>CIRCLE</code> becomes a ring, <code>SQUARE</code> becomes a square frame.
+- <code>radius</code>: Outer radius in <strong>chunks</strong> (or with a spatial unit suffix like <code>5000b</code> or <code>10km</code>). For <code>CIRCLE</code> it is the disk radius; for <code>SQUARE</code> it is the half-extent, so the square spans <code>2 x radius</code> chunks per side.
+- <code>centerRadius</code>: Inner radius (donut hole) in <strong>chunks</strong> (or with a spatial unit suffix like <code>1000b</code>). Must be less than <code>radius</code>. <code>CIRCLE</code> becomes a ring, <code>SQUARE</code> becomes a square frame.
 - <code>weight</code>: <code>&gt; 1.0</code> pulls landings toward center; <code>&lt; 1.0</code> pushes toward edges. Applies within the <code>centerRadius</code>-to-<code>radius</code> band; it does not move the bounds themselves.
 - <code>expand</code>: If true, radius grows as locations are used.</p>
-<h4 id="circle_optimized_dual_layer-square_optimized_dual_layer"><code>CIRCLE_OPTIMIZED_DUAL_LAYER</code> / <code>SQUARE_OPTIMIZED_DUAL_LAYER</code><a class="headerlink" href="#circle_optimized_dual_layer-square_optimized_dual_layer" title="Permanent link">&para;</a></h4>
-<p>Variants of <code>CIRCLE</code> and <code>SQUARE</code> that use less memory at one-chunk precision and pick locations faster (2x-11x in my benchmarks under <code>ACCUMULATE</code> mode).
-- Accepts the exact same parameters as <code>CIRCLE</code> and <code>SQUARE</code> (<code>radius</code>, <code>centerRadius</code>, <code>centerX</code>, <code>centerZ</code>, <code>weight</code>, <code>uniquePlacements</code>, <code>expand</code>, <code>mode</code>).</p>
-<h4 id="circle_deprecated_pure_spiral-square_deprecated_pure_spiral"><code>CIRCLE_DEPRECATED_PURE_SPIRAL</code> / <code>SQUARE_DEPRECATED_PURE_SPIRAL</code><a class="headerlink" href="#circle_deprecated_pure_spiral-square_deprecated_pure_spiral" title="Permanent link">&para;</a></h4>
-<p>Legacy pure 1D Archimedean spiral mapping shapes.
-- Preserved for backwards compatibility, regression testing, and side-by-side benchmarks against the newer shapes.
-- Accepts identical parameters to <code>CIRCLE</code> and <code>SQUARE</code>.</p>
-<h4 id="circle_normal-square_normal"><code>CIRCLE_NORMAL</code> / <code>SQUARE_NORMAL</code><a class="headerlink" href="#circle_normal-square_normal" title="Permanent link">&para;</a></h4>
-<p>Gaussian distribution variants.
-- <code>radius</code> / <code>centerRadius</code>: Same as above - still chunks, still the hard outer and inner bounds.
-- <code>mean</code>: Center of the bell curve, expressed as a fraction of the band (0.0 = at <code>centerRadius</code>, 1.0 = at <code>radius</code>).
-- <code>deviation</code>: Spread of the bell curve. Smaller = tighter clustering around <code>mean</code>.</p>
 <h4 id="ellipse"><code>ELLIPSE</code><a class="headerlink" href="#ellipse" title="Permanent link">&para;</a></h4>
 <p>A circle with independent X and Z semi-axes, so it can cover a non-square world border without wasting a corner.
-- <code>radius</code> / <code>radius2</code>: The two outer semi-axes in <strong>chunks</strong>. The wider of the two sets the bounding circle the spiral mapping walks; the ellipse predicate rejects everything outside the true ellipse.
+- <code>radius</code> / <code>radius2</code>: The two outer semi-axes in <strong>chunks</strong> (supports spatial suffixes). The wider of the two sets the bounding circle the spiral mapping walks; the ellipse predicate rejects everything outside the true ellipse.
 - <code>centerRadius</code> / <code>centerRadius2</code>: The two semi-axes of the inner exclusion ellipse, also in <strong>chunks</strong>. Both default to <code>0</code> (no hole).
 - <code>rotation</code>: Rotation of both the outer and inner ellipse in degrees around <code>centerX</code> / <code>centerZ</code>.
 - <code>weight</code>, <code>uniquePlacements</code>, <code>expand</code>, <code>mode</code>, <code>centerX</code>, <code>centerZ</code>: Same meaning as <code>CIRCLE</code>.</p>
 <h4 id="rectangle"><code>RECTANGLE</code><a class="headerlink" href="#rectangle" title="Permanent link">&para;</a></h4>
 <p>Uses explicit side lengths instead of a radius.
-- <code>width</code> / <code>height</code>: Full X-axis and Z-axis extent in <strong>chunks</strong>, centred on <code>centerX</code> / <code>centerZ</code> (so <code>width: 256</code> reaches 128 chunks / 2,048 blocks either side). There is no <code>centerRadius</code> hole for this shape.
+- <code>width</code> / <code>height</code>: Full X-axis and Z-axis extent in <strong>chunks</strong> (supports spatial suffixes), centred on <code>centerX</code> / <code>centerZ</code> (so <code>width: 4096b</code> or <code>256c</code> reaches 128 chunks / 2,048 blocks either side). There is no <code>centerRadius</code> hole for this shape.
 - <code>rotation</code>: Rotation in degrees around the center.</p>
 <h4 id="polygon"><code>POLYGON</code><a class="headerlink" href="#polygon" title="Permanent link">&para;</a></h4>
-<p>An arbitrary closed boundary, including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
+<p>An arbitrary closed boundary (such as a triangle, pentagon, hexagon, octagon, or custom map border), including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
 - <code>vertices</code>: List of <code>[x, z]</code> pairs in traversal order, written Chunky-style - one bracketed pair per list item:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">shape</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POLYGON</span>
@@ -5190,6 +5341,20 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 - <code>centerX</code> / <code>centerZ</code>: Optional. Defaults to the center of the vertex bounding box.
 - <code>weight</code>, <code>uniquePlacements</code>, <code>mode</code>: Same meaning as <code>SQUARE</code>.
 - <code>expand</code> is not supported here and is ignored (with a warning if set) - the boundary is yours, and expanding it would push selections outside the polygon you authored.</p>
+<details>
+<summary><b>Advanced / Legacy Benchmark Shape Aliases (Optional)</b></summary>
+
+Normal server setups only need `CIRCLE`, `SQUARE`, `RECTANGLE`, `ELLIPSE`, or `POLYGON`. The variants below exist for bell-curve customization, legacy config migration, or side-by-side benchmark runs:
+
+- **`CIRCLE_NORMAL` / `SQUARE_NORMAL`**: Gaussian distribution variants.
+  - `radius` / `centerRadius`: Same as `CIRCLE` / `SQUARE` (hard outer and inner bounds).
+  - `mean`: Center of the bell curve, expressed as a fraction of the band (`0.0` = at `centerRadius`, `1.0` = at `radius`).
+  - `deviation`: Spread of the bell curve. Smaller = tighter clustering around `mean`.
+- **`CIRCLE_OPTIMIZED_DUAL_LAYER` / `SQUARE_OPTIMIZED_DUAL_LAYER`**: Explicit aliases for the default `CIRCLE` and `SQUARE` dual-layer engine. Accepts the exact same parameters as `CIRCLE` and `SQUARE` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
+- **`CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL`**: Legacy v1/v2 pure 1D Archimedean spiral mapping shapes, preserved for backwards compatibility, regression testing, and side-by-side benchmarks. Accepts identical parameters to `CIRCLE` and `SQUARE`.
+
+</details>
+
 <hr />
 <h2 id="vert-section"><code>vert</code> Section<a class="headerlink" href="#vert-section" title="Permanent link">&para;</a></h2>
 <p>The <code>vert</code> block controls the Y-coordinate (height) selection.</p>
@@ -5198,6 +5363,66 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 <li><code>name</code>: The vertical adjustor engine.</li>
 <li><code>minY</code> / <code>maxY</code>: The allowed Y-range for teleportation.</li>
 <li><code>requireSkyLight</code>: If true, only accepts locations with direct access to the sky (surface-only).</li>
+<li><code>maxSlope</code> (<code>LINEAR</code> and <code>JUMP</code> only): Largest floor-height step, in blocks, allowed between the landing spot and the floor <code>slopeRadius</code> blocks away to the north, south, east and west. A spot that fails is skipped and the search continues with the next height or column. Omit it, or set <code>-1</code>, to turn the check off. <code>0</code> accepts only flat ground.</li>
+<li><code>slopeRadius</code> (<code>LINEAR</code> and <code>JUMP</code> only): How far from the landing spot the floor is sampled. Default <code>2</code>, range <code>1</code>-<code>8</code>.</li>
+</ul>
+<h4 id="slope-check-details-maxslope">Slope check details (<code>maxSlope</code>)<a class="headerlink" href="#slope-check-details-maxslope" title="Permanent link">&para;</a></h4>
+<ul>
+<li>The check looks for the floor near the landing spot's own height (within <code>maxSlope</code> blocks up or down), not from the sky down. Cave roofs, the Nether ceiling and other cave layers are ignored, so it works underground and in the Nether.</li>
+<li>A sample with no floor within <code>maxSlope</code> blocks counts as too steep, so drops (cliff edges, ravines) and walls are both rejected.</li>
+<li><strong>Chunk-edge caveat:</strong> samples stay inside the landing spot's chunk. Near a chunk edge the samples on that side are moved inward or skipped, so steep ground just across the edge is not seen. Larger <code>slopeRadius</code> values make this more common.</li>
+<li>Adding, changing or removing <code>maxSlope</code> or <code>slopeRadius</code> rebuilds that region's saved location data once, because chunks rejected under the old setting may be fine under the new one.</li>
+<li>Steep terrain with a low <code>maxSlope</code> rejects more chunks, so selection can take longer. Raise <code>maxSlope</code> if <code>/rtp</code> starts failing in hilly regions.</li>
+<li><code>FIXED</code> ignores both keys: it places players in mid-air, where there is no floor to measure.</li>
+</ul>
+<h4 id="hillside-and-cliff-check-maxhillangle">Hillside and cliff check (<code>maxHillAngle</code>)<a class="headerlink" href="#hillside-and-cliff-check-maxhillangle" title="Permanent link">&para;</a></h4>
+<p><code>maxHillAngle</code> (<code>LINEAR</code> and <code>JUMP</code> only) is the steepest hill, in degrees, a player may land on. It ships as <code>"off"</code> in <code>defaults.vert</code> of <code>config.yml</code>, because the check costs search time.</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Refuses (26.3 test world, land spots)</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"off"</code> (default)</td>
+<td>nothing</td>
+<td>Fastest search; any terrain allowed.</td>
+</tr>
+<tr>
+<td><code>30</code></td>
+<td>about 1 in 5</td>
+<td>Gentle landings; refuses most hillsides and many cliff edges.</td>
+</tr>
+<tr>
+<td><code>45</code></td>
+<td>about 1 in 12</td>
+<td>Refuses steep slopes and cliff edges only.</td>
+</tr>
+<tr>
+<td><code>60</code></td>
+<td>about 1 in 60</td>
+<td>Refuses only near-vertical ground.</td>
+</tr>
+</tbody>
+</table>
+<p>Any number from <code>0</code> to <code>89</code> also works; <code>-1</code> means off, like <code>"off"</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">vert</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LINEAR&quot;</span>
+<span class="w">  </span><span class="c1"># Refuse landings on hillsides or cliff edges this steep or steeper, in degrees.</span>
+<span class="w">  </span><span class="c1"># &quot;off&quot; (fastest, default), 30, 45 or 60.</span>
+<span class="w">  </span><span class="nt">maxHillAngle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+</code></pre></div>
+<ul>
+<li><strong>What it looks at:</strong> the ground 16 blocks away in 8 directions, and the ground within 8 blocks of the landing spot, all inside the 3x3 chunks around the spot. A spot is refused when at least half of those directions rise or fall at <code>maxHillAngle</code> or more (a mountainside), or when the ground around the spot leans that steeply (a cliff edge or ledge).</li>
+<li><strong>Blocks only:</strong> it reads blocks, not the world generator, so it works the same with custom generators such as Iris or Terra. It follows the floor near the landing height, so it also works in caves and the Nether.</li>
+<li><strong>Where it runs:</strong> first on region files during the background search, then again on the chunks the server already has loaded around the spot. It never loads extra chunks. Ground it cannot see counts as unknown, not as steep.</li>
+<li><strong>Effect on search:</strong> with <code>selection_failure</code> logging on, refusals are listed as <code>terrain</code> and <code>prefilterTerrain</code> when a search gives up. Each region-file check reads about 2-3 chunks around the spot, so the background search does about 3-4 times the work per spot with the check on, and refused spots are picked again.</li>
+<li><strong>Platforms:</strong> every platform keeps at least the 3x3 chunks around a spot loaded, so the check behaves the same on Paper, Spigot, Folia, Fabric and NeoForge.</li>
+<li>Turning <code>maxHillAngle</code> on, off or to another angle rebuilds that region's saved location data once. <code>"off"</code>, <code>-1</code> and a missing key count as the same setting, so they don't.</li>
+<li><code>FIXED</code> ignores it, as it does <code>maxSlope</code>.</li>
 </ul>
 <h3 id="vert-engines-and-parameters">Vert Engines and Parameters<a class="headerlink" href="#vert-engines-and-parameters" title="Permanent link">&para;</a></h3>
 <h4 id="jump"><code>JUMP</code><a class="headerlink" href="#jump" title="Permanent link">&para;</a></h4>
@@ -5216,7 +5441,7 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 <p>Places the player at a single configured Y level in <strong>mid-air</strong>, with no terrain scan. Designed for skyblock-style worlds where the platform tool builds a foothold around the player after teleport.
 - <code>y</code>: The exact Y-level for placement. Default <code>64</code>.
 - The destination cell <code>(x, y, z)</code> and the head cell <code>(x, y+1, z)</code> must both be air; any non-air block at either cell is treated as unsafe and the chunk is rejected so a different one is rolled.
-- Ignores <code>minY</code>, <code>maxY</code>, <code>direction</code>, <code>requireSkyLight</code>, and the <code>unsafeBlocks</code> ground sweep — none of those apply to mid-air placement.
+- Ignores <code>minY</code>, <code>maxY</code>, <code>direction</code>, <code>requireSkyLight</code>, <code>maxSlope</code>, <code>slopeRadius</code>, and the <code>unsafeBlocks</code> ground sweep — none of those apply to mid-air placement.
 - <strong>Enable a platform builder</strong> when using <code>FIXED</code>. Without one the player will fall straight through air.</p>
 <hr />
 <h2 id="backlog-cache-l3">Backlog Cache (L3)<a class="headerlink" href="#backlog-cache-l3" title="Permanent link">&para;</a></h2>
@@ -5282,7 +5507,7 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -5307,6 +5532,8 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
     
     
       <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

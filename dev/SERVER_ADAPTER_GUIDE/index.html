@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Server Adapter Requirements & Implementation Guide - LeafRTP</title>
+        <title>Server Adapter Requirements & Implementation Guide - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -55,7 +55,8 @@
     
     
     
-  </head>
+  <meta name="robots" content="noindex, follow">
+</head>
   
   
     
@@ -88,7 +89,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -102,7 +103,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -359,13 +360,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -3351,11 +3352,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../../adr/ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
@@ -3981,6 +3982,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4100,9 +4269,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#platform-identity-compatibility" class="md-nav__link">
+  <a href="#common-server-identity-compatibility-logging" class="md-nav__link">
     <span class="md-ellipsis">
-      Platform Identity &amp; Compatibility
+      Common Server Identity, Compatibility &amp; Logging
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-specific-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      RTP-Specific Services
     </span>
   </a>
   
@@ -4438,9 +4616,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#93-rtp-api-platformfamily-registration" class="md-nav__link">
+  <a href="#93-server-api-platformfamily-registration" class="md-nav__link">
     <span class="md-ellipsis">
-      9.3 rtp-api PlatformFamily Registration
+      9.3 server-api PlatformFamily Registration
     </span>
   </a>
   
@@ -4650,7 +4828,7 @@
 <tr>
 <td><strong>S-005</strong></td>
 <td><strong>Zero synchronous chunk loads on tick threads</strong></td>
-<td><code>RTPWorld#getChunkAtAsync()</code> must NEVER call synchronous <code>world.getChunkAt()</code> or blocking <code>.get()</code> on the main/tick thread. Off-tick Anvil reading (<a href="ADR-016-anvil-subsystem.md">ADR-016</a>) must be utilized for ungenerated or unloaded pre-filtering.</td>
+<td><code>RTPWorld#getChunkAtAsync()</code> must NEVER call synchronous <code>world.getChunkAt()</code> or blocking <code>.get()</code> on the main/tick thread. Off-tick Anvil reading (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>) must be utilized for ungenerated or unloaded pre-filtering.</td>
 </tr>
 <tr>
 <td><strong>S-006</strong></td>
@@ -4676,7 +4854,7 @@
 along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>).</p>
 <hr />
 <h3 id="31-rtpserveraccessor">3.1 <code>RTPServerAccessor</code><a class="headerlink" href="#31-rtpserveraccessor" title="Permanent link">&para;</a></h3>
-<p><code>io.github.dailystruggle.rtp.api.server.RTPServerAccessor</code> is the central service locator and lifecycle gateway instantiated and bound by the platform adapter on startup.</p>
+<p><code>io.github.dailystruggle.rtp.api.server.RTPServerAccessor</code> is the central service locator and lifecycle gateway instantiated and bound by the platform adapter on startup. It extends the platform-neutral <code>io.github.dailystruggle.server.api.ServerAccessor</code> from <code>api/server-api</code>.</p>
 <h4 id="lifecycle-subsystems">Lifecycle &amp; Subsystems<a class="headerlink" href="#lifecycle-subsystems" title="Permanent link">&para;</a></h4>
 <ul>
 <li><code>void start()</code> / <code>void start(Object pluginHandle)</code></li>
@@ -4695,17 +4873,23 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li><code>PlayerLifecycleHook getPlayerLifecycleHook()</code></li>
 <li><strong>Purpose:</strong> Returns the platform-agnostic lifecycle hook that dispatches player join, quit, and teleportation events.</li>
 </ul>
-<h4 id="platform-identity-compatibility">Platform Identity &amp; Compatibility<a class="headerlink" href="#platform-identity-compatibility" title="Permanent link">&para;</a></h4>
+<h4 id="common-server-identity-compatibility-logging">Common Server Identity, Compatibility &amp; Logging<a class="headerlink" href="#common-server-identity-compatibility-logging" title="Permanent link">&para;</a></h4>
+<p>These methods are declared by <code>ServerAccessor</code> and are available through <code>RTPServerAccessor</code>:
+- <code>String getServerVersion()</code>
+  - <strong>Purpose:</strong> Returns the server-reported version string (e.g. <code>"git-Paper-400 (MC: 1.21.1)"</code>).
+- <code>String getPlatform()</code>
+  - <strong>Purpose:</strong> Returns a platform identifier such as <code>"paper"</code>, <code>"folia"</code>, <code>"fabric"</code>, or <code>"neoforge"</code>.
+- <code>Integer getServerIntVersion()</code>
+  - <strong>Purpose:</strong> Normalized integer version (e.g. <code>20</code> for 1.20.x, <code>21</code> for 1.21.x) for quick version gating.
+- <code>PlatformFamily getPlatformFamily()</code>
+  - <strong>Purpose:</strong> Returns <code>BUKKIT</code>, <code>FABRIC</code>, <code>NEOFORGE</code>, or <code>UNKNOWN</code>; Bukkit-derived platforms including Paper and Folia use <code>BUKKIT</code>.
+  - <strong>Usage:</strong> Used by addons and core for platform-aware capability gating.
+- <code>boolean isCompatible(PlatformFamily family, int minVersion, int maxVersion)</code>
+  - <strong>Purpose:</strong> Compatibility check for addons to verify if the server platform satisfies their requirements.
+- <code>void log(Level level, String message)</code> / <code>void log(Level level, String message, Throwable throwable)</code>
+  - <strong>Purpose:</strong> Writes through the platform's server logger; <code>ServerAccessors.log(...)</code> uses a generic logger before the accessor is installed.</p>
+<h4 id="rtp-specific-services">RTP-Specific Services<a class="headerlink" href="#rtp-specific-services" title="Permanent link">&para;</a></h4>
 <ul>
-<li><code>String getServerVersion()</code></li>
-<li><strong>Purpose:</strong> Returns human-readable platform string (e.g. <code>"Paper 1.21.4"</code>, <code>"Fabric 1.21.1"</code>).</li>
-<li><code>int getServerIntVersion()</code></li>
-<li><strong>Purpose:</strong> Normalized integer version (e.g. <code>20</code> for 1.20.x, <code>21</code> for 1.21.x) for quick version gating.</li>
-<li><code>PlatformFamily getPlatformFamily()</code></li>
-<li><strong>Purpose:</strong> Returns enum: <code>BUKKIT</code>, <code>PAPER</code>, <code>FOLIA</code>, <code>FABRIC</code>, <code>NEOFORGE</code>, <code>VELOCITY</code>, or <code>BUNGEECORD</code>.</li>
-<li><strong>Usage:</strong> Used by addons and core for platform-aware capability gating.</li>
-<li><code>boolean isCompatible(PlatformFamily family, int minVersion, int maxVersion)</code></li>
-<li><strong>Purpose:</strong> Compatibility check for addons to verify if the server platform satisfies their requirements.</li>
 <li><code>File getPluginDirectory()</code></li>
 <li><strong>Purpose:</strong> Returns the base directory where <code>config.yml</code>, <code>regions.yml</code>, and <code>messages.yml</code> reside.</li>
 <li><code>Object getPlugin()</code></li>
@@ -4828,7 +5012,7 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li><code>void releaseOrphanedTickets(Set&lt;Long&gt; keepAliveKeys)</code></li>
 <li><strong>Purpose:</strong> Memory hygiene garbage collection hook called by <code>MemoryTracker</code>. Any ticket key not present in <code>keepAliveKeys</code> must be freed.</li>
 </ul>
-<h4 id="off-tick-anvil-mca-file-access-adr-016">Off-Tick Anvil / MCA File Access (<a href="ADR-016-anvil-subsystem.md">ADR-016</a>)<a class="headerlink" href="#off-tick-anvil-mca-file-access-adr-016" title="Permanent link">&para;</a></h4>
+<h4 id="off-tick-anvil-mca-file-access-adr-016">Off-Tick Anvil / MCA File Access (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>)<a class="headerlink" href="#off-tick-anvil-mca-file-access-adr-016" title="Permanent link">&para;</a></h4>
 <ul>
 <li><code>Path anvilWorldFolder()</code></li>
 <li><strong>Purpose:</strong> Path to the world save folder containing the <code>region/</code> directory. Enables off-tick Anvil prefiltering without live chunk loads.</li>
@@ -4844,9 +5028,9 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li><code>void platform(RTPLocation location)</code></li>
 <li><strong>Purpose:</strong> Places an emergency landing platform if the landing site is over water or in the air.</li>
 <li><code>boolean restoreBlocks(List&lt;BlockDelta&gt; blocks)</code></li>
-<li><strong>Purpose:</strong> Restores original terrain after emergency platform timeout (<a href="ADR-060-emergency-platform-block-restoration-timeout.md">ADR-060</a>).</li>
+<li><strong>Purpose:</strong> Restores original terrain after emergency platform timeout (<a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/">ADR-060</a>).</li>
 <li><code>int setBlocks(List&lt;BlockDelta&gt; blocks)</code> / <code>restoreBlockEntities(List&lt;PlacedBlockEntity&gt; entities)</code></li>
-<li><strong>Purpose:</strong> Bulk block and block-entity writes for schematic pasting (<a href="ADR-058-schematic-paster-spi.md">ADR-058</a>).</li>
+<li><strong>Purpose:</strong> Bulk block and block-entity writes for schematic pasting (<a href="../../adr/ADR-058-region-specific-schematic-paste/">ADR-058</a>).</li>
 </ul>
 <hr />
 <h3 id="34-rtpchunkt">3.4 <code>RTPChunk&lt;T&gt;</code><a class="headerlink" href="#34-rtpchunkt" title="Permanent link">&para;</a></h3>
@@ -4873,7 +5057,7 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li><strong>Purpose:</strong> Evaluates destination safety.</li>
 <li><strong>Rule S-001:</strong> If the block material name is null, empty, or unresolvable, it MUST return <code>false</code> (fail-closed).</li>
 <li><code>boolean isSafe(int localX, int worldY, int localZ, CompiledUnsafeSet unsafeBlocks)</code></li>
-<li><strong>Purpose:</strong> Optimized compiled check (<a href="ADR-017-block-tags-and-state-predicates-in-safety-lists.md">ADR-017</a>) supporting block tags and block-state properties.</li>
+<li><strong>Purpose:</strong> Optimized compiled check (<a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/">ADR-017</a>) supporting block tags and block-state properties.</li>
 <li><code>boolean isSelfContained()</code></li>
 <li><strong>Purpose:</strong> Returns <code>true</code> if the chunk is backed by off-tick preformed data (e.g. <code>AnvilChunkView</code>) and requires zero live chunk I/O.</li>
 </ul>
@@ -4901,7 +5085,7 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li><code>boolean isOnline()</code></li>
 <li><strong>Purpose:</strong> Returns whether the player is currently connected. Safe to call from any thread.</li>
 <li><code>void setRespawnLocation(RTPLocation location)</code></li>
-<li><strong>Purpose:</strong> Sets the player's respawn anchor / bed location (<a href="ADR-023-login-reserve-cache.md">ADR-023</a>).</li>
+<li><strong>Purpose:</strong> Sets the player's respawn anchor / bed location (<a href="../../adr/ADR-023-login-reserve-cache/">ADR-023</a>).</li>
 </ul>
 <h4 id="client-visuals-hud-optional-enhanced-capabilities">Client Visuals &amp; HUD (Optional / Enhanced Capabilities)<a class="headerlink" href="#client-visuals-hud-optional-enhanced-capabilities" title="Permanent link">&para;</a></h4>
 <ul>
@@ -4912,7 +5096,7 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li><code>void showProgressBar(String id, String title, double progress)</code> / <code>clearProgressBar(String id)</code></li>
 <li><strong>Purpose:</strong> Displays a native boss-bar or progress bar during teleport warmups or queue generation.</li>
 <li><code>int getViewDistance()</code> / <code>void setViewDistance(int distance)</code></li>
-<li><strong>Purpose:</strong> Gets or tunes the player's server tracking chunk radius (<a href="ADR-072-teleport-pre-load-view-distance.md">ADR-072</a>).</li>
+<li><strong>Purpose:</strong> Gets or tunes the player's server tracking chunk radius (<a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/">ADR-072</a>).</li>
 <li><code>int getSendViewDistance()</code> / <code>void setSendViewDistance(int distance)</code></li>
 <li><strong>Purpose:</strong> Gets or tunes client render chunk distance independently of server tracking.</li>
 </ul>
@@ -4946,7 +5130,7 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li><strong>Player Join:</strong></li>
 <li>Call <code>accessor.registerPlayer(nativePlayer)</code>.</li>
 <li>Call <code>playerLifecycleHook.fireJoinFromPlayer(nativePlayer)</code>.</li>
-<li>On default world, check for Login Reserve Cache refill (<a href="ADR-023-login-reserve-cache.md">ADR-023</a>).</li>
+<li>On default world, check for Login Reserve Cache refill (<a href="../../adr/ADR-023-login-reserve-cache/">ADR-023</a>).</li>
 <li><strong>Player Quit:</strong></li>
 <li>Call <code>playerLifecycleHook.fireQuitFromPlayer(nativePlayer)</code>.</li>
 <li>Cancel any pending <code>TeleportPipelineTask</code> for that player via <code>MemoryTracker</code>.</li>
@@ -4983,7 +5167,7 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li>Always check <code>RTPScheduler#isOwnedByCurrentRegion</code> before touching world blocks or entity state.</li>
 <li>Coordinate transitions using <code>runAtLocation</code> and <code>runAtEntity</code>.</li>
 <li>Vault and global economy calls must be offloaded to <code>GlobalRegionScheduler</code> or async pools.</li>
-<li>Use <code>CountBoundTaskPipe</code> (<a href="ADR-015-stale-chunk-guard-countbound-pipes.md">ADR-015</a>) to bound per-pulse slice work on region threads.</li>
+<li>Use <code>CountBoundTaskPipe</code> (<a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>) to bound per-pulse slice work on region threads.</li>
 </ul>
 <hr />
 <h2 id="5-chunk-ticket-lifecycle-leak-prevention-memorytracker">5. Chunk Ticket Lifecycle &amp; Leak Prevention (MemoryTracker)<a class="headerlink" href="#5-chunk-ticket-lifecycle-leak-prevention-memorytracker" title="Permanent link">&para;</a></h2>
@@ -5016,6 +5200,12 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><strong><code>server-api</code></strong></td>
+<td><code>api/server-api</code></td>
+<td>Server identity, platform family and logging</td>
+<td>Implement the neutral <code>ServerAccessor</code> contract through the RTP server accessor.</td>
+</tr>
 <tr>
 <td><strong><code>metrics-api</code></strong></td>
 <td><code>api/metrics-api</code></td>
@@ -5055,7 +5245,7 @@ along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>
 <li>[ ] <strong>1. Module &amp; Repo Setup:</strong></li>
 <li>Create <code>platforms/rtp-&lt;platform&gt;</code> directory.</li>
 <li>Add <code>include 'rtp-&lt;platform&gt;'</code> (or version submodules) to <code>settings.gradle</code> and assign <code>project(':rtp-&lt;platform&gt;').projectDir = file('platforms/rtp-&lt;platform&gt;')</code>.</li>
-<li>Add new platform identifier to <code>io.github.dailystruggle.rtp.api.server.PlatformFamily</code> enum in <code>rtp-api</code>.</li>
+<li>Add new platform identifier to <code>io.github.dailystruggle.server.api.PlatformFamily</code> enum in <code>server-api</code>.</li>
 <li>Configure <code>build.gradle</code> targeting Java 21+ with <code>api project(':rtp-api')</code>, <code>implementation project(':rtp-core')</code>, and <code>compileOnly project(':commands-api')</code>. Ensure zero platform imports leak into <code>rtp-core</code>.</li>
 <li>[ ] <strong>2. Scheduler Implementation:</strong></li>
 <li>Implement <code>RTPScheduler</code> (synchronous tick dispatch, asynchronous thread pool, delayed/repeating tasks).</li>
@@ -5168,8 +5358,8 @@ If the new platform relies on specialized build plugins (e.g. Loom, ModDevGradle
 </code></pre></div></p>
 </li>
 </ol>
-<h3 id="93-rtp-api-platformfamily-registration">9.3 <code>rtp-api</code> PlatformFamily Registration<a class="headerlink" href="#93-rtp-api-platformfamily-registration" title="Permanent link">&para;</a></h3>
-<p>Every platform adapter must have a recognized entry in <code>io.github.dailystruggle.rtp.api.server.PlatformFamily</code>:</p>
+<h3 id="93-server-api-platformfamily-registration">9.3 <code>server-api</code> PlatformFamily Registration<a class="headerlink" href="#93-server-api-platformfamily-registration" title="Permanent link">&para;</a></h3>
+<p>Every platform adapter must have a recognized entry in <code>io.github.dailystruggle.server.api.PlatformFamily</code>:</p>
 <p><div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">PlatformFamily</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">BUKKIT</span><span class="p">,</span>
 <span class="w">    </span><span class="n">PAPER</span><span class="p">,</span>
@@ -5220,7 +5410,7 @@ Ensure your <code>RTPServerAccessor#getPlatformFamily()</code> returns this cons
 <p>LeafRTP supports two distribution paradigms for platform adapters:</p>
 <ol>
 <li><strong>Unified Multi-Loader JAR (<code>rtp-plugin</code>):</strong></li>
-<li>For server modloaders where operators expect a single release jar that boots across loaders (Bukkit, Paper, Folia, Fabric, NeoForge, Velocity per <strong>ADR-022</strong> and <strong>ADR-036</strong>).</li>
+<li>For server modloaders where operators expect a single release jar that boots across loaders (Bukkit, Paper, Folia, Fabric, NeoForge, Velocity per <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>, <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>, and <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a>).</li>
 <li>In <code>rtp-plugin/build.gradle</code>, add <code>implementation project(':rtp-&lt;platform&gt;')</code> (or merge post-remap bytecode).</li>
 <li>Include the loader descriptor file (<code>plugin.yml</code>, <code>fabric.mod.json</code>, <code>neoforge.mods.toml</code>, <code>velocity-plugin.json</code>) in <code>rtp-plugin/src/main/resources/</code>.</li>
 <li><strong>Standalone Platform Artifact / Library:</strong></li>
@@ -5356,7 +5546,7 @@ Understanding the architectural boundary between the <strong>Platform Host Adapt
 <tr>
 <td><strong>Region File Formats</strong></td>
 <td><code>RegionFormatRegistry.register(...)</code></td>
-<td>Adding support for <code>.linear</code> region files (<a href="ADR-077-multi-format-region-support.md">ADR-077</a>) or custom compressed world formats.</td>
+<td>Adding support for <code>.linear</code> region files (<a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>) or custom compressed world formats.</td>
 </tr>
 <tr>
 <td><strong>Visual &amp; Particle Effects</strong></td>
@@ -5381,7 +5571,7 @@ Understanding the architectural boundary between the <strong>Platform Host Adapt
 <tr>
 <td><strong>Declarative Actions</strong></td>
 <td><code>ActionManager.registerAction(...)</code></td>
-<td>Custom scripted actions on pre/post teleport (<a href="ADR-093-declarative-scripted-actions.md">ADR-093</a>).</td>
+<td>Custom scripted actions on pre/post teleport (<a href="../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/">ADR-093</a>).</td>
 </tr>
 </tbody>
 </table>
@@ -5524,7 +5714,7 @@ Create <code>src/main/resources/META-INF/services/io.github.dailystruggle.rtp.ap
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -5549,6 +5739,8 @@ Create <code>src/main/resources/META-INF/services/io.github.dailystruggle.rtp.ap
     
     
       <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

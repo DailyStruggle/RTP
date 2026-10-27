@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
@@ -26,7 +26,7 @@
     
     
       
-        <title>Commands - LeafRTP</title>
+        <title>Commands - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,7 +106,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -365,13 +365,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -734,6 +734,42 @@
   <a href="#rtp-action-declarative-scripted-actions" class="md-nav__link">
     <span class="md-ellipsis">
       /rtp action — Declarative Scripted Actions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-back-return-to-previous-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp back — Return to Previous Location
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-menu-rtp-gui-rtp-admin-and-rtp-admin-setup-interactive-menus-setup-wizard" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp menu, /rtp gui, /rtp admin, and /rtp admin setup — Interactive Menus &amp; Setup Wizard
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-clear-clear-runtime-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp clear — Clear Runtime State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-visualization-map-charts-diagnostic-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp visualization — Map Charts &amp; Diagnostic Exports
     </span>
   </a>
   
@@ -3567,11 +3603,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../../adr/ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
@@ -4197,6 +4233,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4374,6 +4578,42 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rtp-back-return-to-previous-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp back — Return to Previous Location
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-menu-rtp-gui-rtp-admin-and-rtp-admin-setup-interactive-menus-setup-wizard" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp menu, /rtp gui, /rtp admin, and /rtp admin setup — Interactive Menus &amp; Setup Wizard
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-clear-clear-runtime-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp clear — Clear Runtime State
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-visualization-map-charts-diagnostic-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp visualization — Map Charts &amp; Diagnostic Exports
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rtp-editor-web-workspace-configuration-editor" class="md-nav__link">
     <span class="md-ellipsis">
       /rtp editor — Web Workspace &amp; Configuration Editor
@@ -4431,7 +4671,7 @@
 <p>All RTP commands are subcommands of <code>/rtp</code>. Parameters are passed in <code>key=value</code> format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.</p>
 <hr />
 <h2 id="rtp-random-teleport"><code>/rtp</code> — Random Teleport<a class="headerlink" href="#rtp-random-teleport" title="Permanent link">&para;</a></h2>
-<p>Initiates a random teleportation sequence for the executing player (or a named target). Guards (permission, cooldown, duplicate-processing, reload-lock) run synchronously on the calling thread; the location search and teleport pipeline are dispatched asynchronously and never block the main server thread.</p>
+<p>Initiates a random teleportation sequence for the executing player (or a named target). Alias: <code>/wild</code>. Guards (permission, cooldown, duplicate-processing, reload-lock) run synchronously on the calling thread; the location search and teleport pipeline are dispatched asynchronously and never block the main server thread.</p>
 <p><strong>Syntax</strong>
 <div class="highlight"><pre><span></span><code>/rtp
 /rtp [player=&lt;name&gt;] [world=&lt;name&gt;] [region=&lt;name&gt;]
@@ -4456,30 +4696,30 @@
 <td><em>(none)</em></td>
 <td>—</td>
 <td><code>rtp.use</code></td>
-<td>Teleport the executing player using the default region for their current world.</td>
+<td>Teleport the executing player using the default region for their current world (or open the GUI picker when the GUI addon is installed and <code>openOnBareRtp</code> is enabled).</td>
 </tr>
 <tr>
 <td><code>player=&lt;name&gt;</code></td>
 <td>String (online player name)</td>
-<td><code>rtp.use</code></td>
+<td><code>rtp.other</code></td>
 <td>Teleport a named online player instead of (or in addition to) yourself. Repeat for multiple targets: <code>player=Alice player=Bob</code>.</td>
 </tr>
 <tr>
 <td><code>world=&lt;name&gt;</code></td>
 <td>String (loaded world name)</td>
-<td><code>rtp.use</code></td>
+<td><code>rtp.world</code> / <code>rtp.worlds.&lt;name&gt;</code></td>
 <td>Derive the target region from this world's configuration rather than the sender's current world. Ignored when <code>region</code> is also supplied.</td>
 </tr>
 <tr>
 <td><code>region=&lt;name&gt;</code></td>
 <td>String (region name)</td>
-<td><code>rtp.use</code></td>
+<td><code>rtp.region</code> / <code>rtp.regions.&lt;name&gt;</code></td>
 <td>Teleport into a specific, named region. Takes priority over <code>world</code>. Repeat for multiple values; one is chosen at random each time.</td>
 </tr>
 <tr>
 <td><code>biome=&lt;name&gt;</code></td>
 <td>String (Minecraft biome key, upper-case)</td>
-<td><code>rtp.use</code></td>
+<td><code>rtp.biome</code> / <code>rtp.biome.&lt;name&gt;</code></td>
 <td>Restrict the destination to locations inside the specified biome. Repeat to allow multiple biomes. Forces a fresh async search — pre-cached locations are not used.</td>
 </tr>
 <tr>
@@ -4567,15 +4807,15 @@
 <hr />
 <h2 id="rtp-config-edit-configuration-at-runtime"><code>/rtp config</code> — Edit Configuration at Runtime<a class="headerlink" href="#rtp-config-edit-configuration-at-runtime" title="Permanent link">&para;</a></h2>
 <p>Reads and writes individual keys in any loaded configuration file. One child sub-command is registered for every loaded <code>ConfigParser</code> and <code>MultiConfigParser</code> (file names with <code>.yml</code> stripped); tab-complete at position 1 enumerates the live set. Each successful write is <strong>atomic</strong> (temp + fsync + rename) and the affected parser is reloaded automatically — <code>/rtp reload</code> is only needed after hand-edits on disk.</p>
-<blockquote>
-<p>⚠️ <strong>Hardening in <code>3.0.0-beta.3</code>.</strong> This section describes the <strong>target</strong> behavior. Pre-beta.3 builds may still silently ignore unknown keys or skip validation; for production use on those builds, prefer hand-editing the YAML files followed by <code>/rtp reload</code>.</p>
-</blockquote>
 <p><strong>Syntax</strong>
 <div class="highlight"><pre><span></span><code>/rtp config &lt;file&gt; &lt;key&gt;=&lt;value&gt; [&lt;key&gt;=&lt;value&gt; …] [--dry-run]
 /rtp config &lt;file&gt; &lt;list-key&gt; add=&lt;value&gt; [add=&lt;value&gt; …] [remove=&lt;value&gt; …] [--dry-run]
 /rtp config &lt;multifile&gt; &lt;subfile&gt; &lt;key&gt;=&lt;value&gt; [--dry-run]
-/rtp config &lt;file&gt; view
-/rtp config &lt;file&gt; view &lt;key&gt; [&lt;key&gt; …]
+/rtp config &lt;regions|worlds&gt; add=&lt;name&gt;|remove=&lt;name&gt;
+/rtp config &lt;file&gt; view|viewraw [&lt;key&gt; …]
+/rtp config import [source] [path=&lt;dir&gt;] [overwrite=true]
+/rtp config import permissions [source] [apply=true]
+/rtp config language &lt;locale&gt;
 </code></pre></div></p>
 <p>One invocation targets <strong>exactly one</strong> file. Multiple <code>&lt;key&gt;=&lt;value&gt;</code> pairs (or <code>add=</code> / <code>remove=</code> operators on the same list key) within that file form one all-or-nothing transaction. The <code>--dry-run</code> token (default literal, configurable via <code>commands.config.dryRunFlag</code>) runs validation and renders the would-be diff without touching disk.</p>
 <p><strong>Required permissions</strong> (additive; the most-specific node wins):</p>
@@ -4615,19 +4855,35 @@
 <tbody>
 <tr>
 <td><code>/rtp config &lt;file&gt; &lt;key&gt;=&lt;value&gt;</code></td>
-<td>Set one or more scalar keys in the named config file. Validation is uniform; unknown keys, type mismatches, out-of-range values, and unknown region / world names are rejected with a <code>reasonCode</code> (see below) before any state mutates.</td>
+<td>Set one or more scalar keys in the named config file (dotted paths for nested keys, e.g. <code>/rtp config regions default shape.radius=10km</code>). Validation is uniform; unknown keys, type mismatches, out-of-range values, and unknown region / world names are rejected with a <code>reasonCode</code> (see below) before any state mutates.</td>
 </tr>
 <tr>
 <td><code>/rtp config &lt;file&gt; &lt;list-key&gt; add=&lt;value&gt;</code> / <code>remove=&lt;value&gt;</code></td>
 <td>Append to / remove from a YAML list field. Duplicate <code>add=</code> and <code>remove=</code> of non-members are no-ops, not failures.</td>
 </tr>
 <tr>
-<td><code>/rtp config &lt;file&gt; view</code></td>
-<td>Interactive read-only inspection of every key in the file. Each rendered entry carries hover-text (when YAML comments are available; this is a substrate-dependent best-effort) and a click-suggest action that pre-fills an update command. Degrades to plain text on consoles.</td>
+<td><code>/rtp config &lt;regions\|worlds&gt; add=&lt;name&gt;\|remove=&lt;name&gt;</code></td>
+<td>Create or delete a region or world file (<code>default</code> cannot be removed).</td>
+</tr>
+<tr>
+<td><code>/rtp config &lt;file&gt; view</code> / <code>viewraw</code></td>
+<td>Open a config file as an interactive book menu (<code>view</code>) or print its raw YAML to chat (<code>viewraw</code>). Each rendered entry in <code>view</code> carries hover-text and a click-suggest action that pre-fills an update command. Degrades to plain text on consoles.</td>
 </tr>
 <tr>
 <td><code>/rtp config &lt;file&gt; view &lt;key&gt;</code></td>
 <td>As above, but for one key (or one list-key's members).</td>
+</tr>
+<tr>
+<td><code>/rtp config import [source] [path=&lt;dir&gt;] [overwrite=true]</code></td>
+<td>Translate another RTP plugin's configuration (BetterRTP, JustRTP, or EzRTP; auto-detected in <code>plugins/</code>, or any folder via <code>path=&lt;dir&gt;</code>). Previews the translated config and never overwrites without <code>overwrite=true</code>.</td>
+</tr>
+<tr>
+<td><code>/rtp config import permissions [source] [apply=true]</code></td>
+<td>Dry-run the LuckPerms commands that copy BetterRTP, JustRTP, or EzRTP permission nodes onto <code>rtp.*</code>; pass <code>apply=true</code> to execute them.</td>
+</tr>
+<tr>
+<td><code>/rtp config language &lt;locale&gt;</code></td>
+<td>Switch configuration files and messages to a bundled locale, then reload every parser.</td>
 </tr>
 <tr>
 <td>trailing <code>--dry-run</code></td>
@@ -4812,7 +5068,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <hr />
 <h2 id="rtp-test-runtime-test-suite"><code>/rtp test</code> — Runtime Test Suite<a class="headerlink" href="#rtp-test-runtime-test-suite" title="Permanent link">&para;</a></h2>
 <p>Operator-facing self-test commands that exercise the teleport pipeline, queue, safety checks, verifiers, and scheduler against the live server.</p>
-<p><strong>Required permission:</strong> <code>rtp.test</code></p>
+<p><strong>Required permission:</strong> <code>rtp.test</code>; named <code>HEAVY</code> probes also require <code>rtp.test.mutating</code>.</p>
 <table>
 <thead>
 <tr>
@@ -4823,33 +5079,84 @@ The <code>scan</code> command is used to proactively map out the world. While th
 </thead>
 <tbody>
 <tr>
-<td><code>/rtp test stress player=&lt;name&gt; [iterations=N] [intervalTicks=T] [region=&lt;name&gt;]</code></td>
+<td><code>/rtp test stress [count=1-16] [iterations=N] [intervalTicks=T] [region=&lt;name&gt;]</code></td>
 <td>Available</td>
-<td>Repeatedly teleports the listed player(s) through the real <code>/rtp</code> pipeline. <code>iterations</code> is clamped to <code>[1, 1000]</code> (default <code>10</code>); <code>intervalTicks</code> to <code>[10, 6000]</code> (default <code>40</code>).</td>
+<td>Without <code>player=</code>, exercises the pipeline with registered mock players in the default region or the selected region. <code>count</code> defaults to <code>4</code>; <code>iterations</code> is clamped to <code>[1, 1000]</code> (default <code>10</code>).</td>
 </tr>
 <tr>
-<td><code>/rtp test queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code>, <code>full</code></td>
+<td><code>/rtp test stress player=&lt;name&gt; [iterations=N] [intervalTicks=T] [region=&lt;name&gt;]</code></td>
+<td>Available</td>
+<td>Retains real-player platform teleport checks; <code>intervalTicks</code> is clamped to <code>[10, 6000]</code> (default <code>40</code>). Its BIT component is <code>stress-player</code>.</td>
+</tr>
+<tr>
+<td><code>/rtp test queue-starvation [region=&lt;name&gt;] [samples=N]</code></td>
+<td>Available</td>
+<td>Bounded queue sampling; console uses the default region when <code>region=</code> is omitted. Requires <code>rtp.test.mutating</code>.</td>
+</tr>
+<tr>
+<td><code>/rtp test teleport-heatmap [region=&lt;name&gt;] [samples=N]</code></td>
+<td>Available</td>
+<td>Runs sequential mock teleports through the real pipeline and writes timestamped landing CSV/PNG files under the plugin data folder at <code>reports/adr-121/teleport-heatmap</code>; artifacts are not automatically pruned. <code>region</code> defaults to <code>default</code>; <code>samples</code> defaults to <code>64</code> and is clamped to <code>[1, 256]</code>. Requires <code>rtp.test.mutating</code>.</td>
+</tr>
+<tr>
+<td><code>/rtp test disconnect-midflight</code></td>
+<td>Available</td>
+<td>Verifies disconnect cleanup using a registered mock player when the default region world is loaded.</td>
+</tr>
+<tr>
+<td><code>/rtp test folia-ownership</code></td>
+<td>Available</td>
+<td>Checks the Folia region handoff using a mock player and the default region world.</td>
+</tr>
+<tr>
+<td><code>/rtp test async-reply [region=&lt;name&gt;]</code></td>
+<td>Available</td>
+<td>Exercises the pipeline reply with a mock player.</td>
+</tr>
+<tr>
+<td><code>/rtp test async-reply player=&lt;name&gt;</code></td>
+<td>Available</td>
+<td>Retains real-player reply-thread classification; its BIT component is <code>async-reply-player</code>.</td>
+</tr>
+<tr>
+<td><code>/rtp test hologram player=&lt;name&gt; [seconds=N]</code></td>
+<td>Available</td>
+<td>Spawns and closes a temporary player-visible hologram; console invocation reports provider status only.</td>
+</tr>
+<tr>
+<td><code>/rtp test action &lt;id&gt; [players=&lt;n&gt;] [script=&lt;violate,die,expire&gt;]</code></td>
+<td>Available</td>
+<td>Runs a simulation asynchronously with 1-16 synthetic players (default <code>2</code>); prints gate results/reasons and fully substituted commands with an explicit simulation notice, and dispatches nothing. Options use <code>=</code>; a bare first token is accepted as the action id.</td>
+</tr>
+<tr>
+<td><code>/rtp test queue</code>, <code>safety</code>, <code>verifiers</code>, <code>memory</code>, <code>platform</code></td>
 <td>Planned</td>
 <td>Not yet available.</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Examples</strong>
-<div class="highlight"><pre><span></span><code>/rtp test stress player=leaf26
+<div class="highlight"><pre><span></span><code>/rtp test stress count=4 iterations=3
+/rtp test stress player=leaf26
 /rtp test stress player=leaf26 iterations=50 intervalTicks=60
 /rtp test stress player=Alice player=Bob region=mining
+/rtp test teleport-heatmap
+/rtp test teleport-heatmap region=mining samples=128
+/rtp test async-reply player=Alice
+/rtp test hologram player=Alice seconds=10
+/rtp test action koth players=2 script=violate,expire
 </code></pre></div></p>
 <blockquote>
-<p><strong>Threading note:</strong> The stress loop runs asynchronously and delegates each iteration to the standard <code>/rtp</code> pipeline, so every safety guard (cooldown, economy, claim verifiers, async chunk I/O) remains active. Per-iteration failures are logged at <code>WARNING</code> in the server log.</p>
+<p><strong>Threading note:</strong> Mock stress, queue sampling, teleport heatmap sampling and action simulation run asynchronously; mock teleports still use the standard <code>/rtp</code> pipeline. Action simulation touches no live world or chunk and dispatches no command. Heatmap selection performs real asynchronous chunk I/O and records only the synthetic landings in <code>BitTeleportLog</code>; it does not alter ADR-104 <code>LandingHeatmap</code>. Real-player stress delegates each iteration to the standard pipeline, so normal safety guards remain active. Probe timeouts appear as <code>BIT_COMPONENT_TIMEOUT</code> in the BIT report.</p>
 </blockquote>
 <hr />
 <h2 id="rtp-action-declarative-scripted-actions"><code>/rtp action</code> — Declarative Scripted Actions<a class="headerlink" href="#rtp-action-declarative-scripted-actions" title="Permanent link">&para;</a></h2>
 <p>Executes a declarative scripted action defined in <code>definitions/actions/&lt;id&gt;.yml</code>. Actions support multi-entity group placements, custom anchor types (<code>nearplayer</code>, <code>nearclaim</code>, <code>location</code>, <code>scatter</code>), arena confinement boundaries, scoreboards, and lifecycle automation.</p>
 <p><strong>Syntax</strong>
 <div class="highlight"><pre><span></span><code>/rtp action &lt;actionId&gt; [player=&lt;target&gt;] [parameters...]
-/rtp action cancel [session_id]
+/rtp action cancel [action|session_id]
 </code></pre></div></p>
-<p><strong>Required permissions:</strong> <code>rtp.action</code> plus the action's specific permission (e.g. <code>rtp.action.nearplayer</code>).</p>
+<p><strong>Required permissions:</strong> <code>rtp.action</code> plus the action's specific permission (e.g. <code>rtp.action.nearplayer</code>); <code>rtp.action.cancel</code> for <code>/rtp action cancel</code> (<code>rtp.action.cancel.other</code> to cancel another player's entry or session ID).</p>
 <table>
 <thead>
 <tr>
@@ -4867,12 +5174,73 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <td>Target or pair with another player (when supported by the action).</td>
 </tr>
 <tr>
-<td><code>/rtp action cancel</code></td>
-<td>Cancel the caller's active confined action session, running its <code>onCancel</code> script.</td>
+<td><code>/rtp action cancel [action\|session_id]</code></td>
+<td>Leave a matchmaking queue or cancel an active confined action session, running its <code>onCancel</code> script.</td>
 </tr>
 </tbody>
 </table>
 <p>Actions with a configured <code>command:</code> block are also automatically registered as top-level standalone commands (e.g. <code>/challenge</code>, <code>/duel</code>, <code>/nearplayer</code>). See the dedicated <a href="../ACTIONS/">Action Engine guide</a> for full configuration details.</p>
+<hr />
+<h2 id="rtp-back-return-to-previous-location"><code>/rtp back</code> — Return to Previous Location<a class="headerlink" href="#rtp-back-return-to-previous-location" title="Permanent link">&para;</a></h2>
+<p>Returns the executing player to the location they were at immediately before their last <code>/rtp</code> teleport.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp back
+</code></pre></div></p>
+<p><strong>Required permission:</strong> <code>rtp.back</code></p>
+<hr />
+<h2 id="rtp-menu-rtp-gui-rtp-admin-and-rtp-admin-setup-interactive-menus-setup-wizard"><code>/rtp menu</code>, <code>/rtp gui</code>, <code>/rtp admin</code>, and <code>/rtp admin setup</code> — Interactive Menus &amp; Setup Wizard<a class="headerlink" href="#rtp-menu-rtp-gui-rtp-admin-and-rtp-admin-setup-interactive-menus-setup-wizard" title="Permanent link">&para;</a></h2>
+<p>Opens the player or operator menus and guided setup flows.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp menu
+/rtp gui
+/rtp admin
+/rtp admin setup [world|gameplay|perf|preview|confirm]
+</code></pre></div></p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Required Permission</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/rtp menu</code></td>
+<td><code>rtp.use</code></td>
+<td>Open the interactive player book menu (or chat pages on Spigot) to teleport or choose a region, world, or biome.</td>
+</tr>
+<tr>
+<td><code>/rtp gui</code></td>
+<td><code>rtp.gui</code></td>
+<td>Open the chest destination menu registered by the bundled GUI addon (<code>LeafRTPGuiAddon</code>); without a GUI addon, performs a plain teleport.</td>
+</tr>
+<tr>
+<td><code>/rtp admin</code></td>
+<td><code>rtp.menu.admin</code></td>
+<td>Open the operator book menu for inspecting queues, editing config files, and reloading in game.</td>
+</tr>
+<tr>
+<td><code>/rtp admin setup &lt;world\|gameplay\|perf\|preview\|confirm&gt;</code></td>
+<td><code>rtp.admin.setup</code></td>
+<td>Run the guided first-time setup wizard (world layout, gameplay presets, region radius via presets or Anvil input, performance profile, addon toggles, and diff preview before writing).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="rtp-clear-clear-runtime-state"><code>/rtp clear</code> — Clear Runtime State<a class="headerlink" href="#rtp-clear-clear-runtime-state" title="Permanent link">&para;</a></h2>
+<p>Clears cached locations, player cooldowns, queues, use limits, or post-teleport invulnerability windows.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp clear &lt;cache|cooldown|queue|limit|invuln&gt; [region=&lt;name&gt;] [player=&lt;name&gt;]
+</code></pre></div></p>
+<p><strong>Required permission:</strong> <code>rtp.admin</code></p>
+<hr />
+<h2 id="rtp-visualization-map-charts-diagnostic-exports"><code>/rtp visualization</code> — Map Charts &amp; Diagnostic Exports<a class="headerlink" href="#rtp-visualization-map-charts-diagnostic-exports" title="Permanent link">&para;</a></h2>
+<p>Renders live region boundaries, biome layouts, and candidate heatmaps onto held in-game maps or exports high-resolution diagnostic images to disk.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp visualization [held|export &lt;type&gt;] [region=&lt;name&gt;]
+</code></pre></div></p>
+<p><strong>Required permission:</strong> <code>rtp.admin</code></p>
 <hr />
 <h2 id="rtp-editor-web-workspace-configuration-editor"><code>/rtp editor</code> — Web Workspace &amp; Configuration Editor<a class="headerlink" href="#rtp-editor-web-workspace-configuration-editor" title="Permanent link">&para;</a></h2>
 <p>Generates an outbound ephemeral web editor session or offline standalone bundle to inspect diagnostics, adjust region boundary geometry, and configure plugin YAML with live documentation hints on a secondary display without port forwarding.</p>
@@ -5169,18 +5537,38 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tbody>
 <tr>
 <td><code>rtp.use</code></td>
-<td>op</td>
-<td>Use <code>/rtp</code> to teleport yourself</td>
+<td>true</td>
+<td>Use <code>/rtp</code>, <code>/wild</code>, and <code>/rtp menu</code> to teleport yourself</td>
 </tr>
 <tr>
 <td><code>rtp.see</code></td>
-<td>op</td>
-<td>See RTP related messages and <code>/rtp help</code></td>
+<td>true</td>
+<td>Tab-complete <code>/rtp</code>, see RTP related messages and <code>/rtp help</code></td>
 </tr>
 <tr>
 <td><code>rtp.free</code></td>
 <td>op</td>
 <td>Bypass all economy charges</td>
+</tr>
+<tr>
+<td><code>rtp.back</code></td>
+<td>op</td>
+<td>Use <code>/rtp back</code> to return to the location before your last <code>/rtp</code></td>
+</tr>
+<tr>
+<td><code>rtp.gui</code></td>
+<td>op</td>
+<td>Use <code>/rtp gui</code> to open the chest destination picker</td>
+</tr>
+<tr>
+<td><code>rtp.menu.admin</code></td>
+<td>op</td>
+<td>Open the operator book menu (<code>/rtp admin</code>)</td>
+</tr>
+<tr>
+<td><code>rtp.admin.setup</code></td>
+<td>op</td>
+<td>Use the <code>/rtp admin setup</code> guided setup wizard</td>
 </tr>
 <tr>
 <td><code>rtp.noCooldown</code></td>
@@ -5210,7 +5598,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.notme</code></td>
 <td>op</td>
-<td>Make yourself untargetable by other players' <code>/rtp player=&lt;name&gt;</code> - prevents forced RTP by other ops. Console is exempt and can always target any player.</td>
+<td>Make yourself untargetable by <code>/rtp player=&lt;name&gt;</code> (causes <code>invalid command argument player:&lt;name&gt;</code> when targeting an OP player from console or in-game). Negate with <code>rtp.notme: false</code> in LuckPerms if operators should be targetable.</td>
 </tr>
 <tr>
 <td><code>rtp.reload</code></td>
@@ -5220,12 +5608,12 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.config</code></td>
 <td>op</td>
-<td>Legacy alias — grants <code>rtp.config.view</code> + <code>rtp.config.set</code>. Retained for back-compat; new deployments should grant the more specific nodes below.</td>
+<td>Legacy alias — grants <code>rtp.config.view</code> + <code>rtp.config.set</code> + <code>rtp.update</code>, plus <code>/rtp config import</code> and <code>/rtp config language</code>. Retained for back-compat; new deployments can grant the more specific nodes below.</td>
 </tr>
 <tr>
 <td><code>rtp.config.view</code></td>
 <td>op</td>
-<td>Use <code>/rtp config &lt;file&gt; view</code> (read-only inspection).</td>
+<td>Use <code>/rtp config &lt;file&gt; view</code> / <code>viewraw</code> (read-only inspection).</td>
 </tr>
 <tr>
 <td><code>rtp.config.set</code></td>
@@ -5245,7 +5633,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.editor</code></td>
 <td>op</td>
-<td>Use <code>/rtp editor</code> and its subcommands (local, apply, trust, untrust).</td>
+<td>Use <code>/rtp editor</code> and its subcommands (<code>local</code>, <code>apply</code>, <code>trust</code>, <code>untrust</code>).</td>
 </tr>
 <tr>
 <td><code>rtp.info</code></td>
@@ -5255,7 +5643,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.admin</code></td>
 <td>op</td>
-<td>See DRM info in <code>/rtp info</code>; elevated admin access</td>
+<td>Use <code>/rtp clear</code> and <code>/rtp visualization</code>, see DRM info in <code>/rtp info</code>, plus <code>rtp.reload</code>, <code>rtp.config</code>, <code>rtp.scan</code>, <code>rtp.info</code>, and <code>rtp.menu.admin</code></td>
 </tr>
 <tr>
 <td><code>rtp.support</code></td>
@@ -5275,7 +5663,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.params</code></td>
 <td>op</td>
-<td>Override <code>shape</code>, <code>vert</code>, and <code>worldBorderOverride</code> parameters</td>
+<td>Override <code>shape</code>, <code>vert</code>, <code>centerx</code>, <code>centerz</code>, <code>radius</code>, and <code>worldBorderOverride</code> parameters</td>
 </tr>
 <tr>
 <td><code>rtp.action</code></td>
@@ -5288,14 +5676,24 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <td>Permission to execute a specific action (e.g. <code>rtp.action.nearplayer</code>, <code>rtp.action.challenge</code>)</td>
 </tr>
 <tr>
+<td><code>rtp.action.cancel</code></td>
+<td>op</td>
+<td>Use <code>/rtp action cancel</code> for your own entries (<code>rtp.action.cancel.other</code> for other players and session IDs)</td>
+</tr>
+<tr>
 <td><code>rtp.unqueued</code></td>
 <td>op</td>
 <td>Teleport without consuming a pre-generated cached location</td>
 </tr>
 <tr>
 <td><code>rtp.personalqueue</code></td>
-<td>op</td>
-<td>Use a personal (per-player) location queue</td>
+<td>false</td>
+<td>Reserve a personal (per-player) pre-warmed location queue</td>
+</tr>
+<tr>
+<td><code>rtp.servers.*</code></td>
+<td>true</td>
+<td>Access cross-server destinations in network mode (<code>rtp.servers.&lt;server&gt;</code> for a single backend server)</td>
 </tr>
 <tr>
 <td><code>rtp.world</code></td>
@@ -5350,12 +5748,12 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <tr>
 <td><code>rtp.onevent.join</code></td>
 <td>false</td>
-<td>Auto-RTP on first join</td>
+<td>Auto-RTP on every join</td>
 </tr>
 <tr>
 <td><code>rtp.onevent.firstJoin</code></td>
 <td>false</td>
-<td>Auto-RTP on every join</td>
+<td>Auto-RTP on first join</td>
 </tr>
 <tr>
 <td><code>rtp.onevent.respawn</code></td>
@@ -5381,6 +5779,11 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <td><code>rtp.onevent.*</code></td>
 <td>false</td>
 <td>All auto-RTP event triggers</td>
+</tr>
+<tr>
+<td><code>rtp.*</code></td>
+<td>op</td>
+<td>Grant all RTP permissions</td>
 </tr>
 </tbody>
 </table>
@@ -5424,7 +5827,7 @@ The <code>scan</code> command is used to proactively map out the world. While th
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -5449,6 +5852,8 @@ The <code>scan</code> command is used to proactively map out the world. While th
     
     
       <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

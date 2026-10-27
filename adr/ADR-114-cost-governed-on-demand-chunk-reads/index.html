@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
@@ -26,7 +26,7 @@
     
     
       
-        <title>ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission - LeafRTP</title>
+        <title>ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -59,7 +59,8 @@
     
     
     
-  </head>
+  <meta name="robots" content="noindex, follow">
+</head>
   
   
     
@@ -92,7 +93,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,7 +107,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -365,13 +366,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -3362,11 +3363,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
@@ -4134,6 +4135,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4302,9 +4471,9 @@
 
 
 <h1 id="adr-114-cost-governed-on-demand-chunk-reads-and-native-fallback-admission">ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission<a class="headerlink" href="#adr-114-cost-governed-on-demand-chunk-reads-and-native-fallback-admission" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Proposed
+<p><strong>Status:</strong> Accepted
 <strong>Date:</strong> 2026-10-14
-<strong>Extends:</strong> <a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> (Archimedean spiral 1D mapping), <a href="../ADR-009-configurable-spatial-distributions/">ADR-009</a> (Configurable spatial distributions), <a href="../ADR-016-anvil-subsystem/">ADR-016</a> (Anvil read-only subsystem), <a href="../ADR-028-l3-backlog-cache/">ADR-028</a> (L3 backlog cache order preservation), <a href="../ADR-109-measured-cost-probe-first-gate/">ADR-109</a> (Measured-cost probe-first gate), <a href="../ADR-110-purpose-gated-live-loads/">ADR-110</a> (Purpose-gated live loads)
+<strong>Extends:</strong> <a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> (Archimedean spiral 1D mapping), <a href="../ADR-009-configurable-spatial-distributions/">ADR-009</a> (Configurable spatial distributions), <a href="../ADR-016-anvil-subsystem/">ADR-016</a> (Anvil read-only subsystem), <a href="../ADR-028-l3-backlog-cache/">ADR-028</a> (L3 backlog cache order preservation), <a href="../ADR-087-adaptive-compute-governor/">ADR-087</a> (Adaptive compute governor: <code>ComputeBudget#generationCap()</code> and <code>ComputeBudget#cpuTarget()</code>), <a href="../ADR-109-measured-cost-probe-first-gate/">ADR-109</a> (Measured-cost probe-first gate), <a href="../ADR-110-purpose-gated-live-loads/">ADR-110</a> (Purpose-gated live loads)
 <strong>Related:</strong> <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/">ADR-067</a> (MCA header generation check), <a href="../ADR-112-per-region-work-division-on-folia/">ADR-112</a> (Per-region work division on Folia)</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>On-demand location generation executes when a player requires an immediate destination and no pre-cached candidate is available. This occurs during:
@@ -4341,9 +4510,9 @@
 </ul>
 <p>To maximize aggregate system welfare, computational expenditure must be decomposed into asynchronous worker core-time ($C_{\text{async}}$) and main/regional tick time ($C_{\text{sync}}$), weighted by the scarcity of the tick budget:
 $$\text{Cost}<em _text_async="\text{async">{\text{effective}} = C</em>$$
-where $W_{\text{tick}}(\text{MSPT})$ is the dynamic shadow price of main-thread tick time:
-$$W_{\text{tick}}(\text{MSPT}) = 1 + \alpha + \beta \cdot \left(\frac{\max(0, \text{MSPT} - 35)}{10}\right)^2$$
-Under healthy conditions ($\text{MSPT} \le 25\text{ ms}$), $W_{\text{tick}} \approx 5\text{--}10$; under tick distress ($\text{MSPT} &gt; 35\text{ ms}$), $W_{\text{tick}}$ escalates quadratically, reflecting the severe penalty of tick stalls.}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{sync}</p>
+where $W_{\text{tick}}(\text{MSPT})$ is the dynamic shadow price of main-thread tick time with knee $K_{\text{cpu}} = \min(35\text{ ms},\; T_{\text{cpu}})$ from }} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{sync}<code>ComputeBudget#cpuTarget()</code> (<a href="../ADR-087-adaptive-compute-governor/">ADR-087</a> section 4.3 item 7 &amp; section 7.3; $35.0\text{ ms}$ when <code>autoTune: false</code>):
+$$W_{\text{tick}}(\text{MSPT}) = 1 + \alpha + \beta \cdot \left(\frac{\max(0, \text{MSPT} - K_{\text{cpu}})}{10}\right)^2$$
+Under healthy conditions ($\text{MSPT} \le 25\text{ ms}$), $W_{\text{tick}} \approx 5\text{--}10$; under tick distress ($\text{MSPT} &gt; K_{\text{cpu}}$), $W_{\text{tick}}$ escalates quadratically, reflecting the severe penalty of tick stalls.</p>
 <h4 id="empirical-deduplication-equation">Empirical Deduplication Equation<a class="headerlink" href="#empirical-deduplication-equation" title="Permanent link">&para;</a></h4>
 <p>Let:
 - $C_{\text{file, async}}$ be the off-thread CPU core-time to decode an Anvil chunk ($2\text{--}5\text{ ms}$). Anvil reads consume <strong>zero</strong> main-thread tick time ($C_{\text{file, sync}} = 0$).
@@ -4376,12 +4545,12 @@ $$P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} 
 <p>Therefore, on-demand governance must achieve CPU and tick savings without distorting the 2D spatial distribution.</p>
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Three-Tier Chunk Resolution Hierarchy with Governed Deduplication:</strong>
-   On-demand execution (<code>LoadPurpose.IMMEDIATE</code>) shall resolve candidates through three explicit tiers governed by empirical cost-outcome heuristics to eliminate duplicate parsing and redundant loading:</li>
+<li><strong>Three-Tier Chunk Resolution Hierarchy with Governed Deduplication (<code>io.github.dailystruggle.rtp.common.predict</code>):</strong>
+   On-demand execution (<code>LoadPurpose.IMMEDIATE</code>) shall resolve candidates through three explicit tiers governed by empirical cost-outcome heuristics using the shared Tier 1 <code>io.github.dailystruggle.rtp.common.predict</code> stochastic foundation (<code>EwmaEstimator</code>, <code>BernoulliEstimator</code>, <code>CostContext</code>, <code>ComparativeCostGovernor</code>) rather than bespoke per-governor EWMA/variance trackers. <code>ComparativeCostGovernor</code> supports both shadow-weighted expected cost (<code>CostContext</code>) and variance-aware switching (<code>z</code>-score threshold over combined standard error, correlation-window sustain count, cooldown since last flip, and bounded $\epsilon$-exploration floor <code>~1 / (1 + |z|)</code> in <code>[1/32, 1/4]</code> shared with <a href="../ADR-109-measured-cost-probe-first-gate/">ADR-109</a>):</li>
 <li><strong>Tier 1 (Resident Cache):</strong> Resident chunks (<code>isChunkLoaded(cx, cz)</code>) and cached views (<code>getCachedChunk(key)</code>) shall be evaluated immediately with zero disk I/O and zero generation overhead.</li>
 <li><strong>Tier 2 (Governed Off-Thread Pre-Filter):</strong> When the candidate chunk is present on disk (verified in $&lt;1\ \mu\text{s}$ via <code>AnvilRegionOccupancyCache</code>), the decision whether to decode via <code>AnvilChunkView</code> off-thread vs. bypass directly to Tier 3 native loading is governed dynamically by <code>ImmediateLoadGovernor</code>:<ul>
-<li><strong>Deduplication Bypass (Direct Native Load):</strong> If empirical candidate rejection is below the thread-weighted threshold ($P_{\text{reject}} \le \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$) and server tick health is stable ($\text{MSPT} \le 30\text{ ms}$), the task bypasses off-thread Anvil decoding and dispatches directly to Tier 3 native loading. This eliminates the duplicate decompression and NBT parsing penalty on safe chunks, delivering the destination with a single read and minimizing both CPU expenditure and command-to-teleport latency.</li>
-<li><strong>Pre-Filter Engagement:</strong> If candidate rejection exceeds the threshold ($P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$), or the query is predicate-constrained, or the server is under tick distress ($\text{MSPT} &gt; 35\text{ ms}$), the candidate is decoded and verified off-thread on <code>AnvilIoPool</code>. If rejected, it sheds an expensive discarded native load and protects the main/regional tick loop.</li>
+<li><strong>Deduplication Bypass (Direct Native Load):</strong> If empirical candidate rejection is below the thread-weighted threshold ($P_{\text{reject}} \le \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$) and server tick health is below the knee ($\text{MSPT} \le K_{\text{cpu}}$, where $K_{\text{cpu}} = \min(35\text{ ms},\; T_{\text{cpu}})$ from <code>ComputeBudget#cpuTarget()</code>, equal to $35.0\text{ ms}$ when <code>autoTune: false</code>), the task bypasses off-thread Anvil decoding and dispatches directly to Tier 3 native loading. This eliminates the duplicate decompression and NBT parsing penalty on safe chunks, delivering the destination with a single read and minimizing both CPU expenditure and command-to-teleport latency.</li>
+<li><strong>Pre-Filter Engagement:</strong> If candidate rejection exceeds the threshold ($P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$), or the query is predicate-constrained, or the server is above the CPU target knee ($\text{MSPT} &gt; K_{\text{cpu}}$), the candidate is decoded and verified off-thread on <code>AnvilIoPool</code>. If rejected, it sheds an expensive discarded native load and protects the main/regional tick loop.</li>
 </ul>
 </li>
 <li><strong>Tier 3 (Cost-Governed Native Load Admission):</strong> Native generation of ungenerated chunks shall proceed under the supervision of the <code>ImmediateLoadGovernor</code> concurrency semaphore. Native loads of chunks already on disk (bypass candidates and Anvil-verified safe candidates) generate nothing and shall not take a generation permit; serialising them behind the per-region permit defeats the latency purpose of the bypass route.</li>
@@ -4431,18 +4600,16 @@ $$P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} 
 <p>Whenever a candidate is rejected (due to safety hazards, biome mismatch, or macro-bin filtering), the task shall draw a new, independent pseudo-random sample $s_{i+1} \sim f(x, z)$ across the valid domain.</p>
 </li>
 <li>
-<p><strong>In-Flight Native Generation Bounding (<code>ImmediateLoadGovernor</code>):</strong></p>
+<p><strong>In-Flight Native Generation Bounding (<code>ImmediateLoadGovernor</code> &amp; <code>ADR-087</code> <code>ComputeBudget</code>):</strong></p>
 </li>
-<li>Live chunk generation for on-demand tasks shall be bounded by an in-flight concurrency semaphore:<ul>
+<li>Live chunk generation for on-demand tasks shall be bounded by an in-flight concurrency semaphore aligned with <a href="../ADR-087-adaptive-compute-governor/">ADR-087</a> section 4.3 item 7 &amp; section 7.3:<ul>
 <li>Maximum 1 concurrent native generation per region.</li>
-<li>Maximum 2 concurrent native generations server-wide across all unqueued on-demand executions.</li>
+<li>Server-wide concurrent native generation permits in <code>ImmediateLoadGovernor</code> and <code>GenerationBudget</code> share <code>ComputeBudget#generationCap()</code> ($g_{\text{eff}} \in [1, \text{capFor(version)}]$), removing the separate <code>mspt &gt; 35 -&gt; 1 permit</code> step.</li>
 </ul>
 </li>
 <li><strong>Resource Backpressure:</strong> If <code>HeapPressureMonitor.underPressure()</code> is true, native generation requests are held in a bounded FIFO wait queue until pressure subsides.</li>
 <li>
-<p><strong>Tick Degradation Damping:</strong> Candidate admission accounts for externalized tick penalties:
-     $$\Phi_{\text{tick}}(\text{MSPT}) = \begin{cases} 0 &amp; \text{if } \text{MSPT} \le 35\text{ ms} \ \gamma \cdot \left(\frac{\text{MSPT} - 35}{10}\right)^2 &amp; \text{if } \text{MSPT} &gt; 35\text{ ms} \end{cases}$$
-     When $\Phi_{\text{tick}}(\text{MSPT}) &gt; 0$, concurrent native generation permits are restricted to 1 server-wide, pacing generation to protect the tick loop.</p>
+<p><strong>Tick-Target Knee &amp; Limiter Integration:</strong> The <code>PREFILTER</code> short-circuit in <code>PregenTask</code> and <code>ImmediateLoadGovernor</code> and the knee of <code>ImmediateLoadGovernor#computeTickWeight</code> read $K_{\text{cpu}} = \min(35\text{ ms},\; T_{\text{cpu}})$ from <code>ComputeBudget#cpuTarget()</code> ($35.0\text{ ms}$ when <code>autoTune: false</code>), while the global generation cap $g_{\text{eff}}$ is governed by the <code>ADR-087</code> <code>AimdLimiter</code> over chunk-system latency, process CPU, tick breach, and tick stall signals.</p>
 </li>
 <li>
 <p><strong>Pipelined Async Execution and Regional Thread Handoff:</strong>
@@ -4543,6 +4710,7 @@ $$P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} 
 <li><a href="../ADR-016-anvil-subsystem/">ADR-016</a> — Anvil read-only subsystem (prefilter, backed chunk view).</li>
 <li><a href="../ADR-028-l3-backlog-cache/">ADR-028</a> — L3 backlog cache order preservation (distribution invariance contract).</li>
 <li><a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/">ADR-067</a> — Automatic PRESCAN, adaptive scan rate control, and <code>.mca</code>-header generation check.</li>
+<li><a href="../ADR-087-adaptive-compute-governor/">ADR-087</a> — Adaptive compute governor (<code>ComputeBudget#generationCap()</code>, <code>ComputeBudget#cpuTarget()</code>, and <code>AimdLimiter</code>).</li>
 <li><a href="../ADR-109-measured-cost-probe-first-gate/">ADR-109</a> — Measured-cost probe-first gate.</li>
 <li><a href="../ADR-110-purpose-gated-live-loads/">ADR-110</a> — Purpose-gated live loads.</li>
 <li><a href="../ADR-112-per-region-work-division-on-folia/">ADR-112</a> — Per-region work division on Folia.</li>
@@ -4587,7 +4755,7 @@ $$P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} 
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -4612,6 +4780,8 @@ $$P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} 
     
     
       <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

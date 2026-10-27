@@ -1,0 +1,5354 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-087-adaptive-compute-governor/">
+      
+      
+        <link rel="prev" href="../ADR-086-external-web-map-integration/">
+      
+      
+        <link rel="next" href="../ADR-088-configurable-downsampling-stride-filter/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  <meta name="robots" content="noindex, follow">
+</head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-087-adaptive-compute-governor-demand-driven-backoff-memory-backpressure-and-multi-region-concurrency" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ACTIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Actions & arenas
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Web Workspace & Editor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/shape-algorithms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtp admin setup` & Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Principles
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Architecture
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multi-region-concurrency-tracked-scheduling-and-anti-starvation-folia" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Multi-Region Concurrency, Tracked Scheduling and Anti-Starvation (Folia)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-control-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Control Law
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Control Law">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Signals
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-measured-unit-costs-empirical-beforeafter-differentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Measured unit costs (empirical before/after differentials)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-knob-formulas-model-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Knob formulas (model targets)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-stability-guard-aimd-limiter" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.4 Stability guard (AIMD limiter)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-operator-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Operator Surface
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-operator-visibility-and-telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Operator Visibility and Telemetry
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-mechanical-specification-and-implementation-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Mechanical Specification and Implementation Layout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-verification-and-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Verification and Evidence
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Rollout
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-097 — Per-Action Pre-Validated Caches, Anvil Region Pre-Screening, and Bounded Subspace Placement Retries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-098 - Declarative Command Parameters, Per-Parameter Permissions, and Authoritative Defaults
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-099 — Zero-Overhead Visual Region Creation via Ecosystem Selection Bridges and Cartography Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-101 — In-House SQL Connection Pool and Retirement of HikariCP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-102 — Coverage-Guided Fuzz Testing and Parser Input Hardening
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-103 — Multi-Version Platform Adapter Deduplication and Runtime Coverage Normalization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-104 — Ephemeral Web Editor and In-Game Packed Docs Integration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-105 — Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-116-effects-through-neutral-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-117-release-cadence-contractual-pro-discretionary-lite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-117 - Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      Context
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decision
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Principles
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Architecture
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-multi-region-concurrency-tracked-scheduling-and-anti-starvation-folia" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Multi-Region Concurrency, Tracked Scheduling and Anti-Starvation (Folia)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-control-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Control Law
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Control Law">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-signals" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Signals
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-measured-unit-costs-empirical-beforeafter-differentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Measured unit costs (empirical before/after differentials)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-knob-formulas-model-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Knob formulas (model targets)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-stability-guard-aimd-limiter" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.4 Stability guard (AIMD limiter)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-operator-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Operator Surface
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-operator-visibility-and-telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Operator Visibility and Telemetry
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-mechanical-specification-and-implementation-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Mechanical Specification and Implementation Layout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-verification-and-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Verification and Evidence
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Rollout
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternatives Considered
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Consequences
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-087-adaptive-compute-governor-demand-driven-backoff-memory-backpressure-and-multi-region-concurrency">ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency<a class="headerlink" href="#adr-087-adaptive-compute-governor-demand-driven-backoff-memory-backpressure-and-multi-region-concurrency" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted (2026-10-24). Section 3 records Folia constraints already in force: 3.2 is implemented by the <code>FoliaSchedulerImpl</code> regional permit pool, and 3.4 and 3.6 by <a href="../ADR-112-per-region-work-division-on-folia/">ADR-112</a>, which owns them. Folia tick-region allocation (work placement, per-region shares, steering, lending) is <a href="../ADR-123-folia-tick-region-allocation/">ADR-123</a> and consumer attribution is <a href="../ADR-124-consumer-attribution-for-background-refill/">ADR-124</a>; both build on this ADR and have their own evidence gates.
+<strong>Date:</strong> 2026-09-07
+<strong>Revised:</strong> 2026-10-24 (rewritten before implementation; scope widened from Folia to every platform; guarantees reduced to the invariants of section 1, each with a mechanical check in section 8; then split: former section 4.5 moved to ADR-123 and former section 4.6 to ADR-124, invariant IDs kept; then re-aimed at per-tick budgets: background refill may run on every pulse within the per-tick ceilings instead of once per <code>period</code>, and invariant I2 bounds spend per pulse and per tick; then I2 restated as a per-pulse safety bound with one task of slack plus a window bound, kept by an overrun carry-forward, that holds the long-run average at or below the configured values. Review history is in git.)</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>RTP spends server compute on background work: backlog picks, cold-cache fill, cold-to-hot promotion, pregeneration, and the async and sync pulses that drain the selection pipelines. Today that spend is set by <strong>fixed budgets plus on/off gates</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Kind</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TickBudget</code> (<code>syncAllottedTime</code> 5 ms, <code>asyncAllottedTime</code> 25 ms, <code>period</code> 20 ticks)</td>
+<td>Fixed values from <code>performance.yml</code>, clamped to <code>[1, 25]</code> ms</td>
+<td><code>rtp-core</code> <code>tasks/tick/TickBudget</code></td>
+</tr>
+<tr>
+<td><code>ServerHealthGate</code> (<code>minTPS</code>, <code>maxMSPT</code>, stalled tick)</td>
+<td>Binary pause with hysteresis; per region on Folia</td>
+<td><code>rtp-core</code> <code>tools/ServerHealthGate</code></td>
+</tr>
+<tr>
+<td><code>HeapPressureMonitor</code> (<code>maxHeapPercent</code>)</td>
+<td>Binary pause plus active hot-cache shedding</td>
+<td><code>rtp-core</code> <code>tools/HeapPressureMonitor</code>, <code>Region#shedHotCacheUnderPressure</code></td>
+</tr>
+<tr>
+<td><code>GenerationBudget</code> (cap 2 on 1.20/1.21, 4 on 26.x)</td>
+<td>Fixed in-flight cap for first-come, first-served chunk systems</td>
+<td><code>rtp-core</code> <code>tools/GenerationBudget</code></td>
+</tr>
+<tr>
+<td><code>ImmediateLoadGovernor</code> permits (1 regional, 2 global, 1 when MSPT &gt; 35)</td>
+<td>Fixed caps with one step</td>
+<td><code>rtp-core</code> <code>selection/region/ImmediateLoadGovernor</code> (ADR-114)</td>
+</tr>
+<tr>
+<td><code>Region.MAX_PROMOTIONS_PER_PULSE</code> (8)</td>
+<td>Fixed</td>
+<td><code>rtp-core</code> <code>selection/region/Region</code></td>
+</tr>
+<tr>
+<td><code>RegionThreadBudget</code> (<code>syncAllottedTime</code> per region thread per 50 ms)</td>
+<td>Fixed token bucket</td>
+<td><code>rtp-folia</code> (ADR-112)</td>
+</tr>
+<tr>
+<td><code>cacheCap</code>, <code>activeChunkCap</code>, <code>backlogCacheCap</code></td>
+<td>Fixed per region</td>
+<td>region definitions, <code>config.yml</code></td>
+</tr>
+</tbody>
+</table>
+<p>The problems this ADR addresses:</p>
+<ol>
+<li><strong>The operator is the tuner.</strong> Picking <code>period</code>, <code>asyncAllottedTime</code>, <code>syncAllottedTime</code>, <code>activeChunkCap</code> and <code>cacheCap</code> requires knowing the host's CPU, storage, heap, platform and player load. Most operators never touch them; others copy a prefab (<code>low-performance</code>, <code>high-performance</code>, <code>folia-tuned</code>) that matches their host on the day they install it and not after. REQ-RTP-OPS-001 requires only that the defaults work. This ADR removes tuning in both directions within the configured per-tick values: spending less on a loaded, small or idle host, and spending each tick's allotment on a busy one instead of once per <code>period</code>. Per-tick values that are themselves too low for a host still need raising; that is rollout step 5, a separate decision. "Never need to tune" is a Server Administrator goal in <a href="../../dev/STAKEHOLDERS/"><code>STAKEHOLDERS.md</code></a> with no requirement, because nothing yet shows it can be met; this ADR's differential benchmark (section 8) covers both directions on the bench only.</li>
+<li><strong>Binary gates are a cliff, not a slope.</strong> Between "healthy" and "paused" RTP runs at full configured spend. A server at 40 ms MSPT gets the same background load as one at 5 ms, until it crosses <code>maxMSPT</code> (45 ms) and gets none. The result is avoidable lag just below the threshold, and stop-start refill around it.</li>
+<li><strong>Spend does not follow demand, and refill is paced by <code>period</code>, not by the tick.</strong> Each region refills once per <code>period</code> whether or not anyone teleports there, and a full cache still pays the pulse. A lobby-adjacent region with constant traffic and a forgotten region with none get the same compute. <code>AsyncTaskProcessing#runPulse</code> fires every tick with a fresh <code>asyncAllottedTime</code> budget, but under the shipped defaults (<code>period: 20</code>) a region turn runs only once every <code>period / R</code> pulses: with one region, refill gets 1 pulse in 20, and once the selection drains are empty the rest of each tick's allotment goes unused. To refill on every tick, the Paper 26.2 Linux ramp (<a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md"><code>RESULTS.md</code></a>) had to use a custom <code>bench-config</code> override (<code>period: 1</code>, <code>syncAllottedTime: 50</code>, <code>asyncAllottedTime: 50</code>, gates off); even there, with <code>cacheCap: 10</code> and <code>activeChunkCap: 5</code>, the ready queue runs out at 40 TP/s and p50 latency rises from 5 ms to 158 ms.</li>
+<li><strong>Platform and environment drift.</strong> Operators swap jars (Paper to Folia), hardware, JVM flags and heap sizes without revisiting plugin config. Static unit estimates misjudge the real footprint (cold NVMe versus spinning disk versus network storage; G1 on 32 GB versus a 2 GB container).</li>
+<li><strong>No control over downstream startup flags.</strong> RTP cannot set JVM flags, GC tuning, or heap size. Background execution must adapt to the compute and memory it actually gets.</li>
+<li><strong>Each subsystem adapts alone.</strong> <code>ProbeFirstGovernor</code> (ADR-109), <code>LiveLoadGate</code> (ADR-110), <code>ImmediateLoadGovernor</code> (ADR-114), <code>HotBudgetAllocator</code> (ADR-078) and <code>RegionThreadBudget</code> (ADR-112) each measure their own costs or bound their own resource. <code>ImmediateLoadGovernor</code> also reacts to MSPT through one fixed constant, <code>mspt &gt; 35</code>, in three places: it damps the global permits, forces PREFILTER, and is the knee of the tick-time shadow price <code>computeTickWeight</code>. They share the <code>common/predict</code> primitives (<code>EwmaEstimator</code>, <code>BernoulliEstimator</code>, <code>EwmaLinearFit</code>, <code>BudgetPacer</code>, <code>ComparativeCostGovernor</code>, <code>AimdLimiter</code>) but not a budget, so they cannot trade compute against each other and can react to the same spike several times.</li>
+</ol>
+<p>Folia-specific hazards remain in scope (section 3):</p>
+<ol>
+<li><strong>The 50 ms tick cliff per region.</strong> When a region's own load uses 40-48 ms of its tick, any RTP work scheduled onto it pushes the tick past 50 ms; queued tasks spill into later ticks and players see rubber-banding and hit delay.</li>
+<li><strong>Region over-instantiation.</strong> Chunk loads scattered across disjoint coordinates can create more ticking regions than tick threads, so regions time-share threads and each ticks late. This hazard follows from Folia's threading model; no RTP benchmark isolates it yet. The competitor failure often cited next to it is a different one: in run <code>20260617-191448</code> (Folia 26.1) EzRTP 3.4.0 tripped the Folia watchdog 7 times, with one region unresponsive for 20.4 s, and the stack shows a synchronous <code>World.loadChunk</code> on a region thread (<code>ServerChunkCache.syncLoad</code>). That is an S-005-class block, not over-instantiation (<a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/PRE_WRITEUP.md"><code>PRE_WRITEUP.md</code></a> section 5.3). S-005 and ADR-112 guard the blocking load; section 3.2 guards over-instantiation.</li>
+<li><strong>Multi-region allocation churn.</strong> Concurrent chunk loads across regions expand young-gen quickly on elastic collectors (G1 on 16-32 GB heaps can grow Eden past 8 GB before collecting).</li>
+<li><strong>Uneven cost concentration.</strong> In the ADR-112 stress run one region fell to about 1.4 TPS while the mean stayed at 18.9. The candidate causes (chunk-bound clustering, placement-free work pinned to the global region, inline continuations, new regions starting from zero) and the Folia-side response are the subject of <a href="../ADR-123-folia-tick-region-allocation/">ADR-123</a>. This ADR supplies the snapshot, limiter and observe-only mode it builds on.</li>
+</ol>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Introduce one <strong>Adaptive Compute Governor</strong> in <code>rtp-core</code> that measures headroom and demand, computes an effective value for every background compute knob, and publishes them as one immutable snapshot that every actuation point reads. Operator-configured values become <strong>limits</strong> the governor works within, so the operator states how much RTP may use, not how to spend it.</p>
+<p><strong>One problem.</strong> Every mechanism below answers the same question: how much background work RTP does, and when. Demand idling and the per-region quota stop spending when nobody consumes, and spend each tick's allotment when players consume faster than the caches refill (section 4.3, item 1). The limiter and the heap and chunk-system terms stop spending when the server cannot spare it (sections 4.3, 4.4). Section 3 bounds how many regions RTP creates on Folia. Two follow-on decisions build on this one: <a href="../ADR-124-consumer-attribution-for-background-refill/">ADR-124</a> shares constrained refill by the players who cause it, and on Folia <a href="../ADR-123-folia-tick-region-allocation/">ADR-123</a> puts what remains on the tick region and thread that can absorb it, not on bystanders.</p>
+<p><strong>What the governor is for.</strong> It spends more when players are teleporting and the server has room, and less when they are not or it has none. The operator's per-tick values (<code>asyncAllottedTime</code> per pulse, <code>syncAllottedTime</code> per tick) stay ceilings (invariant I2): a single pulse or tick may overshoot by one task, the overshoot is repaid from the next background budgets, and the long-run average never exceeds them. <code>period</code> no longer limits how often refill runs: background refill may use the remainder of every pulse while a region has a deficit or consumption (section 4.3, item 1). RTP's total background spend over a period can therefore exceed today's, up to the per-tick ceilings on every tick, and only while the headroom terms allow it: MSPT below its soft target on single-loop hosts ($B_{\text{cpu}}$, section 4.3), the ADR-112 per-thread bucket on Folia, and process CPU, heap and chunk-system latency (section 4.4). Raising the per-tick ceilings themselves is a separate, evidence-gated decision (section 9, step 5). The governor does not change the budgets, order or admission of player-facing work (principle 4).</p>
+<h3 id="1-principles">1. Principles<a class="headerlink" href="#1-principles" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Spend headroom only where there is demand.</strong> Background spend is the product of two terms: how much the server can spare (tick time, heap, chunk-system capacity, CPU) and how much work is needed (cache deficit, consumption rate). Either term at zero means background work idles; with both above zero it runs on every tick, up to the per-tick ceilings.</li>
+<li><strong>Never more than the configured per-tick limits.</strong> Every effective value (background async per pulse, background sync per tick, promotions per turn, hot cap, generation cap) lies between a fixed internal floor and the operator's configured value, which is the ceiling. <code>period</code> is not a spend limit: it sets the credit horizon and the idle cadence (section 4.3, item 1). On Folia, <code>syncAllottedTime</code> stays the ADR-112 per-tick-thread ceiling. Any per-region refinement, and its one bounded exception (a loan), is ADR-123's decision and its invariant I1.</li>
+<li><strong>Hard gates stay as backstops.</strong> <code>minTPS</code>, <code>maxMSPT</code>, <code>maxHeapPercent</code>, the stalled-tick check and the ADR-112 regional circuit breaker keep their current semantics and keep pausing background work. The governor's soft targets sit below them, so in normal operation the gates do not trip.</li>
+<li><strong>Players already waiting are never throttled.</strong> The governor shapes background work only. Player-facing pipelines (urgent selection, each region's <code>miscPipeline</code>, waiting <code>playerQueue</code> entries including cold promotions and fills needed to cover a <code>playerQueue</code> shortfall when <code>keptLocations</code> is empty, interactive loads, teleport stages) keep the configured budgets, their existing order and their existing admission rule, as today ("serving waiting players is never gated"; <code>GenerationBudget</code> never refuses a load). The governor never refuses or reorders a player's request and never applies a reduced budget to one. ADR-112 admission is unchanged: one-shot interactive dispatches count towards the section 3.2 bound and take permits ahead of background slices (with ADR-112's 2 s anti-starvation rule for aged slices), so an interactive request can wait for a permit under the same rule as with <code>autoTune: false</code>. How long it waits depends on how many background slices hold permits, which the governor changes, usually downwards.</li>
+<li><strong>Fail to configured, never climb blind.</strong> A signal that has never been sampled (no metrics on this platform) leaves its knobs at configured values, which is today's behaviour. A signal that was sampled and is now stale or failed holds the current effective value and never raises it; recovery needs fresh readings. No effective value ever exceeds a ceiling, and no signal failure blocks interactive work.</li>
+<li><strong>One controller, no new threads.</strong> The governor runs on the existing async pulse through <code>RTP.scheduler</code> (Rule F-001). It holds no locks on hot paths: actuation points read a <code>volatile</code> snapshot reference.</li>
+<li><strong>Pure and testable.</strong> The control law is a pure function <code>(signals, previous state, clock) -&gt; (budget, state)</code>. Signal sources and the clock are injectable, so every behaviour below is unit-testable without a server.</li>
+</ol>
+<p><strong>Invariants.</strong> These are the governor's guarantees, and the only ones. Each has at least one mechanical check in section 8 that names it. Everything else in this ADR (fairness between regions, fill time, lower MSPT) is a design expectation measured by benchmark, not a guarantee. Invariant IDs are shared with ADR-123, which owns I1 and I9, so that references stay stable; this ADR owns I2-I8 and I10-I12. On acceptance they are added to <code>REQUIREMENTS.md</code> (IDs assigned then, phrased with <em>shall</em>) and traced in <code>TRACEABILITY.md</code>. The rest of this ADR is design and may change by revision without changing them.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Invariant</th>
+<th>Principle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I2</td>
+<td>With <code>autoTune</code> enabled, spend is bounded at two scales, cancellations excluded from both. <strong>Per pulse (safety):</strong> a pulse spends at most $A_{\text{cfg}}$ plus one background task (since all background drains in a pulse share one deadline), and background sync work per tick at most $S_{\text{cfg}}$ plus one task. <strong>Over a window (target):</strong> over any $n$ consecutive pulses, async spend is at most $n \cdot A_{\text{cfg}} + \varepsilon_A$, and background sync spend over any $n$ consecutive ticks is at most $n \cdot S_{\text{cfg}} + \varepsilon_S$, where $\varepsilon_A$ and $\varepsilon_S$ are the longest single background async and sync task and do not grow with $n$ (section 4.3, items 3 and 4). Overruns by unshaped and player-facing work, which I4 leaves as today, are added to the async and sync bounds and are repaid from background budget whenever there is any. The long-run average therefore does not exceed the configured value; it is a ceiling, not a level the governor promises to reach (reaching it under saturation is checked by I12). No other effective background value (promotions per turn, hot cap, generation cap) exceeds the configured value of its key. <code>period</code> is not bounded by this invariant: background refill may run on every pulse. The only exception is a Folia loan under ADR-123 invariant I1, if that ADR ships.</td>
+<td>2</td>
+</tr>
+<tr>
+<td>I3</td>
+<td>With <code>autoTune</code> disabled, every budget equals its configured value, refill runs once per <code>period / R</code> pulses as today, and the per-thread ADR-112 bucket is used unchanged.</td>
+<td>2</td>
+</tr>
+<tr>
+<td>I4</td>
+<td>The budgets and queue order of player-facing work, and the section 3.2 admission rule it is subject to, are identical with <code>autoTune</code> enabled and disabled. (Admission <em>timing</em> can differ, because background work occupying permits differs; the rule that interactive requests go first is unchanged.)</td>
+<td>4</td>
+</tr>
+<tr>
+<td>I5</td>
+<td>On single-loop hosts with a fresh MSPT reading, no background tick work starts while $B_{\text{cpu}} &lt; 1$ ms; otherwise background tick charge per tick stays within $S_{\text{eff}}$ plus one task.</td>
+<td>1</td>
+</tr>
+<tr>
+<td>I6</td>
+<td>A never-sampled signal leaves its knobs at configured values; a stale signal never raises an effective value.</td>
+<td>5</td>
+</tr>
+<tr>
+<td>I7</td>
+<td>The semantics of <code>minTPS</code>, <code>maxMSPT</code>, <code>maxHeapPercent</code>, the stalled-tick check and the regional circuit breaker are unchanged.</td>
+<td>3</td>
+</tr>
+<tr>
+<td>I8</td>
+<td>The governor creates no threads and takes no locks on actuation paths.</td>
+<td>6</td>
+</tr>
+<tr>
+<td>I10</td>
+<td>One-shot regional dispatches in flight, interactive and background, never exceed the section 3.2 bound; inline runs and repeating timers are exempt, as today.</td>
+<td>3.2</td>
+</tr>
+<tr>
+<td>I11</td>
+<td>Over any window $[a, b]$, the background units delivered to RTP region $r$ never exceed $\int_a^b x_r\,dt + b_r(a)$, where $b_r(t) = \max\left(1,\; x_r(t) \cdot \text{period}_{\text{cfg}}\right)$ when $x_r(t) &gt; 0$ and $0$ when $x_r(t) = 0$ is the region's credit cap (section 4.3, item 1); their total never exceeds $\int_a^b r^{*}\,dt + \sum_r b_r(a)$.</td>
+<td>1</td>
+</tr>
+<tr>
+<td>I12</td>
+<td>With <code>autoTune</code> enabled and every signal that drives a knob <code>FRESH</code> and not in breach, each published effective value reaches its model target within $\max(5\text{ s},\; L) + 50$ s: it differs from the target by no more than the deadband (section 4.4), and equals it when the target is a ceiling. A <code>STALE</code> signal is excluded on purpose: it holds its knobs (principle 5) and raises <code>GOVERNOR_SIGNAL_STALE</code>.</td>
+<td>1, 5</td>
+</tr>
+</tbody>
+</table>
+<p>Existing requirements this design must also meet: REQ-RTP-OPS-002 (every load-driven reduction of a <code>performance.yml</code> value reports its cause and configured value on an operator surface; section 6 is the governor's design for it) and REQ-RTP-OPS-001 (shipping <code>autoTune: true</code> must not stop the shipped configuration from working on any Tested platform).</p>
+<h3 id="2-architecture">2. Architecture<a class="headerlink" href="#2-architecture" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+    subgraph Signals
+        M["MetricsBinding&lt;br/&gt;MSPT, TPS, per-region readings"]
+        H["HeapSampler&lt;br/&gt;tenured used / max"]
+        P["CPU&lt;br/&gt;process load, RTP async CPU"]
+        G["GenerationBudget&lt;br/&gt;in-flight, native load latency"]
+        C["Measured unit costs&lt;br/&gt;(EWMA per pulse)"]
+        D["Demand&lt;br/&gt;deficit, consumption rate"]
+    end
+    Signals --&gt; CG["ComputeGovernor&lt;br/&gt;(async pulse, every 250 ms at most)"]
+    CG --&gt; B["ComputeBudget&lt;br/&gt;immutable snapshot"]
+    B --&gt; TB["TickBudget&lt;br/&gt;background async, sync, idle cadence"]
+    B --&gt; RG["Region.execute&lt;br/&gt;unit quota, hot cap, promotions per turn"]
+    B --&gt; GB["GenerationBudget cap&lt;br/&gt;ImmediateLoadGovernor permits"]
+    HG["Hard gates&lt;br/&gt;minTPS, maxMSPT, maxHeapPercent, stall"] -. pause .-&gt; RG</code></pre>
+<ul>
+<li><strong><code>ComputeSignals</code></strong>: one sampled reading of every input, built by a <code>SignalSource</code> (production: metrics binding, heap sampler, CPU sampler, budgets, regions; tests: fixed values). Each reading carries a state: <code>NEVER_SAMPLED</code>, <code>FRESH</code> or <code>STALE</code> (principle 5).</li>
+<li><strong><code>ComputeGovernor</code></strong>: holds the estimator and limiter state and evaluates the control law. It is a single instance, reset on reload.</li>
+<li><strong><code>ComputeBudget</code></strong>: an immutable record of effective values plus a <code>reason</code> per knob (<code>CONFIGURED</code>, <code>CPU_HEADROOM</code>, <code>ASYNC_CPU</code>, <code>HEAP_HEADROOM</code>, <code>IDLE</code>, <code>CHUNK_LATENCY</code>, <code>REGION_OVERLOAD</code>, <code>STALE_SIGNAL</code>, <code>BACKSTOP</code>) for diagnostics.</li>
+<li><strong>Global plus regional.</strong> The governor sets server-wide values and a per-RTP-region unit quota. Per-tick-region values on Folia (share, steering weight, loan) and the signals they need are added to the same snapshot by ADR-123, from each region's own readings, because one slow region must not shrink every other region's budget (ADR-112 decision 6).</li>
+</ul>
+<h3 id="3-multi-region-concurrency-tracked-scheduling-and-anti-starvation-folia">3. Multi-Region Concurrency, Tracked Scheduling and Anti-Starvation (Folia)<a class="headerlink" href="#3-multi-region-concurrency-tracked-scheduling-and-anti-starvation-folia" title="Permanent link">&para;</a></h3>
+<p>Sections 3.4 and 3.6 are implemented by <a href="../ADR-112-per-region-work-division-on-folia/">ADR-112</a>.</p>
+<ol>
+<li><strong>Zero untracked worker threads.</strong> All async and regional operations go through the server's native schedulers (<code>RTPScheduler</code> to Folia <code>AsyncScheduler</code>, <code>RegionScheduler</code>, <code>GlobalRegionScheduler</code>). <code>AsyncTaskProcessing</code> runs on one thread at a time; a tick thread is engaged only through the native schedulers (ADR-123 adds placement classes that decide which). Watchdog, tick monitor and profilers (Spark, Paper timings) see every RTP task.</li>
+<li><strong>In-scheduler regional concurrency bound.</strong> <code>FoliaSchedulerImpl</code> bounds in-flight regional dispatches with a permit pool of $C_{\text{max_regional_inflight}} = \max(1, \lfloor \text{availableProcessors} / 2 \rfloor)$ and defers new dispatches until in-flight checks complete, so RTP does not create disjoint ticking regions faster than the thread pool can tick them. RTP's off-tick Anvil prefilter (ADR-016; addon-registered readers per ADR-077) evaluates most candidates from disk without touching live chunks; this bound covers prefilter-disabled worlds, custom generators and burst load.</li>
+<li><strong>Spatial balance under the bound.</strong> When the regional ceiling is saturated, the pipeline prefers Type A work (coordinate generation, bitmap lookups, off-tick prefilter) and Type B work (chunks inside an already-active region), and defers Type C work (L2-to-L1 promotion or live fallback reads that create a new region). It never substitutes non-uniform candidates, preserving the ADR-001 spiral distribution.</li>
+<li><strong>Coalesce per region, interleave across regions.</strong> <em>Implemented by ADR-112 (per-cell FIFOs, one slice per cell, per-region-thread token bucket).</em></li>
+<li><strong>Backlog is bounded by existing tiers.</strong> Deferred Type C work stays in its current tier (<code>backlogLocations</code>, <code>unkeptLocations</code>), already bounded by <code>backlogCacheCap</code> and <code>cacheCap</code> (ADR-028, ADR-078). No new queues are introduced and nothing in a tier is dropped.</li>
+<li><strong>Regional circuit breaker.</strong> <em>Implemented by ADR-112 (late slice &gt; 100 ms or unhealthy region runs one task; <code>RTPScheduler#isRegionSaturated</code>).</em></li>
+</ol>
+<h3 id="4-control-law">4. Control Law<a class="headerlink" href="#4-control-law" title="Permanent link">&para;</a></h3>
+<p>Evaluated at most every 250 ms (the gate sampling interval) at the start of an async pulse. Notation: $R$ = active RTP regions (selection regions) with a loaded world; $R_d$ = those with demand ($\bar d_r &gt; 0$, section 4.3); configured values carry the suffix <code>cfg</code>. $\text{period}_{\text{cfg}}$ is the configured <code>period</code> in ticks. Rates ($\lambda_r$, $\bar d_r$, $x_r$, $r^{*}$) are in units per tick, because the pulse runs every tick. With <code>autoTune: false</code>, <code>period</code> keeps today's role: one region turn every <code>period / R</code> pulses, with <code>period</code> raised to at least $R$.</p>
+<h4 id="41-signals">4.1 Signals<a class="headerlink" href="#41-signals" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Source</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\text{mspt}$</td>
+<td><code>MetricsBinding#worstMspt</code> (single-loop hosts)</td>
+<td>Tick <strong>work</strong>, not interval (METRICS_PLAN). NaN = unsampled. Not used as headroom on Folia (below).</td>
+</tr>
+<tr>
+<td>$\text{mspt}_{\text{rtp}}^{b}$</td>
+<td>EWMA of RTP's measured <strong>background</strong> tick-thread time per tick (single-loop hosts)</td>
+<td>Subtracted from $\text{mspt}$ so background work does not throttle against itself and oscillate. RTP's interactive tick time is not subtracted: it is load like any other, not headroom for background work.</td>
+</tr>
+<tr>
+<td>Region readings</td>
+<td><code>MetricsBinding#regionTps1m</code> / <code>#regionMspt</code>, ADR-112 slice dispatch lag</td>
+<td>Folia samples tick intervals: below 50 ms they carry no headroom information; only overload is visible.</td>
+</tr>
+<tr>
+<td>Process CPU</td>
+<td><code>com.sun.management.OperatingSystemMXBean#getProcessCpuLoad</code> and <code>#getProcessCpuTime</code>; RTP async CPU per pulse from <code>ThreadMXBean#getCurrentThreadCpuTime</code> around <code>AsyncTaskProcessing</code> drains</td>
+<td>Async work (the 25 ms pulse, Anvil decompression) competes with tick threads for cores, and $B_{\text{cpu}}$ cannot see it. The only CPU-contention reading on Folia. It covers this JVM only; contention from other processes on a shared host is not seen. <code>NEVER_SAMPLED</code> when the JVM does not support these calls.</td>
+</tr>
+<tr>
+<td>Tick stall</td>
+<td><code>ServerHealthGate#tickStalled</code></td>
+<td>Backstop and breach signal.</td>
+</tr>
+<tr>
+<td>Heap</td>
+<td><code>HeapSampler</code> tenured used/max, <code>Runtime#maxMemory</code></td>
+<td>Same tenured-first rules as <code>HeapPressureMonitor</code>, including the 512 MiB absolute-headroom floor. The hot-cap terms ($B_{\text{mem}}$ and the heap breach) read post-GC collection usage only: <code>HeapSampler</code>'s fallback to current pool usage is a sawtooth, and because decreases publish at once it would ratchet the hot cap down at every peak. Without a post-GC reading the hot cap's heap signal is <code>NEVER_SAMPLED</code> (configured value), and <code>HeapPressureMonitor</code> stays the backstop.</td>
+</tr>
+<tr>
+<td>Chunk-system load</td>
+<td><code>GenerationBudget#inFlight</code>, native load latency EWMA and windowed minimum</td>
+<td>Latency is shared with <code>ImmediateLoadGovernor</code> (ADR-114) rather than re-measured.</td>
+</tr>
+<tr>
+<td>Unit costs</td>
+<td>$\Delta T_{\text{async}}$, $\Delta T_{\text{tick}}$, $\Delta T_{\text{prom}}$, $\Delta M_{\text{unit}}$</td>
+<td>Section 4.2.</td>
+</tr>
+<tr>
+<td>Demand</td>
+<td>Per region: deficit $D_r$, consumption rate $\lambda_r$</td>
+<td>$D_r = \max(D_r^{\text{cold}}, D_r^{\text{hot}})$, where each tier's deficit is its configured or effective fill level minus (current + in flight + pending); $\lambda_r$ = EWMA of locations served per tick (the <code>HotBudgetAllocator#recordDemand</code> counters).</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Signal lag.</strong> Every signal declares its lag $L_s$: the window its value averages over (for example the window of the MSPT statistic the binding reads, or one minute for <code>regionTps1m</code>), or 0 for instantaneous readings such as a tick stall. The limiter uses it (section 4.4).</li>
+<li><strong>Folia is detected by <code>MetricsBinding#regionalTicking()</code>, not by a NaN MSPT.</strong> With Spark installed, <code>SparkMetricsBinding</code> wraps <code>FoliaMetricsBinding</code> and <code>worstMspt()</code> returns the worse of Spark's scalar MSPT and the worst region interval. Neither is per-region work time, so on Folia no MSPT reading is used as headroom, whichever binding is active.</li>
+</ul>
+<p>Soft targets, derived from the existing keys so that no new key is required:</p>
+<ul>
+<li>$T_{\text{cpu}} = 0.8 \times \text{maxMSPT}$ (36 ms at the default 45 ms; 40 ms when <code>maxMSPT</code> is 0 = off).</li>
+<li>$T_{\text{heap}} = \text{maxHeapPercent} - 10$ points (75 % at the default 85 %; 80 % when the gate is off).</li>
+<li>$T_{\text{proc}} = 0.9$ process CPU load.</li>
+</ul>
+<h4 id="42-measured-unit-costs-empirical-beforeafter-differentials">4.2 Measured unit costs (empirical before/after differentials)<a class="headerlink" href="#42-measured-unit-costs-empirical-beforeafter-differentials" title="Permanent link">&para;</a></h4>
+<p>A <strong>unit</strong> is one verified location advanced into a cache tier (cold fill or hot promotion), so units have the same dimension (locations) as $\lambda_r$ and $D_r = \max(D_r^{\text{cold}}, D_r^{\text{hot}})$. Every location served from the hot cache ($\lambda_r$) requires both a cold fill and a cold-to-hot promotion; if both tiers drew from a single combined count, a steady-state plan of $x_r = \lambda_r$ would deliver only $\lambda_r / 2$ hot locations, and unverified <code>processBacklog</code> shape picks (which run first and may be rejected by verification) would consume the quota before cold fill or promotion ran. Instead, a turn's quota $u_r$ caps each verified stage independently ($\min(u_r, D_r^{\text{cold}})$ cold fills and $\min(u_r, p_{\text{eff}}, D_r^{\text{hot}})$ promotions), unverified backlog picks stay bounded by <code>backlogCacheCap</code> and the turn's async deadline, and the turn reports $\max(\text{coldFills}, \text{promotions})$ as the units completed. In <code>Region#execute</code>, <code>coldFills</code> is the sum of validated backlog entries drained into <code>unkeptLocations</code> by <code>drainValidatedToCold</code> and <code>RegionCacheTask</code> fills started in that turn (with <code>GenerationBudget</code> slots reserved only up to the remaining turn quota $\min(u_r, D_r^{\text{cold}}) - \text{drainedFromBacklog}$ rather than the full <code>deficit</code>), and <code>promotions</code> is the number of <code>promoteCold</code> dispatches started in the turn.</p>
+<ul>
+<li>$\Delta T_{\text{async}}$: async-worker nanoseconds per unit, measured around each <code>Region.execute</code> turn and divided by $\max(\text{coldFills}, \text{promotions})$ so that sub-microsecond unverified shape picks do not dilute the cost of Anvil and chunk operations. When a turn runs only unverified <code>processBacklog</code> picks or defers on saturation so $\max(\text{coldFills}, \text{promotions}) = 0$, its async elapsed time is carried forward and added to the numerator of the next turn for that region that completes at least one unit, avoiding division by zero while charging backlog-pick time to the units it feeds.</li>
+<li>$\Delta T_{\text{tick}}$: tick-thread nanoseconds per unit, averaged over completed units. It sizes the unit rate $r^{*}$ so that when tick headroom $B_{\text{cpu}}$ is the binding limit, the constrained allocation (section 4.3, item 1) shares that tick headroom across regions by weight rather than letting the first region in turn order spend all of $S_{\text{eff}}$. Only promotions have material tick cost, so $\Delta T_{\text{tick}}$ equals the promotion share of units times $\Delta T_{\text{prom}}$.</li>
+<li>$\Delta T_{\text{prom}}$: tick-thread nanoseconds per promotion (completion, ticket activation, native sync load cost). It sizes promotions per turn and queued tick work. On Folia both are charged to the region by the ADR-112 bucket and only inform the global estimate.</li>
+<li>All three use <code>EwmaEstimator</code> with $\alpha = 0.1$. Priors are today's effective values, so the first minutes match current behaviour.</li>
+<li>$\Delta M_{\text{unit}}$: retained heap per hot entry, modelled from the chunks RTP holds rather than from heap deltas:
+  $$\Delta M_{\text{unit}} = n_{\text{chunks}} \cdot m_{\text{chunk}}$$</li>
+<li>$n_{\text{chunks}}$ is the measured mean number of chunk tickets per hot entry (EWMA, prior $(2 \cdot \text{viewDistanceSelect} + 1)^2$).</li>
+<li>$m_{\text{chunk}}$ starts at a per-version prior, calibrated offline with <code>helpers/StressTestRTP/.../TicketFootprintProbe.java</code> and recorded before rollout step 3. It is refined by the least-squares slope of post-GC tenured used (<code>HeapSampler#tenuredUsedBytes</code>, collection usage) against RTP-held chunk tickets over a 10-minute window. The slope replaces the prior only when the window holds at least 20 post-GC samples and RTP's ticket count varied by at least 25 % of its mean; otherwise the prior stands. Other allocations enter the fit as noise rather than as RTP's cost.</li>
+<li><strong>Only demand-driven ticket changes enter the fit.</strong> Samples taken within 60 s after a hot-cap contraction or a heap shed are excluded.</li>
+<li>The estimate stays within $[m_{\text{prior}},\; 4 \cdot m_{\text{prior}}]$. It moves in both directions inside that range and returns to the prior when the fit no longer supports a higher value.</li>
+</ul>
+<p>Why the fit is guarded this way:
+  - <strong>The controller biases the fit low.</strong> Under <code>autoTune</code> the hot cap contracts when heap is high (section 4.3, item 6), so the governor itself pushes ticket count down exactly when tenured use is up. The regression then sees a negative correlation that is not a property of chunks, and the slope comes out low. A low $m_{\text{chunk}}$ grows $N_{\text{total}}$ and expands the hot tier into the pressure it is meant to avoid; a high one only costs hit rate. Excluding contraction windows removes most of the induced correlation, and the floor at the prior removes the dangerous direction. Observe-only data (rollout step 1) is free of this bias, and is recorded to check the prior.
+  - <strong>Large heaps rarely refine the prior.</strong> On large G1 heaps old-gen collection usage updates infrequently, the 20-sample condition is seldom met, and the calibrated prior is the operative estimate. That is intended: the hot tier is a small share of a large heap.
+  - <strong>Per-batch tenured deltas are not used.</strong> Tenured growth includes every allocation on the server, kept chunks reach tenured long after their batch, and a GC between samples hides the delta. Dropping negative deltas would leave an estimate that only ratchets upwards.</p>
+<h4 id="43-knob-formulas-model-targets">4.3 Knob formulas (model targets)<a class="headerlink" href="#43-knob-formulas-model-targets" title="Permanent link">&para;</a></h4>
+<p><strong>Background CPU headroom per tick (single-loop hosts):</strong>
+$$B_{\text{cpu}} = s \cdot \max\left(0,\; T_{\text{cpu}} - (\text{mspt} - \text{mspt}_{\text{rtp}}^{b})\right), \quad s = 0.5$$</p>
+<p>With $\text{mspt}$ <code>NEVER_SAMPLED</code>, $B_{\text{cpu}}$ is undefined and every term that reads it is dropped, leaving configured values (principle 5). With $\text{mspt}$ <code>STALE</code>, the last $B_{\text{cpu}}$ is held and never raised.</p>
+<p>$B_{\text{cpu}}$ is an allowance spent on every tick that has background work, not a cap on a per-period plan. Refill runs on every pulse (item 1), so while regions have credit the background tick time per tick approaches $\min(B_{\text{cpu}}, S_{\text{cfg}})$, and it falls with $B_{\text{cpu}}$ as MSPT rises towards $T_{\text{cpu}}$.</p>
+<p>$B_{\text{cpu}}$ is the whole background tick allowance per tick, and it is spent once. Background sync stages and promotion completions both draw from the background sync budget $S_{\text{eff}}$ (item 4), and nothing else sizes tick work from $B_{\text{cpu}}$. Promotion completions are background tick work; where one runs outside the background sync span today, rollout step 2 brings it under that span. Otherwise sync stages and promotions would each size themselves from $B_{\text{cpu}}$, background tick spend could reach $2 \cdot B_{\text{cpu}} = T_{\text{cpu}} - \text{base}$, and the $s = 0.5$ safety margin would be gone.</p>
+<p><strong>Background unit rate.</strong> The rate is driven by demand and limited by every capacity limit in force, in units per tick. Region $r$'s deliverable demand is its consumption plus its deficit spread over one configured period, capped by what one full-budget turn can complete ($u_{\max}$ units, item 1), since a region gets at most one turn per pulse:
+$$\bar d_r = \min\left(\lambda_r + \frac{D_r}{\text{period}<em _max="\max">{\text{cfg}}},\; u</em>\right)$$
+Today a region completes at most $u_{\max}$ units per <code>period</code>; here the cap is $u_{\max}$ per tick. With no capacity limit binding, a cold region therefore plans to fill within one configured period, and a full region ($D_r = 0$) plans its consumption $\lambda_r$, however high. Deficit smoothing applies only to the weight used when a limit binds (item 1), $w_r = \lambda_r + D_r / h$ with $h = \max(600, \text{period}<em _text_bg="\text{bg">{\text{cfg}})$ ticks, so that a large deficit does not take the whole constrained rate. Then
+$$r^{*} = \min\left(f_A \cdot \min\left(\sum_r \bar d_r,\; \frac{\hat A</em>\right)$$
+Here $\hat A_{\text{bg}}$ is the async time a pulse leaves for background work: an EWMA of the remainder of $A_{\text{cfg}}$ after cancellations, }}}{\Delta T_{\text{async}}}\right),\; \frac{B_{\text{cpu}}}{\Delta T_{\text{tick}}<code>MiscTasks</code> and the player-facing drains (item 3), so player-facing load lowers the background rate instead of competing with it. $\Delta T_{\text{async}}$ is floored at $1\ \mu\text{s}$. $f_A = \ell_A / A_{\text{cfg}} \in (0, 1]$ is the async limiter's current fraction (item 3; 1 until it first cuts). The tick term is dropped (treated as $+\infty$) when $\Delta T_{\text{tick}} &lt; 1\ \mu\text{s}$: units without tick cost do not spend $B_{\text{cpu}}$, and promotions are still stopped by $S_{\text{eff}} = 0$ (item 4). This also keeps $0/0$ out of the law (<code>Math.min</code> returns NaN if either argument is NaN). Every server-wide capacity limit enters through $r^{*}$, so whenever one binds, the constrained allocation (item 1) decides which regions give up refill, rather than the region with the most demand being clipped first.</p>
+<p><strong>Folia</strong> (selected by <code>regionalTicking()</code>, section 4.1). No reading gives tick headroom below 50 ms on Folia, so $B_{\text{cpu}}$ is not computed there and no knob reads it. Tick-time headroom is enforced where it is spent: by the ADR-112 per-region-thread bucket, refined by ADR-123's per-region shares if they ship. Without a reading, the global CPU terms stay at their configured values (principle 5):</p>
+<ul>
+<li>$r^{<em>}$ has no $B_{\text{cpu}}$ term: $r^{</em>} = f_A \cdot \min\left(\sum_r \bar d_r,\; \hat A_{\text{bg}} / \Delta T_{\text{async}}\right)$. The per-region plan and the async budget follow from it as below, and the process CPU breach (item 3) still acts through $f_A$. Refill turns on every pulse dispatch more background regional work than today; it stays within the section 3.2 permit pool (I10) and the ADR-112 per-region-thread bucket.</li>
+<li>Promotions per turn stay at the ceiling (8). Promotion completions are chunk-bound tick work, already bounded by the ADR-112 bucket of the region thread they run on.</li>
+<li>Item 4 (single-loop sync) does not apply; on Folia the sync bound is ADR-112's, refined by ADR-123. Item 6 has no CPU term and applies unchanged.</li>
+<li>
+<p>The global limiters breach only on server-wide signals: tick stall, heap above $T_{\text{heap}}$, process CPU above $T_{\text{proc}}$, chunk-system latency, and the mean-TPS gate (ADR-112 decision 6). A slow tick region is handled by the ADR-112 circuit breaker (and ADR-123's per-region share) and never cuts a global knob.</p>
+</li>
+<li>
+<p><strong>Per-region quota and turn scheduling.</strong></p>
+</li>
+<li><strong>Plan.</strong> Each region gets a planned rate $x_r$: its deliverable demand $\bar d_r$ when $r^{<em>} = \sum_r \bar d_r$, otherwise its constrained allocation (below), so that $\sum_r x_r = r^{</em>}$ and $0 \le x_r \le \bar d_r$.</li>
+<li><strong>Constrained allocation.</strong> When $r^{<em>} &lt; \sum_r \bar d_r$, the rate is divided in proportion to the smoothed weight $w_r$, capped at deliverable demand (water-filling):
+     $$x_r = \min\left(\bar d_r,\; \theta \cdot w_r\right), \qquad \theta \text{ chosen so that } \sum_r x_r = r^{</em>}$$
+     Regions below their cap keep the same fraction of their weight, so no region is clipped first and a popular region is not penalised relative to its demand; a region whose cap binds passes its excess to the others. A smaller $r^{*}$ gives a smaller $\theta$, so no region's plan rises when a limit tightens. It needs no ledger and matches the demand weighting of the hot quotas (item 6). <a href="../ADR-124-consumer-attribution-for-background-refill/">ADR-124</a> proposes the same water-filling with distinct consuming players $n_r$ as weights; until it ships, this is the allocation.</li>
+<li><strong>Quota (credit bucket).</strong> Each region holds a credit $c_r$. At every evaluation and every turn it accrues the integral of the plan since its last update (the plan is constant between evaluations) and is then clamped to the cap
+     $$b_r = \begin{cases} 0 &amp; x_r = 0 \ \max\left(1,\; x_r \cdot \text{period}<em _max="\max">{\text{cfg}}\right) &amp; x_r &gt; 0 \end{cases}$$
+     so a region whose plan is $0$ holds no credit and a region that was skipped or idle for a long time cannot bank more than one configured period's plan. A region turn completes at most
+     $$u_r = \min\left(\lfloor c_r \rfloor,\; u</em>\right)$$
+     units per verified tier ($\min(u_r, D_r^{\text{cold}})$ cold fills and $\min(u_r, p_{\text{eff}}, D_r^{\text{hot}})$ promotions), and $c_r$ is debited by $\max(\text{coldFills}, \text{promotions})$ (section 4.2). Long-run delivery therefore equals $x_r$ even when $0 &lt; x_r \cdot \text{period}_{\text{cfg}} &lt; 1$, and over any window delivery exceeds the summed plan by at most the credit held at the window's start, which is the bound of I11. Accrual uses the integral of the plan, not the current plan times elapsed time, so a plan that rose late in a window does not release a burst sized from its latest value. <code>ComputeBudget#unitsPerTurn(region)</code> publishes $u_r$.</li>
+<li><strong>Scheduling.</strong> $u_{\max} = \max\left(1,\; \lfloor A_{\text{cfg}} / \Delta T_{\text{async}} \rfloor\right)$ is the number of units one uncontended full-budget region turn can complete. On every pulse, after the player-facing drains (item 3), the background budget runs turns for regions with $c_r \ge 1$, largest credit first (ties in round-robin order), at most one turn per region per pulse, until the budget or the credit runs out. Because $\bar d_r \le u_{\max}$ per tick and credit accrues every tick, one turn per pulse can deliver any region's plan.
+     A short turn completes fewer than $u_r$ units, and a pulse whose budget runs out skips the remaining regions; the shortfall stays in $D_r$ and in $c_r$ up to its cap, and the largest-credit order serves those regions first on the next pulse. I11 is an upper bound, so short turns do not affect it; how often they happen is a benchmark measure. <code>period</code> paces nothing while a region has credit. A region whose plan is 0 gets a turn at most once per idle period $\text{period}<em _text_cfg="\text{cfg">{\text{eff}} = 8 \cdot \text{period}</em>$ (}<code>backgroundPeriodTicks()</code>), so whatever <code>Region#execute</code> does besides refill keeps running; its credit starts accruing on the first evaluation that gives it a plan, not on its next turn. Full regions with no credit get no refill, and candidates within a region are never reordered (ADR-001).</li>
+</ul>
+<p>Why it is built this way:
+   - <strong>The quota is the rate limiter.</strong> The global knobs ($A_{\text{eff}}$, $p_{\text{eff}}$) are the same for every region. Without a per-region bound a turn completes as many units as its deficit and budget allow, so a region capped by the constrained allocation still refills at full speed, the delivered total can exceed $r^{<em>}$, and the allocation is a number nobody enforces.
+   - <strong>Turns every pulse, not once per period.</strong> Pacing refill by <code>period</code> caps every region at $u_{\max}$ units per period however much of each tick's budget goes unused: with one region and <code>period: 20</code>, 19 pulses in 20 offer refill nothing (Context item 3). Handing out turns on every pulse lets the plan set the rate, and the per-pulse budget, $B_{\text{cpu}}$ and the limiters bound it. It also removes the shared cadence, which the busiest region would have to set: sized from the mean instead, a region holding 90 % of demand among ten would get about a tenth of its plan.
+   - <strong>Largest credit first.</strong> Several regions can hold credit when a pulse's budget runs out. Serving the largest credit first keeps each region's delivery close to its plan without a ledger, and the credit cap bounds how far behind any region can fall.
+2. <strong>Promotions per turn</strong> (today <code>MAX_PROMOTIONS_PER_PULSE = 8</code>), drawn from the background sync budget rather than from $B_{\text{cpu}}$ directly:
+   $$p_{\text{eff}} = \text{clamp}\left(\left\lfloor \frac{S_{\text{eff}}}{\max(1, R_d) \cdot \Delta T_{\text{prom}}} \right\rfloor,\; 1,\; 8\right), \quad p_{\text{eff}} = 0 \text{ when } S_{\text{eff}} = 0$$
+   Turns run every pulse, so this is per tick. The background sync span, not $p_{\text{eff}}$, bounds promotion tick time per tick (I5).
+3. <strong>Background async budget (<code>asyncAllottedTime</code>).</strong> This is enough for one pulse's share of the plan, with a 25 % margin up to the ceiling:
+   $$A_{\text{eff}} = \text{clamp}\left(1.25 \cdot \lceil r^{</em>} \rceil \cdot \Delta T_{\text{async}},\; 1\text{ ms},\; A_{\text{cfg}}\right)$$
+   For a plan at or near $\hat A_{\text{bg}} / \Delta T_{\text{async}}$ the margin is clamped away, and the pulse's background work gets all that earlier work in the pulse left (below): as much as one turn per period gets today, but on every pulse. A turn that runs out of budget completes fewer than $u_r$ units; the shortfall stays in $D_r$ and enters the next plan, so I11, an upper bound, is unaffected. The budget is sized from the plan, not from units completed last turn: those are capped by the budget, so a history-based budget would hold itself low. Its limiter $\ell_A$ does not clamp $A_{\text{eff}}$ directly. It acts through $f_A$ in $r^{*}$, so a cut lowers the plan, then the quotas, then $A_{\text{eff}}$, and the constrained allocation decides which regions give up refill. Its knob-specific breach is process CPU load above $T_{\text{proc}}$ on two consecutive evaluations while RTP's async CPU is at least 10 % of the process's CPU time over the same interval (the <code>ThreadMXBean</code> sum over the <code>getProcessCpuTime</code> delta), so RTP backs off when cores are saturated and it is a material contributor. Contention from other processes on a shared host does not trigger it (section 4.1); there the knob behaves as today.</p>
+<p><strong>One pulse, one budget.</strong> A pulse runs cancellations (excluded from the pulse timer), <code>MiscTasks</code>, then the player-facing drains (<code>ActiveSelection</code> urgent selection, each region's <code>miscPipeline</code>, and each region's waiting <code>playerQueue</code> across all regions), then background work (the standard selection drain and region turns in credit order, item 1), all from one <code>asyncNanos()</code> budget (<code>AsyncTaskProcessing#runPulse</code>). In the player-facing <code>playerQueue</code> phase, each region wakes waiting players from <code>privateQueue</code> or <code>keptLocations</code> and, when <code>keptLocations</code> cannot cover <code>playerQueue.size()</code>, promotes from <code>unkeptLocations</code> or starts <code>RegionCacheTask</code> fills for the waiting-player shortfall $\max(0,\; \text{playerQueue.size()} - (\text{kept} + \text{pendingKept} + \text{inFlight}))$ (up to <code>MAX_PROMOTIONS_PER_PULSE</code>, gated only by the existing hard gates of I7 and <code>GenerationBudget</code>), outside $c_r$, $u_r$, $p_{\text{eff}}$ and $S_{\text{eff}}$. A player in <code>playerQueue</code> is therefore never stalled when $B_{\text{cpu}} &lt; 1\text{ ms}$ ($S_{\text{eff}} = 0$) or when a region has no refill credit or background budget (principle 4, I4). Background work runs on one shared budget $\text{bgBudget} = \max\left(0,\; \min\left(A_{\text{eff}},\; \text{remainder of } A_{\text{cfg}}\right) - d_A\right)$, and the remainder of $A_{\text{cfg}}$ after the player-facing drains is the $\hat A_{\text{bg}}$ sample.</p>
+<p><strong>Overrun carry-forward.</strong> All background stages in a pulse share one background deadline (<code>bgDeadline = bgStart + bgBudget</code>) and one pulse-wide <code>ranAnyBg</code> flag (replacing per-pipe <code>ranAny == false</code>, <code>i &gt; 0</code> and <code>Math.max(1L, ...)</code> floors): when <code>bgBudget &lt;= 0</code> or <code>now &gt;= bgDeadline</code>, no background task starts; when <code>bgBudget &gt; 0</code> and <code>!ranAnyBg</code>, the first background task of the pulse starts even if its predicted cost exceeds <code>bgBudget</code> (setting <code>ranAnyBg = true</code>), and every subsequent background task across all stages in the pulse requires <code>now + predictedCost &lt;= bgDeadline</code> (or <code>now &lt; bgDeadline</code> for unpaced steps). A low positive $A_{\text{eff}}$ therefore never deadlocks behind a larger predicted task cost (I12), and the entire pulse's background work overruns its budget by at most one single task ($\varepsilon_A$), so the per-pulse and $n$-pulse bounds of I2 agree at $n = 1$. The governor keeps an async debt $d_A$: after each pulse, $d_A \leftarrow \max\left(0,\; d_A + \text{spend} - A_{\text{cfg}}\right)$, cancellations excluded from the spend. Player-facing drains never pay the debt (principle 4, I4); background work repays it as soon as it has budget to repay it from. Without the carry-forward, a drain that overruns by one task on every pulse would hold the average above $A_{\text{cfg}}$ indefinitely. The debt is the time counterpart of the unit credit $c_r$ of item 1.
+4. <strong>Background sync budget (<code>syncAllottedTime</code>), single-loop hosts:</strong>
+   $$S_{\text{eff}} = \begin{cases} 0 &amp; B_{\text{cpu}} &lt; 1\text{ ms} \ \text{clamp}\left(B_{\text{cpu}},\; 1\text{ ms},\; S_{\text{cfg}}\right) &amp; \text{otherwise} \end{cases}$$
+   In <code>SyncTaskProcessing</code>, player-facing sync stages (<code>CommandsAPI</code>, <code>ActionServices</code>, <code>MiscTasks.sync()</code>, and promotion completions serving a waiting <code>playerQueue</code> shortfall) run first against $S_{\text{cfg}}$ with their existing 1-task progress floors and never pay $d_S$ (I4). Background tick work (a dedicated <code>MiscTasks.backgroundSync()</code> queue for background verification callbacks and speculative promotion completions) runs after them in one shared background sync span with budget $\text{bgSyncBudget} = \max\left(0,\; \min\left(S_{\text{eff}},\; \text{remainder of } S_{\text{cfg}}\right) - d_S\right)$ and one tick-wide <code>ranAnyBgSync</code> flag: when $\text{bgSyncBudget} \le 0$ no background sync task or promotion completion starts (principle 1, I5); when positive, the first background sync task starts and subsequent tasks require <code>now + predictedCost &lt;= bgSyncDeadline</code>, so at most one task finishes past the deadline (charge within $S_{\text{eff}} + \varepsilon_S$, I5) and after each tick $d_S \leftarrow \max\left(0,\; d_S + \text{syncSpend} - S_{\text{cfg}}\right)$ keeps background sync spend over any $n$ ticks within $n \cdot S_{\text{cfg}} + \varepsilon_S$ (I2). When interactive load alone pushes $\text{mspt} - \text{mspt}<em _text_cpu="\text{cpu">{\text{rtp}}^{b}$ to $T</em>$ (36 ms) and }}$ (as player arrival chunk loads do around 40 TP/s on the Paper 26.2 ramp), $B_{\text{cpu}}$ and $S_{\text{eff}}$ reach 0 by design: the governor yields background refill so RTP does not compound tick load between $T_{\text{cpu}<code>maxMSPT</code> (45 ms).
+5. <strong>Per-region sync share, steering and lending (Folia).</strong> Not part of this decision; see ADR-123. Without it, Folia keeps the ADR-112 uniform per-region-thread bound.
+6. <strong>Hot cache capacity (<code>activeChunkCap</code>).</strong> Memory available to the hot tier is what RTP already holds plus the remaining headroom to the soft target:
+   $$B_{\text{mem}} = \max\left(0,\; T_{\text{heap}} \cdot \text{maxHeap} - \text{tenuredUsed}<em _text_hot="\text{hot">{\text{postGC}}\right) + N</em>$$
+   $$N_{\text{total}} = \left\lfloor \frac{B_{\text{mem}}}{\Delta M_{\text{unit}}} \right\rfloor$$
+   $N_{\text{total}}$ is divided across regions by demand weight with }} \cdot \Delta M_{\text{unit}<code>HotBudgetAllocator#computeQuotas</code> (floors honoured first, then proportional). Each region is bounded by $[\min(1, \text{activeChunkCap}<em _text_cfg="\text{cfg">{\text{cfg}}),\; \text{activeChunkCap}</em>}}]$, and a region with $\lambda_r = 0$ over 10 minutes floats down to $\lceil \text{activeChunkCap<em _text_heap="\text{heap">{\text{cfg}} / 4 \rceil$.
+   - <strong>Contraction</strong> gates promotions first (ADR-078: quota changes act as promotion gating). Tickets are released only while the hot count exceeds the quota by more than 25 % or the heap is above $T</em>$, at most 4 per pulse, through the existing shed path: the location returns to cold and its ticket is closed exactly once (S-002).
+   - }<strong>Kept chunks also cost tick time.</strong> $N_{\text{total}}$ has no CPU term, and the hot-cap limiter breaches on heap only (section 4.4). A tick breach stops the hot tier growing, because it cuts $S_{\text{eff}}$ and so $p_{\text{eff}}$, but releases no tickets: shedding on a CPU spike churns tickets, and refilling them later costs promotion tick time. Whether that is enough depends on the per-ticket tick cost, which varies with the ticket level each platform uses. Rollout step 1 records MSPT against RTP-held ticket count while nothing actuates, so the governor cannot bias the measurement. If the per-ticket cost at $\text{activeChunkCap}<em _text_cpu="\text{cpu">{\text{cfg}}$ is not negligible against $B</em>$, step 3 adds a CPU bound (and a sustained-tick-breach term for the hot-cap limiter) before it ships. On Folia, ADR-123's steering orders sheds by tick-region weight; without it, sheds follow the existing order.
+   - }<strong><code>cacheCap</code> (cold) is not floated.</strong> Cold entries hold no chunk tickets and cost little memory; demand weighting orders their refill (item 1) instead.
+   - <strong>Pin slots follow the quota.</strong> <code>LiveLoadGate</code> (ADR-110) bounds pinned native loads by <code>activeChunkCap</code>. It reads <code>budget.hotCap(region)</code> instead, so pinned loads cannot overcommit a contracted hot tier.
+7. <strong>Generation concurrency.</strong> The <code>GenerationBudget</code> server cap and the <code>ImmediateLoadGovernor</code> global permits read one value:
+   $$g_{\text{eff}} \in \left[1,\; \text{capFor(version)}\right]$$
+   Unifying both on $\text{capFor(version)}$ aligns the 26.x global permit ceiling with <code>GenerationBudget</code> (4 when healthy, 2 on 1.20/1.21) instead of keeping separate fixed caps. This value is driven by the limiter only. A breach is native load latency EWMA $&gt; 2\times$ its 5-minute windowed minimum (queueing in the chunk system), the process CPU breach of item 3, or a tick breach (section 4.4: $\text{mspt} &gt; T_{\text{cpu}}$ on single-loop hosts, the mean-TPS gate on Folia). The fixed <code>mspt &gt; 35 -&gt; 1 permit</code> step is removed. The other two uses of the constant (Context item 6), the PREFILTER short-circuit and the knee of <code>computeTickWeight</code>, are cost-model inputs rather than budgets, so the limiter does not drive them. They keep reading the MSPT value they read today (<code>ServerHealthGate.lastMspt()</code> in <code>PregenTask</code>) and replace the constant 35 with $\min(35\text{ ms},\; T_{\text{cpu}})$ from the snapshot: the shipped defaults keep 35, a lower <code>maxMSPT</code> moves the knee down, and with <code>autoTune: false</code> they keep 35. A lower knee forces PREFILTER and prices tick time earlier, which only makes RTP lighter. <code>ProbeFirstGovernor</code> (ADR-109) compares wall-clock costs, reads no MSPT and does not read the snapshot. The regional permit (1) and the "loads are never refused, interactive loads still count" invariant are unchanged. The ceiling stays at <code>capFor(version)</code>: on first-come, first-served chunk systems every extra RTP load delays a joining player's chunks, so raising it needs its own evidence (section 9).</p>
+<h4 id="44-stability-guard-aimd-limiter">4.4 Stability guard (AIMD limiter)<a class="headerlink" href="#44-stability-guard-aimd-limiter" title="Permanent link">&para;</a></h4>
+<p>Each knob's effective value is $\min(\text{model target}, \text{limit})$, where the limit is an additive-increase / multiplicative-decrease limiter (new <code>common/predict/AimdLimiter</code>). The one exception is the background async budget, whose limit $\ell_A$ acts through $f_A$ in $r^{*}$ (section 4.3, item 3):</p>
+<ul>
+<li><strong>Breach</strong>: the limit is multiplied by 0.5 and clamped to the floor. Each limiter cuts only on breaches of the resource its knob spends, so one spike does not cut every knob at once:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Limiter</th>
+<th>Cuts on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\ell_A$ (background async, through $f_A$)</td>
+<td>process CPU breach (section 4.3, item 3), tick stall</td>
+</tr>
+<tr>
+<td>$S_{\text{eff}}$ (single-loop background sync)</td>
+<td>tick breach, tick stall</td>
+</tr>
+<tr>
+<td>Hot cap</td>
+<td>heap above $T_{\text{heap}}$ (post-GC reading, section 4.1)</td>
+</tr>
+<tr>
+<td>$g_{\text{eff}}$ (generation)</td>
+<td>chunk-system latency breach, process CPU breach, tick breach, tick stall (section 4.3, item 7)</td>
+</tr>
+</tbody>
+</table>
+<p>A <strong>tick breach</strong> is $\text{mspt} &gt; T_{\text{cpu}}$ on single-loop hosts and the mean-TPS gate (ADR-112 decision 6) on Folia. <code>period</code> no longer paces refill, and $p_{\text{eff}}$ and $u_r$ have no limiter: they are derived from the plan and from $S_{\text{eff}}$, so a cut reaches each of them once, through $r^{*}$ or $S_{\text{eff}}$.
+- <strong>The tick breach reads raw MSPT, RTP's own background work included.</strong> The model target subtracts $\text{mspt}<em _text_cpu="\text{cpu">{\text{rtp}}^{b}$ so that the headroom <em>estimate</em> is not biased by RTP's own spend. The limiter deliberately does not: it keeps total tick time below $T</em>$ whoever spends it, so when RTP's background work is what pushes MSPT over the target, backing off is the intended response. The cycle this can cause is bounded by the next two rules and is the oscillation the bounded-oscillation test asserts.
+- }<strong>One cut per breach episode, then a lag-aware cooldown.</strong> A knob is cut when a breach begins. While the breach persists, it is cut again only after a cooldown of $\max(1\text{ s},\; L)$, where $L$ is the largest lag among the signals in breach. A single spike seen by several signals therefore cuts once. <em>Why:</em> a windowed mean stays above target for most of its window after the load has gone. With a fixed 1 s cooldown, one short spike seen through a 10 s window would cut about ten times and drive the knob to its floor. This is the usual failure of AIMD under delayed feedback.
+- <strong>Recovery</strong>: after $\max(5\text{ s},\; L)$ without a breach, the limit rises by 10 % of the knob's range per 5 s window. Recovery counts only evaluations whose driving signals are <code>FRESH</code>: a <code>STALE</code> signal holds the limit (reason <code>STALE_SIGNAL</code>), because readings freeze during the stalls they should report (<code>ServerHealthGate</code>). A full return from floor to ceiling takes at least 50 s, which subsumes the original 30 s stabilisation window.
+- <strong>Deadband</strong>: an increase is published only when the new target exceeds the published value by more than 10 % or reaches a ceiling, so actuation points see few changes. Decreases are published at once. The deadband therefore never holds a published value above its model target, and every ceiling bound (and ADR-123's pool and loan caps) holds for the published values, which are what the tests check.
+- <strong>Bounded oscillation</strong>: a stable load converges to a limit cycle no wider than one cut, below the hard gates. The tests assert this with signals that carry realistic lag (section 8); with instantaneous test signals the assertion would prove nothing.</p>
+<p>The model gives fast, informed targets after a platform or load change. The limiter is there so that estimate errors are corrected by measured breaches, with each cut taking effect on the next evaluation; how long the server stays over its soft target is a benchmark measure (section 8), not an invariant.</p>
+<h3 id="5-operator-surface">5. Operator Surface<a class="headerlink" href="#5-operator-surface" title="Permanent link">&para;</a></h3>
+<p><code>performance.yml</code> gains one key, mirrored into <code>lang/&lt;file&gt;.lang.yml</code> and every <code>lang/&lt;locale&gt;/advanced/performance.yml</code> (REQ-RTP-F-013, ADR-020, <code>LocaleParityTest</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Tune background work automatically from measured server headroom and demand.</span>
+<span class="c1"># While players teleport and the server has room, cache refill uses the</span>
+<span class="c1"># per-tick budgets below on every tick instead of once per period. Under</span>
+<span class="c1"># load or with full caches it backs off. The budgets stay hard limits.</span>
+<span class="c1"># Requests from waiting players keep the full values.</span>
+<span class="c1"># false = fixed values and refill once per period.</span>
+<span class="c1"># @type: boolean</span>
+<span class="c1"># @default: true</span>
+<span class="nt">autoTune</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>The key ships with rollout step 2, the first step that actuates anything. Before that the key is absent, and observe-only mode (step 1) runs only when the operator starts the server with the system property <code>-Drtp.governor.observe=true</code>; without it, no observer runs and no CPU timing is taken, which is today's behaviour. From step 2, <code>autoTune</code> controls the observers too (<code>false</code> starts none of them), and <code>true</code> actuates only the knobs whose rollout step has shipped; the others stay at their configured values with reason <code>CONFIGURED</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>With <code>autoTune: true</code></th>
+<th>With <code>autoTune: false</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>period</code></td>
+<td>Credit horizon and idle cadence (8x); refill runs on every pulse while there is demand</td>
+<td>Fixed refill cadence (today)</td>
+</tr>
+<tr>
+<td><code>asyncAllottedTime</code>, <code>syncAllottedTime</code></td>
+<td>Per-tick ceiling for background work, used on every tick with demand and headroom; player-facing work keeps the full value</td>
+<td>Fixed (today)</td>
+</tr>
+<tr>
+<td><code>syncAllottedTime</code> on Folia</td>
+<td>Per-region-thread ceiling, unchanged (ADR-112); ADR-123 adds per-region shares and lending if it ships</td>
+<td>Fixed per region thread (ADR-112)</td>
+</tr>
+<tr>
+<td><code>activeChunkCap</code></td>
+<td>Per-region ceiling; floats with heap headroom and demand</td>
+<td>Fixed (today)</td>
+</tr>
+<tr>
+<td><code>cacheCap</code>, <code>backlogCacheCap</code></td>
+<td>Unchanged; refill order and share follow demand</td>
+<td>Unchanged</td>
+</tr>
+<tr>
+<td><code>minTPS</code>, <code>maxMSPT</code>, <code>maxHeapPercent</code></td>
+<td>Hard backstops; also derive the soft targets</td>
+<td>Hard backstops (today)</td>
+</tr>
+</tbody>
+</table>
+<p>With the shipped defaults <code>autoTune: true</code> raises RTP's refill rate when players consume faster than one turn per <code>period</code> refills and the server has headroom, and lowers RTP's footprint when the server is loaded or the caches are full. Raising the per-tick ceilings themselves is section 9, step 5. The performance prefabs (<code>low-performance</code>, <code>high-performance</code>, <code>folia-tuned</code>) become ceiling presets, and their pulse and budget entries stay valid. Whether operators still need them to match a host is the Context item 1 goal, so whether to retire them is decided after the section 8 evidence and section 9.</p>
+<h3 id="6-operator-visibility-and-telemetry">6. Operator Visibility and Telemetry<a class="headerlink" href="#6-operator-visibility-and-telemetry" title="Permanent link">&para;</a></h3>
+<p>Silent adaptation confuses operators (for example, <code>/rtp info</code> showing fewer hot entries than configured), and "RTP is slow" becomes a question about the governor's recent history. REQ-RTP-OPS-002 requires at least one operator surface per reduction. The governor uses four because each serves a different reader: the console for the operator at the time, <code>/rtp info</code> for a live check, metrics for dashboards, and BIT for support.</p>
+<ol>
+<li><strong>Console.</strong> On a state change of any knob's <code>reason</code> (not on every value change), the governor logs one line through <code>RTPRuntime.log(Level.INFO, ...)</code>, at most once per 60 s per knob. The line names the cause, the configured value and the effective value, for example <code>[RTP] Background work reduced (MSPT 41.2 ms, target 36.0 ms): background async 25 -&gt; 12 ms, activeChunkCap 10 -&gt; 6.</code> Recovery to configured values logs once.</li>
+<li><strong><code>/rtp info</code>.</strong> Shows configured and effective values with the reason, for example <code>Background async: 25 ms (effective 12, cpu headroom)</code>, <code>Hot cap: 10 (effective 6, heap headroom)</code>, <code>Generation: 2 (effective 1, chunk latency)</code>, plus Folia regional in-flight versus ceiling. ADR-123 and ADR-124 add their own lines (Folia per-region cost; refill share and top consumers). All strings are in <code>messages.yml</code> (REQ-RTP-F-013, REQ-RTP-S-007).</li>
+<li><strong>Metrics.</strong> Through <code>metrics-api</code>: <code>rtp_governor_period_ticks</code>, <code>rtp_governor_async_budget_ms</code>, <code>rtp_governor_sync_budget_ms</code>, <code>rtp_governor_hot_cap</code> (per region), <code>rtp_governor_units_per_turn</code> (per region), <code>rtp_governor_generation_cap</code>, <code>rtp_governor_breaches_total</code> (by signal), <code>rtp_governor_stale_signals</code>, <code>rtp_governor_regional_inflight_count</code>. ADR-123 and ADR-124 add their own metrics under the same prefix. There are no per-player labels, which keeps cardinality bounded and player identifiers out of metrics.</li>
+<li><strong>Built-in test (<a href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/">ADR-121</a>).</strong> The governor registers a CBIT component <code>compute-governor</code> under a <code>GOVERNOR</code> code namespace, so support reads it through <code>/rtp test</code> like every other subsystem instead of through metrics:</li>
+<li><code>GOVERNOR_KNOB_REDUCED</code> (<code>INFO</code>): a knob below its configured value, with its reason.</li>
+<li><code>GOVERNOR_KNOB_AT_FLOOR</code> (<code>WARNING</code>): a knob held at its floor for more than 10 minutes. Background work is effectively off; the server is overloaded or a signal is wrong.</li>
+<li><code>GOVERNOR_SIGNAL_STALE</code> (<code>WARNING</code>): a previously sampled signal stale for more than 60 s; the knobs it drives are held.</li>
+<li><code>GOVERNOR_EVALUATION_FAILED</code> (<code>WARNING</code>): evaluations failing and the previous snapshot kept.</li>
+</ol>
+<h3 id="7-mechanical-specification-and-implementation-layout">7. Mechanical Specification and Implementation Layout<a class="headerlink" href="#7-mechanical-specification-and-implementation-layout" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Placement (<code>rtp-core</code>, package <code>io.github.dailystruggle.rtp.common.governor</code>).</strong> <code>ComputeGovernor</code>, <code>ComputeBudget</code> (record), <code>ComputeSignals</code> (record), <code>SignalSource</code>. <code>AimdLimiter</code> goes to <code>common/predict</code> next to <code>EwmaEstimator</code>, since it is domain-agnostic. There are no platform imports; platforms supply signals only through the existing <code>MetricsBinding</code> and <code>RTPScheduler</code> SPIs. The process CPU sampler uses only JDK management beans and stays in <code>rtp-core</code>.</li>
+<li><strong>Evaluation point.</strong> <code>AsyncTaskProcessing#runPulse</code> calls <code>ComputeGovernor#maybeEvaluate(now)</code> before draining. A failed evaluation keeps the previous snapshot and logs at <code>WARNING</code>, rate-limited (no silent swallow), and raises <code>GOVERNOR_EVALUATION_FAILED</code>.</li>
+<li><strong>Actuation points</strong> read the snapshot and do not re-derive anything:</li>
+<li><code>TickBudget</code>: <code>asyncNanos()</code>, <code>syncNanos()</code> and <code>periodTicks()</code> keep returning configured values. New <code>backgroundAsyncNanos()</code>, <code>backgroundSyncNanos()</code> and <code>backgroundPeriodTicks()</code> return effective values, and background callers opt in to them. A missed call site therefore behaves exactly as today and never throttles players (principle 4). <code>SelectionAPI</code>'s default budget supplier, set in <code>TickBudget</code>'s static initialiser, stays on the configured accessor; background refill paths pass the background supplier explicitly. On Folia, <code>RegionThreadBudget</code> keeps its ADR-112 supplier; ADR-123 changes it.</li>
+<li><code>AsyncTaskProcessing</code>: the pulse timer starts after <code>MiscTasks.cancel()</code> and keeps one <code>asyncNanos()</code> total (section 4.3, item 3). <code>ActiveSelection#compute</code> is split into its urgent and standard drains, and each region's <code>miscPipeline</code> and waiting <code>playerQueue</code> drain (including cold promotions and <code>RegionCacheTask</code> fills for any waiting-player shortfall when <code>keptLocations</code> is empty) run in the player-facing phase right after the urgent drain against the remainder of <code>asyncNanos()</code>. The standard background drain and the region turns share one background deadline (<code>bgBudget = max(0, min(backgroundAsyncNanos(), remainder) - d_A)</code>) and one pulse-wide <code>ranAnyBg</code> flag (replacing per-pipe <code>ranAny == false</code>, <code>i &gt; 0</code> and <code>Math.max(1L, ...)</code> floors so no task starts when <code>bgBudget &lt;= 0</code> and at most one task crosses <code>bgDeadline</code>), and the post-player remainder is reported to the governor as the $\hat A_{\text{bg}}$ sample. With <code>autoTune</code> on, region turns run on every pulse in credit order (section 4.3, item 1) and <code>backgroundPeriodTicks()</code> is only the idle cadence; with <code>autoTune</code> off, the cadence is today's (<code>period</code> raised to at least the region count, one turn per <code>period / R</code> pulses). Background drains are timed with <code>ThreadMXBean#getCurrentThreadCpuTime</code> for the process CPU signal.</li>
+<li><code>Region#execute</code> and <code>SyncTaskProcessing</code>: the turn's cold fills (<code>drainValidatedToCold</code> plus <code>RegionCacheTask</code> admissions, reserving <code>GenerationBudget</code> slots only up to the remaining turn quota) and promotions are each bounded by <code>budget.unitsPerTurn(region)</code> (the governor keeps the credit $c_r$ and debits it by <code>max(coldFills, promotions)</code>), <code>activeCap</code> comes from <code>budget.hotCap(region)</code>, the promotion bound from <code>min(unitsPerTurn, budget.promotionsPerTurn(), hotDeficit)</code>, and measured unit costs are reported back to the governor (carrying forward async elapsed time on 0-unit turns). In <code>SyncTaskProcessing</code>, <code>MiscTasks.sync()</code> stays in the player-facing phase under <code>syncNanos()</code>, while background sync callbacks (<code>MiscTasks.backgroundSync()</code>) and speculative promotion completions share the background sync span (<code>max(0, min(backgroundSyncNanos(), remainder) - d_S)</code> with one tick-wide <code>ranAnyBgSync</code> flag and no 1-task floor at 0) on single-loop hosts.</li>
+<li><code>GenerationBudget.configureServerCap(() -&gt; Math.min(versionCap, budget.generationCap()))</code>. <code>ImmediateLoadGovernor#tryAcquirePermit</code> / <code>#permitsAvailable</code> use <code>budget.generationCap()</code> for the global limit; the PREFILTER short-circuit and <code>computeTickWeight</code> read <code>budget.cpuTarget()</code>. <code>LiveLoadGate</code> reads <code>budget.hotCap(region)</code> for its pin-slot bound.</li>
+<li><strong>Reload and lifecycle.</strong> The governor resets to configured values on config reload and on <code>autoTune: false</code>, and its state is released on shutdown. No <code>MemoryTracker</code> registration is needed because no chunk tickets are held.</li>
+<li><strong>Safety rules.</strong> S-005: no signal read or actuation loads a chunk; the governor only gates when existing paths run. S-002: hot-cap contraction uses the existing single-close shed path. S-004: a reduced quota leaves background candidates in their tier and never fails a teleport. F-001: no threads.</li>
+</ol>
+<h3 id="8-verification-and-evidence">8. Verification and Evidence<a class="headerlink" href="#8-verification-and-evidence" title="Permanent link">&para;</a></h3>
+<p><strong>Invariant checks.</strong> Each invariant of section 1 has a build-failing check. Property tests run the pure control law over random signals and region sets, and assert on <strong>published</strong> values. The checks for I1 and I9 are in ADR-123:</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I2</td>
+<td>No published effective value exceeds its ceiling and no published value is NaN or infinite, over random signals (including $\Delta T_{\text{tick}} = 0$ with $B_{\text{cpu}} = 0$); with a simulated pulse loop whose drains run tasks of random duration (including tasks whose predicted and actual durations exceed the remaining budget, a drain that overruns on every pulse, and pulses that run several region turns against one shared background deadline), each pulse spends at most $A_{\text{cfg}}$ plus one background task, and for every $n$ the cumulative gap $\sum \text{spend} - n \cdot A_{\text{cfg}}$, net of player-facing and unshaped overruns, stays at or below $\varepsilon_A$; the same per tick and per window for background sync against $S_{\text{cfg}}$ and $\varepsilon_S$; a background stage with remaining budget 0 or less starts no task, while a positive budget starts the pulse's first background task (<code>!ranAnyBg</code>) even when its predicted cost exceeds <code>bgBudget</code>; player-facing drains get the same budget with debt outstanding as with none. A governor without the carry-forward fails the window assertion on the always-overrunning fixture.</td>
+</tr>
+<tr>
+<td>I3</td>
+<td><code>autoTune: false</code> publishes exactly the configured values, refill runs once per <code>period / R</code> pulses, and <code>RegionThreadBudget</code> runs the unchanged ADR-112 per-thread bucket.</td>
+</tr>
+<tr>
+<td>I4</td>
+<td>With <code>autoTune</code> on and off, the same scripted player requests produce identical budgets and queue order for every player-facing path (including <code>MiscTasks.sync()</code>, <code>region.miscPipeline</code>, and advancing a location for a waiting <code>playerQueue</code> entry when <code>keptLocations</code> is empty while $B_{\text{cpu}} &lt; 1$ ms or $c_r &lt; 1$), and with the same permit occupancy the same admission order; <code>TickBudget</code>'s existing accessors return configured values with <code>autoTune</code> on.</td>
+</tr>
+<tr>
+<td>I5</td>
+<td>On single-loop hosts, with $B_{\text{cpu}} &lt; 1$ ms no background sync stage (<code>MiscTasks.backgroundSync()</code>) or speculative promotion completion starts; otherwise the background charge per tick (background sync stages plus speculative promotion completions) is within $S_{\text{eff}}$ plus one task.</td>
+</tr>
+<tr>
+<td>I6</td>
+<td>A never-sampled signal leaves its knobs at configured values; a sampled signal that turns stale never raises them; recovery resumes only on fresh readings.</td>
+</tr>
+<tr>
+<td>I7</td>
+<td>Existing gate tests pass unchanged with the governor enabled.</td>
+</tr>
+<tr>
+<td>I8</td>
+<td>An architecture test rejects thread creation and <code>synchronized</code> / <code>Lock</code> use in <code>common.governor</code> and on the budget-reading actuation paths (<code>TickBudget</code>, <code>RegionThreadBudget</code>, <code>GenerationBudget#cap</code>, <code>ImmediateLoadGovernor#tryAcquirePermit</code> / <code>#permitsAvailable</code>).</td>
+</tr>
+<tr>
+<td>I10</td>
+<td>Existing ADR-112 permit tests pass unchanged with <code>autoTune</code> on.</td>
+</tr>
+<tr>
+<td>I11</td>
+<td>Property test over random plans, plan changes between evaluations (including transitions to $x_r = 0$, which clamp $b_r = 0$ and $c_r = 0$ and deliver 0 background units), skipped, idle and budget-short turns, turns combining <code>drainValidatedToCold</code> and <code>RegionCacheTask</code> admissions, regions skipped when a pulse's budget runs out, and windows of every length (including windows shorter than one turn and windows starting after a long skip): delivery to each region over $[a, b]$ never exceeds $\int_a^b x_r\,dt + b_r(a)$, the total never exceeds $\int_a^b r^{*}\,dt + \sum_r b_r(a)$, and $u_r \le u_{\max}$. Fixtures include skewed demand (one region with 90 % of demand among ten) and regions with $0 &lt; x_r \cdot \text{period}_{\text{cfg}} &lt; 1$, which receive $x_r$ in the long run through the credit.</td>
+</tr>
+<tr>
+<td>I12</td>
+<td>With injected <code>FRESH</code>, non-breaching signals after breaches have driven every limiter to its floor, each published value is within the deadband of its model target after $\max(5\text{ s},\; L) + 50$ s. A fixture with saturated demand and headroom above every ceiling publishes every per-tick ceiling and runs a refill turn on every pulse for every region with credit, so a governor that holds any knob low, or paces refill by <code>period</code>, fails.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Design behaviour tests</strong> (pure control law, injected signals and clock). These check intended behaviour that is not an invariant:</li>
+<li>Step load in MSPT cuts on the first evaluation and recovers within the bounded window.</li>
+<li>A single one-tick spike observed through a windowed-mean signal model with lag $L$ cuts each knob once, not once per second of the window; constant load through the same model gives an oscillation width of one cut or less.</li>
+<li>Zero demand idles (no refill turns, idle cadence at $8 \cdot \text{period}_{\text{cfg}}$, background async at floor).</li>
+<li>Under constraint the plan is water-filled on $w_r$: regions below their cap get the same $\theta w_r$, the plan sums to $r^{<em>}$, no region gets more than $\bar d_r$, and lowering $r^{</em>}$ raises no region's plan.</li>
+<li>With no limit binding, a cold region's plan is $\min(\lambda_r + D_r / \text{period}<em _max="\max">{\text{cfg}},\; u</em>$ whenever consumption or deficit needs it, and a full region's is $\lambda_r$.})$, above today's $u_{\max} / \text{period}_{\text{cfg}</li>
+<li>$u_r \le u_{\max}$ and at most one turn per region per pulse, including the region holding most demand; with skewed demand and budget-short pulses, largest-credit-first order keeps every region's shortfall within its credit cap.</li>
+<li><strong>Uses the tick.</strong> With sustained consumption above today's refill rate, headroom, and no limit binding, background async spent per pulse tracks $\min(A_{\text{eff}}, \hat A_{\text{bg}})$ on every pulse, not on one pulse in <code>period / R</code>; as MSPT rises towards $T_{\text{cpu}}$ it falls with $B_{\text{cpu}}$.</li>
+<li>Process CPU above $T_{\text{proc}}$ on two evaluations, with RTP async CPU at least 10 % of process CPU time, cuts $\ell_A$ and $g_{\text{eff}}$, and the cut lowers $r^{*}$ by the cut fraction and raises no region's plan; with RTP's share below 10 % it does not cut.</li>
+<li>Each breach type cuts exactly the limiters listed in section 4.4; a tick breach sheds no hot-tier tickets and leaves refill turns to follow the plan.</li>
+<li>With only the current-usage heap fallback available, the hot cap stays at its configured value.</li>
+<li>Under constant load where RTP's own background work alone pushes MSPT over $T_{\text{cpu}}$, the limiter settles into a cycle no wider than one cut.</li>
+<li>Heap ramp contracts the hot cap before <code>maxHeapPercent</code> trips.</li>
+<li>The per-chunk memory estimate never falls below the prior, never exceeds $4 \cdot m_{\text{prior}}$, ignores samples within 60 s after a contraction, keeps the prior when RTP's ticket count did not vary, and stays at or above the prior when the input carries a controller-induced negative correlation.</li>
+<li>The background async budget reaches its planned level on the first evaluation after demand appears, rather than growing from the floor.</li>
+<li>The deadband publishes every decrease on the evaluation that computes it.</li>
+<li>On Folia (<code>regionalTicking() == true</code>, with and without a Spark-wrapped binding) no global knob reads $B_{\text{cpu}}$ or any MSPT as headroom, and a single slow region cuts no global limiter.</li>
+<li>The PREFILTER knee and <code>computeTickWeight</code> read 35 ms at the default <code>maxMSPT</code> and with <code>autoTune: false</code>.</li>
+<li><strong>Simulation</strong>: the ADR-090 <code>SimulatedFoliaRuntime</code> with injected regional MSPT and dispatch lag exercises the section 3 bounds and the Folia rules of section 4.3 (no global knob reads MSPT as headroom; a slow tick region cuts no global limiter). ADR-123 adds the clustered scenario.</li>
+<li><strong>Go/no-go</strong> (recorded in this ADR before the step it gates). On the bench and at least one real server:</li>
+<li><strong>Is RTP the marginal cost?</strong> Answered by the stress runs; it gates no step. On Paper 26.2 Test B (paced 5 TP/s) LeafRTP adds 4.3 ms MSPT over the settle-gap baseline (12.2 -&gt; 16.4 ms). On the Paper 26.2 Linux ramp its MSPT p95 rises from 21.2-21.3 ms at 5 TP/s to 42.6-45.2 ms at 40 TP/s, and it fails 80 TP/s on MSPT p95 (87.9-90.5 ms) with 0 failed teleports (<a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md"><code>RESULTS.md</code></a>). RTP's spend is a material share of tick time near the gate, so the $B_{\text{cpu}}$ terms ship with step 2: they are what keeps spending each tick's allotment safe. Observe-only mode (rollout step 1) still records RTP's background share of MSPT between $T_{\text{cpu}}$ and <code>maxMSPT</code>, to check $s$ and $T_{\text{cpu}}$.</li>
+<li><strong>Memory</strong>: the observe-only memory fit against the calibrated prior, and MSPT against RTP-held ticket count (section 4.3, item 6).</li>
+</ul>
+<p>The same observe-only mode also carries ADR-123's go/no-go measurements (concentration diagnostic, sampler agreement, lending veto) and ADR-124's (how often refill is constrained), recorded in those ADRs.
+- <strong>Differential benchmark</strong> (VERIFICATION_GATES gate 10): the same bench scenarios with <code>autoTune</code> on and off, reporting the highest ramp stage passed, MSPT p50/p95/p99, gate trips, cache fill time after startup, teleport latency p50/p99, failed teleports and RTP CPU time (tick and async). The reference is the Paper 26.2 Linux ramp (60 s stages at 5, 10, 20, 40, 80, ... TP/s, stopping after two failed stages), run under the <strong>shipped defaults</strong> (<code>period: 20</code>, <code>cacheCap: 50</code>, <code>activeChunkCap: 10</code>) rather than the <code>bench-config</code> <code>period: 1</code> override, plus a parity check on <code>bench-config</code>. Acceptance:
+  1. On the shipped defaults, the highest stage passed (MSPT p95 within the ramp's threshold, zero failed teleports) is at least the <code>autoTune: false</code> value, and across the stages where $B_{\text{cpu}} &gt; 0$ (5-20 TP/s, where <code>period: 20</code> starves refill under <code>autoTune: false</code>), teleport latency p50 and p99 are lower without manual <code>period: 1</code> tuning. By 40 TP/s, where player arrival chunk loads alone push MSPT past $T_{\text{cpu}}$ (36 ms), the governor intentionally tapers background refill toward 0 to protect MSPT p95/p99.
+  2. Gate trips are fewer and MSPT p99 is no higher under load.
+  3. Cache fill time after startup is no slower.
+- <strong>Traceability</strong>: invariants I2-I8 and I10-I12 are added to <code>REQUIREMENTS.md</code> and <code>TRACEABILITY.md</code> when this ADR is accepted; each invariant check carries its REQ ID.
+- <strong>Revision rule.</strong> A later finding that a claim in this ADR can fail is handled by checking whether it contradicts an invariant. If it does, a failing check is added first and then the design is fixed. If it does not, the finding is a design-expectation question for the benchmarks, and the prose is corrected without new guarantees. Numeric constants in this ADR ($s = 0.5$, $h = 600$, the 8x idle ceiling, the 25 % margin, the 10 % deadband, cooldown and recovery windows) are initial values, revisable under this rule.</p>
+<h3 id="9-rollout">9. Rollout<a class="headerlink" href="#9-rollout" title="Permanent link">&para;</a></h3>
+<p>Each step ships behind its own evidence and is independently revertible by <code>autoTune: false</code>, except step 1. ADR-123 and ADR-124 have their own rollouts on top of steps 1 and 2.</p>
+<ol>
+<li><strong>Observe only.</strong> With <code>-Drtp.governor.observe=true</code>, the governor computes and publishes metrics, <code>/rtp info</code> lines and its BIT component, but actuates nothing. Without the property nothing runs. No config key ships yet (section 5). Run go/no-go 2 and the observe-only checks of section 8 and record them here; go/no-go 1 is already recorded.</li>
+<li><strong>Per-tick refill.</strong> Split <code>ActiveSelection#compute</code> into its urgent and standard drains and run each region's <code>miscPipeline</code> and waiting <code>playerQueue</code> drain (with waiting-player shortfall promotions and fills) in the player-facing phase (section 4.3, item 3). Actuate demand idling, the per-region credit quota with the constrained allocation, refill turns on every pulse (section 4.3, item 1), background async (with $\hat A_{\text{bg}}$, the shared pulse-wide <code>ranAnyBg</code> deadline and the process CPU breach), promotions per turn, and the single-loop sync budget $S_{\text{eff}}$ with its $B_{\text{cpu}}$ terms, and bring <code>MiscTasks.backgroundSync()</code> and speculative promotion completions under the background sync span. The headroom terms ship in this step, not after it, because this step is what raises RTP's spend per period.</li>
+<li><strong>Hot cache.</strong> Actuate <code>activeChunkCap</code> floating, after the per-version priors are calibrated and go/no-go 2 has decided whether a CPU bound is needed.</li>
+<li><strong>Generation.</strong> Actuate the generation cap and the <code>ImmediateLoadGovernor</code> permits.</li>
+<li><strong>Raising per-tick ceilings</strong> (separate decision). Step 2 already raises RTP's spend per period within today's per-tick values. With differential evidence, consider shipping higher per-tick defaults (for example <code>syncAllottedTime</code> above 5 ms, <code>cacheCap</code> sized to consumption, generation caps above today's on prioritised chunk systems), since the governor would then only spend them when there is headroom and demand.</li>
+</ol>
+<h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why Rejected</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fixed operator configuration knobs (status quo)</strong></td>
+<td>Operators rarely tune them, and static limits cannot react to boss fights, farms, raids or platform swaps.</td>
+</tr>
+<tr>
+<td><strong>Per-knob control loops in each owning class</strong></td>
+<td>No shared budget: loops react to the same spike several times and fight each other (for example, the hot cap growing while the period stretches).</td>
+</tr>
+<tr>
+<td><strong>Single <code>targetMSPT</code> knob replacing the existing keys</strong></td>
+<td>Breaks existing configs and prefabs, and removes the operator's hard upper bound on RTP's spend.</td>
+</tr>
+<tr>
+<td><strong>Headroom-only driving signal</strong></td>
+<td>Burns CPU filling caches nobody uses; idle regions still cost compute.</td>
+</tr>
+<tr>
+<td><strong>Demand-only driving signal</strong></td>
+<td>Keeps the binary cliff below <code>maxMSPT</code>; busy servers still get full spend until the gate trips.</td>
+</tr>
+<tr>
+<td><strong>Pure AIMD</strong></td>
+<td>Robust but slow to find the right level after a platform or load change; spends a long time far below the target.</td>
+</tr>
+<tr>
+<td><strong>Pure cost model</strong></td>
+<td>Reacts fast but depends on estimate quality; a bad estimate can hold the server over target.</td>
+</tr>
+<tr>
+<td><strong>Refill paced by <code>period</code> (one region turn per <code>period / R</code> pulses)</strong></td>
+<td>Under the shipped <code>period: 20</code> default, leaves 19 of 20 pulses' async allotment unused once the selection drains are empty and caps each region at $u_{\max}$ units per period, which forced the Paper 26.2 benchmark to use a custom <code>period: 1</code> override (Context item 3). Turns run on every pulse for regions with credit (section 4.3, item 1).</td>
+</tr>
+<tr>
+<td><strong>Every limiter cuts on every breach, including a <code>period</code> limiter</strong></td>
+<td>Reacts to one spike several times inside the governor, the failure Context item 6 describes. A <code>period</code> limiter would act on nothing, because <code>period</code> no longer paces refill; a hot-cap cut on a CPU spike churns tickets (section 4.4).</td>
+</tr>
+<tr>
+<td><strong>Deficit smoothed over $h$ in the plan cap</strong></td>
+<td>Caps cold-start fill at about <code>cacheCap</code> per 30 s even with full headroom, slower than today's one full turn per period, so the fill-time acceptance of section 8 would fail by design. Smoothing is kept only in the constrained weight (section 4.3).</td>
+</tr>
+<tr>
+<td><strong>Quota sized from the current plan times the time since the last turn</strong></td>
+<td>A region skipped for a long time releases one large burst, and a plan that just rose releases a burst sized from its new value, so no bound holds over short windows. The credit bucket accrues the plan's integral and is capped (section 4.3, item 1).</td>
+</tr>
+<tr>
+<td><strong>AIMD with a fixed 1 s cut cooldown</strong></td>
+<td>Shorter than the lag of windowed signals; one spike cuts repeatedly and drives knobs to the floor (section 4.4).</td>
+</tr>
+<tr>
+<td><strong>Climb towards configured values when a signal goes stale</strong></td>
+<td>Readings freeze during the stalls they should report, so the governor would raise spend exactly when it is blind. Only a never-sampled signal defaults to configured values.</td>
+</tr>
+<tr>
+<td><strong>Cadence sized from mean regional demand, no per-region quota</strong></td>
+<td>Starves the busiest region (it gets about $\text{mean} / \text{max}$ of its plan), and the constrained allocation is never enforced (section 4.3, item 1).</td>
+</tr>
+<tr>
+<td><strong>Static a priori unit cost estimates</strong></td>
+<td>Wrong when the platform or storage changes (Paper to Folia, NVMe to HDD or network storage). Measured differentials self-correct.</td>
+</tr>
+<tr>
+<td><strong>Symmetric clamp on the fitted per-chunk memory cost</strong></td>
+<td>Under <code>autoTune</code> the governor's own contraction biases the fit low, and a low estimate grows the hot tier into heap pressure. The estimate may only rise above the calibrated prior (section 4.2).</td>
+</tr>
+<tr>
+<td><strong>Global thread-sleep throttling</strong></td>
+<td>Sleeping workers does not relieve Folia region queues once tasks are dispatched.</td>
+</tr>
+<tr>
+<td><strong>Unbounded regional dispatch</strong></td>
+<td>Region over-instantiation: more ticking regions than tick threads, so every region ticks late (Context item 8).</td>
+</tr>
+<tr>
+<td><strong>Bypassing region schedulers</strong></td>
+<td>Violates S-005 and Folia's threading contract (<code>ThreadAccessException</code>, races on live world state).</td>
+</tr>
+<tr>
+<td><strong>Folia tick-region allocation and consumer attribution in this ADR</strong></td>
+<td>Each is a separate decision with its own evidence gate, and Folia allocation depends on a diagnostic not yet run. Moved to ADR-123 and ADR-124 so this ADR can be accepted or rejected on its own.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Positive:</strong></li>
+<li>Operators state per-tick limits once; RTP adapts to hardware, platform, heap and player load in both directions within them, without changing config values by hand.</li>
+<li>Busy regions refill on every tick with headroom instead of once per <code>period</code>, so the per-tick allotment that sits unused today goes to the caches that are running out (Context item 3).</li>
+<li>Background spend slopes down as MSPT approaches the soft target instead of falling off a cliff at <code>maxMSPT</code>, so gate trips and stop-start refill are expected to become rare (differential benchmark).</li>
+<li>Compute follows demand: busy regions refill first and get the rate they need, idle regions and full caches cost close to nothing.</li>
+<li>The hot cache shrinks before heap pressure forces a full pause, and grows back when memory is available.</li>
+<li>Chunk-system queueing and core saturation are detected from measured latency and CPU load, protecting joining players on first-come, first-served chunk systems.</li>
+<li>One snapshot replaces scattered constants (<code>mspt &gt; 35</code>, fixed permits, fixed promotions per pulse); <code>/rtp info</code>, metrics and the BIT component explain every reduction.</li>
+<li>Player-facing work keeps its budgets, order and admission rule: no waiting player is throttled or reordered by the governor (I4).</li>
+<li>The Folia protections (section 3, ADR-112) are kept and fed by the same budget.</li>
+<li><strong>Negative / Trade-offs:</strong></li>
+<li>RTP's background spend per period can exceed today's: with demand and headroom, background work runs on every tick up to the per-tick ceilings. The $B_{\text{cpu}}$, process CPU, heap and chunk-latency terms are what keep it below the soft targets, so a wrong cost estimate shows as extra MSPT until the limiter cuts; the hard gates remain the backstop.</li>
+<li>Under sustained load, caches refill more slowly, so more teleports are served from cold or backlog tiers or resolved on demand.</li>
+<li>A region with no plan gets turns only at the idle cadence (8x <code>period</code>), but its credit accrues from the first evaluation that gives it a plan, so refill resumes on the next pulse after that evaluation (at most 250 ms after demand returns).</li>
+<li>The player-facing / background split needs background callers to opt in to the <code>TickBudget</code> background accessors. A missed call site leaves that work at the configured value, the same as today, and never throttles players. Tests on each background path and the differential benchmark's RTP CPU time catch missed sites.</li>
+<li>More moving parts: behaviour depends on measured state, so bug reports need <code>/rtp info</code> governor output, the <code>compute-governor</code> BIT findings and metrics to reproduce.</li>
+<li>The lag-aware cooldown makes the limiter slower to cut a second time under a sustained breach; the hard gates remain the fast backstop.</li>
+<li>The memory estimate cannot fall below its calibrated prior, so a host whose chunks are genuinely cheaper than the prior keeps a smaller hot tier than it could.</li>
+<li>Observe-only data (step 1) comes only from servers that opt in with the system property, so the go/no-go evidence covers the bench and cooperating servers, not the general population.</li>
+</ul>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Folia regional threading, <code>RegionScheduler</code> and <code>EntityScheduler</code> contracts</li>
+<li><a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>: Archimedean spiral mapping (candidate order preserved; full regions are skipped, never reordered)</li>
+<li><a href="../ADR-004-countbound-taskpipe-on-folia/">ADR-004</a>: CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads</li>
+<li><a href="../ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>: Stale-Chunk Guard for Count-Bound Pipes</li>
+<li><a href="../ADR-028-l3-backlog-cache/">ADR-028</a>: L3 backlog cache tier</li>
+<li><a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/">ADR-067</a>: Automatic PRESCAN, Adaptive Scan Rate Control, and .mca-Header Generation Check</li>
+<li><a href="../ADR-078-composable-cache-pipeline-stages/">ADR-078</a>: Composable Cache Pipeline Stages and Dynamic Hot Quota Allocation (<code>HotBudgetAllocator</code>)</li>
+<li><a href="../ADR-090-test-driver-and-synthetic-mca-architecture/">ADR-090</a>: Test-Driver and Synthetic MCA Architecture (<code>SimulatedFoliaRuntime</code>)</li>
+<li><a href="../ADR-109-measured-cost-probe-first-gate/">ADR-109</a>, <a href="../ADR-110-purpose-gated-live-loads/">ADR-110</a>, <a href="../ADR-114-cost-governed-on-demand-chunk-reads/">ADR-114</a>: measured-cost gates whose constants this budget feeds</li>
+<li><a href="../ADR-112-per-region-work-division-on-folia/">ADR-112</a>: Per-Region Work Division on Folia (implements sections 3.4 and 3.6)</li>
+<li><a href="../ADR-123-folia-tick-region-allocation/">ADR-123</a>: Folia tick-region allocation (work placement, per-region shares, steering, lending; invariants I1, I9)</li>
+<li><a href="../ADR-124-consumer-attribution-for-background-refill/">ADR-124</a>: Consumer attribution for constrained background refill</li>
+<li><a href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/">ADR-121</a>: Built-In Test (the <code>compute-governor</code> CBIT component)</li>
+<li><a href="../../admin/configuration/PERFORMANCE/"><code>PERFORMANCE.md</code></a>, <a href="../../dev/METRICS_PLAN/"><code>METRICS_PLAN.md</code></a>, <a href="../../dev/VERIFICATION_GATES/"><code>VERIFICATION_GATES.md</code></a></li>
+<li>Competitor benchmark: EzRTP 3.4.0 on Folia 26.1, 7 watchdog stalls and a 20.4 s region freeze from a synchronous <code>World.loadChunk</code> on a region thread, run <code>20260617-191448</code>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/PRE_WRITEUP.md"><code>helpers/StressTestRTP/PRE_WRITEUP.md</code></a> section 5.3 and <a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md"><code>RESULTS.md</code></a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.3.1
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
+      
+    
+  </body>
+</html>

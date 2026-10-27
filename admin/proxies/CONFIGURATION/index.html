@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
@@ -26,7 +26,7 @@
     
     
       
-        <title>Configuration (network.yml) - LeafRTP</title>
+        <title>Configuration (network.yml) - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,7 +106,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -365,13 +365,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -1361,6 +1361,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#duration-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Duration values
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#network-backend-identity" class="md-nav__link">
     <span class="md-ellipsis">
       network (Backend identity)
@@ -1469,6 +1478,24 @@
   <a href="#loadbalancer-blank-rtp-region-selection-scoring" class="md-nav__link">
     <span class="md-ellipsis">
       loadBalancer (Blank-/rtp region selection scoring)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editor-web-editor-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      editor (Web editor services)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics-cross-backend-metric-time-series-publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      metrics (Cross-backend metric time-series publication)
     </span>
   </a>
   
@@ -3516,11 +3543,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../../../adr/ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
@@ -4146,6 +4173,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4192,6 +4387,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#duration-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Duration values
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#network-backend-identity" class="md-nav__link">
@@ -4307,6 +4511,24 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#editor-web-editor-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      editor (Web editor services)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics-cross-backend-metric-time-series-publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      metrics (Cross-backend metric time-series publication)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4331,6 +4553,9 @@
 <p>When <code>enabled: false</code>, this file is read, validated, and otherwise ignored: no threads start, no database tables are created, no transport opens. The backend behaves byte-identically to a build without network mode.</p>
 </blockquote>
 <p>For the conceptual model and verification walkthroughs see <a href="../INDEX/"><code>INDEX.md</code></a>, <a href="../SINGLE_BACKEND_VERIFICATION/"><code>SINGLE_BACKEND_VERIFICATION.md</code></a>, and <a href="../CROSS_SERVER_VERIFICATION/"><code>CROSS_SERVER_VERIFICATION.md</code></a>.</p>
+<hr />
+<h2 id="duration-values">Duration values<a class="headerlink" href="#duration-values" title="Permanent link">&para;</a></h2>
+<p>Keys marked <strong>Integer / Duration</strong> below accept a plain number or a duration with unit suffixes (e.g. <code>500ms</code>, <code>5s</code>, <code>2m</code>, <code>24h</code>, <code>1d</code>, or composites such as <code>1m30s</code>). A plain number keeps the key's own unit: milliseconds for every <code>*Ms</code> key, days for <code>editor.trust.maxAgeDays</code>. A suffixed value is converted from its own units, so <code>heartbeat.staleAfterMs: 5s</code> is <code>5000</code> ms and <code>editor.trust.maxAgeDays: 12h</code> is half a day. Full suffix list: <a href="../../configuration/CORE_CONFIG/#duration-unit-suffixes--parsing">CORE_CONFIG.md -&gt; Duration Unit Suffixes &amp; Parsing</a>.</p>
 <hr />
 <h2 id="network-backend-identity"><code>network</code> (Backend identity)<a class="headerlink" href="#network-backend-identity" title="Permanent link">&para;</a></h2>
 <table>
@@ -4504,9 +4729,9 @@
 </tr>
 <tr>
 <td><code>connectTimeoutMs</code> / <code>readTimeoutMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>1000</code> / <code>2000</code></td>
-<td>Socket timeouts.</td>
+<td>Socket timeouts (ms).</td>
 </tr>
 <tr>
 <td><code>tls</code></td>
@@ -4548,15 +4773,15 @@
 <tbody>
 <tr>
 <td><code>intervalMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>1000</code></td>
-<td>How often this backend publishes its state row. On the plugin-message tier this also sets the region-availability gossip cadence.</td>
+<td>How often this backend publishes its state row (ms). On the plugin-message tier this also sets the region-availability gossip cadence.</td>
 </tr>
 <tr>
 <td><code>staleAfterMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>5000</code></td>
-<td>How long a peer's last-seen state stays trusted before being treated as unknown. Keep comfortably above <code>intervalMs</code> so one dropped heartbeat does not flap a peer.</td>
+<td>How long (ms) a peer's last-seen state stays trusted before being treated as unknown. Keep comfortably above <code>intervalMs</code> so one dropped heartbeat does not flap a peer.</td>
 </tr>
 </tbody>
 </table>
@@ -4605,21 +4830,21 @@
 </tr>
 <tr>
 <td><code>flushIntervalMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>250</code></td>
 <td>Backend dirty-write flush cadence (ms). Lower = lower latency, higher = fewer round trips.</td>
 </tr>
 <tr>
 <td><code>pollIntervalMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>1000</code></td>
 <td>Backend status-cache poll cadence (ms); drives per-player progress refresh.</td>
 </tr>
 <tr>
 <td><code>entryTtlMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>0</code></td>
-<td>Optional passive aging of envelope hashes. <code>0</code> disables (terminal transitions still delete explicitly).</td>
+<td>Cancels non-terminal queue entries whose last status update is at least this old (ms). <code>0</code> disables it.</td>
 </tr>
 <tr>
 <td><code>crossServerRequestsPerSecond</code></td>
@@ -4654,13 +4879,13 @@
 <tbody>
 <tr>
 <td><code>reapIntervalMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>30000</code></td>
 <td>Proxy-side TTL reaper cadence (ms). Sweeps expired tokens and fires release so co-located backends can return the coordinate.</td>
 </tr>
 <tr>
 <td><code>ttlMs</code></td>
-<td>Integer</td>
+<td>Integer / Duration</td>
 <td><code>60000</code></td>
 <td>Per-token TTL (ms). A claimed-but-not-consumed reservation older than this is treated as abandoned and released.</td>
 </tr>
@@ -4800,6 +5025,76 @@
 </tr>
 </tbody>
 </table>
+<h2 id="editor-web-editor-services"><code>editor</code> (Web editor services)<a class="headerlink" href="#editor-web-editor-services" title="Permanent link">&para;</a></h2>
+<p>Used by <code>/rtp editor</code> whether or not network mode is enabled. See <a href="../../WEB_EDITOR_GUIDE/"><code>WEB_EDITOR_GUIDE.md</code></a>.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bytebinUrl</code></td>
+<td>String</td>
+<td><code>""</code></td>
+<td>Upload store for editor sessions. Empty = <code>https://bytebin.lucko.me</code>.</td>
+</tr>
+<tr>
+<td><code>relayUrl</code></td>
+<td>String</td>
+<td><code>""</code></td>
+<td>Live-update relay (bytesocks-compatible). Empty = <code>https://usersockets.luckperms.net</code>. Point it at your own bytesocks server to avoid depending on a public one.</td>
+</tr>
+<tr>
+<td><code>trust.maxAgeDays</code></td>
+<td>Integer / Duration</td>
+<td><code>0</code></td>
+<td>Days a browser stays trusted after <code>/rtp editor trust</code>. <code>0</code> = never expires. A negative or unreadable value is logged and treated as <code>0</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="metrics-cross-backend-metric-time-series-publication"><code>metrics</code> (Cross-backend metric time-series publication)<a class="headerlink" href="#metrics-cross-backend-metric-time-series-publication" title="Permanent link">&para;</a></h2>
+<p>Controls batched publication of condensed metric time-series buckets (<code>rtp_metric_bucket</code> in SQL or <code>rtp:metric:&lt;backend_id&gt;:&lt;metric_key&gt;</code> in Redis) for cross-backend chart and diagnostic history reads. Ignored when <code>network.enabled: false</code> (setting <code>publish: true</code> while <code>network.enabled: false</code> logs a one-time warning and stays dormant).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>networkTimeSeries.publish</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Master toggle to publish condensed metric buckets to the shared network store.</td>
+</tr>
+<tr>
+<td><code>networkTimeSeries.tier</code></td>
+<td>String</td>
+<td><code>"24h@1m"</code></td>
+<td>Condensed local ring tier to publish cross-backend on tier promotion.</td>
+</tr>
+<tr>
+<td><code>networkTimeSeries.retentionDays</code></td>
+<td>Integer</td>
+<td><code>7</code></td>
+<td>Days to retain published metric buckets for this backend before the periodic retention sweep purges them (<code>&gt;= 1</code>).</td>
+</tr>
+<tr>
+<td><code>networkTimeSeries.perPassWriteCap</code></td>
+<td>Integer</td>
+<td><code>64</code></td>
+<td>Maximum metric bucket rows written per periodic flush pass (<code>&gt;= 1</code>). Overflow is deferred to the next pass with a structured warning.</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <blockquote>
 <p>The <code>config.yml</code> <code>network.redis</code> block is a separate, simpler Redis-backed state binding for single-network cached-location sync; see <a href="../../configuration/CORE_CONFIG/#network-redis"><code>CORE_CONFIG.md</code></a>.</p>
@@ -4841,7 +5136,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -4866,6 +5161,8 @@
     
     
       <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

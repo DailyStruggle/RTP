@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
@@ -26,7 +26,7 @@
     
     
       
-        <title>FAQ - LeafRTP</title>
+        <title>FAQ - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,7 +106,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -365,13 +365,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -809,6 +809,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#console-logs-heap-usage-exceeds-maxheappercent-threshold-850-pausing-background-cache-generation-how-do-i-fix-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      Console logs Heap usage ... exceeds maxHeapPercent threshold 85.0%; pausing background cache generation. How do I fix it?
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -823,6 +832,15 @@
   
     <nav class="md-nav" aria-label="Economy & Permissions">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-does-rtp-playername-say-invalid-command-argument-playername-when-targeting-an-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why does /rtp player=&lt;name&gt; say invalid command argument player:&lt;name&gt; when targeting an operator?
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#i-have-vault-installed-but-economy-isnt-working" class="md-nav__link">
@@ -867,9 +885,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#why-does-rtp-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end" class="md-nav__link">
+  <a href="#why-does-rtp-or-rtp-worldworld_nether-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end" class="md-nav__link">
     <span class="md-ellipsis">
-      Why does /rtp always send me to the overworld, even when I'm in the nether or the end?
+      Why does /rtp (or /rtp world=world_nether) always send me to the overworld, even when I'm in the nether or the end?
     </span>
   </a>
   
@@ -3735,11 +3753,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../../adr/ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
@@ -4365,6 +4383,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4569,6 +4755,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#console-logs-heap-usage-exceeds-maxheappercent-threshold-850-pausing-background-cache-generation-how-do-i-fix-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      Console logs Heap usage ... exceeds maxHeapPercent threshold 85.0%; pausing background cache generation. How do I fix it?
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4583,6 +4778,15 @@
   
     <nav class="md-nav" aria-label="Economy & Permissions">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-does-rtp-playername-say-invalid-command-argument-playername-when-targeting-an-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Why does /rtp player=&lt;name&gt; say invalid command argument player:&lt;name&gt; when targeting an operator?
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#i-have-vault-installed-but-economy-isnt-working" class="md-nav__link">
@@ -4627,9 +4831,9 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#why-does-rtp-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end" class="md-nav__link">
+  <a href="#why-does-rtp-or-rtp-worldworld_nether-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end" class="md-nav__link">
     <span class="md-ellipsis">
-      Why does /rtp always send me to the overworld, even when I'm in the nether or the end?
+      Why does /rtp (or /rtp world=world_nether) always send me to the overworld, even when I'm in the nether or the end?
     </span>
   </a>
   
@@ -4836,8 +5040,12 @@
 <li>Lower <code>viewDistanceSelect</code> in <code>performance.yml</code> (default <code>0</code> is fine, as higher values pre-load more surrounding chunks).</li>
 <li>Increase <code>cacheCap</code> so fewer on-demand generations happen during peak play.</li>
 </ol>
+<h3 id="console-logs-heap-usage-exceeds-maxheappercent-threshold-850-pausing-background-cache-generation-how-do-i-fix-it">Console logs <code>Heap usage ... exceeds maxHeapPercent threshold 85.0%; pausing background cache generation</code>. How do I fix it?<a class="headerlink" href="#console-logs-heap-usage-exceeds-maxheappercent-threshold-850-pausing-background-cache-generation-how-do-i-fix-it" title="Permanent link">&para;</a></h3>
+<p><code>maxHeapPercent: 85.0</code> in <code>plugins/RTP/advanced/performance.yml</code> pauses background cache filling whenever JVM heap usage passes <code>85.0%</code> so chunk pre-loading does not trigger an out-of-memory stall. If your JVM normally runs above 85% heap between GC cycles (or during early chunk generation), either lower <code>cacheCap</code> / <code>activeChunkCap</code> in your region files, raise the server's <code>-Xmx</code> heap allocation, or adjust <code>maxHeapPercent</code> in <code>advanced/performance.yml</code> (<code>/rtp config performance maxHeapPercent=90.0</code>, or <code>0</code> to disable the check).</p>
 <hr />
 <h2 id="economy-permissions">Economy &amp; Permissions<a class="headerlink" href="#economy-permissions" title="Permanent link">&para;</a></h2>
+<h3 id="why-does-rtp-playername-say-invalid-command-argument-playername-when-targeting-an-operator">Why does <code>/rtp player=&lt;name&gt;</code> say <code>invalid command argument player:&lt;name&gt;</code> when targeting an operator?<a class="headerlink" href="#why-does-rtp-playername-say-invalid-command-argument-playername-when-targeting-an-operator" title="Permanent link">&para;</a></h3>
+<p>By default, the <code>rtp.notme</code> permission node is granted to server operators (<code>op</code>) so one operator or command block cannot forcibly random-teleport another operator against their will. Because your OP account inherits <code>rtp.notme: true</code>, targeting an OP player with <code>player=&lt;name&gt;</code> (from console or in-game) is rejected. Test <code>player=&lt;name&gt;</code> on a non-operator player, or negate the node (<code>rtp.notme: false</code> in LuckPerms) for accounts that should be targetable.</p>
 <h3 id="i-have-vault-installed-but-economy-isnt-working">I have Vault installed but economy isn't working.<a class="headerlink" href="#i-have-vault-installed-but-economy-isnt-working" title="Permanent link">&para;</a></h3>
 <p>Vault alone does not provide an economy; it is a bridge. You also need an economy plugin like EssentialsX Economy, CMI, or Gringotts. RTP detects both at startup. If economy is still not working after installing both, check the console for a "Vault economy not found" message and restart cleanly.</p>
 <h3 id="how-do-i-make-certain-players-bypass-the-economy-cost">How do I make certain players bypass the economy cost?<a class="headerlink" href="#how-do-i-make-certain-players-bypass-the-economy-cost" title="Permanent link">&para;</a></h3>
@@ -4846,9 +5054,11 @@
 <p>Set <code>requirePermission: true</code> in the region's config, then grant <code>rtp.regions.&lt;regionName&gt;</code> to the groups that should have access. Players without the permission are redirected to the region specified by <code>override</code>.</p>
 <hr />
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<h3 id="why-does-rtp-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end">Why does <code>/rtp</code> always send me to the overworld, even when I'm in the nether or the end?<a class="headerlink" href="#why-does-rtp-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end" title="Permanent link">&para;</a></h3>
-<p>This is the most common first-run confusion. RTP ships with a single region (<code>default</code>) that targets the overworld (<code>world: "[0]"</code>). <strong>There is no nether or end region out of the box</strong>, so you have to create them.</p>
-<p>Here's the full setup for a nether region:</p>
+<h3 id="why-does-rtp-or-rtp-worldworld_nether-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end">Why does <code>/rtp</code> (or <code>/rtp world=world_nether</code>) always send me to the overworld, even when I'm in the nether or the end?<a class="headerlink" href="#why-does-rtp-or-rtp-worldworld_nether-always-send-me-to-the-overworld-even-when-im-in-the-nether-or-the-end" title="Permanent link">&para;</a></h3>
+<p>This is the most common first-run confusion. RTP ships with a single region (<code>default</code> in <code>definitions/regions/default.yml</code>) that targets the overworld (<code>world: "[0]"</code>), and <code>definitions/worlds/default.yml</code> routes every unconfigured world to <code>region: "default"</code>. <strong>Do not change <code>default.yml</code> to <code>world_nether</code></strong> (that would send overworld players into the nether); instead, <strong>create a region for that world and map the world to it</strong> using <code>/rtp editor</code> (the browser map workspace), <code>/rtp admin setup</code>, <code>/rtp config</code>, or YAML files:</p>
+<p><strong>Option A — Visual Web Editor (<code>/rtp editor</code>) or Guided Setup (<code>/rtp admin setup</code>):</strong>
+- Run <code>/rtp editor</code> to create a <code>nether</code> region with <code>world: "world_nether"</code>, <code>vert.maxY: 120</code>, and <code>vert.requireSkyLight: false</code>, and point <code>definitions/worlds/world_nether.yml</code> at <code>region: "nether"</code>, or run <code>/rtp admin setup</code> and choose <code>multi</code> worlds.</p>
+<p><strong>Option B — Config files (<code>definitions/regions/</code> + <code>definitions/worlds/</code>):</strong></p>
 <p><strong>Step 1 — Create the region file</strong> <code>plugins/RTP/definitions/regions/nether.yml</code>:
 <div class="highlight"><pre><span></span><code><span class="nt">world</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;world_nether&quot;</span>
 <span class="nt">cacheCap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
@@ -4863,26 +5073,28 @@
 <span class="w">  </span><span class="nt">maxY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">120</span>
 <span class="w">  </span><span class="nt">requireSkyLight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div></p>
-<p><strong>Step 2 — Map the nether world to that region</strong> in <code>plugins/RTP/definitions/worlds/world_nether.yml</code>:
+<p><strong>Step 2 — Map the nether world to that region</strong> in <code>plugins/RTP/definitions/worlds/world_nether.yml</code> (or run <code>/rtp config worlds world_nether region=nether</code>):
 <div class="highlight"><pre><span></span><code><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;nether&quot;</span>
 </code></pre></div></p>
 <p><strong>Step 3</strong> — Run <code>/rtp reload</code>.</p>
-<p>Now players who run <code>/rtp</code> while standing in the nether will land in the nether. Without Step 2, every world falls back to the <code>default</code> region (overworld).</p>
+<p>Now players who run <code>/rtp</code> while standing in the nether (or run <code>/rtp world=world_nether</code> / <code>/rtp region=nether</code>) will land in the nether. Without Step 2, every world falls back to the <code>default</code> region (overworld).</p>
 <blockquote>
 <p><strong>Why isn't this automatic?</strong> RTP cannot know your world names, nether height limits, or whether you even want nether teleportation enabled. Explicit configuration prevents accidental teleports into void or bedrock.</p>
 </blockquote>
 <h3 id="can-i-have-different-regions-for-different-worlds">Can I have different regions for different worlds?<a class="headerlink" href="#can-i-have-different-regions-for-different-worlds" title="Permanent link">&para;</a></h3>
-<p>Yes. Create a file in <code>plugins/RTP/definitions/worlds/&lt;worldName&gt;.yml</code> and set:</p>
+<p>Yes. Create a region in <code>plugins/RTP/definitions/regions/&lt;regionName&gt;.yml</code> (or via <code>/rtp editor</code>) and map the world to it in <code>plugins/RTP/definitions/worlds/&lt;worldName&gt;.yml</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;myRegionName&quot;</span>
 </code></pre></div>
-<p>That world will now use <code>myRegionName</code> as its default region when players run <code>/rtp</code> there.</p>
+<p>That world will now use <code>myRegionName</code> as its default region when players run <code>/rtp</code> there (or <code>/rtp world=&lt;worldName&gt;</code>).</p>
 <h3 id="how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml">How do I change the teleport radius for one world? There is no <code>radius</code> in <code>worlds/&lt;world&gt;.yml</code>.<a class="headerlink" href="#how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml" title="Permanent link">&para;</a></h3>
-<p>Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers <code>/rtp</code> there; the <strong>region</strong> owns the destination, including distance, shape, vertical range, and price. So you change the region, not the world:</p>
+<p>Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers <code>/rtp</code> there; the <strong>region</strong> (<code>definitions/regions/&lt;region&gt;.yml</code>) owns the destination, including distance (<code>shape.radius</code> / <code>shape.centerRadius</code>), shape, vertical range (<code>vert.minY</code> / <code>vert.maxY</code> / <code>vert.requireSkyLight</code>), and price. So you change the region, not the world:</p>
 <ol>
-<li><strong>Edit the region that world points at.</strong> Read the name out of <code>plugins/RTP/definitions/worlds/&lt;world&gt;.yml</code> (<code>region:</code>), then either run <code>/rtp config regions &lt;region&gt; shape.radius=10km</code> or edit the <code>shape:</code> block in <code>plugins/RTP/definitions/regions/&lt;region&gt;.yml</code>. Add <code>--dry-run</code> to the command to preview it.</li>
-<li><strong>If that region is shared</strong> by other worlds and you only want this one to change, create a new region file and point the world at it instead.</li>
+<li><strong>Use the Web Editor (<code>/rtp editor</code>) or edit the region in <code>definitions/regions/&lt;region&gt;.yml</code>:</strong> Run <code>/rtp editor</code> to drag the region boundary on the map, or run <code>/rtp config regions &lt;region&gt; shape.radius=5000b</code> (add <code>--dry-run</code> to preview), or edit the <code>shape:</code> block in <code>plugins/RTP/definitions/regions/&lt;region&gt;.yml</code> with explicit unit suffixes (<code>5000b</code>, <code>5km</code>, <code>256c</code>).</li>
+<li><strong>If that region is shared</strong> by other worlds and you only want this one to change, create a new region file in <code>definitions/regions/</code> and point <code>definitions/worlds/&lt;world&gt;.yml</code> at it (<code>region: "&lt;newRegion&gt;"</code>).</li>
 </ol>
-<p>On a fresh install the region ships <code>shape: "@config"</code>, which inherits the whole <code>defaults.shape</code> block from <code>config.yml</code>. That is why a new setup has only one <code>radius</code> on disk: editing <code>defaults.shape.radius</code> moves every region that still inherits, which is what a single-world server wants. To give one world its own distance, replace <code>"@config"</code> with an inline <code>shape:</code> block in that region. Full walkthrough: <a href="../configuration/REGIONS/#where-to-set-the-radius">Where to set the radius</a>.</p>
+<blockquote>
+<p><strong>Note on <code>config.yml</code> vs <code>definitions/regions/</code>:</strong> On a fresh install <code>definitions/regions/default.yml</code> sets <code>shape: "@config"</code> and <code>vert: "@config"</code> as a starter fallback to <code>config.yml</code>, but in general you should configure regions via <code>/rtp editor</code> and <code>definitions/regions/&lt;region&gt;.yml</code> (<code>shape</code> and <code>vert</code> settings) rather than treating <code>config.yml</code> as the primary place for region geometry. Also prefer setting <code>shape.radius</code> with a unit suffix (e.g. <code>2500b</code> or <code>5km</code>) over enabling <code>worldBorderOverride: true</code> (which is generally not recommended because it replaces your entire <code>shape</code> block and discards <code>centerRadius</code>). Full walkthrough: <a href="../configuration/REGIONS/#where-to-set-the-radius">Where to set the radius</a>.</p>
+</blockquote>
 <p>The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship <code>wild</code> at <code>radius: 10km</code> and <code>wild_far</code> at <code>radius: 50km</code>, gate the second with <code>requirePermission: true</code>, and players who have it use <code>/rtp region=wild_far</code>. A radius attached to the world could not do that.</p>
 <h3 id="can-i-disable-the-invulnerability-period">Can I disable the invulnerability period?<a class="headerlink" href="#can-i-disable-the-invulnerability-period" title="Permanent link">&para;</a></h3>
 <p>Set <code>invulnerabilityTime: 0</code> in <code>plugins/RTP/safety.yml</code>.</p>
@@ -4947,7 +5159,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -4972,6 +5184,8 @@
     
     
       <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

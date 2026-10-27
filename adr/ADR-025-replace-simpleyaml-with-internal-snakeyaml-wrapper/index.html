@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
       
       
         <meta name="author" content="DailyStruggle">
@@ -26,7 +26,7 @@
     
     
       
-        <title>ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library - LeafRTP</title>
+        <title>ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
       
     
     
@@ -59,7 +59,8 @@
     
     
     
-  </head>
+  <meta name="robots" content="noindex, follow">
+</head>
   
   
     
@@ -92,7 +93,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -106,7 +107,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            LeafRTP
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -365,13 +366,13 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
 
     </a>
-    LeafRTP
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
   </label>
   
     <div class="md-nav__source">
@@ -3516,11 +3517,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../ADR-087-adaptive-compute-governor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
   </span>
   
 
@@ -4146,6 +4147,174 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4326,7 +4495,7 @@
 
 
 <h1 id="adr-025-replace-simpleyaml-with-an-internal-comment-preserving-yaml-library">ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library<a class="headerlink" href="#adr-025-replace-simpleyaml-with-an-internal-comment-preserving-yaml-library" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Proposed
+<p><strong>Status:</strong> Accepted
 <strong>Date:</strong> 2026-05-01 (initial) / 2026-05-15 (decision reversed: in-house parser
 chosen over a SnakeYAML-backed wrapper; see <em>Decision History</em> below)</p>
 <blockquote>
@@ -4432,13 +4601,17 @@ becomes 100% RTP-owned code.</p>
 <p>This replaces the 2026-05-01 plan to wrap SnakeYAML. Rationale for the
 reversal is preserved under <em>Decision History</em>.</p>
 <h3 id="scope-which-yaml-features-the-in-house-library-supports">Scope: which YAML features the in-house library supports<a class="headerlink" href="#scope-which-yaml-features-the-in-house-library-supports" title="Permanent link">&para;</a></h3>
-<p>Bounded by the 2026-05-15 <em>YAML Feature Audit</em> over 187 shipped <code>.yml</code>
-files (see <code>docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md</code>, to be
-folded into this ADR on acceptance).</p>
+<p>Initially bounded by the 2026-05-15 <em>YAML Feature Audit</em> over 187
+shipped <code>.yml</code> files (see <code>docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md</code>,
+to be folded into this ADR on acceptance), with the block-scalar
+extension recorded in <em>Decision History</em> below.</p>
 <p><strong>Supported (reader and writer):</strong></p>
 <ul>
 <li>Block-style mappings (nested, arbitrary depth).</li>
 <li>Block-style sequences of scalars (<code>- item</code>).</li>
+<li>Literal (<code>|</code>) and folded (<code>&gt;</code>) block-scalar values with optional
+  indentation and chomping indicators. The reader normalizes these to
+  multiline scalar values; the writer emits equivalent double-quoted values.</li>
 <li>Scalar types: integer, double, boolean, <code>null</code>/empty.</li>
 <li>Bare (unquoted) string scalars.</li>
 <li>Double-quoted string scalars with standard escape sequences
@@ -4466,13 +4639,13 @@ REQ-RTP-S-007):</strong></p>
   the 64 raw hits were all Bukkit color codes <code>&amp;a</code>/<code>&amp;c</code> inside quoted
   strings, which are <em>not</em> anchors — they're string content).</li>
 <li>Merge keys <code>&lt;&lt;:</code> (0 audited occurrences).</li>
-<li>Flow-style mappings <code>{…}</code> or sequences <code>[…]</code> at value position
-  (0 audited real occurrences; the 234 raw hits were <code>[placeholder]</code>
-  substrings inside quoted strings or comments).</li>
+<li>Flow-style mappings <code>{…}</code> at value position, including inside flow
+  sequences (0 audited real occurrences; the 234 raw hits were
+  <code>[placeholder]</code> substrings inside quoted strings or comments).</li>
+<li>Flow sequences as a mapping key or document root
+  (<code>rtpYaml.unsupported.flowSeq</code>).</li>
 <li>Explicit tags <code>!Tag</code> / <code>!!type</code> (0 audited occurrences).</li>
 <li>Multi-document separators <code>---</code> / <code>...</code> (0 audited occurrences).</li>
-<li>Block-scalar indicators <code>|</code> and <code>&gt;</code> (4 audited occurrences, all
-  <code>usage: |</code> in <code>plugin.yml</code>, see <em>plugin.yml carve-out</em> below).</li>
 </ul>
 <p>The fail-fast error reports the offending line and column and the
 specific unsupported feature, in a <code>messages.yml</code>-resolved key
@@ -4481,10 +4654,10 @@ specific unsupported feature, in a <code>messages.yml</code>-resolved key
 <p><code>plugin.yml</code> is loaded by the Bukkit platform's plugin loader, not by
 RTP's configuration layer. It is never read or written by <code>rtp-core</code>,
 never mutated by <code>/rtp config</code>, and never round-tripped through the
-in-house parser. Its <code>usage: |</code> block-scalar fields therefore do not
-need to be supported by the in-house parser. The audit results
-documented this as the only place block scalars appear in the
-shipped tree.</p>
+in-house parser, so the plugin descriptor does not depend on parser
+support for its <code>usage: |</code> fields. The 2026-05-15 audit documented
+<code>plugin.yml</code> as the only shipped-tree occurrence at that time; support
+for block scalars was later added for editor-authored vault files.</p>
 <h3 id="comment-preservation-strategy">Comment preservation strategy<a class="headerlink" href="#comment-preservation-strategy" title="Permanent link">&para;</a></h3>
 <p>The reader produces a comment-aware AST: each <code>Node</code> carries its
 source line/column and the list of <code>^# …</code> comment lines immediately
@@ -4564,10 +4737,12 @@ parser too just removes the shaded dependency.</p>
    <code>set()</code> rewrite of a <em>different</em> key in the same mapping, and
    golden-file byte-for-byte idempotence over every shipped <code>.yml</code>
    in <code>rtp-plugin/src/main/resources/</code>.</li>
-<li><strong>Subset-rejection tests</strong> <code>RtpYamlUnsupportedFeatureTest</code>: one
+<li><strong>Subset tests</strong> <code>RtpYamlUnsupportedFeatureTest</code>: one
    case per rejected feature (anchor, alias, merge key, flow map,
-   flow sequence, tag, doc separator, block scalar), each asserting
-   a precise line/column error and a configurable <code>messages.yml</code> key.</li>
+   flow sequence as a key/root, tag, doc separator), each asserting
+   a precise line/column error and a configurable <code>messages.yml</code> key.
+   Block scalar parsing is covered separately, including flow-context
+   rejection.</li>
 <li><strong>Deep-keys parity test</strong> <code>RtpYamlDeepKeysParityTest</code> locks in
    dotted-path semantics of <code>getKeys(true)</code> matching SimpleYaml's
    prior output.</li>
@@ -4653,6 +4828,12 @@ Fabric mod jar gets the same in-house parser as every other variant.</p>
   separators have <strong>zero occurrences</strong> in 187 shipped <code>.yml</code> files;
   block scalars exist only in <code>plugin.yml</code>, which is not parsed by
   RTP at all.</li>
+<li><strong>2026-10-22 (block-scalar subset amendment):</strong> Literal and folded
+  block scalars with optional indentation and chomping indicators are
+  accepted as input and normalized to multiline scalar values. The
+  existing writer emits equivalent quoted values, preserving their
+  contents without expanding the parser to full YAML. Block-scalar
+  indicators remain unsupported inside flow sequences.</li>
 </ul>
 <h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
 <table>
@@ -4847,7 +5028,7 @@ Fabric mod jar gets the same in-house parser as every other variant.</p>
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      LeafRTP v3.3.0
+      LeafRTP v3.3.1
     </div>
   
   
@@ -4872,6 +5053,8 @@ Fabric mod jar gets the same in-house parser as every other variant.</p>
     
     
       <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../../assets/javascripts/rtp-support-doctor.js"></script>
       
     
   </body>

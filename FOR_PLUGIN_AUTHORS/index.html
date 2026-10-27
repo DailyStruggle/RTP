@@ -1,0 +1,5084 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/FOR_PLUGIN_AUTHORS/">
+      
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>Start Here - Standalone Plugin & Mod Authors (api/* SDK) - LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#start-here-standalone-plugin-mod-authors-api-sdk" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-header__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Start Here - Standalone Plugin &amp; Mod Authors (api/* SDK)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="LeafRTP - Minecraft Random Teleport (/rtp &amp; /wild) Plugin &amp; Mod" class="md-nav__button md-logo" aria-label="LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/ACTIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Actions & arenas
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Web Workspace & Editor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/shape-algorithms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtp admin setup` & Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-087-adaptive-compute-governor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 - Adaptive Compute Governor: Demand-Driven Backoff, Memory Backpressure, and Multi-Region Concurrency
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-097 — Per-Action Pre-Validated Caches, Anvil Region Pre-Screening, and Bounded Subspace Placement Retries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-098 - Declarative Command Parameters, Per-Parameter Permissions, and Authoritative Defaults
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-099 — Zero-Overhead Visual Region Creation via Ecosystem Selection Bridges and Cartography Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-101 — In-House SQL Connection Pool and Retirement of HikariCP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-102 — Coverage-Guided Fuzz Testing and Parser Input Hardening
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-103 — Multi-Version Platform Adapter Deduplication and Runtime Coverage Normalization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-104 — Ephemeral Web Editor and In-Game Packed Docs Integration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-105 — Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-116-effects-through-neutral-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-117 - Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-118-claim-checkers-compile-against-published-apis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-118 - Claim Checkers Compile Against Published Plugin APIs; Reflection Only Where None Exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-119-slope-detection-and-elevation-memory/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-119 - Slope Detection at the Landing Spot; Elevation and Slope Memory Recorded as Alternatives
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-120-mountainside-check-over-pinned-square/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-120 - Mountainside and Cliff-Edge Check over the Resident 3x3 Square
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-121 - Built-In Test for Configuration and the Action Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-122-platform-neutral-stress-harness/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-122 - Platform-Neutral Stress Harness: Neutral Core, Thin Carriers, Harness-Local Host SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-123-folia-tick-region-allocation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-123 - Folia Tick-Region Allocation: Work Placement, Probed Shares, Steering and Lending
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-124-consumer-attribution-for-background-refill/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-124 - Consumer Attribution for Constrained Background Refill
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-125-whole-server-discovery-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-why-use-the-leafcraft-api-sdk" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Why Use the LeafCraft api/* SDK?
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-module-selection-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Module Selection Matrix
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Module Selection Matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#by-plugin-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      By Plugin Need
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-14-api-maven-coordinates" class="md-nav__link">
+    <span class="md-ellipsis">
+      All 14 api/* Maven Coordinates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-5-file-multi-platform-plugin-blueprint-oneplayersleep-treegen-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. 5-File Multi-Platform Plugin Blueprint (OnePlayerSleep / TreeGen Example)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 5-File Multi-Platform Plugin Blueprint (OnePlayerSleep / TreeGen Example)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gradle-setup-buildgradle" class="md-nav__link">
+    <span class="md-ellipsis">
+      Gradle Setup (build.gradle)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-1-srcmainresourcesconfigyml-comment-directives-for-self-testing-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      File 1: src/main/resources/config.yml (Comment Directives for Self-Testing YAML)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-2-treegenconfigjava-yaml-api-units-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      File 2: TreeGenConfig.java (yaml-api + units-api)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-3-treegenbitsuitejava-bit-api-config-bit-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      File 3: TreeGenBitSuite.java (bit-api + config-bit-api)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-4-treegenrootcommandjava-commands-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      File 4: TreeGenRootCommand.java (commands-api)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-5-treegenservicejava-server-api-predict-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      File 5: TreeGenService.java (server-api + predict-api)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-folia-regional-safety-adaptive-budgeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Folia Regional Safety &amp; Adaptive Budgeting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Folia Regional Safety & Adaptive Budgeting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rule-f-001-region-ownership-server-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rule F-001 &amp; Region Ownership (server-api)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adaptive-control-multi-tenant-fairness-predict-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adaptive Control &amp; Multi-Tenant Fairness (predict-api)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-day-0-carrier-qualification-whole-server-fuzzing-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Day-0 Carrier Qualification &amp; Whole-Server Fuzzing Reuse
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Day-0 Carrier Qualification & Whole-Server Fuzzing Reuse">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#target-free-whole-server-discovery-fuzzing-scriptsbench_fuzzpy-mode-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      Target-Free Whole-Server Discovery Fuzzing (scripts/bench_fuzz.py --mode server)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#additional-reusable-repository-tooling-scripts-devstack" class="md-nav__link">
+    <span class="md-ellipsis">
+      Additional Reusable Repository Tooling (scripts/* &amp; devstack/*)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="start-here-standalone-plugin-mod-authors-api-sdk">Start Here - Standalone Plugin &amp; Mod Authors (<code>api/*</code> SDK)<a class="headerlink" href="#start-here-standalone-plugin-mod-authors-api-sdk" title="Permanent link">&para;</a></h1>
+<p><strong>Current SDK Version:</strong> <code>3.3.1</code></p>
+<p>If you want to extend <strong>LeafRTP</strong> itself (for example with a custom region shape, safety verifier, or post-teleport hook), see <a href="../FOR_ADDON_DEVELOPERS/">FOR_ADDON_DEVELOPERS.md</a> and the <a href="../ADDON_QUICKSTART/">Addon Quickstart</a>.</p>
+<p>This guide is for developers building a <strong>standalone Minecraft plugin or mod</strong> - such as <code>OnePlayerSleep</code>, <code>TreeGen</code>, or <code>ChunkClaimLite</code> - that has nothing to do with random teleportation, but wants <strong>Spigot, Paper, Folia, Fabric, NeoForge, and Velocity</strong> support, comment-preserving YAML configs with self-testing directives, Brigadier commands, book/chest menus, adaptive Folia tick budgeting, and automated whole-server leak/stall fuzzing out of the box.</p>
+<hr />
+<h2 id="1-why-use-the-leafcraft-api-sdk">1. Why Use the LeafCraft <code>api/*</code> SDK?<a class="headerlink" href="#1-why-use-the-leafcraft-api-sdk" title="Permanent link">&para;</a></h2>
+<p>Roughly 80% of this repository is <strong>platform-neutral infrastructure</strong> (<code>api/*</code>, multi-version platform carriers, headless fuzzers, and release tooling) rather than teleport-specific logic. Every subsystem that a production server plugin needs has been extracted into 14 standalone, MIT-licensed Java 17 libraries under <a href="https://github.com/DailyStruggle/RTP/blob/V3/api/README.md"><code>api/</code></a>:</p>
+<ul>
+<li><strong>Write once, run on 6 runtimes:</strong> Your core plugin logic compiles against pure Java 17 interfaces (<code>server-api</code>, <code>commands-api</code>, <code>yaml-api</code>, <code>menu-api</code>, <code>effects-api</code>, <code>predict-api</code>). Thin platform carriers bind those interfaces to <strong>Spigot, Paper, Folia, Fabric, NeoForge, and Velocity</strong> without leaking <code>org.bukkit.*</code> or <code>net.minecraft.*</code> imports into your domain code.</li>
+<li><strong>Zero-dependency foundations:</strong> Core SDK libraries (<code>server-api</code>, <code>yaml-api</code>, <code>units-api</code>, <code>tags-api</code>, <code>bit-api</code>, <code>predict-api</code>, <code>bstats-api</code>, <code>metrics-api</code>) have <strong>zero external runtime dependencies</strong> and compile to Java 17 bytecode (<a href="../adr/ADR-113-java-17-baseline-and-26x-support-boundary/">ADR-113</a>).</li>
+<li><strong>Folia-native by construction:</strong> Regional thread ownership (<code>TaskScheduler.isOwnedByCurrentRegion</code>, <code>runAtLocation</code>) and adaptive per-region share allocation (<code>ProbedShareAllocator</code>, <code>AimdLimiter</code>, <code>BudgetPacer</code>) are first-class primitives, eliminating raw thread creation (<code>F-001</code>) and main-thread stalls (<code>S-005</code>).</li>
+<li><strong>Built-In Test (PBIT / CBIT / IBIT):</strong> Instead of waiting for operators to paste broken YAML files in Discord, <code>bit-api</code> and <code>config-bit-api</code> validate <code>@type</code>, <code>@options</code>, <code>@range</code>, <code>@pattern</code>, and locale key parity at startup (PBIT), track runtime anomalies without log spam (CBIT), and run interactive diagnostics on demand (IBIT; <a href="../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine/">ADR-121</a>).</li>
+<li><strong>Published to Maven Central &amp; JitPack:</strong> Consume only the modules your plugin needs via <code>io.github.dailystruggle:&lt;module&gt;:&lt;version&gt;</code> from <code>mavenCentral()</code> or <code>com.github.DailyStruggle.RTP:&lt;module&gt;:&lt;tag&gt;</code> from <code>jitpack.io</code> (<a href="../dev/PUBLISHING/">dev/PUBLISHING.md</a>).</li>
+</ul>
+<hr />
+<h2 id="2-module-selection-matrix">2. Module Selection Matrix<a class="headerlink" href="#2-module-selection-matrix" title="Permanent link">&para;</a></h2>
+<p>Pick only the SDK modules that match your plugin's requirements. Full module catalog: <a href="https://github.com/DailyStruggle/RTP/blob/V3/api/README.md"><code>api/README.md</code></a>.</p>
+<h3 id="by-plugin-need">By Plugin Need<a class="headerlink" href="#by-plugin-need" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Plugin Need</th>
+<th>SDK Module(s)</th>
+<th>Key Entry Points</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Platform detection, version gating &amp; Folia regional scheduling (<code>ServerAccessor</code> is composed of focused capability sub-interfaces <code>ScoreboardAccessor</code>, <code>WorldBorderAccessor</code>, <code>PaletteTagAccessor</code>, <code>EffectHandleBridge</code>, <code>MenuContextAccessor</code>, and <code>CommandDispatchAccessor</code> with safe default implementations)</td>
+<td><code>server-api</code></td>
+<td><code>ServerAccessor</code>, <code>ServerAccessors</code>, <code>PlatformFamily</code>, <code>TaskScheduler</code>, <code>TaskHandle</code>, <code>ScoreboardAccessor</code>, <code>WorldBorderAccessor</code>, <code>PaletteTagAccessor</code>, <code>EffectHandleBridge</code>, <code>MenuContextAccessor</code>, <code>CommandDispatchAccessor</code></td>
+</tr>
+<tr>
+<td>Brigadier command trees, <code>key=value</code> parameters &amp; regex (<code>reg:</code>) tab completion</td>
+<td><code>commands-api</code></td>
+<td><code>TreeCommand</code>, <code>CommandsAPICommand</code>, <code>CommandParameter</code>, <code>BrigadierCommandAdapter</code></td>
+</tr>
+<tr>
+<td>Comment-preserving YAML + <code>@type</code> / <code>@range</code> / <code>@options</code> self-tests &amp; unit parsing</td>
+<td><code>yaml-api</code> + <code>units-api</code> + <code>bit-api</code> + <code>config-bit-api</code></td>
+<td><code>RtpYamlConfig</code>, <code>DistanceParser</code>, <code>DurationParser</code>, <code>DataSizeParser</code>, <code>BitRunner</code>, <code>DirectiveValidator</code>, <code>MessageKeyParity</code></td>
+</tr>
+<tr>
+<td>Declarative chest GUIs, written-book menus, chat click tokens &amp; anvil text prompts</td>
+<td><code>menu-api</code></td>
+<td><code>MenuDescriptor</code>, <code>MenuRenderer</code>, <code>MenuSession</code>, <code>MenuTokenService</code>, <code>AnvilInputOpener</code></td>
+</tr>
+<tr>
+<td>Cross-platform particles, sounds, titles, potions, glide &amp; virtual holograms</td>
+<td><code>effects-api</code></td>
+<td><code>EffectsAPI</code>, <code>EffectFactory</code>, <code>ParticleEffect</code>, <code>SoundEffect</code>, <code>HologramRegistry</code>, <code>VolumetricParticleRenderer</code></td>
+</tr>
+<tr>
+<td>TPS / MSPT / heap snapshots, Folia region sampling &amp; dependency-free bStats v2</td>
+<td><code>metrics-api</code> + <code>bstats-api</code></td>
+<td><code>Metrics</code>, <code>MetricsBinding</code>, <code>MetricsSnapshot</code>, <code>FoliaRegionSample</code>, <code>BStatsService</code>, <code>SimplePie</code></td>
+</tr>
+<tr>
+<td>Off-tick <code>.mca</code> / <code>.linear</code> region NBT decoding, block-tag JSON resolution &amp; block-state predicate compilation</td>
+<td><code>anvil-api</code> + <code>tags-api</code></td>
+<td><code>RegionFileReader</code>, <code>RegionFormatRegistry</code>, <code>AnvilReader</code>, <code>AnvilChunkView</code>, <code>TagResolver</code>, <code>DiskTagSource</code>, <code>BlockStateString</code>, <code>SafetyTokenParser</code>, <code>StatePredicate</code>, <code>CompiledUnsafeSet</code>, <code>SafetyCompilationCache</code></td>
+</tr>
+<tr>
+<td>EWMA cost estimation, AIMD throttling, max-min water-filling, Folia share allocation, unit-interval shaping curves, distribution samplers &amp; polar spirals</td>
+<td><code>predict-api</code></td>
+<td><code>EwmaEstimator</code>, <code>AimdLimiter</code>, <code>BudgetPacer</code>, <code>ComparativeCostGovernor</code>, <code>WaterFillingAllocator</code>, <code>WorkAttributionLedger</code>, <code>ProbedShareAllocator</code>, <code>UnitCurve</code>, <code>DistributionSampler</code>, <code>PolarCurve</code></td>
+</tr>
+<tr>
+<td>In-game 2D map canvases, spatial heatmaps, sparklines &amp; Mermaid chart rendering</td>
+<td><code>maps-api</code></td>
+<td><code>MapBinding</code>, <code>MapCanvas</code>, <code>HeatmapRenderer</code>, <code>DualSparklineRenderer</code>, <code>ChartRenderer</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="all-14-api-maven-coordinates">All 14 <code>api/*</code> Maven Coordinates<a class="headerlink" href="#all-14-api-maven-coordinates" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Maven Central Coordinate</th>
+<th>Inter-Module Dependencies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>server-api</code></td>
+<td><code>io.github.dailystruggle:server-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>units-api</code></td>
+<td><code>io.github.dailystruggle:units-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>tags-api</code></td>
+<td><code>io.github.dailystruggle:tags-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>yaml-api</code></td>
+<td><code>io.github.dailystruggle:yaml-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>bit-api</code></td>
+<td><code>io.github.dailystruggle:bit-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>config-bit-api</code></td>
+<td><code>io.github.dailystruggle:config-bit-api:3.3.1</code></td>
+<td><code>yaml-api</code>, <code>bit-api</code>, <code>units-api</code></td>
+</tr>
+<tr>
+<td><code>commands-api</code></td>
+<td><code>io.github.dailystruggle:commands-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>menu-api</code></td>
+<td><code>io.github.dailystruggle:menu-api:3.3.1</code></td>
+<td><code>server-api</code>, <code>commands-api</code></td>
+</tr>
+<tr>
+<td><code>effects-api</code></td>
+<td><code>io.github.dailystruggle:effects-api:3.3.1</code></td>
+<td><code>server-api</code></td>
+</tr>
+<tr>
+<td><code>maps-api</code></td>
+<td><code>io.github.dailystruggle:maps-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>metrics-api</code></td>
+<td><code>io.github.dailystruggle:metrics-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>bstats-api</code></td>
+<td><code>io.github.dailystruggle:bstats-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>predict-api</code></td>
+<td><code>io.github.dailystruggle:predict-api:3.3.1</code></td>
+<td><em>(none)</em></td>
+</tr>
+<tr>
+<td><code>anvil-api</code></td>
+<td><code>io.github.dailystruggle:anvil-api:3.3.1</code></td>
+<td><code>bit-api</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-5-file-multi-platform-plugin-blueprint-oneplayersleep-treegen-example">3. 5-File Multi-Platform Plugin Blueprint (<code>OnePlayerSleep</code> / <code>TreeGen</code> Example)<a class="headerlink" href="#3-5-file-multi-platform-plugin-blueprint-oneplayersleep-treegen-example" title="Permanent link">&para;</a></h2>
+<p>Below is a complete, minimal 5-part architecture for a standalone multi-platform plugin (<code>TreeGen</code> / <code>OnePlayerSleep</code>) that runs across Spigot, Paper, Folia, Fabric, and NeoForge without importing platform classes in its core module.</p>
+<h3 id="gradle-setup-buildgradle">Gradle Setup (<code>build.gradle</code>)<a class="headerlink" href="#gradle-setup-buildgradle" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>plugins {
+    id &#39;java-library&#39;
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+    // Optional: use JitPack to track a specific git tag or V3-SNAPSHOT
+    maven { url = &#39;https://jitpack.io&#39; }
+}
+
+ext {
+    leafSdkVersion = &#39;3.3.1&#39;
+}
+
+dependencies {
+    api &quot;io.github.dailystruggle:server-api:${leafSdkVersion}&quot;
+    api &quot;io.github.dailystruggle:yaml-api:${leafSdkVersion}&quot;
+    api &quot;io.github.dailystruggle:units-api:${leafSdkVersion}&quot;
+    api &quot;io.github.dailystruggle:bit-api:${leafSdkVersion}&quot;
+    api &quot;io.github.dailystruggle:config-bit-api:${leafSdkVersion}&quot;
+    api &quot;io.github.dailystruggle:commands-api:${leafSdkVersion}&quot;
+    api &quot;io.github.dailystruggle:predict-api:${leafSdkVersion}&quot;
+}
+</code></pre></div>
+<h3 id="file-1-srcmainresourcesconfigyml-comment-directives-for-self-testing-yaml">File 1: <code>src/main/resources/config.yml</code> (Comment Directives for Self-Testing YAML)<a class="headerlink" href="#file-1-srcmainresourcesconfigyml-comment-directives-for-self-testing-yaml" title="Permanent link">&para;</a></h3>
+<p>Annotate your default YAML comments with <code>@type</code>, <code>@range</code>, <code>@options</code>, and <code>@unit</code> (<a href="adr/ADR-064-comment-directives-for-finite-value-domains.md">ADR-064</a>). <code>RtpYamlConfig</code> preserves comments across saves, and <code>DirectiveValidator</code> turns those comments into executable startup checks:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Maximum canopy radius in blocks for custom tree generation.</span>
+<span class="c1"># @type integer</span>
+<span class="c1"># @range [2, 32]</span>
+<span class="c1"># @default 8</span>
+<span class="nt">maxCanopyRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+
+<span class="c1"># Sleep fraction required to advance night in OnePlayerSleep mode.</span>
+<span class="c1"># @type number</span>
+<span class="c1"># @range [0.0, 1.0]</span>
+<span class="c1"># @default 0.01</span>
+<span class="nt">sleepThresholdRatio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span>
+
+<span class="c1"># Generation mode across biomes.</span>
+<span class="c1"># @type enum</span>
+<span class="c1"># @options [NATURAL, DENSE, SPARSE]</span>
+<span class="c1"># @default NATURAL</span>
+<span class="nt">generationStyle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NATURAL</span>
+
+<span class="c1"># Per-tick background decoration budget in milliseconds.</span>
+<span class="c1"># @type number</span>
+<span class="c1"># @range [0.25, 10.0]</span>
+<span class="c1"># @default 2.0</span>
+<span class="nt">tickBudgetMs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.0</span>
+</code></pre></div>
+<h3 id="file-2-treegenconfigjava-yaml-api-units-api">File 2: <code>TreeGenConfig.java</code> (<code>yaml-api</code> + <code>units-api</code>)<a class="headerlink" href="#file-2-treegenconfigjava-yaml-api-units-api" title="Permanent link">&para;</a></h3>
+<p>Define an enum of your configuration keys and use <code>ConfigParser&lt;MyConfigKeys&gt;</code> for single-file loading, schema version migration (<code>.old1</code> backups), locale switching (<code>LanguageBootstrap</code>), <code>.bak.&lt;epochMillis&gt;</code> rollback snapshots (<code>ConfigBackups</code>), and unit-aware duration/data-size getters, plus <code>MultiConfigParser&lt;MyZoneKeys&gt;</code> for folders of <code>.yml</code> definitions (or use low-level <code>RtpYamlConfig</code> directly):</p>
+<div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nn">com.example.treegen</span><span class="p">;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.configuration.ConfigParser</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.configuration.MultiConfigParser</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.configuration.yaml.YamlFileCache</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.io.File</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.io.IOException</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">TreeGenConfig</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">ConfigKeys</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">maxCanopyRadius</span><span class="p">,</span>
+<span class="w">        </span><span class="n">sleepThresholdRatio</span><span class="p">,</span>
+<span class="w">        </span><span class="n">generationStyle</span><span class="p">,</span>
+<span class="w">        </span><span class="n">tickBudgetMs</span><span class="p">,</span>
+<span class="w">        </span><span class="n">version</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">BiomeProfileKeys</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">canopyDensity</span><span class="p">,</span>
+<span class="w">        </span><span class="n">allowCustomSaplings</span><span class="p">,</span>
+<span class="w">        </span><span class="n">regrowthDelay</span><span class="p">,</span>
+<span class="w">        </span><span class="n">version</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">File</span><span class="w"> </span><span class="n">dataFolder</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="n">ConfigParser</span><span class="o">&lt;</span><span class="n">ConfigKeys</span><span class="o">&gt;</span><span class="w"> </span><span class="n">configParser</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="n">MultiConfigParser</span><span class="o">&lt;</span><span class="n">BiomeProfileKeys</span><span class="o">&gt;</span><span class="w"> </span><span class="n">biomeProfiles</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="nf">TreeGenConfig</span><span class="p">(</span><span class="n">File</span><span class="w"> </span><span class="n">dataFolder</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">dataFolder</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dataFolder</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">loadOrCreateDefault</span><span class="p">(</span><span class="n">ClassLoader</span><span class="w"> </span><span class="n">resourceLoader</span><span class="p">)</span><span class="w"> </span><span class="kd">throws</span><span class="w"> </span><span class="n">IOException</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">String</span><span class="w"> </span><span class="n">locale</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LanguageBootstrap</span><span class="p">.</span><span class="na">resolve</span><span class="p">(</span><span class="n">dataFolder</span><span class="p">);</span>
+<span class="w">        </span><span class="n">YamlFileCache</span><span class="w"> </span><span class="n">fileCache</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">YamlFileCache</span><span class="p">(</span><span class="n">dataFolder</span><span class="p">);</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">configParser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">ConfigParser</span><span class="o">&lt;&gt;</span><span class="p">(</span>
+<span class="w">                </span><span class="n">ConfigKeys</span><span class="p">.</span><span class="na">class</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;config.yml&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;1.0&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="n">dataFolder</span><span class="p">,</span>
+<span class="w">                </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">                </span><span class="n">fileCache</span><span class="p">,</span>
+<span class="w">                </span><span class="n">resourceLoader</span><span class="p">,</span>
+<span class="w">                </span><span class="n">locale</span><span class="p">);</span>
+<span class="w">        </span><span class="c1">// Manages plugins/TreeGen/profiles/*.yml cloned from profiles/default.yml</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">biomeProfiles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">MultiConfigParser</span><span class="o">&lt;&gt;</span><span class="p">(</span>
+<span class="w">                </span><span class="n">BiomeProfileKeys</span><span class="p">.</span><span class="na">class</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;profiles&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;1.0&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="n">dataFolder</span><span class="p">,</span>
+<span class="w">                </span><span class="n">resourceLoader</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;profiles&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="n">locale</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">maxCanopyRadius</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">configParser</span><span class="p">.</span><span class="na">getNumber</span><span class="p">(</span><span class="n">ConfigKeys</span><span class="p">.</span><span class="na">maxCanopyRadius</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">).</span><span class="na">intValue</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="nf">sleepThresholdRatio</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">configParser</span><span class="p">.</span><span class="na">getNumber</span><span class="p">(</span><span class="n">ConfigKeys</span><span class="p">.</span><span class="na">sleepThresholdRatio</span><span class="p">,</span><span class="w"> </span><span class="mf">0.01</span><span class="p">).</span><span class="na">doubleValue</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="nf">tickBudgetMs</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">configParser</span><span class="p">.</span><span class="na">getNumber</span><span class="p">(</span><span class="n">ConfigKeys</span><span class="p">.</span><span class="na">tickBudgetMs</span><span class="p">,</span><span class="w"> </span><span class="mf">2.0</span><span class="p">).</span><span class="na">doubleValue</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">ConfigParser</span><span class="o">&lt;</span><span class="n">BiomeProfileKeys</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">profile</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">profileName</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">biomeProfiles</span><span class="p">.</span><span class="na">getParser</span><span class="p">(</span><span class="n">profileName</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="nf">regrowthDelayTicks</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">profileName</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">profile</span><span class="p">(</span><span class="n">profileName</span><span class="p">).</span><span class="na">getDuration</span><span class="p">(</span>
+<span class="w">                </span><span class="n">BiomeProfileKeys</span><span class="p">.</span><span class="na">regrowthDelay</span><span class="p">,</span><span class="w"> </span><span class="n">TemporalUnit</span><span class="p">.</span><span class="na">SECOND</span><span class="p">,</span><span class="w"> </span><span class="n">TemporalUnit</span><span class="p">.</span><span class="na">TICK</span><span class="p">,</span><span class="w"> </span><span class="mi">200L</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">RtpYamlConfig</span><span class="w"> </span><span class="nf">raw</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="n">RtpYamlConfig</span><span class="p">)</span><span class="w"> </span><span class="n">configParser</span><span class="p">.</span><span class="na">getYamlRoot</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">File</span><span class="w"> </span><span class="nf">file</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">File</span><span class="p">(</span><span class="n">dataFolder</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;config.yml&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="file-3-treegenbitsuitejava-bit-api-config-bit-api">File 3: <code>TreeGenBitSuite.java</code> (<code>bit-api</code> + <code>config-bit-api</code>)<a class="headerlink" href="#file-3-treegenbitsuitejava-bit-api-config-bit-api" title="Permanent link">&para;</a></h3>
+<p>Register a Power-On Built-In Test (PBIT) that validates the on-disk <code>config.yml</code> against your bundled <code>config.yml</code> directives, plus a Continuous Built-In Test (CBIT) counter for runtime anomalies:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nn">com.example.treegen</span><span class="p">;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitComponent</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitFinding</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitReport</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitResult</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitRunner</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitSelector</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitSideEffect</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitTier</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.CbitCounter</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.bit.config.DirectiveValidator</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.List</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.Map</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">TreeGenBitSuite</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">BitRunner</span><span class="w"> </span><span class="n">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">BitRunner</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">CbitCounter</span><span class="w"> </span><span class="n">skippedPlacements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">CbitCounter</span><span class="p">(</span><span class="s">&quot;treegen.placement.skipped&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="nf">TreeGenBitSuite</span><span class="p">(</span><span class="n">TreeGenConfig</span><span class="w"> </span><span class="n">config</span><span class="p">,</span><span class="w"> </span><span class="n">ClassLoader</span><span class="w"> </span><span class="n">resourceLoader</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">runner</span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">BitComponent</span><span class="p">(</span>
+<span class="w">                </span><span class="s">&quot;treegen.config.directives&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;config&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="n">BitTier</span><span class="p">.</span><span class="na">PBIT</span><span class="p">,</span>
+<span class="w">                </span><span class="n">BitSideEffect</span><span class="p">.</span><span class="na">SAFE</span><span class="p">,</span>
+<span class="w">                </span><span class="mi">5_000L</span><span class="p">,</span>
+<span class="w">                </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="n">ConfigSnapshot</span><span class="p">.</span><span class="na">Document</span><span class="w"> </span><span class="n">doc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">ConfigSnapshot</span><span class="p">.</span><span class="na">Document</span><span class="p">(</span>
+<span class="w">                            </span><span class="s">&quot;config.yml&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="na">raw</span><span class="p">(),</span><span class="w"> </span><span class="n">Map</span><span class="p">.</span><span class="na">of</span><span class="p">(),</span><span class="w"> </span><span class="n">Map</span><span class="p">.</span><span class="na">of</span><span class="p">());</span>
+<span class="w">                    </span><span class="n">String</span><span class="w"> </span><span class="n">bundled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DirectiveValidator</span><span class="p">.</span><span class="na">readResource</span><span class="p">(</span><span class="n">resourceLoader</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;config.yml&quot;</span><span class="p">);</span>
+<span class="w">                    </span><span class="n">List</span><span class="o">&lt;</span><span class="n">BitFinding</span><span class="o">&gt;</span><span class="w"> </span><span class="n">findings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DirectiveValidator</span><span class="p">.</span><span class="na">validate</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="n">bundled</span><span class="p">);</span>
+<span class="w">                    </span><span class="k">return</span><span class="w"> </span><span class="n">BitReport</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="n">findings</span><span class="p">);</span>
+<span class="w">                </span><span class="p">}));</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">BitReport</span><span class="w"> </span><span class="nf">runStartupPbit</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">List</span><span class="o">&lt;</span><span class="n">BitResult</span><span class="o">&gt;</span><span class="w"> </span><span class="n">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">runner</span><span class="p">.</span><span class="na">run</span><span class="p">(</span><span class="n">BitSelector</span><span class="p">.</span><span class="na">tier</span><span class="p">(</span><span class="n">BitTier</span><span class="p">.</span><span class="na">PBIT</span><span class="p">),</span><span class="w"> </span><span class="n">Runnable</span><span class="p">::</span><span class="n">run</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">runner</span><span class="p">.</span><span class="na">aggregate</span><span class="p">(</span><span class="n">results</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">BitRunner</span><span class="w"> </span><span class="nf">runner</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">runner</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">CbitCounter</span><span class="w"> </span><span class="nf">skippedPlacements</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">skippedPlacements</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="file-4-treegenrootcommandjava-commands-api">File 4: <code>TreeGenRootCommand.java</code> (<code>commands-api</code>)<a class="headerlink" href="#file-4-treegenrootcommandjava-commands-api" title="Permanent link">&para;</a></h3>
+<p>Implement <code>TreeCommand</code> once to get subcommand routing, <code>key=value</code> parameter validation, regex token expansion (<code>reg:.*</code>), and Brigadier command-graph registration across Bukkit, Paper, Folia, Fabric, and NeoForge:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nn">com.example.treegen</span><span class="p">;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.commandsapi.common.CommandParameter</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.commandsapi.common.CommandsAPICommand</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.commandsapi.common.parameters.EnumParameter</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.List</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.Map</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.UUID</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.concurrent.ConcurrentHashMap</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.function.Consumer</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">TreeGenRootCommand</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">TreeCommand</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">CommandParameter</span><span class="o">&gt;</span><span class="w"> </span><span class="n">parameters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">ConcurrentHashMap</span><span class="o">&lt;&gt;</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">CommandsAPICommand</span><span class="o">&gt;</span><span class="w"> </span><span class="n">subCommands</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">ConcurrentHashMap</span><span class="o">&lt;&gt;</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">TreeGenService</span><span class="w"> </span><span class="n">service</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="nf">TreeGenRootCommand</span><span class="p">(</span><span class="n">TreeGenService</span><span class="w"> </span><span class="n">service</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">service</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">service</span><span class="p">;</span>
+<span class="w">        </span><span class="n">addParameter</span><span class="p">(</span><span class="s">&quot;radius&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">IntegerParameter</span><span class="p">(</span>
+<span class="w">                </span><span class="s">&quot;treegen.use&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;Canopy radius in blocks (2..32)&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="p">(</span><span class="n">caller</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="kt">int</span><span class="w"> </span><span class="n">parsed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Integer</span><span class="p">.</span><span class="na">parseInt</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+<span class="w">                    </span><span class="k">return</span><span class="w"> </span><span class="n">parsed</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">parsed</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">32</span><span class="p">;</span>
+<span class="w">                </span><span class="p">},</span>
+<span class="w">                </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">));</span>
+<span class="w">        </span><span class="n">addParameter</span><span class="p">(</span><span class="s">&quot;style&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">EnumParameter</span><span class="o">&lt;&gt;</span><span class="p">(</span>
+<span class="w">                </span><span class="s">&quot;treegen.use&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="s">&quot;Canopy generation style&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="p">(</span><span class="n">caller</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">                </span><span class="n">Style</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">Style</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">NATURAL</span><span class="p">,</span><span class="w"> </span><span class="n">DENSE</span><span class="p">,</span><span class="w"> </span><span class="n">SPARSE</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;treegen&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">permission</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;treegen.use&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">description</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;Generate a custom canopy or run built-in diagnostics&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">CommandsAPICommand</span><span class="w"> </span><span class="nf">parent</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">msgBadParameter</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">callerId</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">parameterName</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">parameterValue</span><span class="p">,</span><span class="w"> </span><span class="n">Consumer</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">messageMethod</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">messageMethod</span><span class="p">.</span><span class="na">accept</span><span class="p">(</span><span class="s">&quot;[TreeGen] Invalid parameter &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">parameterName</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">&quot;=&quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">parameterValue</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">msgNoPermission</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">callerId</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">permission</span><span class="p">,</span><span class="w"> </span><span class="n">Consumer</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">messageMethod</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">messageMethod</span><span class="p">.</span><span class="na">accept</span><span class="p">(</span><span class="s">&quot;[TreeGen] Missing permission: &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">permission</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">onCommand</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">callerId</span><span class="p">,</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">parameterValues</span><span class="p">,</span><span class="w"> </span><span class="n">CommandsAPICommand</span><span class="w"> </span><span class="n">nextCommand</span><span class="p">,</span><span class="w"> </span><span class="n">Consumer</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">messageMethod</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">nextCommand</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">radius</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parameterValues</span><span class="p">.</span><span class="na">getOrDefault</span><span class="p">(</span><span class="s">&quot;radius&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">List</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="s">&quot;8&quot;</span><span class="p">))</span>
+<span class="w">                </span><span class="p">.</span><span class="na">stream</span><span class="p">().</span><span class="na">findFirst</span><span class="p">().</span><span class="na">map</span><span class="p">(</span><span class="n">Integer</span><span class="p">::</span><span class="n">parseInt</span><span class="p">).</span><span class="na">orElse</span><span class="p">(</span><span class="mi">8</span><span class="p">);</span>
+<span class="w">        </span><span class="n">service</span><span class="p">.</span><span class="na">scheduleCanopyJob</span><span class="p">(</span><span class="n">callerId</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;world&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">radius</span><span class="p">,</span><span class="w"> </span><span class="n">messageMethod</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">CommandParameter</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">getParameterLookup</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">parameters</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">CommandsAPICommand</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">getCommandLookup</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">subCommands</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="file-5-treegenservicejava-server-api-predict-api">File 5: <code>TreeGenService.java</code> (<code>server-api</code> + <code>predict-api</code>)<a class="headerlink" href="#file-5-treegenservicejava-server-api-predict-api" title="Permanent link">&para;</a></h3>
+<p>Combine <code>ServerAccessor</code> / <code>TaskScheduler</code> (<code>server-api</code>) with <code>EwmaEstimator</code>, <code>AimdLimiter</code>, <code>BudgetPacer</code>, and <code>WaterFillingAllocator</code> (<code>predict-api</code>) so your plugin automatically paces its work on both single-thread servers and Folia regionalized servers:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nn">com.example.treegen</span><span class="p">;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.bit.BitReport</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.predict.AimdLimiter</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.predict.BudgetPacer</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.predict.EwmaEstimator</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.predict.WaterFillingAllocator</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.server.api.ServerAccessor</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.server.api.ServerAccessors</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.server.api.TaskScheduler</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.Map</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.UUID</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.concurrent.TimeUnit</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.function.Consumer</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.logging.Level</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">TreeGenService</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">ServerAccessor</span><span class="w"> </span><span class="n">server</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">TreeGenConfig</span><span class="w"> </span><span class="n">config</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">TreeGenBitSuite</span><span class="w"> </span><span class="n">bitSuite</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">EwmaEstimator</span><span class="w"> </span><span class="n">stepCostEstimator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EwmaEstimator</span><span class="p">.</span><span class="na">ofWindow</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="n">TimeUnit</span><span class="p">.</span><span class="na">MICROSECONDS</span><span class="p">.</span><span class="na">toNanos</span><span class="p">(</span><span class="mi">250</span><span class="p">));</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">BudgetPacer</span><span class="w"> </span><span class="n">pacer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BudgetPacer</span><span class="p">.</span><span class="na">ofEstimator</span><span class="p">(</span><span class="n">stepCostEstimator</span><span class="p">,</span><span class="w"> </span><span class="mf">1.10</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">AimdLimiter</span><span class="w"> </span><span class="n">budgetLimiter</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="nf">TreeGenService</span><span class="p">(</span><span class="n">ServerAccessor</span><span class="w"> </span><span class="n">server</span><span class="p">,</span><span class="w"> </span><span class="n">TreeGenConfig</span><span class="w"> </span><span class="n">config</span><span class="p">,</span><span class="w"> </span><span class="n">TreeGenBitSuite</span><span class="w"> </span><span class="n">bitSuite</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">server</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">server</span><span class="p">;</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="p">;</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">bitSuite</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitSuite</span><span class="p">;</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">budgetLimiter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">AimdLimiter</span><span class="p">(</span><span class="mf">0.25</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="na">tickBudgetMs</span><span class="p">());</span>
+<span class="w">        </span><span class="n">ServerAccessors</span><span class="p">.</span><span class="na">setCurrent</span><span class="p">(</span><span class="n">server</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">enable</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">BitReport</span><span class="w"> </span><span class="n">pbit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitSuite</span><span class="p">.</span><span class="na">runStartupPbit</span><span class="p">();</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">pbit</span><span class="p">.</span><span class="na">findings</span><span class="p">().</span><span class="na">isEmpty</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">server</span><span class="p">.</span><span class="na">log</span><span class="p">(</span><span class="n">Level</span><span class="p">.</span><span class="na">WARNING</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;[TreeGen BIT] Startup config findings: &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">pbit</span><span class="p">.</span><span class="na">findings</span><span class="p">().</span><span class="na">size</span><span class="p">());</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">scheduleCanopyJob</span><span class="p">(</span>
+<span class="w">            </span><span class="n">UUID</span><span class="w"> </span><span class="n">actorId</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">worldName</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">chunkX</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">chunkZ</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">radius</span><span class="p">,</span><span class="w"> </span><span class="n">Consumer</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">reply</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">TaskScheduler</span><span class="w"> </span><span class="n">scheduler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">server</span><span class="p">.</span><span class="na">scheduler</span><span class="p">()</span>
+<span class="w">                </span><span class="p">.</span><span class="na">orElseThrow</span><span class="p">(()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">IllegalStateException</span><span class="p">(</span><span class="s">&quot;TaskScheduler unavailable on &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">server</span><span class="p">.</span><span class="na">getPlatform</span><span class="p">()));</span>
+
+<span class="w">        </span><span class="c1">// Fairly divide tick budget across active worlds using max-min water-filling:</span>
+<span class="w">        </span><span class="kt">double</span><span class="w"> </span><span class="n">effectiveBudgetMs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">budgetLimiter</span><span class="p">.</span><span class="na">publishedValue</span><span class="p">();</span>
+<span class="w">        </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">Double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">worldBudgetsMs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">WaterFillingAllocator</span><span class="p">.</span><span class="na">allocateRates</span><span class="p">(</span>
+<span class="w">                </span><span class="n">Map</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="n">worldName</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">double</span><span class="p">)</span><span class="w"> </span><span class="n">radius</span><span class="p">),</span>
+<span class="w">                </span><span class="n">Map</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="n">worldName</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">),</span>
+<span class="w">                </span><span class="n">effectiveBudgetMs</span><span class="p">);</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="n">availableNanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Math</span><span class="p">.</span><span class="na">round</span><span class="p">(</span><span class="n">worldBudgetsMs</span><span class="p">.</span><span class="na">getOrDefault</span><span class="p">(</span><span class="n">worldName</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">1_000_000.0</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Dispatch onto the owning region thread on Folia, or primary thread on Paper/Spigot/Fabric/NeoForge:</span>
+<span class="w">        </span><span class="n">scheduler</span><span class="p">.</span><span class="na">runAtLocation</span><span class="p">(</span><span class="n">worldName</span><span class="p">,</span><span class="w"> </span><span class="n">chunkX</span><span class="p">,</span><span class="w"> </span><span class="n">chunkZ</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kt">long</span><span class="w"> </span><span class="n">startNanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">System</span><span class="p">.</span><span class="na">nanoTime</span><span class="p">();</span>
+<span class="w">            </span><span class="kt">boolean</span><span class="w"> </span><span class="n">ranAny</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">placed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">            </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">placed</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">radius</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">pacer</span><span class="p">.</span><span class="na">canExecute</span><span class="p">(</span><span class="n">System</span><span class="p">.</span><span class="na">nanoTime</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">startNanos</span><span class="p">,</span><span class="w"> </span><span class="n">availableNanos</span><span class="p">,</span><span class="w"> </span><span class="n">ranAny</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="kt">long</span><span class="w"> </span><span class="n">stepStart</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">System</span><span class="p">.</span><span class="na">nanoTime</span><span class="p">();</span>
+<span class="w">                </span><span class="c1">// Perform region-safe block state placement here (already on owning region thread)</span>
+<span class="w">                </span><span class="n">placed</span><span class="o">++</span><span class="p">;</span>
+<span class="w">                </span><span class="n">ranAny</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
+<span class="w">                </span><span class="n">pacer</span><span class="p">.</span><span class="na">recordDuration</span><span class="p">(</span><span class="n">System</span><span class="p">.</span><span class="na">nanoTime</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">stepStart</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">            </span><span class="n">reply</span><span class="p">.</span><span class="na">accept</span><span class="p">(</span><span class="s">&quot;[TreeGen] Placed &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">placed</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s">&quot; canopy segments on &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">server</span><span class="p">.</span><span class="na">getPlatform</span><span class="p">());</span>
+<span class="w">        </span><span class="p">});</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="4-folia-regional-safety-adaptive-budgeting">4. Folia Regional Safety &amp; Adaptive Budgeting<a class="headerlink" href="#4-folia-regional-safety-adaptive-budgeting" title="Permanent link">&para;</a></h2>
+<p>Plugins that mutate blocks or entities on background threads crash Folia immediately, while plugins that run unbounded loops on a region thread cause acute MSPT spikes. The combination of <code>server-api</code> and <code>predict-api</code> solves both problems with zero platform imports.</p>
+<h3 id="rule-f-001-region-ownership-server-api">Rule <code>F-001</code> &amp; Region Ownership (<code>server-api</code>)<a class="headerlink" href="#rule-f-001-region-ownership-server-api" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Never spawn raw threads (<code>new Thread(...)</code>, <code>Executors.new*ThreadPool</code>)</strong> in plugin code. Always route asynchronous and regional work through <code>ServerAccessor.scheduler()</code> (<code>TaskScheduler</code>).</li>
+<li><strong>Check or route by coordinates:</strong> Before touching a chunk or entity at <code>(worldName, chunkX, chunkZ)</code>, either check <code>scheduler.isOwnedByCurrentRegion(worldName, chunkX, chunkZ)</code> or dispatch via <code>scheduler.runAtLocation(worldName, chunkX, chunkZ, task)</code>. On Paper/Spigot/Fabric/NeoForge, <code>runAtLocation</code> delegates to <code>runSync</code>; on Folia, it schedules onto the owning region's tick queue.</li>
+<li><strong>Never block the tick thread on chunk I/O (<code>S-005</code>):</strong> When scanning unloaded terrain (for example, searching for biomes or structures), read <code>.mca</code> region files off-tick using <code>anvil-api</code> (<code>RegionFileReader</code>, <code>AnvilReader</code>, <code>AnvilChunkView</code>) inside <code>scheduler.runAsync(...)</code>, and only jump to <code>scheduler.runAtLocation(...)</code> once a candidate chunk is selected.</li>
+</ol>
+<h3 id="adaptive-control-multi-tenant-fairness-predict-api">Adaptive Control &amp; Multi-Tenant Fairness (<code>predict-api</code>)<a class="headerlink" href="#adaptive-control-multi-tenant-fairness-predict-api" title="Permanent link">&para;</a></h3>
+<p><code>api/predict-api</code> provides five composable control primitives that keep background tasks within a strict tick budget (<a href="adr/ADR-087-reactive-governor-closed-loop-control.md">ADR-087</a>, <a href="adr/ADR-109-empirical-cost-governor-for-anvil-prefilter.md">ADR-109</a>, <a href="adr/ADR-123-folia-regional-work-division-and-idle-thread-lending.md">ADR-123</a>, <a href="adr/ADR-124-multi-region-pareto-fair-governor.md">ADR-124</a>):</p>
+<table>
+<thead>
+<tr>
+<th>Control Primitive</th>
+<th>Role in a Standalone Plugin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EwmaEstimator</code> &amp; <code>BudgetPacer</code></td>
+<td>Tracks moving mean and Welford variance of per-step nanosecond cost. <code>BudgetPacer.canExecute(elapsedNanos, availableNanos, ranAny)</code> guarantees <strong>Forward Progress</strong> (at least 1 unit runs on any positive budget) and <strong>Overrun Protection</strong> (yields before exceeding the deadline).</td>
+</tr>
+<tr>
+<td><code>AimdLimiter</code></td>
+<td>Lag-aware Additive-Increase / Multiplicative-Decrease controller. Cuts the budget by <code>0.5x</code> on an MSPT/tick breach, holds during stale telemetry (<code>ADR-087</code> I6), and recovers linearly (<code>+10%</code> per <code>5 s</code> clean window) with an asymmetric deadband.</td>
+</tr>
+<tr>
+<td><code>WorkAttributionLedger</code></td>
+<td>Lock-free 4096-entry LRU ledger that tracks distinct active players per bucket/world ($n_b \ge 1$) over a 10-minute window and per-player dual-EWMA (<code>30 s</code> and <code>10 min</code> half-lives) attributed cost ($a_p$ in <code>ms/min</code>). Prevents one player spamming a command from starving everyone else.</td>
+</tr>
+<tr>
+<td><code>WaterFillingAllocator</code></td>
+<td>Weighted max-min water-filling (<code>allocateRates(demands, weights, totalBudget)</code>) plus <code>jainsFairnessIndex(values)</code>. Gives small worlds/tasks 100% of their demand while splitting congested budget proportionally to active consumer counts ($w_b = n_b$).</td>
+</tr>
+<tr>
+<td><code>ProbedShareAllocator</code></td>
+<td>Folia per-region share allocator (<code>ADR-123</code>). Maintains per-region AIMD limiters, down-weights regions with higher player populations ($w'_k = w_k / (1 + P_k / 4)$) to minimize bystander lag exposure, and lends idle region threads from a global lending pool ($\Pi$).</td>
+</tr>
+<tr>
+<td><code>UnitCurve</code>, <code>DistributionSampler</code> &amp; <code>PolarCurve</code></td>
+<td>Stateless unit-interval shaping curves (<code>linear</code>, <code>power</code>, <code>sigmoid</code>, <code>smoothstep</code>, <code>parabolicCrown</code>, <code>gaussian</code>, <code>logarithmic</code>, <code>logarithmicTaper</code>, <code>harmonic</code>), continuous distribution samplers (<code>samplePowerLaw</code>, <code>samplePowerLawIndex</code>, <code>sampleTruncatedNormal</code>, <code>variantSeed</code>), and polar-spiral / multi-harmonic cross-section geometry (<code>spiralOffset</code>, <code>harmonicRadius</code>, <code>annularRingRadius</code>) shared between spatial region selectors and procedural worldgen plugins (<code>leaf-treegen</code>).</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="c1">// Example: Fair per-player &amp; per-world budget allocation with WorkAttributionLedger + WaterFillingAllocator</span>
+<span class="n">WorkAttributionLedger</span><span class="w"> </span><span class="n">ledger</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">WorkAttributionLedger</span><span class="p">();</span>
+<span class="kt">long</span><span class="w"> </span><span class="n">nowNanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">System</span><span class="p">.</span><span class="na">nanoTime</span><span class="p">();</span>
+
+<span class="c1">// Record that player `actorId` triggered 180 microseconds of work in &quot;world_nether&quot;:</span>
+<span class="n">ledger</span><span class="p">.</span><span class="na">recordConsumption</span><span class="p">(</span><span class="s">&quot;world_nether&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">actorId</span><span class="p">,</span><span class="w"> </span><span class="mf">180_000.0</span><span class="p">,</span><span class="w"> </span><span class="n">nowNanos</span><span class="p">);</span>
+<span class="n">ledger</span><span class="p">.</span><span class="na">recordActorCharge</span><span class="p">(</span><span class="n">actorId</span><span class="p">,</span><span class="w"> </span><span class="mi">180_000L</span><span class="p">,</span><span class="w"> </span><span class="n">nowNanos</span><span class="p">);</span>
+
+<span class="c1">// Weight each world by its distinct active player count (n_b &gt;= 1):</span>
+<span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">Double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">demandsMs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Map</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="s">&quot;world&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">3.0</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;world_nether&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">3.0</span><span class="p">);</span>
+<span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">weights</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Map</span><span class="p">.</span><span class="na">of</span><span class="p">(</span>
+<span class="w">        </span><span class="s">&quot;world&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ledger</span><span class="p">.</span><span class="na">distinctConsumers</span><span class="p">(</span><span class="s">&quot;world&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">nowNanos</span><span class="p">),</span>
+<span class="w">        </span><span class="s">&quot;world_nether&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ledger</span><span class="p">.</span><span class="na">distinctConsumers</span><span class="p">(</span><span class="s">&quot;world_nether&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">nowNanos</span><span class="p">));</span>
+
+<span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">Double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">allocatedMs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">WaterFillingAllocator</span><span class="p">.</span><span class="na">allocateRates</span><span class="p">(</span><span class="n">demandsMs</span><span class="p">,</span><span class="w"> </span><span class="n">weights</span><span class="p">,</span><span class="w"> </span><span class="mf">4.0</span><span class="p">);</span>
+<span class="kt">double</span><span class="w"> </span><span class="n">fairness</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">WaterFillingAllocator</span><span class="p">.</span><span class="na">jainsFairnessIndex</span><span class="p">(</span><span class="n">allocatedMs</span><span class="p">.</span><span class="na">values</span><span class="p">());</span>
+</code></pre></div>
+<hr />
+<h2 id="5-day-0-carrier-qualification-whole-server-fuzzing-reuse">5. Day-0 Carrier Qualification &amp; Whole-Server Fuzzing Reuse<a class="headerlink" href="#5-day-0-carrier-qualification-whole-server-fuzzing-reuse" title="Permanent link">&para;</a></h2>
+<p>When you build a plugin or mod using this repository's patterns, you can reuse its verification and support scripts directly against your own <code>.jar</code> without writing custom test harnesses.</p>
+<h3 id="target-free-whole-server-discovery-fuzzing-scriptsbench_fuzzpy-mode-server">Target-Free Whole-Server Discovery Fuzzing (<code>scripts/bench_fuzz.py --mode server</code>)<a class="headerlink" href="#target-free-whole-server-discovery-fuzzing-scriptsbench_fuzzpy-mode-server" title="Permanent link">&para;</a></h3>
+<p>Governed by <a href="../adr/ADR-125-whole-server-discovery-fuzzing/">ADR-125</a> and documented in <a href="../dev/WHOLE_SERVER_FUZZING/"><code>docs/dev/WHOLE_SERVER_FUZZING.md</code></a>, <code>scripts/bench_fuzz.py --mode server</code> fuzzes <strong>any</strong> Paper, Fabric, or NeoForge plugin/mod jar dropped into a disposable bench server - with zero hardcoded plugin names, commands, or package prefixes:</p>
+<ol>
+<li><strong>Protocol Command Discovery (<code>declare_commands</code>):</strong> Headless Mineflayer bots (<code>devstack/clients/bench-swarm.js</code>) log in under <code>default</code> and <code>op</code> permission tiers, capture the live Brigadier <code>declare_commands</code> packet, fold aliases, apply the safety denylist (<code>DEFAULT_DENYLIST</code>), and sample boundary-ladder arguments (<code>min</code>, <code>-1</code>, <code>0</code>, <code>1</code>, <code>16</code>, <code>max</code>) plus tab completions.</li>
+<li><strong>Tier-Stratified UCB1 Bandit &amp; Player Archetypes:</strong> Explores <code>(command node, follow-up shape)</code> pairs including rapid quit-during-warmup (<code>quit_lt1s</code>, <code>quit_delay</code>), concurrent execution (<code>concurrent</code>), inventory clicks (<code>window_click</code>), and realistic player-taxonomy flows (<code>homesteader_reroll</code>, <code>explorer_wander</code>, <code>coop_group</code>).</li>
+<li><strong>Agentless JVM Leak &amp; Stall Oracles (<code>jcmd</code>):</strong> Collects post-GC class histograms (<code>jcmd &lt;pid&gt; GC.class_histogram</code>) and main-thread stack dumps (<code>jcmd &lt;pid&gt; Thread.print</code>) compared against a same-seed vanilla baseline.</li>
+<li><strong>Automated Shrinking &amp; Delta-Debugging Attribution (<code>ddmin</code>):</strong> When a memory leak slope or main-thread stall reproduces (<code>k</code> of <code>n</code> replays), the fuzzer shrinks the bot action sequence, bisects numeric arguments to find the exact failing threshold, and runs dependency-closed delta debugging (<code>ddmin_jars</code>) over <code>plugins/</code> or <code>mods/</code> to isolate the minimal culprit jar set.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Create a disposable bench copy of your Paper, Fabric, or NeoForge server containing your plugin jar:</span>
+python3<span class="w"> </span>scripts/bench_setup.py<span class="w"> </span>/path/to/template-server<span class="w"> </span>/tmp/bench-myplugin<span class="w"> </span>--port<span class="w"> </span><span class="m">25566</span><span class="w"> </span>--rcon-port<span class="w"> </span><span class="m">25576</span>
+
+<span class="c1"># 2. Run a read-only passive audit (captures commands.json + offline JarIndex inventory):</span>
+python3<span class="w"> </span>scripts/bench_fuzz.py<span class="w"> </span>--mode<span class="w"> </span>server<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--profile<span class="w"> </span>paper<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--server-dir<span class="w"> </span>/tmp/bench-myplugin<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--mc-host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--mc-port<span class="w"> </span><span class="m">25566</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--tiers<span class="w"> </span>default
+
+<span class="c1"># 3. Run active discovery fuzzing (baseline + bandit exploration + jcmd leak/stall screening + jar ddmin):</span>
+python3<span class="w"> </span>scripts/bench_fuzz.py<span class="w"> </span>--mode<span class="w"> </span>server<span class="w"> </span>--active<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--profile<span class="w"> </span>paper<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--server-dir<span class="w"> </span>/tmp/bench-myplugin<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--mc-host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--mc-port<span class="w"> </span><span class="m">25566</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--tiers<span class="w"> </span>default,op<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--episodes<span class="w"> </span><span class="m">40</span>
+</code></pre></div>
+<h3 id="additional-reusable-repository-tooling-scripts-devstack">Additional Reusable Repository Tooling (<code>scripts/*</code> &amp; <code>devstack/*</code>)<a class="headerlink" href="#additional-reusable-repository-tooling-scripts-devstack" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Zero-Backend Interactive Web Config Editor (<code>scripts/generate_web_editor.py</code>):</strong> Generates a static HTML/JS configuration editor directly from the <code>@type</code>, <code>@options</code>, <code>@range</code>, and <code>@pattern</code> comment directives in your YAML files.</li>
+<li><strong>Single-Source Storefront Builder (<code>scripts/release/build_front_pages.py</code>):</strong> Compiles a single tagged Markdown source (<a href="../publishing/FRONT_PAGE/"><code>docs/publishing/FRONT_PAGE.md</code></a>) into platform-tailored pages for Modrinth, Hangar, SpigotMC (BBCode), CurseForge, and BuiltByBit.</li>
+<li><strong>Multi-Server Docker Devstack (<code>devstack/</code>):</strong> Scriptable containers and headless Mineflayer acceptance runners (<code>devstack/run-acceptance.sh</code>) for validating cross-server Velocity/Redis/MySQL topologies.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.3.1
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+        <script src="../assets/javascripts/rtp-support-doctor.js"></script>
+      
+    
+  </body>
+</html>
