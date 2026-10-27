@@ -148,6 +148,17 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Break the remaining `region <-> shapes` reverse edge by routing shape-specific region queries through a region-owned port interface.
 - **Linear:** RTP-67
 
+### 2026-10-26 - Multi-plugin path parameterization in ci-scope.py, generate_web_editor.py, and diff-coverage.py
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** monorepo developer tooling audit (`corpus-atlas`, `scripts/`)
+- **Location:** `scripts/ci-scope.py` lines 56-83 (`LEAF_ROOTS`, `SETS`, `_LEAF_LITERAL_RE`); `scripts/generate_web_editor.py` lines 20-21 (`RESOURCES_DIR`, `DOCS_DIR`); `scripts/diff-coverage.py` lines 54-60 (`SONAR_PROJECT_DIR_EXCLUSIONS`)
+- **Symptom / hypothesis:** While `corpus-atlas/build_doc_index.py` indexes `plugins/*` as `TIER_4_LEAF_ENTRY`, `scripts/ci-scope.py` hardcodes `LEAF_ROOTS = ("addons", "helpers")` and `SETS` without `plugins`, so any edit under `plugins/<Name>/**` falls outside known sets and triggers an unscoped `full=true` CI build across all modules. Similarly, `scripts/generate_web_editor.py` hardcodes `rtp-plugin/src/main/resources` and `docs/editor/editor-data.json`, and `scripts/diff-coverage.py` hardcodes `SONAR_PROJECT_DIR_EXCLUSIONS`.
+- **Impact:** Adding standalone plugins (e.g. `plugins/LeafSleep`, `plugins/LeafTreeGen`, `plugins/Thuum`) to the monorepo forces full multi-module CI rebuilds on leaf plugin edits and prevents generating per-plugin web editor payloads without CLI flags.
+- **Suggested next step:** Add `"plugins"` to `LEAF_ROOTS` and `SETS` in `scripts/ci-scope.py` (with matching job wiring in `.github/workflows/gradle.yml`), add `--resources-dir`, `--docs-dir`, and `--out` CLI flags to `scripts/generate_web_editor.py` (defaulting to `rtp-plugin`), and include `plugins/` carrier exclusions in `scripts/diff-coverage.py` as needed.
+- **Linear:** RTP-101
+
 ### 2026-10-14 - LocationGenerator.joinSafely waits on work queued to the same pool
 
 - **Severity:** Low
@@ -214,5 +225,27 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** The README and `setup-multiworld-demo.ps1` describe one committed demo region per backend, but the backend-a (Verdant Wilds) and backend-b (Ashen Wastes) files exist only in local working copies. backend-c runs Fabric, whose adapters name worlds by registry key (`minecraft:the_end`, see `FabricRTPWorld` region-dir mapping); backend-d already uses `minecraft:overworld`. `world_the_end` probably does not resolve there.
 - **Impact:** On a fresh clone the lobby GUI demo shows fewer cross-server destinations than documented, and the Fabric End region may fall back or fail to load.
 - **Suggested next step:** Add `!backend-a/rtp-config/regions/default.yml` and the backend-b equivalent to `devstack/.gitignore` and commit the two files. Boot backend-c and check `/rtp info`; switch to `minecraft:the_end` if the region is not bound.
+
+### 2026-10-26 - POSIX gradlew lock wrapper falls back to the global build lock for modules with in-tree project dependencies
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** monorepo developer tooling audit (`gradlew` vs `gradle/rtp-gradle-lock.ps1`)
+- **Location:** `gradlew` lines 110-156 (`LOCK_SUFFIX="mod_${TARGET_MODULE}"` vs `LOCK_SUFFIX="build"`); compare `gradle/rtp-gradle-lock.ps1`
+- **Symptom / hypothesis:** On Windows, `gradlew.bat` delegates to `gradle/rtp-gradle-lock.ps1` to acquire mutexes for the target module's transitive `project(':...')` dependency closure. On Linux/POSIX, `./gradlew` falls back to the global `rtp_gradle_build.flock` lock whenever a module's `build.gradle` references any other in-tree `project(':...')`, because POSIX `/bin/sh` (`dash`/`ash`) only supports single-digit file descriptors (`0-9`).
+- **Impact:** Concurrent Linux/agent Gradle runs on disjoint non-leaf subtrees serialize on the global build lock instead of running in parallel when their transitive dependency closures do not overlap.
+- **Suggested next step:** Extract a lightweight `python3` lock helper invoked by `./gradlew` when `python3` is available that computes the sorted transitive `project(':...')` closure from `settings.gradle` and `build.gradle` and acquires `fcntl.flock` locks in deterministic lexicographical order before `exec`-ing the Gradle wrapper.
+- **Linear:** RTP-102
+
+### 2026-10-26 - Consolidate scripts/ directory sprawl and index script docstrings in corpus-atlas
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** monorepo developer tooling audit (`scripts/`, `corpus-atlas/build_doc_index.py`)
+- **Location:** `scripts/` (`111` top-level files, including duplicate PowerShell + Python pairs such as `analyze-lite-jar.{ps1,py}`, `analyze-long-comments.{ps1,py}`, `audit-locale-bleed.{ps1,py}`, `export-translation-bundle.{ps1,py}`, `import-translation-bundle.{ps1,py}`, `list-common-comment-leaks.{ps1,py}`); `corpus-atlas/build_doc_index.py`
+- **Symptom / hypothesis:** Daily verification and agent entrypoints (`agent-gate.py`, `repo_ast.py`, `local_llm_queue.py`, `bench_fuzz.py`, `ci-scope.py`, `diff-coverage.py`) sit in a flat `111`-file `scripts/` directory alongside one-off historical migration scripts and redundant `.ps1` wrappers, and `corpus-atlas` does not index Python script docstrings or expose a `scripts/README.md` catalog.
+- **Impact:** Contributors and agents cannot discover existing helper scripts via `repo_ast_search`, increasing the risk of reinventing ad-hoc scripts or invoking stale wrappers.
+- **Suggested next step:** Add a concise `scripts/README.md` catalog (indexed in `dev_sections` by `corpus-atlas/build_doc_index.py`), archive or retire superseded one-off migration scripts and redundant `.ps1` wrappers after verifying no `.github/workflows/*.yml` or docs reference them, and optionally index top-level `scripts/*.py` module docstrings in `dev_sections`.
+- **Linear:** RTP-103
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->
