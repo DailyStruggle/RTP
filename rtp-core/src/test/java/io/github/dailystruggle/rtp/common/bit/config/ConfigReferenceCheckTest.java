@@ -173,9 +173,11 @@ class ConfigReferenceCheckTest {
         List<BitFinding> findings = withCode(raw(WORLDS,
                 "advanced/schematics/default.schem", "",
                 "advanced/schematics/pit.schematic", "",
+                "advanced/schematics/shrine.litematic", "",
                 "advanced/schematics/arenas/ring.schem", "",
                 "advanced/schematics/old.schem", "",
                 "definitions/actions/koth.yml", "placement:\n  schematic: \"pit\"\n",
+                "definitions/actions/shrine_duel.yml", "placement:\n  schematic: \"shrine.litematic\"\n",
                 "definitions/actions/arena.yml", "placement:\n  schematic: \"arenas/ring.schem\"\n"),
                 "RTP_SCHEMATIC_ORPHAN");
         assertEquals(1, findings.size(), findings.toString());

@@ -42,21 +42,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
-### 2026-10-21 - NeoForge 1.21.1 watchdog crash: main thread stuck on a vanilla chunk load while RTP fill thrashes the heap
-
-- **Severity:** High
-- **Status:** Open
-- **Discovered during:** live bot check of RTP-78 effects on a standalone NeoForge 1.21.1 container (podman, `MEMORY=6G`, seed 8675309, `teleportDelay` 4)
-- **Location:** NeoForge background cache fill (`RTP-NeoForge-Async-*` workers); crash report `ServerHangWatchdog` stack: `ServerPlayer.doTick` -> `Entity.updateFluidOnEyes` -> `Level.getChunkAt` -> `ServerChunkCache.getChunk` -> `managedBlock`
-- **Symptom / hypothesis:** After `/rtp reload` and a restart, the log alternated `Heap usage 85-95% ... pausing` / `Heap pressure subsided` every few seconds, the container sat at ~640% CPU, a bot login hung, and the watchdog killed the server after `MAX_TICK_TIME` 180 s. The main thread was waiting on a vanilla load of the player's own chunk, so the chunk workers were starved; RTP's fill (or the GC load it causes) is the likely starver. Not reproduced on the first boot with 4G; not yet compared against the `HEAD` jar.
-- **Impact:** A NeoForge server can hang and crash with no player action beyond joining.
-- **Vanilla reproduction without RTP (2026-10-21, same world, all mods removed):** `forceload add` on random chunks within +-10,000 blocks, sent one at a time over RCON, does the same thing. 105 of 130 forceloads went in before one `forceload add` held the main thread in `ServerChunkCache.getChunk` -> `managedBlock` for 180 s, and the watchdog crashed the server (`crash-2026-10-21_20.54.42`, 22 of 23 `Worker-Main` threads parked, no mod frames). In a second copy, 40 forceloads then a bot join gave a 60.8 s ("1215 ticks behind") join tick; the bot stayed connected. So the hang is vanilla 1.21.1 behaviour once roughly 40-100 ticketed chunks in fresh terrain are queued; RTP's part is how many tickets its fill holds, which is the budget to fix.
-- **Attribution (2026-10-21, same world copied twice, bot joins 60 s after start):** with RTP removed the join costs one 2 s "Can't keep up" and the bot stays connected; with RTP (including the generation budget and stuck-tick pause added that day) the join tick runs 129 s and the bot times out. RTP-driven chunk writes in the first two minutes: about 14,000 with RTP, about 600 without. The budget counts only the centre chunk future of each RTP load, and the check lags the load (8 promotions pass one pulse's check before the async probe reaches the counter). Likely uncounted sources: the restart re-pin of saved kept locations and the generation cascade each RTP ticket causes around its chunk (`RTP_TICKET_DISTANCE` 1, so about radius 11 of partial generation per ticket).
-- **Partial fix (2026-10-22, in the working tree):** `LoginCacheTask` promotions and the `RegionQueueManager.validateTickets` re-pin now take a `GenerationBudget` slot before they dispatch a load. The re-pin runs as one sweep that resumes through `RTP.scheduler` when slots free up. On NeoForge, `TicketGenerationWatch` counts each ticket's non-resident footprint until it is resident, cancelled or past its TTL.
-- **A/B rerun (2026-10-22, `neoforge-ctrl` world copied per run, 6G, bot joins 60 s after boot and stays 150 s):** no RTP: bot spawns at 1.0 s, no stall. Jar from 2026-10-21 15:37: bot never spawns (socket closed at 31 s), 180 s tick, watchdog crash (`crash-2026-10-22_15.57.12`). Current build, two runs: bot spawns at 12.9 s and 13.5 s and stays connected, worst ticks 12.5 s and 13.0 s, no crash. RTP's tick-stuck / unhealthy pauses fired and generation resumed once the tick recovered. Chunk writes over about 3.5 minutes were 27,859 and 18,001 with the current build and 810 without RTP; the old jar's 1,945 is not comparable because it crashed before its final save. Harness: `scripts/tmp/livecheck/ab.sh` (gitignored).
-- **Suggested next step:** The crash is gone, but the join still stalls about 13 s where vanilla stalls 0 s. Find what fills the chunk workers in the first minute: count ticket applications and generation-cascade chunks against the budget during the A/B, and try a lower budget cap or a later fill start after boot on hold-back hosts. Clears when a rerun shows a join tick comparable to the no-RTP baseline.
-- **Linear:** RTP-80
-
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium
@@ -115,17 +100,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Ship hazard runs coarse to fine like biomes (`BiomeBinCodec` levels 32/4/1, finer levels bin by bin via a level field on `hazard-delta`, bad share per stretch). Stopgap: raise the cap to about 1 MiB.
 - **Linear:** RTP-72
 
-### 2026-10-14 - Folia safety scan reads live neighbour chunks off-thread when the centre is an Anvil view
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** dividing Folia region-thread work per region (ADR-112)
-- **Location:** `rtp-core/.../selection/region/PregenTask.java` `loadSafetyNeighbours` / `evaluateSafety` (~1157-1300)
-- **Symptom / hypothesis:** When the centre chunk is an Anvil view (`reservation == null`), `evaluateSafety` runs on the async worker, but neighbour slots can hold live resident chunks whose `isSafe` reads touch live block state. Neighbours that belong to another Folia region than the centre were also read from the centre's thread before ADR-112.
-- **Impact:** Possible `ThreadAccessException` or racy reads at `safetyRadius > 0` near loaded areas; candidates are rejected rather than accepted, so S-001 holds.
-- **Suggested next step:** Read neighbours from Anvil views or snapshots only, or dispatch each live neighbour's column check to its own region and join the results off-thread.
-- **Linear:** RTP-92
-
 ### 2026-10-14 - Folia arrival platform writes blocks in one unbudgeted destination-region task
 
 - **Severity:** Medium
@@ -137,28 +111,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
 - **Linear:** RTP-93
 
-### 2026-10-16 — Package tangles: selection.region is mutually coupled with shapes
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** SonarQube tangle audit on branch `v3.3.0` / PR #57 (ADR-115 Phase 2)
-- **Location:** `rtp-core/.../selection/region/` (`Region`, `LockFreeLocationBuffer`, `LocationGenerator`, `RegionSettings`, `RegionQueueManager`) and its importers in `selection.region.selectors.memory.shapes`
-- **Symptom / hypothesis:** The original hypothesis (relocating `RTPLocation` breaks ~6 cycles) is wrong. Measured with `jdeps -verbose:class` on compiled `rtp-core` (2026-10-19): moving `RTPLocation` alone removes 0 of 45 mutual package pairs, because every importer also uses `Region`, `LockFreeLocationBuffer`, `LocationGenerator` or `RegionSettings`; `DatabaseAccessor` does not use `RTPLocation` at all (only `Region`). Moving `LockFreeLocationBuffer` too breaks only `region<->cache`, and the new package then depends on `common.RTP`. Moving to `rtp-api` would also collide with the existing `api.world.RTPLocation`. Seam 1 (`region -> cache`, `region -> claim`, `region -> database`) is now closed via `RingBufferDelegate`, `RegionClaimTracker`, and `RegionLocationStore` and enforced by ArchUnit Rules 23-25 in `RTPArchitectureTest.java` (alongside Rule 19 `tools_must_not_depend_on_region_classes` and Rule 20 `runtime_holder_must_not_depend_on_core`). Remaining reverse edge: `region <-> shapes` (`MemoryShape` and subclasses).
-- **Impact:** Partial violation of the Tier 1-4 package DAG in ADR-115; `selection.region` remains coupled to `selection.region.selectors.memory.shapes`.
-- **Suggested next step:** Break the remaining `region <-> shapes` reverse edge by routing shape-specific region queries through a region-owned port interface.
-- **Linear:** RTP-67
-
-### 2026-10-26 - Multi-plugin path parameterization in ci-scope.py, generate_web_editor.py, and diff-coverage.py
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** monorepo developer tooling audit (`corpus-atlas`, `scripts/`)
-- **Location:** `scripts/ci-scope.py` lines 56-83 (`LEAF_ROOTS`, `SETS`, `_LEAF_LITERAL_RE`); `scripts/generate_web_editor.py` lines 20-21 (`RESOURCES_DIR`, `DOCS_DIR`); `scripts/diff-coverage.py` lines 54-60 (`SONAR_PROJECT_DIR_EXCLUSIONS`)
-- **Symptom / hypothesis:** While `corpus-atlas/build_doc_index.py` indexes `plugins/*` as `TIER_4_LEAF_ENTRY`, `scripts/ci-scope.py` hardcodes `LEAF_ROOTS = ("addons", "helpers")` and `SETS` without `plugins`, so any edit under `plugins/<Name>/**` falls outside known sets and triggers an unscoped `full=true` CI build across all modules. Similarly, `scripts/generate_web_editor.py` hardcodes `rtp-plugin/src/main/resources` and `docs/editor/editor-data.json`, and `scripts/diff-coverage.py` hardcodes `SONAR_PROJECT_DIR_EXCLUSIONS`.
-- **Impact:** Adding standalone plugins (e.g. `plugins/LeafSleep`, `plugins/LeafTreeGen`, `plugins/Thuum`) to the monorepo forces full multi-module CI rebuilds on leaf plugin edits and prevents generating per-plugin web editor payloads without CLI flags.
-- **Suggested next step:** Add `"plugins"` to `LEAF_ROOTS` and `SETS` in `scripts/ci-scope.py` (with matching job wiring in `.github/workflows/gradle.yml`), add `--resources-dir`, `--docs-dir`, and `--out` CLI flags to `scripts/generate_web_editor.py` (defaulting to `rtp-plugin`), and include `plugins/` carrier exclusions in `scripts/diff-coverage.py` as needed.
-- **Linear:** RTP-101
-
 ### 2026-10-14 - LocationGenerator.joinSafely waits on work queued to the same pool
 
 - **Severity:** Low
@@ -168,17 +120,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** Blocks a pool thread on a future whose work is submitted to the same bounded pool. Only tests call it today, and it has a timeout.
 - **Impact:** None in production; a future production caller could stall a bounded pool until the timeout.
 - **Suggested next step:** Remove it or make callers compose the future instead of joining.
-
-### 2026-10-06 — Pregen biome extraction reads surface biomes with the Anvil probe for every format
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** removing the built-in Linear reader (ADR-077 revision)
-- **Location:** `rtp-core/.../commands/editor/PregenBiomeExtractor.java` `sampleRegionFile` (~264-300): `reader.isChunkGenerated(...)` then `AnvilReader.readColumnProbe(bytes, ...)`
-- **Symptom / hypothesis:** The generated check uses the registered reader, but the surface-biome probe always parses the bytes as Anvil. For an addon-registered format the probe throws (caught), so every chunk falls back to the shape's biome cache or `minecraft:plains`.
-- **Impact:** None today (only `.mca` is built in). Once a Linear addon registers a reader, the editor's land and biome backdrop for Linear worlds would show plains or cached biomes instead of the real ones.
-- **Suggested next step:** Probe through the registered reader: `reader.readChunk(...)` then `AnvilReader.toView(entry.root)` for the surface biome, or add a column-probe method to the `RegionFileReader` SPI with an Anvil default.
-- **Linear:** RTP-22
 
 ### 2026-10-06 — Fuzz targets: unreachable paths, exception-only oracles, missing parsers
 
@@ -194,58 +135,5 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Coverage gap only; no production defect.
 - **Suggested next step:** Let the fuzzer pick the chunk coordinates (`FuzzedDataProvider`); add a prefilter target asserting the verdict is never ACCEPT on malformed data; narrow the tolerated exceptions; add targets for YAML, editor JSON and the network envelope first.
 - **Linear:** RTP-28
-
-### 2026-10-07 — Web editor reference materialize does not support native undo/redo
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** LeafRTP Web Editor testing (`docs/editor/index.html`)
-- **Location:** `docs/editor/index.html` line 3421 (`materializeCurrentReference`)
-- **Symptom / hypothesis:** In the Config & Prefabs editor panel (`#cfg-editor`), typing characters creates browser-native undo history and responds to `Ctrl+Z`, but clicking `⚡ Materialize` on an inherited reference (e.g. `@config`) replaces text via direct `.value` assignment (`cfgEditor.value = before + replacement + after`). Direct property assignment to a `<textarea>` wipes the browser's native undo manager stack, preventing operators from reverting the materialization or restoring the original reference token via `Ctrl+Z` / `Cmd+Z`.
-- **Impact:** Operators who unpack inherited references in the config editor cannot undo the replacement using keyboard shortcuts (`Ctrl+Z`), leaving the configuration file mutated unless manually rewritten or completely reverted.
-- **Suggested next step:** Replace editor line text using `document.execCommand('insertText', false, replacement)` across the selected line range (with fallback to `setRangeText`), and dispatch an `input` event. This preserves the browser's native undo stack on the textarea while ensuring geometry synchronization (`applyYamlGeometry`), gutter diagnostics, and diff updates execute cleanly without requiring extra server-roundtrip data.
-- **Linear:** RTP-31
-
-### 2026-10-12 - ActionContext gate validators are not consulted by in-session lifecycle gates
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** SonarCloud PR 57 coverage tests for `ActionSessionImpl`
-- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/action/ActionSessionImpl.java` `triggerBoundaryViolation` / `triggerStart` (`new ActionGateContext(...)` without the session's `ActionContext`); `GateEvaluator.evaluate` lines 75-79, 123-127
-- **Symptom / hypothesis:** `GateEvaluator` applies `context.context().gateValidators()`, but the session builds its `ActionGateContext` without an `ActionContext`, so validators added via `ActionContext.withValidator` gate only queue admission in `ActionManager` and never lifecycle steps. Unclear whether that is intended.
-- **Impact:** An addon that expects its validator to suppress `onBoundaryViolation` / `onStart` steps sees them run anyway.
-- **Suggested next step:** Decide the contract; either pass `context` into the session's gate contexts or document `withValidator` as admission-only. `ActionSessionImplCoverageTest#gatesAndDelayedSteps` pins the current behaviour.
-
-### 2026-10-13 - Devstack demo regions: two untracked, one with a Bukkit world name on Fabric
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release docs audit (`devstack/README.md` backend counts)
-- **Location:** `devstack/.gitignore` lines 78-79 (`backend-a/rtp-config/**`, `backend-b/rtp-config/**`); `devstack/backend-c/rtp-config/regions/default.yml` (`world: "world_the_end"`, header comment still says Folia)
-- **Symptom / hypothesis:** The README and `setup-multiworld-demo.ps1` describe one committed demo region per backend, but the backend-a (Verdant Wilds) and backend-b (Ashen Wastes) files exist only in local working copies. backend-c runs Fabric, whose adapters name worlds by registry key (`minecraft:the_end`, see `FabricRTPWorld` region-dir mapping); backend-d already uses `minecraft:overworld`. `world_the_end` probably does not resolve there.
-- **Impact:** On a fresh clone the lobby GUI demo shows fewer cross-server destinations than documented, and the Fabric End region may fall back or fail to load.
-- **Suggested next step:** Add `!backend-a/rtp-config/regions/default.yml` and the backend-b equivalent to `devstack/.gitignore` and commit the two files. Boot backend-c and check `/rtp info`; switch to `minecraft:the_end` if the region is not bound.
-
-### 2026-10-26 - POSIX gradlew lock wrapper falls back to the global build lock for modules with in-tree project dependencies
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** monorepo developer tooling audit (`gradlew` vs `gradle/rtp-gradle-lock.ps1`)
-- **Location:** `gradlew` lines 110-156 (`LOCK_SUFFIX="mod_${TARGET_MODULE}"` vs `LOCK_SUFFIX="build"`); compare `gradle/rtp-gradle-lock.ps1`
-- **Symptom / hypothesis:** On Windows, `gradlew.bat` delegates to `gradle/rtp-gradle-lock.ps1` to acquire mutexes for the target module's transitive `project(':...')` dependency closure. On Linux/POSIX, `./gradlew` falls back to the global `rtp_gradle_build.flock` lock whenever a module's `build.gradle` references any other in-tree `project(':...')`, because POSIX `/bin/sh` (`dash`/`ash`) only supports single-digit file descriptors (`0-9`).
-- **Impact:** Concurrent Linux/agent Gradle runs on disjoint non-leaf subtrees serialize on the global build lock instead of running in parallel when their transitive dependency closures do not overlap.
-- **Suggested next step:** Extract a lightweight `python3` lock helper invoked by `./gradlew` when `python3` is available that computes the sorted transitive `project(':...')` closure from `settings.gradle` and `build.gradle` and acquires `fcntl.flock` locks in deterministic lexicographical order before `exec`-ing the Gradle wrapper.
-- **Linear:** RTP-102
-
-### 2026-10-26 - Consolidate scripts/ directory sprawl and index script docstrings in corpus-atlas
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** monorepo developer tooling audit (`scripts/`, `corpus-atlas/build_doc_index.py`)
-- **Location:** `scripts/` (`111` top-level files, including duplicate PowerShell + Python pairs such as `analyze-lite-jar.{ps1,py}`, `analyze-long-comments.{ps1,py}`, `audit-locale-bleed.{ps1,py}`, `export-translation-bundle.{ps1,py}`, `import-translation-bundle.{ps1,py}`, `list-common-comment-leaks.{ps1,py}`); `corpus-atlas/build_doc_index.py`
-- **Symptom / hypothesis:** Daily verification and agent entrypoints (`agent-gate.py`, `repo_ast.py`, `local_llm_queue.py`, `bench_fuzz.py`, `ci-scope.py`, `diff-coverage.py`) sit in a flat `111`-file `scripts/` directory alongside one-off historical migration scripts and redundant `.ps1` wrappers, and `corpus-atlas` does not index Python script docstrings or expose a `scripts/README.md` catalog.
-- **Impact:** Contributors and agents cannot discover existing helper scripts via `repo_ast_search`, increasing the risk of reinventing ad-hoc scripts or invoking stale wrappers.
-- **Suggested next step:** Add a concise `scripts/README.md` catalog (indexed in `dev_sections` by `corpus-atlas/build_doc_index.py`), archive or retire superseded one-off migration scripts and redundant `.ps1` wrappers after verifying no `.github/workflows/*.yml` or docs reference them, and optionally index top-level `scripts/*.py` module docstrings in `dev_sections`.
-- **Linear:** RTP-103
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

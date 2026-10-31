@@ -193,4 +193,4 @@ prefab_blanket:
   bakRetention: 3
 
 # Do not bite the version number, sacred catnip
-meowsion: 1.0
+version: 1.0

@@ -3,14 +3,11 @@ package io.github.dailystruggle.rtp.bukkit.effects;
 import io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.effects.EffectDispatch;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -29,7 +26,6 @@ import org.bukkit.event.Event;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -194,8 +190,11 @@ public class BukkitEffectsHandler {
      * permission prefix of the shape {@code "rtp.effect.<stage>"}.
      */
     private static String stageOf(String prefix) {
-        int dot = prefix.lastIndexOf('.');
-        return (dot >= 0 && dot < prefix.length() - 1) ? prefix.substring(dot + 1) : prefix;
+        return EffectDispatch.stageOf(prefix);
+    }
+
+    private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> parser) {
+        return EffectDispatch.isEffectParsingEnabled(parser);
     }
 
     public static void setupEffects(JavaPlugin plugin) {
@@ -211,10 +210,7 @@ public class BukkitEffectsHandler {
                 task -> {
                     PreSetupTeleportEvent event = new PreSetupTeleportEvent(task);
                     if (fire(task.player(), event) && event.isCancelled()) task.setCancelled(true);
-                    if (task.player() != null) {
-                        if (!Boolean.parseBoolean(
-                                parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
-                            return;
+                    if (task.player() != null && effectParsingEnabled(parser)) {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "presetup");
                         if (player == null) return;
                         MiscTasks.async()
@@ -226,10 +222,7 @@ public class BukkitEffectsHandler {
                 (task, aBoolean) -> {
                     if (!aBoolean) return;
                     fire(task.player(), new PostSetupTeleportEvent(task));
-                    if (task.player() != null) {
-                        if (!Boolean.parseBoolean(
-                                parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
-                            return;
+                    if (task.player() != null && effectParsingEnabled(parser)) {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postsetup");
                         if (player == null) return;
                         MiscTasks.async()
@@ -241,10 +234,7 @@ public class BukkitEffectsHandler {
                 task -> {
                     fire(task.player(), new PreLoadChunksEvent(task));
 
-                    if (task.player() != null) {
-                        if (!Boolean.parseBoolean(
-                                parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
-                            return;
+                    if (task.player() != null && effectParsingEnabled(parser)) {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "preload");
                         if (player == null) return;
                         MiscTasks.async()
@@ -256,10 +246,7 @@ public class BukkitEffectsHandler {
                 task -> {
                     fire(task.player(), new PostLoadChunksEvent(task));
 
-                    if (task.player() != null) {
-                        if (!Boolean.parseBoolean(
-                                parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
-                            return;
+                    if (task.player() != null && effectParsingEnabled(parser)) {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postload");
                         if (player == null) return;
                         MiscTasks.async()
@@ -271,10 +258,7 @@ public class BukkitEffectsHandler {
                 task -> {
                     fire(task.player(), new PreTeleportEvent(task));
 
-                    if (task.player() != null) {
-                        if (!Boolean.parseBoolean(
-                                parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
-                            return;
+                    if (task.player() != null && effectParsingEnabled(parser)) {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "preteleport");
                         if (player == null) return;
                         org.bukkit.Location originLocation = player.getLocation();
@@ -301,92 +285,36 @@ public class BukkitEffectsHandler {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postteleport-title");
                         if (player == null) return;
 
-                        /*
-                         * Title/subtitle/actionbar must be dispatched on the player's region/main
-                         * thread. Player.sendTitle from an async thread is silently dropped on modern
-                         * Spigot/Paper and throws on Folia, which is why titles weren't appearing
-                         * in-game. Resolve config values up-front (cheap, thread-safe) and hand the
-                         * Bukkit API calls to the scheduler.
-                         */
-                        @SuppressWarnings("unchecked")
-                        ConfigParser<PlayerMessages> lang =
-                                (ConfigParser<PlayerMessages>) ActiveConfigs.get().getParser(PlayerMessages.class);
-                        if (lang == null) return;
-
-                        String title = ActiveConfigs.get().getConfigValue(PlayerMessages.title, "").toString();
-                        String subtitle = ActiveConfigs.get().getConfigValue(PlayerMessages.subtitle, "").toString();
-
-                        int fadeIn = lang.getNumber(PlayerMessages.fadeIn, 0).intValue();
-                        int stay = lang.getNumber(PlayerMessages.stay, 0).intValue();
-                        int fadeOut = lang.getNumber(PlayerMessages.fadeOut, 0).intValue();
-
-                        String actionbar = ActiveConfigs.get().getConfigValue(PlayerMessages.actionbar, "").toString();
-
-                        RTPRuntime.scheduler().runTask(() -> {
-                            SendMessage.title(player, title, subtitle, fadeIn, stay, fadeOut);
-                            SendMessage.actionbar(player, actionbar);
-                        });
-
-                        ConfigParser<ConfigKeys> configParser =
-                                (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
-
-                        /*
-                         * Folia note: command dispatch (Bukkit.dispatchCommand and player.performCommand)
-                         * is handled by the global region. Region/entity threads throw
-                         * IllegalStateException("Dispatching command async"). Always route to the
-                         * global region scheduler via RTPRuntime.scheduler().runTask(Runnable).
-                         * Collect all commands and dispatch them in a single scheduled task to
-                         * reduce per-command scheduling overhead.
-                         */
-                        List<String> consoleCommandsToRun = new ArrayList<>();
-                        Object consoleCommandsObj =
-                                configParser.getConfigValue(ConfigKeys.consoleCommands, new ArrayList<>());
-                        if (consoleCommandsObj instanceof List<?> consoleCommands) {
-                            for (Object cmd : consoleCommands) {
-                                if (cmd == null) continue;
-                                String command = cmd.toString().replace("[player]", player.getName());
-                                if (command.isBlank()) continue;
-                                consoleCommandsToRun.add(command);
-                            }
-                        }
-
-                        List<String> playerCommandsToRun = new ArrayList<>();
-                        Object playerCommandsObj =
-                                configParser.getConfigValue(ConfigKeys.playerCommands, new ArrayList<>());
-                        if (playerCommandsObj instanceof List<?> playerCommands) {
-                            for (Object cmd : playerCommands) {
-                                if (cmd == null) continue;
-                                String command = cmd.toString().replace("[player]", player.getName());
-                                if (command.isBlank()) continue;
-                                playerCommandsToRun.add(command);
-                            }
-                        }
-
-                        if (!consoleCommandsToRun.isEmpty() || !playerCommandsToRun.isEmpty()) {
+                        EffectDispatch.PostTeleportTitle titleSpec =
+                                EffectDispatch.resolvePostTeleportTitle(task);
+                        if (titleSpec != null) {
                             RTPRuntime.scheduler().runTask(() -> {
-                                for (String c : consoleCommandsToRun) {
+                                SendMessage.title(
+                                        player,
+                                        titleSpec.title(),
+                                        titleSpec.subtitle(),
+                                        titleSpec.fadeIn(),
+                                        titleSpec.stay(),
+                                        titleSpec.fadeOut());
+                                SendMessage.actionbar(player, titleSpec.actionbar());
+                            });
+                        }
+
+                        EffectDispatch.PostTeleportCommands commands =
+                                EffectDispatch.resolvePostTeleportCommands(task, player.getName(), false);
+                        if (commands != null) {
+                            RTPRuntime.scheduler().runTask(() -> {
+                                for (String c : commands.consoleCommands()) {
                                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), c);
                                 }
-                                for (String c : playerCommandsToRun) {
+                                for (String c : commands.playerCommands()) {
                                     player.performCommand(c);
                                 }
                             });
                         }
                     }
 
-                    if (task.player() != null) {
-                        boolean effectParsing;
-                        Object data = parser.getData(PerformanceKeys.effectParsing);
-                        if (data instanceof Boolean) effectParsing = (Boolean) data;
-                        else if (data == null) {
-                            effectParsing = false;
-                        } else {
-                            effectParsing = Boolean.parseBoolean(data.toString());
-                            parser.set(PerformanceKeys.effectParsing, effectParsing);
-                        }
-
-                        if (!effectParsing) return;
-
+                    if (task.player() != null && effectParsingEnabled(parser)) {
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postteleport");
                         if (player == null) return;
                         MiscTasks.async()
@@ -406,12 +334,9 @@ public class BukkitEffectsHandler {
                     MiscTasks.async()
                             .add(
                                     () -> {
-                                        if (!Boolean.parseBoolean(
-                                                parser
-                                                        .getData()
-                                                        .getOrDefault(PerformanceKeys.effectParsing, false)
-                                                        .toString())) return;
-                                        dispatchEffects(plugin, "rtp.effect.cancel", player);
+                                        if (effectParsingEnabled(parser)) {
+                                            dispatchEffects(plugin, "rtp.effect.cancel", player);
+                                        }
                                     });
                 });
 
@@ -425,12 +350,9 @@ public class BukkitEffectsHandler {
                     MiscTasks.async()
                             .add(
                                     () -> {
-                                        if (!Boolean.parseBoolean(
-                                                parser
-                                                        .getData()
-                                                        .getOrDefault(PerformanceKeys.effectParsing, false)
-                                                        .toString())) return;
-                                        dispatchEffects(plugin, "rtp.effect.queuepush", player);
+                                        if (effectParsingEnabled(parser)) {
+                                            dispatchEffects(plugin, "rtp.effect.queuepush", player);
+                                        }
                                     });
                 });
 
@@ -444,12 +366,9 @@ public class BukkitEffectsHandler {
                     MiscTasks.async()
                             .add(
                                     () -> {
-                                        if (!Boolean.parseBoolean(
-                                                parser
-                                                        .getData()
-                                                        .getOrDefault(PerformanceKeys.effectParsing, false)
-                                                        .toString())) return;
-                                        dispatchEffects(plugin, "rtp.effect.queuepop", player);
+                                        if (effectParsingEnabled(parser)) {
+                                            dispatchEffects(plugin, "rtp.effect.queuepop", player);
+                                        }
                                     });
                 });
 
@@ -461,12 +380,9 @@ public class BukkitEffectsHandler {
                     MiscTasks.async()
                             .add(
                                     () -> {
-                                        if (!Boolean.parseBoolean(
-                                                parser
-                                                        .getData()
-                                                        .getOrDefault(PerformanceKeys.effectParsing, false)
-                                                        .toString())) return;
-                                        dispatchEffects(plugin, "rtp.effect.death", player);
+                                        if (effectParsingEnabled(parser)) {
+                                            dispatchEffects(plugin, "rtp.effect.death", player);
+                                        }
                                     });
                 }
             }, plugin);

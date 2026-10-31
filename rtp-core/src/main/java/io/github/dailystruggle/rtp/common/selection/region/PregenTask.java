@@ -81,7 +81,7 @@ final class PregenTask implements Runnable {
 
     /**
      * Completes {@link #result} off the calling region thread via the async scheduler so
-     * placement-free dependent stages never run inline on a tick region thread (ADR-123 Section 2 & 11).
+     * placement-free dependent stages never run inline on a tick region thread (ADR-123 Section 2 and 11).
      */
     private void completeOffRegion(@org.jetbrains.annotations.Nullable GenerationResult value) {
         try {
@@ -1472,14 +1472,23 @@ final class PregenTask implements Runnable {
                     }
                     Runnable eval = () -> evaluateSafety(
                             candidate, localChunks, L, centerChunkX, centerChunkZ, reservation);
-                    if (reservation != null && isFoliaPlatform()) {
+                    if ( isFoliaPlatform() && (reservation != null || hasLiveChunk(localChunks))) {
                         // Folia neighbour loads complete off the region thread (ADR-112): live
-                        // block reads re-enter the owning region through the budgeted scheduler.
+                        // block reads re-enter the owning region through the budgeted scheduler;
+                        // dispatchToRegion attributes and logs any failure (S-004).
                         dispatchToRegion(cx, cz, reservation, eval);
                     } else {
                         continueInline(eval);
                     }
                 });
+    }
+
+    private static boolean hasLiveChunk(RTPChunk<?>[] chunks) {
+        if (chunks == null) return false;
+        for (RTPChunk<?> c : chunks) {
+            if (c != null && !c.isSelfContained()) return true;
+        }
+        return false;
     }
 
     /** Runs {@code body} on the region owning chunk (cx, cz); a failure rejects the candidate (S-004). */
@@ -1613,12 +1622,18 @@ final class PregenTask implements Runnable {
             return;
         }
         if (square.isDone()) {
-            evaluateTerrain(candidate, square.getNow(null), reservation, hillAngle);
+            RTPChunk<?>[] completedGrid = square.getNow(new RTPChunk<?>[0]);
+            Runnable eval = () -> evaluateTerrain(candidate, completedGrid, reservation, hillAngle);
+            if (isFoliaPlatform() && reservation == null && hasLiveChunk(completedGrid)) {
+                dispatchToRegion(candidate.cx(), candidate.cz(), null, eval);
+            } else {
+                eval.run();
+            }
             return;
         }
         square.whenComplete((grid, ex) -> {
             Runnable eval = () -> evaluateTerrain(candidate, grid, reservation, hillAngle);
-            if (reservation != null && isFoliaPlatform()) {
+            if (isFoliaPlatform() && (reservation != null || hasLiveChunk(grid))) {
                 dispatchToRegion(candidate.cx(), candidate.cz(), reservation, eval);
             } else {
                 continueInline(eval);

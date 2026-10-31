@@ -1,7 +1,10 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
+import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
 import io.github.dailystruggle.rtp.anvil.AnvilReader;
+import io.github.dailystruggle.rtp.anvil.BiomePaletteSection;
 import io.github.dailystruggle.rtp.anvil.ColumnProbe;
+import io.github.dailystruggle.rtp.anvil.PaletteSection;
 import io.github.dailystruggle.rtp.anvil.RegionFileReader;
 import io.github.dailystruggle.rtp.anvil.RegionFormatRegistry;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
@@ -21,7 +24,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -84,8 +89,13 @@ class PregenBiomeExtractorBranchTest {
     /** Reader for {@link #TEST_EXT}: chunk column {@code lx == 3} throws, {@code lx == 6} is absent. */
     private static class PatternReader implements RegionFileReader {
         @Override
-        public AnvilReader.ChunkEntry readChunk(byte[] regionBytes, int rx, int rz) {
-            return null;
+        public AnvilReader.ChunkEntry readChunk(byte[] regionBytes, int rx, int rz) throws IOException {
+            if (rx == 4) throw new IOException("truncated chunk");
+            if (rx == 5) return rz == 1 ? null : new AnvilReader.ChunkEntry(2, 0, null);
+            LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+            root.put("rcx", rx);
+            root.put("rcz", rz);
+            return new AnvilReader.ChunkEntry(2, 16, root);
         }
 
         @Override
@@ -237,8 +247,9 @@ class PregenBiomeExtractorBranchTest {
     // ---------------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("sampleRegionFile clips to bounds, skips absent/throwing chunks, prefers the column probe, then the shape, then plains")
+    @DisplayName("sampleRegionFile clips to bounds, skips absent/throwing chunks, prefers the column probe for .mca and readChunk+toView for custom readers, then the shape, then plains")
     void sampleRegionFileBranches() {
+        RegionFormatRegistry.register(".mca", new PatternReader());
         RegionFormatRegistry.register(TEST_EXT, new PatternReader());
         ColumnProbe desert = mock(ColumnProbe.class);
         when(desert.hasHeightmap()).thenReturn(true);
@@ -248,6 +259,14 @@ class PregenBiomeExtractorBranchTest {
         when(noBiome.hasHeightmap()).thenReturn(true);
         when(noBiome.heightmapTopY()).thenReturn(70);
         ColumnProbe noHeightmap = new ColumnProbe(0, 255, Integer.MIN_VALUE, List.of(), List.of());
+
+        long[] heightmap70 = new long[37];
+        heightmap70[19] = 7L << 27; // columnIndex(8, 8) = 136 -> longIdx 19, slot 3; minHeight 64 + 7 - 1 = 70
+        List<PaletteSection> blockSections = List.of(new PaletteSection(4, List.of("minecraft:stone"), null));
+        AnvilChunkView desertView = new AnvilChunkView(
+                3465, blockSections, heightmap70, List.of(new BiomePaletteSection(4, List.of("minecraft:desert"), null)));
+        AnvilChunkView noBiomeView = new AnvilChunkView(3465, blockSections, heightmap70, List.of());
+        AnvilChunkView noHeightmapView = new AnvilChunkView(3465, blockSections, List.of());
 
         MemoryShape<?> fallback = mock(MemoryShape.class);
         when(fallback.biomeAt(anyInt(), anyInt())).thenAnswer(inv -> switch ((int) inv.getArgument(0)) {
@@ -267,20 +286,46 @@ class PregenBiomeExtractorBranchTest {
                         if (lx == 4) throw new IOException("truncated chunk");
                         return null;
                     });
+            anvil.when(() -> AnvilReader.toView(any()))
+                    .thenAnswer(inv -> {
+                        Map<?, ?> root = inv.getArgument(0);
+                        int lx = (Integer) root.get("rcx");
+                        int lz = (Integer) root.get("rcz");
+                        if (lx == 1) return lz == 1 ? desertView : noBiomeView;
+                        if (lx == 2) return lz == 1 ? noHeightmapView : null;
+                        return null;
+                    });
 
-            List<String> seen = new ArrayList<>();
-            int generated = PregenBiomeExtractor.sampleRegionFile(bytes, TEST_EXT, 0, 0, 1, 1, 6, 2, fallback,
-                    (cx, cz, biome) -> seen.add(cx + "," + cz + "=" + biome));
-            assertEquals(8, generated, "columns 1, 2, 4, 5 on rows 1 and 2");
-            assertEquals(List.of(
+            List<String> expectedWithFallback = List.of(
                     "1,1=minecraft:desert", "2,1=minecraft:forest", "4,1=minecraft:plains", "5,1=minecraft:plains",
-                    "1,2=minecraft:plains", "2,2=minecraft:forest", "4,2=minecraft:plains", "5,2=minecraft:plains"), seen);
+                    "1,2=minecraft:plains", "2,2=minecraft:forest", "4,2=minecraft:plains", "5,2=minecraft:plains");
+            List<String> expectedNoFallback = List.of(
+                    "minecraft:desert", "minecraft:plains", "minecraft:plains", "minecraft:plains",
+                    "minecraft:plains", "minecraft:plains", "minecraft:plains", "minecraft:plains");
 
-            List<String> noFallback = new ArrayList<>();
+            // 1. .mca format uses AnvilReader.readColumnProbe
+            List<String> seenMca = new ArrayList<>();
+            int generatedMca = PregenBiomeExtractor.sampleRegionFile(bytes, ".mca", 0, 0, 1, 1, 6, 2, fallback,
+                    (cx, cz, biome) -> seenMca.add(cx + "," + cz + "=" + biome));
+            assertEquals(8, generatedMca, "columns 1, 2, 4, 5 on rows 1 and 2 (.mca)");
+            assertEquals(expectedWithFallback, seenMca);
+
+            List<String> noFallbackMca = new ArrayList<>();
+            PregenBiomeExtractor.sampleRegionFile(bytes, ".mca", 0, 0, 1, 1, 6, 2, null,
+                    (cx, cz, biome) -> noFallbackMca.add(biome));
+            assertEquals(expectedNoFallback, noFallbackMca);
+
+            // 2. Non-Anvil custom RegionFileReader (TEST_EXT) uses reader.readChunk + AnvilReader.toView
+            List<String> seenCustom = new ArrayList<>();
+            int generatedCustom = PregenBiomeExtractor.sampleRegionFile(bytes, TEST_EXT, 0, 0, 1, 1, 6, 2, fallback,
+                    (cx, cz, biome) -> seenCustom.add(cx + "," + cz + "=" + biome));
+            assertEquals(8, generatedCustom, "columns 1, 2, 4, 5 on rows 1 and 2 (TEST_EXT)");
+            assertEquals(expectedWithFallback, seenCustom);
+
+            List<String> noFallbackCustom = new ArrayList<>();
             PregenBiomeExtractor.sampleRegionFile(bytes, TEST_EXT, 0, 0, 1, 1, 6, 2, null,
-                    (cx, cz, biome) -> noFallback.add(biome));
-            assertEquals(List.of("minecraft:desert", "minecraft:plains", "minecraft:plains", "minecraft:plains",
-                    "minecraft:plains", "minecraft:plains", "minecraft:plains", "minecraft:plains"), noFallback);
+                    (cx, cz, biome) -> noFallbackCustom.add(biome));
+            assertEquals(expectedNoFallback, noFallbackCustom);
 
             AtomicInteger accepted = new AtomicInteger();
             int early = PregenBiomeExtractor.sampleRegionFile(bytes, TEST_EXT, 0, 0, 0, 0, 31, 31, null,

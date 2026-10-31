@@ -271,11 +271,12 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
      * failure is logged at FINE and reported via the return value so the caller
      * skips the matching removal. Must be invoked on the server tick thread.
      */
+    private static final int TEMP_LOAD_TICKET_RADIUS = 0;
+
     private boolean tryAddTempLoadTicket(ServerLevel level, ChunkPos cp) {
         try {
-            int distance = io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance();
-            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, distance);
-            recordTicketDistance(level, cp, true, distance);
+            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, TEMP_LOAD_TICKET_RADIUS);
+            recordTicketDistance(level, cp, true, TEMP_LOAD_TICKET_RADIUS);
             return true;
         } catch (Throwable t) {
             RTP.log(Level.FINE,

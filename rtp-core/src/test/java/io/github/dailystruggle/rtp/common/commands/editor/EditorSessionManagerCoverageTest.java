@@ -124,6 +124,47 @@ public class EditorSessionManagerCoverageTest {
     }
 
     @Test
+    void testConcurrentExportLocalEditorHtml(@TempDir Path tempDir) throws Exception {
+        EditorSessionManager manager = EditorSessionManager.getInstance();
+        Path htmlFile = tempDir.resolve("concurrent_editor_export.html");
+
+        int threadCount = 8;
+        int iterationsPerThread = 4;
+        java.util.concurrent.CountDownLatch startGate = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+        java.util.List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+
+        try {
+            for (int t = 0; t < threadCount; t++) {
+                final int threadIdx = t;
+                futures.add(pool.submit(() -> {
+                    startGate.await();
+                    for (int i = 0; i < iterationsPerThread; i++) {
+                        Map<String, String> configs = new HashMap<>();
+                        configs.put("config.yml", "teleportDelay: " + (threadIdx * 100 + i) + "\n");
+                        manager.exportLocalEditorHtml(htmlFile, configs, (i & 1) == 0);
+                    }
+                    return null;
+                }));
+            }
+            startGate.countDown();
+            for (java.util.concurrent.Future<?> f : futures) {
+                f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertTrue(Files.exists(htmlFile));
+        String content = Files.readString(htmlFile);
+        assertFalse(content.isEmpty());
+        try (var stream = Files.list(tempDir)) {
+            assertTrue(stream.noneMatch(p -> p.getFileName().toString().endsWith(".tmp")),
+                    "No leftover .tmp files should remain after concurrent exports");
+        }
+    }
+
+    @Test
     void testBuildWorldBiomesJson() {
         EditorSessionManager manager = EditorSessionManager.getInstance();
         String jsonFull = manager.buildWorldBiomesJson(true);

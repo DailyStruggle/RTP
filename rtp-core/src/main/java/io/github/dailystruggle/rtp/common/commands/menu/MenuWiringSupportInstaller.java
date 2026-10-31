@@ -476,9 +476,14 @@ final class MenuWiringSupportInstaller {
                 try {
                     menuRenderer.render(viewer, model);
                 } catch (RuntimeException e) {
-                    RTPRuntime.log(Level.WARNING,
-                            "/rtp admin opener: renderer failed for " + viewer
-                                    + ": " + e.getMessage(), e);
+                    if (MenuDrawer.isDisconnectedViewerFailure(viewer, e)) {
+                        RTPRuntime.log(Level.FINE,
+                                "/rtp admin opener: render skipped because viewer " + viewer + " disconnected");
+                    } else {
+                        RTPRuntime.log(Level.WARNING,
+                                "/rtp admin opener: renderer failed for " + viewer
+                                        + ": " + e.getMessage(), e);
+                    }
                 }
             };
         }
@@ -518,7 +523,7 @@ final class MenuWiringSupportInstaller {
                             "config search: empty model for query='" + query + "'");
                     return;
                 }
-                finalRenderer.render(callerId, model);
+                MenuDrawer.draw(finalRenderer, callerId, model, null, null, "config search");
             });
         }, 8));
     }

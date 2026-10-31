@@ -122,35 +122,59 @@ public class LocaleParityTest {
                     String localeName = localeDir.getFileName().toString();
                     if (NON_LOCALE_DIRS.contains(localeName)) continue;
 
-                    try (DirectoryStream<Path> langMaps =
-                                 Files.newDirectoryStream(localeDir, "*.lang.yml")) {
-                        for (Path langMap : langMaps) {
-                            String mapName = langMap.getFileName().toString();
-                            // ADR-076: maps are co-located dotfile siblings
-                            // (`.config.lang.yml`); the backing value file drops
-                            // the leading dot (`config.yml`). The legacy monolithic
-                            // `messages.lang.yml` has no leading dot and is handled
-                            // by the same stripping (no-op).
-                            String stem = mapName.substring(
-                                    0, mapName.length() - ".lang.yml".length());
-                            if (stem.startsWith(".")) stem = stem.substring(1);
-                            String valueName = stem + ".yml";
-                            Path valueFile = localeDir.resolve(valueName);
+                    List<Path> langMaps = new ArrayList<>();
+                    try (var stream = Files.walk(localeDir)) {
+                        stream.filter(Files::isRegularFile)
+                              .filter(p -> p.getFileName().toString().endsWith(".lang.yml"))
+                              .forEach(langMaps::add);
+                    }
+                    langMaps.sort((a, b) -> a.toString().compareTo(b.toString()));
 
-                            if (!Files.exists(valueFile)) {
-                                // .lang.yml without a sibling value file: allowed
-                                // for template-only files (regions, worlds).
-                                continue;
+                    for (Path langMap : langMaps) {
+                        String mapName = langMap.getFileName().toString();
+                        // ADR-076: maps are co-located dotfile siblings
+                        // (`.config.lang.yml`); the backing value file drops
+                        // the leading dot (`config.yml`). The legacy monolithic
+                        // `messages.lang.yml` has no leading dot and is handled
+                        // by the same stripping (no-op).
+                        String stem = mapName.substring(
+                                0, mapName.length() - ".lang.yml".length());
+                        if (stem.startsWith(".")) stem = stem.substring(1);
+                        String valueName = stem + ".yml";
+                        Path valueFile = langMap.getParent().resolve(valueName);
+
+                        Map<String, String> map = MessageKeyParity.langMap(READER, rel(langMap));
+
+                        // Never rename the `version` sentinel key in any .lang.yml map.
+                        String versionTarget = map.get("version");
+                        if (versionTarget != null && !"version".equals(versionTarget)) {
+                            failures.add(String.format(
+                                    "%s maps version -> %s (version sentinel must remain 'version')",
+                                    rel(langMap), versionTarget));
+                        }
+
+                        if (!Files.exists(valueFile)) {
+                            // .lang.yml without a sibling value file: allowed
+                            // for template-only files (regions, worlds).
+                            continue;
+                        }
+
+                        Set<String> valueKeys = MessageKeyParity.keys(READER, rel(valueFile));
+
+                        MessageKeyParity.unresolvedLangRows(map, valueKeys).forEach((key, mappedName) ->
+                                failures.add(String.format(
+                                        "%s maps %s -> %s but %s has no top-level key %s",
+                                        rel(langMap), key, mappedName,
+                                        rel(valueFile), mappedName)));
+
+                        Set<String> mappedTargets = new TreeSet<>(map.values());
+                        for (String vk : valueKeys) {
+                            if ("version".equals(vk)) continue;
+                            if (!mappedTargets.contains(vk)) {
+                                failures.add(String.format(
+                                        "%s has orphan top-level key '%s' not referenced by %s",
+                                        rel(valueFile), vk, rel(langMap)));
                             }
-
-                            Map<String, String> map = MessageKeyParity.langMap(READER, rel(langMap));
-                            Set<String> valueKeys = MessageKeyParity.keys(READER, rel(valueFile));
-
-                            MessageKeyParity.unresolvedLangRows(map, valueKeys).forEach((key, mappedName) ->
-                                    failures.add(String.format(
-                                            "%s/%s maps %s -> %s but %s has no top-level key %s",
-                                            localeName, mapName, key, mappedName,
-                                            valueName, mappedName)));
                         }
                     }
                 }
@@ -228,28 +252,64 @@ public class LocaleParityTest {
             if (!Files.isDirectory(LANG_ROOT)) return;
             if (!Files.isDirectory(MESSAGES_DIR)) return;
 
-            Set<String> baselinePlaceholders = collectPlaceholders(mergedMessagesBaseline());
             List<String> failures = new ArrayList<>();
 
-            try (DirectoryStream<Path> locales = Files.newDirectoryStream(LANG_ROOT, Files::isDirectory)) {
-                for (Path localeDir : locales) {
-                    String localeName = localeDir.getFileName().toString();
-                    if (NON_LOCALE_DIRS.contains(localeName)) continue;
-                    Path messagesDir = localeDir.resolve("advanced").resolve("messages");
-                    if (!Files.isDirectory(messagesDir)) continue;
+            for (String fileStem : MessageKeyParity.MESSAGE_FILES) {
+                Path baseValueFile = MESSAGES_DIR.resolve(fileStem + ".yml");
+                Path baseLangFile = MESSAGES_DIR.resolve("." + fileStem + ".lang.yml");
+                if (!Files.exists(baseValueFile)) continue;
 
-                    Set<String> seen = collectPlaceholders(mergedMessages(messagesDir));
-                    Set<String> missing = new TreeSet<>(baselinePlaceholders);
-                    missing.removeAll(seen);
-                    if (!missing.isEmpty()) {
-                        Set<String> extras = new TreeSet<>(seen);
-                        extras.removeAll(baselinePlaceholders);
-                        if (!extras.isEmpty()) {
+                Map<String, Object> baseValues = loadYaml(baseValueFile);
+                Map<String, String> baseLang = Files.exists(baseLangFile)
+                        ? loadLangMap(baseLangFile)
+                        : Collections.emptyMap();
+
+                // Collect the set of known placeholder tokens in the English baseline for this file
+                // (excluding literal bracketed UI labels such as [confirm], [cancel], [Refresh], etc.).
+                Set<String> filePlaceholderVocab = new TreeSet<>();
+                for (Map.Entry<String, Object> e : baseValues.entrySet()) {
+                    if ("placeholders".equals(e.getKey())) continue;
+                    Set<String> tokens = new TreeSet<>();
+                    scan(e.getValue(), tokens);
+                    for (String t : tokens) {
+                        if (!NON_PLACEHOLDER_BRACKET_LABELS.contains(t)) {
+                            filePlaceholderVocab.add(t);
+                        }
+                    }
+                }
+
+                for (Path localeDir : discoverLocaleDirs()) {
+                    String localeName = localeDir.getFileName().toString();
+                    Path locMsgDir = localeDir.resolve("advanced").resolve("messages");
+                    Path locValueFile = locMsgDir.resolve(fileStem + ".yml");
+                    Path locLangFile = locMsgDir.resolve("." + fileStem + ".lang.yml");
+                    if (!Files.exists(locValueFile)) continue;
+
+                    Map<String, Object> locValues = loadYaml(locValueFile);
+                    Map<String, String> locLang = Files.exists(locLangFile)
+                            ? loadLangMap(locLangFile)
+                            : Collections.emptyMap();
+
+                    for (Map.Entry<String, Object> e : baseValues.entrySet()) {
+                        String baseKey = e.getKey();
+                        if ("version".equals(baseKey) || "placeholders".equals(baseKey)) continue;
+
+                        String translatedKey = MessageKeyParity.translatedKey(baseKey, baseLang, locLang);
+                        Object locVal = locValues.get(translatedKey);
+                        if (locVal == null) continue;
+
+                        Set<String> baseKeyTokens = new TreeSet<>();
+                        scan(e.getValue(), baseKeyTokens);
+                        baseKeyTokens.retainAll(filePlaceholderVocab);
+
+                        Set<String> locKeyTokens = new TreeSet<>();
+                        scan(locVal, locKeyTokens);
+                        locKeyTokens.retainAll(filePlaceholderVocab);
+
+                        if (!baseKeyTokens.equals(locKeyTokens)) {
                             failures.add(String.format(
-                                    "%s/advanced/messages introduces non-baseline placeholders %s; "
-                                            + "expected only %s. Likely an accidentally translated "
-                                            + "placeholder token.",
-                                    localeName, extras, baselinePlaceholders));
+                                    "%s/advanced/messages/%s.yml key '%s' (baseline '%s') has placeholders %s; expected %s",
+                                    localeName, fileStem, translatedKey, baseKey, locKeyTokens, baseKeyTokens));
                         }
                     }
                 }
@@ -370,22 +430,50 @@ public class LocaleParityTest {
             // brand + universal "menu" loanword
             "rtpmenu");
 
+    /**
+     * Multi-word bracketed UI button labels in the English baseline that are literal
+     * display text (not single-word {@code [placeholder]} tokens) and therefore
+     * SHOULD be translated by locales rather than stripped as placeholders.
+     */
+    private static final Set<String> LITERAL_BRACKET_LABELS = Set.of(
+            "[confirm delete]", "[Switch to chat]");
+
+    /**
+     * All bracketed UI button labels in the English baseline whose comments declare
+     * {@code No placeholders.} and therefore must be excluded from the runtime
+     * placeholder vocabulary in {@link ResourceParity#messagePlaceholdersArePreserved}.
+     */
+    private static final Set<String> NON_PLACEHOLDER_BRACKET_LABELS = Set.of(
+            "[confirm]", "[cancel]", "[Refresh]", "[apply]", "[discard]",
+            "[confirm delete]", "[Switch to chat]");
+
     private static final Pattern COLOR_AMP = Pattern.compile("[&\u00a7][0-9A-Za-z]");
     private static final Pattern COLOR_HEX = Pattern.compile("#[0-9A-Fa-f]{6}");
     private static final Pattern BRACKET_TOKEN = Pattern.compile("\\[[^\\]]*]");
     private static final Pattern NON_LETTER = Pattern.compile("[^A-Za-z]");
 
     /**
-     * Strips legacy/hex color codes and {@code [placeholder]} tokens, then
-     * removes every non-letter character and lowercases. Two values whose only
+     * Strips legacy/hex color codes and runtime {@code [placeholder]} tokens
+     * (while preserving literal bracketed UI labels in {@link #LITERAL_BRACKET_LABELS}),
+     * then removes every non-letter character and lowercases. Two values whose only
      * difference is formatting/placeholders collapse to the same residual; a
      * value with no translatable words collapses to the empty string.
      */
     private static String normalizeForTranslation(String value) {
         String s = COLOR_HEX.matcher(value).replaceAll("");
         s = COLOR_AMP.matcher(s).replaceAll("");
-        s = BRACKET_TOKEN.matcher(s).replaceAll("");
-        s = NON_LETTER.matcher(s).replaceAll("");
+        Matcher m = BRACKET_TOKEN.matcher(s);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String token = m.group();
+            if (LITERAL_BRACKET_LABELS.contains(token)) {
+                m.appendReplacement(sb, Matcher.quoteReplacement(token));
+            } else {
+                m.appendReplacement(sb, "");
+            }
+        }
+        m.appendTail(sb);
+        s = NON_LETTER.matcher(sb.toString()).replaceAll("");
         return s.toLowerCase();
     }
 
@@ -613,14 +701,6 @@ public class LocaleParityTest {
             map.put(e.getKey(), String.valueOf(e.getValue()));
         }
         return map;
-    }
-
-    private static Set<String> collectPlaceholders(Map<String, Object> yaml) {
-        Set<String> out = new TreeSet<>();
-        for (Object v : yaml.values()) {
-            scan(v, out);
-        }
-        return out;
     }
 
     private static void scan(Object v, Set<String> out) {

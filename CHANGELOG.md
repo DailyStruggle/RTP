@@ -88,6 +88,50 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [Unreleased]
 
+## [3.3.2] - 2026-10-30
+
+### Added
+
+- **Litematica schematics (`.litematic`, [ADR-058](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-058-region-specific-schematic-paste.md)).** Regions (`schematic` in `definitions/regions/*.yml`) and action `PASTE_SCHEMATIC` steps now accept `.litematic` files in `schematics/` alongside `.schem` and `.schematic`, including multi-region Litematica files, negative region sizes and block entities. Config and action BIT checks accept `.litematic` paths as well.
+
+### Changed
+
+- **Action name collisions with `/rtp`, `/wild` or another action are now BIT errors (`ACTADDON_NAME_COLLISION`, [ADR-121](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)).** `/rtp test action-setup` reports `ACTADDON_NAME_COLLISION` as an `ERROR` instead of a `WARNING` when an action's name or command alias collides with `/rtp`, `/wild` or another action, and names the existing owner in the message.
+
+- **`/rtp reload` reads and checks config files off the main thread.** Full and single-section reloads (such as `/rtp reload regions` or `/rtp reload worlds`) now parse files and run config BIT checks asynchronously before swapping the active configuration on the main thread, and a reload started while another is already running replies with `alreadyReloading` instead of overlapping.
+
+- **`/rtp config search` expands multi-word queries and falls back to an online thesaurus.** Multi-word searches strip punctuation before matching, and when local keys and the bundled thesaurus return no matches, `/rtp config search` queries an online synonym fallback off-thread.
+
+- **For addon developers.** `RTPPlayer` adds default `sendTitle(title, subtitle, fadeIn, stay, fadeOut)` and `sendActionbar(message)` methods. In-session `onStart` and `onBoundaryViolation` action gates now pass the session's `ActionContext` to registered custom gate validators, and `RTPRuntime.setServerAccessor` keeps `RTPAPI.serverAccessor` in sync.
+
+### Fixed
+
+- **Background cache fill on NeoForge 1.21.1 could hang the server and trip the watchdog.** The 1.21.1 chunk-ticket lookup bound the raw-level ticket method instead of the radius-based region-ticket method, turning a 0- or 1-chunk ticket radius into a 32-33 chunk generation radius around every loaded chunk, and temporary load tickets shared the `rtp` ticket type with kept-cache tickets. NeoForge 1.21.1 now binds the region-ticket method and uses a separate `rtp_load` ticket type with a 30-second expiry for temporary loads.
+
+- **Folia safety checks with `safetyRadius > 0` could read loaded neighbor chunks off the region thread.** When a candidate chunk's center was read from an offline region file while one of its `safetyRadius` neighbors was already loaded on the server, the neighbor check ran on the async worker instead of the owning region thread. Safety checks now hop to the region thread whenever any chunk in the safety square is loaded.
+
+- **Failed region economy checks left players stuck as "already teleporting", and `rtp.free` did not bypass `balanceFloor`.** When a region's `price` or `balanceFloor` rejected a teleport, the player's incomplete teleport entry stayed active and blocked later `/rtp` commands with `alreadyTeleporting`. With `toggleTargetPerms` enabled, a target player who failed the economy check also did not refund the command sender. Economy and region checks now finish before a teleport session is recorded, `rtp.free` bypasses `balanceFloor`, and failed target charges refund the sender.
+
+- **Post-teleport `title`, `subtitle`, `actionbar`, `consoleCommands` and `playerCommands` did not run on Fabric or NeoForge, and toggling `effectParsing` ignored `/rtp reload`.** Post-teleport titles, actionbars and commands now run on Fabric and NeoForge as well as Spigot, Paper and Folia (and are skipped for `/rtp test` mock players), and `effectParsing` in `advanced/performance.yml` updates on `/rtp reload` without a restart.
+
+- **Visual and sound effects on Folia could run off the player's region thread.** Player-targeted effects now check region ownership on Folia and reschedule onto the player's entity scheduler when called from another thread.
+
+- **Bundled action definitions always loaded from the English locale folder.** On startup and reload, the action addon read `definitions/actions/` using `"en"` instead of the server's configured `language` in `config.yml`.
+
+- **Some translated keys in nested `lang/<locale>/advanced/` files did not match their `.lang.yml` key maps, and `/rtp docs` messages hardcoded `[RTP]` instead of `[P0]`.** Nested `advanced/` locale files in `de`, `it`, `pl`, `zh` and `cat` now match their `.lang.yml` key-rename maps, and `docsNotFound`, `docsEmpty`, `docsExportSuccess` and `docsExportFailed` in `advanced/messages/commands.yml` now use the `[P0]` prefix placeholder across all locales.
+
+- **Unpacking an `@config`, `@economy` or `@safety` reference in `/rtp editor` could not be undone with `Ctrl+Z`.** Unpacking a reference now records an undo/redo step, concurrent `/rtp editor` HTML exports no longer share a single temporary file, and unreachable relay servers log a single warning line without a stack trace when falling back to snapshot-only mode.
+
+- **The `/rtp editor` biome map on non-Anvil region formats used the `.mca` reader.** Biome extraction for the web editor map now decodes chunks through the registered region-file reader for non-`.mca` formats instead of calling the Anvil `.mca` probe directly, and counts unreadable chunks in BIT status.
+
+- **World border startup checks skipped `CIRCLE_DEPRECATED_PURE_SPIRAL` and `SQUARE_DEPRECATED_PURE_SPIRAL` regions and string numbers.** The world border check now recognizes both spiral shapes and numeric string values in region shape configs.
+
+- **Disconnecting players kept background-refill attribution history and could trigger warnings from open menus.** Leaving the server now clears the player's `autoTune` refill attribution history, and chat or book menus and `/rtp admin setup` pages that finish rendering after the viewer disconnects skip the render without logging a warning stack trace.
+
+- **Concurrent bad-location flushes could fail with an array bounds error under heavy rejection load.** Rebuilding a region's bad-location table while another worker recorded a rejected spot could overrun the snapshot buffer; the snapshot is now bounded to the allocated buffer size.
+
+- **Biome activity sampling could load unloaded player chunks on the main thread.** Periodic biome sampling for players standing in or crossing into an unloaded chunk could trigger a synchronous chunk load on Bukkit and Paper; biome sampling now skips unloaded player chunks.
+
 ## [3.3.1] - 2026-10-26
 
 ### Added
@@ -949,6 +993,7 @@ Earlier versions introduced the multi-module split (`rtp-api` / `rtp-core` / pla
 
 ---
 
+[3.3.2]: https://github.com/DailyStruggle/RTP/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/DailyStruggle/RTP/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/DailyStruggle/RTP/compare/v3.2.1...v3.3.0
 [3.2.1]: https://github.com/DailyStruggle/RTP/compare/v3.2.0...v3.2.1

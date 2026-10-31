@@ -38,7 +38,7 @@ public final class ActionSetupBit {
             3, "ACTADDON_TRIGGER_INACTIVE", Level.ERROR, BitTier.PBIT, "action-setup", "",
             "Ensure the trigger is registered for its action and start the wave timer for batch triggers.");
     public static final BitCode NAME_COLLISION = NAMESPACE.register(
-            4, "ACTADDON_NAME_COLLISION", Level.WARNING, BitTier.PBIT, "action-setup", "",
+            4, "ACTADDON_NAME_COLLISION", Level.ERROR, BitTier.PBIT, "action-setup", "",
             "Give each action and command a unique name and alias.");
 
     public static final io.github.dailystruggle.bit.BitComponent COMPONENT = new io.github.dailystruggle.bit.BitComponent(
@@ -148,6 +148,8 @@ public final class ActionSetupBit {
 
     private static void reportRootCommandCollisions(List<ActionDefinition> actions, List<BitFinding> findings) {
         Map<String, String> owners = new HashMap<>();
+        owners.put("rtp", "built-in /rtp");
+        owners.put("wild", "built-in /wild");
         for (ActionDefinition action : actions) {
             ActionDefinition.CommandSpec command = action.command();
             if (!command.isConfigured()) continue;
@@ -164,7 +166,7 @@ public final class ActionSetupBit {
         String key = normalize(name);
         String previous = owners.putIfAbsent(key, owner);
         if (previous != null && !previous.equalsIgnoreCase(owner)) {
-            findings.add(finding(NAME_COLLISION, Level.WARNING, "action definitions", path,
+            findings.add(finding(NAME_COLLISION, Level.ERROR, "action definitions", path,
                     "Name or alias '" + name + "' is shared by " + previous + " and " + owner + ".",
                     "unique action and command names"));
         }

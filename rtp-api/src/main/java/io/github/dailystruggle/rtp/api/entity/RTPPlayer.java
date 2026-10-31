@@ -161,4 +161,18 @@ public interface RTPPlayer extends RTPCommandSender {
   default void setSendViewDistance(int viewDistance) {
     // no-op by default; platform adapters override with the native per-player send-view-distance call
   }
+
+  /**
+   * Sends a title and subtitle overlay to this player on the main/entity thread.
+   */
+  default void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+    // no-op by default; platform adapters override with the native title dispatch
+  }
+
+  /**
+   * Sends an actionbar message above the hotbar on the main/entity thread.
+   */
+  default void sendActionbar(String message) {
+    // no-op by default; platform adapters override with the native actionbar dispatch
+  }
 }

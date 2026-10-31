@@ -245,4 +245,15 @@ class FoliaDispatchTest {
         assertSame(entityLoc, seenLocation.get(),
                 "Entity target must be unwrapped to its Location before dispatch");
     }
+
+    @Test
+    @DisplayName("BukkitHandles.isFolia returns cached class-probe constant without repeated ClassNotFoundException")
+    void isFoliaUsesCachedConstant() throws Exception {
+        Field isFoliaField = BukkitHandles.class.getDeclaredField("IS_FOLIA");
+        isFoliaField.setAccessible(true);
+        boolean expected = isFoliaField.getBoolean(null);
+        for (int i = 0; i < 1_000; i++) {
+            assertEquals(expected, BukkitHandles.isFolia());
+        }
+    }
 }

@@ -145,8 +145,20 @@ public final class FabricHandlesUnobf implements HandleProvider {
 
         @Override
         public void playSound(Object type, float volume, float pitch, double dx, double dy, double dz) {
+            SoundEvent sound = null;
+            if (type instanceof SoundEvent se) {
+                sound = se;
+            } else if (type != null) {
+                try {
+                    Object parsed = new FabricValueCoercer().parse(
+                            io.github.dailystruggle.effectsapi.common.spi.TypeKey.SOUND, type.toString());
+                    if (parsed instanceof SoundEvent se) sound = se;
+                } catch (RuntimeException _) {
+                }
+            }
+            if (sound == null) return;
             player.connection.send(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
-                    net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.wrapAsHolder((SoundEvent) type),
+                    net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),
                     SoundSource.PLAYERS,
                     player.getX() + dx, player.getY() + dy, player.getZ() + dz,
                     volume, pitch, player.getRandom().nextLong()
@@ -155,16 +167,40 @@ public final class FabricHandlesUnobf implements HandleProvider {
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
+            ParticleOptions particle = null;
+            if (type instanceof ParticleOptions po) {
+                particle = po;
+            } else if (type != null) {
+                try {
+                    Object parsed = new FabricValueCoercer().parse(
+                            io.github.dailystruggle.effectsapi.common.spi.TypeKey.PARTICLE, type.toString());
+                    if (parsed instanceof ParticleOptions po) particle = po;
+                } catch (RuntimeException _) {
+                }
+            }
+            if (particle == null) return;
             // 26.x targeted overload: 2 booleans (longDistance, overrideLimiter).
-            ((ServerLevel) player.level()).sendParticles(player, (ParticleOptions) type, false, false,
+            player.level().sendParticles(player, particle, false, false,
                     player.getX() + dx, player.getY() + dy, player.getZ() + dz,
                     count, 0, 0, 0, speed);
         }
 
         @Override
         public void applyPotionEffect(Object type, int duration, int amplifier, boolean ambient, boolean particles, boolean icon) {
+            MobEffect effect = null;
+            if (type instanceof MobEffect me) {
+                effect = me;
+            } else if (type != null) {
+                try {
+                    Object parsed = new FabricValueCoercer().parse(
+                            io.github.dailystruggle.effectsapi.common.spi.TypeKey.POTION_EFFECT, type.toString());
+                    if (parsed instanceof MobEffect me) effect = me;
+                } catch (RuntimeException _) {
+                }
+            }
+            if (effect == null) return;
             player.addEffect(new MobEffectInstance(
-                    net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.wrapAsHolder((MobEffect) type),
+                    net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect),
                     duration, amplifier, ambient, particles, icon));
         }
 

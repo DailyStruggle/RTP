@@ -458,4 +458,286 @@ class RTPCmdBranchTest {
         };
         assertTrue(rtpCmd.compute(senderId, Collections.emptyMap(), dummyNext, msg -> {}));
     }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: region economy rejection does not leave incomplete TeleportData stuck in latestTeleportData")
+    void testRegionEconomyRejectionDoesNotLeavePlayerStuckAlreadyTeleporting() {
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+        accessor.addWorld(world);
+        MockRTPPlayer sender = new MockRTPPlayer(
+                UUID.randomUUID(),
+                "poorRegionUser",
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        sender.setPermission("rtp.free", false);
+        sender.setPermission("rtp.region", true);
+        accessor.addPlayer(sender);
+
+        Region paidRegion = new Region("paidRegion", new RegionSettings(
+                "paidRegion", world,
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>()),
+                false, false, 0, 0, 0, 0, 250.0, 0, null, false, -1L, null));
+        paidRegion.set(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.price, 250.0);
+        ActiveSelection.get().permRegionLookup.put("paidRegion", paidRegion);
+
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
+        EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> savedEco = eco.getData();
+        io.github.dailystruggle.rtp.api.economy.RTPEconomy prevEconomy =
+                io.github.dailystruggle.rtp.common.runtime.RTPRuntime.economy();
+
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages> msgParser =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages>)
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class);
+        Object prevNotEnough = msgParser.getData(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.notEnoughMoney);
+
+        try {
+            msgParser.set(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.notEnoughMoney,
+                    "[P0] you need at least $[money] for that.");
+            EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> mutated = new EnumMap<>(savedEco);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.price, 0.0);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.balanceFloor, 0.0);
+            eco.setData(mutated);
+
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setEconomy(new io.github.dailystruggle.rtp.api.economy.RTPEconomy() {
+                @Override public void give(UUID playerId, double money) {}
+                @Override public boolean take(UUID playerId, double money) { return false; }
+                @Override public double bal(UUID playerId) { return 10.0; }
+            });
+
+            TeleportData priorCompleted = completedTeleport(paidRegion, System.currentTimeMillis() - 60000L);
+            TeleportSessions.current().latestTeleportData.put(sender.uuid(), priorCompleted);
+
+            Map<String, List<String>> args = new HashMap<>();
+            args.put("region", List.of("paidRegion"));
+            List<String> feedback = new ArrayList<>();
+            assertTrue(rtpCmd.compute(sender.uuid(), args, null, feedback::add));
+
+            assertFalse(feedback.isEmpty(), "Expected insufficient-funds feedback");
+            assertTrue(feedback.get(0).contains("250.0"), "Expected region price 250.0 in message, got: " + feedback.get(0));
+            assertSame(priorCompleted, TeleportSessions.current().latestTeleportData.get(sender.uuid()),
+                    "Rejected region charge must preserve prior completed TeleportData rather than leaving an incomplete one");
+        } finally {
+            if (prevNotEnough != null) {
+                msgParser.set(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.notEnoughMoney, prevNotEnough);
+            }
+            eco.setData(savedEco);
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setEconomy(prevEconomy);
+            ActiveSelection.get().permRegionLookup.remove("paidRegion");
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: rtp.free sender is not blocked by balanceFloor when balance is below floor")
+    void testFreePermissionBypassesBalanceFloorCheck() {
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+        accessor.addWorld(world);
+        Region previousDefault = ActiveSelection.get().permRegionLookup.get("default");
+        Region defaultRegion = new Region("default", new RegionSettings(
+                "default", world,
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>()),
+                false, false, 0, 0, 0, 0, 0.0, 0, null, false, -1L, null));
+        ActiveSelection.get().permRegionLookup.put("default", defaultRegion);
+        MockRTPPlayer sender = new MockRTPPlayer(
+                UUID.randomUUID(),
+                "freeFloorUser",
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        sender.setPermission("rtp.free", true);
+        accessor.addPlayer(sender);
+
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
+        EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> savedEco = eco.getData();
+        io.github.dailystruggle.rtp.api.economy.RTPEconomy prevEconomy =
+                io.github.dailystruggle.rtp.common.runtime.RTPRuntime.economy();
+        java.util.concurrent.atomic.AtomicInteger balCalls = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        try {
+            EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> mutated = new EnumMap<>(savedEco);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.price, 50.0);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.balanceFloor, 100.0);
+            eco.setData(mutated);
+
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setEconomy(new io.github.dailystruggle.rtp.api.economy.RTPEconomy() {
+                @Override public void give(UUID playerId, double money) {}
+                @Override public boolean take(UUID playerId, double money) { return true; }
+                @Override public double bal(UUID playerId) {
+                    balCalls.incrementAndGet();
+                    return 0.0;
+                }
+            });
+
+            List<String> feedback = new ArrayList<>();
+            assertTrue(rtpCmd.compute(sender.uuid(), new HashMap<>(), null, feedback::add));
+            assertEquals(0, balCalls.get(), "rtp.free sender must not query economy balance");
+            assertTrue(feedback.isEmpty(), "rtp.free sender must not receive notEnoughMoney message");
+        } finally {
+            eco.setData(savedEco);
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setEconomy(prevEconomy);
+            if (previousDefault != null) {
+                ActiveSelection.get().permRegionLookup.put("default", previousDefault);
+            } else {
+                ActiveSelection.get().permRegionLookup.remove("default");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: toggleTargetPerms target economy rejection refunds sender and leaves session state untouched")
+    void testToggleTargetPermsTargetEconomyRejectionRefundsSender() {
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+        accessor.addWorld(world);
+        MockRTPPlayer sender = new MockRTPPlayer(
+                UUID.randomUUID(),
+                "richSender",
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        sender.setPermission("rtp.free", false);
+        sender.setPermission("rtp.other", true);
+        accessor.addPlayer(sender);
+
+        MockRTPPlayer target = new MockRTPPlayer(
+                UUID.randomUUID(),
+                "brokeTarget",
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 10, 64, 10));
+        target.setPermission("rtp.free", false);
+        target.setPermission("rtp.notme", false);
+        accessor.addPlayer(target);
+
+        Region paidRegion = new Region("targetPaidRegion", new RegionSettings(
+                "targetPaidRegion", world,
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>()),
+                false, false, 0, 0, 0, 0, 100.0, 0, null, false, -1L, null));
+        paidRegion.set(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.price, 100.0);
+        ActiveSelection.get().permRegionLookup.put("targetPaidRegion", paidRegion);
+
+        @SuppressWarnings("unchecked")
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys> eco =
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys>)
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.class);
+        EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> savedEco = eco.getData();
+        io.github.dailystruggle.rtp.api.economy.RTPEconomy prevEconomy =
+                io.github.dailystruggle.rtp.common.runtime.RTPRuntime.economy();
+        Map<UUID, Double> balances = new HashMap<>();
+        balances.put(sender.uuid(), 500.0);
+        balances.put(target.uuid(), 10.0);
+
+        try {
+            EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys, Object> mutated = new EnumMap<>(savedEco);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.price, 50.0);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.priceOther, 50.0);
+            mutated.put(io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys.balanceFloor, 0.0);
+            eco.setData(mutated);
+
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setEconomy(new io.github.dailystruggle.rtp.api.economy.RTPEconomy() {
+                @Override public void give(UUID playerId, double money) {
+                    balances.merge(playerId, money, Double::sum);
+                }
+                @Override public boolean take(UUID playerId, double money) {
+                    double cur = balances.getOrDefault(playerId, 0.0);
+                    if (cur < money) return false;
+                    balances.put(playerId, cur - money);
+                    return true;
+                }
+                @Override public double bal(UUID playerId) {
+                    return balances.getOrDefault(playerId, 0.0);
+                }
+            });
+
+            Map<String, List<String>> args = new HashMap<>();
+            args.put("player", List.of("brokeTarget"));
+            args.put("region", List.of("targetPaidRegion"));
+            args.put("toggletargetperms", List.of("true"));
+            List<String> feedback = new ArrayList<>();
+            assertTrue(rtpCmd.compute(sender.uuid(), args, null, feedback::add));
+
+            assertEquals(500.0, balances.get(sender.uuid()), 1e-6,
+                    "Sender charge must be refunded when target-pays charge fails");
+            assertNull(TeleportSessions.current().latestTeleportData.get(target.uuid()),
+                    "Target must not have a TeleportData entry committed when target charge fails");
+        } finally {
+            eco.setData(savedEco);
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setEconomy(prevEconomy);
+            ActiveSelection.get().permRegionLookup.remove("targetPaidRegion");
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: compute covers shape overrides, relative coords, biome filter, worldBorderOverride, and bad world rejection")
+    void testShapeOverridesRelativeCoordsBiomeFilterAndWorldRejection() {
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+        accessor.addWorld(world);
+        Region previousDefault = ActiveSelection.get().permRegionLookup.get("default");
+        Region defaultRegion = new Region("default", new RegionSettings(
+                "default", world,
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>()),
+                false, false, 0, 0, 0, 0, 0.0, 0, null, false, -1L, null));
+        ActiveSelection.get().permRegionLookup.put("default", defaultRegion);
+
+        MockRTPPlayer sender = new MockRTPPlayer(
+                UUID.randomUUID(),
+                "shapeOverridePlayer",
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 64, 64, -32));
+        sender.setPermission("rtp.free", true);
+        accessor.addPlayer(sender);
+
+        try {
+            // 1. Unknown world argument rejected with badArg feedback
+            Map<String, List<String>> badWorldArgs = new HashMap<>();
+            badWorldArgs.put("world", List.of("missing_world_xyz"));
+            List<String> badWorldFeedback = new ArrayList<>();
+            assertTrue(rtpCmd.compute(sender.uuid(), badWorldArgs, null, badWorldFeedback::add));
+            assertFalse(badWorldFeedback.isEmpty());
+
+            // 2. Shape overrides with relative coords (~, ~10, ~abc), booleans, explicit units, numbers, and biome filter
+            Map<String, List<String>> shapeArgs = new HashMap<>();
+            shapeArgs.put("region", List.of("default"));
+            shapeArgs.put("shape", List.of("RECTANGLE"));
+            shapeArgs.put("centerX", List.of("~10"));
+            shapeArgs.put("centerZ", List.of("~"));
+            shapeArgs.put("width", List.of("16c"));
+            shapeArgs.put("length", List.of("32"));
+            shapeArgs.put("weight", List.of("1.5"));
+            shapeArgs.put("mode", List.of("ACCUMULATED"));
+            shapeArgs.put("uniquePlacements", List.of("true"));
+            shapeArgs.put("expand", List.of("false"));
+            shapeArgs.put("biome", java.util.Arrays.asList("plains", "", null));
+            shapeArgs.put("worldBorderOverride", List.of("true"));
+
+            assertTrue(rtpCmd.compute(sender.uuid(), shapeArgs, null, msg -> {}));
+            Region tempRegion = ActiveSelection.get().tempRegions.get(sender.uuid());
+            assertNotNull(tempRegion);
+            TeleportSessions.current().processingPlayers.remove(sender.uuid());
+            TeleportSessions.current().latestTeleportData.remove(sender.uuid());
+
+            // 3. Invalid relative coordinate offset (~abc) falls back to base coordinate
+            Map<String, List<String>> invalidRelArgs = new HashMap<>();
+            invalidRelArgs.put("region", List.of("default"));
+            invalidRelArgs.put("shape", List.of("SQUARE"));
+            invalidRelArgs.put("centerX", List.of("~abc"));
+            invalidRelArgs.put("centerZ", List.of("~+"));
+            invalidRelArgs.put("radius", List.of("2.5c"));
+            assertTrue(rtpCmd.compute(sender.uuid(), invalidRelArgs, null, msg -> {}));
+        } finally {
+            TeleportSessions.current().processingPlayers.remove(sender.uuid());
+            TeleportSessions.current().latestTeleportData.remove(sender.uuid());
+            ActiveSelection.get().tempRegions.remove(sender.uuid());
+            if (previousDefault != null) {
+                ActiveSelection.get().permRegionLookup.put("default", previousDefault);
+            } else {
+                ActiveSelection.get().permRegionLookup.remove("default");
+            }
+        }
+    }
 }

@@ -1270,9 +1270,9 @@ public class RTP {
   public static long getEffectiveLastTeleportTime(UUID uuid) {
     if (uuid == null) return 0L;
     long localTime = 0L;
-    RTP inst = instance;
-    if (inst != null) {
-      TeleportData localData = TeleportSessions.current().latestTeleportData.get(uuid);
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions != null) {
+      TeleportData localData = sessions.latestTeleportData.get(uuid);
       if (localData != null) {
         localTime = localData.time;
       }
@@ -1292,7 +1292,7 @@ public class RTP {
     RTP inst = instance;
     long sharedTime = 0L;
     try {
-      if (inst != null && ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
+      if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
         io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding binding = sql.getNetworkStateBinding();
         if (binding != null) {
           sharedTime = binding.getLastTeleportTime(uuid);
@@ -1316,7 +1316,6 @@ public class RTP {
   public static void updateSharedLastTeleportTime(UUID uuid, long epochMillis) {
     if (uuid == null) return;
     RTP inst = instance;
-    if (inst == null) return;
     try {
       if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
         io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding binding = sql.getNetworkStateBinding();
@@ -1324,7 +1323,7 @@ public class RTP {
           binding.setLastTeleportTime(uuid, epochMillis);
         }
       }
-      if (inst.networkManager != null) {
+      if (inst != null && inst.networkManager != null) {
         inst.networkManager.setLastTeleportTime(uuid, epochMillis);
       }
     } catch (RuntimeException t) {
@@ -1342,9 +1341,9 @@ public class RTP {
    */
   public static long getLastRegionTeleportTime(UUID uuid, String regionName) {
     if (uuid == null || regionName == null) return 0L;
-    RTP inst = instance;
-    if (inst == null) return 0L;
-    Map<String, Long> map = TeleportSessions.current().regionTeleportTimes.get(uuid);
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return 0L;
+    Map<String, Long> map = sessions.regionTeleportTimes.get(uuid);
     if (map == null) return 0L;
     Long time = map.get(regionName.toLowerCase(Locale.ROOT));
     return time != null ? time : 0L;
@@ -1359,9 +1358,9 @@ public class RTP {
    */
   public static void setLastRegionTeleportTime(UUID uuid, String regionName, long epochMillis) {
     if (uuid == null || regionName == null) return;
-    RTP inst = instance;
-    if (inst == null) return;
-    TeleportSessions.current().regionTeleportTimes
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return;
+    sessions.regionTeleportTimes
         .computeIfAbsent(uuid, k -> new ConcurrentHashMap<>())
         .put(regionName.toLowerCase(Locale.ROOT), epochMillis);
   }
@@ -1605,6 +1604,7 @@ public class RTP {
         try {
           RTPRuntime.serverAccessor().getPlayerLifecycleHook().onPlayerQuit(uuid -> {
             if (uuid == null) return;
+            io.github.dailystruggle.rtp.common.governor.ConsumerLedger.active().evictPlayer(uuid);
             io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pending =
                 DeathTeleports.pending().remove(uuid);
             if (pending != null) {

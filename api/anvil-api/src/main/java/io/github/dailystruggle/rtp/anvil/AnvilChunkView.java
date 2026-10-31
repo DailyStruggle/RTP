@@ -8,60 +8,55 @@ import java.util.Set;
 
 /**
  * Immutable view over the subset of chunk NBT the pre-filter consults: block
- * palette + optional biome palette. Built by
+ * palette + optional heightmap + optional biome palette. Built by
  * {@link AnvilReader#readChunkView(byte[], int, int)}. Sections are kept in
  * on-disk order (no sort).
+ *
+ * @governedBy ADR-016
+ * @governedBy ADR-077
  */
 public final class AnvilChunkView {
 
     private final int dataVersion;
     private final List<PaletteSection> sections;
+    private final long[] motionBlockingNoLeaves;
     private final List<BiomePaletteSection> biomeSections;
 
     /**
-     * Canonical constructor. {@code sections} and {@code biomeSections} must be
-     * non-null (use {@link Collections#emptyList()} for "no data").
+     * Canonical constructor without heightmap. {@code sections} and {@code biomeSections}
+     * must be non-null (use {@link Collections#emptyList()} for "no data").
      */
     public AnvilChunkView(int dataVersion,
                           List<PaletteSection> sections,
                           List<BiomePaletteSection> biomeSections) {
-        this.dataVersion = dataVersion;
-        this.sections = Objects.requireNonNull(sections, "sections");
-        this.biomeSections = Objects.requireNonNull(biomeSections, "biomeSections");
+        this(dataVersion, sections, null, biomeSections);
     }
 
     /**
      * Overload for views without biome data. Defaults {@code biomeSections} to an empty list.
      */
     public AnvilChunkView(int dataVersion, List<PaletteSection> sections) {
-        this(dataVersion, sections, Collections.emptyList());
+        this(dataVersion, sections, null, Collections.emptyList());
     }
 
     /**
-     * Deprecated constructor retained for backward compatibility.
-     * The {@code motionBlockingNoLeaves} heightmap array is ignored.
-     *
-     * @deprecated heightmap is no longer stored; use
-     *             {@link #AnvilChunkView(int, List, List)}.
+     * Canonical constructor with optional {@code MOTION_BLOCKING_NO_LEAVES} heightmap array.
      */
-    @Deprecated(since = "3.3.0", forRemoval = false)
     public AnvilChunkView(int dataVersion,
                           List<PaletteSection> sections,
                           long[] motionBlockingNoLeaves,
                           List<BiomePaletteSection> biomeSections) {
-        this(dataVersion, sections, biomeSections);
+        this.dataVersion = dataVersion;
+        this.sections = Objects.requireNonNull(sections, "sections");
+        this.motionBlockingNoLeaves = motionBlockingNoLeaves;
+        this.biomeSections = Objects.requireNonNull(biomeSections, "biomeSections");
     }
 
     /**
-     * Deprecated constructor retained for backward compatibility.
-     * The {@code motionBlockingNoLeaves} heightmap array is ignored.
-     *
-     * @deprecated heightmap is no longer stored; use
-     *             {@link #AnvilChunkView(int, List)}.
+     * Overload for views with heightmap but without biome data.
      */
-    @Deprecated(since = "3.3.0", forRemoval = false)
     public AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
-        this(dataVersion, sections, Collections.emptyList());
+        this(dataVersion, sections, motionBlockingNoLeaves, Collections.emptyList());
     }
 
     // -------------------------------------------------- record-style accessors
@@ -118,6 +113,27 @@ public final class AnvilChunkView {
             if (s.sectionY() < min) min = s.sectionY();
         }
         return (min == Integer.MAX_VALUE) ? 0 : (min * 16);
+    }
+
+    /**
+     * Returns the world-Y of the highest motion-blocking, no-leaves column top at
+     * chunk-local {@code (x, z)}, or {@link Integer#MIN_VALUE} when the heightmap is
+     * absent or empty.
+     */
+    public int getHeightmapTopY(int x, int z) {
+        if (motionBlockingNoLeaves == null || motionBlockingNoLeaves.length == 0) {
+            return Integer.MIN_VALUE;
+        }
+        int bits = 9;
+        int entriesPerLong = 64 / bits;
+        int columnIndex = (z & 15) * 16 + (x & 15);
+        int longIdx = columnIndex / entriesPerLong;
+        if (longIdx >= motionBlockingNoLeaves.length) return Integer.MIN_VALUE;
+        int slot = columnIndex - longIdx * entriesPerLong;
+        long mask = (1L << bits) - 1L;
+        int rawVal = (int) ((motionBlockingNoLeaves[longIdx] >>> (slot * bits)) & mask);
+        int floor = minHeight();
+        return (rawVal <= 0) ? floor : (floor + rawVal - 1);
     }
 
     /**

@@ -806,7 +806,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final java.util.concurrent.locks.ReentrantLock writeLock = new ReentrantLock();
 
   /**
-   * Parallel hazard mirror table (Slice 1 foundation).
+   * Parallel hazard mirror table.
    * Maintained in parallel with bad-run arrays without affecting production read paths.
    */
   @SuppressWarnings("java:S3077") // Volatile reference publication for hazard mirror table
@@ -3506,12 +3506,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         // 5. Merge values from capturedBad into local data with RLE compression.
         //    Each pending entry's map value carries: (causeByte & 0xFF) | (epochSec << 8).
-        long[] pendingKeys = new long[localPendingBad.size()];
-        long[] pendingCauses = new long[localPendingBad.size()];
-        long[] pendingExpiries = new long[localPendingBad.size()];
+        java.util.List<java.util.Map.Entry<Long, Long>> tempBadEntries =
+            new java.util.ArrayList<>(localPendingBad.entrySet());
+        long[] pendingKeys = new long[tempBadEntries.size()];
+        long[] pendingCauses = new long[tempBadEntries.size()];
+        long[] pendingExpiries = new long[tempBadEntries.size()];
         {
           int pk = 0;
-          for (java.util.Map.Entry<Long, Long> e : localPendingBad.entrySet()) {
+          for (java.util.Map.Entry<Long, Long> e : tempBadEntries) {
             pendingKeys[pk] = e.getKey();
             Long v = e.getValue();
             long val = (v == null) ? MISC_CAUSE : v;

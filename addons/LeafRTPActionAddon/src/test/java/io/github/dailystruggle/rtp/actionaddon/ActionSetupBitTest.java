@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.bit.BitCode;
+import io.github.dailystruggle.bit.BitHealth;
 import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
@@ -67,6 +68,22 @@ class ActionSetupBitTest {
                 List.of(), Set.of("first", "second"), List.of(first, second), List.of(), List.of(), true);
 
         assertHasCode(snapshot, ActionSetupBit.NAME_COLLISION);
+        BitReport report = ActionSetupBit.report(snapshot);
+        assertEquals(BitHealth.FAILED, report.health());
+        assertTrue(report.findings().stream()
+                .filter(f -> f.code().equals(ActionSetupBit.NAME_COLLISION.key()))
+                .allMatch(f -> f.severity() == Level.ERROR));
+    }
+
+    @Test
+    void reportsRootCommandConflictWithBuiltInRtpOrWildAsBitFailure() {
+        ActionDefinition conflicting = action("arena", "arena", command("rtp", List.of("wild")), List.of());
+        ActionSetupBit.Snapshot snapshot = snapshot(
+                List.of(), Set.of("arena"), List.of(conflicting), List.of(), List.of(), true);
+
+        assertHasCode(snapshot, ActionSetupBit.NAME_COLLISION);
+        BitReport report = ActionSetupBit.report(snapshot);
+        assertEquals(BitHealth.FAILED, report.health());
     }
 
     @Test

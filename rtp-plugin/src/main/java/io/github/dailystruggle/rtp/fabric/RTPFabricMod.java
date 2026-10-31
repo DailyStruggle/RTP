@@ -1,10 +1,8 @@
 package io.github.dailystruggle.rtp.fabric;
-import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.bit.RtpBitStartup;
 import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
-import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
@@ -387,183 +385,16 @@ public final class RTPFabricMod implements ModInitializer {
             //     subtitle set) still works.
             // ----------------------------------------------------------------
             io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
-                    .teleportPostActions.add(task -> {
-                try {
-                    if (task == null || task.player() == null) return;
-                    final io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = task.player();
-
-                    // Duck-type on sendTitle/sendActionbar rather than instanceof
-                    // FabricRTPPlayer. Reason: per-MC adapter modules (e.g.
-                    // V26_1_R1FabricRTPPlayer compiled under unobf Loom for the
-                    // deobf MC 26.1.x runtime) implement RTPPlayer directly and
-                    // do NOT extend the intermediary FabricRTPPlayer - so a
-                    // FabricRTPPlayer instanceof check silently drops every
-                    // post-teleport title/subtitle/actionbar on 26.1.x.
-                    // Reflective dispatch keeps this hook adapter-agnostic for
-                    // future per-version players too.
-                    final java.lang.reflect.Method sendTitleM;
-                    final java.lang.reflect.Method sendActionbarM;
-                    try {
-                        sendTitleM = rtpPlayer.getClass().getMethod(
-                                "sendTitle", String.class, String.class,
-                                int.class, int.class, int.class);
-                        sendActionbarM = rtpPlayer.getClass().getMethod(
-                                "sendActionbar", String.class);
-                    } catch (NoSuchMethodException nsme) {
-                        // RTPPlayer implementation doesn't expose the Fabric
-                        // title/actionbar sinks - silently skip (matches the
-                        // pre-2026-05 behaviour for non-Fabric players, e.g.
-                        // a console-driven /rtp where task.player() is a
-                        // DetachedClone).
-                        return;
-                    }
-
-                    @SuppressWarnings("unchecked")
-                    io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages> lang =
-                            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages>)
-                                    ActiveConfigs.get().getParser(PlayerMessages.class);
-                    if (lang == null) return;
-
-                    final String title = ActiveConfigs.get().getConfigValue(
-                            io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.title, "").toString();
-                    final String subtitle = ActiveConfigs.get().getConfigValue(
-                            io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.subtitle, "").toString();
-                    final int fadeIn = lang.getNumber(
-                            io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeIn, 0).intValue();
-                    final int stay = lang.getNumber(
-                            io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.stay, 0).intValue();
-                    final int fadeOut = lang.getNumber(
-                            io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeOut, 0).intValue();
-                    final String actionbar = ActiveConfigs.get().getConfigValue(
-                            io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.actionbar, "").toString();
-
-                    if ((title == null || title.isEmpty())
-                            && (subtitle == null || subtitle.isEmpty())
-                            && (actionbar == null || actionbar.isEmpty())) {
-                        return;
-                    }
-
-                    RTPRuntime.scheduler().runTask(() -> {
-                        try {
-                            sendTitleM.invoke(rtpPlayer, title, subtitle, fadeIn, stay, fadeOut);
-                            sendActionbarM.invoke(rtpPlayer, actionbar);
-                        } catch (ReflectiveOperationException roe) {
-                            RTP.log(Level.WARNING,
-                                    "[RTP] Fabric post-teleport title dispatch (reflective invoke) failed: "
-                                            + roe.getClass().getSimpleName() + ": " + roe.getMessage());
-                        }
-                    });
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING,
-                            "[RTP] Fabric post-teleport title dispatch failed: "
-                                    + t.getClass().getSimpleName() + ": " + t.getMessage());
-                }
-            });
+                    .teleportPostActions.add(
+                            io.github.dailystruggle.rtp.common.effects.EffectDispatch::dispatchPostTeleportTitle);
 
             // ----------------------------------------------------------------
             // Post-teleport command dispatch - config.yml `consoleCommands` /
-            // `playerCommands` parity with BukkitEffectsHandler. Without this
-            // hook the two config lists are silent no-ops on Fabric, leaving
-            // operators no way to run e.g. `give [player] map` or `effect give
-            // [player] resistance` after a successful /rtp on a Fabric server.
-            //
-            // Both lists tolerate a leading slash, substitute the literal
-            // `[player]` token with the teleported player's name, and skip
-            // blank entries. Console commands run as the server console
-            // (op-level CommandSourceStack); player commands run as the
-            // player (player.createCommandSourceStack via FabricRTPPlayer).
-            // Dispatch is deferred to the main thread via RTPRuntime.scheduler().runTask
-            // because Brigadier dispatch on Fabric must run on the server tick
-            // thread (CommandSourceStack#performPrefixedCommand mutates server
-            // state and is not thread-safe). Mirrors the Folia-aware Bukkit
-            // path which routes commands to the global region scheduler for
-            // the same reason.
+            // `playerCommands` parity via shared EffectDispatch helper.
             // ----------------------------------------------------------------
             io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
-                    .teleportPostActions.add(task -> {
-                try {
-                    if (task == null || task.player() == null) return;
-                    io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = task.player();
-                    String playerName = rtpPlayer.name();
-                    if (playerName == null || playerName.isBlank()) return;
-
-                    @SuppressWarnings("unchecked")
-                    io.github.dailystruggle.rtp.common.configuration.ConfigParser<
-                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
-                            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
-                                    io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
-                                    ActiveConfigs.get().getParser(
-                                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
-                    if (configParser == null) return;
-
-                    java.util.List<String> consoleCommandsToRun = new java.util.ArrayList<>();
-                    Object consoleObj = configParser.getConfigValue(
-                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.consoleCommands,
-                            new java.util.ArrayList<>());
-                    if (consoleObj instanceof java.util.List<?> consoleList) {
-                        for (Object cmd : consoleList) {
-                            if (cmd == null) continue;
-                            String c = cmd.toString().replace("[player]", playerName);
-                            if (c.isBlank()) continue;
-                            // performPrefixedCommand tolerates a leading slash
-                            // but normalize anyway for log-clarity parity with Bukkit.
-                            if (c.startsWith("/")) c = c.substring(1);
-                            consoleCommandsToRun.add(c);
-                        }
-                    }
-
-                    java.util.List<String> playerCommandsToRun = new java.util.ArrayList<>();
-                    Object playerObj = configParser.getConfigValue(
-                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.playerCommands,
-                            new java.util.ArrayList<>());
-                    if (playerObj instanceof java.util.List<?> playerList) {
-                        for (Object cmd : playerList) {
-                            if (cmd == null) continue;
-                            String c = cmd.toString().replace("[player]", playerName);
-                            if (c.isBlank()) continue;
-                            if (c.startsWith("/")) c = c.substring(1);
-                            playerCommandsToRun.add(c);
-                        }
-                    }
-
-                    if (consoleCommandsToRun.isEmpty() && playerCommandsToRun.isEmpty()) return;
-
-                    final java.util.List<String> consoleFinal = consoleCommandsToRun;
-                    final java.util.List<String> playerFinal = playerCommandsToRun;
-                    final io.github.dailystruggle.rtp.api.entity.RTPPlayer playerRef = rtpPlayer;
-                    RTPRuntime.scheduler().runTask(() -> {
-                        if (!consoleFinal.isEmpty()) {
-                            io.github.dailystruggle.rtp.api.entity.RTPCommandSender console =
-                                    RTPRuntime.serverAccessor().getSender(
-                                            io.github.dailystruggle.rtp.api.RTPAPI.serverId);
-                            if (console != null) {
-                                for (String c : consoleFinal) {
-                                    try {
-                                        console.performCommand(playerRef, c);
-                                    } catch (Throwable t) {
-                                        RTP.log(Level.WARNING,
-                                                "[RTP] consoleCommand dispatch failed ('" + c + "'): "
-                                                        + t.getClass().getSimpleName() + ": " + t.getMessage());
-                                    }
-                                }
-                            }
-                        }
-                        for (String c : playerFinal) {
-                            try {
-                                playerRef.performCommand(playerRef, c);
-                            } catch (Throwable t) {
-                                RTP.log(Level.WARNING,
-                                        "[RTP] playerCommand dispatch failed ('" + c + "'): "
-                                                + t.getClass().getSimpleName() + ": " + t.getMessage());
-                            }
-                        }
-                    });
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING,
-                            "[RTP] Fabric post-teleport command dispatch failed: "
-                                    + t.getClass().getSimpleName() + ": " + t.getMessage());
-                }
-            });
+                    .teleportPostActions.add(
+                            io.github.dailystruggle.rtp.common.effects.EffectDispatch::dispatchPostTeleportCommands);
 
             // ----------------------------------------------------------------
             // Brigadier custom-ArgumentType registration: NOT performed.

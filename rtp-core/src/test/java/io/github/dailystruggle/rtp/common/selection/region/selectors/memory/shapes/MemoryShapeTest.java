@@ -803,4 +803,27 @@ public class MemoryShapeTest {
         assertTrue(shrunkUnionLen <= 1024,
                 "unionKeys should shrink back to steady-state floor (<= 1024), was " + shrunkUnionLen);
     }
+
+    @Test
+    public void testFlushAndRebuildInFlightPendingBadPutDoesNotThrowAIOOBE() {
+        TestShape shape = new TestShape();
+        java.util.concurrent.ConcurrentHashMap<Long, Long> racingPendingBad =
+                new java.util.concurrent.ConcurrentHashMap<>() {
+                    @Override
+                    public int size() {
+                        // Simulate an in-flight pendingBadLocations.get().put(...) landing after size()
+                        // is read but before entrySet() iteration completes.
+                        return 1;
+                    }
+                };
+        racingPendingBad.put(10L, 0L);
+        racingPendingBad.put(25L, 0L);
+        shape.pendingBadLocations.set(racingPendingBad);
+        shape.badLocationsDirty = true;
+
+        shape.flushAndRebuild(1L);
+        assertEquals(2, shape.getBadKeysCache().length);
+        assertEquals(10L, shape.getBadKeysCache()[0]);
+        assertEquals(25L, shape.getBadKeysCache()[1]);
+    }
 }

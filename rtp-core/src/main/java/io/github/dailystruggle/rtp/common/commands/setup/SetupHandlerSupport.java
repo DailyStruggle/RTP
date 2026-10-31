@@ -106,6 +106,10 @@ public final class SetupHandlerSupport {
             renderer.render(callerId, model);
             return true;
         } catch (RuntimeException e) {
+            if (isDisconnectedCallerFailure(callerId, e)) {
+                RTPRuntime.log(Level.FINE, "Setup book menu render skipped: caller " + callerId + " disconnected");
+                return true;
+            }
             CoreFallbackCbitCounters.recordSetupWizardDegraded("SetupHandlerSupport.renderCurrentStage", e);
             RTPRuntime.log(Level.WARNING, "Failed to render setup book menu for " + callerId + ": " + e.getMessage(), e);
             List<String> lines = SetupConsoleFormatter.formatStatus(session, null);
@@ -114,6 +118,18 @@ public final class SetupHandlerSupport {
             }
             return true;
         }
+    }
+
+    static boolean isDisconnectedCallerFailure(UUID callerId, RuntimeException e) {
+        if (!(e instanceof IllegalStateException)) {
+            return false;
+        }
+        String msg = e.getMessage();
+        if (msg == null || !msg.contains("no online player")) {
+            return false;
+        }
+        var accessor = RTPRuntime.serverAccessor();
+        return accessor == null || accessor.getPlayer(callerId) == null;
     }
 
     public static Map<String, List<PrefabApplier.Change>> computeDiffPreview(SetupSession session) {

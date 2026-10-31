@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.shapes;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Rectangle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import org.popcraft.chunky.ChunkyProvider;
@@ -18,11 +21,18 @@ public class ChunkyRTPShape extends Rectangle {
    *
    * @param chunkyShapeName the name of the Chunky shape
    */
+  @SuppressWarnings("unchecked")
   public ChunkyRTPShape(String chunkyShapeName) {
     super(chunkyShapeName.toUpperCase());
     this.chunkyShapeName = "chunky_" + chunkyShapeName;
 
-    RTP.addShape(this);
+    Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
+        (Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>>)
+            FactoryRegistry.map().computeIfAbsent(FactoryNames.shape, k -> new Factory<>());
+    shapeFactory.add(this.name, this);
+    if (ActiveSelection.get() != null && ActiveSelection.get().shapeFactory == null) {
+      ActiveSelection.get().shapeFactory = shapeFactory;
+    }
   }
 
   /**

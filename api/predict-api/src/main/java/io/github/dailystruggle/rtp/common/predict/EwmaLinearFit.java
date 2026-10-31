@@ -168,11 +168,15 @@ public final class EwmaLinearFit {
      */
     public static final class WindowedOlsSlope {
 
+        /** Upper capacity bound on retained sliding-window samples under high-frequency bursts. */
+        public static final int MAX_WINDOW_SAMPLES = 256;
+
         private record Sample(long timestampNanos, double x, double y) {}
 
         private final long windowNanos;
         private final long exclusionNanos;
         private final int minSamples;
+        private final int maxSamples;
         private final double minRelativeXRange;
         private final double priorSlope;
         private final double minSlope;
@@ -210,6 +214,7 @@ public final class EwmaLinearFit {
             this.windowNanos = windowNanos;
             this.exclusionNanos = exclusionNanos;
             this.minSamples = minSamples;
+            this.maxSamples = Math.max(minSamples, MAX_WINDOW_SAMPLES);
             this.minRelativeXRange = minRelativeXRange;
             this.priorSlope = Math.max(minSlope, Math.min(maxSlope, priorSlope));
             this.minSlope = minSlope;
@@ -254,6 +259,11 @@ public final class EwmaLinearFit {
                     break;
                 }
                 window.pollFirst();
+            }
+            while (window.size() > maxSamples) {
+                if (window.pollFirst() == null) {
+                    break;
+                }
             }
 
             List<Sample> samples = new ArrayList<>(window);

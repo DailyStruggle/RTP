@@ -722,7 +722,9 @@ public final class ActionSessionImpl implements ActionSession {
         (double) z,
         (double) anchorX,
         slotY,
-        (double) anchorZ);
+        (double) anchorZ,
+        participants.size(),
+        context);
 
     executeLifecycleSteps(definition.lifecycle().onBoundaryViolation(), gateCtx);
   }

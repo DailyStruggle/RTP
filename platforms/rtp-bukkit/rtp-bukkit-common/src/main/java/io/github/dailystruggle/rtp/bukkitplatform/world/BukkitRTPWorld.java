@@ -52,6 +52,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           int x = location.getBlockX();
           int y = location.getBlockY();
           int z = location.getBlockZ();
+          if (isPrimaryThreadSafe() && !world.isChunkLoaded(x >> 4, z >> 4)) {
+            return null;
+          }
           return world.getBiome(x, y, z).name();
         } catch (Throwable t) {
           io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
@@ -59,6 +62,15 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           return Biome.PLAINS.name();
         }
       };
+
+  @SuppressWarnings("ConstantValue")
+  private static boolean isPrimaryThreadSafe() {
+    try {
+      return Bukkit.getServer() != null && Bukkit.isPrimaryThread();
+    } catch (Throwable ignored) {
+      return false;
+    }
+  }
 
   public static @NotNull Set<String> defaultBiomes() {
     Set<String> out = new java.util.HashSet<>();

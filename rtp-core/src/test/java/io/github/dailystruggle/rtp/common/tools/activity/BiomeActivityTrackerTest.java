@@ -161,6 +161,7 @@ class BiomeActivityTrackerTest {
     BiomeActivityTracker t = new BiomeActivityTracker();
     MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
     MockRTPWorld world = Mockito.mock(MockRTPWorld.class);
+    Mockito.when(world.isChunkLoaded(Mockito.anyInt(), Mockito.anyInt())).thenReturn(true);
     Mockito.when(world.getBiome(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt()))
         .thenThrow(new RuntimeException("boom"));
 
@@ -175,5 +176,30 @@ class BiomeActivityTrackerTest {
 
     CompletableFuture<String> f = futures.get(0);
     assertTrue(f.isCompletedExceptionally());
+  }
+
+  @Test
+  @DisplayName("S-005: sample skips unloaded player chunk without calling world.getBiome")
+  void sampleSkipsUnloadedPlayerChunk() throws Exception {
+    BiomeActivityTracker t = new BiomeActivityTracker();
+    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
+    MockRTPWorld world = Mockito.mock(MockRTPWorld.class);
+    Mockito.when(world.isChunkLoaded(Mockito.anyInt(), Mockito.anyInt())).thenReturn(false);
+
+    RTPLocation loc = new RTPLocation(world, 160, 64, -320);
+    MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "UnloadedChunkBot", loc);
+    player.setOnline(true);
+
+    List<CompletableFuture<String>> futures = t.sample(List.of(player));
+    assertEquals(1, futures.size());
+
+    accessor.getMockScheduler().tick(1L);
+
+    CompletableFuture<String> f = futures.get(0);
+    assertTrue(f.isDone());
+    assertNull(f.get());
+    assertEquals(0L, t.totalSamples());
+    Mockito.verify(world, Mockito.never())
+        .getBiome(Mockito.anyInt(), Mockito.anyInt(), Mockito.anyInt());
   }
 }

@@ -131,15 +131,33 @@ public class SendMessage {
     }
   }
 
+  private static int resolveServerIntVersion() {
+    try {
+      if (RTPRuntime.serverAccessor() != null
+          && RTPRuntime.serverAccessor().getServerIntVersion() != null) {
+        return RTPRuntime.serverAccessor().getServerIntVersion();
+      }
+      io.github.dailystruggle.server.api.ServerAccessor acc =
+          io.github.dailystruggle.server.api.ServerAccessors.get();
+      if (acc != null && acc.getServerIntVersion() != null) {
+        return acc.getServerIntVersion();
+      }
+    } catch (Throwable ignored) {
+    }
+    return 21;
+  }
+
+  @SuppressWarnings("ConstantValue")
   public static void sendMessage(CommandSender sender, String message) {
-    if (message == null || message.isEmpty()) return;
+    if (sender == null || message == null || message.isEmpty()) return;
     // Bukkit.getLogger().info("[diag/sendMessage(CS)] entry sender=" + (sender == null ? "null" : sender.getClass().getSimpleName()) + " raw=\"" + message + "\"");
     intercept(message);
     // Bukkit.getLogger().info("[diag/sendMessage(CS)] after intercept(): \"" + message + "\"");
     if (sender instanceof Player) sendMessage((Player) sender, message);
     else {
-      OfflinePlayer console = Bukkit.getOfflinePlayer(RTPAPI.serverId);
-      if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
+      OfflinePlayer console =
+          Bukkit.getServer() != null ? Bukkit.getOfflinePlayer(RTPAPI.serverId) : null;
+      if (resolveServerIntVersion() > 12 && sender.spigot() != null) {
         BaseComponent[] components = toComponents(console, message);
         sender.spigot().sendMessage(components);
       } else {
@@ -148,10 +166,11 @@ public class SendMessage {
     }
   }
 
+  @SuppressWarnings("ConstantValue")
   public static void sendMessage(Player player, String message) {
     if (player == null || message == null || message.isEmpty()) return;
     intercept(message);
-    if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
+    if (resolveServerIntVersion() > 12 && player.spigot() != null) {
       BaseComponent[] components = toComponents(player, message);
       player.spigot().sendMessage(components);
     } else player.sendMessage(format(player, message));
@@ -168,6 +187,7 @@ public class SendMessage {
    * {@link ClickEvent.Action#RUN_COMMAND} clicks so every fragment auto-fires
    * its literal {@code /rtp menu ...} command instead of suggesting it.
    */
+  @SuppressWarnings("ConstantValue")
   public static void sendMessage(
       RTPCommandSender sender, String message, String hover, String click,
       ClickEvent.Action clickAction) {
@@ -176,9 +196,9 @@ public class SendMessage {
 
     OfflinePlayer player;
     if (sender instanceof Player) player = (OfflinePlayer) sender;
-    else player = Bukkit.getOfflinePlayer(RTPAPI.serverId).getPlayer();
+    else player = Bukkit.getServer() != null ? Bukkit.getOfflinePlayer(RTPAPI.serverId).getPlayer() : null;
 
-    if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
+    if (resolveServerIntVersion() > 12) {
       BaseComponent[] textComponents = toComponents(player, message);
 
       if (hover != null && !hover.isEmpty()) {
@@ -199,7 +219,7 @@ public class SendMessage {
       // In a version-independent rtp-plugin, we use the API to send messages.
       // If it's a Bukkit server, we know the player's spigot() method is available if we check the
       // server version.
-      if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
+      if (resolveServerIntVersion() > 12) {
         Player bukkitPlayer = Bukkit.getPlayer(sender.uuid());
         if (bukkitPlayer != null) {
           bukkitPlayer.spigot().sendMessage(textComponents);

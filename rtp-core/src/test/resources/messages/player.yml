@@ -1,5 +1,6 @@
 # RTP player-facing messages (test fixture mirroring the shipped messages/ subtree).
 alreadyTeleporting: "&7[P0] ⚡ you're already teleporting!"
+notEnoughMoney: "&7[P0] you need at least $[money] for that."
 busy: "&c[P0] busy"
 days: "d"
 version: 1.0
