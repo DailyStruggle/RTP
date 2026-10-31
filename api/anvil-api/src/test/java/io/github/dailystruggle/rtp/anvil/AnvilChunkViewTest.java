@@ -2,18 +2,27 @@ package io.github.dailystruggle.rtp.anvil;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -203,6 +212,88 @@ class AnvilChunkViewTest {
         }
         assertTrue(sawNamespacedId,
                 "at least one section in " + dirName + " should produce a namespaced block id");
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-005 / ADR-016: region file reads, layout parsing and getHeightmapTopY run off the caller thread")
+    void offTickRegionReadLayoutParseAndHeightmapTopYDecode(@TempDir Path tempDir) throws IOException {
+        long callerThreadId = Thread.currentThread().getId();
+        List<String> palette = List.of("minecraft:stone");
+        LinkedHashMap<String, Object> sec = AnvilTestFixtures.section((byte) -4, palette, null);
+        long[] heightmap = new long[37];
+        // Column (8, 8) -> index 136 -> longIdx 19, slot 3 -> rawVal = 80 -> topY = -64 + 80 - 1 = 15
+        heightmap[19] = 80L << 27;
+        LinkedHashMap<String, Object> root = AnvilTestFixtures.chunkRoot(
+                DataVersionSupport.MC_1_20_DATA_VERSION, heightmap, List.of(sec));
+        Path regionDir = Files.createDirectories(tempDir.resolve("region"));
+        Files.write(regionDir.resolve("r.0.0.mca"), AnvilTestFixtures.writeSingleChunkRegion(root));
+
+        AtomicLong workerThreadId = new AtomicLong(-1L);
+        AtomicReference<String> workerThreadName = new AtomicReference<>("");
+        CompletableFuture<Integer> topYFuture = AnvilPrefilter
+                .probeDetailed(tempDir, "", 0, 0, Set.of("LAVA"), null)
+                .thenApply(res -> {
+                    workerThreadId.set(Thread.currentThread().getId());
+                    workerThreadName.set(Thread.currentThread().getName());
+                    assertEquals(Verdict.ACCEPT, res.verdict());
+                    assertNotNull(res.view());
+                    return res.view().getHeightmapTopY(8, 8);
+                });
+
+        assertEquals(15, topYFuture.join());
+        assertNotEquals(callerThreadId, workerThreadId.get(), "probe and heightmap decode must run off the caller thread");
+        assertTrue(workerThreadName.get().startsWith("RTP-Anvil-IO-"),
+                "expected RTP-Anvil-IO- worker thread, saw " + workerThreadName.get());
+
+        // Exercise remaining getHeightmapTopY branches and constructors (empty, truncated, zero rawVal, 3-arg ctor)
+        AnvilChunkView decoded = AnvilReader.toView(root);
+        assertEquals(-64, decoded.getHeightmapTopY(0, 0), "rawVal == 0 returns minHeight floor (-64)");
+        assertEquals(Integer.MIN_VALUE,
+                new AnvilChunkView(DataVersionSupport.MC_1_20_DATA_VERSION, decoded.sections(), new long[0])
+                        .getHeightmapTopY(8, 8));
+        assertEquals(Integer.MIN_VALUE,
+                new AnvilChunkView(DataVersionSupport.MC_1_20_DATA_VERSION, decoded.sections(), new long[1])
+                        .getHeightmapTopY(8, 8));
+    }
+
+    @Test
+    @DisplayName("ADR-016: AnvilChunkView heightmap retention stays bounded under continuous cache and prefilter allocation")
+    void boundedMemoryUnderContinuousAllocationWithRetainedHeightmap(@TempDir Path tempDir) throws IOException {
+        AnvilRegionByteCache.invalidateAll();
+        long originalBudget = AnvilIoPool.getMemoryBudgetBytes();
+        try {
+            AnvilIoPool.setMemoryBudgetBytes(64L * 1024L);
+            Path regionDir = Files.createDirectories(tempDir.resolve("region"));
+            LinkedHashMap<String, Object> sec = AnvilTestFixtures.section(
+                    (byte) 0, List.of("minecraft:stone"), null);
+            long[] heightmap = new long[37];
+            heightmap[0] = 16L;
+            byte[] regionBytes = AnvilTestFixtures.writeSingleChunkRegion(
+                    AnvilTestFixtures.chunkRoot(DataVersionSupport.MC_1_20_DATA_VERSION, heightmap, List.of(sec)));
+
+            WeakReference<AnvilChunkView> firstViewRef = null;
+            for (int r = 0; r < 24; r++) {
+                Files.write(regionDir.resolve("r." + r + ".0.mca"), regionBytes);
+                AnvilPrefilter.ProbeResult res = AnvilPrefilter
+                        .probeDetailed(tempDir, "", r << 5, 0, Set.of("LAVA"), null)
+                        .join();
+                assertEquals(Verdict.ACCEPT, res.verdict());
+                assertNotNull(res.view());
+                assertEquals(15, res.view().getHeightmapTopY(0, 0));
+                if (r == 0) {
+                    firstViewRef = new WeakReference<>(res.view());
+                }
+            }
+
+            assertTrue(AnvilRegionByteCache.size() <= 16,
+                    "region byte cache must stay capped at <= 16 entries, saw " + AnvilRegionByteCache.size());
+            assertTrue(AnvilRegionByteCache.cachedBytes() <= AnvilIoPool.getMemoryBudgetBytes(),
+                    "region byte cache must stay within memory budget");
+            assertNotNull(firstViewRef);
+        } finally {
+            AnvilIoPool.setMemoryBudgetBytes(originalBudget);
+            AnvilRegionByteCache.invalidateAll();
+        }
     }
 
     // ---------------------------------------------------------------------------- helpers
