@@ -3506,10 +3506,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         // 5. Merge values from capturedBad into local data with RLE compression.
         //    Each pending entry's map value carries: (causeByte & 0xFF) | (epochSec << 8).
-        java.util.List<java.util.Map.Entry<Long, Long>> tempBadEntries = new java.util.ArrayList<>();
-        for (java.util.Map.Entry<Long, Long> e : localPendingBad.entrySet()) {
-          tempBadEntries.add(e);
-        }
+        java.util.List<java.util.Map.Entry<Long, Long>> tempBadEntries =
+            new java.util.ArrayList<>(localPendingBad.entrySet());
         long[] pendingKeys = new long[tempBadEntries.size()];
         long[] pendingCauses = new long[tempBadEntries.size()];
         long[] pendingExpiries = new long[tempBadEntries.size()];

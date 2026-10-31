@@ -115,7 +115,7 @@ public final class EffectDispatch {
         if (active == null) {
             active = fallbackParser;
         }
-        if (active == null || active.getData() == null) return false;
+        if (active == null) return false;
         Object val = active.getData().get(PerformanceKeys.effectParsing);
         if (val instanceof Boolean b) return b;
         if (val == null) return false;

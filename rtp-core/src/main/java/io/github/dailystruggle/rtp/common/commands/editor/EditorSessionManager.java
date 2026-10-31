@@ -374,18 +374,24 @@ public final class EditorSessionManager {
 
         String html = embedPayload(loadEditorTemplate(), payloadJson);
         String prefix = normalizedTarget.getFileName().toString() + ".";
-        if (prefix.length() < 3) {
-            prefix = "rtp." + prefix;
-        }
         Object lock = EXPORT_LOCKS.computeIfAbsent(normalizedTarget, k -> new Object());
         synchronized (lock) {
             // The page embeds the loopback channel token: owner-only, restricted before it holds anything
-            Path tmp = (parentDir != null)
-                    ? Files.createTempFile(parentDir, prefix, ".tmp")
-                    : Files.createTempFile(prefix, ".tmp");
+            Path tmp = normalizedTarget.resolveSibling(prefix + UUID.randomUUID() + ".tmp");
             try {
+                Files.writeString(
+                        tmp,
+                        "",
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE_NEW,
+                        StandardOpenOption.WRITE);
                 EditorKeys.restrictToOwner(tmp);
-                Files.writeString(tmp, html, StandardCharsets.UTF_8);
+                Files.writeString(
+                        tmp,
+                        html,
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.TRUNCATE_EXISTING,
+                        StandardOpenOption.WRITE);
                 try {
                     Files.move(tmp, normalizedTarget, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 } catch (AtomicMoveNotSupportedException e) {

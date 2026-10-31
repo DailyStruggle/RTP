@@ -153,7 +153,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
                     Object parsed = new FabricValueCoercer().parse(
                             io.github.dailystruggle.effectsapi.common.spi.TypeKey.SOUND, type.toString());
                     if (parsed instanceof SoundEvent se) sound = se;
-                } catch (RuntimeException ignored) {
+                } catch (RuntimeException _) {
                 }
             }
             if (sound == null) return;
@@ -175,12 +175,12 @@ public final class FabricHandlesUnobf implements HandleProvider {
                     Object parsed = new FabricValueCoercer().parse(
                             io.github.dailystruggle.effectsapi.common.spi.TypeKey.PARTICLE, type.toString());
                     if (parsed instanceof ParticleOptions po) particle = po;
-                } catch (RuntimeException ignored) {
+                } catch (RuntimeException _) {
                 }
             }
             if (particle == null) return;
             // 26.x targeted overload: 2 booleans (longDistance, overrideLimiter).
-            ((ServerLevel) player.level()).sendParticles(player, particle, false, false,
+            player.level().sendParticles(player, particle, false, false,
                     player.getX() + dx, player.getY() + dy, player.getZ() + dz,
                     count, 0, 0, 0, speed);
         }
@@ -195,7 +195,7 @@ public final class FabricHandlesUnobf implements HandleProvider {
                     Object parsed = new FabricValueCoercer().parse(
                             io.github.dailystruggle.effectsapi.common.spi.TypeKey.POTION_EFFECT, type.toString());
                     if (parsed instanceof MobEffect me) effect = me;
-                } catch (RuntimeException ignored) {
+                } catch (RuntimeException _) {
                 }
             }
             if (effect == null) return;

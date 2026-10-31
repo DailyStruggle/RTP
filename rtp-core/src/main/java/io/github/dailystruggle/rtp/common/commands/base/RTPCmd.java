@@ -448,9 +448,13 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
 
+    if (rtpArgs == null) {
+      rtpArgs = Collections.emptyMap();
+    }
+
     // Bare /rtp root action (ADR-056) for platforms dispatching directly to compute().
     // Releases processingPlayers lock if handled.
-    boolean bareInvocation = (rtpArgs == null || rtpArgs.isEmpty());
+    boolean bareInvocation = rtpArgs.isEmpty();
     if (bareInvocation && tryRootAction(senderId, messageMethod, true)) {
       return true;
     }
@@ -590,7 +594,11 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     if (verbose) {
-      RTPRuntime.log(Level.INFO, "#0080ff[RTP] RTP command triggered by " + sender.name() + ".");
+      RTPRuntime.log(
+          Level.INFO,
+          "#0080ff[RTP] RTP command triggered by "
+              + (sender != null ? sender.name() : senderId)
+              + ".");
     }
 
     ConfigParser<EconomyKeys> eco =
@@ -644,7 +652,7 @@ public interface RTPCmd extends BaseRTPCmd {
     double price = 0.0;
     RTPEconomy economy = RTPRuntime.economy();
     if (economy != null) {
-      if (!senderId.equals(CommandsAPI.serverId) && !sender.hasPermission("rtp.free")) {
+      if (!senderId.equals(CommandsAPI.serverId) && (sender == null || !sender.hasPermission("rtp.free"))) {
         for (RTPPlayer player : players) {
           if (player.uuid().equals(senderId))
             price += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
@@ -656,7 +664,7 @@ public interface RTPCmd extends BaseRTPCmd {
         }
       }
       double bal =
-          (senderId.equals(CommandsAPI.serverId) || sender.hasPermission("rtp.free"))
+          (senderId.equals(CommandsAPI.serverId) || (sender != null && sender.hasPermission("rtp.free")))
               ? Double.MAX_VALUE
               : economy.bal(senderId);
       double floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0d).doubleValue();
@@ -713,15 +721,16 @@ public interface RTPCmd extends BaseRTPCmd {
       TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
       Set<String> biomes = parseBiomeFilter(biomeList);
+      Set<String> activeBiomes = biomes.isEmpty() ? null : biomes;
       Region region = applyShapeOverrides(
           senderId, player, plan.region(), plan.rtpWorld(), rtpArgs, shapeNames, vertNames);
 
       TeleportPipelineTask pipelineTask =
-          new TeleportPipelineTask(new GenerationContext(sender, player, biomes), region);
+          new TeleportPipelineTask(new GenerationContext(sender, player, activeBiomes), region);
       data.nextTask = pipelineTask;
       RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute TeleportPipelineTask constructed playerId=" + player.uuid()
               + " region=" + region.name
-              + " biomes=" + biomes
+              + " biomes=" + activeBiomes
               + " syncLoading=" + syncLoading);
 
       long delay = RTP.getDelay((toggleTargetPerms) ? player : sender, region.getSettings());
@@ -732,7 +741,7 @@ public interface RTPCmd extends BaseRTPCmd {
       }
 
       if (!syncLoading) {
-        syncLoading = biomes == null && region.hasLocation(player.uuid()) && delay <= 0;
+        syncLoading = activeBiomes == null && region.hasLocation(player.uuid()) && delay <= 0;
       }
 
       if (player.uuid().equals(senderId)) senderDispatched = true;
@@ -905,8 +914,11 @@ public interface RTPCmd extends BaseRTPCmd {
           ? Boolean.parseBoolean(wboVals.get(playerIndex))
           : Boolean.parseBoolean(wboVals.get(0));
       if (doWBO) {
-        region = region.clone();
-        region.set(RegionKeys.shape, RTPRuntime.serverAccessor().getShape(rtpWorld.name()));
+        Object wboShape = RTPRuntime.serverAccessor().getShape(rtpWorld.name());
+        if (wboShape != null) {
+          region = region.clone();
+          region.set(RegionKeys.shape, wboShape);
+        }
       }
     }
 
@@ -989,7 +1001,7 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   private static Set<String> parseBiomeFilter(List<String> biomeList) {
-    if (biomeList == null) return null;
+    if (biomeList == null || biomeList.isEmpty()) return Collections.emptySet();
     Set<String> biomes = new HashSet<>(biomeList.size());
     for (String biome : biomeList) {
       if (biome == null || biome.isEmpty()) continue;
@@ -1017,13 +1029,16 @@ public interface RTPCmd extends BaseRTPCmd {
 
     Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
     FactoryValue<?> factoryValue = factory.get(shapeName);
-    if (!(factoryValue instanceof Shape<?>)) {
+    if (!(factoryValue instanceof Shape<?> shape)) {
       RTPRuntime.log(
           Level.SEVERE,
           "",
           new IllegalArgumentException("shape factory did not return a shape"));
+      return region;
     }
-    Shape<?> shape = (Shape<?>) factoryValue;
+    if (originalShape == null) {
+      return region;
+    }
 
     EnumMap<?, Object> originalShapeData = originalShape.getData();
     EnumMap<?, Object> shapeData = shape.getData();
@@ -1069,8 +1084,9 @@ public interface RTPCmd extends BaseRTPCmd {
         if (offsetPart.isEmpty() || offsetPart.equals("-") || offsetPart.equals("+")) {
           return base;
         }
-        Scanner offsetScanner = new Scanner(offsetPart);
-        return offsetScanner.hasNextLong() ? resolveRelativeCoordinate(string, base) : base;
+        try (Scanner offsetScanner = new Scanner(offsetPart)) {
+          return offsetScanner.hasNextLong() ? resolveRelativeCoordinate(string, base) : base;
+        }
       }
       return resolveRelativeCoordinate(string, base);
     }
@@ -1103,15 +1119,17 @@ public interface RTPCmd extends BaseRTPCmd {
         double chunks = interpreted.toChunks();
         return (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
       }
-      Scanner numScanner = new Scanner(string);
-      if (numScanner.hasNextLong()) return numScanner.nextLong();
-      if (numScanner.hasNextDouble()) return numScanner.nextDouble();
+      try (Scanner numScanner = new Scanner(string)) {
+        if (numScanner.hasNextLong()) return numScanner.nextLong();
+        if (numScanner.hasNextDouble()) return numScanner.nextDouble();
+      }
       double chunks = parsedDist.toChunks();
       return (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
     }
-    Scanner fallbackScanner = new Scanner(string);
-    if (fallbackScanner.hasNextLong()) return fallbackScanner.nextLong();
-    if (fallbackScanner.hasNextDouble()) return fallbackScanner.nextDouble();
+    try (Scanner fallbackScanner = new Scanner(string)) {
+      if (fallbackScanner.hasNextLong()) return fallbackScanner.nextLong();
+      if (fallbackScanner.hasNextDouble()) return fallbackScanner.nextDouble();
+    }
     return string;
   }
 

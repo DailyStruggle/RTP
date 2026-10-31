@@ -8,6 +8,16 @@ public final class RelativeCoordinate {
   private RelativeCoordinate() {}
 
   /**
+   * Returns {@code true} if {@code token} uses relative tilde notation ({@code ~}).
+   *
+   * @param token raw override token (may be {@code null})
+   * @return {@code true} when {@code token} contains {@code '~'}
+   */
+  public static boolean isRelative(String token) {
+    return token != null && token.indexOf('~') >= 0;
+  }
+
+  /**
    * Resolves relative coordinate tokens (~, ~n, -~, -~n) against a base coordinate.
    * Tokens without ~ are parsed as absolute numbers.
    *
@@ -16,10 +26,6 @@ public final class RelativeCoordinate {
    * @return the resolved absolute coordinate
    * @throws NumberFormatException if the numeric offset is malformed
    */
-  public static boolean isRelative(String token) {
-    return token != null && token.indexOf('~') >= 0;
-  }
-
   public static long resolve(String token, long base) {
     String t = token.trim();
     int tilde = t.indexOf('~');

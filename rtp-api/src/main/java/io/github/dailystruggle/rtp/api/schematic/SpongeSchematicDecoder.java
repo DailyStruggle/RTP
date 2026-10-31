@@ -149,16 +149,38 @@ public final class SpongeSchematicDecoder {
    */
   private static DecodedSchematic decodeLitematicRegions(
       SchematicSource source, Map<String, Object> regions) throws IOException {
-    record RegionBox(
-        int minX,
-        int minY,
-        int minZ,
-        int width,
-        int height,
-        int length,
-        List<String> palette,
-        long[] blockStates,
-        List<Object> tileEntities) {}
+    final class RegionBox {
+      final int minX;
+      final int minY;
+      final int minZ;
+      final int width;
+      final int height;
+      final int length;
+      final List<String> palette;
+      final long[] blockStates;
+      final List<Object> tileEntities;
+
+      RegionBox(
+          int minX,
+          int minY,
+          int minZ,
+          int width,
+          int height,
+          int length,
+          List<String> palette,
+          long[] blockStates,
+          List<Object> tileEntities) {
+        this.minX = minX;
+        this.minY = minY;
+        this.minZ = minZ;
+        this.width = width;
+        this.height = height;
+        this.length = length;
+        this.palette = palette;
+        this.blockStates = blockStates;
+        this.tileEntities = tileEntities;
+      }
+    }
 
     List<RegionBox> boxes = new ArrayList<>(regions.size());
     int globalMinX = Integer.MAX_VALUE;
@@ -229,22 +251,22 @@ public final class SpongeSchematicDecoder {
     List<BlockEntityData> blockEntities = new ArrayList<>();
 
     for (RegionBox box : boxes) {
-      int[] palMap = new int[box.palette().size()];
-      for (int i = 0; i < box.palette().size(); i++) {
-        String stateStr = box.palette().get(i);
+      int[] palMap = new int[box.palette.size()];
+      for (int i = 0; i < box.palette.size(); i++) {
+        String stateStr = box.palette.get(i);
         palMap[i] = unifiedPaletteMap.computeIfAbsent(stateStr, k -> unifiedPaletteMap.size());
       }
-      int bits = Math.max(2, 32 - Integer.numberOfLeadingZeros(Math.max(1, box.palette().size() - 1)));
+      int bits = Math.max(2, 32 - Integer.numberOfLeadingZeros(Math.max(1, box.palette.size() - 1)));
       long mask = (1L << bits) - 1L;
-      long[] longs = box.blockStates();
-      int ox = box.minX() - globalMinX;
-      int oy = box.minY() - globalMinY;
-      int oz = box.minZ() - globalMinZ;
+      long[] longs = box.blockStates;
+      int ox = box.minX - globalMinX;
+      int oy = box.minY - globalMinY;
+      int oz = box.minZ - globalMinZ;
 
-      for (int y = 0; y < box.height(); y++) {
-        for (int z = 0; z < box.length(); z++) {
-          for (int x = 0; x < box.width(); x++) {
-            int localIdx = (y * box.length() + z) * box.width() + x;
+      for (int y = 0; y < box.height; y++) {
+        for (int z = 0; z < box.length; z++) {
+          for (int x = 0; x < box.width; x++) {
+            int localIdx = (y * box.length + z) * box.width + x;
             long bitIdx = (long) localIdx * bits;
             int li = (int) (bitIdx >>> 6);
             int bo = (int) (bitIdx & 63L);
@@ -264,8 +286,8 @@ public final class SpongeSchematicDecoder {
         }
       }
 
-      if (box.tileEntities() != null) {
-        for (Object teObj : box.tileEntities()) {
+      if (box.tileEntities != null) {
+        for (Object teObj : box.tileEntities) {
           Map<String, Object> te = asCompound(teObj);
           if (te == null) {
             continue;

@@ -166,17 +166,13 @@ public interface RTPPlayer extends RTPCommandSender {
    * Sends a title and subtitle overlay to this player on the main/entity thread.
    */
   default void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-    if ((title == null || title.isEmpty()) && (subtitle == null || subtitle.isEmpty())) {
-      return;
-    }
+    // no-op by default; platform adapters override with the native title dispatch
   }
 
   /**
    * Sends an actionbar message above the hotbar on the main/entity thread.
    */
   default void sendActionbar(String message) {
-    if (message == null || message.isEmpty()) {
-      return;
-    }
+    // no-op by default; platform adapters override with the native actionbar dispatch
   }
 }

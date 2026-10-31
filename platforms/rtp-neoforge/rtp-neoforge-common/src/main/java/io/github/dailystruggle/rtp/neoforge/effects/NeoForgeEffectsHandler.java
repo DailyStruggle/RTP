@@ -1,5 +1,4 @@
 package io.github.dailystruggle.rtp.neoforge.effects;
-import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;

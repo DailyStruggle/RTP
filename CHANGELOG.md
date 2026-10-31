@@ -130,6 +130,8 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Concurrent bad-location flushes could fail with an array bounds error under heavy rejection load.** Rebuilding a region's bad-location table while another worker recorded a rejected spot could overrun the snapshot buffer; the snapshot is now bounded to the allocated buffer size.
 
+- **Biome activity sampling could load unloaded player chunks on the main thread.** Periodic biome sampling for players standing in or crossing into an unloaded chunk could trigger a synchronous chunk load on Bukkit and Paper; biome sampling now skips unloaded player chunks.
+
 ## [3.3.1] - 2026-10-26
 
 ### Added

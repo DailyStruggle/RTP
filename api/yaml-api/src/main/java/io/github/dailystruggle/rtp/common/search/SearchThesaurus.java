@@ -58,21 +58,27 @@ public final class SearchThesaurus {
     private static final Pattern COMBINING_MARKS_RE =
             Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
 
-    private static final Pattern MULTILINGUAL_QUESTION_RE = Pattern.compile(
-            "(?iu)(?:[?？¿]|^\\s*(?:hey\\s+|hi\\s+|hola\\s+|salut\\s+|hallo\\s+|hej\\s+|привет\\s+)?"
-                    + "(?:how\\b|where\\b|what\\b|can\\s+i\\b|do\\s+i\\b|is\\s+there\\b"
-                    + "|como\\b|donde\\b|que\\s+es\\b|puedo\\b|cual\\b"
-                    + "|comment\\b|ou\\s+est\\b|puis\\s*je\\b|est\\s*ce\\s+que\\b"
-                    + "|wie\\s+(?:kann|komme|geht)\\b|wo\\s+(?:ist|sind|kann)\\b|kann\\s+ich\\b"
-                    + "|jak\\s+(?:moge|wyjsc|zarobic|ustawic)\\b|gdzie\\s+jest\\b|czy\\s+moge\\b"
-                    + "|onde\\s+(?:fica|esta)\\b|posso\\b"
-                    + "|come\\s+(?:posso|si|esco)\\b|dove\\s+si\\b"
-                    + "|hoe\\s+(?:kan|kom)\\b|waar\\s+is\\b"
-                    + "|как\\b|где\\b|можно\\s+ли\\b|какие\\b"
-                    + "|nasil\\b|nerede\\b"
-                    + "|怎么|如何|哪里|在哪|请问|能不能|怎么去"
-                    + "|どうやって|どこ|どうやって出|コマンドは"
-                    + "|어떻게|어디|나가는\\s*법|명령어))"
+    private static final List<String> QUESTION_GREETING_PREFIXES = List.of(
+            "hey ", "hi ", "hola ", "salut ", "hallo ", "hej ", "привет "
+    );
+
+    private static final List<String> QUESTION_WORD_PREFIXES = List.of(
+            "how", "where", "what", "can i", "do i", "is there",
+            "como", "donde", "que es", "puedo", "cual",
+            "comment", "ou est", "puis je", "puisje", "est ce que", "estce que",
+            "wie kann", "wie komme", "wie geht", "wo ist", "wo sind", "wo kann", "kann ich",
+            "jak moge", "jak wyjsc", "jak zarobic", "jak ustawic", "gdzie jest", "czy moge",
+            "onde fica", "onde esta", "posso",
+            "come posso", "come si", "come esco", "dove si",
+            "hoe kan", "hoe kom", "waar is",
+            "как", "где", "можно ли", "какие",
+            "nasil", "nerede"
+    );
+
+    private static final List<String> QUESTION_CJK_SUBSTRINGS = List.of(
+            "怎么", "如何", "哪里", "在哪", "请问", "能不能", "怎么去",
+            "どうやって", "どこ", "コマンドは",
+            "어떻게", "어디", "나가는 법", "나가는법", "명령어"
     );
 
     /**
@@ -311,8 +317,56 @@ public final class SearchThesaurus {
         if (rawMessage == null || rawMessage.isBlank()) {
             return false;
         }
-        String folded = foldDiacritics(rawMessage.trim());
-        return MULTILINGUAL_QUESTION_RE.matcher(folded).find();
+        if (rawMessage.indexOf('?') >= 0 || rawMessage.indexOf('？') >= 0 || rawMessage.indexOf('¿') >= 0) {
+            return true;
+        }
+        String folded = foldDiacritics(rawMessage.trim()).toLowerCase(Locale.ROOT);
+        for (String cjk : QUESTION_CJK_SUBSTRINGS) {
+            if (folded.contains(cjk)) {
+                return true;
+            }
+        }
+        String collapsed = collapseAsciiSpaces(folded);
+        for (String greeting : QUESTION_GREETING_PREFIXES) {
+            if (collapsed.startsWith(greeting)) {
+                collapsed = collapsed.substring(greeting.length()).stripLeading();
+                break;
+            }
+        }
+        for (String prefix : QUESTION_WORD_PREFIXES) {
+            if (startsWithWordBoundary(collapsed, prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String collapseAsciiSpaces(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        boolean prevSpace = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isWhitespace(c)) {
+                if (!prevSpace) {
+                    sb.append(' ');
+                    prevSpace = true;
+                }
+            } else {
+                sb.append(c);
+                prevSpace = false;
+            }
+        }
+        return sb.toString();
+    }
+
+    private static boolean startsWithWordBoundary(String text, String prefix) {
+        if (!text.startsWith(prefix)) {
+            return false;
+        }
+        if (text.length() == prefix.length()) {
+            return true;
+        }
+        return !Character.isLetterOrDigit(text.charAt(prefix.length()));
     }
 
     /**
