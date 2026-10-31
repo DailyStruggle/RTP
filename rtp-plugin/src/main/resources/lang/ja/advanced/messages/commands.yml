@@ -145,10 +145,10 @@ infoBiomeActivityEmpty: "&8--- &7まだバイオーム占有がサンプリン�
 # セクション 8b: 汎用メニューフレームワーク
 # ###############################################################################
 # メニュートークンが不明、不正、または他のプレイヤーのものである場合に送信されます。
-menuInvalid: "&c[P0] that menu link is invalid."
+menuInvalid: "&c[P0] そのメニューリンクは無効です。"
 
 # メニューの引き換え時に呼び出し元プレイヤーの UUID を解決できなかった場合に送信されます。
-menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+menuUnknownPlayer: "&c[P0] メニューリンクはゲーム内のプレイヤーのみが使用できます。"
 
 # パラメータに YAML ブロックコメントが存在しない場合にメニューリフレクターによって使用されるホバーフォールバックテンプレート。プレースホルダー: [type] - 宣言されたパラメータの型。
 menuHoverFallbackType: "種類: [type]"
@@ -191,8 +191,8 @@ menuPageNext: "&7次のページ ([page]) »"
 menuFrontPageSectionTeleport: "&8--- &7テレポート &8---"
 
 # フロントページの行。プレースホルダーなし。
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- ランダムな場所にテレポート"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- リージョンを選択"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- ワールドを選択"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- バイオームを選択"
 menuFrontPageRowHelp: "#7A4FB8❓ コマンド一覧 &7- /rtp help"
@@ -209,7 +209,7 @@ menuFrontPageHoverAdmin: "&7運営者ツール: 設定, スキャン, 診断, �
 menuAdminPanelTitle: "#5FB3B3&l⚙ 管理パネル"
 
 # menuAdminPanelTitle の下にあるクリック不可のヒント行。プレースホルダーなし。
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7オプションをクリックしてください。破壊的な操作にはホバー時に警告が表示されます"
 
 # 管理パネル上のセクション区切り。プレースホルダーなし。
 menuAdminPanelSectionConfig: "&8--- &7設定 &8---"
@@ -318,7 +318,7 @@ infoBookRefreshHover: "&7このページを最新のメトリクススナップ�
 
 # /rtp info 本の下部にあるチャットへ切り替え用のクリック可能な行ラベル。
 # 従来のチャット出力経由で同じスコープを再実行します。
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[チャットに切り替え]"
 
 # info 本のチャット切り替え行のホバーテキスト。
 infoBookSwitchToTextHover: "&7本の代わりにチャットで /rtp info を再実行します。"
@@ -373,7 +373,7 @@ configValueUnsetPlaceholder: "&8(未設定)"
 
 # 閲覧者が未コミットの編集を1つ以上ステージングしている場合に、設定ファイルページで
 # 「変更可能」リストと「保留中」ステージングカートリストを区切るクリック不可のヘッダー行。プレースホルダーなし。
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- 保留中の変更 --"
 
 # 設定ファイルページ上のステージングされた（保留中）key=value エントリの行ラベル。
 # 行をクリックするとカートから削除されます。プレースホルダー: [key], [value]。
@@ -444,7 +444,7 @@ multiconfigRowRemoveHover: "&c&f[name] を削除"
 multiconfigConfirmTitle: "&c&l[name] を削除しますか？"
 
 # 削除確認ページの「はい」行のラベル。プレースホルダーなし。
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[削除を確認]"
 
 # 削除確認ページの「キャンセル」行のラベル。プレースホルダーなし。
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -475,10 +475,10 @@ multiconfigResultNameInvalid: "&c名前 '[name]' は使用できません。文�
 # プレースホルダー: [name]。
 multiconfigResultNameTaken: "&c'[name]' という名前の項目は既に存在します。"
 
-docsNotFound: "&c[RTP] ドキュメントのトピック '[topic]' が見つかりません。利用可能なトピックは /rtp docs list で確認してください。"
-docsEmpty: "&c[RTP] 登録されているドキュメントのトピックはありません。"
-docsExportSuccess: "&a[RTP] ドキュメントのHTMLバンドルが正常に [path] にエクスポートされました。"
-docsExportFailed: "&c[RTP] ドキュメントバンドルのエクスポートに失敗しました: [reason]。"
+docsNotFound: "&c[P0] ドキュメントのトピック '[topic]' が見つかりません。利用可能なトピックは /rtp docs list で確認してください。"
+docsEmpty: "&c[P0] 登録されているドキュメントのトピックはありません。"
+docsExportSuccess: "&a[P0] ドキュメントのHTMLバンドルが正常に [path] にエクスポートされました。"
+docsExportFailed: "&c[P0] ドキュメントバンドルのエクスポートに失敗しました: [reason]。"
 
 # --- Web editor channel (ADR-106) ---
 editorTrustPrompt: "&e[P0] Webエディターのページがコード &b[nonce]&e でアクセスを求めています。ページに同じコードが表示されている場合は、ここをクリックしてこのブラウザーを信頼してください。"

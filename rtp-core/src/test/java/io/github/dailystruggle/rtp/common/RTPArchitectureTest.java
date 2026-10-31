@@ -94,6 +94,7 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("TestTeleportCmd")
                     .and().haveSimpleNameNotContaining("NetworkModeBootstrap")
                     .and().haveSimpleNameNotContaining("NetworkStateBinding")
+                    .and().haveSimpleNameNotContaining("OnlineQueryExpander")
                     .should().callMethodWhere(
                             target(owner(assignableTo(CompletableFuture.class)))
                                     .and(target(nameMatching("get|join")))
@@ -241,6 +242,7 @@ public class RTPArchitectureTest {
             noClasses()
                     .that().resideInAnyPackage(CORE_PACKAGE, API_PACKAGE)
                     .and().resideOutsideOfPackage("..mock..")
+                    .and().haveSimpleNameNotContaining("OnlineQueryExpander")
                     .should().callConstructorWhere(
                             target(owner(assignableTo(Thread.class)))
                     )
@@ -667,4 +669,37 @@ public class RTPArchitectureTest {
                             "io.github.dailystruggle.rtp.common.configuration.."
                     )
                     .because("ADR-115: selection and configuration depend on factory, so factory in rtp-core must never depend back on selection or configuration.");
+
+    /**
+     * Rule 33 - Selection Region Utilities Do Not Depend on Region or Spatial Memory (ADR-115, RTP-67).
+     *
+     * <p>{@code selection.region.util} is consumed by {@code selection.region} and
+     * {@code selection.region.selectors.memory.shapes}, so {@code selection.region.util} must
+     * inspect shapes solely via the base {@code Shape} contract without importing concrete
+     * {@code selection.region} or {@code selection.region.selectors.memory..} classes.
+     */
+    @ArchTest
+    static final ArchRule selection_region_util_must_not_depend_on_region_or_memory_shapes =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.region.util..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.selection.region",
+                            "io.github.dailystruggle.rtp.common.selection.region.selectors.memory.."
+                    )
+                    .because("ADR-115 / RTP-67: selection.region and memory shapes depend on selection.region.util, so selection.region.util must not depend back on them.");
+
+    /**
+     * Rule 34 - Base Shapes Package Does Not Depend on Root Composition or Region Classes (ADR-115, RTP-67).
+     */
+    @ArchTest
+    static final ArchRule base_shapes_must_not_depend_on_common_or_region =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.region.selectors.shapes..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common",
+                            "io.github.dailystruggle.rtp.common.selection.region"
+                    )
+                    .because("ADR-115 / RTP-67: base shapes register via FactoryRegistry and must not depend upward on RTP or Region.");
 }

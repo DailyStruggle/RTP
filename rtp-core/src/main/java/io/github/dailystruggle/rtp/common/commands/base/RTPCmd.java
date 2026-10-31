@@ -655,7 +655,10 @@ public interface RTPCmd extends BaseRTPCmd {
           if (biomeList != null) price += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
         }
       }
-      double bal = economy.bal(senderId);
+      double bal =
+          (senderId.equals(CommandsAPI.serverId) || sender.hasPermission("rtp.free"))
+              ? Double.MAX_VALUE
+              : economy.bal(senderId);
       double floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0d).doubleValue();
       if ((bal - price) < floor) {
         String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
@@ -677,364 +680,44 @@ public interface RTPCmd extends BaseRTPCmd {
         RTPRuntime.log(Level.INFO, "#0080ff[RTP] RTP processing player:" + player.name());
       }
 
-      // get their data
-      TeleportData data = TeleportSessions.current().latestTeleportData.get(player.uuid());
-      RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute per-player loop playerId=" + player.uuid()
-              + " priorData=" + (data == null ? "null" : ("completed=" + data.completed + " age=" + (System.currentTimeMillis() - data.time) + "ms")));
-      // if player has an incomplete teleport
-      if (data != null) {
-        if (!data.completed) {
-          RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId=" + player.uuid() + " -> skipping pipeline (sending alreadyTeleporting message via serverAccessor)");
-          String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.alreadyTeleporting, "");
-          RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), msg);
-          failEvent(sender, msg);
-          continue;
-        }
-
-        if (toggleTargetPerms) {
-          long lastTpTime = RTP.getEffectiveLastTeleportTime(player.uuid());
-          long dt = (lastTpTime > 0) ? (System.currentTimeMillis() - lastTpTime) : (System.currentTimeMillis() - data.time);
-          if (dt < 0) dt = Long.MAX_VALUE + dt;
-          if (dt < player.cooldown()) {
-            RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), PlayerMessages.cooldownMessage);
-            continue;
-          }
-        }
-
-        TeleportSessions.current().priorTeleportData.put(player.uuid(), data);
+      // Stage 1: pure pre-flight target validation & region resolution (zero session mutation).
+      TargetTeleportPlan plan = resolveTargetPlan(
+          senderId, sender, player, i, rtpArgs, biomeList, toggleTargetPerms, economy != null, messageMethod);
+      if (plan.outcome() == TargetPlanOutcome.SKIP_CONTINUE) {
+        continue;
+      }
+      if (plan.outcome() == TargetPlanOutcome.ABORT_COMMAND) {
+        TeleportSessions.current().processingPlayers.remove(senderId);
+        return true;
       }
 
-      TeleportData prior = data;
-      data = new TeleportData();
-      io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(data, "TeleportData-" + player.uuid().toString(), 120000L);
+      // Stage 2: economy gate before mutating latestTeleportData or priorTeleportData.
+      Double chargedCost = chargeTargetEconomy(
+          senderId, sender, player, plan.region(), economy, price,
+          toggleTargetPerms, shapeNames != null || vertNames != null || plan.doWBO(),
+          biomeList != null, messageMethod);
+      if (chargedCost == null) {
+        TeleportSessions.current().processingPlayers.remove(senderId);
+        return true;
+      }
+
+      // Stage 3: atomic session commit and pipeline dispatch.
+      if (plan.prior() != null) {
+        TeleportSessions.current().priorTeleportData.put(player.uuid(), plan.prior());
+      }
+      TeleportData data = new TeleportData();
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
+          data, "TeleportData-" + player.uuid().toString(), 120000L);
       data.sender = sender;
+      data.cost = chargedCost;
       TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
 
-      String regionName;
-      List<String> regionNames = rtpArgs.get("region");
-      if (rtpArgs.containsKey("region")) {
-        // todo: get one region from the list
-        regionName = pickOne(regionNames, "default");
-      } else {
-        String worldName;
-        // get region parameter from world options
-        if (rtpArgs.containsKey("world")) {
-          // get one world from the list
-          worldName = pickOne(rtpArgs.get("world"), "default");
-        } else {
-          // use player's world
-          worldName = player.getLocation().world().name();
-        }
+      Set<String> biomes = parseBiomeFilter(biomeList);
+      Region region = applyShapeOverrides(
+          senderId, player, plan.region(), plan.rtpWorld(), rtpArgs, shapeNames, vertNames);
 
-        ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(worldName);
-
-        if (worldParser == null) {
-          String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
-          msg = msg.replace("[arg]", "world=" + worldName);
-          if(messageMethod != null) messageMethod.accept(msg);
-          else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
-          RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg world senderId=" + senderId
-                  + " worldName=" + worldName);
-          RTPRuntime.log(Level.WARNING, msg);
-          TeleportSessions.current().processingPlayers.remove(senderId);
-          return true;
-        }
-
-        regionName = worldParser.getConfigValue(WorldKeys.region, "default").toString();
-
-        // ADR-063: auto-region by biome availability. When a biome is requested
-        // without an explicit region, keep the world-default region only if it
-        // has itself observed the biome; otherwise pick the accessible region
-        // that best offers it. Falls back to the world-default name when no
-        // region has observed the biome (cold-data graceful degradation). This
-        // shared resolution keeps CLI and menu in parity: the menu emits the
-        // plain /rtp biome:<x> command and gets the same region choice.
-        if (biomeList != null && !biomeList.isEmpty()) {
-          String requestedBiome = biomeList.get(0);
-          String resolved =
-              io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.bestRegionForBiome(
-                  senderId, requestedBiome, regionName);
-          if (resolved != null) {
-            if (!resolved.equals(regionName)) {
-              RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute auto-region by biome senderId="
-                  + senderId + " biome=" + requestedBiome + " worldDefaultRegion=" + regionName
-                  + " -> resolvedRegion=" + resolved);
-            }
-            regionName = resolved;
-          }
-        }
-      }
-
-      SelectionAPI selectionAPI = ActiveSelection.get();
-
-      Region region;
-      try {
-        region = selectionAPI.getRegionOrDefault(regionName);
-        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute region resolved senderId=" + senderId
-                + " requestedRegion=" + regionName + " resolvedRegion=" + region.name);
-      } catch (IllegalArgumentException | IllegalStateException exception) {
-        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
-        msg = msg.replace("[arg]", "region=" + regionName);
-        RTPRuntime.serverAccessor().sendMessage(senderId, msg);
-        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg region senderId=" + senderId
-                + " regionName=" + regionName + " cause=" + exception.getClass().getSimpleName());
-        RTPRuntime.log(Level.WARNING, msg);
-        TeleportSessions.current().processingPlayers.remove(senderId);
-        TeleportSessions.current().latestTeleportData.remove(senderId);
-        return true;
-      }
-
-      // World-override: duplicates base region <r> rebound to world <w> for `rtp region:<r> world:<w>`.
-      // Top-level `rtp world:<w>` resolves its configured region above without override.
-      if (shouldApplyWorldOverride(rtpArgs)) {
-        String worldOverride = pickOne(rtpArgs.get("world"), null);
-        if (worldOverride != null && !worldOverride.isEmpty()) {
-          Region worldRegion = selectionAPI.worldRegion(region.name, worldOverride);
-          if (worldRegion != null && worldRegion != region) {
-            RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute world-override senderId=" + senderId
-                + " baseRegion=" + region.name + " world=" + worldOverride
-                + " -> region=" + worldRegion.name);
-            region = worldRegion;
-          }
-        }
-      }
-
-      RTPWorld rtpWorld = region.getWorld();
-      if (rtpWorld == null) {
-        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
-        msg = msg.replace("[arg]", "region=" + regionName);
-        RTPRuntime.serverAccessor().sendMessage(senderId, msg);
-        RTPRuntime.log(Level.WARNING, msg);
-        TeleportSessions.current().processingPlayers.remove(senderId);
-        TeleportSessions.current().latestTeleportData.remove(senderId);
-        return true;
-      }
-
-      // check for wbo
-      boolean doWBO = false;
-      if (rtpArgs.containsKey("worldBorderOverride")) {
-        List<String> WBOVals = rtpArgs.get("worldBorderOverride");
-        if (WBOVals.size() > i) doWBO = Boolean.parseBoolean(WBOVals.get(i));
-        else doWBO = Boolean.parseBoolean(WBOVals.get(0));
-
-        if (doWBO) {
-          region = region.clone();
-          region.set(RegionKeys.shape, RTPRuntime.serverAccessor().getShape(rtpWorld.name()));
-        }
-      }
-
-      // Cooldown guard:
-      RTPCommandSender cooldownSubject = (toggleTargetPerms) ? player : sender;
-      // Requested region -> its override; world-default region -> shorter of override and global.
-      // Measured against the previous teleport (prior), not the TeleportData created above.
-      long remainingCooldown = RTPCmd.cooldownRemaining(cooldownSubject, player.uuid(), region,
-          rtpArgs.containsKey("region"), prior, System.currentTimeMillis());
-      if (remainingCooldown > 0L) {
-        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.cooldownMessage, "");
-        if (messageMethod != null) messageMethod.accept(msg);
-        else RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), msg);
-        TeleportSessions.current().processingPlayers.remove(senderId);
-        TeleportSessions.current().latestTeleportData.remove(player.uuid());
-        return true;
-      }
-
-      // Sender charge. Routes through the single EconomyGate so the price math,
-      // balance-floor check and withdrawal live in one place (shared with the
-      // addon-facing RTPAPI.teleport path). The rtp.notme opt-out stays here as
-      // control flow; the charge is accumulated onto data.cost for the
-      // refund-on-failure path (RTPTeleportCancel).
-      if (economy != null && !sender.hasPermission("rtp.free")) {
-        io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey which;
-        if (player.uuid().equals(senderId)) {
-          which = io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF;
-        } else if (player.hasPermission("rtp.notme")) {
-          continue;
-        } else {
-          which = io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.OTHER;
-        }
-        io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge senderCharge =
-            io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
-                senderId, sender, region, which,
-                shapeNames != null || vertNames != null || doWBO, biomeList != null);
-        if (senderCharge.result()
-            == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
-          String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
-          s = s.replace("[money]", String.valueOf(price));
-          RTPRuntime.serverAccessor().sendMessage(senderId, s);
-          TeleportSessions.current().processingPlayers.remove(senderId);
-          return true;
-        }
-        data.cost += senderCharge.cost();
-      }
-
-      // Target-pays charge (BetterRTP target-perms parity): when target perms
-      // are toggled and the target is not the sender, the target pays their own
-      // teleport price. Same single EconomyGate; the target's rtp.free exemption
-      // is applied inside the gate via the free-check subject.
-      if (economy != null
-          && toggleTargetPerms
-          && !player.hasPermission("rtp.free")
-          && !player.uuid().equals(senderId)) {
-        io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge targetCharge =
-            io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
-                player.uuid(), player, region,
-                io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF,
-                shapeNames != null || vertNames != null || doWBO, biomeList != null);
-        if (targetCharge.result()
-            == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
-          String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
-          s = s.replace("[money]", String.valueOf(price));
-          RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), s);
-          TeleportSessions.current().processingPlayers.remove(senderId);
-          return true;
-        }
-        data.cost += targetCharge.cost();
-      }
-
-      Set<String> biomes = null;
-      if (biomeList != null) {
-        biomes = new HashSet<>(biomeList.size());
-        for (String biome : biomeList) {
-          if (biome == null || biome.isEmpty()) continue;
-          // Upper-case for case-insensitivity. Namespace is preserved verbatim so that
-          // modded ids like `iris:overworld:plains` survive intact; vanilla-namespace
-          // equivalence (`plains` <-> `minecraft:plains`) is handled at the comparator
-          // site (`BiomeNames#matches`) rather than by normalizing the input.
-          biomes.add(biome.toUpperCase());
-        }
-      }
-
-      if (shapeNames != null || vertNames != null) {
-        region = region.clone();
-      }
-
-      if (shapeNames != null) {
-        for (int j = 0; j < 1 && shapeNames != null && !shapeNames.isEmpty(); j++) {
-          Shape<?> originalShape = region.getShape();
-
-          ActiveSelection.get().tempRegions.put(senderId, region);
-          String shapeName = pickOne(shapeNames, "CIRCLE");
-
-          Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
-          FactoryValue<?> factoryValue = factory.get(shapeName);
-          if (!(factoryValue instanceof Shape<?>)) {
-            RTPRuntime.log(
-                Level.SEVERE,
-                "",
-                new IllegalArgumentException("shape factory did not return a shape"));
-          }
-          Shape<?> shape = (Shape<?>) factoryValue;
-
-          EnumMap<?, Object> originalShapeData = originalShape.getData();
-          EnumMap<?, Object> shapeData = shape.getData();
-          for (Map.Entry<? extends Enum<?>, Object> entry : shapeData.entrySet()) {
-            String name = entry.getKey().name();
-            if (name.equalsIgnoreCase("name")) continue;
-            if (name.equalsIgnoreCase("version")) continue;
-            String argKey = name;
-            if (!rtpArgs.containsKey(argKey) && name.equalsIgnoreCase("height") && rtpArgs.containsKey("length")) {
-              argKey = "length";
-            }
-            if (rtpArgs.containsKey(argKey)) {
-              String string = pickOne(rtpArgs.get(argKey), "");
-
-              Object value;
-              boolean isCoord =
-                  name.equalsIgnoreCase("centerx") || name.equalsIgnoreCase("centerz");
-              if (isCoord && string.indexOf('~') >= 0) {
-                // Relative coordinate token (vanilla `/spreadplayers`-style `~`, `~<n>`, `-~`).
-                // Resolve against the teleporting player's current position; without this the
-                // token falls through to Boolean.valueOf("~") == false below and silently yields
-                // a garbage (0/false) center despite being advertised in tab-complete.
-                long base =
-                    name.equalsIgnoreCase("centerx")
-                        ? player.getLocation().x()
-                        : player.getLocation().z();
-                try {
-                  value = resolveRelativeCoordinate(string, base);
-                } catch (NumberFormatException badOffset) {
-                  // Malformed offset (e.g. `~abc`): fall back to the player's coordinate rather
-                  // than a non-numeric override value.
-                  value = base;
-                }
-              } else if (string.equalsIgnoreCase("true")) {
-                value = true;
-              } else if (string.equalsIgnoreCase("false")) {
-                value = false;
-              } else {
-                io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsedDist =
-                    io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(
-                        string, io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK);
-                if (parsedDist != null && parsedDist.explicitUnit()) {
-                  double chunks = parsedDist.toChunks();
-                  value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
-                } else if (parsedDist != null) {
-                  double worldBorderRad = 0.0;
-                  try {
-                    Object wbObj = RTPRuntime.serverAccessor().getWorldBorder(rtpWorld.name());
-                    if (wbObj instanceof io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder wb
-                        && wb.getShape() != null
-                        && wb.getShape().get() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square bs) {
-                      worldBorderRad = bs.getNumber(
-                          io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius,
-                          0L).doubleValue() * 16.0;
-                    }
-                  } catch (Throwable ignored) {
-                  }
-                  io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance interpreted =
-                      io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.autoInterpret(
-                          parsedDist, worldBorderRad, name, msg -> RTPRuntime.log(Level.INFO, msg));
-                  if (interpreted != null && interpreted.unit() != io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK) {
-                    double chunks = interpreted.toChunks();
-                    value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
-                  } else {
-                    try {
-                      value = Long.parseLong(string);
-                    } catch (IllegalArgumentException ignored) {
-                      try {
-                        value = Double.parseDouble(string);
-                      } catch (IllegalArgumentException ignored2) {
-                        double chunks = parsedDist.toChunks();
-                        value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
-                      }
-                    }
-                  }
-                } else {
-                  try {
-                    value = Long.parseLong(string);
-                  } catch (IllegalArgumentException ignored) {
-                    try {
-                      value = Double.parseDouble(string);
-                    } catch (IllegalArgumentException ignored2) {
-                      value = string;
-                    }
-                  }
-                }
-              }
-
-              entry.setValue(value);
-            } else {
-              Enum<?> e;
-              try {
-                e = Enum.valueOf(originalShape.myClass, name);
-              } catch (IllegalArgumentException ignored) {
-                continue;
-              }
-
-              Object o1 = originalShapeData.get(e);
-              if ((o1 instanceof Number)
-                  || entry.getValue().getClass().isAssignableFrom(o1.getClass()))
-                entry.setValue(o1);
-            }
-          }
-          shape.setData(shapeData);
-          region.set(RegionKeys.shape, shape);
-        }
-      }
-
-      // todo: vert params
-
-      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, biomes), region);
+      TeleportPipelineTask pipelineTask =
+          new TeleportPipelineTask(new GenerationContext(sender, player, biomes), region);
       data.nextTask = pipelineTask;
       RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute TeleportPipelineTask constructed playerId=" + player.uuid()
               + " region=" + region.name
@@ -1068,6 +751,368 @@ public interface RTPCmd extends BaseRTPCmd {
       TeleportSessions.current().processingPlayers.remove(senderId);
     }
     return true;
+  }
+
+  enum TargetPlanOutcome {
+    READY,
+    SKIP_CONTINUE,
+    ABORT_COMMAND
+  }
+
+  record TargetTeleportPlan(
+      TargetPlanOutcome outcome,
+      RTPPlayer player,
+      TeleportData prior,
+      Region region,
+      RTPWorld rtpWorld,
+      boolean doWBO) {
+    static TargetTeleportPlan skip(RTPPlayer player) {
+      return new TargetTeleportPlan(TargetPlanOutcome.SKIP_CONTINUE, player, null, null, null, false);
+    }
+
+    static TargetTeleportPlan abort(RTPPlayer player) {
+      return new TargetTeleportPlan(TargetPlanOutcome.ABORT_COMMAND, player, null, null, null, false);
+    }
+  }
+
+  /**
+   * Resolves and validates a single player's target region, world, and cooldown without mutating
+   * {@link TeleportSessions#latestTeleportData} or {@link TeleportSessions#priorTeleportData}.
+   */
+  private TargetTeleportPlan resolveTargetPlan(
+      UUID senderId,
+      RTPCommandSender sender,
+      RTPPlayer player,
+      int playerIndex,
+      Map<String, List<String>> rtpArgs,
+      List<String> biomeList,
+      boolean toggleTargetPerms,
+      boolean economyActive,
+      java.util.function.Consumer<String> messageMethod) {
+    TeleportData prior = TeleportSessions.current().latestTeleportData.get(player.uuid());
+    RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute per-player loop playerId=" + player.uuid()
+            + " priorData=" + (prior == null ? "null" : ("completed=" + prior.completed + " age=" + (System.currentTimeMillis() - prior.time) + "ms")));
+    if (prior != null) {
+      if (!prior.completed) {
+        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId="
+            + player.uuid() + " -> skipping pipeline (sending alreadyTeleporting message via serverAccessor)");
+        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.alreadyTeleporting, "");
+        RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), msg);
+        failEvent(sender, msg);
+        return TargetTeleportPlan.skip(player);
+      }
+
+      if (toggleTargetPerms) {
+        long lastTpTime = RTP.getEffectiveLastTeleportTime(player.uuid());
+        long dt = (lastTpTime > 0) ? (System.currentTimeMillis() - lastTpTime) : (System.currentTimeMillis() - prior.time);
+        if (dt < 0) dt = Long.MAX_VALUE + dt;
+        if (dt < player.cooldown()) {
+          RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), PlayerMessages.cooldownMessage);
+          return TargetTeleportPlan.skip(player);
+        }
+      }
+    }
+
+    String regionName;
+    List<String> regionNames = rtpArgs.get("region");
+    if (rtpArgs.containsKey("region")) {
+      regionName = pickOne(regionNames, "default");
+    } else {
+      String worldName = rtpArgs.containsKey("world")
+          ? pickOne(rtpArgs.get("world"), "default")
+          : player.getLocation().world().name();
+
+      ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(worldName);
+      if (worldParser == null) {
+        String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
+        msg = msg.replace("[arg]", "world=" + worldName);
+        if (messageMethod != null) messageMethod.accept(msg);
+        else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
+        RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg world senderId=" + senderId
+                + " worldName=" + worldName);
+        RTPRuntime.log(Level.WARNING, msg);
+        return TargetTeleportPlan.abort(player);
+      }
+
+      regionName = worldParser.getConfigValue(WorldKeys.region, "default").toString();
+
+      if (biomeList != null && !biomeList.isEmpty()) {
+        String requestedBiome = biomeList.get(0);
+        String resolved =
+            io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.bestRegionForBiome(
+                senderId, requestedBiome, regionName);
+        if (resolved != null) {
+          if (!resolved.equals(regionName)) {
+            RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute auto-region by biome senderId="
+                + senderId + " biome=" + requestedBiome + " worldDefaultRegion=" + regionName
+                + " -> resolvedRegion=" + resolved);
+          }
+          regionName = resolved;
+        }
+      }
+    }
+
+    SelectionAPI selectionAPI = ActiveSelection.get();
+    Region region = (selectionAPI == null) ? null : selectionAPI.getRegion(regionName);
+    if (region == null && selectionAPI != null) {
+      region = selectionAPI.getRegion("DEFAULT");
+      if (region == null) {
+        region = selectionAPI.getRegion("default");
+      }
+    }
+    if (region == null) {
+      String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
+      msg = msg.replace("[arg]", "region=" + regionName);
+      if (messageMethod != null) messageMethod.accept(msg);
+      else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
+      RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg region senderId=" + senderId
+              + " regionName=" + regionName);
+      RTPRuntime.log(Level.WARNING, msg);
+      failEvent(sender, msg);
+      return TargetTeleportPlan.abort(player);
+    }
+    RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute region resolved senderId=" + senderId
+            + " requestedRegion=" + regionName + " resolvedRegion=" + region.name);
+
+    if (shouldApplyWorldOverride(rtpArgs)) {
+      String worldOverride = pickOne(rtpArgs.get("world"), null);
+      if (worldOverride != null && !worldOverride.isEmpty()) {
+        Region worldRegion = selectionAPI.worldRegion(region.name, worldOverride);
+        if (worldRegion != null && worldRegion != region) {
+          RTPRuntime.log(Level.FINER, "[RTP][trace] RTPCmd.compute world-override senderId=" + senderId
+              + " baseRegion=" + region.name + " world=" + worldOverride
+              + " -> region=" + worldRegion.name);
+          region = worldRegion;
+        }
+      }
+    }
+
+    RTPWorld rtpWorld = region.getWorld();
+    if (rtpWorld == null) {
+      String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
+      msg = msg.replace("[arg]", "region=" + regionName);
+      if (messageMethod != null) messageMethod.accept(msg);
+      else RTPRuntime.serverAccessor().sendMessage(senderId, msg);
+      RTPRuntime.log(Level.WARNING, msg);
+      failEvent(sender, msg);
+      return TargetTeleportPlan.abort(player);
+    }
+
+    boolean doWBO = false;
+    if (rtpArgs.containsKey("worldBorderOverride")) {
+      List<String> wboVals = rtpArgs.get("worldBorderOverride");
+      doWBO = (wboVals.size() > playerIndex)
+          ? Boolean.parseBoolean(wboVals.get(playerIndex))
+          : Boolean.parseBoolean(wboVals.get(0));
+      if (doWBO) {
+        region = region.clone();
+        region.set(RegionKeys.shape, RTPRuntime.serverAccessor().getShape(rtpWorld.name()));
+      }
+    }
+
+    RTPCommandSender cooldownSubject = (toggleTargetPerms) ? player : sender;
+    long remainingCooldown = RTPCmd.cooldownRemaining(cooldownSubject, player.uuid(), region,
+        rtpArgs.containsKey("region"), prior, System.currentTimeMillis());
+    if (remainingCooldown > 0L) {
+      String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.cooldownMessage, "");
+      if (messageMethod != null) messageMethod.accept(msg);
+      else RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), msg);
+      return TargetTeleportPlan.abort(player);
+    }
+
+    if (economyActive
+        && !sender.hasPermission("rtp.free")
+        && !player.uuid().equals(senderId)
+        && player.hasPermission("rtp.notme")) {
+      return TargetTeleportPlan.skip(player);
+    }
+
+    return new TargetTeleportPlan(TargetPlanOutcome.READY, player, prior, region, rtpWorld, doWBO);
+  }
+
+  /**
+   * Executes sender and optional target-pays economy charges before session state is mutated.
+   * Returns total charged cost, or {@code null} when rejected for insufficient funds.
+   */
+  private static Double chargeTargetEconomy(
+      UUID senderId,
+      RTPCommandSender sender,
+      RTPPlayer player,
+      Region region,
+      RTPEconomy economy,
+      double basePrice,
+      boolean toggleTargetPerms,
+      boolean hasShapeOrVertOrWbo,
+      boolean hasBiomeArg,
+      java.util.function.Consumer<String> messageMethod) {
+    if (economy == null) return 0.0;
+    double totalCost = 0.0;
+    if (!sender.hasPermission("rtp.free")) {
+      io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey which =
+          player.uuid().equals(senderId)
+              ? io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF
+              : io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.OTHER;
+      io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge senderCharge =
+          io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+              senderId, sender, region, which, hasShapeOrVertOrWbo, hasBiomeArg);
+      if (senderCharge.result()
+          == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
+        String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
+        s = s.replace("[money]", String.valueOf(Math.max(basePrice, senderCharge.cost())));
+        if (messageMethod != null) messageMethod.accept(s);
+        else RTPRuntime.serverAccessor().sendMessage(senderId, s);
+        return null;
+      }
+      totalCost += senderCharge.cost();
+    }
+
+    if (toggleTargetPerms && !player.hasPermission("rtp.free") && !player.uuid().equals(senderId)) {
+      io.github.dailystruggle.rtp.common.economy.EconomyGate.Charge targetCharge =
+          io.github.dailystruggle.rtp.common.economy.EconomyGate.charge(
+              player.uuid(), player, region,
+              io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF,
+              hasShapeOrVertOrWbo, hasBiomeArg);
+      if (targetCharge.result()
+          == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
+        if (totalCost > 0.0) {
+          economy.give(senderId, totalCost);
+        }
+        String s = ActiveConfigs.get().getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
+        s = s.replace("[money]", String.valueOf(Math.max(basePrice, targetCharge.cost())));
+        if (messageMethod != null) messageMethod.accept(s);
+        else RTPRuntime.serverAccessor().sendMessage(senderId, player.uuid(), s);
+        return null;
+      }
+      totalCost += targetCharge.cost();
+    }
+    return totalCost;
+  }
+
+  private static Set<String> parseBiomeFilter(List<String> biomeList) {
+    if (biomeList == null) return null;
+    Set<String> biomes = new HashSet<>(biomeList.size());
+    for (String biome : biomeList) {
+      if (biome == null || biome.isEmpty()) continue;
+      biomes.add(biome.toUpperCase());
+    }
+    return biomes;
+  }
+
+  private static Region applyShapeOverrides(
+      UUID senderId,
+      RTPPlayer player,
+      Region baseRegion,
+      RTPWorld rtpWorld,
+      Map<String, List<String>> rtpArgs,
+      List<String> shapeNames,
+      List<String> vertNames) {
+    Region region = (shapeNames != null || vertNames != null) ? baseRegion.clone() : baseRegion;
+    if (shapeNames == null || shapeNames.isEmpty()) {
+      return region;
+    }
+
+    Shape<?> originalShape = region.getShape();
+    ActiveSelection.get().tempRegions.put(senderId, region);
+    String shapeName = pickOne(shapeNames, "CIRCLE");
+
+    Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
+    FactoryValue<?> factoryValue = factory.get(shapeName);
+    if (!(factoryValue instanceof Shape<?>)) {
+      RTPRuntime.log(
+          Level.SEVERE,
+          "",
+          new IllegalArgumentException("shape factory did not return a shape"));
+    }
+    Shape<?> shape = (Shape<?>) factoryValue;
+
+    EnumMap<?, Object> originalShapeData = originalShape.getData();
+    EnumMap<?, Object> shapeData = shape.getData();
+    for (Map.Entry<? extends Enum<?>, Object> entry : shapeData.entrySet()) {
+      String name = entry.getKey().name();
+      if (name.equalsIgnoreCase("name") || name.equalsIgnoreCase("version")) continue;
+      String argKey = name;
+      if (!rtpArgs.containsKey(argKey) && name.equalsIgnoreCase("height") && rtpArgs.containsKey("length")) {
+        argKey = "length";
+      }
+      if (rtpArgs.containsKey(argKey)) {
+        String string = pickOne(rtpArgs.get(argKey), "");
+        entry.setValue(parseShapeParamOverride(player, rtpWorld, name, string));
+      } else {
+        for (Enum<?> candidate : originalShape.myClass.getEnumConstants()) {
+          if (candidate.name().equals(name)) {
+            Object o1 = originalShapeData.get(candidate);
+            if (o1 != null
+                && ((o1 instanceof Number)
+                    || entry.getValue().getClass().isAssignableFrom(o1.getClass()))) {
+              entry.setValue(o1);
+            }
+            break;
+          }
+        }
+      }
+    }
+    shape.setData(shapeData);
+    region.set(RegionKeys.shape, shape);
+    return region;
+  }
+
+  private static Object parseShapeParamOverride(
+      RTPPlayer player, RTPWorld rtpWorld, String name, String string) {
+    boolean isCoord = name.equalsIgnoreCase("centerx") || name.equalsIgnoreCase("centerz");
+    if (isCoord && string.indexOf('~') >= 0) {
+      long base =
+          name.equalsIgnoreCase("centerx")
+              ? player.getLocation().x()
+              : player.getLocation().z();
+      if (RelativeCoordinate.isRelative(string)) {
+        String offsetPart = string.replace("~", "").trim();
+        if (offsetPart.isEmpty() || offsetPart.equals("-") || offsetPart.equals("+")) {
+          return base;
+        }
+        Scanner offsetScanner = new Scanner(offsetPart);
+        return offsetScanner.hasNextLong() ? resolveRelativeCoordinate(string, base) : base;
+      }
+      return resolveRelativeCoordinate(string, base);
+    }
+    if (string.equalsIgnoreCase("true")) return true;
+    if (string.equalsIgnoreCase("false")) return false;
+
+    io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsedDist =
+        io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(
+            string, io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK);
+    if (parsedDist != null && parsedDist.explicitUnit()) {
+      double chunks = parsedDist.toChunks();
+      return (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
+    }
+    if (parsedDist != null) {
+      double worldBorderRad = 0.0;
+      if (RTPRuntime.serverAccessor() != null && rtpWorld != null) {
+        Object wbObj = RTPRuntime.serverAccessor().getWorldBorder(rtpWorld.name());
+        if (wbObj instanceof io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder wb
+            && wb.getShape() != null
+            && wb.getShape().get() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square bs) {
+          worldBorderRad = bs.getNumber(
+              io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius,
+              0L).doubleValue() * 16.0;
+        }
+      }
+      io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance interpreted =
+          io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.autoInterpret(
+              parsedDist, worldBorderRad, name, msg -> RTPRuntime.log(Level.INFO, msg));
+      if (interpreted != null && interpreted.unit() != io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK) {
+        double chunks = interpreted.toChunks();
+        return (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
+      }
+      Scanner numScanner = new Scanner(string);
+      if (numScanner.hasNextLong()) return numScanner.nextLong();
+      if (numScanner.hasNextDouble()) return numScanner.nextDouble();
+      double chunks = parsedDist.toChunks();
+      return (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);
+    }
+    Scanner fallbackScanner = new Scanner(string);
+    if (fallbackScanner.hasNextLong()) return fallbackScanner.nextLong();
+    if (fallbackScanner.hasNextDouble()) return fallbackScanner.nextDouble();
+    return string;
   }
 
   @Override

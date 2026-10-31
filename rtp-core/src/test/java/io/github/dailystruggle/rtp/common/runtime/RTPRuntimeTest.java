@@ -72,9 +72,13 @@ class RTPRuntimeTest {
     assertSame(accessor, ctx.serverAccessor());
     assertSame(scheduler, ctx.scheduler());
     assertSame(economy, ctx.economy());
+    assertSame(accessor, io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor,
+        "RTPRuntime.setServerAccessor must keep RTPAPI.serverAccessor synchronized");
 
     RTPRuntime.setServerAccessor(null);
     assertEquals(null, ctx.serverAccessor(), "context is a live view, not a snapshot");
+    assertEquals(null, io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor,
+        "RTPRuntime.setServerAccessor must keep RTPAPI.serverAccessor synchronized");
   }
 
   @Test

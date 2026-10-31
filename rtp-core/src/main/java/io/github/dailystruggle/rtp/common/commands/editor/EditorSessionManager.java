@@ -350,11 +350,15 @@ public final class EditorSessionManager {
      * token-gated loopback address), or {@code null}. With it the page runs the same handshake and
      * messages as a hosted session: viewport focus, walk-path / curve-state previews and Hot-Apply.
      */
+    private static final ConcurrentHashMap<Path, Object> EXPORT_LOCKS = new ConcurrentHashMap<>();
+
     public void exportLocalEditorHtml(Path targetFile, Map<String, String> configFiles, boolean liveFeed,
                                       Map<String, Object> channel) throws IOException {
         Objects.requireNonNull(targetFile, "targetFile");
-        if (targetFile.getParent() != null) {
-            Files.createDirectories(targetFile.getParent());
+        Path normalizedTarget = targetFile.toAbsolutePath().normalize();
+        Path parentDir = normalizedTarget.getParent();
+        if (parentDir != null) {
+            Files.createDirectories(parentDir);
         }
 
         String payloadJson = createPayloadJson(configFiles, true);
@@ -369,16 +373,30 @@ public final class EditorSessionManager {
         }
 
         String html = embedPayload(loadEditorTemplate(), payloadJson);
-        // The page embeds the loopback channel token: owner-only, restricted before it holds anything
-        Path tmp = targetFile.resolveSibling(targetFile.getFileName() + ".tmp");
-        Files.deleteIfExists(tmp);
-        Files.createFile(tmp);
-        EditorKeys.restrictToOwner(tmp);
-        Files.writeString(tmp, html, StandardCharsets.UTF_8);
-        try {
-            Files.move(tmp, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-            Files.move(tmp, targetFile, StandardCopyOption.REPLACE_EXISTING);
+        String prefix = normalizedTarget.getFileName().toString() + ".";
+        if (prefix.length() < 3) {
+            prefix = "rtp." + prefix;
+        }
+        Object lock = EXPORT_LOCKS.computeIfAbsent(normalizedTarget, k -> new Object());
+        synchronized (lock) {
+            // The page embeds the loopback channel token: owner-only, restricted before it holds anything
+            Path tmp = (parentDir != null)
+                    ? Files.createTempFile(parentDir, prefix, ".tmp")
+                    : Files.createTempFile(prefix, ".tmp");
+            try {
+                EditorKeys.restrictToOwner(tmp);
+                Files.writeString(tmp, html, StandardCharsets.UTF_8);
+                try {
+                    Files.move(tmp, normalizedTarget, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (AtomicMoveNotSupportedException e) {
+                    Files.move(tmp, normalizedTarget, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException ignored) {
+                }
+            }
         }
     }
 

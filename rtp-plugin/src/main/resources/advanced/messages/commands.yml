@@ -514,18 +514,18 @@ multiconfigResultNameTaken: "&can entry named '[name]' already exists."
 # --- Documentation viewer and export (ADR-045, ADR-104) ---
 # Sent when a requested documentation topic cannot be found.
 # Placeholder: [topic]
-docsNotFound: "&c[RTP] Documentation topic '[topic]' not found. Use /rtp docs list to see available topics."
+docsNotFound: "&c[P0] Documentation topic '[topic]' not found. Use /rtp docs list to see available topics."
 
 # Sent when the documentation registry has no documents loaded.
-docsEmpty: "&c[RTP] No documentation topics are currently registered."
+docsEmpty: "&c[P0] No documentation topics are currently registered."
 
 # Sent when offline HTML documentation export completes successfully.
 # Placeholder: [path]
-docsExportSuccess: "&a[RTP] Documentation HTML bundle successfully exported to [path]."
+docsExportSuccess: "&a[P0] Documentation HTML bundle successfully exported to [path]."
 
 # Sent when offline HTML documentation export fails.
 # Placeholder: [reason]
-docsExportFailed: "&c[RTP] Failed to export documentation bundle: [reason]."
+docsExportFailed: "&c[P0] Failed to export documentation bundle: [reason]."
 
 # --- Web editor channel (ADR-106) ---
 # Clickable prompt sent to the operator who opened the editor session when a

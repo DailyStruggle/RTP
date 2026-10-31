@@ -26,12 +26,8 @@ scanBossBar: "Varrendo [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_l
 # ###############################################################################
 tituloInfo: "&2&l/rtp info"
 infoTickets: "&7Tickets de chunk ativos globais: #7E9CC8[tickets]"
-
-# infoTeletransportes: deduplicado com infoPendingTeleports no bloco Health (esvaziado por compatibilidade com sobrescritas de locale).
-infoTeletransportes: ""
-
-# infoMSPT: deduplicado com infoMSPTLive ("MSPT: x ms (orçamento do tick y%)"); a linha live carrega o indicador de orçamento.
-infoMSPT: ""
+infoTeletransportes: "&7Máquinas de estado de teletransporte ativas: #7E9CC8[teleports]"
+infoMSPT: "&7MSPT atual do plugin: #7E9CC8[mspt]"
 infoCargasTotais: "&7Chunks carregados ao longo da vida: #7E9CC8[loads]"
 infoCargasPorOrigem: "&7Carregamentos por origem: #7E9CC8[loadsByOrigin]"
 infoTaxaVazamento: "&7Taxa atual de vazamento de chunks: #7E9CC8[leakRate]"
@@ -199,8 +195,8 @@ menuPageNext: "&7próxima página ([page]) »"
 menuFrontPageSectionTeleport: "&8--- &7teletransporte &8---"
 
 # Linhas da página inicial. Sem espaços reservados.
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- teletransporte-se para uma localização aleatória"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- escolha uma região"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- escolha um mundo"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- escolha um bioma"
 menuFrontPageRowHelp: "#7A4FB8❓ listar comandos &7- /rtp help"
@@ -218,7 +214,7 @@ menuFrontPageHoverAdmin: "&7ferramentas de operador: config, varreduras, diagnó
 menuAdminPanelTitle: "#5FB3B3&l⚙ painel de administração"
 
 # Linha de dica não interativa abaixo de menuAdminPanelTitle. Sem espaços reservados.
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7clique em uma opção; ações destrutivas mostram um aviso ao passar o cursor"
 
 # Divisores de seção no painel de administração. Sem espaços reservados.
 menuAdminPanelSectionConfig: "&8--- &7configuração &8---"
@@ -327,7 +323,7 @@ infoBookRefreshHover: "&7Renderiza novamente esta página com um instantâneo de
 
 # Rótulo da linha clicável para a opção Mudar para o chat na parte inferior do
 # livro /rtp info. Executa novamente o mesmo escopo por meio do chat clássico.
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[Mudar para o chat]"
 
 # Texto de tooltip para a linha mudar para chat do livro de informações.
 infoBookSwitchToTextHover: "&7Execute /rtp info no chat em vez do livro."
@@ -384,7 +380,7 @@ configValueUnsetPlaceholder: "&8(não definido)"
 # Linha de cabeçalho não interativa que separa a lista \"Alterável\" da lista
 # \"Pendente\" na página de arquivo de configuração quando o usuário preparou uma
 # ou mais alterações não confirmadas. Sem espaços reservados.
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- alterações pendentes --"
 
 # Rótulo por linha para uma entrada chave=valor preparada (pendente) em uma página de arquivo de configuração.
 # Clicar na linha remove-a da lista pendente. Espaços reservados: [key], [value].
@@ -458,7 +454,7 @@ multiconfigRowRemoveHover: "&cexcluir &f[name]"
 multiconfigConfirmTitle: "&c&lexcluir [name]?"
 
 # Rótulo da linha Sim da página de confirmação de exclusão. Sem espaços reservados.
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[confirmar exclusão]"
 
 # Rótulo da linha Cancelar da página de confirmação de exclusão. Sem espaços reservados.
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -489,10 +485,10 @@ multiconfigResultNameInvalid: "&co nome '[name]' não é permitido; use letras, 
 # Espaço reservado: [name].
 multiconfigResultNameTaken: "&cjá existe uma entrada chamada '[name]'."
 
-docsNotFound: "&c[RTP] Tópico de documentação '[topic]' não encontrado. Use /rtp docs list para ver os tópicos disponíveis."
-docsEmpty: "&c[RTP] Não há tópicos de documentação registrados no momento."
-docsExportSuccess: "&a[RTP] Pacote HTML da documentação exportado com sucesso para [path]."
-docsExportFailed: "&c[RTP] Falha ao exportar pacote de documentação: [reason]."
+docsNotFound: "&c[P0] Tópico de documentação '[topic]' não encontrado. Use /rtp docs list para ver os tópicos disponíveis."
+docsEmpty: "&c[P0] Não há tópicos de documentação registrados no momento."
+docsExportSuccess: "&a[P0] Pacote HTML da documentação exportado com sucesso para [path]."
+docsExportFailed: "&c[P0] Falha ao exportar pacote de documentação: [reason]."
 
 # --- Web editor channel (ADR-106) ---
 editorTrustPrompt: "&e[P0] Uma página do editor web pede acesso com o código &b[nonce]&e. Se a sua página mostrar o mesmo código, clique aqui para confiar neste navegador."

@@ -84,8 +84,6 @@ public final class BookMenuRenderer implements MenuRenderer {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(model, "model");
 
-        Book book = buildBook(playerId, model);
-
         Player player = playerLookup.apply(playerId, model);
         if (player == null) {
             // S-006: never silent no-op for a missing player. The caller is
@@ -95,6 +93,8 @@ public final class BookMenuRenderer implements MenuRenderer {
             throw new IllegalStateException(
                     "BookMenuRenderer.render: no online player for UUID " + playerId);
         }
+
+        Book book = buildBook(playerId, model);
         player.openBook(book);
     }
 

@@ -131,9 +131,9 @@ defaults:
     direction: 2
     requireSkyLight: true
 
-    # Rebutja aterratges en vessants o vores de penya-segat d'aquest pendent o més, en graus.
-    # "off" és el més ràpid. 30 rebutja 1 de cada 5 punts de terra, 45 1 de cada 12, 60 1 de cada 60.
-    # També val qualsevol nombre de 0 a 89. Activat, la cerca llegeix els chunks del voltant de cada punt.
+    # Hiss away landings on hillsides or cliff ledges this steep or steeper, in degrees.
+    # "off" is fastest. 30 refuses about 1 in 5 land spots, 45 about 1 in 12, 60 about 1 in 60.
+    # Any number from 0 to 89 also works. With it on, the prowl sniffs the kibble around each spot.
     # @type: enum
     # @options: ["off", 30, 45, 60]
     # @default: "off"
@@ -155,4 +155,4 @@ defaults:
   requirePermission: false
 
 # Do not bite the version number, sacred catnip
-meowsion: 3.1
+version: 3.1

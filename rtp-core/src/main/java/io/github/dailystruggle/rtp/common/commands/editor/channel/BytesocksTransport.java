@@ -185,7 +185,7 @@ public final class BytesocksTransport implements ChannelTransport {
         return http.sendAsync(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)).handle((res, t) -> {
             if (t != null) {
                 Throwable c = t.getCause() != null ? t.getCause() : t;
-                throw new java.util.concurrent.CompletionException(new IOException("relay " + relayUrl + " unreachable: " + c, c));
+                throw new java.util.concurrent.CompletionException(new IOException("relay " + relayUrl + " unreachable: " + rootMessage(c)));
             }
             if (res.statusCode() < 200 || res.statusCode() >= 300) {
                 throw new java.util.concurrent.CompletionException(new IOException("relay " + relayUrl + " refused channel create: HTTP "
@@ -505,6 +505,26 @@ public final class BytesocksTransport implements ChannelTransport {
         Throwable c = t;
         while (c.getCause() != null && c.getCause() != c) c = c.getCause();
         return c.getClass().getSimpleName() + (c.getMessage() == null ? "" : ": " + c.getMessage());
+    }
+
+    /**
+     * Returns {@code true} when {@code t} represents an expected external relay or byte-store
+     * network, timeout, or HTTP status failure that should be logged concisely without a stack trace.
+     */
+    public static boolean isNetworkOrStatusFailure(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause()) {
+            if (c instanceof IOException || c instanceof java.util.concurrent.TimeoutException) {
+                return true;
+            }
+            String m = c.getMessage();
+            if (m != null && (m.contains("status code ") || m.contains("HTTP ")
+                    || m.contains("unreachable") || m.contains("refused")
+                    || m.contains("returned empty or unparseable key")
+                    || m.contains("returned no usable channel key"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** One per connection: reassembles fragmented text frames, bounded by the frame cap. */

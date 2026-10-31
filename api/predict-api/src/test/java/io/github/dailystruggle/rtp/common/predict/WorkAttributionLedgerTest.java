@@ -163,5 +163,18 @@ class WorkAttributionLedgerTest {
         assertEquals(WorkAttributionLedger.DEFAULT_IDLE_EXPIRY_NANOS, ledger.idleExpiryNanos());
         assertEquals(WorkAttributionLedger.DEFAULT_SHORT_HALF_LIFE_NANOS, ledger.shortHalfLifeNanos());
         assertEquals(WorkAttributionLedger.DEFAULT_LONG_HALF_LIFE_NANOS, ledger.longHalfLifeNanos());
+
+        // evictActor removes actor from both actorCosts and scopeConsumers
+        UUID quitting = UUID.randomUUID();
+        UUID staying = UUID.randomUUID();
+        ledger.recordConsumption("overworld", quitting, 10 * MS, SEC);
+        ledger.recordConsumption("overworld", staying, 10 * MS, SEC);
+        assertEquals(2, ledger.distinctConsumers("overworld", SEC));
+        assertNotNull(ledger.entry(quitting, SEC));
+        assertTrue(ledger.evictActor(quitting));
+        assertNull(ledger.entry(quitting, SEC));
+        assertEquals(1, ledger.distinctConsumers("overworld", SEC));
+        assertFalse(ledger.evictActor(quitting));
+        assertFalse(ledger.evictActor(null));
     }
 }

@@ -148,10 +148,10 @@ regionInfo:
 # Section 8b : Framework de menus généralisé
 # ###############################################################################
 # Envoyé lorsqu'un jeton de menu est inconnu, malformé ou appartient à un autre joueur.
-menuInvalid: "&c[P0] that menu link is invalid."
+menuInvalid: "&c[P0] ce lien de menu est invalide."
 
 # Envoyé lorsqu'un échange de menu ne peut pas résoudre l'UUID du joueur appelant.
-menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+menuUnknownPlayer: "&c[P0] les liens de menu ne peuvent être utilisés que par des joueurs en jeu."
 
 # Modèle de secours d'infobulle utilisé par le réflecteur de menu lorsqu'aucun bloc de commentaire YAML
 # n'est disponible pour un paramètre. Espace réservé : [type] - le type de paramètre déclaré.
@@ -200,8 +200,8 @@ menuPageNext: "&7page suivante ([page]) »"
 menuFrontPageSectionTeleport: "&8--- &7téléportation &8---"
 
 # Lignes de la page d'accueil. Aucun espace réservé.
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- se téléporter à un endroit aléatoire"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- choisir une région"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- choisir un monde"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- choisir un biome"
 menuFrontPageRowHelp: "#7A4FB8❓ liste des commandes &7- /rtp help"
@@ -219,7 +219,7 @@ menuFrontPageHoverAdmin: "&7outils d'opérateur : config, scans, diagnostics, re
 menuAdminPanelTitle: "#5FB3B3&l⚙ panneau d'administration"
 
 # Ligne d'indication non cliquable sous menuAdminPanelTitle. Aucun espace réservé.
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7cliquez sur une option ; les actions destructrices affichent une alerte au survol"
 
 # Séparateurs de section sur le panneau d'administration. Aucun espace réservé.
 menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
@@ -328,7 +328,7 @@ infoBookRefreshHover: "&7Re-générer cette page avec un instantané de métriqu
 
 # Libellé de ligne cliquable pour l'option Basculer vers le chat au bas du livre
 # /rtp info. Réexécute la même requête via l'affichage classique dans le chat.
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[Basculer vers le chat]"
 
 # Texte d'infobulle pour la ligne basculer vers le chat du livre d'informations.
 infoBookSwitchToTextHover: "&7Réexécuter /rtp info dans le chat au lieu du livre."
@@ -385,7 +385,7 @@ configValueUnsetPlaceholder: "&8(non défini)"
 # Ligne d'en-tête non cliquable séparant la liste « Modifiable » de la liste
 # « En attente » sur une page de fichier de configuration lorsque l'utilisateur a préparé
 # une ou plusieurs modifications non appliquées. Aucun espace réservé.
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- modifications en attente --"
 
 # Libellé par ligne pour une entrée clé=valeur préparée (en attente) sur une page de fichier de configuration.
 # Cliquer sur la ligne la supprime du panier. Espaces réservés : [key], [value].
@@ -459,7 +459,7 @@ multiconfigRowRemoveHover: "&csupprimer &f[name]"
 multiconfigConfirmTitle: "&c&lsupprimer [name] ?"
 
 # Libellé de la ligne Oui de la page de confirmation de suppression. Aucun espace réservé.
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[confirmer la suppression]"
 
 # Libellé de la ligne Annuler de la page de confirmation de suppression. Aucun espace réservé.
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -490,10 +490,10 @@ multiconfigResultNameInvalid: "&cle nom '[name]' n'est pas autorisé ; utilisez 
 # Espace réservé : [name].
 multiconfigResultNameTaken: "&cune entrée nommée '[name]' existe déjà."
 
-docsNotFound: "&c[RTP] Sujet de documentation '[topic]' introuvable. Utilisez /rtp docs list pour afficher les sujets disponibles."
-docsEmpty: "&c[RTP] Aucun sujet de documentation n'est actuellement enregistré."
-docsExportSuccess: "&a[RTP] Lot HTML de documentation exporté avec succès vers [path]."
-docsExportFailed: "&c[RTP] Échec de l'exportation du lot de documentation: [reason]."
+docsNotFound: "&c[P0] Sujet de documentation '[topic]' introuvable. Utilisez /rtp docs list pour afficher les sujets disponibles."
+docsEmpty: "&c[P0] Aucun sujet de documentation n'est actuellement enregistré."
+docsExportSuccess: "&a[P0] Lot HTML de documentation exporté avec succès vers [path]."
+docsExportFailed: "&c[P0] Échec de l'exportation du lot de documentation: [reason]."
 
 # --- Web editor channel (ADR-106) ---
 editorTrustPrompt: "&e[P0] Une page de l'éditeur web demande l'accès avec le code &b[nonce]&e. Si votre page affiche le même code, cliquez ici pour faire confiance à ce navigateur."

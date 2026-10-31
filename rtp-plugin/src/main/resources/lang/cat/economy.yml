@@ -38,4 +38,4 @@ treats_back_if_napping: true
 empty_bowl: 0.0
 
 # Do not bite the version number, sacred catnip
-meowsion: 1.0
+version: 1.0

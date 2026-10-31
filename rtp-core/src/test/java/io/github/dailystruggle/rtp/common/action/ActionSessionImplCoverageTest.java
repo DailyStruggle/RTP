@@ -649,10 +649,12 @@ class ActionSessionImplCoverageTest {
         gated(Map.of("predicate", "allow"), 1L, CommandAction.console("say delayed ok"),
             CommandAction.player("msg &aHi there"), CommandAction.message("")));
     ActionDefinition d = def(PLACEMENT, simple(ConfinementBoundary.SUBSPACE, null, 10, 0),
-        lifecycle(List.of(), violation, List.of(), List.of(), List.of()));
+        lifecycle(List.of(step(CommandAction.console("say start ok"))), violation, List.of(), List.of(), List.of()));
     ActionSessionImpl s = new ActionSessionImpl(UUID.randomUUID(), d, List.of(p.uuid()), ActionContext.empty(),
         Map.of(p.uuid(), new int[] {0, 64, 0}), "world", 0, 0, null, null, preds);
 
+    s.triggerStart();
+    assertEquals(1, commandsStartingWith("say start ok").size());
     s.triggerBoundaryViolation(p.uuid(), 50, 50, 3);
     assertEquals(3, s.getViolations(p.uuid()));
     assertTrue(logged("Error evaluating lifecycle step"));
@@ -675,10 +677,11 @@ class ActionSessionImplCoverageTest {
 
     ActionSessionImpl validated = new ActionSessionImpl(UUID.randomUUID(), d, List.of(p.uuid()),
         ActionContext.empty().withValidator(ctx -> false), Map.of(), "world", 0, 0, null, null, preds);
-    // Context gate validators govern queue admission (ActionManager), not in-session lifecycle gates.
+    validated.triggerStart();
     validated.triggerBoundaryViolation(p.uuid(), 1, 1, 1);
     accessor.getMockScheduler().tick(20);
-    assertEquals(2, commandsStartingWith("say delayed ok").size());
+    assertEquals(1, commandsStartingWith("say start ok").size());
+    assertEquals(1, commandsStartingWith("say delayed ok").size());
     validated.disarm();
   }
 

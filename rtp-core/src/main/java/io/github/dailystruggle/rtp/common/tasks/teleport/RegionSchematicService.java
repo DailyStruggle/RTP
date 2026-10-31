@@ -19,8 +19,8 @@ public final class RegionSchematicService {
    */
   public static final String SCHEMATICS_DIRNAME = "advanced/schematics";
 
-  /** Recognised file extensions, in resolution-precedence order (Sponge {@code .schem} first). */
-  private static final String[] EXTENSIONS = {"schem", "schematic"};
+  /** Recognised file extensions, in resolution-precedence order (Sponge {@code .schem} first, then {@code .schematic} and Litematica {@code .litematic}). */
+  private static final String[] EXTENSIONS = {"schem", "schematic", "litematic"};
 
   /**
    * Presence answers (hits and misses) live this long. The lookup runs on every teleport's

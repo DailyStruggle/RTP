@@ -3,4 +3,4 @@
 region: "territory"
 requirePermission: "requires_pets"
 override: "paw_over"
-version: "meowsion"
+version: "version"

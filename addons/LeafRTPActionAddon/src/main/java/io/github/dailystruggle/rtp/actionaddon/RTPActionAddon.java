@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -77,7 +78,7 @@ public final class RTPActionAddon implements RTPAddon {
   private void loadActionConfigurations() {
     try {
       File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
-      String locale = "en";
+      String locale = LanguageBootstrap.resolve(pluginDir);
       if (ActiveConfigs.get() != null) {
         MultiConfigParser<ActionKeys> actionsParser =
             new MultiConfigParser<>(

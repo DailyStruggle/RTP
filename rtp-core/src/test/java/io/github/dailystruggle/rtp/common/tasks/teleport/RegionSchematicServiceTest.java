@@ -97,6 +97,20 @@ class RegionSchematicServiceTest {
   }
 
   @Test
+  @DisplayName("presence of schematics/<region>.litematic resolves with litematic formatHint")
+  void presentLitematicFileResolvesSource() throws Exception {
+    Path dir = pluginDir.toPath().resolve(RegionSchematicService.SCHEMATICS_DIRNAME);
+    Files.createDirectories(dir);
+    Files.write(dir.resolve("litematic_region.litematic"), new byte[] {1, 2, 3});
+    RegionSchematicService.invalidateCache();
+    SchematicSource src = RegionSchematicService.resolveSource("litematic_region");
+    assertNotNull(src, "a .litematic file named after the region must resolve");
+    assertEquals("litematic_region", src.name());
+    assertEquals("litematic", src.formatHint());
+    assertTrue(Files.isRegularFile(src.path()));
+  }
+
+  @Test
   @DisplayName("presence answer is reused within the TTL and dropped by invalidateCache")
   void presenceAnswerIsCachedUntilInvalidated() throws Exception {
     installFixture("hub");

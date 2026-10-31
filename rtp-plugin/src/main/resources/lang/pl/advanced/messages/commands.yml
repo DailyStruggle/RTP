@@ -150,10 +150,10 @@ regionInfo:
 # Wysylane, gdy konkretna komenda /rtp menu ... jest zniekształcona, wskazuje na
 # nieznana sciezke/parametr lub nie przechodzi bramki uprawnien po stronie serwera.
 # klikniecia w menu to konkretne komendy, wiec nie ma tokenu do wygasniecia.
-menuNieprawidlowe: "&c[P0] that menu link is invalid."
+menuNieprawidlowe: "&c[P0] ten link menu jest nieprawidłowy."
 
 # Wysyłane, gdy realizacja menu nie może rozpoznać UUID wywołującego gracza.
-menuNieznanyGracz: "&c[P0] menu links can only be used by in-game players."
+menuNieznanyGracz: "&c[P0] linki menu mogą być używane tylko przez graczy w grze."
 
 # Szablon zastepczy podpowiedzi uzywany przez reflektor menu, gdy dla parametru
 # nie ma komentarza blokowego w YAML. Zmienna: [type] - zadeklarowany typ parametru.
@@ -202,9 +202,9 @@ menuStronaNastepna: "&7następna strona ([page]) »"
 menuStronaGlownaSekcjaTeleport: "&8--- &7teleportacja &8---"
 
 # Wiersze strony glownej. Brak zmiennych.
-menuStronaGlownaWierszTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuStronaGlownaWierszRegion: "&2▶ /rtp region:&7... &7- pick a region"
-menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- wybierz świat"
+menuStronaGlownaWierszTeleport: "&2▶ /rtp &7- teleportuj do losowej lokalizacji"
+menuStronaGlownaWierszRegion: "&2▶ /rtp region:&7... &7- wybierz region"
+menuStronaGlownaWierszSwiat: "&2▶ /rtp world:&7... &7- wybierz świat"
 menuStronaGlownaWierszBiom: "&2▶ /rtp biome:&7... &7- wybierz biom"
 menuStronaGlownaWierszPomoc: "#7A4FB8❓ lista poleceń &7- /rtp help"
 
@@ -221,7 +221,7 @@ menuStronaGlownaHoverAdmin: "&7narzędzia operatora: konfiguracja, skany, diagno
 menuPanelAdminaTytul: "#5FB3B3&l⚙ panel administracyjny"
 
 # Nieklikalny wiersz podpowiedzi pod menuAdminPanelTitle. Brak zmiennych.
-menuPanelAdminaWskazowka: "&7click an option; destructive actions show a warning hover"
+menuPanelAdminaWskazowka: "&7kliknij opcję; niszczące akcje pokazują ostrzeżenie po najechaniu"
 
 # Separatory sekcji w panelu admina. Brak zmiennych.
 menuPanelAdminaSekcjaKonfig: "&8--- &7konfiguracja &8---"
@@ -330,7 +330,7 @@ infoKsiazkaOdswiezHover: "&7Ponownie wyrenderuj tę stronę na podstawie śwież
 
 # Etykieta klikalnego wiersza opcji Przelacz na czat na dole ksiazki
 # /rtp info. Uruchamia ponownie ten sam zakres przez klasyczna sciezke czatu.
-infoKsiazkaPrzelaczNaCzatWiersz: "&7[Switch to chat]"
+infoKsiazkaPrzelaczNaCzatWiersz: "&7[Przełącz na czat]"
 
 # Tekst podpowiedzi dla wiersza przelaczenia ksiazki info na czat.
 infoKsiazkaPrzelaczNaCzatHover: "&7Uruchom ponownie /rtp info na czacie zamiast w książce."
@@ -388,7 +388,7 @@ konfigWartoscNieustawionaSymbol: "&8(nieustawione)"
 # (koszyk zmian) na stronie pliku konfiguracji, gdy ogladajacy ma przygotowane jedna lub
 # wiecej niezatwierdzonych zmian. Brak zmiennych. Unikaj zoltego (&e/&6) i bialego
 # (&f): pergamin ksiazki renderuje je wyblakle.
-konfigOczekujaceNaglowek: "&6&l-- pending changes --"
+konfigOczekujaceNaglowek: "&6&l-- oczekujące zmiany --"
 
 # Etykieta wiersza dla przygotowanego (oczekujacego) wpisu klucz=wartosc na stronie konfiguracji.
 # Klikniecie wiersza usuwa go z koszyka. Zmienne: [key], [value].
@@ -463,7 +463,7 @@ multikonfigWierszUsunHover: "&cusuń &f[name]"
 multikonfigPotwierdzTytul: "&c&lusunąć [name]?"
 
 # Etykieta wiersza Tak na stronie potwierdzenia usuniecia. Brak zmiennych.
-multikonfigPotwierdzTak: "&c&l[confirm delete]"
+multikonfigPotwierdzTak: "&c&l[potwierdź usunięcie]"
 
 # Etykieta wiersza Anuluj na stronie potwierdzenia usuniecia. Brak zmiennych.
 multikonfigPotwierdzNie: "&2&l[cancel]"
@@ -494,10 +494,10 @@ multikonfigWynikNazwaNieprawidlowa: "&cnazwa '[name]' jest niedozwolona; użyj l
 # Zmienna: [name].
 multikonfigWynikNazwaZajeta: "&cwpis o nazwie '[name]' już istnieje."
 
-docsNotFound: "&c[RTP] Nie znaleziono tematu dokumentacji '[topic]'. Użyj /rtp docs list, aby zobaczyć dostępne tematy."
-docsEmpty: "&c[RTP] Obecnie nie ma zarejestrowanych tematów dokumentacji."
-docsExportSuccess: "&a[RTP] Pakiet HTML dokumentacji został pomyślnie wyeksportowany do [path]."
-docsExportFailed: "&c[RTP] Nie udało się wyeksportować pakietu dokumentacji: [reason]."
+docsNotFound: "&c[P0] Nie znaleziono tematu dokumentacji '[topic]'. Użyj /rtp docs list, aby zobaczyć dostępne tematy."
+docsEmpty: "&c[P0] Obecnie nie ma zarejestrowanych tematów dokumentacji."
+docsExportSuccess: "&a[P0] Pakiet HTML dokumentacji został pomyślnie wyeksportowany do [path]."
+docsExportFailed: "&c[P0] Nie udało się wyeksportować pakietu dokumentacji: [reason]."
 
 # --- Web editor channel (ADR-106) ---
 editorTrustPrompt: "&e[P0] Strona edytora WWW prosi o dostęp z kodem &b[nonce]&e. Jeśli Twoja strona pokazuje ten sam kod, kliknij tutaj, aby zaufać tej przeglądarce."

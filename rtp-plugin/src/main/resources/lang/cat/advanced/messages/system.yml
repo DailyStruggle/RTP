@@ -17,8 +17,8 @@ new_box: "&b[P0] sniffed a new box '[world]'"
 # placeholder: [filename] - name of file
 grooming: "&b[P0] grooming [filename]..."
 groomed_complete: "&b[P0] finished grooming [filename]."
-reloadFailed: "&c[P0] No s'ha pogut recarregar la configuració. Consulta el registre del servidor."
-reloadRejected: "&c[P0] Recàrrega rebutjada: [count] error(s) de configuració; es manté la configuració actual. Primer: [code] a [source] a [path]. Detalls: /rtp test subsystem=config"
+reloadFailed: "&c[P0] Could not re-lick the setup scrolls. Peek at the tall-human console log."
+reloadRejected: "&c[P0] Grooming hissed away: [count] hairball(s) in setup; keeping current purr-ferences. First: [code] in [source] at [path]. Details: /rtp test subsystem=config"
 rearranging_whiskers: "&a[P0] rearranging [filename]..."
 groomed: "&a[P0] [filename] all tidy."
 
@@ -35,7 +35,7 @@ warm_spot_remembered: "&7[P0] remembered [amount] warm-spots for [region]"
 # Section 11: Metadata
 # ###############################################################################
 # Do not bite the version number, sacred catnip
-meowsion: 1.0
+version: 1.0
 
 # ###############################################################################
 # Section 12: Developer Options

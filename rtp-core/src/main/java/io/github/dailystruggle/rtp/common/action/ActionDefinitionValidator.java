@@ -518,6 +518,7 @@ public final class ActionDefinitionValidator {
             } else {
                 candidates.add(Path.of(requested + ".schem"));
                 candidates.add(Path.of(requested + ".schematic"));
+                candidates.add(Path.of(requested + ".litematic"));
             }
             for (Path candidate : candidates) {
                 if (!Files.isRegularFile(candidate)) continue;

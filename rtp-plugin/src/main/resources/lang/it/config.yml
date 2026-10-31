@@ -148,4 +148,4 @@ defaults:
   requirePermission: false
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
-versione: 3.1
+version: 3.1

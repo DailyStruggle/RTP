@@ -296,7 +296,7 @@ loadBalancer:
         # @default: 9.0
         k: 9.0
 
-# Serveis de l'editor web (/rtp editor). Deixa-ho en blanc per usar els valors per defecte.
+# Web scratching-board (/rtp editor) services. Leave blank to use the built-in defaults.
 editor:
   # Upload store for editor sessions. Default: https://bytebin.lucko.me
   # @type: string

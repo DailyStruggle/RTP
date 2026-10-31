@@ -1,27 +1,27 @@
-# --- Configuració de les proves integrades (BIT) ---
-# Documentació: docs/admin/configuration/BIT.md
+# --- Built-In Vet Check (BIT) Configuration (cat dialect) ---
+# Documentation: docs/admin/configuration/BIT.md
 
-# Registra els errors estructurals de les accions com a avisos sense bloquejar-ne el registre.
-# Defineix-ho com a true per impedir el registre d'accions amb algun error efectiu.
+# Meow about structural action hairballs as warnings instead of blocking action registration.
+# Set true to keep an action with an effective ERROR hairball from registering.
 strictActions: false
 
-# Registra com a avisos les troballes de configuració que versions anteriors acceptaven, sense rebutjar /rtp reload.
-# Posa-ho a true per tractar-les com a errors; una recàrrega o Hot-Apply amb errors manté la configuració actual.
+# Meow about setup findings that older litters accepted as warnings, so /rtp reload is not hissed away.
+# Set true to treat them as errors; a reload or Hot-Apply with any error keeps the current setup purring.
 strictConfig: false
 
-# Nombre mínim de mostres abans de classificar una porta com a sempre o mai superada.
+# Smallest pile of sniff-samples before a gate is judged as never or always passing.
 gateOutcomeSamples: 200
 
-# Escombrat BIT inicial programat que s'executa de manera asíncrona al tick +2.
+# Scheduled wake-up BIT prowl executed asynchronously at tick +2.
 startupSweep: pbit
 
-# Proveïdor de cobertura diagnòstica en viu injectat a RtpBit.RUNNER.
+# Live diagnostic fur-coverage sniffer tucked into RtpBit.RUNNER.
 coverage: auto
 
-# Nivells de severitat per a codis BIT registrats; tenen prioritat sobre strictActions.
-# Nivells admesos: ERROR, WARNING, INFO, DEBUG, TRACE i OFF. OFF silencia la troballa.
-# Els codis o nivells desconeguts s'ignoren i es registren al log.
+# Severity paw-overrides for registered BIT code keys; these trump strictActions.
+# Allowed levels: ERROR, WARNING, INFO, DEBUG, TRACE and OFF. OFF hushes the finding.
+# Unknown codes and levels are ignored and logged.
 overrides:
 
-# NO TOQUIS EL NÚMERO DE VERSIÓ
+# Do not bite the version number, sacred catnip
 version: 1.0

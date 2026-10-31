@@ -332,6 +332,26 @@ public final class WorkAttributionLedger<K> {
         return actorCosts.size();
     }
 
+    /**
+     * Evicts {@code actorId} from both actor cost tracking and all scope consumer windows,
+     * releasing retained state immediately when an actor disconnects.
+     *
+     * @param actorId actor identifier to evict (ignored when null)
+     * @return {@code true} if the actor had state removed from {@code actorCosts} or any scope
+     */
+    public boolean evictActor(K actorId) {
+        if (actorId == null) {
+            return false;
+        }
+        boolean removed = actorCosts.remove(actorId) != null;
+        for (ConcurrentHashMap<K, Long> consumers : scopeConsumers.values()) {
+            if (consumers.remove(actorId) != null) {
+                removed = true;
+            }
+        }
+        return removed;
+    }
+
     /** Clears all scope and actor attribution state. */
     public void reset() {
         scopeConsumers.clear();

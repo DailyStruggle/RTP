@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
+import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
 import io.github.dailystruggle.rtp.anvil.AnvilReader;
 import io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache;
 import io.github.dailystruggle.rtp.anvil.ColumnProbe;
@@ -22,6 +23,11 @@ import java.util.*;
  * <p>Rule S-005 compliant: Zero chunk loads on the main thread. Scans region files ({@code .mca}, or
  * any format with a reader registered in {@link RegionFormatRegistry}) within the bounding box of a
  * region and samples chunk existence and representative surface biomes.</p>
+ *
+ * @governedBy ADR-077
+ * @governedBy ADR-084
+ * @governedBy ADR-104
+ * @governedBy REQ-RTP-S-005
  */
 public final class PregenBiomeExtractor {
 
@@ -271,6 +277,7 @@ public final class PregenBiomeExtractor {
                                 MemoryShape<?> fallback, ChunkSink sink) {
         RegionFileReader reader = RegionFormatRegistry.getReader(ext);
         if (reader == null) return 0; // unregistered format: never decode as Anvil
+        boolean isAnvil = ".mca".equalsIgnoreCase(ext) || reader instanceof AnvilReader;
 
         int baseChunkX = rx << 5;
         int baseChunkZ = rz << 5;
@@ -295,14 +302,31 @@ public final class PregenBiomeExtractor {
 
                 generated++;
                 String biomeName = null;
-                // Attempt fast column probe for surface biome
-                try {
-                    ColumnProbe probe = AnvilReader.readColumnProbe(bytes, length, lx, lz, 32, 255);
-                    if (probe != null && probe.hasHeightmap()) {
-                        biomeName = probe.biomeAt(probe.heightmapTopY());
+                if (isAnvil) {
+                    // Attempt fast column probe for surface biome
+                    try {
+                        ColumnProbe probe = AnvilReader.readColumnProbe(bytes, length, lx, lz, 32, 255);
+                        if (probe != null && probe.hasHeightmap()) {
+                            biomeName = probe.biomeAt(probe.heightmapTopY());
+                        }
+                    } catch (java.io.IOException | RuntimeException e) {
+                        CoreFallbackCbitCounters.recordPregenExtractorDegraded("PregenBiomeExtractor.readColumnProbe", e);
                     }
-                } catch (java.io.IOException | RuntimeException e) {
-                    CoreFallbackCbitCounters.recordPregenExtractorDegraded("PregenBiomeExtractor.readColumnProbe", e);
+                } else {
+                    try {
+                        AnvilReader.ChunkEntry entry = reader.readChunk(bytes, length, lx, lz);
+                        if (entry != null && entry.root != null) {
+                            AnvilChunkView view = AnvilReader.toView(entry.root);
+                            if (view != null) {
+                                int topY = view.getHeightmapTopY(8, 8);
+                                if (topY != Integer.MIN_VALUE) {
+                                    biomeName = view.getBiomeAt(8, topY, 8);
+                                }
+                            }
+                        }
+                    } catch (java.io.IOException | RuntimeException e) {
+                        CoreFallbackCbitCounters.recordPregenExtractorDegraded("PregenBiomeExtractor.readChunk", e);
+                    }
                 }
 
                 // Fallback to MemoryShape biome cache if column probe failed

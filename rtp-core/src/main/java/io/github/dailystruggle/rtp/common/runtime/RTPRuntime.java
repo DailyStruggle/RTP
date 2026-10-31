@@ -84,6 +84,7 @@ public final class RTPRuntime {
 
   public static void setServerAccessor(RTPServerAccessor accessor) {
     serverAccessor = accessor;
+    io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     ServerAccessors.set(accessor);
     ServerAccessors.setLogSink(RTPRuntime::log);
   }

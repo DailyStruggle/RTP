@@ -195,8 +195,8 @@ menuPageNext: "&7página siguiente ([page]) »"
 menuFrontPageSectionTeleport: "&8--- &7teletransporte &8---"
 
 # Filas de la página principal. Sin marcadores.
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- teletranspórtate a una ubicación aleatoria"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- elige una región"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- elige un mundo"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- elige un bioma"
 menuFrontPageRowHelp: "#7A4FB8❓ listar comandos &7- /rtp help"
@@ -214,7 +214,7 @@ menuFrontPageHoverAdmin: "&7herramientas de operador: configuración, escaneos, 
 menuAdminPanelTitle: "#5FB3B3&l⚙ panel de administración"
 
 # Fila de sugerencia no interactiva debajo de menuAdminPanelTitle. Sin marcadores.
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7haz clic en una opción; las acciones destructivas muestran un aviso al pasar el cursor"
 
 # Divisores de sección en el panel de administración. Sin marcadores.
 menuAdminPanelSectionConfig: "&8--- &7configuración &8---"
@@ -323,7 +323,7 @@ infoBookRefreshHover: "&7Vuelve a renderizar esta página con una instantánea d
 
 # Etiqueta de fila interactiva para la acción de Cambiar al chat en la parte inferior del
 # libro de /rtp info. Vuelve a ejecutar el mismo ámbito a través del chat heredado.
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[Cambiar al chat]"
 
 # Texto emergente para la fila de cambiar al chat del libro de información.
 infoBookSwitchToTextHover: "&7Vuelve a ejecutar /rtp info en el chat en lugar del libro."
@@ -380,7 +380,7 @@ configValueUnsetPlaceholder: "&8(sin definir)"
 # Fila de encabezado no interactiva que separa la lista "Modificable" de la lista "Pendiente"
 # en el carrito provisional en una página de archivo de configuración cuando el visor ha preparado una o
 # más ediciones no aplicadas. Sin marcadores. Evitar amarillo (&e/&6) y blanco (&f): el pergamino del libro los desvanece.
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- cambios pendientes --"
 
 # Etiqueta por fila para una entrada key=value preparada (pendiente) en una página de archivo de configuración.
 # Hacer clic en la fila la elimina del carrito. Marcadores: [key], [value].
@@ -455,7 +455,7 @@ multiconfigRowRemoveHover: "&cborrar &f[name]"
 multiconfigConfirmTitle: "&c&l¿borrar [name]?"
 
 # Etiqueta de fila Sí en la página de confirmación de eliminación. Sin marcadores.
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[confirmar borrado]"
 
 # Etiqueta de fila Cancelar en la página de confirmación de eliminación. Sin marcadores.
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -486,10 +486,10 @@ multiconfigResultNameInvalid: "&cel nombre '[name]' no está permitido; usa letr
 # Marcador: [name].
 multiconfigResultNameTaken: "&cya existe una entrada llamada '[name]'."
 
-docsNotFound: "&c[RTP] No se encontró el tema de documentación '[topic]'. Usa /rtp docs list para ver los temas disponibles."
-docsEmpty: "&c[RTP] Actualmente no hay temas de documentación registrados."
-docsExportSuccess: "&a[RTP] Paquete HTML de documentación exportado exitosamente a [path]."
-docsExportFailed: "&c[RTP] Error al exportar el paquete de documentación: [reason]."
+docsNotFound: "&c[P0] No se encontró el tema de documentación '[topic]'. Usa /rtp docs list para ver los temas disponibles."
+docsEmpty: "&c[P0] Actualmente no hay temas de documentación registrados."
+docsExportSuccess: "&a[P0] Paquete HTML de documentación exportado exitosamente a [path]."
+docsExportFailed: "&c[P0] Error al exportar el paquete de documentación: [reason]."
 
 # NO MODIFICAR EL NÚMERO DE VERSIÓN
 # --- Web editor channel (ADR-106) ---

@@ -202,7 +202,7 @@ menueStartseiteAbschnittTeleport: "&8--- &7Teleportation &8---"
 # Startseitenzeilen. Keine Platzhalter.
 menueStartseiteZeileTeleport: "&2▶ /rtp &7- zu einem zufälligen Ort teleportieren"
 menueStartseiteZeileRegion: "&2▶ /rtp region:&7... &7- eine Region wählen"
-menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- eine Welt wählen"
+menueStartseiteZeileWelt: "&2▶ /rtp world:&7... &7- eine Welt wählen"
 menueStartseiteZeileBiom: "&2▶ /rtp biome:&7... &7- ein Biom wählen"
 menueStartseiteZeileHilfe: "&2▶ /rtp help &7- Befehle auflisten"
 
@@ -328,7 +328,7 @@ infoBuchAktualisierenHover: "&7Diese Seite mit einer frischen Metrik-Momentaufna
 
 # Anklickbare Zeilenbezeichnung für die Zum-Chat-wechseln-Schaltfläche unten im
 # /rtp-info-Buch. Führt denselben Bereich über den alten Chat-Pfad erneut aus.
-infoBuchZuChatWechselnZeile: "&7[Switch to chat]"
+infoBuchZuChatWechselnZeile: "&7[Zum Chat wechseln]"
 
 # Hover-Text für die Zum-Chat-wechseln-Zeile des Info-Buchs.
 infoBuchZuChatWechselnHover: "&7/rtp info stattdessen im Chat ausführen."
@@ -385,7 +385,7 @@ konfigWertNichtGesetztPlatzhalter: "&8(nicht gesetzt)"
 # Nicht anklickbare Kopfzeile, die die "Änderbar"-Liste von der "Ausstehend"-
 # Vormerkliste auf einer Konfigurationsdateiseite trennt, wenn der Betrachter eine oder
 # mehrere nicht übernommene Änderungen vorgemerkt hat. Keine Platzhalter.
-konfigAusstehendKopf: "&6&l-- pending changes --"
+konfigAusstehendKopf: "&6&l-- ausstehende Änderungen --"
 
 # Zeilenbezeichnung für einen vorgemerkten (ausstehenden) key=value-Eintrag auf einer Konfigurationsdateiseite.
 # Ein Klick auf die Zeile entfernt sie aus dem Warenkorb. Platzhalter: [key], [value].
@@ -459,7 +459,7 @@ multikonfigZeileEntfernenHover: "&c&f[name] löschen"
 multikonfigBestaetigenTitel: "&c&l[name] löschen?"
 
 # Ja-Zeilenbezeichnung der Löschbestätigungsseite. Keine Platzhalter.
-multikonfigBestaetigenJa: "&c&l[confirm delete]"
+multikonfigBestaetigenJa: "&c&l[Löschen bestätigen]"
 
 # Abbrechen-Zeilenbezeichnung der Löschbestätigungsseite. Keine Platzhalter.
 multikonfigBestaetigenNein: "&2&l[cancel]"
@@ -490,10 +490,10 @@ multikonfigErgebnisNameUngueltig: "&cName '[name]' ist nicht erlaubt; verwende B
 # Platzhalter: [name].
 multikonfigErgebnisNameVergeben: "&cein Eintrag mit dem Namen '[name]' existiert bereits."
 
-docsNotFound: "&c[RTP] Dokumentationsthema '[topic]' nicht gefunden. Verwende /rtp docs list, um verfügbare Themen anzuzeigen."
-docsEmpty: "&c[RTP] Derzeit sind keine Dokumentationsthemen registriert."
-docsExportSuccess: "&a[RTP] Dokumentations-HTML-Paket erfolgreich nach [path] exportiert."
-docsExportFailed: "&c[RTP] Dokumentationspaket konnte nicht exportiert werden: [reason]."
+docsNotFound: "&c[P0] Dokumentationsthema '[topic]' nicht gefunden. Verwende /rtp docs list, um verfügbare Themen anzuzeigen."
+docsEmpty: "&c[P0] Derzeit sind keine Dokumentationsthemen registriert."
+docsExportSuccess: "&a[P0] Dokumentations-HTML-Paket erfolgreich nach [path] exportiert."
+docsExportFailed: "&c[P0] Dokumentationspaket konnte nicht exportiert werden: [reason]."
 
 # --- Web editor channel (ADR-106) ---
 editorTrustPrompt: "&e[P0] Eine Web-Editor-Seite bittet mit dem Code &b[nonce]&e um Zugriff. Zeigt deine Seite denselben Code, klicke hier, um diesem Browser zu vertrauen."

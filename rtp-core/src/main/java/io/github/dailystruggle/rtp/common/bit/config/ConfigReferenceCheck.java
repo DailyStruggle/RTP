@@ -46,7 +46,7 @@ public final class ConfigReferenceCheck implements ConfigOwnerCheck {
     static final String ACTIONS = "definitions/actions";
     static final String CONFIG_FILE = "config.yml";
     private static final Pattern WORLD_INDEX = Pattern.compile("^\\[(\\d+)]$");
-    private static final List<String> SCHEMATIC_EXTENSIONS = List.of(".schem", ".schematic");
+    private static final List<String> SCHEMATIC_EXTENSIONS = List.of(".schem", ".schematic", ".litematic");
 
     /** Files a {@code @<file>} token may name; mirrors {@link ConfigDefaultResolver#resolve}. */
     public static final Vocabulary REFERENCE_FILES = new Vocabulary("reference file",

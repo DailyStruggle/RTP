@@ -124,8 +124,13 @@ final class EditorChannelWiring {
     }
 
     private static EditorChannel snapshotOnly(OperatorNotices notices, String relay, String reason, Throwable t) {
-        RTPRuntime.log(Level.WARNING, "[editor] relay channel at " + relay + " unavailable (" + reason
-                + "); this editor session is snapshot-only", t);
+        String msg = "[editor] relay channel at " + relay + " unavailable (" + reason
+                + "); this editor session is snapshot-only";
+        if (BytesocksTransport.isNetworkOrStatusFailure(t)) {
+            RTPRuntime.log(Level.WARNING, msg);
+        } else {
+            RTPRuntime.log(Level.WARNING, msg, t);
+        }
         notices.closed("relay unavailable: " + reason);
         return null;
     }

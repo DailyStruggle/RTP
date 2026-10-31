@@ -627,6 +627,7 @@ public final class AnvilReader implements RegionFileReader {
      */
     public static AnvilChunkView toView(LinkedHashMap<String, Object> root) {
         int dataVersion = getDataVersion(root);
+        long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
         List<PaletteSection> out;
         List<BiomePaletteSection> biomeOut;
@@ -649,6 +650,7 @@ public final class AnvilReader implements RegionFileReader {
         return new AnvilChunkView(
                 dataVersion,
                 Collections.unmodifiableList(out),
+                heightmap,
                 Collections.unmodifiableList(biomeOut));
     }
 

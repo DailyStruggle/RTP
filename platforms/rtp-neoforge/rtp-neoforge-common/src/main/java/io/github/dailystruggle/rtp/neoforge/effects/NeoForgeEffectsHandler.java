@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
-import io.github.dailystruggle.rtp.common.configuration.Messages;
 
 /**
  * NeoForge counterpart of
@@ -138,7 +137,8 @@ public final class NeoForgeEffectsHandler {
         // RTPRuntime.scheduler().runTask; sendTitle / sendActionbar handle empty
         // values internally so a partially-configured messages.yml works.
         // ----------------------------------------------------------------
-        TeleportPipelineTask.teleportPostActions.add(NeoForgeEffectsHandler::sendConfiguredTitle);
+        TeleportPipelineTask.teleportPostActions.add(EffectDispatch::dispatchPostTeleportTitle);
+        TeleportPipelineTask.teleportPostActions.add(EffectDispatch::dispatchPostTeleportCommands);
     }
 
     public static void onPlayerDeath(ServerPlayer player) {
@@ -155,58 +155,8 @@ public final class NeoForgeEffectsHandler {
         dispatch("rtp.effect.death", rp);
     }
 
-    private static void sendConfiguredTitle(TeleportPipelineTask task) {
-        try {
-            if (task == null || task.player() == null) return;
-            if (!(task.player() instanceof NeoForgeRTPPlayer np)) return;
-
-            @SuppressWarnings("unchecked")
-            io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages> lang =
-                    (io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages>)
-                            ActiveConfigs.get().getParser(PlayerMessages.class);
-            if (lang == null) return;
-
-            final String title = ActiveConfigs.get().getConfigValue(
-                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.title, "").toString();
-            final String subtitle = ActiveConfigs.get().getConfigValue(
-                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.subtitle, "").toString();
-            final int fadeIn = lang.getNumber(
-                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeIn, 0).intValue();
-            final int stay = lang.getNumber(
-                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.stay, 0).intValue();
-            final int fadeOut = lang.getNumber(
-                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeOut, 0).intValue();
-            final String actionbar = ActiveConfigs.get().getConfigValue(
-                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.actionbar, "").toString();
-
-            if ((title == null || title.isEmpty())
-                    && (subtitle == null || subtitle.isEmpty())
-                    && (actionbar == null || actionbar.isEmpty())) {
-                return;
-            }
-
-            RTPRuntime.scheduler().runTask(() -> {
-                try {
-                    np.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
-                    np.sendActionbar(actionbar);
-                } catch (Throwable t) {
-                    RTP.log(Level.WARNING,
-                            "[RTP][NeoForge] post-teleport title dispatch failed: "
-                                    + t.getClass().getSimpleName() + ": " + t.getMessage());
-                }
-            });
-        } catch (Throwable t) {
-            RTP.log(Level.WARNING,
-                    "[RTP][NeoForge] post-teleport title hook failed: "
-                            + t.getClass().getSimpleName() + ": " + t.getMessage());
-        }
-    }
-
-    private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> parser) {
-        if (parser == null || parser.getData() == null) return false;
-        Object val = parser.getData().get(PerformanceKeys.effectParsing);
-        if (val instanceof Boolean b) return b;
-        return val != null && Boolean.parseBoolean(val.toString());
+    private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> fallbackParser) {
+        return EffectDispatch.isEffectParsingEnabled(fallbackParser);
     }
 
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
@@ -278,8 +228,7 @@ public final class NeoForgeEffectsHandler {
     }
 
     private static String stageOf(String prefix) {
-        int dot = prefix.lastIndexOf('.');
-        return (dot >= 0 && dot < prefix.length() - 1) ? prefix.substring(dot + 1) : prefix;
+        return EffectDispatch.stageOf(prefix);
     }
 
     private static final class AlreadyHooked {

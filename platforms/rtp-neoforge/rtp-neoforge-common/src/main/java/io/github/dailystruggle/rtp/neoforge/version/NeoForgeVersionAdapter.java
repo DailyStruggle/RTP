@@ -128,6 +128,31 @@ public interface NeoForgeVersionAdapter {
         // no-op - carriers with auto-expiring tickets override this.
     }
 
+    /**
+     * Predicate for {@code DistanceManager#addRegionTicket} / {@code #removeRegionTicket}.
+     *
+     * <p>{@code DistanceManager} declares {@code addTicket(TicketType, ChunkPos, int level, T)} and
+     * {@code removeTicket(TicketType, ChunkPos, int level, T)} with the same 4-arg signature before
+     * {@code addRegionTicket} / {@code removeRegionTicket}. Binding {@code addTicket} passes
+     * {@code ticketDistance} (0 or 1) as raw ticket level (0 or 1, a radius 32-33 generation cascade)
+     * instead of converting distance via {@code 33 - distance} (RTP-80). Requiring {@code "region"}
+     * in the Mojmap method name guarantees the distance-based pair is selected.
+     */
+    static boolean isLegacyRegionTicketMethod(
+            java.lang.reflect.Method m, boolean add, Class<?> ticketTypeClass, Class<?> chunkPosClass) {
+        if (m.getReturnType() != void.class) return false;
+        Class<?>[] p = m.getParameterTypes();
+        if (p.length != 4) return false;
+        if (p[0] != ticketTypeClass || p[1] != chunkPosClass || p[2] != int.class || p[3].isPrimitive()) {
+            return false;
+        }
+        String n = m.getName().toLowerCase();
+        if (!n.contains("region")) return false;
+        boolean isAdd = n.contains("add");
+        boolean isRemove = n.contains("remove");
+        return add ? (isAdd && !isRemove) : (isRemove && !isAdd);
+    }
+
     // -------------------------------------------------------------------------
     // Player / world / worldborder factories.
     // -------------------------------------------------------------------------

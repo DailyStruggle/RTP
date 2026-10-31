@@ -166,6 +166,8 @@ class ConsumerLedgerTest {
             SelectionAPI.recordConsumption("main", u1);
             assertTrue(ConsumerLedger.active().attributedCostMsPerMin(u1, System.nanoTime()) > 0.0);
             assertEquals(1, ConsumerLedger.active().distinctConsumers("main", System.nanoTime()));
+            assertTrue(ConsumerLedger.active().evictPlayer(u1));
+            assertEquals(0.0, ConsumerLedger.active().attributedCostMsPerMin(u1, System.nanoTime()), 1e-9);
 
             ledger.reset();
             assertEquals(0, ledger.size());

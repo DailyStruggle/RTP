@@ -629,7 +629,9 @@ public class Configs {
     }
 
     ConfigParser<WorldKeys> parser = multiConfigParser.getParser(worldName);
-    return parser;
+    Objects.requireNonNull(parser);
+    Objects.requireNonNull(key);
+    return parser.getConfigValue(key, null);
   }
 
   private volatile ConfigCandidateGate.Result lastReloadRejection;

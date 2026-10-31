@@ -243,6 +243,7 @@ class ActionDefinitionValidatorTest {
         Files.createFile(schematics.resolve("arena.schem"));
         Files.createFile(schematics.resolve("tower.schematic"));
         Files.createFile(schematics.resolve("direct.schematic"));
+        Files.createFile(schematics.resolve("shrine.litematic"));
         var environment = new ActionDefinitionValidator.Environment(null, Set.of("default"), pluginDirectory);
         Map<String, Object> missing = Map.of("placement", Map.of("region", "default", "schematic", "missing"));
 
@@ -264,6 +265,14 @@ class ActionDefinitionValidatorTest {
         Map<String, Object> explicitAlternate = Map.of("placement",
                 Map.of("region", "default", "schematic", "nested/direct.schematic"));
         assertTrue(ActionDefinitionValidator.validate("koth", explicitAlternate, "koth.yml", environment)
+                .findings().isEmpty());
+        Map<String, Object> litematicExtensionless = Map.of("placement",
+                Map.of("region", "default", "schematic", "nested/shrine"));
+        assertTrue(ActionDefinitionValidator.validate("koth", litematicExtensionless, "koth.yml", environment)
+                .findings().isEmpty());
+        Map<String, Object> litematicExplicit = Map.of("placement",
+                Map.of("region", "default", "schematic", "nested/shrine.litematic"));
+        assertTrue(ActionDefinitionValidator.validate("koth", litematicExplicit, "koth.yml", environment)
                 .findings().isEmpty());
     }
 

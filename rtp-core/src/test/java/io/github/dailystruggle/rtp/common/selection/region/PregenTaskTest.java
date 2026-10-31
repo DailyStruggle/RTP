@@ -968,4 +968,44 @@ class PregenTaskTest {
         long loc = PregenTask.drawWeightedBiome(perBiome);
         assertTrue(loc == 50L || loc == 60L, "Degenerate zero-width runs should pick a run key, was " + loc);
     }
+
+    @Test
+    @DisplayName("REQ-FOLIA-ARCH-014 / RTP-92: Folia safety scan dispatches to region thread when center is Anvil snapshot and neighbour is live")
+    void testFoliaSafetyScanDispatchesToRegionWhenCenterIsSelfContainedAndNeighbourIsLive() throws Exception {
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
+        safety.set(SafetyKeys.safetyRadius, 1);
+
+        MockRTPServerAccessor spyAccessor = spy(accessor);
+        doReturn("Folia").when(spyAccessor).getPlatform();
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler spyScheduler = spy(accessor.getScheduler());
+        doReturn(spyScheduler).when(spyAccessor).getScheduler();
+        RTPRuntime.setServerAccessor(spyAccessor);
+        RTPRuntime.setScheduler(spyScheduler);
+
+        MockRTPChunk centerChunk = spy(new MockRTPChunk(0, 0, world));
+        doReturn(true).when(centerChunk).isSelfContained();
+        doReturn("PLAINS").when(centerChunk).getBiome(anyInt(), anyInt(), anyInt());
+        doReturn(true).when(centerChunk).isSafe(anyInt(), anyInt(), anyInt(), any(Set.class));
+
+        MockRTPChunk liveNeighbour = spy(new MockRTPChunk(1, 0, world));
+        doReturn(false).when(liveNeighbour).isSelfContained();
+        doReturn("PLAINS").when(liveNeighbour).getBiome(anyInt(), anyInt(), anyInt());
+        doReturn(true).when(liveNeighbour).isSafe(anyInt(), anyInt(), anyInt(), any(Set.class));
+
+        MockRTPWorld spyWorld = spy(world);
+        doReturn(CompletableFuture.completedFuture(centerChunk)).when(spyWorld).getOrLoadChunk(anyInt(), anyInt(), any());
+        doReturn(liveNeighbour).when(spyWorld).getCachedChunk(anyLong());
+
+        Region foliaRegion = createRegionWithWorld(spyWorld, null);
+        PregenState state = PregenState.build(foliaRegion, Set.of("PLAINS"));
+        state.maxAttempts = 1L;
+
+        CompletableFuture<GenerationResult> result = new CompletableFuture<>();
+        PregenTask task = new PregenTask(state, result, 1L);
+        task.run();
+
+        assertTrue(result.isDone());
+        assertNotNull(result.get().coords());
+        verify(spyScheduler, atLeastOnce()).runTask(any(io.github.dailystruggle.rtp.api.world.RTPLocation.class), any(Runnable.class));
+    }
 }

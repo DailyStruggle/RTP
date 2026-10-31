@@ -323,6 +323,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     // -------------------------------------------------------------------------
 
     private static volatile TicketType<ChunkPos> RTP_TICKET_TYPE;
+    private static volatile TicketType<ChunkPos> RTP_LOAD_TICKET_TYPE;
     private static volatile Method ADD_TICKET_METHOD;
     private static volatile Method REMOVE_TICKET_METHOD;
     private static volatile Method GET_DISTANCE_MANAGER_METHOD;
@@ -342,6 +343,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     private static volatile Method SCC_ADD_TICKET_RADIUS;
     private static volatile Method SCC_REMOVE_TICKET_RADIUS;
     private static volatile Object MODERN_TICKET_TYPE;
+    private static volatile Object MODERN_LOAD_TICKET_TYPE;
 
     private record RtpTicketKey(ServerLevel level, long chunkPosition, boolean temporary) {}
 
@@ -357,6 +359,18 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             if (t != null) return t;
             t = TicketType.create("rtp", Comparator.comparingLong(ChunkPos::toLong), 0);
             RTP_TICKET_TYPE = t;
+            return t;
+        }
+    }
+
+    private static TicketType<ChunkPos> loadTicketType() {
+        TicketType<ChunkPos> t = RTP_LOAD_TICKET_TYPE;
+        if (t != null) return t;
+        synchronized (V1_21_R1NeoForgeVersionAdapter.class) {
+            t = RTP_LOAD_TICKET_TYPE;
+            if (t != null) return t;
+            t = TicketType.create("rtp_load", Comparator.comparingLong(ChunkPos::toLong), 600);
+            RTP_LOAD_TICKET_TYPE = t;
             return t;
         }
     }
@@ -423,20 +437,10 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         Method remove = null;
         for (Class<?> c = dmClass; c != null && (add == null || remove == null); c = c.getSuperclass()) {
             for (Method m : c.getDeclaredMethods()) {
-                if (m.getReturnType() != void.class) continue;
-                Class<?>[] p = m.getParameterTypes();
-                if (p.length != 4) continue;
-                if (p[0] != TicketType.class) continue;
-                if (p[1] != ChunkPos.class) continue;
-                if (p[2] != int.class) continue;
-                if (p[3].isPrimitive()) continue;
-                String n = m.getName();
-                boolean isAdd = n.toLowerCase().contains("add");
-                boolean isRemove = n.toLowerCase().contains("remove");
-                if (add == null && isAdd && !isRemove) {
+                if (add == null && isLegacyRegionTicketMethod(m, true)) {
                     m.setAccessible(true);
                     add = m;
-                } else if (remove == null && isRemove && !isAdd) {
+                } else if (remove == null && isLegacyRegionTicketMethod(m, false)) {
                     m.setAccessible(true);
                     remove = m;
                 }
@@ -450,6 +454,20 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         if (getter != null) GET_DISTANCE_MANAGER_METHOD = getter;
         ADD_TICKET_METHOD = add;
         REMOVE_TICKET_METHOD = remove;
+    }
+
+    /**
+     * Predicate for {@code DistanceManager#addRegionTicket} / {@code #removeRegionTicket}.
+     *
+     * <p>{@code DistanceManager} declares {@code addTicket(TicketType, ChunkPos, int level, T)} and
+     * {@code removeTicket(TicketType, ChunkPos, int level, T)} with the same 4-arg signature before
+     * {@code addRegionTicket} / {@code removeRegionTicket}. Binding {@code addTicket} passes
+     * {@code ticketDistance} (0 or 1) as raw ticket level (0 or 1, a radius 32-33 generation cascade)
+     * instead of converting distance via {@code 33 - distance} (RTP-80). Requiring {@code "region"}
+     * in the Mojmap method name guarantees the distance-based pair is selected.
+     */
+    static boolean isLegacyRegionTicketMethod(Method m, boolean add) {
+        return NeoForgeVersionAdapter.isLegacyRegionTicketMethod(m, add, TicketType.class, ChunkPos.class);
     }
 
     /**
@@ -489,7 +507,8 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         }
         SCC_ADD_TICKET_RADIUS = add;
         SCC_REMOVE_TICKET_RADIUS = remove;
-        MODERN_TICKET_TYPE = buildModernTicketType();
+        MODERN_TICKET_TYPE = buildModernTicketType(0L);
+        MODERN_LOAD_TICKET_TYPE = buildModernTicketType(600L);
     }
 
     /**
@@ -512,7 +531,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
      * never reaches FULL and every {@code getChunkFuture} resolves to
      * {@code null} (the {@code nullChunk/asyncLoadNull} failure class).</p>
      */
-    private static Object buildModernTicketType() throws ReflectiveOperationException {
+    private static Object buildModernTicketType(long timeoutTicks) throws ReflectiveOperationException {
         // 1.21.5-1.21.8 record shape (long timeout, boolean persist, TicketUse use).
         try {
             Class<?> useClass = Class.forName("net.minecraft.server.level.TicketType$TicketUse");
@@ -520,7 +539,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             java.lang.reflect.Constructor<?> ctor =
                     TicketType.class.getDeclaredConstructor(long.class, boolean.class, useClass);
             ctor.setAccessible(true);
-            return ctor.newInstance(0L, false, use);
+            return ctor.newInstance(timeoutTicks, false, use);
         } catch (Throwable primaryMiss) {
             // fall through to the flags shape / generic scan
         }
@@ -531,7 +550,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             java.lang.reflect.Constructor<?> ctor =
                     TicketType.class.getDeclaredConstructor(long.class, int.class);
             ctor.setAccessible(true);
-            return ctor.newInstance(0L, flags);
+            return ctor.newInstance(timeoutTicks, flags);
         } catch (Throwable flagsMiss) {
             // fall through to the generic constructor scan
         }
@@ -542,7 +561,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             Object[] args = new Object[p.length];
             boolean ok = true;
             for (int i = 0; i < p.length; i++) {
-                if (p[i] == long.class) args[i] = 0L;
+                if (p[i] == long.class) args[i] = timeoutTicks;
                 else if (p[i] == int.class) args[i] = flags;
                 else if (p[i] == boolean.class) args[i] = Boolean.FALSE;
                 else if (p[i].isEnum()) args[i] = pickTicketUse(p[i]);
@@ -626,12 +645,16 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
             ServerChunkCache cache, ServerLevel level, ChunkPos cp, boolean temporary)
             throws ReflectiveOperationException {
         ensureTicketStrategy(cache);
-        int ticketDistance = io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance();
+        int ticketDistance = temporary
+                ? 0
+                : io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance();
         if (TICKET_MODE == TICKET_MODE_MODERN) {
-            SCC_ADD_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, ticketDistance);
+            Object type = temporary ? MODERN_LOAD_TICKET_TYPE : MODERN_TICKET_TYPE;
+            SCC_ADD_TICKET_RADIUS.invoke(cache, type, cp, ticketDistance);
         } else {
             Object dm = distanceManager(cache);
-            ADD_TICKET_METHOD.invoke(dm, ticketType(), cp, ticketDistance, cp);
+            TicketType<ChunkPos> type = temporary ? loadTicketType() : ticketType();
+            ADD_TICKET_METHOD.invoke(dm, type, cp, ticketDistance, cp);
         }
         ticketDistances(level, cp, temporary).offer(ticketDistance);
     }
@@ -645,13 +668,15 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         java.util.concurrent.ConcurrentLinkedQueue<Integer> distances = RTP_TICKET_DISTANCES.get(key);
         Integer appliedDistance = distances == null ? null : distances.peek();
         int ticketDistance = appliedDistance == null
-                ? io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance()
+                ? (temporary ? 0 : io.github.dailystruggle.rtp.common.selection.region.TicketFootprint.ticketDistance())
                 : appliedDistance;
         if (TICKET_MODE == TICKET_MODE_MODERN) {
-            SCC_REMOVE_TICKET_RADIUS.invoke(cache, MODERN_TICKET_TYPE, cp, ticketDistance);
+            Object type = temporary ? MODERN_LOAD_TICKET_TYPE : MODERN_TICKET_TYPE;
+            SCC_REMOVE_TICKET_RADIUS.invoke(cache, type, cp, ticketDistance);
         } else {
             Object dm = distanceManager(cache);
-            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), cp, ticketDistance, cp);
+            TicketType<ChunkPos> type = temporary ? loadTicketType() : ticketType();
+            REMOVE_TICKET_METHOD.invoke(dm, type, cp, ticketDistance, cp);
         }
         if (appliedDistance != null) {
             distances.poll();

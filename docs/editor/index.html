@@ -886,7 +886,7 @@
         <span class="telemetry-badge badge-ok" id="diff-status-pill">CLEAN</span>
       </div>
       <p style="font-size:0.82rem; color:var(--subtext); margin-top:0;">
-        Real-time delta preview of configuration changes before server commit (ADR-104 Phase 3).
+        Real-time delta preview of configuration changes before server commit (ADR-104).
       </p>
       
       <!-- Live YAML Staging Diff Window -->
@@ -1399,7 +1399,7 @@
 
     <!-- Fallback In-Game Command Action -->
     <div style="margin:14px 0;">
-      <label style="display:block; font-size:0.8rem; color:var(--subtext); margin-bottom:6px;">In-Game / Console Command Fallback (ADR-104 Phase 2):</label>
+      <label style="display:block; font-size:0.8rem; color:var(--subtext); margin-bottom:6px;">In-Game / Console Command Fallback (ADR-104):</label>
       <div style="background:var(--dark); padding:10px 14px; border-radius:6px; border:1px solid var(--overlay); font-family:ui-monospace, monospace; font-size:0.9rem; color:var(--green); display:flex; justify-content:space-between; align-items:center;">
         <span id="apply-cmd">/rtp editor apply token=e4d2a90f</span>
         <button class="btn" id="btn-copy-cmd" onclick="copyApplyCmd()" style="padding:4px 10px; font-size:0.75rem;">Copy</button>
@@ -3448,13 +3448,13 @@ function materializeCurrentReference() {
   if (!cfgEditor || !currentConfigFile) return;
   const val = cfgEditor.value;
   const selStart = cfgEditor.selectionStart || 0;
-  const lineStart = val.lastIndexOf('\n', selStart - 1) + 1;
+  const lineStart = selStart > 0 ? val.lastIndexOf('\n', selStart - 1) + 1 : 0;
   let lineEnd = val.indexOf('\n', selStart);
   if (lineEnd === -1) lineEnd = val.length;
   const line = val.substring(lineStart, lineEnd);
 
   // Find key and ref token on line
-  const match = line.match(/^([a-zA-Z0-9_.-]+)\s*:\s*(["']?)(@[a-zA-Z0-9_.-]+)\2/);
+  const match = line.match(/^\s*([a-zA-Z0-9_.-]+)\s*:\s*(["']?)(@[a-zA-Z0-9_.-]+)\2/);
   const key = match ? match[1] : currentActiveKey;
   const token = match ? match[3] : currentRefToken;
   if (!isInheritedReferenceToken(token)) return;
@@ -3470,17 +3470,50 @@ function materializeCurrentReference() {
       replacement = `${key}: 0`;
     }
   }
+  const indent = (line.match(/^\s*/) || [''])[0];
+  if (indent && !replacement.startsWith(' ')) {
+    replacement = replacement.split('\n').map(l => l ? indent + l : l).join('\n');
+  }
 
-  // Perform replacement of the reference line
-  const before = val.substring(0, lineStart);
-  const after = val.substring(lineEnd);
-  cfgEditor.value = before + replacement + after;
-  cfgEditor.selectionStart = cfgEditor.selectionEnd = lineStart + replacement.length;
+  // Replace the reference line via native editing APIs so browser undo/redo history is preserved
   cfgEditor.focus();
+  if (typeof cfgEditor.setSelectionRange === 'function') {
+    cfgEditor.setSelectionRange(lineStart, lineEnd);
+  } else {
+    cfgEditor.selectionStart = lineStart;
+    cfgEditor.selectionEnd = lineEnd;
+  }
+  let inserted = false;
+  if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
+    try {
+      inserted = Boolean(document.execCommand('insertText', false, replacement)) && (cfgEditor.value !== val || replacement === line);
+    } catch (_) {
+      inserted = false;
+    }
+  }
+  if (!inserted) {
+    if (typeof cfgEditor.setRangeText === 'function') {
+      cfgEditor.setRangeText(replacement, lineStart, lineEnd, 'end');
+    } else {
+      cfgEditor.value = val.substring(0, lineStart) + replacement + val.substring(lineEnd);
+    }
+  }
+  const caret = lineStart + replacement.length;
+  if (typeof cfgEditor.setSelectionRange === 'function') {
+    cfgEditor.setSelectionRange(caret, caret);
+  } else {
+    cfgEditor.selectionStart = cfgEditor.selectionEnd = caret;
+  }
+  if (typeof cfgEditor.dispatchEvent === 'function' && typeof Event === 'function') {
+    cfgEditor.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 
   configs[currentConfigFile] = cfgEditor.value;
-  updateStagingDiff();
+  const editedRegion = regionNameOfFile(currentConfigFile);
+  if (editedRegion) applyYamlGeometry(editedRegion, cfgEditor.value);
   trackCurrentConfigLine();
+  updateGutterAndDiagnostics();
+  updateStagingDiff();
 
   const matBtn = document.getElementById('btn-materialize');
   if (matBtn) {

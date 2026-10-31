@@ -77,6 +77,9 @@ public final class ThesaurusIndex {
             }
 
             if (synonymsSection != null) {
+                if (THESAURUS_RESOURCE.equals(resourcePath)) {
+                    seedFromSharedThesaurus(conceptMap, keyMap);
+                }
                 populate(synonymsSection, conceptMap, keyMap);
             }
         } catch (IOException | RuntimeException e) {
@@ -95,6 +98,43 @@ public final class ThesaurusIndex {
         Map<String, Set<String>> keyMap = new LinkedHashMap<>();
         populate(synonyms, conceptMap, keyMap);
         return new ThesaurusIndex(conceptMap, keyMap);
+    }
+
+    private static void seedFromSharedThesaurus(
+            Map<String, Set<String>> conceptMap,
+            Map<String, Set<String>> keyMap
+    ) {
+        SearchThesaurus shared = SearchThesaurus.defaultInstance();
+        for (Map.Entry<String, Set<String>> entry : shared.canonicalSynsets().entrySet()) {
+            String root = FuzzySearchEngine.normalize(entry.getKey());
+            if (root.isEmpty()) continue;
+            Set<String> expanded = shared.expandSynset(root);
+            for (String member : entry.getValue()) {
+                String normMember = FuzzySearchEngine.normalize(member);
+                if (normMember.isEmpty()) continue;
+                Set<String> keys = conceptMap.computeIfAbsent(normMember, k -> new LinkedHashSet<>());
+                for (String target : expanded) {
+                    String normTarget = FuzzySearchEngine.normalize(target);
+                    if (!normTarget.isEmpty()) {
+                        keys.add(normTarget);
+                        keyMap.computeIfAbsent(normTarget, x -> new LinkedHashSet<>()).add(normMember);
+                    }
+                }
+            }
+        }
+        for (Map.Entry<String, String> piv : shared.crossLingualPivots().entrySet()) {
+            String foreign = SearchThesaurus.normalizeUnicodeToken(piv.getKey());
+            String root = FuzzySearchEngine.normalize(piv.getValue());
+            if (foreign.isEmpty() || root.isEmpty()) continue;
+            Set<String> keys = conceptMap.computeIfAbsent(foreign, k -> new LinkedHashSet<>());
+            for (String target : shared.expandSynset(root)) {
+                String normTarget = FuzzySearchEngine.normalize(target);
+                if (!normTarget.isEmpty()) {
+                    keys.add(normTarget);
+                    keyMap.computeIfAbsent(normTarget, x -> new LinkedHashSet<>()).add(foreign);
+                }
+            }
+        }
     }
 
     private static void populate(Map<?, ?> rawSynonyms,
@@ -181,6 +221,9 @@ public final class ThesaurusIndex {
         for (String rawTok : tokens) {
             if (rawTok == null) continue;
             String tok = FuzzySearchEngine.normalize(rawTok);
+            if (tok.isEmpty()) {
+                tok = SearchThesaurus.normalizeUnicodeToken(rawTok);
+            }
             if (tok.isEmpty()) continue;
 
             for (Map.Entry<String, Set<String>> entry : conceptToKeys.entrySet()) {

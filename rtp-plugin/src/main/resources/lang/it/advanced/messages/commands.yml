@@ -223,7 +223,7 @@ menuFrontPageHoverAdmin: "&7strumenti operatore: config, scansioni, diagnostica,
 menuAdminPanelTitle: "#5FB3B3&l⚙ pannello di amministrazione"
 
 # Riga di suggerimento non cliccabile sotto menuAdminPanelTitle. Nessun segnaposto.
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7clicca su un'opzione; le azioni distruttive mostrano un avviso al passaggio del mouse"
 
 # Divisori di sezione nel pannello admin. Nessun segnaposto.
 menuAdminPanelSectionConfig: "&8--- &7configurazione &8---"
@@ -332,7 +332,7 @@ infoBookRefreshHover: "&7Ri-renderizza questa pagina con un'istantanea di metric
 
 # Etichetta cliccabile per l'opzione Passa alla chat in fondo al libro /rtp info.
 # Riesegue lo stesso ambito tramite la chat tradizionale.
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[Passa alla chat]"
 
 # Testo al passaggio del mouse per la riga passa alla chat del libro info.
 infoBookSwitchToTextHover: "&7Riesegui /rtp info in chat invece del libro."
@@ -389,7 +389,7 @@ configValueUnsetPlaceholder: "&8(non impostato)"
 # Riga di intestazione non cliccabile che separa l'elenco "Modificabile" dall'elenco "In attesa"
 # nel carrello in una pagina di file di configurazione quando il visualizzatore ha preparato una o
 # più modifiche non confermate. Nessun segnaposto. Evitare giallo (&e/&6) e bianco (&f): la pergamena del libro li rende sbiaditi.
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- modifiche in attesa --"
 
 # Etichetta per riga per una voce key=value preparata (in attesa) in una pagina di file di configurazione.
 # Cliccando sulla riga la si rimuove dal carrello. Segnaposto: [key], [value].
@@ -464,7 +464,7 @@ multiconfigRowRemoveHover: "&celimina &f[name]"
 multiconfigConfirmTitle: "&c&leliminare [name]?"
 
 # Etichetta della riga Sì della pagina di conferma eliminazione. Nessun segnaposto.
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[conferma eliminazione]"
 
 # Etichetta della riga Annulla della pagina di conferma eliminazione. Nessun segnaposto.
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -495,10 +495,10 @@ multiconfigResultNameInvalid: "&cil nome '[name]' non è consentito; usa lettere
 # Segnaposto: [name].
 multiconfigResultNameTaken: "&cesiste già una voce chiamata '[name]'."
 
-docsNotFound: "&c[RTP] Argomento di documentazione '[topic]' non trovato. Usa /rtp docs list per visualizzare gli argomenti disponibili."
-docsEmpty: "&c[RTP] Nessun argomento di documentazione è attualmente registrato."
-docsExportSuccess: "&a[RTP] Pacchetto HTML della documentazione esportato con successo in [path]."
-docsExportFailed: "&c[RTP] Impossibile esportare il pacchetto della documentazione: [reason]."
+docsNotFound: "&c[P0] Argomento di documentazione '[topic]' non trovato. Usa /rtp docs list per visualizzare gli argomenti disponibili."
+docsEmpty: "&c[P0] Nessun argomento di documentazione è attualmente registrato."
+docsExportSuccess: "&a[P0] Pacchetto HTML della documentazione esportato con successo in [path]."
+docsExportFailed: "&c[P0] Impossibile esportare il pacchetto della documentazione: [reason]."
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
 # --- Web editor channel (ADR-106) ---

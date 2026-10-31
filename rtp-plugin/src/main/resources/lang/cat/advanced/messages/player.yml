@@ -111,7 +111,7 @@ KITTY_POUNCING: "&bPOUNCING"
 # title settings
 # remove or set big_meow to " to disable
 # PlaceholderAPI is recommended for coordinates
-big_meow: "<rainbow>Teletransportat!</rainbow>"
+big_meow: "<rainbow>Pounced!</rainbow>"
 little_meow: "<gradient:#A78BFA:#E876A0>purr-fect fun!</gradient>"
 slow_blink_in: 20
 stay_visible: 20
