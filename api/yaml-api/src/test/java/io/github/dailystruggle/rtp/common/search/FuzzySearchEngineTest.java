@@ -339,21 +339,81 @@ class FuzzySearchEngineTest {
         assertEquals(Set.of(), expander.expandWithBoundedWait("coldmiss", 10L, 700L));
 
         // Capacity enforcement and maxWaitMs <= 0 branch
-        expander.putCacheEntry("k1", List.of("v1"), 1000L);
-        expander.putCacheEntry("k2", List.of("v2"), 1001L);
-        expander.putCacheEntry("k3", List.of("v3"), 1002L);
-        expander.putCacheEntry("k4", List.of("v4"), 1003L);
-        expander.putCacheEntry("k5", List.of("v5"), 1004L);
+        for (int i = 1; i <= 18; i++) {
+            expander.putCacheEntry("key" + String.format("%02d", i), List.of("val" + i), 1000L + i);
+        }
+        expander.putCacheEntry("k5", List.of("v5"), 2000L);
         expander.setOnlineFetchEnabled(true);
-        assertEquals(Set.of("v5"), expander.expandWithBoundedWait("k5", 50L, 1100L));
+        assertEquals(Set.of("v5"), expander.expandWithBoundedWait("k5", 50L, 2100L));
         // Expired positive entry with maxWaitMs = 0 returns stale terms
         assertEquals(Set.of("v5"), expander.expandWithBoundedWait("k5", 0L, 5000L));
+        // Expired positive entry via getCachedOrScheduleAsync returns stale terms and schedules refresh
+        expander.putCacheEntry("stalekey", List.of("staleval"), 2500L);
+        assertEquals(Set.of("staleval"), expander.getCachedOrScheduleAsync("stalekey", 5000L));
 
         // Stage 3 remoteRoot match in matchTokenCascade (remote term "escape" -> canonical root "leave")
         expander.putCacheEntry("wander", List.of("escape"), 6000L);
         var stage3RootHit = merged.matchTokenCascade("wander", Set.of("leave"), Set.of(), expander, 6100L);
         assertEquals(SearchThesaurus.MatchStage.STAGE_3_ONLINE_EXPANSION, stage3RootHit.stage());
         assertEquals("leave", stage3RootHit.matchedTerm());
+
+        // SearchThesaurus additional methods (matchesAnyInDocument, getters, foldDiacritics, questions)
+        assertFalse(merged.matchesAnyInDocument(null, Set.of("spawn")));
+        assertFalse(merged.matchesAnyInDocument("spawn", null));
+        assertFalse(merged.matchesAnyInDocument("spawn", Set.of()));
+        assertFalse(merged.matchesAnyInDocument("   ", Set.of("spawn")));
+        assertTrue(merged.matchesAnyInDocument("spawn", Set.of("spawn")));
+        assertTrue(merged.matchesAnyInDocument("hub", Set.of("spawn")));
+        assertTrue(merged.matchesAnyInDocument("leave", Set.of("escape")));
+        assertFalse(merged.matchesAnyInDocument("nonexistenttoken", Set.of("spawn")));
+        assertFalse(merged.canonicalSynsets().isEmpty());
+        assertFalse(merged.crossLingualPivots().isEmpty());
+        assertEquals("", SearchThesaurus.normalizeToken(null));
+        assertEquals("", SearchThesaurus.normalizeToken("   "));
+        assertEquals("lodz", SearchThesaurus.normalizeToken("Łódź"));
+        assertEquals("strasse", SearchThesaurus.normalizeToken("Straße"));
+        assertTrue(merged.hasMultilingualQuestionIntent("hey   how can i teleport"));
+        assertTrue(merged.hasMultilingualQuestionIntent("hola donde esta el lobby"));
+        assertTrue(merged.hasMultilingualQuestionIntent("怎么去主城"));
+        assertTrue(merged.hasMultilingualQuestionIntent("how"));
+
+        // OnlineQueryExpander Datamuse JSON parser & failure/timeout branches
+        assertEquals(Set.of(), OnlineQueryExpander.parseDatamuseWordsJson(null));
+        assertEquals(Set.of(), OnlineQueryExpander.parseDatamuseWordsJson("   "));
+        Set<String> parsedJsonWords = OnlineQueryExpander.parseDatamuseWordsJson(
+                "[{\"word\":\"teleport\"},{\"word\":\"warp\"},{\"word\":\"a\"},{\"word\":\"portal\"},"
+                        + "{\"word\":\"gate\"},{\"word\":\"jump\"},{\"word\":\"blink\"},{\"word\":\"shift\"},"
+                        + "{\"word\":\"hop\"},{\"word\":\"extra\"}]");
+        assertEquals(8, parsedJsonWords.size());
+        assertTrue(parsedJsonWords.contains("teleport"));
+
+        OnlineQueryExpander failingExpander = new OnlineQueryExpander(
+                null,
+                1_000L,
+                500L,
+                16,
+                true,
+                tok -> {
+                    throw new java.io.IOException("simulated network error");
+                });
+        assertEquals(Set.of(), failingExpander.expandWithBoundedWait("failword", 50L, 1000L));
+
+        OnlineQueryExpander slowExpander = new OnlineQueryExpander(
+                null,
+                1_000L,
+                500L,
+                16,
+                true,
+                tok -> {
+                    try {
+                        Thread.sleep(60L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return Set.of("delayed");
+                });
+        assertEquals(Set.of(), slowExpander.expandWithBoundedWait("slowword", 5L, 1000L));
+        assertEquals(Set.of(), slowExpander.getCachedOrScheduleAsync("slowword", 1000L));
 
         // Malformed lines in TSV cache file
         java.nio.file.Files.writeString(cacheFile,

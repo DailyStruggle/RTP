@@ -147,6 +147,7 @@ public class SendMessage {
     return 21;
   }
 
+  @SuppressWarnings("ConstantValue")
   public static void sendMessage(CommandSender sender, String message) {
     if (sender == null || message == null || message.isEmpty()) return;
     // Bukkit.getLogger().info("[diag/sendMessage(CS)] entry sender=" + (sender == null ? "null" : sender.getClass().getSimpleName()) + " raw=\"" + message + "\"");
@@ -165,6 +166,7 @@ public class SendMessage {
     }
   }
 
+  @SuppressWarnings("ConstantValue")
   public static void sendMessage(Player player, String message) {
     if (player == null || message == null || message.isEmpty()) return;
     intercept(message);
@@ -185,6 +187,7 @@ public class SendMessage {
    * {@link ClickEvent.Action#RUN_COMMAND} clicks so every fragment auto-fires
    * its literal {@code /rtp menu ...} command instead of suggesting it.
    */
+  @SuppressWarnings("ConstantValue")
   public static void sendMessage(
       RTPCommandSender sender, String message, String hover, String click,
       ClickEvent.Action clickAction) {

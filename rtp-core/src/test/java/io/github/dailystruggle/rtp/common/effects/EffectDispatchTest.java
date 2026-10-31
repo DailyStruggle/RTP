@@ -115,8 +115,119 @@ class EffectDispatchTest {
                 (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.effectParsing, true);
         assertTrue(EffectDispatch.isEffectParsingEnabled(null));
+        perf.set(PerformanceKeys.effectParsing, "true");
+        assertTrue(EffectDispatch.isEffectParsingEnabled(perf));
         perf.set(PerformanceKeys.effectParsing, false);
         assertFalse(EffectDispatch.isEffectParsingEnabled(perf));
+
+        Configs saved = ActiveConfigs.get();
+        try {
+            ActiveConfigs.set(null);
+            assertFalse(EffectDispatch.isEffectParsingEnabled(null));
+            assertFalse(EffectDispatch.isEffectParsingEnabled(perf));
+        } finally {
+            ActiveConfigs.set(saved);
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-CORE-ARCH-003: dispatchPostTeleportTitle and dispatchPostTeleportCommands execute on scheduler")
+    @SuppressWarnings("unchecked")
+    void dispatchPostTeleportTitleAndCommandsExecuteOnScheduler() {
+        EffectDispatch.dispatchPostTeleportTitle(null);
+        EffectDispatch.dispatchPostTeleportCommands(null);
+
+        MockRTPWorld world = new MockRTPWorld("world");
+        accessor.addWorld(world);
+        List<String> titlesSent = new java.util.ArrayList<>();
+        List<String> actionbarsSent = new java.util.ArrayList<>();
+        List<String> playerCmdsExecuted = new java.util.ArrayList<>();
+        MockRTPPlayer realPlayer = new MockRTPPlayer(
+                UUID.randomUUID(), "Bob", new RTPLocation(world, 0, 64, 0)) {
+            @Override
+            public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+                super.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+                titlesSent.add(title + "|" + subtitle + "|" + fadeIn + "|" + stay + "|" + fadeOut);
+            }
+
+            @Override
+            public void sendActionbar(String message) {
+                super.sendActionbar(message);
+                actionbarsSent.add(message);
+            }
+
+            @Override
+            public void performCommand(
+                    io.github.dailystruggle.rtp.api.entity.RTPPlayer target, String command) {
+                playerCmdsExecuted.add(command);
+            }
+        };
+        accessor.addPlayer(realPlayer);
+
+        ConfigParser<PlayerMessages> msgParser =
+                (ConfigParser<PlayerMessages>) ActiveConfigs.get().getParser(PlayerMessages.class);
+        ConfigParser<ConfigKeys> cfgParser =
+                (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
+
+        TeleportPipelineTask task = new TeleportPipelineTask(
+                new GenerationContext(realPlayer, realPlayer, null),
+                new io.github.dailystruggle.rtp.common.selection.region.Region(
+                        "default",
+                        new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+                                "default",
+                                world,
+                                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>()),
+                                false, false, 0, 0, 0, 0, 0.0, 0, null, false, -1L, null)));
+        try {
+            msgParser.set(PlayerMessages.title, "");
+            msgParser.set(PlayerMessages.subtitle, "");
+            msgParser.set(PlayerMessages.actionbar, "");
+            EffectDispatch.PostTeleportTitle emptyTitle = EffectDispatch.resolvePostTeleportTitle(task);
+            assertNotNull(emptyTitle);
+            assertTrue(emptyTitle.isEmpty());
+            EffectDispatch.dispatchPostTeleportTitle(task);
+            assertTrue(titlesSent.isEmpty());
+
+            msgParser.set(PlayerMessages.title, "Arrived");
+            msgParser.set(PlayerMessages.subtitle, "Sub");
+            msgParser.set(PlayerMessages.fadeIn, 5);
+            msgParser.set(PlayerMessages.stay, 20);
+            msgParser.set(PlayerMessages.fadeOut, 5);
+            msgParser.set(PlayerMessages.actionbar, "Bar");
+            EffectDispatch.dispatchPostTeleportTitle(task);
+            assertEquals(List.of("Arrived|Sub|5|20|5"), titlesSent);
+            assertEquals(List.of("Bar"), actionbarsSent);
+
+            cfgParser.set(ConfigKeys.consoleCommands, List.of());
+            cfgParser.set(ConfigKeys.playerCommands, List.of());
+            assertNull(EffectDispatch.resolvePostTeleportCommands(task, "OverrideBob", false));
+
+            List<Object> rawConsole = new java.util.ArrayList<>();
+            rawConsole.add(null);
+            rawConsole.add("   ");
+            rawConsole.add("/");
+            rawConsole.add("/say hi [player]");
+            cfgParser.set(ConfigKeys.consoleCommands, rawConsole);
+            List<Object> rawPlayer = new java.util.ArrayList<>();
+            rawPlayer.add(null);
+            rawPlayer.add("");
+            rawPlayer.add("/");
+            rawPlayer.add("/me [player]");
+            cfgParser.set(ConfigKeys.playerCommands, rawPlayer);
+
+            EffectDispatch.PostTeleportCommands unstripped =
+                    EffectDispatch.resolvePostTeleportCommands(task, "OverrideBob", false);
+            assertNotNull(unstripped);
+            assertFalse(unstripped.isEmpty());
+            assertTrue( new EffectDispatch.PostTeleportCommands(null, null).isEmpty());
+            assertEquals(List.of("/", "/say hi OverrideBob"), unstripped.consoleCommands());
+
+            EffectDispatch.dispatchPostTeleportCommands(task);
+            assertEquals(List.of("me Bob"), playerCmdsExecuted);
+        } finally {
+            task.setCancelled(true);
+        }
     }
 
     @Test

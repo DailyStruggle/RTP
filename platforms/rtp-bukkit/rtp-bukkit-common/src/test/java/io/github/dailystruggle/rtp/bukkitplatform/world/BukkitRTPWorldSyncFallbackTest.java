@@ -170,4 +170,18 @@ class BukkitRTPWorldSyncFallbackTest {
     verify(world, never()).addPluginChunkTicket(anyInt(), anyInt(), any());
     verify(world, never()).getChunkAt(anyInt(), anyInt());
   }
+
+  @Test
+  @DisplayName("S-005: getBiome on primary thread with unloaded chunk returns null without calling World#getBiome")
+  void getBiomeOnPrimaryThreadUnloadedChunkSkipsLiveCall() {
+    World world = mockWorld();
+    when(world.isChunkLoaded(2, 3)).thenReturn(false);
+    assertTrue(server.isPrimaryThread());
+
+    BukkitRTPWorld rtpWorld = new BukkitRTPWorld(world);
+    String biome = rtpWorld.getBiome(36, 64, 52);
+
+    assertNull(biome);
+    verify(world, never()).getBiome(anyInt(), anyInt(), anyInt());
+  }
 }

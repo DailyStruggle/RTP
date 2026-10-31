@@ -317,11 +317,9 @@ public final class PregenBiomeExtractor {
                         AnvilReader.ChunkEntry entry = reader.readChunk(bytes, length, lx, lz);
                         if (entry != null && entry.root != null) {
                             AnvilChunkView view = AnvilReader.toView(entry.root);
-                            if (view != null) {
-                                int topY = view.getHeightmapTopY(8, 8);
-                                if (topY != Integer.MIN_VALUE) {
-                                    biomeName = view.getBiomeAt(8, topY, 8);
-                                }
+                            int topY = view.getHeightmapTopY(8, 8);
+                            if (topY != Integer.MIN_VALUE) {
+                                biomeName = view.getBiomeAt(8, topY, 8);
                             }
                         }
                     } catch (java.io.IOException | RuntimeException e) {

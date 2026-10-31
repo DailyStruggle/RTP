@@ -670,4 +670,74 @@ class RTPCmdBranchTest {
             ActiveSelection.get().permRegionLookup.remove("targetPaidRegion");
         }
     }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: compute covers shape overrides, relative coords, biome filter, worldBorderOverride, and bad world rejection")
+    void testShapeOverridesRelativeCoordsBiomeFilterAndWorldRejection() {
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("world");
+        accessor.addWorld(world);
+        Region previousDefault = ActiveSelection.get().permRegionLookup.get("default");
+        Region defaultRegion = new Region("default", new RegionSettings(
+                "default", world,
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>()),
+                false, false, 0, 0, 0, 0, 0.0, 0, null, false, -1L, null));
+        ActiveSelection.get().permRegionLookup.put("default", defaultRegion);
+
+        MockRTPPlayer sender = new MockRTPPlayer(
+                UUID.randomUUID(),
+                "shapeOverridePlayer",
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 64, 64, -32));
+        sender.setPermission("rtp.free", true);
+        accessor.addPlayer(sender);
+
+        try {
+            // 1. Unknown world argument rejected with badArg feedback
+            Map<String, List<String>> badWorldArgs = new HashMap<>();
+            badWorldArgs.put("world", List.of("missing_world_xyz"));
+            List<String> badWorldFeedback = new ArrayList<>();
+            assertTrue(rtpCmd.compute(sender.uuid(), badWorldArgs, null, badWorldFeedback::add));
+            assertFalse(badWorldFeedback.isEmpty());
+
+            // 2. Shape overrides with relative coords (~, ~10, ~abc), booleans, explicit units, numbers, and biome filter
+            Map<String, List<String>> shapeArgs = new HashMap<>();
+            shapeArgs.put("region", List.of("default"));
+            shapeArgs.put("shape", List.of("RECTANGLE"));
+            shapeArgs.put("centerX", List.of("~10"));
+            shapeArgs.put("centerZ", List.of("~"));
+            shapeArgs.put("width", List.of("16c"));
+            shapeArgs.put("length", List.of("32"));
+            shapeArgs.put("weight", List.of("1.5"));
+            shapeArgs.put("mode", List.of("ACCUMULATED"));
+            shapeArgs.put("uniquePlacements", List.of("true"));
+            shapeArgs.put("expand", List.of("false"));
+            shapeArgs.put("biome", java.util.Arrays.asList("plains", "", null));
+            shapeArgs.put("worldBorderOverride", List.of("true"));
+
+            assertTrue(rtpCmd.compute(sender.uuid(), shapeArgs, null, msg -> {}));
+            Region tempRegion = ActiveSelection.get().tempRegions.get(sender.uuid());
+            assertNotNull(tempRegion);
+            TeleportSessions.current().processingPlayers.remove(sender.uuid());
+            TeleportSessions.current().latestTeleportData.remove(sender.uuid());
+
+            // 3. Invalid relative coordinate offset (~abc) falls back to base coordinate
+            Map<String, List<String>> invalidRelArgs = new HashMap<>();
+            invalidRelArgs.put("region", List.of("default"));
+            invalidRelArgs.put("shape", List.of("SQUARE"));
+            invalidRelArgs.put("centerX", List.of("~abc"));
+            invalidRelArgs.put("centerZ", List.of("~+"));
+            invalidRelArgs.put("radius", List.of("2.5c"));
+            assertTrue(rtpCmd.compute(sender.uuid(), invalidRelArgs, null, msg -> {}));
+        } finally {
+            TeleportSessions.current().processingPlayers.remove(sender.uuid());
+            TeleportSessions.current().latestTeleportData.remove(sender.uuid());
+            ActiveSelection.get().tempRegions.remove(sender.uuid());
+            if (previousDefault != null) {
+                ActiveSelection.get().permRegionLookup.put("default", previousDefault);
+            } else {
+                ActiveSelection.get().permRegionLookup.remove("default");
+            }
+        }
+    }
 }

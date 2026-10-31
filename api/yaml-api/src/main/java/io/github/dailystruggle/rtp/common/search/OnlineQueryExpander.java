@@ -115,7 +115,7 @@ public final class OnlineQueryExpander {
     @FunctionalInterface
     public interface RemoteWordFetcher {
         @NotNull
-        Set<String> fetchRelatedWords(@NotNull String sanitizedToken) throws Exception;
+        Set<String> fetchRelatedWords(@NotNull String sanitizedToken) throws IOException;
     }
 
     /**
@@ -134,7 +134,8 @@ public final class OnlineQueryExpander {
     ) {
         public CachedExpansionEntry {
             Objects.requireNonNull(queryToken, "queryToken");
-            expandedTerms = expandedTerms == null ? Set.of() : Collections.unmodifiableSet(new LinkedHashSet<>(expandedTerms));
+            Objects.requireNonNull(expandedTerms, "expandedTerms");
+            expandedTerms = Collections.unmodifiableSet(new LinkedHashSet<>(expandedTerms));
         }
 
         public boolean isExpired(long nowEpochMs, long positiveTtlMs, long negativeTtlMs) {
@@ -331,6 +332,10 @@ public final class OnlineQueryExpander {
         }
         try {
             return fut.get(maxWaitMs, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            logFine("OnlineQueryExpander bounded wait interrupted for token '" + token + "'", ex);
+            return entry != null && !entry.negativeHit() ? entry.expandedTerms() : Set.of();
         } catch (Exception ex) {
             logFine("OnlineQueryExpander bounded wait timed out or failed for token '" + token + "'", ex);
             return entry != null && !entry.negativeHit() ? entry.expandedTerms() : Set.of();
@@ -378,11 +383,11 @@ public final class OnlineQueryExpander {
         int removed = 0;
         for (Map.Entry<String, CachedExpansionEntry> e : cache.entrySet()) {
             CachedExpansionEntry entry = e.getValue();
-            if (entry != null && entry.isExpired(nowEpochMs, positiveTtlMs, negativeTtlMs)) {
-                if (cache.remove(e.getKey(), entry)) {
-                    removed++;
-                    ttlInvalidations.increment();
-                }
+            if (entry != null
+                    && entry.isExpired(nowEpochMs, positiveTtlMs, negativeTtlMs)
+                    && cache.remove(e.getKey(), entry)) {
+                removed++;
+                ttlInvalidations.increment();
             }
         }
         if (removed > 0) {
@@ -538,18 +543,16 @@ public final class OnlineQueryExpander {
                 Set<String> sanitized = new LinkedHashSet<>();
                 try {
                     Set<String> rawWords = fetcher.fetchRelatedWords(token);
-                    if (rawWords != null) {
-                        for (String w : rawWords) {
-                            String clean = sanitizeToken(w);
-                            if (!clean.isEmpty() && !clean.equals(token)) {
-                                sanitized.add(clean);
-                                if (sanitized.size() >= 8) {
-                                    break;
-                                }
+                    for (String w : rawWords) {
+                        String clean = sanitizeToken(w);
+                        if (!clean.isEmpty() && !clean.equals(token)) {
+                            sanitized.add(clean);
+                            if (sanitized.size() >= 8) {
+                                break;
                             }
                         }
                     }
-                } catch (Exception ex) {
+                } catch (IOException | RuntimeException ex) {
                     logFine("OnlineQueryExpander remote fetch failed for token '" + token + "'", ex);
                 }
                 enforceCapacity();

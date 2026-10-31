@@ -319,6 +319,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
                   if (rp == null || !rp.isOnline()) continue;
                   io.github.dailystruggle.rtp.api.world.RTPLocation loc = rp.getLocation();
                   if (loc == null || loc.world() == null) continue;
+                  if (!loc.world().isChunkLoaded(loc.x() >> 4, loc.z() >> 4)) continue;
                   String biome = loc.world().getBiome(loc.x(), loc.y(), loc.z());
                   if (biome != null) biomes.add(biome);
                 }

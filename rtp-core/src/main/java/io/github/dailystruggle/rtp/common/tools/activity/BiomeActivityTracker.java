@@ -69,6 +69,10 @@ public final class BiomeActivityTracker {
                     return;
                   }
                   RTPWorld<?> world = loc.world();
+                  if (!world.isChunkLoaded(loc.x() >> 4, loc.z() >> 4)) {
+                    future.complete(null);
+                    return;
+                  }
                   String biome = world.getBiome(loc.x(), loc.y(), loc.z());
                   record(biome);
                   future.complete(biome);

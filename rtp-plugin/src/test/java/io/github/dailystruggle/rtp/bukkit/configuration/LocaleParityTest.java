@@ -703,14 +703,6 @@ public class LocaleParityTest {
         return map;
     }
 
-    private static Set<String> collectPlaceholders(Map<String, Object> yaml) {
-        Set<String> out = new TreeSet<>();
-        for (Object v : yaml.values()) {
-            scan(v, out);
-        }
-        return out;
-    }
-
     private static void scan(Object v, Set<String> out) {
         if (v == null) return;
         if (v instanceof CharSequence cs) {
