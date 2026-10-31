@@ -2,15 +2,14 @@ package io.github.dailystruggle.rtp.common.selection.region.util;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import java.util.logging.Level;
 
 /**
  * Utility for auditing region bounds against the world border and calculating chunk inscriptions.
+ *
+ * @governedBy ADR-115
  */
 public final class WorldBorderAuditor {
 
@@ -51,11 +50,11 @@ public final class WorldBorderAuditor {
     }
 
     Shape<?> borderShape = wb.getShape() != null ? wb.getShape().get() : null;
-    if (!(borderShape instanceof Square borderSquare)) {
+    if (!isSquareShape(borderShape)) {
       return;
     }
 
-    long borderRadChunks = borderSquare.getNumber(GenericMemoryShapeParams.radius, 0L).longValue();
+    long borderRadChunks = getShapeLongParam(borderShape, "radius", 0L);
     if (borderRadChunks <= 0) {
       return;
     }
@@ -131,13 +130,13 @@ public final class WorldBorderAuditor {
     }
 
     Shape<?> borderShape = wb.getShape() != null ? wb.getShape().get() : null;
-    if (!(borderShape instanceof Square borderSquare)) {
+    if (!isSquareShape(borderShape)) {
       return true;
     }
 
-    long borderRadChunks = borderSquare.getNumber(GenericMemoryShapeParams.radius, 0L).longValue();
-    long borderCxChunks = borderSquare.getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
-    long borderCzChunks = borderSquare.getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
+    long borderRadChunks = getShapeLongParam(borderShape, "radius", 0L);
+    long borderCxChunks = getShapeLongParam(borderShape, "centerX", 0L);
+    long borderCzChunks = getShapeLongParam(borderShape, "centerZ", 0L);
 
     if (borderRadChunks <= 0) {
       return true;
@@ -148,31 +147,16 @@ public final class WorldBorderAuditor {
     long borderMinZ = borderCzChunks - borderRadChunks;
     long borderMaxZ = borderCzChunks + borderRadChunks;
 
-    long shapeMinX;
-    long shapeMaxX;
-    long shapeMinZ;
-    long shapeMaxZ;
-    long shapeRad;
-
-    if (shape instanceof Square sq) {
-      shapeRad = sq.getNumber(GenericMemoryShapeParams.radius, 0L).longValue();
-      long cx = sq.getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
-      long cz = sq.getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
-      shapeMinX = cx - shapeRad;
-      shapeMaxX = cx + shapeRad;
-      shapeMinZ = cz - shapeRad;
-      shapeMaxZ = cz + shapeRad;
-    } else if (shape instanceof Circle cir) {
-      shapeRad = cir.getNumber(GenericMemoryShapeParams.radius, 0L).longValue();
-      long cx = cir.getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
-      long cz = cir.getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
-      shapeMinX = cx - shapeRad;
-      shapeMaxX = cx + shapeRad;
-      shapeMinZ = cz - shapeRad;
-      shapeMaxZ = cz + shapeRad;
-    } else {
+    if (!isRadialShape(shape)) {
       return true;
     }
+    long shapeRad = getShapeLongParam(shape, "radius", 0L);
+    long cx = getShapeLongParam(shape, "centerX", 0L);
+    long cz = getShapeLongParam(shape, "centerZ", 0L);
+    long shapeMinX = cx - shapeRad;
+    long shapeMaxX = cx + shapeRad;
+    long shapeMinZ = cz - shapeRad;
+    long shapeMaxZ = cz + shapeRad;
 
     boolean overflows = (shapeMinX < borderMinX)
         || (shapeMaxX > borderMaxX)
@@ -196,5 +180,29 @@ public final class WorldBorderAuditor {
     }
 
     return true;
+  }
+
+  private static boolean isSquareShape(Shape<?> shape) {
+    if (shape == null) return false;
+    String n = shape.name != null ? shape.name : "";
+    return "SQUARE".equalsIgnoreCase(n) || shape.getClass().getSimpleName().startsWith("Square");
+  }
+
+  private static boolean isRadialShape(Shape<?> shape) {
+    if (shape == null) return false;
+    if (isSquareShape(shape)) return true;
+    String n = shape.name != null ? shape.name : "";
+    return "CIRCLE".equalsIgnoreCase(n) || shape.getClass().getSimpleName().startsWith("Circle");
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static long getShapeLongParam(Shape<?> shape, String paramName, long def) {
+    if (shape == null || shape.myClass == null) return def;
+    try {
+      Enum key = Enum.valueOf((Class) shape.myClass, paramName);
+      return ((Shape) shape).getNumber(key, def).longValue();
+    } catch (IllegalArgumentException ignored) {
+      return def;
+    }
   }
 }

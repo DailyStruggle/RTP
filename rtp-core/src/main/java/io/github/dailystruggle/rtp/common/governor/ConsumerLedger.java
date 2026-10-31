@@ -33,7 +33,7 @@ public final class ConsumerLedger {
 
     /**
      * Immutable telemetry row for a single player's attributed RTP cost in milliseconds per minute
-     * (ADR-124 Section 1 & 5).
+     * (ADR-124 Section 1 and 5).
      *
      * @param playerId        player UUID
      * @param costMsPerMin    mean of 30 s and 10 min EWMAs ({@code a_p = 0.5 * (a_p^30s + a_p^10m)})
@@ -122,7 +122,7 @@ public final class ConsumerLedger {
 
     /**
      * Returns up to {@code limit} active consumers ordered by descending attributed cost {@code a_p}
-     * at {@code nowNanos} (ADR-124 Section 1 & 5).
+     * at {@code nowNanos} (ADR-124 Section 1 and 5).
      */
     public List<ConsumerCostEntry> topConsumers(int limit, long nowNanos) {
         return delegate.topActors(limit, nowNanos, ConsumerLedger::toConsumerCostEntry);
@@ -149,7 +149,18 @@ public final class ConsumerLedger {
     }
 
     /**
-     * Clears all region and player attribution state (called on governor reset/reload, ADR-124 Section 1 & 6).
+     * Evicts {@code playerId} from both per-player cost tracking and per-region active consumer
+     * windows when a player disconnects.
+     *
+     * @param playerId departing player's UUID (ignored when null)
+     * @return {@code true} if any state was removed for {@code playerId}
+     */
+    public boolean evictPlayer(UUID playerId) {
+        return delegate.evictActor(playerId);
+    }
+
+    /**
+     * Clears all region and player attribution state (called on governor reset/reload, ADR-124 Section 1 and 6).
      */
     public void reset() {
         delegate.reset();

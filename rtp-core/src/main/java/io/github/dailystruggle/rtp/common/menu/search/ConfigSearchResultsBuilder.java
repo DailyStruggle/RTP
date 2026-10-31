@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import io.github.dailystruggle.rtp.common.search.OnlineQueryExpander;
 import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 import io.github.dailystruggle.rtp.common.text.LegacyColorStrip;
 import io.github.dailystruggle.rtp.common.text.LegacyColorStrip.StripResult;
@@ -238,6 +239,26 @@ public final class ConfigSearchResultsBuilder {
                 keyHitFound = true;
                 keyScore = Math.max(45 - dist * 10, 20);
                 keyReason = "Fuzzy ~" + keyName;
+            }
+        }
+
+        // 5. Stage 3 — File-Cached TTL Online Expansion fallback (40 pts) ONLY if Stages 1 and 2 missed
+        if (!keyHitFound) {
+            FuzzySearchEngine.ScoredCandidate cascade = FuzzySearchEngine.scoreCandidateCascade(
+                    needle,
+                    fileName,
+                    keyName,
+                    rawValue,
+                    OnlineQueryExpander.defaultInstance(),
+                    System.currentTimeMillis()
+            );
+            for (FuzzySearchEngine.MatchReason reason : cascade.reasons()) {
+                if ("online".equals(reason.type())) {
+                    keyHitFound = true;
+                    keyScore = 40;
+                    keyReason = reason.text();
+                    break;
+                }
             }
         }
 

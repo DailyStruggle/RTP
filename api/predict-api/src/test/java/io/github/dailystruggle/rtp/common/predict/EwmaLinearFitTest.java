@@ -145,5 +145,14 @@ class EwmaLinearFitTest {
             ols.recordSample(tickets, tickets * (10.0 * prior), i * sec);
         }
         assertEquals(4.0 * prior, ols.estimate(), 1e-6);
+
+        // High-frequency burst within windowNanos is capped at MAX_WINDOW_SAMPLES (256)
+        ols.reset();
+        for (int i = 0; i < 1_000; i++) {
+            int tickets = 20 + (i % 50) * 5;
+            ols.recordSample(tickets, tickets * (2.0 * prior), i * 1_000_000L);
+        }
+        assertEquals(EwmaLinearFit.WindowedOlsSlope.MAX_WINDOW_SAMPLES, ols.windowSampleCount(),
+                "WindowedOlsSlope must cap retained samples at MAX_WINDOW_SAMPLES under burst loads");
     }
 }

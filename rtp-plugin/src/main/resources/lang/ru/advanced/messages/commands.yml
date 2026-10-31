@@ -29,8 +29,8 @@ scanBossBar: "Сканирование [scan_regions]: [scan_chunks]/[scan_total
 # сообщения, относящиеся к команде info
 заголовокИнфо: "&2&l/rtp info"
 инфоТикеты: "&7Активные тикеты чанков (глобально): #7E9CC8[tickets]"
-инфоТелепорты: ""
-инфоMSPT: ""
+инфоТелепорты: "&7Активные конечные автоматы телепортации: #7E9CC8[teleports]"
+инфоMSPT: "&7Текущий MSPT плагина: #7E9CC8[mspt]"
 инфоВсегоЗагрузок: "&7Чанков загружено за всё время: #7E9CC8[loads]"
 инфоЗагрузкиПоИсточнику: "&7Загрузки по источнику: #7E9CC8[loadsByOrigin]"
 инфоЧастотаУтечек: "&7Текущая частота утечек чанков: #7E9CC8[leakRate]"
@@ -200,8 +200,8 @@ menuPageNext: "&7следующая страница ([page]) »"
 menuFrontPageSectionTeleport: "&8--- &7телепортация &8---"
 
 # Строки главной страницы. Без плейсхолдеров.
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- телепортироваться в случайное место"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- выберите регион"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- выберите мир"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- выберите биом"
 menuFrontPageRowHelp: "#7A4FB8❓ список команд &7- /rtp help"
@@ -219,7 +219,7 @@ menuFrontPageHoverAdmin: "&7инструменты оператора: наст�
 menuAdminPanelTitle: "#5FB3B3&l⚙ панель администратора"
 
 # Ненажимаемая строка подсказки под menuAdminPanelTitle. Без плейсхолдеров.
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7нажмите на опцию; опасные действия показывают предупреждение при наведении"
 
 # Разделители разделов на панели администратора. Без плейсхолдеров.
 menuAdminPanelSectionConfig: "&8--- &7конфигурация &8---"
@@ -328,7 +328,7 @@ infoBookRefreshHover: "&7Перерисовать эту страницу по �
 
 # Нажимаемая метка строки переключения в чат внизу книги /rtp info.
 # Повторно выполняет ту же область через старый вывод в чат.
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[Переключить в чат]"
 
 # Текст подсказки при наведении для строки переключения книги информации в чат.
 infoBookSwitchToTextHover: "&7Выполнить /rtp info в чате вместо книги."
@@ -384,7 +384,7 @@ configValueUnsetPlaceholder: "&8(не задано)"
 
 # Ненажимаемая строка заголовка, разделяющая список «Изменяемые» от корзины «Ожидающие»,
 # на странице файла конфигурации, когда зритель добавил одно или несколько неприменённых изменений. Без плейсхолдеров.
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- ожидающие изменения --"
 
 # Метка строки для отложенной (ожидающей) записи key=value на странице файла конфигурации.
 # Нажатие на строку удаляет её из корзины. Плейсхолдеры: [key], [value].
@@ -457,7 +457,7 @@ multiconfigRowRemoveHover: "&cудалить &f[name]"
 multiconfigConfirmTitle: "&c&lудалить [name]?"
 
 # Метка строки «Да» на странице подтверждения удаления. Без плейсхолдеров.
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[подтвердить удаление]"
 
 # Метка строки «Отмена» на странице подтверждения удаления. Без плейсхолдеров.
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -488,10 +488,10 @@ multiconfigResultNameInvalid: "&cимя '[name]' не разрешено; исп
 # Плейсхолдер: [name].
 multiconfigResultNameTaken: "&cзапись с именем '[name]' уже существует."
 
-docsNotFound: "&c[RTP] Тема документации '[topic]' не найдена. Используйте /rtp docs list для просмотра доступных тем."
-docsEmpty: "&c[RTP] В настоящее время нет зарегистрированных тем документации."
-docsExportSuccess: "&a[RTP] HTML-пакет документации успешно экспортирован в [path]."
-docsExportFailed: "&c[RTP] Не удалось экспортировать пакет документации: [reason]."
+docsNotFound: "&c[P0] Тема документации '[topic]' не найдена. Используйте /rtp docs list для просмотра доступных тем."
+docsEmpty: "&c[P0] В настоящее время нет зарегистрированных тем документации."
+docsExportSuccess: "&a[P0] HTML-пакет документации успешно экспортирован в [path]."
+docsExportFailed: "&c[P0] Не удалось экспортировать пакет документации: [reason]."
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
 # --- Web editor channel (ADR-106) ---

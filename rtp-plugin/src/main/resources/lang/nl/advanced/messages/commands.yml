@@ -145,10 +145,10 @@ regioGegevens:
 # Sectie 8b: Algemeen menuraamwerk
 # ###############################################################################
 # Verzonden wanneer een menutoken onbekend of misvormd is, of van een andere speler is.
-menuInvalid: "&c[P0] that menu link is invalid."
+menuInvalid: "&c[P0] die menulink is ongeldig."
 
 # Verzonden wanneer een menu-inwisseling de UUID van de aanroepende speler niet kan vinden.
-menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+menuUnknownPlayer: "&c[P0] menulinks kunnen alleen worden gebruikt door spelers in het spel."
 
 # Hover-terugvaltemplate gebruikt door de menureflector wanneer er geen YAML-blokcommentaar
 # beschikbaar is voor een parameter. Plaatshouder: [type] - het gedeclareerde parametertype.
@@ -197,8 +197,8 @@ menuPageNext: "&7volgende pagina ([page]) »"
 menuFrontPageSectionTeleport: "&8--- &7teleportatie &8---"
 
 # Voorpaginarijen. Geen plaatshouders.
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- teletransporteer naar een willekeurige locatie"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- kies een regio"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- kies een wereld"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- kies een biome"
 menuFrontPageRowHelp: "#7A4FB8❓ commando's tonen &7- /rtp help"
@@ -216,7 +216,7 @@ menuFrontPageHoverAdmin: "&7operatorgereedschap: config, scans, diagnostiek, her
 menuAdminPanelTitle: "#5FB3B3&l⚙ beheerpaneel"
 
 # Niet-klikbare hintrij onder menuAdminPanelTitle. Geen plaatshouders.
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7klik op een optie; destructieve acties tonen een waarschuwing bij aanwijzen"
 
 # Sectiescheiders op het beheerpaneel. Geen plaatshouders.
 menuAdminPanelSectionConfig: "&8--- &7configuratie &8---"
@@ -325,7 +325,7 @@ infoBookRefreshHover: "&7Geef deze pagina opnieuw weer met een verse metriekmome
 
 # Klikbaar rijlabel voor de Overschakelen-naar-chat-actie onderaan het
 # /rtp infoboek. Voert hetzelfde bereik opnieuw uit via het klassieke chatpad.
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[Naar chat]"
 
 # Hovertekst voor de overschakelen-naar-chat-rij in het infoboek.
 infoBookSwitchToTextHover: "&7Voer /rtp info opnieuw uit in chat in plaats van het boek."
@@ -382,7 +382,7 @@ configValueUnsetPlaceholder: "&8(niet ingesteld)"
 # Niet-klikbare koptekstrij die de lijst "Wijzigbaar" scheidt van de lijst "In afwachting"
 # (winkelmandje) op een configuratiebestandpagina wanneer de kijker een of
 # meer niet-doorgevoerde bewerkingen heeft klaargezet. Geen plaatshouders.
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- wijzigingen in afwachting --"
 
 # Rijlabel voor een klaargezette (in afwachting zijnde) sleutel=waarde-invoer op een configuratiebestandpagina.
 # Klikken op de rij verwijdert deze uit het mandje. Plaatshouders: [key], [value].
@@ -456,7 +456,7 @@ multiconfigRowRemoveHover: "&cverwijder &f[name]"
 multiconfigConfirmTitle: "&c&l[name] verwijderen?"
 
 # Label van Ja-rij op pagina verwijdering bevestigen. Geen plaatshouders.
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[verwijderen bevestigen]"
 
 # Label van Annuleren-rij op pagina verwijdering bevestigen. Geen plaatshouders.
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -487,10 +487,10 @@ multiconfigResultNameInvalid: "&cnaam '[name]' is niet toegestaan; gebruik lette
 # Plaatshouder: [name].
 multiconfigResultNameTaken: "&cer bestaat al een item met de naam '[name]'."
 
-docsNotFound: "&c[RTP] Documentatieonderwerp '[topic]' niet gevonden. Gebruik /rtp docs list om beschikbare onderwerpen te bekijken."
-docsEmpty: "&c[RTP] Er zijn momenteel geen documentatieonderwerpen geregistreerd."
-docsExportSuccess: "&a[RTP] Documentatie HTML-bundel succesvol geëxporteerd naar [path]."
-docsExportFailed: "&c[RTP] Kan documentatiebundel niet exporteren: [reason]."
+docsNotFound: "&c[P0] Documentatieonderwerp '[topic]' niet gevonden. Gebruik /rtp docs list om beschikbare onderwerpen te bekijken."
+docsEmpty: "&c[P0] Er zijn momenteel geen documentatieonderwerpen geregistreerd."
+docsExportSuccess: "&a[P0] Documentatie HTML-bundel succesvol geëxporteerd naar [path]."
+docsExportFailed: "&c[P0] Kan documentatiebundel niet exporteren: [reason]."
 
 # RAAK HET VERSIENUMMER NIET AAN
 # --- Web editor channel (ADR-106) ---

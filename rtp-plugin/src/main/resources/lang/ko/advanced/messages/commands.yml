@@ -145,10 +145,10 @@ infoBiomeActivityEmpty: "&8--- &7아직 바이옴 점유가 샘플링되지 않�
 # 섹션 8b: 범용 메뉴 프레임워크
 # ###############################################################################
 # 메뉴 토큰을 알 수 없거나, 형식이 잘못되었거나, 다른 플레이어의 소유일 때 전송됩니다.
-menuInvalid: "&c[P0] that menu link is invalid."
+menuInvalid: "&c[P0] 해당 메뉴 링크는 유효하지 않습니다."
 
 # 메뉴 사용 시 호출 플레이어의 UUID 를 확인할 수 없을 때 전송됩니다.
-menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+menuUnknownPlayer: "&c[P0] 메뉴 링크는 게임 내 플레이어만 사용할 수 있습니다."
 
 # 매개변수에 대한 YAML 블록 주석이 없을 때 메뉴 리플렉터가 사용하는 마우스 오버 폴백 템플릿. 자리표시자: [type] - 선언된 매개변수 유형.
 menuHoverFallbackType: "유형: [type]"
@@ -191,8 +191,8 @@ menuPageNext: "&7다음 페이지 ([page]) »"
 menuFrontPageSectionTeleport: "&8--- &7텔레포트 &8---"
 
 # 첫 페이지 행. 자리표시자 없음.
-menuFrontPageRowTeleport: "&2▶ /rtp &7- teleport to a random location"
-menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowTeleport: "&2▶ /rtp &7- 무작위 위치로 텔레포트"
+menuFrontPageRowRegion: "&2▶ /rtp region:&7... &7- 리전 선택"
 menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- 월드 선택"
 menuFrontPageRowBiome: "&2▶ /rtp biome:&7... &7- 바이오타 선택"
 menuFrontPageRowHelp: "#7A4FB8❓ 명령어 목록 &7- /rtp help"
@@ -209,7 +209,7 @@ menuFrontPageHoverAdmin: "&7운영자 도구: 설정, 스캔, 진단, 리로드"
 menuAdminPanelTitle: "#5FB3B3&l⚙ 관리자 패널"
 
 # menuAdminPanelTitle 아래의 클릭할 수 없는 안내 행. 자리표시자 없음.
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7옵션을 클릭하세요. 파괴적인 작업은 마우스를 올리면 경고가 표시됩니다"
 
 # 관리자 패널의 섹션 구분선. 자리표시자 없음.
 menuAdminPanelSectionConfig: "&8--- &7설정 &8---"
@@ -318,7 +318,7 @@ infoBookRefreshHover: "&7최신 지표 스냅샷으로 이 페이지를 다시 �
 
 # /rtp info 책 하단의 채팅으로 전환하기 위한 클릭 가능한 행 라벨.
 # 기존 채팅 경로를 통해 동일한 범위를 다시 실행합니다.
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[채팅으로 전환]"
 
 # info 책 채팅 전환 행의 마우스 오버 텍스트.
 infoBookSwitchToTextHover: "&7책 대신 채팅에서 /rtp info 를 다시 실행합니다."
@@ -373,7 +373,7 @@ configValueUnsetPlaceholder: "&8(설정 안 됨)"
 
 # 보는 사람이 커밋되지 않은 수정을 하나 이상 스테이징했을 때 설정 파일 페이지에서
 # "변경 가능" 목록과 "대기 중" 스테이징 카트 목록을 구분하는 클릭할 수 없는 헤더 행. 자리표시자 없음.
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- 대기 중인 변경 사항 --"
 
 # 설정 파일 페이지의 스테이징된 (대기 중) key=value 항목에 대한 행 라벨.
 # 행을 클릭하면 카트에서 제거됩니다. 자리표시자: [key], [value].
@@ -443,7 +443,7 @@ multiconfigRowRemoveHover: "&c&f[name] 삭제"
 multiconfigConfirmTitle: "&c&l[name] 을(를) 삭제하시겠습니까?"
 
 # 삭제 확인 페이지 '예' 행 라벨. 자리표시자 없음.
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[삭제 확인]"
 
 # 삭제 확인 페이지 '취소' 행 라벨. 자리표시자 없음.
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -474,10 +474,10 @@ multiconfigResultNameInvalid: "&c이름 '[name]' 은(는) 허용되지 않습니
 # 자리표시자: [name].
 multiconfigResultNameTaken: "&c'[name]' (이)라는 이름의 항목이 이미 존재합니다."
 
-docsNotFound: "&c[RTP] 문서 주제 '[topic]'을(를) 찾을 수 없습니다. 사용 가능한 주제를 보려면 /rtp docs list를 사용하세요."
-docsEmpty: "&c[RTP] 현재 등록된 문서 주제가 없습니다."
-docsExportSuccess: "&a[RTP] 문서 HTML 번들을 [path]에 성공적으로 내보냈습니다."
-docsExportFailed: "&c[RTP] 문서 번들을 내보내지 못했습니다: [reason]."
+docsNotFound: "&c[P0] 문서 주제 '[topic]'을(를) 찾을 수 없습니다. 사용 가능한 주제를 보려면 /rtp docs list를 사용하세요."
+docsEmpty: "&c[P0] 현재 등록된 문서 주제가 없습니다."
+docsExportSuccess: "&a[P0] 문서 HTML 번들을 [path]에 성공적으로 내보냈습니다."
+docsExportFailed: "&c[P0] 문서 번들을 내보내지 못했습니다: [reason]."
 
 # 버전 번호는 변경하지 마세요
 # --- Web editor channel (ADR-106) ---

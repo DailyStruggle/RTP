@@ -245,6 +245,8 @@ public class ConfigsTest {
         // "world" is registered in MockRTPServerAccessor
         Object result = configs.getWorldParserValue("world", WorldKeys.requirePermission);
         assertNotNull(result, "getWorldParserValue for a registered world should return non-null");
+        assertFalse(result instanceof ConfigParser, "getWorldParserValue must return the key's value, not the ConfigParser");
+        assertEquals("default", String.valueOf(configs.getWorldParserValue("world", WorldKeys.region)));
     }
 
     // --- reloadConfigs() registers all standard parsers ---

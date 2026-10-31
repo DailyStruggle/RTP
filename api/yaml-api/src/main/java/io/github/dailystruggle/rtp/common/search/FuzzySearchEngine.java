@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Unified fuzzy search and string matching engine.
@@ -11,6 +12,10 @@ import java.util.*;
  * <p>Consolidates fast-path alphanumeric normalization, bounded Levenshtein distance,
  * adaptive typo-tolerance thresholds, and multi-tier relevance scoring across the
  * configuration importer, permission derivation, and in-game search subsystems.
+ *
+ * @governedBy ADR-104
+ * @governedBy ADR-115
+ * @governedBy leafguide-ADR-001
  */
 public final class FuzzySearchEngine {
 
@@ -25,6 +30,9 @@ public final class FuzzySearchEngine {
 
     /** Shortest name length permitted to match by substring containment. */
     public static final int MIN_CONTAINMENT_LENGTH = 4;
+
+    private static final Pattern WHITESPACE_SPLIT_PATTERN = Pattern.compile("\\s+");
+    private static final Pattern NON_TOKEN_CHARS_PATTERN = Pattern.compile("[^\\p{L}a-z0-9_.-]+");
 
     /**
      * Explanation for a search match.
@@ -290,7 +298,9 @@ public final class FuzzySearchEngine {
                                                  @Nullable String rawValue,
                                                  @Nullable Set<String> matchedSynonyms) {
         String query = normalize(rawQuery);
-        if (query.isEmpty()) return ScoredCandidate.none();
+        if (query.isEmpty() && (matchedSynonyms == null || matchedSynonyms.isEmpty())) {
+            return ScoredCandidate.none();
+        }
 
         String normKey = normalize(keyName);
         String normFile = normalize(fileName);
@@ -299,26 +309,36 @@ public final class FuzzySearchEngine {
         int score = 0;
         List<MatchReason> reasons = new ArrayList<>();
 
-        // 1. Exact Key Match
-        if (normKey.equals(query)) {
-            score += 120;
-            reasons.add(new MatchReason("reason", "Exact Key"));
-        } else if (normKey.startsWith(query) || (normKey.contains(query) && query.length() >= MIN_FUZZY_LENGTH)) {
-            score += 80;
-            reasons.add(new MatchReason("reason", "Key Match"));
+        // 1. Stage 1 — Local Exact / Prefix / Substring Key Match (1.00x)
+        boolean localKeyMatched = false;
+        if (!query.isEmpty()) {
+            if (normKey.equals(query)) {
+                score += 120;
+                localKeyMatched = true;
+                reasons.add(new MatchReason("reason", "Exact Key"));
+            } else if (normKey.startsWith(query) || (normKey.contains(query) && query.length() >= MIN_FUZZY_LENGTH)) {
+                score += 80;
+                localKeyMatched = true;
+                reasons.add(new MatchReason("reason", "Key Match"));
+            }
+
+            // 2. File Name Match
+            if (!normFile.isEmpty() && normFile.contains(query)) {
+                score += 40;
+                reasons.add(new MatchReason("file", "File Match"));
+            }
         }
 
-        // 2. File Name Match
-        if (!normFile.isEmpty() && normFile.contains(query)) {
-            score += 40;
-            reasons.add(new MatchReason("file", "File Match"));
-        }
-
-        // 3. Thesaurus / Similar Phrase Match
-        if (matchedSynonyms != null && !matchedSynonyms.isEmpty()) {
+        // 3. Stage 2 — Thesaurus / Cross-Lingual Pivot Match (0.60x cascade: skipped when Stage 1 matched)
+        boolean synonymMatched = false;
+        if (!localKeyMatched && matchedSynonyms != null && !matchedSynonyms.isEmpty()) {
             for (String syn : matchedSynonyms) {
-                if (normKey.equals(syn) || normKey.contains(syn) || syn.contains(normKey)) {
+                if (syn == null || syn.isEmpty()) continue;
+                if (normKey.equals(syn)
+                        || (syn.length() >= MIN_FUZZY_LENGTH && normKey.contains(syn))
+                        || (normKey.length() >= MIN_FUZZY_LENGTH && syn.contains(normKey))) {
                     score += 65;
+                    synonymMatched = true;
                     reasons.add(new MatchReason("synonym", "Similar: " + syn));
                     break;
                 }
@@ -326,10 +346,10 @@ public final class FuzzySearchEngine {
         }
 
         // 4. Fuzzy Levenshtein Distance (Typo Tolerance)
-        if (query.length() >= MIN_FUZZY_LENGTH) {
+        if (!localKeyMatched && !synonymMatched && query.length() >= MIN_FUZZY_LENGTH) {
             int maxAllowed = query.length() >= LENGTH_THRESHOLD_TWO_EDITS ? 2 : 1;
             int dist = levenshtein(query, normKey, maxAllowed);
-            if (dist <= maxAllowed && reasons.stream().noneMatch(r -> "reason".equals(r.type()) || "synonym".equals(r.type()))) {
+            if (dist <= maxAllowed) {
                 int fuzzyScore = Math.max(45 - dist * 10, 20);
                 score += fuzzyScore;
                 reasons.add(new MatchReason("fuzzy", "Fuzzy ~" + keyName));
@@ -337,12 +357,99 @@ public final class FuzzySearchEngine {
         }
 
         // 5. Value Match
-        if (!normVal.isEmpty() && normVal.contains(query)) {
+        if (!query.isEmpty() && !normVal.isEmpty() && normVal.contains(query)) {
             score += 30;
             reasons.add(new MatchReason("reason", "Value Match"));
         }
 
         return score > 0 ? new ScoredCandidate(score, reasons) : ScoredCandidate.none();
+    }
+
+    /**
+     * Scores a candidate key/value using the full <b>Three-Stage Local-First Cascade</b>:
+     * <ol>
+     *   <li><b>Stage 1 (Local Key/Typo Match — {@code 120 / 80 pts}):</b> Direct key or typo match.</li>
+     *   <li><b>Stage 2 (Thesaurus &amp; Cross-Lingual Pivot — {@code 65 pts}):</b> Evaluated only
+     *       when Stage 1 did not match {@code keyName}.</li>
+     *   <li><b>Stage 3 (File-Cached TTL Online Expansion — {@code 40 pts}):</b> Evaluated via
+     *       {@link OnlineQueryExpander#getCachedOrScheduleAsync} only when neither Stage 1 nor
+     *       Stage 2 matched, ensuring remote expansions never pollute local or thesaurus hits.</li>
+     * </ol>
+     */
+    @NotNull
+    public static ScoredCandidate scoreCandidateCascade(
+            @NotNull String rawQuery,
+            @NotNull String fileName,
+            @NotNull String keyName,
+            @Nullable String rawValue,
+            @Nullable OnlineQueryExpander onlineExpander,
+            long nowEpochMs
+    ) {
+        Set<String> stage2Synonyms = expandQueryWithThesaurus(rawQuery);
+        ScoredCandidate stage1And2 = scoreCandidate(rawQuery, fileName, keyName, rawValue, stage2Synonyms);
+        boolean keyOrSynAlreadyMatched = stage1And2.reasons().stream()
+                .anyMatch(r -> "reason".equals(r.type()) || "synonym".equals(r.type()) || "fuzzy".equals(r.type()));
+        if (keyOrSynAlreadyMatched || onlineExpander == null) {
+            return stage1And2;
+        }
+
+        String normKey = normalize(keyName);
+        if (normKey.isEmpty()) {
+            return stage1And2;
+        }
+        String[] rawTokens = WHITESPACE_SPLIT_PATTERN.split(rawQuery.trim().toLowerCase(Locale.ROOT));
+        for (String tok : rawTokens) {
+            Set<String> onlineTerms = onlineExpander.getCachedOrScheduleAsync(tok, nowEpochMs);
+            for (String remote : onlineTerms) {
+                String normRemote = normalize(remote);
+                if (!normRemote.isEmpty() && (normKey.equals(normRemote)
+                        || (normRemote.length() >= MIN_FUZZY_LENGTH && normKey.contains(normRemote))
+                        || (normKey.length() >= MIN_FUZZY_LENGTH && normRemote.contains(normKey)))) {
+                    List<MatchReason> reasons = new ArrayList<>(stage1And2.reasons());
+                    reasons.add(new MatchReason("online", "Online ~" + remote));
+                    return new ScoredCandidate(stage1And2.score() + 40, reasons);
+                }
+            }
+        }
+        return stage1And2;
+    }
+
+    /**
+     * Scores a candidate key/value against a raw query while automatically expanding query
+     * synonyms, cross-lingual pivots, multi-word idioms, and compound tokens via
+     * {@link SearchThesaurus#defaultInstance()} and {@link OnlineQueryExpander#defaultInstance()}.
+     */
+    @NotNull
+    public static ScoredCandidate scoreCandidateWithThesaurus(
+            @NotNull String rawQuery,
+            @NotNull String fileName,
+            @NotNull String keyName,
+            @Nullable String rawValue
+    ) {
+        return scoreCandidateCascade(
+                rawQuery,
+                fileName,
+                keyName,
+                rawValue,
+                OnlineQueryExpander.defaultInstance(),
+                System.currentTimeMillis()
+        );
+    }
+
+    /**
+     * Expands a raw search query through {@link SearchThesaurus#defaultInstance()}, including
+     * phrase rewrites, cross-lingual pivots, compound token splits, and synset expansion.
+     */
+    @NotNull
+    public static Set<String> expandQueryWithThesaurus(@Nullable String rawQuery) {
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return Set.of();
+        }
+        SearchThesaurus thesaurus = SearchThesaurus.defaultInstance();
+        String augmented = thesaurus.normalizePhrases(rawQuery);
+        String[] rawTokens = WHITESPACE_SPLIT_PATTERN.split(
+                NON_TOKEN_CHARS_PATTERN.matcher(augmented).replaceAll(" ").trim());
+        return thesaurus.expandTokens(Arrays.asList(rawTokens));
     }
 
     /**

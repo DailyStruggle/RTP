@@ -35,7 +35,7 @@ posizioneCaricata: "&7[P0] Caricate con successo [amount] posizioni per [region]
 # Sezione 11: Metadati
 # ###############################################################################
 # NON MODIFICARE IL NUMERO DI VERSIONE
-versione: 1.0
+version: 1.0
 
 # ###############################################################################
 # Sezione 12: Opzioni per sviluppatori

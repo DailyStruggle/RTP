@@ -116,4 +116,4 @@ limiteRipetizioniChunkObsoleti: 2
 prefiltroAnvilAttivo: true
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
-versione: 1.0
+version: 1.0

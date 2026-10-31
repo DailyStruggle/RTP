@@ -16,6 +16,10 @@ public final class RelativeCoordinate {
    * @return the resolved absolute coordinate
    * @throws NumberFormatException if the numeric offset is malformed
    */
+  public static boolean isRelative(String token) {
+    return token != null && token.indexOf('~') >= 0;
+  }
+
   public static long resolve(String token, long base) {
     String t = token.trim();
     int tilde = t.indexOf('~');

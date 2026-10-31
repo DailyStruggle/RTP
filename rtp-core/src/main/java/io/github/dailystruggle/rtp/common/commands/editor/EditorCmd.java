@@ -128,9 +128,13 @@ public class EditorCmd extends BaseRTPCmdImpl {
             EditorChannel ch = hosted.get();
             if (ch != null) ch.close("upload failed");
             // S-004: Zero silent swallows on HTTP failure
-            Throwable cause = (throwable.getCause() != null) ? throwable.getCause() : throwable;
+            Throwable cause = EditorChannelWiring.cause(throwable);
             String errMsg = "RTP: Failed to upload editor session to byte-store: " + cause.getMessage();
-            RTPRuntime.log(Level.WARNING, errMsg, cause);
+            if (io.github.dailystruggle.rtp.common.commands.editor.channel.BytesocksTransport.isNetworkOrStatusFailure(cause)) {
+                RTPRuntime.log(Level.WARNING, errMsg);
+            } else {
+                RTPRuntime.log(Level.WARNING, errMsg, cause);
+            }
             sendMessage(callerId, errMsg);
 
             // Fallback: automatically generate local standalone editor bundle when remote upload fails

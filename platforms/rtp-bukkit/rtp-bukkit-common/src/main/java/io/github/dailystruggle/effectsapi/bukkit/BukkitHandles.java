@@ -31,8 +31,18 @@ import java.util.UUID;
 @SuppressWarnings("deprecation")
 public final class BukkitHandles implements HandleProvider {
     private static final BukkitHandles INSTANCE = new BukkitHandles();
+    private static final boolean IS_FOLIA = probeFolia();
 
     private BukkitHandles() {}
+
+    private static boolean probeFolia() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
 
     public static BukkitHandles getInstance() {
         return INSTANCE;
@@ -80,12 +90,7 @@ public final class BukkitHandles implements HandleProvider {
      * on Folia API).
      */
     public static boolean isFolia() {
-        try {
-            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
+        return IS_FOLIA;
     }
 
     /**
@@ -283,13 +288,21 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void playSound(Object type, float volume, float pitch, double dx, double dy, double dz) {
-            player.playSound(player.getLocation().add(dx, dy, dz), (Sound) type, volume, pitch);
+            runOnOwningRegion(player, () -> {
+                if (player.isValid() && !player.isDead()) {
+                    player.playSound(player.getLocation().add(dx, dy, dz), (Sound) type, volume, pitch);
+                }
+            });
         }
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
             int clampedCount = Math.max(1, Math.min(256, count));
-            player.spawnParticle((Particle) type, player.getLocation().add(dx, dy, dz), clampedCount, 0, 0, 0, speed);
+            runOnOwningRegion(player, () -> {
+                if (player.isValid() && !player.isDead()) {
+                    player.spawnParticle((Particle) type, player.getLocation().add(dx, dy, dz), clampedCount, 0, 0, 0, speed);
+                }
+            });
         }
 
         @Override
@@ -303,17 +316,29 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-            player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+            runOnOwningRegion(player, () -> {
+                if (player.isOnline()) {
+                    player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+                }
+            });
         }
 
         @Override
         public void playNote(Object instrument, int tone) {
-            player.playNote(player.getLocation(), (Instrument) instrument, new Note(tone));
+            runOnOwningRegion(player, () -> {
+                if (player.isValid() && !player.isDead()) {
+                    player.playNote(player.getLocation(), (Instrument) instrument, new Note(tone));
+                }
+            });
         }
 
         @Override
         public void setGliding(boolean gliding) {
-            player.setGliding(gliding);
+            runOnOwningRegion(player, () -> {
+                if (player.isValid() && !player.isDead()) {
+                    player.setGliding(gliding);
+                }
+            });
         }
 
         @Override

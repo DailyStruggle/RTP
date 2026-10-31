@@ -125,7 +125,7 @@ public abstract class AbstractFileSchematicPaster implements SchematicPaster {
       return false;
     }
     String hint = source.formatHint().toLowerCase(Locale.ROOT);
-    boolean spongeFormat = hint.isEmpty() || hint.equals("schem") || hint.equals("schematic");
+    boolean spongeFormat = hint.isEmpty() || hint.equals("schem") || hint.equals("schematic") || hint.equals("litematic");
     return spongeFormat && Files.isRegularFile(source.path());
   }
 }

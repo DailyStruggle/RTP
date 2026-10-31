@@ -89,6 +89,7 @@ class AnvilChunkViewTest {
         byte sectionY = 0;
         LinkedHashMap<String, Object> sec = AnvilTestFixtures.section(sectionY, palette, data);
         long[] heightmap = new long[37];
+        heightmap[19] = 16L << 27; // column (8, 8) = 136 -> longIdx 19, slot 3 -> topY = 0 + 16 - 1 = 15
         LinkedHashMap<String, Object> root = AnvilTestFixtures.chunkRoot(
                 DataVersionSupport.MC_1_20_DATA_VERSION, heightmap, List.of(sec));
         byte[] region = AnvilTestFixtures.writeSingleChunkRegion(root);
@@ -99,6 +100,8 @@ class AnvilChunkViewTest {
         assertAll("synthetic placement",
                 () -> assertEquals(1, view.sections().size()),
                 () -> assertEquals(sectionY, view.sections().get(0).sectionY()),
+                () -> assertEquals(15, view.getHeightmapTopY(8, 8)),
+                () -> assertEquals(Integer.MIN_VALUE, new AnvilChunkView(3465, view.sections()).getHeightmapTopY(8, 8)),
                 () -> assertEquals("minecraft:air",  view.blockIdAt(0,  0,  0)),
                 () -> assertEquals("minecraft:lava", view.blockIdAt(7,  3,  5)),
                 () -> assertEquals("minecraft:lava", view.blockIdAt(15, 15, 15)),

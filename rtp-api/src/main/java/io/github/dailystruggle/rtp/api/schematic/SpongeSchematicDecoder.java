@@ -13,9 +13,15 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Dependency-free GZIP-NBT decoder for Sponge schematics (v2/v3; ADR-058).
+ * Dependency-free GZIP-NBT decoder for Sponge schematics (v2/v3) and Litematica ({@code .litematic})
+ * schematics (ADR-058).
  * Extracts bounds, block-state palette, grid indices, and block entities.
  * Blocking I/O: must be invoked off the tick/region thread (S-005).
+ *
+ * @governedBy ADR-115
+ * @governedBy ADR-058
+ * @trace REQ-RTP-S-004
+ * @trace REQ-RTP-S-005
  */
 public final class SpongeSchematicDecoder {
 
@@ -54,6 +60,12 @@ public final class SpongeSchematicDecoder {
       }
       readName(dis); // root name (unnamed in v3, "Schematic" in some v2 writers)
       Map<String, Object> root = readCompound(dis);
+
+      // Litematica (.litematic) format detection: top-level "Regions" compound.
+      Map<String, Object> litematicRegions = asCompound(root.get("Regions"));
+      if (litematicRegions != null && !litematicRegions.isEmpty()) {
+        return decodeLitematicRegions(source, litematicRegions);
+      }
 
       // v3 nests everything under a "Schematic" compound; v2 keeps it at the root.
       Map<String, Object> schem = asCompound(root.get("Schematic"));
@@ -127,6 +139,184 @@ public final class SpongeSchematicDecoder {
       return new DecodedSchematic(source, width, height, length,
           List.of(palette), indices, blockEntities, offset);
     }
+  }
+
+  /**
+   * Decodes a Litematica ({@code .litematic}) {@code Regions} compound (supporting negative region
+   * {@code Size} axes, {@code BlockStatePalette} property maps, cross-long bit-packed
+   * {@code BlockStates} {@code long[]}, and {@code TileEntities}) into a unified
+   * {@link DecodedSchematic}.
+   */
+  private static DecodedSchematic decodeLitematicRegions(
+      SchematicSource source, Map<String, Object> regions) throws IOException {
+    record RegionBox(
+        int minX,
+        int minY,
+        int minZ,
+        int width,
+        int height,
+        int length,
+        List<String> palette,
+        long[] blockStates,
+        List<Object> tileEntities) {}
+
+    List<RegionBox> boxes = new ArrayList<>(regions.size());
+    int globalMinX = Integer.MAX_VALUE;
+    int globalMinY = Integer.MAX_VALUE;
+    int globalMinZ = Integer.MAX_VALUE;
+    int globalMaxX = Integer.MIN_VALUE;
+    int globalMaxY = Integer.MIN_VALUE;
+    int globalMaxZ = Integer.MIN_VALUE;
+
+    for (Object regObj : regions.values()) {
+      Map<String, Object> reg = asCompound(regObj);
+      if (reg == null) {
+        continue;
+      }
+      Map<String, Object> posMap = asCompound(reg.get("Position"));
+      Map<String, Object> sizeMap = asCompound(reg.get("Size"));
+      if (sizeMap == null) {
+        throw new IOException("litematic region missing 'Size' compound");
+      }
+      int px = posMap != null ? intValue(posMap.get("x"), "Position.x") : 0;
+      int py = posMap != null ? intValue(posMap.get("y"), "Position.y") : 0;
+      int pz = posMap != null ? intValue(posMap.get("z"), "Position.z") : 0;
+      int sx = intValue(sizeMap.get("x"), "Size.x");
+      int sy = intValue(sizeMap.get("y"), "Size.y");
+      int sz = intValue(sizeMap.get("z"), "Size.z");
+      int rw = Math.abs(sx);
+      int rh = Math.abs(sy);
+      int rl = Math.abs(sz);
+      if (rw == 0 || rh == 0 || rl == 0) {
+        continue;
+      }
+      int minX = sx < 0 ? px + sx + 1 : px;
+      int minY = sy < 0 ? py + sy + 1 : py;
+      int minZ = sz < 0 ? pz + sz + 1 : pz;
+      globalMinX = Math.min(globalMinX, minX);
+      globalMinY = Math.min(globalMinY, minY);
+      globalMinZ = Math.min(globalMinZ, minZ);
+      globalMaxX = Math.max(globalMaxX, minX + rw);
+      globalMaxY = Math.max(globalMaxY, minY + rh);
+      globalMaxZ = Math.max(globalMaxZ, minZ + rl);
+
+      List<Object> rawPalette = asList(reg.get("BlockStatePalette"));
+      if (rawPalette == null || rawPalette.isEmpty()) {
+        throw new IOException("litematic region has empty BlockStatePalette");
+      }
+      List<String> regPalette = new ArrayList<>(rawPalette.size());
+      for (Object pObj : rawPalette) {
+        regPalette.add(formatLitematicPaletteEntry(asCompound(pObj)));
+      }
+      Object rawStates = reg.get("BlockStates");
+      if (!(rawStates instanceof long[] blockStates)) {
+        throw new IOException("litematic region missing long[] BlockStates");
+      }
+      List<Object> tes = asList(reg.get("TileEntities"));
+      boxes.add(new RegionBox(minX, minY, minZ, rw, rh, rl, regPalette, blockStates, tes));
+    }
+
+    if (boxes.isEmpty()) {
+      throw new IOException("litematic file contains no non-empty regions");
+    }
+
+    int totalW = globalMaxX - globalMinX;
+    int totalH = globalMaxY - globalMinY;
+    int totalL = globalMaxZ - globalMinZ;
+    int[] indices = new int[totalW * totalH * totalL];
+    Map<String, Integer> unifiedPaletteMap = new LinkedHashMap<>();
+    unifiedPaletteMap.put("minecraft:air", 0);
+    List<BlockEntityData> blockEntities = new ArrayList<>();
+
+    for (RegionBox box : boxes) {
+      int[] palMap = new int[box.palette().size()];
+      for (int i = 0; i < box.palette().size(); i++) {
+        String stateStr = box.palette().get(i);
+        palMap[i] = unifiedPaletteMap.computeIfAbsent(stateStr, k -> unifiedPaletteMap.size());
+      }
+      int bits = Math.max(2, 32 - Integer.numberOfLeadingZeros(Math.max(1, box.palette().size() - 1)));
+      long mask = (1L << bits) - 1L;
+      long[] longs = box.blockStates();
+      int ox = box.minX() - globalMinX;
+      int oy = box.minY() - globalMinY;
+      int oz = box.minZ() - globalMinZ;
+
+      for (int y = 0; y < box.height(); y++) {
+        for (int z = 0; z < box.length(); z++) {
+          for (int x = 0; x < box.width(); x++) {
+            int localIdx = (y * box.length() + z) * box.width() + x;
+            long bitIdx = (long) localIdx * bits;
+            int li = (int) (bitIdx >>> 6);
+            int bo = (int) (bitIdx & 63L);
+            int rawPalIdx;
+            if (bo + bits <= 64) {
+              rawPalIdx = (int) ((longs[li] >>> bo) & mask);
+            } else {
+              int low = 64 - bo;
+              rawPalIdx = (int) (((longs[li] >>> bo) | (longs[li + 1] << low)) & mask);
+            }
+            if (rawPalIdx < 0 || rawPalIdx >= palMap.length) {
+              rawPalIdx = 0;
+            }
+            int globalIdx = ((oy + y) * totalL + (oz + z)) * totalW + (ox + x);
+            indices[globalIdx] = palMap[rawPalIdx];
+          }
+        }
+      }
+
+      if (box.tileEntities() != null) {
+        for (Object teObj : box.tileEntities()) {
+          Map<String, Object> te = asCompound(teObj);
+          if (te == null) {
+            continue;
+          }
+          int tx = te.get("x") instanceof Number n ? n.intValue() : 0;
+          int ty = te.get("y") instanceof Number n ? n.intValue() : 0;
+          int tz = te.get("z") instanceof Number n ? n.intValue() : 0;
+          String id = (String) te.get("id");
+          if (id == null) {
+            id = (String) te.get("Id");
+          }
+          if (id == null) {
+            id = "minecraft:unknown";
+          }
+          Map<String, Object> nbt = new LinkedHashMap<>(te);
+          nbt.remove("x");
+          nbt.remove("y");
+          nbt.remove("z");
+          nbt.remove("id");
+          nbt.remove("Id");
+          blockEntities.add(new BlockEntityData(ox + tx, oy + ty, oz + tz, id, nbt));
+        }
+      }
+    }
+
+    List<String> unifiedPalette = new ArrayList<>(unifiedPaletteMap.keySet());
+    return new DecodedSchematic(
+        source, totalW, totalH, totalL, unifiedPalette, indices, blockEntities, new int[] {0, 0, 0});
+  }
+
+  private static String formatLitematicPaletteEntry(Map<String, Object> entry) {
+    if (entry == null) {
+      return "minecraft:air";
+    }
+    Object nameObj = entry.get("Name");
+    String name = (nameObj instanceof String s && !s.isEmpty()) ? s : "minecraft:air";
+    Map<String, Object> props = asCompound(entry.get("Properties"));
+    if (props == null || props.isEmpty()) {
+      return name;
+    }
+    StringBuilder sb = new StringBuilder(name).append('[');
+    boolean first = true;
+    for (Map.Entry<String, Object> e : props.entrySet()) {
+      if (!first) {
+        sb.append(',');
+      }
+      first = false;
+      sb.append(e.getKey()).append('=').append(e.getValue());
+    }
+    sb.append(']');
+    return sb.toString();
   }
 
   /** Decodes the LEB128 varint-packed palette-index stream. */

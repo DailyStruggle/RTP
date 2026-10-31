@@ -151,5 +151,15 @@ public class ReqRtpMenuBuildersAndHandlersTest {
                 (u, k, log, c) -> rejections.add(log), "test-context", "test-op");
         assertFalse(failRes);
         assertFalse(rejections.isEmpty());
+
+        // 4. Disconnected viewer (IllegalStateException: no online player) skips WARNING stack trace and rejection
+        rejections.clear();
+        MenuRenderer offlineRenderer = (u, m) -> {
+            throw new IllegalStateException("BookMenuRenderer.render: no online player for UUID " + u);
+        };
+        boolean offlineRes = MenuDrawer.draw(offlineRenderer, viewer, model, messages::add,
+                (u, k, log, c) -> rejections.add(log), "test-context", "test-op");
+        assertFalse(offlineRes);
+        assertTrue(rejections.isEmpty(), "Disconnected viewer render must not trigger S-004 WARNING rejection");
     }
 }

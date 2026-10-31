@@ -78,15 +78,21 @@ class EditorChannelWiringTest {
     @Test
     @DisplayName("REQ-RTP-S-004 Unreachable relay: openHosted returns at once and completes with null (snapshot-only), never exceptionally")
     void unreachableRelayIsSnapshotOnly() throws Exception {
+        var accessor = RTPTestSetup.install(tempDir.resolve("plugin-unreachable").toFile());
         int port;
         try (ServerSocket s = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             port = s.getLocalPort();
         }
         EditorHttpTransport http = new EditorHttpTransport(HttpClient.newHttpClient(), "http://127.0.0.1:1",
                 "http://127.0.0.1:1/editor/", "http://127.0.0.1:" + port);
+        accessor.logMessages.clear();
         CompletableFuture<EditorChannel> hosted = EditorChannelWiring.openHosted(null, http, feed::get);
         assertNull(hosted.get(30, TimeUnit.SECONDS), "a failed create gives a snapshot-only session");
         assertFalse(hosted.isCompletedExceptionally());
+        assertTrue(accessor.logMessages.stream().anyMatch(m -> m.contains("snapshot-only")),
+                "Unreachable relay must log concise snapshot-only warning");
+        assertTrue(accessor.logMessages.stream().noneMatch(m -> m.contains("lambda$createChannelAt")),
+                "Unreachable relay warning must not dump a lambda$createChannelAt stack trace");
     }
 
     @Test

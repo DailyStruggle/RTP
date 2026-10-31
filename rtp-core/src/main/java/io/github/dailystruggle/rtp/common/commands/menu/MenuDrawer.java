@@ -52,6 +52,12 @@ final class MenuDrawer {
         } catch (RuntimeException e) {
             String tail = (extraWarnDiag == null || extraWarnDiag.isEmpty())
                     ? "" : " " + extraWarnDiag;
+            if (isDisconnectedViewerFailure(viewer, e)) {
+                RTPRuntime.log(Level.FINE,
+                        "menu " + context + " render skipped: viewer " + viewer
+                                + " disconnected" + tail);
+                return false;
+            }
             RTPRuntime.log(Level.WARNING,
                     "menu " + context + " render failed for " + viewer
                             + tail + ": " + e.getMessage(), e);
@@ -62,6 +68,22 @@ final class MenuDrawer {
             }
             return false;
         }
+    }
+
+    /**
+     * Returns {@code true} when {@code e} is an {@link IllegalStateException} raised because
+     * {@code viewer} disconnected before the deferred command tick rendered the menu.
+     */
+    static boolean isDisconnectedViewerFailure(UUID viewer, RuntimeException e) {
+        if (!(e instanceof IllegalStateException)) {
+            return false;
+        }
+        String msg = e.getMessage();
+        if (msg == null || !msg.contains("no online player")) {
+            return false;
+        }
+        var accessor = RTPRuntime.serverAccessor();
+        return accessor == null || accessor.getPlayer(viewer) == null;
     }
 
     /**

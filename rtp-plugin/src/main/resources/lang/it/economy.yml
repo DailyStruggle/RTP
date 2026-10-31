@@ -38,4 +38,4 @@ rimborsoAnnullamento: true
 saldoMinimo: 0.0
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
-versione: 1.0
+version: 1.0

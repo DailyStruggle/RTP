@@ -186,8 +186,7 @@ public final class FabricEffectsHandlerUnobf {
     }
 
     private static boolean effectParsingEnabled(FactoryValue<PerformanceKeys> parser) {
-        return Boolean.parseBoolean(
-                parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString());
+        return EffectDispatch.isEffectParsingEnabled(parser);
     }
 
     /**
@@ -341,8 +340,7 @@ public final class FabricEffectsHandlerUnobf {
      * runs (it will just produce an empty list for an unrecognised stage).
      */
     private static String stageOf(String prefix) {
-        int dot = prefix.lastIndexOf('.');
-        return (dot >= 0 && dot < prefix.length() - 1) ? prefix.substring(dot + 1) : prefix;
+        return EffectDispatch.stageOf(prefix);
     }
 
     /**

@@ -144,10 +144,10 @@ infoBiomeActivityEmpty: "&8--- &7暂无生物群系占用数据 &8---"
 # 第 8b 节: 通用菜单框架
 # ###############################################################################
 # 当菜单令牌未知、格式错误或属于其他玩家时发送。
-菜单_无效: "&c[P0] that menu link is invalid."
+菜单_无效: "&c[P0] 该菜单链接无效。"
 
 # 当菜单兑换无法解析调用玩家 UUID 时发送。
-菜单_未知玩家: "&c[P0] menu links can only be used by in-game players."
+菜单_未知玩家: "&c[P0] 菜单链接只能由游戏内玩家使用。"
 
 # 菜单反射器在没有可用 YAML 块注释时使用的悬停备用模板。
 # 占位符: [type] - 声明的参数类型。
@@ -195,7 +195,7 @@ infoBiomeActivityEmpty: "&8--- &7暂无生物群系占用数据 &8---"
 # 首页行。无占位符。
 菜单_首页_传送行: "&2» /rtp &7- 随机传送到一个位置"
 菜单_首页_区域行: "&2» /rtp region:&7... &7- 选择区域"
-menuFrontPageRowWorld: "&2▶ /rtp world:&7... &7- 选择世界"
+菜单_首页_世界行: "&2▶ /rtp world:&7... &7- 选择世界"
 菜单_首页_生物群系行: "&2▶ /rtp biome:&7... &7- 选择生物群系"
 菜单_首页_帮助行: "&2» /rtp help &7- 列出命令"
 
@@ -212,7 +212,7 @@ menuFrontPageHoverAdmin: "&7管理员工具: 配置、扫描、诊断、重载"
 menuAdminPanelTitle: "#5FB3B3&l⚙ 管理面板"
 
 # menuAdminPanelTitle 下方的不可点击提示行。无占位符。
-menuAdminPanelHint: "&7click an option; destructive actions show a warning hover"
+menuAdminPanelHint: "&7点击一个选项；破坏性操作在悬停时会显示警告"
 
 # 管理面板上的分区分隔符。无占位符。
 menuAdminPanelSectionConfig: "&8--- &7配置 &8---"
@@ -321,7 +321,7 @@ infoBookRefreshHover: "&7根据最新指标快照重新渲染此页面。"
 
 # /rtp info 书本底部切换到聊天按钮的可点击行标签。
 # 通过旧版聊天路径重新运行相同范围。
-infoBookSwitchToTextRow: "&7[Switch to chat]"
+infoBookSwitchToTextRow: "&7[切换到聊天]"
 
 # info 书本切换到聊天行的悬停文字。
 infoBookSwitchToTextHover: "&7在聊天中重新运行 /rtp info 而非书本。"
@@ -376,7 +376,7 @@ configValueUnsetPlaceholder: "&8(未设置)"
 
 # 当查看者暂存了一个或多个未提交的编辑时，在配置文件页面上分隔“可修改”列表和“待处理”
 # 暂存购物车列表的不可点击标题行。无占位符。
-configPendingHeader: "&6&l-- pending changes --"
+configPendingHeader: "&6&l-- 待处理更改 --"
 
 # 配置文件页面上已暂存（待处理）key=value 条目的每行标签。
 # 点击该行会将其从购物车中移除。占位符: [key], [value]。
@@ -444,7 +444,7 @@ multiconfigRowRemoveHover: "&c删除 &f[name]"
 multiconfigConfirmTitle: "&c&l删除 [name]?"
 
 # 确认删除页面「是」行标签。无占位符。
-multiconfigConfirmYes: "&c&l[confirm delete]"
+multiconfigConfirmYes: "&c&l[确认删除]"
 
 # 确认删除页面「取消」行标签。无占位符。
 multiconfigConfirmNo: "&2&l[cancel]"
@@ -475,10 +475,10 @@ multiconfigResultNameInvalid: "&c名称 '[name]' 不合法; 请使用字母、�
 # 占位符: [name]。
 multiconfigResultNameTaken: "&c已存在名为 '[name]' 的条目。"
 
-docsNotFound: "&c[RTP] 未找到文档主题 '[topic]'。请使用 /rtp docs list 查看可用主题。"
-docsEmpty: "&c[RTP] 当前未注册任何文档主题。"
-docsExportSuccess: "&a[RTP] 文档 HTML 离线包已成功导出至 [path]。"
-docsExportFailed: "&c[RTP] 导出文档离线包失败: [reason]。"
+docsNotFound: "&c[P0] 未找到文档主题 '[topic]'。请使用 /rtp docs list 查看可用主题。"
+docsEmpty: "&c[P0] 当前未注册任何文档主题。"
+docsExportSuccess: "&a[P0] 文档 HTML 离线包已成功导出至 [path]。"
+docsExportFailed: "&c[P0] 导出文档离线包失败: [reason]。"
 
 # --- Web editor channel (ADR-106) ---
 editorTrustPrompt: "&e[P0] 一个网页编辑器页面正在以代码 &b[nonce]&e 请求访问。如果你的页面显示相同的代码，请点击此处信任该浏览器。"
