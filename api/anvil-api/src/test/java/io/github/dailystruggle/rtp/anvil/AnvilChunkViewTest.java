@@ -228,20 +228,29 @@ class AnvilChunkViewTest {
         Path regionDir = Files.createDirectories(tempDir.resolve("region"));
         Files.write(regionDir.resolve("r.0.0.mca"), AnvilTestFixtures.writeSingleChunkRegion(root));
 
+        AtomicLong probeThreadId = new AtomicLong(-1L);
+        AtomicReference<String> probeThreadName = new AtomicReference<>("");
         AtomicLong workerThreadId = new AtomicLong(-1L);
         AtomicReference<String> workerThreadName = new AtomicReference<>("");
         CompletableFuture<Integer> topYFuture = AnvilPrefilter
-                .probeDetailed(tempDir, "", 0, 0, Set.of("LAVA"), null)
-                .thenApply(res -> {
+                .probeDetailed(tempDir, "", 0, 0, Set.of("LAVA"), id -> {
+                    probeThreadId.set(Thread.currentThread().getId());
+                    probeThreadName.set(Thread.currentThread().getName());
+                    return AnvilPrefilter.DEFAULT_RECONCILER.apply(id);
+                })
+                .thenApplyAsync(res -> {
                     workerThreadId.set(Thread.currentThread().getId());
                     workerThreadName.set(Thread.currentThread().getName());
                     assertEquals(Verdict.ACCEPT, res.verdict());
                     assertNotNull(res.view());
                     return res.view().getHeightmapTopY(8, 8);
-                });
+                }, AnvilIoPool.get());
 
         assertEquals(15, topYFuture.join());
-        assertNotEquals(callerThreadId, workerThreadId.get(), "probe and heightmap decode must run off the caller thread");
+        assertNotEquals(callerThreadId, probeThreadId.get(), "region probe must run off the caller thread");
+        assertTrue(probeThreadName.get().startsWith("RTP-Anvil-IO-"),
+                "expected RTP-Anvil-IO- probe thread, saw " + probeThreadName.get());
+        assertNotEquals(callerThreadId, workerThreadId.get(), "heightmap decode must run off the caller thread");
         assertTrue(workerThreadName.get().startsWith("RTP-Anvil-IO-"),
                 "expected RTP-Anvil-IO- worker thread, saw " + workerThreadName.get());
 
@@ -258,11 +267,13 @@ class AnvilChunkViewTest {
 
     @Test
     @DisplayName("ADR-016: AnvilChunkView heightmap retention stays bounded under continuous cache and prefilter allocation")
-    void boundedMemoryUnderContinuousAllocationWithRetainedHeightmap(@TempDir Path tempDir) throws IOException {
+    void boundedMemoryUnderContinuousAllocationWithRetainedHeightmap(@TempDir Path tempDir)
+            throws IOException, InterruptedException {
         AnvilRegionByteCache.invalidateAll();
         long originalBudget = AnvilIoPool.getMemoryBudgetBytes();
         try {
-            AnvilIoPool.setMemoryBudgetBytes(64L * 1024L);
+            // 128 KiB budget: 24 x ~8 KiB region files (~192 KiB total) exceeds both the 16-entry cap and the byte budget
+            AnvilIoPool.setMemoryBudgetBytes(128L * 1024L);
             Path regionDir = Files.createDirectories(tempDir.resolve("region"));
             LinkedHashMap<String, Object> sec = AnvilTestFixtures.section(
                     (byte) 0, List.of("minecraft:stone"), null);
@@ -273,27 +284,43 @@ class AnvilChunkViewTest {
 
             WeakReference<AnvilChunkView> firstViewRef = null;
             for (int r = 0; r < 24; r++) {
-                Files.write(regionDir.resolve("r." + r + ".0.mca"), regionBytes);
-                AnvilPrefilter.ProbeResult res = AnvilPrefilter
-                        .probeDetailed(tempDir, "", r << 5, 0, Set.of("LAVA"), null)
-                        .join();
-                assertEquals(Verdict.ACCEPT, res.verdict());
-                assertNotNull(res.view());
-                assertEquals(15, res.view().getHeightmapTopY(0, 0));
+                Path f = regionDir.resolve("r." + r + ".0.mca");
+                Files.write(f, regionBytes);
+                try (AnvilRegionByteCache.Lease l = AnvilRegionByteCache.acquire(f)) {
+                    assertNotNull(l);
+                }
+                WeakReference<AnvilChunkView> ref = probeAndCaptureWeakView(tempDir, r);
                 if (r == 0) {
-                    firstViewRef = new WeakReference<>(res.view());
+                    firstViewRef = ref;
                 }
             }
 
+            assertTrue(AnvilRegionByteCache.size() > 0, "cache must actually be exercised");
             assertTrue(AnvilRegionByteCache.size() <= 16,
                     "region byte cache must stay capped at <= 16 entries, saw " + AnvilRegionByteCache.size());
+            assertTrue(AnvilRegionByteCache.cachedBytes() > 0, "cachedBytes must be non-zero");
             assertTrue(AnvilRegionByteCache.cachedBytes() <= AnvilIoPool.getMemoryBudgetBytes(),
                     "region byte cache must stay within memory budget");
             assertNotNull(firstViewRef);
+            for (int attempt = 0; attempt < 10 && firstViewRef.get() != null; attempt++) {
+                System.gc();
+                Thread.sleep(10L);
+            }
+            assertNull(firstViewRef.get(), "transient AnvilChunkView and its heightmap array must not be retained");
         } finally {
             AnvilIoPool.setMemoryBudgetBytes(originalBudget);
             AnvilRegionByteCache.invalidateAll();
         }
+    }
+
+    private static WeakReference<AnvilChunkView> probeAndCaptureWeakView(Path tempDir, int r) {
+        AnvilPrefilter.ProbeResult res = AnvilPrefilter
+                .probeDetailed(tempDir, "", r << 5, 0, Set.of("LAVA"), null)
+                .join();
+        assertEquals(Verdict.ACCEPT, res.verdict());
+        assertNotNull(res.view());
+        assertEquals(15, res.view().getHeightmapTopY(0, 0));
+        return new WeakReference<>(res.view());
     }
 
     // ---------------------------------------------------------------------------- helpers
