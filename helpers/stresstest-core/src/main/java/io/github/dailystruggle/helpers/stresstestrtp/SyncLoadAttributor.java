@@ -13,7 +13,7 @@ import java.util.logging.Level;
 
 /**
  * Names the plugin that synchronously requested a chunk load, from the call
- * stack of the {@code ChunkLoadEvent} (ADR-122 Decision 1 & 2).
+ * stack of the {@code ChunkLoadEvent} (ADR-122 Decision 1 and 2).
  */
 public final class SyncLoadAttributor {
 

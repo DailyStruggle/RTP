@@ -29,9 +29,11 @@ All 14 modules uphold four shared architectural guarantees:
 - [`metrics-api`](metrics-api/README.md) - Platform-portable runtime health SPI (`Metrics`, `MetricsBinding`, `MetricsSnapshot`, `MetricsExtension`, `FoliaRegionSample`) exposing TPS, MSPT, tick-budget utilization, heap usage, and per-region Folia samples.
 - [`bstats-api`](bstats-api/README.md) - Dependency-free bStats v2 client (`BStatsService`, `SimplePie`, `AdvancedPie`, `DrilldownPie`, `SingleLineChart`, `MultiLineChart`) requiring zero shaded upstream libraries.
 
-### 4. World Storage & Data Decode
+### 4. World Storage, Persistence & Data Decode
+- [`database-api`](database-api/README.md) - Zero-dependency JDBC connection pool (`MiniConnectionPool`, `CloseableDataSource`), dialect abstraction and portable UPSERT builder (`SqlDialect`, `SqlDataSourceFactory`), and bounded-memory Redis RESP2 client and pub/sub engine (`RespEndpoint`, `RespProtocol`, `RespConnection`, `RespPool`, `RespPubSub`).
 - [`anvil-api`](anvil-api/README.md) - Off-tick read-only Minecraft region-file decoder (`.mca` sectors with gzip, zlib, uncompressed, in-house LZ4, and dynamic Zstd; pluggable `RegionFileReader` SPI via `RegionFormatRegistry`), selective NBT parser (`Nbt`), and load-free surface/biome probes (`AnvilPrefilter`, `AnvilChunkView`, `ColumnProbe`).
 - [`tags-api`](tags-api/README.md) - Dependency-free Minecraft data-pack block-tag JSON loader (`DiskTagSource`, `TagFileParser`, `TinyJsonReader`), cycle-safe `#namespace:tag` fixed-point resolver (`TagResolver`), block-state string parser (`BlockStateString`), and ADR-017 block-predicate/subtraction compiler (`SafetyTokenParser`, `StatePredicate`, `CompiledUnsafeSet`, `SafetyCompilationCache`).
+- [`schematics-api`](schematics-api/README.md) - Dependency-free Sponge Schematic v2/v3 (`.schem`, `.schematic`) and Litematica (`.litematic`) GZIP-NBT decoder (`SpongeSchematicDecoder`), in-memory cache (`SchematicFileLoader`), and 3D coordinate placement planner (`SchematicPlacementPlanner`, `BlockDelta`, `BlockPlacement`, `PlacedBlockEntity`).
 
 ### 5. Cartography & Diagnostics Rendering
 - [`maps-api`](maps-api/README.md) - Platform-neutral 128x128 in-game cartography and high-resolution PNG/BMP/Web-tile rendering SPI (`MapBinding`, `MapCanvas`, `ImageMapCanvas`, `ChartModel` hierarchy, `HeatmapRenderer`, `DualSparklineRenderer`, `WebTileRenderer`).
@@ -53,8 +55,10 @@ All 14 modules uphold four shared architectural guarantees:
 | `predict-api` | `:predict-api` | `predict-api` | `io.github.dailystruggle.rtp.common.predict` | Zero (JDK 17 only) | [`predict-api/README.md`](predict-api/README.md) |
 | `metrics-api` | `:metrics-api` | `metrics-api` | `io.github.dailystruggle.metrics.api` | Zero (JDK 17 only) | [`metrics-api/README.md`](metrics-api/README.md) |
 | `bstats-api` | `:bstats-api` | `bstats-api` | `io.github.dailystruggle.bstats.api` | Zero (JDK 17 only) | [`bstats-api/README.md`](bstats-api/README.md) |
-| `anvil-api` | `:anvil-api` | `anvil-api` | `io.github.dailystruggle.rtp.anvil` | `:bit-api` (JDK 17 only) | [`anvil-api/README.md`](anvil-api/README.md) |
+| `database-api` | `:database-api` | `database-api` | `io.github.dailystruggle.database.api` | Zero (JDK 17 only) | [`database-api/README.md`](database-api/README.md) |
+| `anvil-api` | `:anvil-api` | `anvil-api` | `io.github.dailystruggle.anvil` | `:bit-api` (JDK 17 only) | [`anvil-api/README.md`](anvil-api/README.md) |
 | `tags-api` | `:tags-api` | `tags-api` | `io.github.dailystruggle.rtp.tags`, `io.github.dailystruggle.rtp.api.{block,safety}` | Zero (JDK 17 only) | [`tags-api/README.md`](tags-api/README.md) |
+| `schematics-api` | `:schematics-api` | `schematics-api` | `io.github.dailystruggle.rtp.api.schematic`, `io.github.dailystruggle.rtp.api.platform` | `:tags-api`, `:server-api` (JDK 17 only) | [`schematics-api/README.md`](schematics-api/README.md) |
 | `maps-api` | `:maps-api` | `maps-api` | `io.github.dailystruggle.mapsapi` | Zero on core/image (`spigot-api` compileOnly for `.bukkit`) | [`maps-api/README.md`](maps-api/README.md) |
 
 > **Flat Gradle project paths:** On disk, these modules live under `api/<module>`, while `settings.gradle` keeps their Gradle project paths flat (`:<module>`, e.g. `./gradlew :predict-api:build`).
@@ -90,5 +94,5 @@ dependencies {
 ### Related Documentation
 
 - Authoring a standalone multi-loader plugin or mod with the SDK: [`../docs/FOR_PLUGIN_AUTHORS.md`](../docs/FOR_PLUGIN_AUTHORS.md)
-- Building an RTP addon against `rtp-api`: [`../docs/FOR_ADDON_DEVELOPERS.md`](../docs/FOR_ADDON_DEVELOPERS.md)
+- Building an RTP addon against `rtp-api`: [`../docs/FOR_ADDON_DEVELOPERS.md`](../resource/LeafRTP/docs/FOR_ADDON_DEVELOPERS.md)
 - Publishing and artifact closure details: [`../docs/dev/PUBLISHING.md`](../docs/dev/PUBLISHING.md)

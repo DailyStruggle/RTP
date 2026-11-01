@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * Per-attempt chunk-load attribution (ADR-122 Decision 1 & 2).
+ * Per-attempt chunk-load attribution (ADR-122 Decision 1 and 2).
  */
 public final class ChunkLoadCounter {
 

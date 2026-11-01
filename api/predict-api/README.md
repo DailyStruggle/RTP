@@ -27,9 +27,10 @@ dependencies {
 - `WaterFillingAllocator` - constrained weighted max-min fairness solver (`allocate(deliverableDemands, weights, totalBudget)`) and share normalizer (`normalizeShares(plannedRates)`).
 - `WorkAttributionLedger<K>` - lock-free bounded (4096-entry LRU) dual-EWMA (30 s and 10 min half-lives) per-actor cost ledger (`recordConsumption`, `recordCharge`, `distinctConsumers`, `attributedCostMsPerMin`, `topActors`, `costP99MsPerMin`).
 - `ProbedShareAllocator` - lock-free Folia / multi-group probed share, steering-weight (`w_k`, `w'_k`), and idle-thread pool lending (`Pi`, `e_k`) allocator (`evaluate(...)`, `recordSplit`, `recordMerge`, `isCandidateAged`) computing Jain's fairness index `J` and bystander exposure `E`.
-- `UnitCurve` - stateless, allocation-free, `NaN`/boundary-clamped unit-interval shaping and envelope evaluators (`clamp01`, `linear`, `power`, `complementaryPower`, `sigmoid`, `smoothstep`, `parabolicCrown`, `gaussian`, `logarithmic`, `logarithmicTaper`, `harmonic`) and composable `DoubleUnaryOperator` factories (`ofLinear`, `ofPower`, `ofSigmoid`, `ofGaussian`, `ofLogarithmic`, `ofLogarithmicTaper`).
-- `DistributionSampler` - deterministic (`DoubleSupplier`) and `ThreadLocalRandom` continuous samplers over `[0, 1)` and `[0, range)` (`samplePowerLaw`, `samplePowerLawIndex`, `sampleTruncatedNormal`, `radialAreaExponent`) plus deterministic 64-bit FNV-1a + SplitMix64 seed derivation (`variantSeed(namespaceKey, variantIndex)`).
-- `PolarCurve` - parametric polar-to-Cartesian spiral and multi-harmonic cross-section helpers (`spiralOffset`, `spiralAngle`, `harmonicRadius` general array and fast 3-harmonic overloads, `annularRingRadius`).
+- `UnitCurve` - stateless, allocation-free, `NaN`/boundary-clamped unit-interval shaping and envelope evaluators (`clamp01`, `linear`, `power`, `complementaryPower`, `sigmoid`, `smoothstep`, `smootherstep`, `circularArc`, `parabolicCrown`, `parabolicValley`, ` radialFalloff`, `runningMaxBreakouts`, `gaussian`, `logarithmic`, `logarithmicTaper`, `harmonic`) and composable `DoubleUnaryOperator` factories (`ofLinear`, `ofPower`, `ofSigmoid`, `ofSmootherstep`, `ofCircularArc`, `ofParabolicValley`, `ofGaussian`, `ofLogarithmic`, `ofLogarithmicTaper`).
+- `DistributionSampler` - deterministic (`DoubleSupplier`) and `ThreadLocalRandom` continuous and discrete samplers (`samplePowerLaw`, `samplePowerLawIndex`, `sampleTruncatedNormal`, `radialAreaExponent`, `sampleWeightedIndex`, `spreadPoolWeight`, `normalizePoolWeights`, `gridCellSample`) plus deterministic 64-bit FNV-1a + SplitMix64 seed derivation (`variantSeed(namespaceKey, variantIndex)`).
+- `PolarCurve` - parametric polar-to-Cartesian spiral, spherical/spheroidal envelope, multi-harmonic cross-section, and 6-connected parametric curve discretization helpers (`spiralOffset`, `spiralAngle`, `harmonicRadius`, `annularRingRadius`, `spheroidSliceRadius`, `ellipsoidDistance`, `sphericalOffset`, `fanAngleOffset`, `quadrantRotateXZ`, `trace6ConnectedCurve`, `trace6ConnectedLine`, `traceSteepestOrthogonalLine`).
+- `PerlinNoise` - stateless, allocation-free 3D Improved Perlin gradient noise evaluator (`noise(x, y, z)`, `fade(t)`, `lerp(t, a, b)`, `grad(hash, x, y, z)`) built on `UnitCurve.smootherstep` and `UnitCurve.linear`.
 
 ## Usage
 
@@ -87,9 +88,9 @@ double lobedRadius = PolarCurve.harmonicRadius(8.0 * UnitCurve.parabolicCrown(0.
 
 ## Docs
 
-- ADR-087: [`../../docs/adr/ADR-087-adaptive-compute-governor.md`](../../docs/adr/ADR-087-adaptive-compute-governor.md)
-- ADR-109: [`../../docs/adr/ADR-109-measured-cost-probe-first-gate.md`](../../docs/adr/ADR-109-measured-cost-probe-first-gate.md)
-- ADR-114: [`../../docs/adr/ADR-114-cost-governed-on-demand-chunk-reads.md`](../../docs/adr/ADR-114-cost-governed-on-demand-chunk-reads.md)
+- ADR-087: [`../../docs/adr/ADR-087-adaptive-compute-governor.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-068-adaptive-compute-governor.md)
+- ADR-109: [`../../docs/adr/ADR-109-measured-cost-probe-first-gate.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-084-measured-cost-probe-first-gate.md)
+- ADR-114: [`../../docs/adr/ADR-114-cost-governed-on-demand-chunk-reads.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-086-cost-governed-on-demand-chunk-reads.md)
 - ADR-115: [`../../docs/adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph.md`](../../docs/adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph.md)
-- ADR-123: [`../../docs/adr/ADR-123-folia-tick-region-allocation.md`](../../docs/adr/ADR-123-folia-tick-region-allocation.md)
-- ADR-124: [`../../docs/adr/ADR-124-consumer-attribution-for-background-refill.md`](../../docs/adr/ADR-124-consumer-attribution-for-background-refill.md)
+- ADR-123: [`../../docs/adr/ADR-123-folia-tick-region-allocation.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-092-folia-tick-region-allocation.md)
+- ADR-124: [`../../docs/adr/ADR-124-consumer-attribution-for-background-refill.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-093-consumer-attribution-for-background-refill.md)

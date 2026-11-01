@@ -1,0 +1,888 @@
+package io.github.dailystruggle.rtp.folia.server;
+
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.mock.MockPlayerRegistry;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
+import io.github.dailystruggle.rtp.common.tools.MessageTagger;
+import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
+import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
+import io.github.dailystruggle.rtp.folia.world.FoliaLocationGenerator;
+import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.folia.tasks.CountBoundTaskPipe;
+import io.github.dailystruggle.rtp.folia.tasks.RegionKey;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
+import java.io.File;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Tag;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
+public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
+  protected final Map<UUID, FoliaRTPWorld> worldMap = new ConcurrentHashMap<>();
+  protected final ConcurrentHashMap<RegionKey, ConcurrentLinkedQueue<io.github.dailystruggle.rtp.common.tasks.RTPRunnable>> regionQueues = new ConcurrentHashMap<>();
+  protected final Set<RegionKey> activeProcessors = ConcurrentHashMap.newKeySet();
+  protected Function<String, ?> shapeFunction = (s) -> null;
+  protected Function<String, ?> worldBorderFunction = this::createNativeWorldBorder;
+  private final Map<String, WorldBorder> nativeWorldBorderCache = new ConcurrentHashMap<>();
+
+  protected WorldBorder createNativeWorldBorder(String worldName) {
+    return nativeWorldBorderCache.computeIfAbsent(worldName, s -> {
+      RTPWorld<?> rtpWorld = getRTPWorld(s);
+      if (!(rtpWorld instanceof FoliaRTPWorld)) return null;
+      World world = ((FoliaRTPWorld) rtpWorld).world();
+      org.bukkit.WorldBorder worldBorder;
+      try {
+        worldBorder = world.getWorldBorder();
+      } catch (Throwable t) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, t.getClass().getSimpleName() + ": " + t.getMessage());
+        log(Level.WARNING, "[RTP] (Folia) Failed to resolve native WorldBorder for world " + s + ": " + t.getMessage(), t);
+        return null;
+      }
+      //noinspection ConstantValue
+      if (worldBorder == null) {
+        io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordWorldBorderDegraded(
+            s, "world.getWorldBorder() returned null");
+        return null;
+      }
+      return new WorldBorder(
+          () -> {
+            Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
+            if (shape instanceof Square square) {
+              square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
+              square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
+              square.set(GenericMemoryShapeParams.centerZ, (long) (worldBorder.getCenter().getBlockZ() / 16.0));
+            }
+            return shape;
+          },
+          rtpLocation -> {
+            Location location = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
+            return world.getWorldBorder().isInside(location);
+          });
+    });
+  }
+  protected Function<RTPWorld<?>, Set<String>> biomes = FoliaRTPWorld::getBiomes;
+
+  @GlobalRegionThread
+  public AbstractFoliaServerAccessor() {
+    // ADR-058: install the platform-neutral (WorldEdit-free) region-schematic paster, mirroring
+    // AbstractServerAccessor on Bukkit/Paper. Folia does not extend that accessor, so without
+    // this call FoliaRTPWorld stays on NoOpSchematicPaster and every region schematic falls back
+    // to the default platform. The shared WorldBlockSchematicPaster drives FoliaRTPWorld's native
+    // block-write primitives (setBlocks / restoreBlockEntities, which place blocks via the wrapped
+    // Bukkit World) and is invoked on the region-owning thread by the teleport pipeline.
+    FoliaRTPWorld.setSchematicPaster(
+        new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster());
+    for (World world : Bukkit.getWorlds()) {
+      worldMap.put(world.getUID(), new FoliaRTPWorld(world));
+    }
+  }
+
+  @Override
+  @GlobalRegionThread
+  public String getServerVersion() {
+    return Bukkit.getVersion();
+  }
+
+  @Override
+  @GlobalRegionThread
+  public @NotNull String getPluginVersion() {
+    return Bukkit.getPluginManager().getPlugin("RTP").getDescription().getVersion();
+  }
+
+  @Override
+  public @NotNull String getPlatform() { // @AnyThread - returns constant String
+    return "Folia";
+  }
+
+  protected Integer intVersion = null;
+  @Override
+  public Integer getServerIntVersion() { // @AnyThread - pure parse/cache of version string
+    if (intVersion == null) {
+      // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getServerVersion() from unannotated context
+      String v = getServerVersion();
+      if (v.contains("1_13") || v.contains("1.13")) intVersion = 13;
+      else if (v.contains("1_14") || v.contains("1.14")) intVersion = 14;
+      else if (v.contains("1_15") || v.contains("1.15")) intVersion = 15;
+      else if (v.contains("1_16") || v.contains("1.16")) intVersion = 16;
+      else if (v.contains("1_17") || v.contains("1.17")) intVersion = 17;
+      else if (v.contains("1_18") || v.contains("1.18")) intVersion = 18;
+      else if (v.contains("1_19") || v.contains("1.19")) intVersion = 19;
+      else if (v.contains("1_20") || v.contains("1.20")) intVersion = 20;
+      else if (v.contains("1_21") || v.contains("1.21")) intVersion = 21;
+      else if (v.contains("26_") || v.contains("26.")) intVersion = 26;
+      else intVersion = 13;
+    }
+    return intVersion;
+  }
+
+  @Override
+  @GlobalRegionThread
+  public @Nullable RTPWorld<?> getRTPWorld(String name) {
+    World world = Bukkit.getWorld(name);
+    if (world == null) return null;
+    return worldMap.computeIfAbsent(world.getUID(), uuid -> new FoliaRTPWorld(world));
+  }
+
+  @Override
+  @GlobalRegionThread
+  public @Nullable RTPWorld<?> getRTPWorld(UUID id) {
+    World world = Bukkit.getWorld(id);
+    if (world == null) return null;
+    return worldMap.computeIfAbsent(id, uuid -> new FoliaRTPWorld(world));
+  }
+
+  @Override
+  public @Nullable Object getShape(String name) { // @AnyThread - delegates to pure function
+    return shapeFunction.apply(name);
+  }
+
+  @Override
+  public boolean isPrimaryThread() { // @AnyThread - pure boolean check
+    return false;
+  }
+
+  @Override
+  @GlobalRegionThread
+  public @Nullable Object getWorldBorder(String worldName) {
+    Object res = worldBorderFunction.apply(worldName);
+    if (res == null) res = createNativeWorldBorder(worldName);
+    return res;
+  }
+
+  @Override
+  @GlobalRegionThread
+  public @NotNull List<RTPWorld<?>> getRTPWorlds() {
+    return Bukkit.getWorlds().stream()
+        .map(world -> getRTPWorld(world.getUID()))
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  @GlobalRegionThread
+  public @Nullable RTPPlayer getPlayer(UUID uuid) {
+    // ADR-121: registered BIT mocks shadow native lookup; the registry is empty in production.
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
+    Player player = Bukkit.getPlayer(uuid);
+    if (player == null) return null;
+    return new FoliaRTPPlayer(player);
+  }
+
+  @Override
+  @GlobalRegionThread
+  public @Nullable RTPPlayer getPlayer(String name) {
+    RTPPlayer mock = MockPlayerRegistry.getByName(name);
+    if (mock != null) return mock;
+    Player player = Bukkit.getPlayer(name);
+    if (player == null) return null;
+    return new FoliaRTPPlayer(player);
+  }
+
+  @Override
+  public @Nullable RTPPlayer getConsolePlayer() {
+    return getPlayer(RTPAPI.serverId);
+  }
+
+  @Override
+  public @NotNull RTPCommandSender getSender(UUID uuid) {
+    if (uuid.equals(RTPAPI.serverId)) return new FoliaRTPCommandSender(Bukkit.getConsoleSender());
+    RTPPlayer mock = MockPlayerRegistry.get(uuid);
+    if (mock != null) return mock;
+    Player player = Bukkit.getPlayer(uuid);
+    if (player == null) return new FoliaRTPCommandSender(Bukkit.getConsoleSender());
+    return new FoliaRTPPlayer(player);
+  }
+
+  @Override
+  public long overTime() { // @AnyThread - returns constant
+    return 0;
+  }
+
+  @Override
+  public @NotNull File getPluginDirectory() {
+    return Bukkit.getPluginManager().getPlugin("RTP").getDataFolder();
+  }
+
+  @Override
+  public void sendMessage(UUID target, Enum<?> msgType, String tag) {
+    String message = String.valueOf(ActiveConfigs.get().getConfigValue(msgType, ""));
+    sendMessage(target, message, tag);
+  }
+
+  @Override
+  public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
+    String message = String.valueOf(ActiveConfigs.get().getConfigValue(msgType, ""));
+    sendMessage(target1, target2, message, tag);
+  }
+
+  @Override
+  public void sendMessage(UUID target, String message, String tag) {
+    message = tagMessage(message, tag);
+    if (target.equals(RTPAPI.serverId)) {
+      io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+      return;
+    }
+    Player player = Bukkit.getPlayer(target);
+    if (player != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(player, message);
+  }
+
+  @Override
+  public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
+    message = tagMessage(message, null);
+    // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getSender() from @RegionThread context
+    RTPCommandSender sender = getSender(target);
+    // Routes the suggestion safely as a click event via your formatting pipeline
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(sender, message, "", suggestion);
+  }
+
+
+  @Override
+  public void sendMessage(UUID target1, UUID target2, String message, String tag) {
+    message = tagMessage(message, tag);
+
+    if (target1.equals(RTPAPI.serverId)) {
+      io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+    } else {
+      Player p1 = Bukkit.getPlayer(target1);
+      if (p1 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p1, message);
+    }
+
+    // Prevent double sending if target1 and target2 are the exact same entity
+    if (target1.equals(target2)) return;
+
+    if (target2.equals(RTPAPI.serverId)) {
+      io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+    } else {
+      Player p2 = Bukkit.getPlayer(target2);
+      if (p2 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p2, message);
+    }
+  }
+
+  @Override
+  public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) {
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(target, tagMessage(message, tag), hover, click);
+  }
+
+  @Override
+  public void sendMessageWithRunCommand(
+      RTPCommandSender target, String message, String hover, String runCommand, String tag) {
+    // ADR-050: menu fragment clicks dispatch the literal /rtp menu ... command;
+    // use RUN_COMMAND instead of the SUGGEST_COMMAND used by sendMessage(...).
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(
+        target,
+        tagMessage(message, tag),
+        hover,
+        runCommand,
+        net.md_5.bungee.api.chat.ClickEvent.Action.RUN_COMMAND);
+  }
+
+  @Override
+  public String format(@Nullable UUID player, String text) { // @AnyThread - pure text formatting
+    org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
+    return io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.format(bukkitPlayer, text);
+  }
+
+  @Override
+  public String formatNoColor(@Nullable UUID player, String text) { // @AnyThread - pure text formatting
+    org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
+    return io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.formatNoColor(bukkitPlayer, text);
+  }
+
+  @Override
+  public void log(Level level, String msg) { // @AnyThread - thread-safe logger
+    // Route through SendMessage.log so that '&' color codes in messages.yml
+    // (e.g. the locationLoaded hydration banner) are translated before being
+    // printed to the console. Previously this delegated directly to
+    // Bukkit.getLogger().log, causing raw "&e[P0] Successfully loaded ..." to
+    // appear on Folia consoles.
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.log(level, msg);
+  }
+
+  @Override
+  public void log(Level level, String msg, Throwable throwable) { // @AnyThread - thread-safe logger
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.log(level, msg, throwable);
+  }
+
+  @Override
+  public void announce(String msg, String permission, String tag) {
+    msg = tagMessage(msg, tag);
+    for (Player player : Bukkit.getOnlinePlayers()) {
+      if (player.hasPermission(permission)) {
+        io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(player, msg);
+      }
+    }
+
+    // Route to console via the formatting pipeline
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
+  }
+
+  private String tagMessage(String message, @Nullable String tag) {
+    return MessageTagger.tagMessage(message, tag);
+  }
+
+  @Override
+  public @NotNull Set<String> getBiomes(RTPWorld<?> rtpWorld) { // @AnyThread - delegates to pure function
+    return biomes.apply(rtpWorld);
+  }
+
+  @Override
+  public @NotNull Set<String> getBiomes() { // @AnyThread - delegates to pure function
+    return biomes.apply(null);
+  }
+
+  @Override
+  public @NotNull Set<String> materials() { // @AnyThread - pure enum enumeration
+    return Arrays.stream(Material.values())
+        .map(material -> material.name().toUpperCase())
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * Lazy-initialised snapshot of the Bukkit block-tag registry, mirroring the
+   * Spigot-side {@code AbstractServerAccessor.blockTagSnapshot} contract
+   * (ADR-017). Populated on first read or on explicit
+   * {@link #rebuildBlockTagSnapshot()}, consumed by
+   * {@code SafetyTokenExpander} / {@code SafetyCompilationCache} to flatten
+   * {@code #namespace:tag} tokens in {@code safety.airBlocks} /
+   * {@code unsafeBlocks} into their member material names.
+   */
+  private volatile Map<String, Set<String>> blockTagSnapshot;
+
+  @Override
+  public @NotNull Map<String, Set<String>> blockTagSnapshot() {
+    Map<String, Set<String>> snap = this.blockTagSnapshot;
+    if (snap != null) return snap;
+    synchronized (this) {
+      snap = this.blockTagSnapshot;
+      if (snap != null) return snap;
+      snap = buildBlockTagSnapshot();
+      this.blockTagSnapshot = snap;
+      return snap;
+    }
+  }
+
+  @Override
+  public void rebuildBlockTagSnapshot() {
+    synchronized (this) {
+      this.blockTagSnapshot = buildBlockTagSnapshot();
+    }
+  }
+
+  private Map<String, Set<String>> buildBlockTagSnapshot() {
+    Map<String, Set<String>> out = new HashMap<>();
+    int totalTags = 0;
+    int totalEmpty = 0;
+    try {
+      Iterable<Tag<Material>> tags = Bukkit.getTags(Tag.REGISTRY_BLOCKS, Material.class);
+      for (Tag<Material> tag : tags) {
+        totalTags++;
+        NamespacedKey key = tag.getKey();
+        String tagId = key.getNamespace() + ":" + key.getKey();
+        Set<Material> values;
+        try {
+          values = tag.getValues();
+        } catch (Throwable t) {
+          io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+              tagId,
+              t.getClass().getSimpleName() + ": " + t.getMessage());
+          log(Level.WARNING,
+              "[RTP] (Folia) tag.getValues() threw for key="
+                  + tagId
+                  + " (" + t.getClass().getName() + ": " + t.getMessage() + ")");
+          totalEmpty++;
+          continue;
+        }
+        if (values.isEmpty()) {
+          totalEmpty++;
+          continue;
+        }
+        Set<String> members = new HashSet<>(values.size());
+        for (Material m : values) members.add(m.name());
+        out.put(
+            tagId,
+            Collections.unmodifiableSet(members));
+      }
+    } catch (Throwable e) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", e.getClass().getSimpleName() + ": " + e.getMessage());
+      log(Level.WARNING,
+          "[RTP] (Folia) Failed to snapshot block tag registry: "
+              + e.getClass().getName() + ": " + e.getMessage(), e);
+      return Collections.emptyMap();
+    }
+    if (out.isEmpty()) {
+      io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          "Tag.REGISTRY_BLOCKS", "empty-tag-snapshot(iterated=" + totalTags + ",empty=" + totalEmpty + ")");
+      log(Level.WARNING,
+          "[RTP] (Folia) Bukkit block-tag registry yielded no usable tags (iterated="
+              + totalTags + ", empty=" + totalEmpty
+              + "); #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
+    }
+    return Collections.unmodifiableMap(out);
+  }
+
+  private Object plugin;
+
+  // ADR-049: Folia is a Bukkit-API platform, so it reuses the Bukkit-family
+  // join/quit listener hook. Folia's AbstractFoliaServerAccessor does NOT
+  // extend the Bukkit AbstractServerAccessor (separate region-threaded
+  // implementation), so the lifecycle-hook registration and the backend
+  // sampler-factory install that the Bukkit accessor performs in start(Object)
+  // must be mirrored here, otherwise network mode aborts its boot on Folia
+  // ("no BackendStateSampler factory installed") and a proxied player arriving
+  // on a Folia backend never redeems its reservation token (no teleport).
+  private final io.github.dailystruggle.rtp.bukkitplatform.server.BukkitPlayerLifecycleHook
+      playerLifecycleHook =
+          new io.github.dailystruggle.rtp.bukkitplatform.server.BukkitPlayerLifecycleHook();
+  private boolean playerLifecycleHookRegistered = false;
+
+  @Override
+  @GlobalRegionThread
+  public void stop() {
+    for (RTPWorld<?> rtpWorld : worldMap.values()) {rtpWorld.forgetChunks();}
+  }
+
+  @Override
+  @GlobalRegionThread
+  public void start() {
+    start(plugin);
+  }
+
+  @Override
+  @GlobalRegionThread
+  public void start(Object plugin) {
+    this.plugin = plugin;
+    if (plugin instanceof Plugin foliaPlugin && !playerLifecycleHookRegistered) {
+      playerLifecycleHook.register(foliaPlugin);
+      playerLifecycleHookRegistered = true;
+    }
+    // ADR-049: install the platform backend-heartbeat sampler factory so the
+    // platform-neutral NetworkModeBootstrap (rtp-core) can build a sampler
+    // without importing a platform class. BukkitBackendStateSampler is on the
+    // Folia classpath (rtp-folia-common -> rtp-paper-common -> rtp-bukkit-common)
+    // and uses only Folia-safe Bukkit API (Bukkit.getWorlds() + RTP internals).
+    NetworkHooks.setBackendStateSamplerFactory(
+        io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler::new);
+  }
+
+  @Override
+  public io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook getPlayerLifecycleHook() {
+    return playerLifecycleHook;
+  }
+
+  @Override
+  public boolean setShapeFunction(Function<String, ?> shapeFunction) { // @AnyThread - sets a pure function field
+    this.shapeFunction = shapeFunction;
+    return true;
+  }
+
+  @Override
+  public boolean setWorldBorderFunction(Function<String, ?> function) { // @AnyThread - sets a pure function field
+    this.worldBorderFunction = function;
+    return true;
+  }
+
+  @Override
+  public RTPTaskPipe createTaskPipe() { // @AnyThread - factory method, no Bukkit state
+    return new CountBoundTaskPipe((Plugin) plugin, 10);
+  }
+
+  @Override
+  public Object createCachePipe() { // @AnyThread - factory method, no Bukkit state
+    // Drained on the async worker, so asyncAllottedTime bounds it; the cap only limits how many
+    // chunk loads one region turn starts (matches Region.MAX_PROMOTIONS_PER_PULSE).
+    return new CountBoundTaskPipe((Plugin) plugin, 8);
+  }
+
+  @Override
+  public Object getPlugin() { // @AnyThread - returns stored field
+    return plugin;
+  }
+
+  @Override
+  public ILocationGenerator getLocationGenerator() { // @AnyThread - factory method
+    return new FoliaLocationGenerator();
+  }
+
+  @Override
+  public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() { // @AnyThread - returns stored field
+    return io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
+  }
+
+  @Override
+  public double getTPS(int ticks) { // @AnyThread - reads snapshot, falls back to nominal
+    // Folia exposes no first-class TPS field on its server object (regions tick independently).
+    // When a FoliaMetricsBinding is installed the snapshot carries the EMA-blended
+    // global TPS; fall back to the nominal constant only on the NOOP path.
+    try {
+      io.github.dailystruggle.metrics.api.MetricsSnapshot s =
+          CoreMetrics.instance().snapshot();
+      double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
+      if (!Double.isNaN(v)) return v;
+    } catch (Throwable ignored) {
+      // Defensive - snapshot() is non-throwing by contract.
+    }
+    return 20.0;
+  }
+
+  @Override
+  public void setBiomeGetter(Function<RTPLocation, String> getter) { // @AnyThread - sets a pure function field
+    FoliaRTPWorld.setBiomeGetter(
+        location ->
+            getter.apply(
+                new RTPLocation(
+                    // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getRTPWorld() from unannotated lambda context
+                    getRTPWorld(location.getWorld().getUID()),
+                    location.getBlockX(),
+                    location.getBlockY(),
+                    location.getBlockZ())));
+  }
+
+  @Override
+  public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) { // @AnyThread - sets a pure function field
+    this.biomes = getter;
+    FoliaRTPWorld.setBiomesGetter(getter);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Menu platform surface (ADR-048) - Bukkit-equivalent overrides (Folia runs
+  // on the Bukkit API so Player#getLocale / Player#getWorld() are available).
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public java.util.function.Predicate<String> menuPermissionProbe(UUID player) {
+    return node -> {
+      if (player == null || node == null) return false;
+      try {
+        Player p = Bukkit.getPlayer(player);
+        if (p != null) return p.hasPermission(node);
+        org.bukkit.OfflinePlayer off = Bukkit.getOfflinePlayer(player);
+        return off != null && off.isOp();
+      } catch (RuntimeException | LinkageError t) {
+        PlatformHookBitComponent.recordWorldHookDegraded(
+            "AbstractFoliaServerAccessor#menuPermissionProbe",
+            t.getClass().getSimpleName() + ": " + t.getMessage());
+        return false;
+      }
+    };
+  }
+
+  @Override
+  public Set<String> menuEffectivePermissions(UUID player) {
+    if (player == null) return Collections.emptySet();
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return Collections.emptySet();
+      return p.getEffectivePermissions().stream()
+          .filter(pai -> pai.getValue())
+          .map(pai -> pai.getPermission())
+          .collect(Collectors.toUnmodifiableSet());
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#menuEffectivePermissions",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
+      return Collections.emptySet();
+    }
+  }
+
+  @Override
+  public String menuLocale(UUID player) {
+    if (player == null) return "en_us";
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return "en_us";
+      String loc = p.getLocale();
+      return loc.isEmpty() ? "en_us" : loc;
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#menuLocale",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
+      return "en_us";
+    }
+  }
+
+  @Override
+  public String menuRegionDescriptor(UUID player) {
+    if (player == null) return "";
+    try {
+      Player p = Bukkit.getPlayer(player);
+      if (p == null) return "";
+      World w = p.getWorld();
+      return w.getName();
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#menuRegionDescriptor",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
+      return "";
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Command registration & execution SPI
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void registerCommands(Object rootCommand, String... aliases) {
+    if (!(rootCommand instanceof io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand treeCommand)) {
+      return;
+    }
+    if (!(plugin instanceof org.bukkit.plugin.Plugin bukkitPlugin)) {
+      return;
+    }
+    io.github.dailystruggle.rtp.bukkitplatform.commands.BukkitCommandRegistrar registrar;
+    if (treeCommand instanceof io.github.dailystruggle.rtp.common.commands.CoreRtpRoot coreRtpRoot) {
+      registrar = new io.github.dailystruggle.rtp.bukkitplatform.commands.BukkitCommandRegistrar(
+          bukkitPlugin, treeCommand, coreRtpRoot::dispatchString);
+    } else {
+      registrar = new io.github.dailystruggle.rtp.bukkitplatform.commands.BukkitCommandRegistrar(
+          bukkitPlugin, treeCommand, null);
+    }
+    registrar.register(aliases);
+  }
+
+  @Override
+  public boolean executeCommand(UUID senderId, String commandLine) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    if (!(plugin instanceof org.bukkit.plugin.Plugin bukkitPlugin) || !bukkitPlugin.isEnabled()) {
+      return false;
+    }
+    if (senderId == null || senderId.equals(RTPAPI.serverId)) {
+      if (Bukkit.isGlobalTickThread()) {
+        try {
+          return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), commandLine);
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        Bukkit.getGlobalRegionScheduler().run(bukkitPlugin, task -> {
+          try {
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), commandLine);
+          } catch (Throwable t) {
+            log(Level.WARNING, "[RTP] Console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          }
+        });
+        return true;
+      }
+    } else {
+      Player player = Bukkit.getPlayer(senderId);
+      if (player == null || !player.isOnline()) return false;
+      if (Bukkit.isOwnedByCurrentRegion(player.getLocation())) {
+        try {
+          return Bukkit.dispatchCommand(player, commandLine);
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        player.getScheduler().run(bukkitPlugin, task -> {
+          try {
+            Bukkit.dispatchCommand(player, commandLine);
+          } catch (Throwable t) {
+            log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          }
+        }, null);
+        return true;
+      }
+    }
+  }
+
+  @Override
+  public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    if (!(plugin instanceof org.bukkit.plugin.Plugin bukkitPlugin) || !bukkitPlugin.isEnabled()) {
+      return false;
+    }
+    org.bukkit.command.CommandSender console = Bukkit.getConsoleSender();
+    org.bukkit.command.CommandSender capturingSender = createCapturingConsoleSender(console, lineConsumer);
+    if (Bukkit.isGlobalTickThread()) {
+      try {
+        return Bukkit.dispatchCommand(capturingSender, commandLine);
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP] Capturing console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+        return false;
+      }
+    } else {
+      java.util.concurrent.CompletableFuture<Boolean> dispatchFuture = new java.util.concurrent.CompletableFuture<>();
+      Bukkit.getGlobalRegionScheduler().run(bukkitPlugin, task -> {
+        try {
+          dispatchFuture.complete(Bukkit.dispatchCommand(capturingSender, commandLine));
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Capturing console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          dispatchFuture.completeExceptionally(t);
+        }
+      });
+      try {
+        return dispatchFuture.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        log(Level.WARNING, "[RTP] Async capturing command dispatch interrupted for '" + commandLine + "': " + e.getMessage(), e);
+        return false;
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP] Async capturing command dispatch failed for '" + commandLine + "': " + t.getMessage(), t);
+        return false;
+      }
+    }
+  }
+
+  private org.bukkit.command.CommandSender createCapturingConsoleSender(
+      org.bukkit.command.CommandSender delegate, java.util.function.Consumer<String> lineConsumer) {
+    Class<?>[] interfaces = delegate.getClass().getInterfaces();
+    boolean hasSender = false;
+    for (Class<?> itf : interfaces) {
+      if (org.bukkit.command.CommandSender.class.isAssignableFrom(itf)) {
+        hasSender = true;
+        break;
+      }
+    }
+    Class<?>[] proxyInterfaces;
+    if (hasSender) {
+      proxyInterfaces = interfaces;
+    } else {
+      proxyInterfaces = new Class<?>[interfaces.length + 1];
+      System.arraycopy(interfaces, 0, proxyInterfaces, 0, interfaces.length);
+      proxyInterfaces[interfaces.length] = org.bukkit.command.ConsoleCommandSender.class;
+    }
+    return (org.bukkit.command.CommandSender) java.lang.reflect.Proxy.newProxyInstance(
+        delegate.getClass().getClassLoader(),
+        proxyInterfaces,
+        (proxy, method, args) -> {
+          String name = method.getName();
+          if ("sendMessage".equals(name) && args != null && args.length > 0) {
+            if (lineConsumer != null) {
+              for (Object arg : args) {
+                if (arg instanceof String s) {
+                  lineConsumer.accept(s);
+                } else if (arg instanceof String[] arr) {
+                  for (String s : arr) {
+                    if (s != null) lineConsumer.accept(s);
+                  }
+                } else if (arg != null) {
+                  try {
+                    java.lang.reflect.Method plainTextMethod = arg.getClass().getMethod("toPlainText");
+                    Object text = plainTextMethod.invoke(arg);
+                    if (text != null) lineConsumer.accept(text.toString());
+                  } catch (Throwable ignored) {
+                    lineConsumer.accept(arg.toString());
+                  }
+                }
+              }
+            }
+            return null;
+          }
+          if ("sendFeedback".equals(name) && args != null && args.length > 0) {
+            if (lineConsumer != null && args[0] != null) {
+              lineConsumer.accept(args[0].toString());
+            }
+            return null;
+          }
+          return method.invoke(delegate, args);
+        });
+  }
+
+  @Override
+  public Set<String> getScoreboardTags(UUID playerId) {
+    if (playerId == null) return Collections.emptySet();
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return Collections.emptySet();
+      Set<String> tags = player.getScoreboardTags();
+      if (tags.isEmpty()) return Collections.emptySet();
+      return Collections.unmodifiableSet(new HashSet<>(tags));
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded(
+          "AbstractFoliaServerAccessor#getScoreboardTags",
+          t.getClass().getSimpleName() + ": " + t.getMessage());
+      return Collections.emptySet();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Palette identifier normalization & reconciliation SPI
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Raw palette name to reconciled name. {@code Material.matchMaterial} compiles a regex per
+   * call and safety scans hit it per block name; the material set is fixed for the server's
+   * lifetime, so answers never go stale.
+   */
+  private final java.util.concurrent.ConcurrentHashMap<String, String> paletteIdentifierMemo =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** Bound on memoized names; palettes carry a few thousand distinct block ids at most. */
+  private static final int PALETTE_MEMO_MAX = 8192;
+
+  @Override
+  public String reconcilePaletteIdentifier(String raw) {
+    if (raw == null) return null;
+    String memo = paletteIdentifierMemo.get(raw);
+    if (memo != null) return memo;
+    String reconciled = reconcilePaletteIdentifierUncached(raw);
+    if (reconciled != null && paletteIdentifierMemo.size() < PALETTE_MEMO_MAX) {
+      paletteIdentifierMemo.putIfAbsent(raw, reconciled);
+    }
+    return reconciled;
+  }
+
+  private static String reconcilePaletteIdentifierUncached(String raw) {
+    try {
+      org.bukkit.Material material = org.bukkit.Material.matchMaterial(raw);
+      if (material != null) return material.name();
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordPaletteReconcilerDegraded(
+          raw, e.getClass().getSimpleName() + ": " + e.getMessage());
+    }
+    return io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(raw);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding binding =
+          new io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding();
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
+      RTP.log(Level.FINE,
+          "[RTP] setupMapBinding installed " + binding.getClass().getSimpleName()
+              + " via MapDispatch");
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordWorldHookDegraded("FoliaMapBinding#setupMapBinding", t);
+      RTP.log(Level.WARNING,
+          "[RTP] setupMapBinding failed; MapDispatch will fall back to NoopMapBinding", t);
+    }
+  }
+}

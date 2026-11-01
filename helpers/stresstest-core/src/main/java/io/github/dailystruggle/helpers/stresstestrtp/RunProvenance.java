@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 /**
  * Records what a run measured: every enabled plugin/mod's version, jar SHA-256 and jar mtime,
- * plus a copy of each plugin's {@code *.yml} files as they were at run start (ADR-122 Decision 1 & 2).
+ * plus a copy of each plugin's {@code *.yml} files as they were at run start (ADR-122 Decision 1 and 2).
  */
 public final class RunProvenance {
 

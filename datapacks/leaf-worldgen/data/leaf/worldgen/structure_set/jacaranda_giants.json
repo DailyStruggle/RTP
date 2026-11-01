@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "leaf:jacaranda_giant",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 80093,
+    "spacing": 3,
+    "separation": 2,
+    "spread_type": "linear"
+  }
+}

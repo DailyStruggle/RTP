@@ -82,10 +82,10 @@ mkdir -p "$runDir"
 summary="$runDir/summary.tsv"
 printf 'slug\tresult\taccessor\tqueue\tbot_effects\tbot_death\tlinkage\tnote\n' > "$summary"
 
-mapfile -t jars < <(find "$repoRoot/rtp-plugin/build/libs" -maxdepth 1 -name 'LeafRTP-Pro-*.jar' \
+mapfile -t jars < <(find "$repoRoot/resource/LeafRTP/rtp-plugin/build/libs" "$repoRoot/rtp-plugin/build/libs" -maxdepth 1 -name 'LeafRTP-Pro-*.jar' \
   ! -name '*-dev.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' 2>/dev/null | LC_ALL=C sort)
 if [ "${#jars[@]}" -lt 1 ]; then
-  echo "[stage] FAIL - expected LeafRTP-Pro-*.jar under rtp-plugin/build/libs, found 0" >&2
+  echo "[stage] FAIL - expected LeafRTP-Pro-*.jar under resource/LeafRTP/rtp-plugin/build/libs, found 0" >&2
   exit 1
 fi
 jar="${jars[-1]}"

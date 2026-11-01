@@ -17,26 +17,26 @@ Read this before opening a pull request.
 Module breakdown and architectural boundaries: what belongs in `rtp-core`, `rtp-api`, and each platform adapter.
 The architecture tests in `RTPArchitectureTest.java` enforce these boundaries — know them before writing code.
 
-### 3. [CONCEPTS.md](dev/CONCEPTS.md)
+### 3. [CONCEPTS.md](../resource/LeafRTP/docs/dev/CONCEPTS.md)
 Plain-language explanation of the teleport pipeline, queue system, and bounded selection algorithm.
 Useful context before diving into the implementation.
 
-### 4. [DESIGN.md](dev/DESIGN.md)
+### 4. [DESIGN.md](../resource/LeafRTP/docs/dev/DESIGN.md)
 Deep-dive into bounded execution, the `CountBoundTaskPipe`, `MemoryTracker`, and fault-tolerance contracts.
 The authoritative source on *why* the core is structured the way it is.
 
-### 5. [REQUIREMENTS.md](dev/REQUIREMENTS.md)
+### 5. [REQUIREMENTS.md](../resource/LeafRTP/docs/dev/REQUIREMENTS.md)
 Functional, non-functional, and architectural requirements with unique `REQ-*` IDs.
 Every new feature or fix must trace to an existing requirement or introduce a new one.
 
-### 6. [TRACEABILITY.md](dev/TRACEABILITY.md)
+### 6. [TRACEABILITY.md](../resource/LeafRTP/docs/dev/TRACEABILITY.md)
 The requirement → design decision → implementing class → test matrix.
 The `scripts/check_traceability.sh` CI script fails if any `REQ-*` ID lacks a row here — add the row before pushing.
 
-### 7. [STAKEHOLDERS.md](dev/STAKEHOLDERS.md)
+### 7. [STAKEHOLDERS.md](../resource/LeafRTP/docs/dev/STAKEHOLDERS.md)
 Actor definitions and their goals. Keeps requirements grounded in real user needs.
 
-### 8. [GLOSSARY.md](dev/GLOSSARY.md)
+### 8. [GLOSSARY.md](../resource/LeafRTP/docs/dev/GLOSSARY.md)
 Definitions for every domain term. Use these exact terms in code, comments, and commit messages for consistency.
 
 ### 9. [docs/adr/](adr/README.md)
@@ -51,5 +51,5 @@ The end-to-end pull request lifecycle: branching conventions, local pre-PR verif
 ## Reference Material
 
 - [PULL_REQUEST_PROCESS.md](dev/PULL_REQUEST_PROCESS.md) — pull request lifecycle, pre-PR verification checklist, and CI pipeline reference.
-- [HAZARDS.md](dev/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
-- [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.
+- [HAZARDS.md](../resource/LeafRTP/docs/dev/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
+- [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/resource/LeafRTP/CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.

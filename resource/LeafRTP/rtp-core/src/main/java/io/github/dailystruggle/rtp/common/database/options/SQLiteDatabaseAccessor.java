@@ -1,0 +1,422 @@
+package io.github.dailystruggle.rtp.common.database.options;
+
+import io.github.dailystruggle.database.api.SqlDialect;
+import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import java.io.File;
+import java.sql.*;
+import java.util.*;
+import java.util.logging.Level;
+import org.jetbrains.annotations.NotNull;
+
+public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
+  private final String sqliteUrl;
+  private Connection connection;
+
+  public SQLiteDatabaseAccessor(String url) {
+    if (url != null
+        && url.startsWith("jdbc:sqlite:")
+        && !url.equals("jdbc:sqlite:ignored")
+        && !url.endsWith(File.separator + "RTP.db")) {
+      this.sqliteUrl = url;
+    } else if (RTPRuntime.serverAccessor() != null
+        && RTPRuntime.serverAccessor().getPluginDirectory() != null) {
+      File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+      File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");
+      if (!databaseFile.getParentFile().exists()) {
+        databaseFile.getParentFile().mkdirs();
+      }
+      this.sqliteUrl = "jdbc:sqlite:" + databaseFile.getAbsolutePath();
+    } else if (url != null && url.startsWith("jdbc:sqlite:")) {
+      this.sqliteUrl = url;
+    } else {
+      File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+      File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");
+      this.sqliteUrl = "jdbc:sqlite:" + databaseFile.getAbsolutePath();
+    }
+    try {
+      this.connection = DriverManager.getConnection(sqliteUrl);
+      SqlDialect.SQLITE.configureConnection(this.connection);
+      try (Statement statement = connection.createStatement()) {
+        String schema =
+            "CREATE TABLE IF NOT EXISTS rtp_teleport_data ("
+                + "senderName TEXT, "
+                + "senderId TEXT, "
+                + "time INTEGER, "
+                + "delay INTEGER, "
+                + "selectedX INTEGER, "
+                + "selectedY INTEGER, "
+                + "selectedZ INTEGER, "
+                + "selectedWorldName TEXT, "
+                + "selectedWorldId TEXT, "
+                + "originalX INTEGER, "
+                + "originalY INTEGER, "
+                + "originalZ INTEGER, "
+                + "originalWorldName TEXT, "
+                + "originalWorldId TEXT, "
+                + "region TEXT, "
+                + "cost REAL, "
+                + "attempts INTEGER"
+                + ");";
+        statement.execute(schema);
+        schema =
+                "CREATE TABLE IF NOT EXISTS rtp_cached_locations ("
+                        + "UUID TEXT PRIMARY KEY, "
+                        + "world TEXT, "
+                        + "x INTEGER, "
+                        + "y INTEGER, "
+                        + "z INTEGER, "
+                        + "attempts INTEGER, "
+                        + "region TEXT, "
+                        + "player_uuid TEXT, "
+                        + "timestamp INTEGER, "
+                        + "seed BIGINT"
+                        + ");";
+        statement.execute(schema);
+        ensureMetricBucketSchema(this.connection);
+      }
+    } catch (SQLException e) {
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+  @Override
+  public String name() {
+    return sqliteUrl;
+  }
+
+  @Override
+  public Connection getConnection() throws SQLException {
+    if (connection == null || connection.isClosed()) {
+      connection = DriverManager.getConnection(sqliteUrl);
+      SqlDialect.SQLITE.configureConnection(connection);
+    }
+    return connection;
+  }
+
+
+  @Override
+  public void disconnect(Connection connection) {
+    // Shared connection, do nothing.
+    // Hard disconnect happens in close()
+  }
+
+  @Override
+  public void close() {
+    try {
+      if (connection != null && !connection.isClosed()) {
+        connection.close();
+      }
+    } catch (SQLException e) {
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+  @Override
+  public void startup() {
+    DriverManager.setLoginTimeout(30);
+    Connection conn;
+    try {
+      conn = getConnection();
+    } catch (SQLException e) {
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
+      return;
+    }
+
+    @NotNull
+    Optional<Map<String, Object>> read =
+        read(conn, "referenceData", new AbstractMap.SimpleEntry<>("UUID", new UUID(0, 0)));
+    if (!read.isPresent()) {
+      return;
+    }
+
+    // get table
+    String sql = "SELECT senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
+        + "originalWorldName, originalX, originalY, originalZ, cost FROM rtp_teleport_data";
+
+    try (PreparedStatement statement = conn.prepareStatement(sql);
+        ResultSet resultSet = statement.executeQuery()) {
+      if (resultSet == null) {
+        return;
+      }
+
+      // each data
+      while (resultSet.next()) {
+        String uuidStr = resultSet.getString("senderId");
+        if (uuidStr == null) continue;
+
+        UUID uuid = UUID.fromString(uuidStr);
+
+        TeleportData teleportData = new TeleportData();
+        teleportData.sender = new io.github.dailystruggle.rtp.common.playerData.PureDataRTPCommandSender(
+            uuid, uuidStr, 0, 0, java.util.Collections.emptySet());
+        teleportData.completed = true;
+        teleportData.time = Long.parseLong(resultSet.getString("time"));
+        teleportData.selectedCoords =
+            new RTPCoords(
+                resultSet.getString("selectedWorldName"),
+                Integer.parseInt(resultSet.getString("selectedX")),
+                Integer.parseInt(resultSet.getString("selectedY")),
+                Integer.parseInt(resultSet.getString("selectedZ")));
+        teleportData.originalCoords =
+            new RTPCoords(
+                resultSet.getString("originalWorldName"),
+                Integer.parseInt(resultSet.getString("originalX")),
+                Integer.parseInt(resultSet.getString("originalY")),
+                Integer.parseInt(resultSet.getString("originalZ")));
+        teleportData.originWorldName = resultSet.getString("originalWorldName");
+        teleportData.cost = Double.parseDouble(resultSet.getString("cost"));
+
+        if (TeleportSessions.current() != null && TeleportSessions.current().latestTeleportData != null) {
+          TeleportSessions.current().latestTeleportData.put(uuid, teleportData, teleportData.time);
+        }
+      }
+    } catch (SQLException throwables) {
+      RTPRuntime.log(Level.WARNING, "Failed to load cached locations from SQLite", throwables);
+    } catch (IllegalArgumentException ignored) {
+      // Ignore corrupted or malformed UUID strings in database rows
+    }
+
+    purgeStaleLocations();
+  }
+
+  @Override
+  @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding
+  public @NotNull Optional<Map<String, Object>> read(
+      Connection connection, String tableName, Map.Entry<String, Object> lookup) {
+    String sql = "PRAGMA table_info( " + tableName + " );";
+    Map<String, String> column_info = new HashMap<>();
+
+    try (Statement statement = connection.createStatement()) {
+      statement.execute(sql);
+      ResultSet resultSet = statement.getResultSet();
+
+      if (resultSet == null) return Optional.empty();
+
+      while (resultSet.next()) {
+        column_info.put(resultSet.getString("name"), resultSet.getString("type"));
+      }
+    } catch (SQLException e) {
+      return Optional.empty();
+    }
+
+    // validate and add necessary column_info
+    Map<String, Object> row = new HashMap<>();
+
+    String selectSql = "SELECT * FROM " + tableName + " WHERE " + lookup.getKey() + " = ?";
+
+    try (PreparedStatement statement = connection.prepareStatement(selectSql)) {
+      statement.setObject(1, lookup.getValue());
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet != null) {
+          if (resultSet.next()) {
+            for (String key : column_info.keySet()) {
+              Object object = resultSet.getObject(key);
+              if (object == null || object.equals("NULL")) continue;
+              row.put(key, object);
+            }
+          }
+          return Optional.of(row);
+        }
+      }
+    } catch (SQLException ignored) {
+
+    }
+
+    return Optional.empty();
+  }
+
+  @Override
+  protected String getInsertStatement() {
+    return "INSERT OR IGNORE INTO rtp_teleport_data (senderName, senderId, time, delay, selectedX, selectedY, selectedZ, selectedWorldName, selectedWorldId, originalX, originalY, originalZ, originalWorldName, originalWorldId, region, cost, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  }
+
+  @Override
+  public String getMetricBucketInsertStatement() {
+    return "INSERT OR IGNORE INTO rtp_metric_bucket "
+        + "(backend_id, metric_key, window_start_epoch, window_seconds, sample_count, mean, min, max, p95, generation) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  }
+
+  @Override
+  @SuppressWarnings("java:S2077") // Dynamic table and column identifiers cannot be parameterized in JDBC; values use parameter binding
+  public void write(
+      Connection connection, String tableName, Map<TableObj, TableObj> keyValuePairs) {
+    if (keyValuePairs == null) throw new IllegalStateException();
+    if (keyValuePairs.isEmpty()) throw new IllegalStateException();
+
+    // get table info for validation
+    String sql = "PRAGMA table_info( " + tableName + " );";
+    Map<String, String> columns = new HashMap<>();
+    try (Statement statement = connection.createStatement()) {
+      statement.execute(sql);
+      ResultSet resultSet;
+      try {
+        resultSet = statement.getResultSet();
+      } catch (SQLException e) {
+        StringBuilder create = new StringBuilder("CREATE TABLE IF NOT EXISTS " + tableName + " ( ");
+        for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
+          create =
+              create
+                  .append("\"")
+                  .append(entry.getKey().object.toString())
+                  .append("\" ")
+                  .append("TEXT")
+                  .append(", ");
+        }
+        create = create.replace(create.lastIndexOf(","), create.length(), "");
+        create = create.append(" );");
+        statement.execute(create.toString());
+
+        if (keyValuePairs.containsKey(new TableObj("UUID"))) {
+          String unique =
+              "CREATE UNIQUE INDEX IF NOT EXISTS "
+                  + "UID"
+                  + " ON "
+                  + tableName
+                  + " ( "
+                  + "UUID"
+                  + " );";
+          statement.execute(unique);
+        }
+
+        statement.execute(sql);
+        resultSet = statement.getResultSet();
+      }
+
+      if (resultSet == null) {
+        StringBuilder create = new StringBuilder("CREATE TABLE IF NOT EXISTS " + tableName + " ( ");
+        for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
+          create =
+              create
+                  .append("\"").append(entry.getKey().object.toString()).append("\"")
+                  .append(" ")
+                  .append("TEXT")
+                  .append(", ");
+        }
+        create = create.replace(create.lastIndexOf(","), create.length(), "");
+        create = create.append(" );");
+        statement.execute(create.toString());
+
+        if (keyValuePairs.containsKey(new TableObj("UUID"))) {
+          String unique =
+              "CREATE UNIQUE INDEX IF NOT EXISTS "
+                  + "UID"
+                  + " ON "
+                  + tableName
+                  + " ( "
+                  + "UUID"
+                  + " );";
+          statement.execute(unique);
+        }
+
+        statement.execute(sql);
+        resultSet = statement.getResultSet();
+      }
+
+      Objects.requireNonNull(resultSet);
+      int i = 0;
+      while (resultSet.next()) {
+        i++;
+        columns.put(resultSet.getString("name"), resultSet.getString("type"));
+      }
+
+      if (i == 0) {
+        StringBuilder create = new StringBuilder("CREATE TABLE IF NOT EXISTS " + tableName + " ( ");
+        for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
+          create =
+              create
+                  .append("\"").append(entry.getKey().object.toString()).append("\"")
+                  .append(" ")
+                  .append("TEXT")
+                  .append(", ");
+        }
+        create = create.replace(create.lastIndexOf(","), create.length(), "");
+        create = create.append(" );");
+        statement.execute(create.toString());
+
+        if (keyValuePairs.containsKey(new TableObj("UUID"))) {
+          String unique =
+              "CREATE UNIQUE INDEX IF NOT EXISTS "
+                  + "UID"
+                  + " ON "
+                  + tableName
+                  + " ( "
+                  + "UUID"
+                  + " );";
+          statement.execute(unique);
+        }
+
+        statement.execute(sql);
+        resultSet = statement.getResultSet();
+
+        while (resultSet.next()) {
+          columns.put(resultSet.getString("name"), resultSet.getString("type"));
+        }
+      }
+
+      // validate and add necessary columns
+      List<String> keys = new ArrayList<>();
+      List<String> values = new ArrayList<>();
+      for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
+        String key = entry.getKey().object.toString();
+
+        keys.add(key);
+        values.add("\"" + entry.getValue().object.toString() + "\"");
+
+        if (columns.containsKey(key)) continue;
+
+        String typeStr;
+        switch (entry.getValue().expectedType) {
+          case INT:
+            typeStr = "INTEGER";
+            break;
+          case REAL:
+            typeStr = "REAL";
+            break;
+          case TEXT:
+            typeStr = "TEXT";
+            break;
+          case BLOB:
+            typeStr = "BLOB";
+            break;
+          default:
+            throw new IllegalStateException("Unexpected value: " + entry.getKey().expectedType);
+        }
+
+        sql = "ALTER TABLE " + tableName + " ADD \"" + key + "\" " + typeStr + ";";
+        executeAlterTable(statement, sql);
+      }
+
+      StringBuilder builder =
+          new StringBuilder("INSERT OR REPLACE INTO ").append(tableName).append(" ( ");
+      for (int k = 0; k < keys.size(); k++) {
+        String key = keys.get(k);
+        builder = builder.append("\"").append(key).append("\"");
+        if (k < keys.size() - 1) builder = builder.append(',');
+      }
+      builder = builder.append(" ) VALUES( ");
+      for (int v = 0; v < values.size(); v++) {
+        String value = values.get(v);
+        builder = builder.append(value);
+        if (v < values.size() - 1) builder = builder.append(',');
+      }
+      builder = builder.append(" );");
+
+      statement.execute(builder.toString());
+    } catch (SQLException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private void executeAlterTable(Statement statement, String sql) {
+    try {
+      statement.execute(sql);
+    } catch (SQLException e) {
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+}

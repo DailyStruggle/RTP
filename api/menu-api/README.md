@@ -72,6 +72,6 @@ if (renderer != null) {
 
 ## Docs
 
-- ADR-035: [`../../docs/adr/ADR-035-interactive-menus-book-first.md`](../../docs/adr/ADR-035-interactive-menus-book-first.md)
-- ADR-044: [`../../docs/adr/ADR-044-command-tree-menu-reflector.md`](../../docs/adr/ADR-044-command-tree-menu-reflector.md)
-- ADR-048: [`../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md`](../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md)
+- ADR-035: [`../../docs/adr/ADR-035-interactive-menus-book-first.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-021-interactive-menus-book-first.md)
+- ADR-044: [`../../docs/adr/ADR-044-command-tree-menu-reflector.md`](docs/adr/menu-api-ADR-001-command-tree-menu-reflector.md)
+- ADR-048: [`../../docs/adr/ADR-048-menu-builders-behind-server-accessor.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-031-menu-builders-behind-server-accessor.md)

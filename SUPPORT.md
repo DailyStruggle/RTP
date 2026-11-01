@@ -14,12 +14,12 @@ Check these first. Most questions are already answered:
    The same pages ship inside the jar (unpacked to `plugins/RTP/docs/`, or `config/rtp/docs/` on Fabric / NeoForge) and live in this
    repo under [`docs/`](docs/). They replace the old GitHub Wiki.
 2. **Server-admin docs** — <https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/>
-   ([`docs/FOR_SERVER_ADMINS.md`](docs/FOR_SERVER_ADMINS.md)) and the rest of
-   [`docs/admin/`](docs/admin/).
+   ([`docs/FOR_SERVER_ADMINS.md`](resource/LeafRTP/docs/FOR_SERVER_ADMINS.md)) and the rest of
+   [`docs/admin/`](resource/LeafRTP/docs/admin/).
 3. **FAQ** — <https://dailystruggle.github.io/RTP/admin/FAQ/>
-   ([`docs/admin/FAQ.md`](docs/admin/FAQ.md))
+   ([`docs/admin/FAQ.md`](resource/LeafRTP/docs/admin/FAQ.md))
 4. **Commands reference** — <https://dailystruggle.github.io/RTP/admin/COMMANDS/>
-   ([`docs/admin/COMMANDS.md`](docs/admin/COMMANDS.md))
+   ([`docs/admin/COMMANDS.md`](resource/LeafRTP/docs/admin/COMMANDS.md))
 5. **Resource page** — <https://www.spigotmc.org/resources/leafrtp.94812/>
 6. **Existing issues** — search **open *and* closed** issues; your problem has
    probably been reported.
@@ -88,7 +88,7 @@ Folia is the exception: it is experimental and only its current builds are
 maintained upstream, so Folia below 1.21.11 is not supported at all, and
 reports from it are closed.
 
-For platform, Minecraft, and Java runtime compatibility, refer to the canonical [Platform Support Matrix](docs/dev/SUPPORT_MATRIX.md).
+For platform, Minecraft, and Java runtime compatibility, refer to the canonical [Platform Support Matrix](resource/LeafRTP/docs/dev/SUPPORT_MATRIX.md).
 
 ---
 

@@ -41,10 +41,13 @@ name: Publish API artifacts to Maven Central
 on:
   push:
     branches:
+      - main
       - V3
     # Keep in sync with publishedModulePaths in the root build.gradle and the
     # task list in the "Sign + stage" step.
     paths:
+      - 'resource/LeafRTP/rtp-api/**'
+      - 'resource/LeafRTP/rtp-core/**'
       - 'rtp-api/**'
       - 'rtp-core/**'
       - 'api/server-api/**'
@@ -61,7 +64,12 @@ on:
       - 'api/menu-api/**'
       - 'api/predict-api/**'
       - 'api/tags-api/**'
-      - 'platforms/rtp-proxy/rtp-proxy-common/**'
+      - 'api/database-api/**'
+      - 'api/schematics-api/**'
+      - 'platforms/bukkit/bukkit-common/**'
+      - 'platforms/paper/paper-common/**'
+      - 'platforms/folia/folia-common/**'
+      - 'platforms/proxy/proxy-common/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle.properties'
@@ -130,10 +138,11 @@ jobs:
 
       # Sign + stage the whole published closure into build/central-staging/.
       # With SIGNING_KEY present, each publish task also runs its sign... task.
+      # -PpublicSdkOnly ensures private atlas/* classes are excluded from config-bit-api.
       - name: Sign + stage to Central staging
         if: steps.published.outputs.skip != 'true'
         run: >-
-          ./gradlew --no-daemon
+          ./gradlew --no-daemon -PpublicSdkOnly
           :server-api:publishMavenJavaPublicationToCentralStagingRepository
           :bit-api:publishMavenJavaPublicationToCentralStagingRepository
           :anvil-api:publishMavenJavaPublicationToCentralStagingRepository
@@ -147,8 +156,13 @@ jobs:
           :menu-api:publishMavenJavaPublicationToCentralStagingRepository
           :predict-api:publishMavenJavaPublicationToCentralStagingRepository
           :tags-api:publishMavenJavaPublicationToCentralStagingRepository
+          :database-api:publishMavenJavaPublicationToCentralStagingRepository
+          :schematics-api:publishMavenJavaPublicationToCentralStagingRepository
           :effects-api:publishMavenJavaPublicationToCentralStagingRepository
-          :rtp-proxy:rtp-proxy-common:publishMavenJavaPublicationToCentralStagingRepository
+          :bukkit:bukkit-common:publishMavenJavaPublicationToCentralStagingRepository
+          :paper:paper-common:publishMavenJavaPublicationToCentralStagingRepository
+          :folia:folia-common:publishMavenJavaPublicationToCentralStagingRepository
+          :proxy:proxy-common:publishMavenJavaPublicationToCentralStagingRepository
           :rtp-api:publishMavenJavaPublicationToCentralStagingRepository
           :rtp-core:publishMavenJavaPublicationToCentralStagingRepository
         env:

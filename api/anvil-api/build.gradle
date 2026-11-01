@@ -6,7 +6,8 @@
 
 dependencies {
     api project(':bit-api')
-    implementation 'org.jetbrains:annotations:24.1.0'
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    testCompileOnly 'org.jetbrains:annotations:24.1.0'
     // No runtime dependencies beyond the JDK: non-Anvil region formats (e.g. Linear) ship as
     // addons that register a RegionFileReader with RegionFormatRegistry (ADR-077).
     // ArchUnit — bytecode-level enforcement of the "no platform / no RTP imports"

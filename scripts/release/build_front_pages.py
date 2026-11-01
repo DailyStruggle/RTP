@@ -46,9 +46,16 @@ import urllib.request
 from dataclasses import dataclass, field
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "docs" / "publishing" / "FRONT_PAGE.md"
+LEAFRTP_DOCS = (
+    ROOT / "resource" / "LeafRTP" / "docs"
+    if (ROOT / "resource" / "LeafRTP" / "docs").is_dir()
+    else ROOT / "resource" / "leafrtp" / "docs"
+)
+SOURCE = LEAFRTP_DOCS / "publishing" / "FRONT_PAGE.md"
 OUT_DIR = ROOT / "scripts" / "release" / "generated"
-SOURCE_REL = "docs/publishing/FRONT_PAGE.md"
+SOURCE_REL = SOURCE.relative_to(ROOT).as_posix()
+REPO_BASE = "https://github.com/DailyStruggle/RTP"
+REPO_BRANCH = "V3"
 
 
 @dataclass(frozen=True)
@@ -63,16 +70,105 @@ class Target:
     raster_badges: bool = False
 
 
-_LITE_VARS = {"name": "LeafRTP", "jar": "LeafRTP-x.y.z.jar"}
-TARGETS = {
-    "bbb-pro": Target("bbb-pro", "bbcode", "FRONT_PAGE_PRO.bbcode",
-                      {"name": "LeafRTP-Pro", "jar": "LeafRTP-Pro-x.y.z.jar"}),
-    "bbb-lite": Target("bbb-lite", "bbcode", "FRONT_PAGE_LITE.bbcode", _LITE_VARS),
-    "spigot": Target("spigot", "bbcode", "FRONT_PAGE_SPIGOT.bbcode", _LITE_VARS, denylist=True,
-                     raster_badges=True),
-    "modrinth": Target("modrinth", "markdown", "FRONT_PAGE_MODRINTH.md", _LITE_VARS, denylist=True),
-    "hangar": Target("hangar", "markdown", "FRONT_PAGE_HANGAR.md", _LITE_VARS, denylist=True),
+@dataclass(frozen=True)
+class ProductSpec:
+    product_id: str
+    display_name: str
+    pro_name: str | None
+    lite_jar: str
+    pro_jar: str | None
+    source: pathlib.Path
+    repo_base: str = REPO_BASE
+    repo_branch: str = REPO_BRANCH
+
+
+PRODUCTS = {
+    "leafrtp": ProductSpec(
+        "leafrtp",
+        "LeafRTP",
+        "LeafRTP-Pro",
+        "LeafRTP-x.y.z.jar",
+        "LeafRTP-Pro-x.y.z.jar",
+        LEAFRTP_DOCS / "publishing" / "FRONT_PAGE.md",
+    ),
+    "leafsleep": ProductSpec(
+        "leafsleep",
+        "LeafSleep",
+        "LeafSleep-Pro",
+        "LeafSleep-x.y.z.jar",
+        "LeafSleep-Pro-x.y.z.jar",
+        ROOT / "resource" / "LeafSleep" / "docs" / "publishing" / "FRONT_PAGE.md",
+        repo_base="https://github.com/DailyStruggle/OnePlayerSleep",
+        repo_branch="main",
+    ),
+    "leaftreegen": ProductSpec(
+        "leaftreegen",
+        "LeafTreeGen",
+        "LeafTreeGen-Pro",
+        "LeafTreeGen-x.y.z.jar",
+        "LeafTreeGen-Pro-x.y.z.jar",
+        ROOT / "resource" / "LeafTreeGen" / "docs" / "publishing" / "FRONT_PAGE.md",
+        repo_base="https://github.com/LeafCraftDev/LeafTreeGen",
+        repo_branch="main",
+    ),
+    "leafconfig": ProductSpec(
+        "leafconfig",
+        "LeafConfig",
+        "LeafConfig-Pro",
+        "LeafConfig-x.y.z.jar",
+        "LeafConfig-Pro-x.y.z.jar",
+        ROOT / "resource" / "LeafConfig" / "docs" / "publishing" / "FRONT_PAGE.md",
+    ),
+    "leafsleuth": ProductSpec(
+        "leafsleuth",
+        "LeafSleuth",
+        "LeafSleuth-Pro",
+        "LeafSleuth-x.y.z.jar",
+        "LeafSleuth-Pro-x.y.z.jar",
+        ROOT / "resource" / "LeafSleuth" / "docs" / "publishing" / "FRONT_PAGE.md",
+        repo_base="https://github.com/LeafCraftDev/LeafSleuth",
+        repo_branch="main",
+    ),
+    "leaffuzz": ProductSpec(
+        "leaffuzz",
+        "LeafFuzz",
+        None,
+        "LeafFuzz-0.1.0.jar",
+        None,
+        ROOT / "resource" / "LeafFuzz" / "docs" / "publishing" / "FRONT_PAGE.md",
+        repo_base="https://github.com/LeafCraftDev/LeafFuzz",
+        repo_branch="main",
+    ),
+    "leafanvil": ProductSpec(
+        "leafanvil",
+        "LeafAnvil",
+        "LeafAnvil",
+        "LeafAnvil-x.y.z.jar",
+        "LeafAnvil-x.y.z.jar",
+        ROOT / "resource" / "LeafAnvil" / "docs" / "publishing" / "FRONT_PAGE.md",
+    ),
 }
+
+
+def targets_for_product(product_id="leafrtp"):
+    spec = PRODUCTS[product_id]
+    lite_vars = {"name": spec.display_name, "jar": spec.lite_jar}
+    targets = {}
+    if spec.pro_name and spec.pro_jar:
+        pro_vars = {"name": spec.pro_name, "jar": spec.pro_jar}
+        targets["bbb-pro"] = Target("bbb-pro", "bbcode", "FRONT_PAGE_PRO.bbcode", pro_vars)
+    targets.update({
+        "bbb-lite": Target("bbb-lite", "bbcode", "FRONT_PAGE_LITE.bbcode", lite_vars),
+        "spigot": Target("spigot", "bbcode", "FRONT_PAGE_SPIGOT.bbcode", lite_vars, denylist=True,
+                         raster_badges=True),
+        "modrinth": Target("modrinth", "markdown", "FRONT_PAGE_MODRINTH.md", lite_vars, denylist=True),
+        "hangar": Target("hangar", "markdown", "FRONT_PAGE_HANGAR.md", lite_vars, denylist=True),
+    })
+    return targets
+
+
+_LITE_VARS = {"name": "LeafRTP", "jar": "LeafRTP-x.y.z.jar"}
+TARGETS = targets_for_product("leafrtp")
 ALIASES = {"bbb": ("bbb-pro", "bbb-lite"), "markdown": ("modrinth", "hangar")}
 
 # kind -> targets that keep blocks of that kind. Edit here when a marketplace's
@@ -152,8 +248,76 @@ _CURVE_ATTRIBUTION = re.compile(
 
 # Section 6 (reference block after `## Why I made it` / `## What paying gets you`)
 # keeps compact summary tables only; full catalogs live in docs/admin/.
-REFERENCE_START_HEADINGS = {"## Why I made it", "## What paying gets you"}
+REFERENCE_START_HEADINGS = {
+    "## Why I made it",
+    "## What paying gets you",
+    "## Commands, configuration, and FAQ",
+}
 MAX_REFERENCE_TABLE_ROWS = 10
+
+_POST_STORY_SUMMARIES = frozenset({
+    "Commands, permissions, configuration files",
+    "FAQ",
+    "Support",
+})
+_TESTING_SUMMARIES = frozenset({
+    "How I test it, and what the tests have found",
+    "Testing and quality gates",
+})
+_HOW_IT_WORKS_CONTRACT_RE = re.compile(
+    r"(?i)(automatic\w*|in the background|under the hood)[^\n]*"
+    r"(circle|square|radius|governor\.mode|config\.yml|/fuzz\s+check|/leafconfig)"
+    r"|(circle|square|radius|governor\.mode|config\.yml|/fuzz\s+check|/leafconfig)[^\n]*"
+    r"(automatic\w*|in the background|under the hood)"
+)
+_DEFECT_FIRST_LABEL_RE = re.compile(
+    r"(?i)^(Retained player sessions|Main-thread chunk load on arrival|Repeats under spacing)"
+)
+_FIX_FIRST_SENTENCE_RE = re.compile(
+    r"(?i)\b(fixed|verified|disclosed|dropped|replayed|released immediately|keeps the ticket|regression test|ruled out)\b"
+)
+_SETUP_QUESTION_RE = re.compile(r"(?i)\b(set\s*up|configure|configuration|complicated)\b")
+_SETUP_CURVE_JARGON_RE = re.compile(r"(?i)space-filling|\bspiral\b|\bhilbert\b|\bfeistel\b|\bradix\b")
+_BENCH_PERIOD_RE = re.compile(r"`?period:\s*1`?")
+_BENCH_GUARD_RE = re.compile(
+    r"(?i)(benchmark-only|only for the (stress )?harness|keep (the )?shipped defaults|live servers)"
+)
+_FRONT_PAGE_DEEP_JARGON = [
+    (re.compile(r"\bJazzer\b"), "'Jazzer' fuzzer target jargon (move to docs/site/quality-gates.md)"),
+    (re.compile(r"\bSCHED_FIFO\b"), "'SCHED_FIFO' kernel scheduling jargon (move to helpers/StressTestRTP/)"),
+    (re.compile(r"\bRSA-2048\b"), "'RSA-2048' crypto jargon (use plain TLS/trust-token wording on front page)"),
+    (re.compile(r"\bEntity\.isInWall\b"), "'Entity.isInWall' profiler symbol (move to docs/site/quality-gates.md)"),
+    (re.compile(r"(?i)\bold-generation\b|\bmaxHeapPercent\b"),
+     "JVM heap-pool jargon (use plain memory-pause wording on front page)"),
+    (re.compile(r"(?i)\brejection sampling\b"),
+     "'rejection sampling' algorithm jargon (move to docs/site/why.md)"),
+    (re.compile(r"\bCIRCLE_NORMAL\b"),
+     "'CIRCLE_NORMAL' benchmark curve preset (keep front-page scatter caption to standard CIRCLE/SQUARE)"),
+    (re.compile(r"\b(?:S-0\d\d|F-0\d\d|D-0\d\d)\b"),
+     "internal project rule ID (S-00x / F-00x / D-00x; state the safety or threading guarantee in plain words)"),
+    (re.compile(r"\bREQ-[A-Z0-9-]+\b"),
+     "internal requirement ID (REQ-*; state the behavior in plain words on front page)"),
+    (re.compile(r"\b(?:[a-z][a-z0-9-]*-)?ADR-\d{3}\b"),
+     "internal ADR code (say 'Architecture Decision Records' and state the behavior in plain words)"),
+]
+_FORBIDDEN_CODE_SUFFIXES = frozenset({
+    ".java", ".kt", ".groovy", ".scala", ".gradle", ".py", ".sh", ".ps1", ".js", ".ts",
+})
+_FORBIDDEN_ABS_CODE_LINK = re.compile(
+    r"\]\(https?://[^)\s]*(?:/src/(?:main|test)/|\.(?:java|kt|groovy|scala|gradle|py|sh|ps1|js|ts)(?:[#?][^)\s]*)?)\)"
+)
+_SHORT_VERSION_EASE_RE = re.compile(r"(?i)(\[\*\*Easy\*\*\]|/rtp editor|/rtp admin setup)")
+_SHORT_VERSION_SAFE_RE = re.compile(r"(?i)(\[\*\*Safe\*\*\]|\bclaim)")
+
+
+@dataclass(frozen=True)
+class ShallowAstNode:
+    h1: str
+    h2: str
+    h3: str
+    start_line: int
+    lead_sentence: str
+    lines: tuple
 
 # Share of source lines that are audience-specific before the report warns that
 # the pages are drifting back toward separate copies.
@@ -162,9 +326,7 @@ DRIFT_WARN = 0.15
 HEADING_COLOR = "#27AE60"
 RAW_BASE = "https://raw.githubusercontent.com/dailystruggle/RTP/V3"
 SITE_BASE = "https://dailystruggle.github.io/RTP"  # mkdocs.yml site_url
-REPO_BASE = "https://github.com/DailyStruggle/RTP"
-REPO_BRANCH = "V3"
-DOCS_DIR = ROOT / "docs"
+DOCS_DIR = LEAFRTP_DOCS
 # Mirrors mkdocs.yml exclude_docs: these docs have no page on the website.
 SITE_EXCLUDED = ("site/README.md", "MAP.md", "publishing/")
 
@@ -293,6 +455,8 @@ def _resolve_images(line_no, line, source_dir=SOURCE.parent, raw_base=RAW_BASE):
         candidate = (source_dir / clean_src).resolve()
         if not candidate.is_file():
             candidate = (ROOT / clean_src.lstrip("/\\")).resolve()
+        if not candidate.is_file() and clean_src.lstrip("/\\").startswith("docs/"):
+            candidate = (DOCS_DIR / clean_src.lstrip("/\\")[len("docs/"):]).resolve()
         if not candidate.is_file():
             raise FrontPageError(f"line {line_no}: local image '{src}' does not exist on disk")
 
@@ -317,7 +481,7 @@ def _site_url(docs_rel):
     return SITE_BASE + "/" + "/".join(parts) + ("/" if parts else "")
 
 
-def _resolve_doc_links(line_no, line, source_dir=SOURCE.parent):
+def _resolve_doc_links(line_no, line, source_dir=SOURCE.parent, repo_base=REPO_BASE, repo_branch=REPO_BRANCH):
     """Rewrites relative links to absolute URLs, validating the target exists on disk.
 
     Published docs/**/*.md become website URLs; every other repo path (code,
@@ -331,12 +495,23 @@ def _resolve_doc_links(line_no, line, source_dir=SOURCE.parent):
         candidate = (source_dir / path).resolve()
         if not candidate.exists():
             candidate = (ROOT / path.lstrip("/\\")).resolve()
+        if not candidate.exists() and path.lstrip("/\\").startswith("docs/"):
+            candidate = (DOCS_DIR / path.lstrip("/\\")[len("docs/"):]).resolve()
         if not candidate.exists():
             raise FrontPageError(f"line {line_no}: relative link '{target}' does not exist on disk")
         try:
             rel = candidate.relative_to(ROOT).as_posix()
         except ValueError:
             raise FrontPageError(f"line {line_no}: relative link '{target}' resolves outside the repository")
+        if candidate.is_file() and (
+            candidate.suffix.lower() in _FORBIDDEN_CODE_SUFFIXES
+            or "/src/main/" in f"/{rel}/"
+            or "/src/test/" in f"/{rel}/"
+        ):
+            raise FrontPageError(
+                f"line {line_no}: relative link '{target}' points to source/test code or a build script ({rel}); "
+                "link to a Markdown doc or directory instead"
+            )
         url = None
         if candidate.is_file() and candidate.suffix == ".md":
             try:
@@ -345,7 +520,7 @@ def _resolve_doc_links(line_no, line, source_dir=SOURCE.parent):
                 pass
         if url is None:
             kind = "tree" if candidate.is_dir() else "blob"
-            url = f"{REPO_BASE}/{kind}/{REPO_BRANCH}/{rel}"
+            url = f"{repo_base}/{kind}/{repo_branch}/{rel}"
         return f"]({url}{hash_}{anchor})"
 
     return _RELATIVE_LINK.sub(repl, line)
@@ -359,6 +534,12 @@ def _lint(kept):
         if rel:
             raise FrontPageError(f"line {line_no}: relative link '{rel.group(1)}' breaks on storefronts; "
                                  "use an absolute URL")
+        code_link = _FORBIDDEN_ABS_CODE_LINK.search(line)
+        if code_link:
+            raise FrontPageError(
+                f"line {line_no}: link '{code_link.group(0)[2:-1]}' points directly to source/test code; "
+                "link to a Markdown doc or directory instead"
+            )
 
 
 def _tidy(lines):
@@ -719,13 +900,210 @@ def check_reference_table_caps(kept):
     return problems
 
 
-def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
+def parse_shallow_ast(kept):
+    """Parses rendered lines into heading-scoped shallow AST nodes (`H1 > H2 > H3/<summary>`)."""
+    nodes = []
+    h1 = ""
+    h2 = ""
+    h3 = ""
+    start_line = kept[0][0] if kept else 1
+    current_lines = []
+
+    def _extract_lead(lines_Slice):
+        for _, raw in lines_Slice:
+            s = raw.strip()
+            if not s or s.startswith(("<", "|", "---", "![", "[![")):
+                continue
+            cleaned = _LINK_TARGET.sub("]", s)
+            cleaned = re.sub(r"\[([^\]]+)\]", r"\1", cleaned)
+            m = re.split(r"(?<=[.!?])\s+", cleaned, maxsplit=1)
+            return m[0].strip()
+        return ""
+
+    def flush():
+        if not any(line.strip() and line.strip() != "---" for _, line in current_lines):
+            return
+        nodes.append(
+            ShallowAstNode(
+                h1=h1,
+                h2=h2,
+                h3=h3,
+                start_line=start_line,
+                lead_sentence=_extract_lead(current_lines),
+                lines=tuple(current_lines),
+            )
+        )
+
+    for line_no, line in kept:
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            flush()
+            h1 = stripped
+            h2 = ""
+            h3 = ""
+            start_line = line_no
+            current_lines = []
+            continue
+        if stripped.startswith("## "):
+            flush()
+            h2 = stripped
+            h3 = ""
+            start_line = line_no
+            current_lines = []
+            continue
+        if stripped.startswith("### "):
+            flush()
+            h3 = stripped
+            start_line = line_no
+            current_lines = []
+            continue
+        m_sum = _SUMMARY.match(stripped)
+        if m_sum:
+            flush()
+            h3 = _plain(m_sum.group(1)).strip()
+            start_line = line_no
+            current_lines = []
+            continue
+        if stripped == "</details>":
+            flush()
+            h3 = ""
+            start_line = line_no
+            current_lines = []
+            continue
+        current_lines.append((line_no, line))
+
+    flush()
+    return nodes
+
+
+def check_shallow_ast_sections(kept):
+    """Validates that a shallow AST rebuild assigns accurate heading vectors and lead sentences."""
+    problems = []
+    nodes = parse_shallow_ast(kept)
+    checked_how_it_works_lead = False
+    perf_tables = 0
+    for node in nodes:
+        for line_no, raw in node.lines:
+            cleaned_line = _LINK_TARGET.sub("]", raw.strip())
+            for pattern, label in _FRONT_PAGE_DEEP_JARGON:
+                if pattern.search(cleaned_line):
+                    problems.append(f"line {line_no}: {label}: {raw.strip()[:120]}")
+        if node.h3 == SHORT_VERSION_START:
+            bullets = [raw.strip() for _, raw in node.lines if raw.strip().startswith("- ")]
+            if len(bullets) >= 4:
+                joined = "\n".join(bullets)
+                if not _SHORT_VERSION_EASE_RE.search(joined):
+                    problems.append(
+                        f"line {node.start_line}: '{SHORT_VERSION_START}' must include an ease-of-use "
+                        "bullet ([**Easy**], /rtp editor, or /rtp admin setup) in the main list"
+                    )
+                if not _SHORT_VERSION_SAFE_RE.search(joined):
+                    problems.append(
+                        f"line {node.start_line}: '{SHORT_VERSION_START}' must include a safety/claim "
+                        "bullet ([**Safe**] or claim protection) in the main list"
+                    )
+        if node.h3 in _POST_STORY_SUMMARIES and node.h2 in ("## Why I made it", "## What paying gets you", ""):
+            problems.append(
+                f"line {node.start_line}: '{node.h3}' inherits '{node.h2 or 'root'}' in the shallow AST; "
+                "place post-story reference, FAQ, and support blocks under their own '## ' heading"
+            )
+        if node.h3 in _TESTING_SUMMARIES and node.h2 == "## How it works":
+            problems.append(
+                f"line {node.start_line}: '{node.h3}' sits under '## How it works' in the shallow AST; "
+                "move testing and fuzzer findings under '## Testing and quality gates'"
+            )
+        if node.h2 == "## How it works" and not node.h3 and not checked_how_it_works_lead:
+            checked_how_it_works_lead = True
+            first_content = ""
+            for _, raw in node.lines:
+                s = raw.strip()
+                if s and not s.startswith(("<", "---")):
+                    first_content = s
+                    break
+            if first_content.startswith("- ") or not _HOW_IT_WORKS_CONTRACT_RE.search(first_content):
+                problems.append(
+                    f"line {node.start_line}: '## How it works' needs a lead sentence before its bullets "
+                    "stating that the pipeline runs automatically in the background behind standard CIRCLE/SQUARE radii"
+                )
+        if node.h3 == "How I test it, and what the tests have found":
+            for line_no, raw in node.lines:
+                s = raw.strip()
+                if not s.startswith("- **"):
+                    continue
+                m_lbl = re.match(r"^- \*\*([^*]+)\*\*\s*(.*)$", s)
+                if not m_lbl:
+                    continue
+                label_text = m_lbl.group(1).strip().rstrip(".")
+                rest_text = _LINK_TARGET.sub("]", m_lbl.group(2).strip())
+                first_sent = re.split(r"(?<=[.!?])\s+", rest_text, maxsplit=1)[0]
+                combined_first = f"{label_text}. {first_sent}"
+                if _DEFECT_FIRST_LABEL_RE.search(label_text) or not _FIX_FIRST_SENTENCE_RE.search(combined_first):
+                    problems.append(
+                        f"line {line_no}: defect-first bullet in '{node.h3}'; "
+                        f"lead the label and first sentence with the verified fix or invariant: {s[:120]}"
+                    )
+        if node.h3 == "FAQ":
+            current_q = ""
+            current_q_line = node.start_line
+            for line_no, raw in node.lines:
+                s = raw.strip()
+                if s.startswith("**Q:"):
+                    current_q = s
+                    current_q_line = line_no
+                elif current_q and _SETUP_QUESTION_RE.search(current_q):
+                    cleaned = _LINK_TARGET.sub("]", s)
+                    m_bad = _SETUP_CURVE_JARGON_RE.search(cleaned)
+                    if m_bad:
+                        problems.append(
+                            f"line {line_no} (under Q at line {current_q_line}): setup FAQ mentions "
+                            f"'{m_bad.group(0)}'; state positive setup options (CIRCLE, radius, /rtp editor) "
+                            "without negated curve jargon"
+                        )
+        if node.h2 == "## Performance":
+            in_table = False
+            for line_no, raw in node.lines:
+                s = raw.strip()
+                if s.startswith("|"):
+                    if not in_table:
+                        perf_tables += 1
+                        in_table = True
+                        if perf_tables > 1:
+                            problems.append(
+                                f"line {line_no}: '## Performance' has more than 1 comparison table; "
+                                "keep only the main throughput summary table on FRONT_PAGE.md and link to "
+                                "helpers/StressTestRTP/RESULTS.md for secondary tables"
+                            )
+                else:
+                    in_table = False
+                cleaned = _LINK_TARGET.sub("]", s)
+                if not _BENCH_PERIOD_RE.search(cleaned):
+                    continue
+                for sent in re.split(r"(?<=[.!?])\s+", cleaned):
+                    if _BENCH_PERIOD_RE.search(sent) and not _BENCH_GUARD_RE.search(sent):
+                        problems.append(
+                            f"line {line_no}: 'period: 1' in '## Performance' must include an inline "
+                            "benchmark-only / keep-shipped-defaults guard in the same sentence"
+                        )
+    return problems
+
+
+def render(
+    source_text,
+    target,
+    source_path=SOURCE,
+    raw_base=RAW_BASE,
+    repo_base=REPO_BASE,
+    repo_branch=REPO_BRANCH,
+):
     """Returns (output text, audience-specific line count, shared line count)."""
     source_dir = source_path.parent if isinstance(source_path, pathlib.Path) else pathlib.Path(source_path).parent
     kept, specific, shared = select_lines(source_text, target.name)
     kept = [(n, _substitute(n, line, target)) for n, line in kept]
     kept = [(n, _resolve_images(n, line, source_dir=source_dir, raw_base=raw_base)) for n, line in kept]
-    kept = [(n, _resolve_doc_links(n, line, source_dir=source_dir)) for n, line in kept]
+    kept = [
+        (n, _resolve_doc_links(n, line, source_dir=source_dir, repo_base=repo_base, repo_branch=repo_branch))
+        for n, line in kept
+    ]
     _lint(kept)
     jargon = (
         check_listing_metadata(source_text)
@@ -734,6 +1112,7 @@ def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
         + check_zone2_onramp(kept)
         + check_curve_attribution(kept)
         + check_reference_table_caps(kept)
+        + check_shallow_ast_sections(kept)
     )
     if jargon:
         raise FrontPageError("\n".join(jargon))
@@ -741,7 +1120,11 @@ def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
         lines = to_bbcode(kept, raster_badges=target.raster_badges)
         text = "\n".join(lines) + "\n"
     else:
-        header = (f"<!-- Generated from {SOURCE_REL} by scripts/release/build_front_pages.py "
+        try:
+            src_rel = pathlib.Path(source_path).resolve().relative_to(ROOT).as_posix()
+        except ValueError:
+            src_rel = SOURCE_REL
+        header = (f"<!-- Generated from {src_rel} by scripts/release/build_front_pages.py "
                   f"(target: {target.name}). Edit the source and rerun; do not edit this file. -->")
         text = header + "\n\n" + "\n".join(_tidy(line for _, line in kept)) + "\n"
     if target.denylist:
@@ -751,11 +1134,26 @@ def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
     return text, specific, shared
 
 
-def build_all(source_text, source_path=SOURCE, raw_base=RAW_BASE):
+def build_all(
+    source_text,
+    source_path=SOURCE,
+    raw_base=RAW_BASE,
+    targets=None,
+    repo_base=REPO_BASE,
+    repo_branch=REPO_BRANCH,
+):
+    active_targets = targets if targets is not None else TARGETS
     outputs = {}
     stats = (0, 0)
-    for name, target in TARGETS.items():
-        text, specific, shared = render(source_text, target, source_path=source_path, raw_base=raw_base)
+    for name, target in active_targets.items():
+        text, specific, shared = render(
+            source_text,
+            target,
+            source_path=source_path,
+            raw_base=raw_base,
+            repo_base=repo_base,
+            repo_branch=repo_branch,
+        )
         outputs[name] = text
         stats = (specific, shared)
     return outputs, stats
@@ -766,8 +1164,12 @@ def main(argv=None):
     parser.add_argument("--check", action="store_true",
                         help="build and validate every target without writing (CI)")
     parser.add_argument("--target", choices=sorted(TARGETS), help="build one target only")
+    parser.add_argument("--product", choices=[*PRODUCTS.keys(), "all"], default=None,
+                        help="product id to build (leafrtp, leafsleep, leaftreegen, or all)")
+    parser.add_argument("--all", action="store_true",
+                        help="build and validate all registered products")
     parser.add_argument("--stdout", action="store_true", help="print instead of writing (needs --target)")
-    parser.add_argument("--source", type=pathlib.Path, default=SOURCE)
+    parser.add_argument("--source", type=pathlib.Path, default=None)
     parser.add_argument("--out-dir", type=pathlib.Path, default=OUT_DIR)
     parser.add_argument("--raw-base", default=RAW_BASE,
                         help="base URL for rewritten local image links (default: %(default)s)")
@@ -775,9 +1177,57 @@ def main(argv=None):
 
     if args.stdout and not args.target:
         parser.error("--stdout needs --target")
+
+    selected_product = "all" if args.all else args.product
+    if selected_product is None and args.source is None and not SOURCE.is_file():
+        available = [pid for pid, spec in PRODUCTS.items() if spec.source.is_file()]
+        if len(available) == 1:
+            selected_product = available[0]
+    if selected_product is not None and args.source is None:
+        product_ids = list(PRODUCTS.keys()) if selected_product == "all" else [selected_product]
+        for pid in product_ids:
+            spec = PRODUCTS[pid]
+            prod_targets = targets_for_product(pid)
+            try:
+                source_text = spec.source.read_text(encoding="utf-8")
+                outputs, (specific, shared) = build_all(
+                    source_text,
+                    source_path=spec.source,
+                    raw_base=args.raw_base,
+                    targets=prod_targets,
+                    repo_base=spec.repo_base,
+                    repo_branch=spec.repo_branch,
+                )
+            except (FrontPageError, OSError) as e:
+                print(f"::error::front pages ({pid}): {e}", file=sys.stderr)
+                return 1
+
+            names = [args.target] if args.target else list(prod_targets)
+            if args.stdout:
+                sys.stdout.write(outputs[args.target])
+                return 0
+            if args.check:
+                print(f"front pages valid for {pid} ({len(names)} targets)")
+            else:
+                prod_out_dir = args.out_dir / pid
+                prod_out_dir.mkdir(parents=True, exist_ok=True)
+                for name in names:
+                    path = prod_out_dir / prod_targets[name].filename
+                    with open(path, "w", encoding="utf-8", newline="\n") as f:
+                        f.write(outputs[name])
+                    print(f"wrote {path.relative_to(ROOT) if path.is_relative_to(ROOT) else path}")
+            total = specific + shared
+            share = specific / total if total else 0.0
+            print(f"[{pid}] audience-specific source lines: {specific} of {total} ({share:.0%})")
+            if share > DRIFT_WARN:
+                print(f"::warning::[{pid}] audience-specific copy is above {DRIFT_WARN:.0%}; "
+                      "the pages are drifting back toward separate copies")
+        return 0
+
+    effective_source = args.source if args.source is not None else SOURCE
     try:
-        source_text = args.source.read_text(encoding="utf-8")
-        outputs, (specific, shared) = build_all(source_text, source_path=args.source, raw_base=args.raw_base)
+        source_text = effective_source.read_text(encoding="utf-8")
+        outputs, (specific, shared) = build_all(source_text, source_path=effective_source, raw_base=args.raw_base)
     except (FrontPageError, OSError) as e:
         print(f"::error::front pages: {e}", file=sys.stderr)
         return 1

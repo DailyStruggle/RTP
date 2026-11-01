@@ -517,7 +517,13 @@ public final class LeakProbe {
         return out;
     }
 
-    static String jarEntryClass(String entry) {
+    /** Buffer (+/- 500 ms) around diagnostic GC.class_histogram calls to exclude from MSPT lag attribution. */
+    public static final long GC_PAUSE_WINDOW_BUFFER_NANOS = 500_000_000L;
+
+    private static final AtomicLong lastGcWindowStartNanos = new AtomicLong(-1L);
+    private static final AtomicLong lastGcWindowEndNanos = new AtomicLong(-1L);
+
+    public static String jarEntryClass(String entry) {
         if (entry == null || !entry.endsWith(".class")) return null;
         String e = entry;
         if (e.startsWith("META-INF/versions/")) {
@@ -531,7 +537,8 @@ public final class LeakProbe {
         return e.substring(0, e.length() - ".class".length()).replace('/', '.');
     }
 
-    static String histogramClass(String n) {
+    public static String histogramClass(String n) {
+        if (n == null || n.isEmpty()) return null;
         int i = 0;
         while (i < n.length() && n.charAt(i) == '[') i++;
         String s = n.substring(i);
@@ -617,15 +624,59 @@ public final class LeakProbe {
                 StandardCharsets.UTF_8, StandardOpenOption.APPEND);
     }
 
-    static String classHistogram() throws JMException {
-        MBeanServer server = ManagementFactory.getPlatformMBeanServer();
-        ObjectName name = new ObjectName("com.sun.management:type=DiagnosticCommand");
-        Object out = server.invoke(name, "gcClassHistogram",
-                new Object[]{new String[0]}, new String[]{String[].class.getName()});
-        return out == null ? "" : out.toString();
+    public static String threadPrint() throws JMException {
+        return diagnosticCommand("threadPrint");
     }
 
-    private static double oldGenAfterGcMb() {
+    public static String captureHistogram() throws JMException {
+        return classHistogram();
+    }
+
+    public static String classHistogram() throws JMException {
+        long start = System.nanoTime();
+        lastGcWindowStartNanos.set(start);
+        lastGcWindowEndNanos.set(Long.MAX_VALUE / 2);
+        try {
+            MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+            ObjectName name = new ObjectName("com.sun.management:type=DiagnosticCommand");
+            Object out = server.invoke(name, "gcClassHistogram",
+                    new Object[]{new String[0]}, new String[]{String[].class.getName()});
+            return out == null ? "" : out.toString();
+        } finally {
+            lastGcWindowEndNanos.set(System.nanoTime());
+        }
+    }
+
+    /**
+     * Records a diagnostic GC pause exclusion window {@code [startNanos, endNanos]}
+     * (buffered by {@link #GC_PAUSE_WINDOW_BUFFER_NANOS} on both sides).
+     */
+    public static void recordGcPauseWindow(long startNanos, long endNanos) {
+        lastGcWindowStartNanos.set(startNanos);
+        lastGcWindowEndNanos.set(Math.max(startNanos, endNanos));
+    }
+
+    /** Clears any recorded diagnostic GC pause exclusion window. */
+    public static void clearGcPauseWindow() {
+        lastGcWindowStartNanos.set(-1L);
+        lastGcWindowEndNanos.set(-1L);
+    }
+
+    /**
+     * Returns {@code true} if {@code nowNanos} falls inside the most recent diagnostic
+     * {@code gcClassHistogram} pause window (including {@code +/- 500 ms} buffer).
+     */
+    public static boolean inGcPauseWindow(long nowNanos) {
+        long start = lastGcWindowStartNanos.get();
+        long end = lastGcWindowEndNanos.get();
+        if (start < 0L || end < 0L) {
+            return false;
+        }
+        return nowNanos >= (start - GC_PAUSE_WINDOW_BUFFER_NANOS)
+                && nowNanos <= (end + GC_PAUSE_WINDOW_BUFFER_NANOS);
+    }
+
+    public static double oldGenAfterGcMb() {
         double total = -1;
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             String n = pool.getName().toLowerCase(Locale.ROOT);

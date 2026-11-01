@@ -61,6 +61,81 @@ class VolumetricParticleRendererTest {
         for (Vector3d pt : dustWall) {
             assertTrue(bounds.contains(pt));
         }
+
+        // 6. CORNER_BRACKETS
+        List<Vector3d> brackets = GeometryPointGenerator.generate(bounds, GeometryStyle.CORNER_BRACKETS, 1.0, 0);
+        assertNotNull(brackets);
+        assertEquals(24, brackets.size());
+        for (Vector3d pt : brackets) {
+            assertTrue(bounds.contains(pt));
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-SLEUTH-FARM-001: SpatialBounds plane projection and slab ray intersection preserve Y-column privacy")
+    void testPlaneProjectionAndSlabRayIntersection() {
+        SpatialBounds undergroundFarm = SpatialBounds.of(160, -54, 320, 176, -40, 336);
+
+        // Surface player in the same chunk (10, 20) at Y = 70 is 110 blocks above the +Y plane
+        Vector3d surfaceProj = undergroundFarm.projectOntoBounds(168.0, 70.0, 328.0);
+        assertEquals(new Vector3d(168.0, -40.0, 328.0), surfaceProj);
+        assertEquals(110.0, undergroundFarm.distanceToPlaneProjectedBounds(168.0, 70.0, 328.0), 1.0e-6);
+
+        // Adjacent chunk player at (159, -48, 324) is 1.0 block outside the -X plane
+        Vector3d borderProj = undergroundFarm.projectOntoBounds(159.0, -48.0, 324.0);
+        assertEquals(new Vector3d(160.0, -48.0, 324.0), borderProj);
+        assertEquals(1.0, undergroundFarm.distanceToPlaneProjectedBounds(159.0, -48.0, 324.0), 1.0e-6);
+
+        // Inside point projects to itself with 0 distance
+        assertEquals(0.0, undergroundFarm.distanceToPlaneProjectedBounds(165.0, -45.0, 325.0), 1.0e-6);
+
+        // Slab ray-box intersection tie-breaking and axis-parallel safety
+        SpatialBounds farmWest = SpatialBounds.of(90, 64, 100, 96, 70, 106);
+        SpatialBounds farmEast = SpatialBounds.of(104, 64, 100, 110, 70, 106);
+        Vector3d eye = new Vector3d(100.0, 66.0, 103.0);
+
+        double hitWest = farmWest.rayIntersectionDistance(eye, new Vector3d(-1.0, 0.0, 0.0));
+        double missEast = farmEast.rayIntersectionDistance(eye, new Vector3d(-1.0, 0.0, 0.0));
+        assertEquals(4.0, hitWest, 1.0e-6);
+        assertEquals(Double.POSITIVE_INFINITY, missEast);
+
+        double hitEast = farmEast.rayIntersectionDistance(eye, new Vector3d(1.0, 0.0, 0.0));
+        assertEquals(4.0, hitEast, 1.0e-6);
+
+        // Parallel ray outside slab misses cleanly without NaN
+        assertEquals(Double.POSITIVE_INFINITY, farmWest.rayIntersectionDistance(eye, new Vector3d(0.0, 0.0, 1.0)));
+        // Origin inside bounds returns 0.0
+        assertEquals(0.0, farmWest.rayIntersectionDistance(new Vector3d(93.0, 66.0, 103.0), new Vector3d(1.0, 0.0, 0.0)), 1.0e-6);
+    }
+
+    @Test
+    @DisplayName("REQ-SLEUTH-FARM-002: Corner brackets clamp on 1x1x1 bounds and proximity aperture filters by plane distance")
+    void testCornerBracketsAndPlaneProjectedAperture() {
+        SpatialBounds unitCube = SpatialBounds.of(10, 64, 20, 11, 65, 21);
+        List<Vector3d> unitBrackets = GeometryPointGenerator.generateCornerBrackets(unitCube, 1.0);
+        assertEquals(24, unitBrackets.size());
+        for (Vector3d pt : unitBrackets) {
+            assertTrue(unitCube.contains(pt), "Point must remain inside 1x1x1 unit cube: " + pt);
+        }
+
+        SpatialBounds farmHull = SpatialBounds.of(100, -50, 200, 112, -42, 212);
+        // Surface viewer far above in the same X/Z column -> zero aperture points
+        List<Vector3d> farSurface = GeometryPointGenerator.generatePlaneProjectedAperture(
+                farmHull, new Vector3d(106, 70, 206), 8.0, 4.0, 1.0);
+        assertTrue(farSurface.isEmpty());
+
+        // Viewer 2 blocks outside -X plane near bottom-front edge -> localized aperture points <= 32
+        Vector3d nearWest = new Vector3d(98.0, -49.0, 202.0);
+        List<Vector3d> aperture = GeometryPointGenerator.generatePlaneProjectedAperture(
+                farmHull, nearWest, 8.0, 4.0, 1.0);
+        assertFalse(aperture.isEmpty());
+        assertTrue(aperture.size() <= 32);
+        Vector3d projectedOnWest = new Vector3d(100.0, -49.0, 202.0);
+        for (Vector3d pt : aperture) {
+            assertTrue(farmHull.contains(pt));
+            assertEquals(100.0, pt.x(), 1.0e-6);
+            assertTrue(pt.distance(projectedOnWest) <= 4.0 + 1.0e-6);
+        }
     }
 
     @Test

@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:random_selector",
+  "config": {
+    "features": [
+      { "chance": 0.30, "feature": "leaf:oak_large" },
+      { "chance": 0.30, "feature": "leaf:oak_small" }
+    ],
+    "default": "leaf:oak_medium"
+  }
+}

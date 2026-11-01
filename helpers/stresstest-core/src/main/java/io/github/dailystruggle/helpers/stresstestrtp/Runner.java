@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 
 /**
  * Run loop: dispatches the configured command against the roster while
- * respecting concurrency, attempt timeouts, and the run duration (ADR-122 Decision 1 & 2).
+ * respecting concurrency, attempt timeouts, and the run duration (ADR-122 Decision 1 and 2).
  */
 public final class Runner {
 
@@ -157,7 +157,9 @@ public final class Runner {
         String firstTok = WHITESPACE.split(entry.template.trim(), 2)[0];
         int colon = firstTok.indexOf(':');
         String name = colon > 0 ? firstTok.substring(0, colon) : firstTok;
-        return name.equalsIgnoreCase(owner);
+        if (name.equalsIgnoreCase(owner)) return true;
+        return ("rtp".equalsIgnoreCase(name) || "leafrtp".equalsIgnoreCase(name))
+                && ("rtp".equalsIgnoreCase(owner) || "leafrtp".equalsIgnoreCase(owner));
     }
 
     public boolean isRunning() { return running.get(); }

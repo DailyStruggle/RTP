@@ -119,5 +119,5 @@ ConfigParser<MyZoneKeys> spawnZone = zones.getParser("spawn");
 
 ## Docs
 
-- ADR-025: [`../../docs/adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md`](../../docs/adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md)
-- ADR-042: [`../../docs/adr/ADR-042-yaml-comment-preservation-block-only.md`](../../docs/adr/ADR-042-yaml-comment-preservation-block-only.md)
+- ADR-025: [`../../docs/adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md`](docs/adr/yaml-api-ADR-001-replace-simpleyaml-with-internal-snakeyaml-wrapper.md)
+- ADR-042: [`../../docs/adr/ADR-042-yaml-comment-preservation-block-only.md`](docs/adr/yaml-api-ADR-002-yaml-comment-preservation-block-only.md)

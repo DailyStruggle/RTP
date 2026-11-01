@@ -131,9 +131,9 @@ On Windows host environments, managing dual JDKs (Java 17 and Java 21/25) and co
 ## References
 
 - [ADR-010](ADR-010-versioned-platform-adapter-submodules.md) - Versioned Platform Adapter Submodules
-- [ADR-016](ADR-016-anvil-subsystem.md) - Anvil Read-Only Subsystem
+- [anvil-api-ADR-001](../../api/anvil-api/docs/adr/anvil-api-ADR-001-anvil-subsystem.md) - Anvil Read-Only Subsystem
 - [ADR-021](ADR-021-legacy-mc-and-java-support-scope.md) - Legacy Minecraft and Java Support Are Out of Scope (amended by this ADR)
-- [ADR-077](ADR-077-multi-format-region-support.md) - Multi-Format Region Support: Pluggable Region Readers
-- [ADR-100](ADR-100-superseding-adr-024-sla-and-support-tier.md) - Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
+- [anvil-api-ADR-002](../../api/anvil-api/docs/adr/anvil-api-ADR-002-multi-format-region-support.md) - Multi-Format Region Support: Pluggable Region Readers
+- [leafrtp-ADR-078](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-078-superseding-adr-024-sla-and-support-tier.md) - Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
 - [ADR-102](ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening.md) - Coverage-Guided Fuzz Testing and Parser Input Hardening
 - REQ-RTP-SYS-001 (Java Runtime Baseline), `docs/dev/REQUIREMENTS.md`

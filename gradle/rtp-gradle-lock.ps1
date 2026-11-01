@@ -93,12 +93,13 @@ if ($projectPaths.Count -gt 0 -and -not $hasOtherTasks) {
     $modMutexes = @($lockNames | ForEach-Object { [System.Threading.Mutex]::new($false, ('Global\RTP_Gradle_Lock_' + $_)) })
     $label = ':' + ($lockNames -join ', :')
     while ($held.Count -eq 0) {
-        $haveGlobal = Wait-Mutex $globalMutex 500
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $haveGlobal = Wait-Mutex $globalMutex 5000
         if ($haveGlobal) {
             $got = [System.Collections.Generic.List[System.Threading.Mutex]]::new()
             try {
                 foreach ($m in $modMutexes) {
-                    if (Wait-Mutex $m 4500) { $got.Add($m) } else { break }
+                    if (Wait-Mutex $m 0) { $got.Add($m) } else { break }
                 }
                 if ($got.Count -eq $modMutexes.Count) {
                     $held = $got
@@ -110,6 +111,8 @@ if ($projectPaths.Count -gt 0 -and -not $hasOtherTasks) {
             }
         }
         if ($held.Count -gt 0) { break }
+        $remMs = [Math]::Max(0, 5000 - [int]$sw.ElapsedMilliseconds)
+        if ($remMs -gt 0) { Start-Sleep -Milliseconds $remMs }
         $waited += 5
         $what = if ($haveGlobal) { 'module locks ' + $label } else { 'global build lock (for ' + $label + ')' }
         [Console]::Out.WriteLine('[gradlew] Waiting for ' + $what + '... (' + $waited + 's)')

@@ -63,7 +63,7 @@ jobs:
           fi
 
       # The Modrinth / Hangar descriptions below are built here from the single
-      # source docs/publishing/FRONT_PAGE.md into the gitignored
+      # source resource/LeafRTP/docs/publishing/FRONT_PAGE.md into the gitignored
       # scripts/release/generated/. Fail before building, tagging, or uploading
       # anything if the source is malformed or a Hangar/Modrinth page carries
       # promo copy (scripts/release/build_front_pages.py).
@@ -123,22 +123,22 @@ jobs:
         id: artifact
         run: |
           # ADR-024: the lite artifact is the unclassified `LeafRTP-<version>.jar`
-          # produced by `remapLiteJar` in rtp-plugin/build/libs/. The
+          # produced by `remapLiteJar` in resource/LeafRTP/rtp-plugin/build/libs/. The
           # classified `*-dev.jar` is the pre-remap intermediate and is NOT
           # the release artifact.
-          LITE_JAR=$(find rtp-plugin/build/libs -maxdepth 1 -type f -name 'LeafRTP-*.jar' \
+          LITE_JAR=$(find resource/LeafRTP/rtp-plugin/build/libs -maxdepth 1 -type f -name 'LeafRTP-*.jar' \
             ! -name 'LeafRTP-Pro-*' ! -name '*-dev.jar' ! -name '*-sources.jar' \
             ! -name '*-javadoc.jar' | head -n 1)
           if [ -z "$LITE_JAR" ]; then
-            echo "::error::Could not locate the lite jar under rtp-plugin/build/libs/"
-            ls -la rtp-plugin/build/libs/ || true
+            echo "::error::Could not locate the lite jar under resource/LeafRTP/rtp-plugin/build/libs/"
+            ls -la resource/LeafRTP/rtp-plugin/build/libs/ || true
             exit 1
           fi
           echo "lite_jar=${LITE_JAR}" >> "$GITHUB_OUTPUT"
           echo "Found lite jar: ${LITE_JAR}"
 
           # Locate SBOM (Item 37)
-          SBOM_FILE=$(find rtp-plugin/build/reports -maxdepth 2 -type f -name 'bom.json' | head -n 1)
+          SBOM_FILE=$(find resource/LeafRTP/rtp-plugin/build/reports -maxdepth 2 -type f -name 'bom.json' | head -n 1)
           if [ -n "$SBOM_FILE" ]; then
             echo "sbom_file=${SBOM_FILE}" >> "$GITHUB_OUTPUT"
             echo "Found SBOM: ${SBOM_FILE}"
@@ -210,8 +210,8 @@ jobs:
           # their wrapped continuation lines) are dropped so the lite notes
           # only describe features that ship in rtp-lite -- see the
           # `Pro-exclusive tagging rule` at the top of CHANGELOG.md.
-          if [ ! -f CHANGELOG.md ]; then
-            echo "::warning::CHANGELOG.md not found; falling back to generic release notes."
+          if [ ! -f resource/LeafRTP/CHANGELOG.md ]; then
+            echo "::warning::resource/LeafRTP/CHANGELOG.md not found; falling back to generic release notes."
             echo "rtp-lite ${VERSION}" > release-notes.md
           else
             awk -v ver="$VERSION" '
@@ -234,7 +234,7 @@ jobs:
               # Pro-tagged bullet.
               skip == 1 { next }
               { print }
-            ' CHANGELOG.md > release-notes.md
+            ' resource/LeafRTP/CHANGELOG.md > release-notes.md
             if [ ! -s release-notes.md ]; then
               echo "::warning::No CHANGELOG.md section matched [${VERSION}]; using a placeholder."
               echo "rtp-lite ${VERSION}" > release-notes.md
@@ -277,13 +277,16 @@ jobs:
           name: rtp-lite ${{ steps.version.outputs.version }}
           body_path: release-notes.md
           prerelease: ${{ contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha') }}
+          # ADR-126: LeafRTP owns the repository-wide /releases/latest pointer on
+          # DailyStruggle/RTP; nested plugin workflows set make_latest: false.
+          make_latest: ${{ !(contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'alpha')) }}
           files: |
             ${{ steps.artifact.outputs.lite_jar }}
             ${{ steps.artifact.outputs.lite_jar }}.sha256
             ${{ steps.artifact.outputs.lite_jar }}.sha512
             ${{ steps.artifact.outputs.lite_asc }}
             ${{ steps.evidence.outputs.evidence_file }}
-            rtp-plugin/build/reports/bom.json
+            resource/LeafRTP/rtp-plugin/build/reports/bom.json
 
       - name: Publish to Modrinth
         uses: Kir-Antipov/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3
@@ -380,3 +383,26 @@ jobs:
         run: |
           python3 scripts/release/update_hangar_description.py --project LeafRTP \
             --source-file scripts/release/generated/FRONT_PAGE_HANGAR.md
+
+      # Optional fast-publish hook (Option A) to post the release notes + Lite jar
+      # into the locked `🌿 LeafRTP Releases` thread in `#releases` and update the
+      # `[plugin-status:leafrtp]` status card in place. If DISCORD_BOT_TOKEN /
+      # DISCORD_GUILD_ID are not set in repository secrets, Option B in
+      # `discord_support_bot.py` captures the GitHub/Modrinth release automatically.
+      - name: Publish release jar and status update to Discord (#releases)
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
+          LITE_JAR: ${{ steps.artifact.outputs.lite_jar }}
+        run: |
+          if [ -z "$DISCORD_BOT_TOKEN" ] || [ -z "$DISCORD_GUILD_ID" ]; then
+            echo "DISCORD_BOT_TOKEN / DISCORD_GUILD_ID not set; deferring #releases post to discord_support_bot.py Option B poller."
+            exit 0
+          fi
+          python3 discord-support-bot/discord_support_bot.py \
+            --publish-release \
+            --project leafrtp \
+            --release-version "$VERSION" \
+            --release-jar "$LITE_JAR" \
+            --release-notes-file release-notes.md

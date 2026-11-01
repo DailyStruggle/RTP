@@ -1,270 +1,265 @@
-# LeafRTP - Random Teleport
+# RTP - Real-Time Process / Program for Minecraft
 
-Random teleport (`/rtp`) for Minecraft servers. Players type `/rtp` and land somewhere safe, far from spawn, right away. No "Finding a safe location..." wait and no lag spike for everyone else.
+**Tick-budgeted plugins, multi-loader SDK libraries, and verification tooling for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity.**
 
-One jar runs on Paper, Spigot, Folia, Fabric and NeoForge. It's free and MIT-licensed.
+`RTP` (*Real-Time Process / Program*) is a multi-product Minecraft monorepo built around strict main-thread and Folia regional-thread budgets, zero synchronous chunk I/O (`S-005`), and fail-closed self-testing (`PBIT` / `CBIT` / `IBIT`). It hosts standalone plugins under [`resource/`](resource/), 16 reusable platform-neutral SDK libraries under [`api/`](api/README.md), shared server carriers under [`platforms/`](platforms/), and black-box verification/fuzzing harnesses under [`helpers/`](helpers/) and [`scripts/`](scripts/).
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
 [![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://adoptium.net/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
-[![SpigotMC](https://img.shields.io/badge/SpigotMC-RTP-orange)](https://www.spigotmc.org/resources/leafrtp.94812/)
 [![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/leafrtp-pro.105418/)
 
-**[Download](https://modrinth.com/plugin/leafrtp)** · **[Documentation](https://dailystruggle.github.io/RTP/)** · **[Quick start](docs/admin/QUICK_START.md)** · **[Commands](docs/admin/COMMANDS.md)** · **[FAQ](docs/admin/FAQ.md)** · **[Get help](SUPPORT.md)**
-
-<div align="center">
-
-<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/teleport_title.webp" alt="An RTP teleport completing in 0 attempts, 49 ms" width="560" />
-
-<sub>A real <code>/rtp</code>: the spot was checked ahead of time, so the player landed after <b>0 attempts, in 49 ms</b>.</sub>
-
-</div>
+**[LeafRTP (`resource/LeafRTP`)](resource/LeafRTP/README.md)** · **[LeafTreeGen (`resource/LeafTreeGen`)](resource/LeafTreeGen/README.md)** · **[SDK Catalog (`api/*`)](api/README.md)** · **[Plugin Author Guide](docs/FOR_PLUGIN_AUTHORS.md)** · **[Documentation Site](https://dailystruggle.github.io/RTP/)** · **[Get Help](SUPPORT.md)**
 
 ---
 
-## Contents
+## Where do I start?
 
-- [What servers use it for](#what-servers-use-it-for)
-- [Why LeafRTP](#why-leafrtp)
-- [Quick start](#quick-start)
-- [Features](#features)
-- [Supported platforms](#supported-platforms)
-- [Build from source](#build-from-source)
-- [How it works](#how-it-works)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [Support](#support)
-- [License](#license)
-
----
-
-## What servers use it for
-
-- **Spreading players out on survival servers**, so new players don't all build next to spawn.
-- **Resource and mining worlds** that get reset regularly. `/rtp` can be set to send players to fresh land instead of spots that were already used.
-- **Random spawn on first join, death or world change** ([recipes](docs/admin/RECIPES.md#rtp-on-first-join-random-spawn-for-new-players)).
-- **Hardcore, deathban and UHC-style scatter**, including teleporting a whole group at once.
-- **SkyBlock, OneBlock and void worlds**, where RTP places players at a fixed height and the island plugin builds the ground.
-- **Arenas and 1v1 duels**, with matched spawn points for each side ([recipe](docs/admin/RECIPES.md#symmetrical-1v1-duels--arena-battles-subspace-placement)).
-- **Networks behind Velocity**: `/rtp` on one server sends the player to a region on another ([proxy mode](docs/admin/proxies/INDEX.md)).
-- **Paid teleports, NPCs, signs and menus**: charge through Vault, or start a teleport from any plugin that runs a command ([recipes](docs/admin/RECIPES.md)).
-
----
-
-## Why LeafRTP
-
-Speed is the obvious part. These are the other things it's built to get right.
-
-**For players and the world**
-
-- **Spacing.** In two test runs of 4,096 teleports each, no spot was used twice and no two players landed within 48 blocks of each other; the closest pair was 70 blocks apart. Plain random picks put about 80 pairs that close in each run. No player tracking is involved ([spacing](docs/site/how-it-works.md#spacing-between-players)).
-- **Fresh land.** Optionally, each landing area is handed out only once, so players on a long-running world keep finding untouched ground.
-- **Bad ground.** Oceans, lava, void and claimed land are remembered once and skipped from then on, across restarts. Entries expire on a timer you set, so changes to the world get picked up ([TTL](docs/admin/configuration/TTL.md)).
-- **Biome requests.** `/rtp biome=<biome>` is answered from what RTP already knows about the region, with no extra chunk loading.
-- **Biome weights.** Give a biome a weight to make it more or less likely. Biomes nobody has landed in yet stay reachable. Turn it on with `biomeWeighted: true` in `advanced/biomes.yml` ([biome settings](docs/admin/configuration/SAFETY.md)).
-- **Custom worlds.** Custom generators (Iris, Terra, datapacks) and upgraded worlds are read the same way as vanilla.
-- **Cleanup.** Every loaded chunk and background task is tracked and released, including when a teleport fails, so memory stays flat over long uptimes. Every failed teleport is reported.
-
-**For the people running it**
-
-- **GUI.** Bare `/rtp` opens a chest-style destination picker out of the box. Destinations a player can't use show as barriers, and icons can be custom items (ItemsAdder, Oraxen, Nexo, HeadDatabase). Where no menu can be shown, `/rtp` teleports directly ([GUI addon](docs/admin/ADDONS.md#the-bundled-gui-demo)).
-- **Web editor.** `/rtp editor` opens your config in a browser. Drag the region border on a map of your world, review the exact YAML change before applying it, and get a backup of every file it touches. Like the LuckPerms and spark editors, it needs no open ports ([web editor](docs/admin/WEB_EDITOR_GUIDE.md)).
-- **Admin menu.** `/rtp admin` is one book menu for setup presets, a config browser, diagnostics, scans and reload. From the console, `/rtp config <section> key=value` does the same ([in-game config](docs/admin/configuration/IN_GAME_CONFIG.md)).
-- **Safeguards.** The setup wizard (`/rtp admin setup`) shows a preview and backs up your config before it writes. Presets can be rolled back, and the editor rejects shapes that cross themselves or leave the world border.
-- **In-game help.** `/rtp info` shows what each region is doing. The full admin guide is unpacked to `docs/` in the config folder on first run and can be read inside the web editor.
-- **Migration.** `/rtp config import` reads a BetterRTP, JustRTP or EzRTP config folder, even with the old plugin removed, and moves worlds, radius, cooldowns, prices and effects across, backing up anything it replaces. `/rtp config import permissions` prints the LuckPerms commands for the old permission nodes.
-
----
-
-## Quick start
-
-1. **Download** the jar from [Modrinth](https://modrinth.com/plugin/leafrtp). One jar covers every platform.
-2. **Install:** put it in `plugins/` (Paper, Spigot, Folia) or `mods/` (Fabric, NeoForge), then restart the server.
-3. **Teleport:** run `/rtp`. That's it.
-
-The defaults work as they are. Most servers only change how far players go:
-
-```yaml
-# plugins/RTP/definitions/regions/default.yml
-shape:
-  radius: 4096b        # farthest a player can land from the centre
-  centerRadius: 1024b  # closest a player can land (keeps people off spawn)
-```
-
-Or change it in game, without opening any files:
-
-```
-/rtp config regions default shape.radius=10km shape.centerRadius=1km
-```
-
-Optional extras:
-- `/rtp admin setup` is a guided wizard for single or multi-world servers, SkyBlock, arenas and economy. It shows a preview before it writes anything.
-- `/rtp editor` opens a web editor with a map you can drag the region border on.
-- `/rtp scan start` checks a region ahead of time, so even the first teleports are instant.
-
-Full walkthrough: **[Quick start guide](docs/admin/QUICK_START.md)**. Config folder is `plugins/RTP/` (Bukkit family) or `config/rtp/` (Fabric, NeoForge).
-
-### Everyday commands
-
-| Command | What it does |
+| I want to... | Start here |
 |---|---|
-| `/rtp` | Teleport yourself (permission `rtp.use`) |
-| `/rtp player=Steve` | Teleport another player |
-| `/rtp world=world_nether` / `/rtp region=mining` | Teleport into a specific world or region |
-| `/rtp menu` | In-game menu for picking regions and editing settings |
-| `/rtp reload` | Apply config changes without a restart |
-| `/rtp info` | Region status, queue size and diagnostics |
-
-All commands and permissions: [COMMANDS.md](docs/admin/COMMANDS.md).
+| **Install or configure LeafRTP (`/rtp`) on my server** | **[LeafRTP README](resource/LeafRTP/README.md)** · [Quick Start](resource/LeafRTP/docs/admin/QUICK_START.md) · [Recipes](resource/LeafRTP/docs/admin/RECIPES.md) · [Download on Modrinth](https://modrinth.com/plugin/leafrtp) |
+| **Generate custom procedural trees & jigsaw worldgen datapacks** | **[LeafTreeGen README](resource/LeafTreeGen/README.md)** · [Biome Tree Catalog](resource/LeafTreeGen/docs/biome-trees.md) · [Changelog](resource/LeafTreeGen/CHANGELOG.md) |
+| **Build a standalone multi-loader plugin/mod using the `api/*` SDK** | **[SDK Catalog (`api/README.md`)](api/README.md)** · [Plugin Author Guide](docs/FOR_PLUGIN_AUTHORS.md) · [Architecture](docs/dev/ARCHITECTURE.md) |
+| **Write an addon for LeafRTP (`:rtp-api`)** | **[Addon Quickstart](resource/LeafRTP/docs/ADDON_QUICKSTART.md)** · [For Addon Developers](resource/LeafRTP/docs/FOR_ADDON_DEVELOPERS.md) · [Bundled Addons (`resource/LeafRTP`)](resource/LeafRTP/addons/) |
+| **Fuzz or benchmark a Minecraft server or plugin** | **[Whole-Server Fuzzer (`ADR-125`)](docs/adr/ADR-125-whole-server-discovery-fuzzing.md)** · [StressTestRTP Harness](helpers/StressTestRTP/README.md) · [Devstack Acceptance](devstack/README.md) |
+| **Contribute code, translations, or documentation** | **[For Contributors](docs/FOR_CONTRIBUTORS.md)** · [Developer Index](docs/dev/INDEX.md) · [Testing Guide](docs/dev/TESTING_GUIDE.md) · [ADR Index](docs/adr/README.md) |
 
 ---
 
-## Features
+## 1. Plugins in this Monorepo (`resource/*`)
 
-- **Instant teleports.** RTP finds and checks safe spots before anyone asks, so a teleport is usually served in 0-2 ticks.
-- **Doesn't lag the server.** No chunk loading on the main thread, and it's built for Folia's regional threads.
-- **Safe landings.** No lava, water, mid-air drops or suffocation. You choose which blocks and biomes count as unsafe.
-- **Respects claims.** Skips land protected by GriefPrevention, GriefDefender, WorldGuard, Towny, Lands and others, detected automatically.
-- **Any shape.** Circles, squares, rectangles or custom polygons, with uniform, centre-weighted or ring-shaped spread. Any number of regions per world.
-- **Biome filters.** Leave out oceans, or send players only to the biomes you list.
-- **Economy and cooldowns.** Optional Vault cost per teleport, plus cooldowns, use limits and per-region permissions.
-- **Configurable everything.** Every message is editable, and ships in 11 languages besides English. Teleport effects, sounds and countdowns are optional.
-- **PlaceholderAPI** support for cooldowns, queues and region info on scoreboards, tab lists and holograms.
+Each plugin under `resource/` ships its own deliverable jar, changelog, and release pipeline ([ADR-126](docs/adr/ADR-126-multi-product-monorepo-release-architecture.md)):
 
-<div align="center">
-
-<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_1.png" alt="The /rtp menu admin panel book UI" width="280" /> <img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_2.png" alt="The /rtp menu config-files browser" width="280" />
-
-<sub>The clickable <code>/rtp menu</code>: admin panel (left) and config-file browser (right).</sub>
-
-<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/bad_locations_map.webp" alt="In-game land-vs-water map built from a region scan" width="340" />
-
-<sub>A region scan's map of where players can and can't land.</sub>
-
-</div>
-
-More detail: [feature overview](docs/site/features.md).
-
----
-
-## Supported platforms
-
-| Platform | Versions | Notes |
-|---|---|---|
-| Paper / Spigot | 1.18+ | Paper is recommended. |
-| Folia | 1.21.11+ | Current Folia builds only. |
-| Fabric | 1.20.1, 1.21 - 26.3 | Not 1.20.2 - 1.20.6. |
-| NeoForge | 1.21.1+ | [Details](platforms/rtp-neoforge/README.md) |
-| Velocity (proxy) | - | Optional, for cross-server `/rtp`. [Proxy mode](docs/admin/proxies/INDEX.md) |
-| Forge (legacy) | - | Run the Paper/Spigot jar under Arclight or Mohist. |
-
-**Java 17+**, or newer if your Minecraft version needs it (Java 21 from 1.20.5, Java 25 on 26.x). Bug reports are accepted for 1.21.11 through the latest release; older versions are best effort. Per-version status: [support matrix](docs/dev/SUPPORT_MATRIX.md).
-
-**Tips:** pregenerating the world (for example with Chunky) makes the first teleports faster. RTP holds its prepared spots in memory, so give the server some heap headroom ([performance settings](docs/admin/configuration/PERFORMANCE.md)).
-
----
-
-## Build from source
-
-Most people should [download a release](https://modrinth.com/plugin/leafrtp). To build it yourself:
-
-**You need:** Git and a JDK 21. Gradle and the Java 25 toolchain for the 26.x modules are downloaded automatically by the wrapper.
-
-```sh
-git clone https://github.com/DailyStruggle/RTP.git
-cd RTP
-./gradlew assemble        # Windows: .\gradlew.bat assemble
-```
-
-The jars land in `build/libs/`:
-
-| Jar | What it is |
-|---|---|
-| `LeafRTP-<version>.jar` | The plugin/mod. Install this one. |
-| `LeafRTP-Pro-<version>.jar` | The same engine plus the bundled SQL/Redis drivers for proxy mode and a Folia-tuned scheduler. |
-| `LeafRTPGuiAddon-*.jar`, `LeafRTPCountdownAddon-*.jar` | Optional addons. |
-
-Other useful commands:
-
-```sh
-./gradlew build                  # compile and run every test
-./gradlew :rtp-core:test         # test one module
-./gradlew -PexcludeJdk25 build   # skip the 26.x modules on a JDK-21-only machine
-./gradlew spotlessApply          # format before opening a PR
-```
-
-The first build downloads the Minecraft and loader dependencies and takes a while; later builds are cached. IntelliJ IDEA opens the folder as a Gradle project directly. More detail: [FOR_CONTRIBUTORS.md](docs/FOR_CONTRIBUTORS.md).
-
-### Building an addon
-
-Compile against `rtp-api` only. It lets you register custom shapes, landing rules and claim checks without touching the plugin. Start with the [addon quickstart](docs/ADDON_QUICKSTART.md) and [FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md).
-
-### Reusing the multi-platform SDK (`api/*`) & toolchain
-
-Building a standalone plugin or mod (unrelated to RTP)? All 14 platform-neutral `api/*` libraries (`server-api`, `commands-api`, `yaml-api`, `bit-api`, `config-bit-api`, `menu-api`, `effects-api`, `predict-api`, `anvil-api`, `tags-api`, `units-api`, `metrics-api`, `bstats-api`, `maps-api`) are published to Maven Central and JitPack. Start with [FOR_PLUGIN_AUTHORS.md](docs/FOR_PLUGIN_AUTHORS.md) and the [`api/` SDK catalog](api/README.md).
-
----
-
-## How it works
-
-Most RTP plugins pick random coordinates and check them while the player waits, then pick again whenever a spot is unsafe. RTP does that work ahead of time. It keeps a queue of checked, safe spots for each region, refills it in the background, and remembers areas that failed so it doesn't test them again. When a player runs `/rtp`, the next spot in the queue is handed out.
-
-For the details (selection algorithm, threading model, design decisions), see [How it works](docs/site/how-it-works.md), [Why LeafRTP exists](docs/site/why.md) and the [shape algorithm charts](docs/site/shape-algorithms.md).
+| Plugin | Path | Loaders | Tag Namespace | Description |
+|---|---|---|---|---|
+| **[LeafRTP](resource/LeafRTP/README.md)** | [`resource/LeafRTP`](resource/LeafRTP/README.md) | Paper, Spigot, Folia, Fabric, NeoForge, Velocity | `v<semver>` / `leafrtp-v<semver>` | Zero-wait random teleportation (`/rtp`) with background queue preparation, Hilbert/spiral spatial memory, browser map editor (`/rtp editor`), and cross-server proxy routing. |
+| **[LeafTreeGen](resource/LeafTreeGen/README.md)** | [`resource/LeafTreeGen/`](resource/LeafTreeGen/README.md) | Paper, Folia, Fabric, NeoForge | `leaftreegen-v<semver>` | Pure-Java procedural tree generator that bakes `.nbt` structure variants into native vanilla jigsaw worldgen datapacks and custom saplings (`/leaftree`). |
+| **[LeafSleep](resource/LeafSleep/README.md)** | [`resource/LeafSleep/`](resource/LeafSleep/README.md) | Paper, Folia, Fabric, NeoForge, Velocity | `leafsleep-v<semver>` | Tick-budgeted multiplayer sleep and night-skip coordination built on the shared `api/*` SDK. |
 
 <details>
-<summary>Repository layout</summary>
+<summary><b>LeafRTP (`resource/LeafRTP/`) - Modules, bundled addons, and documentation</b></summary>
 
-| Directory | Purpose |
-|---|---|
-| `rtp-api/` | Public API for addon developers. |
-| `rtp-core/` | Platform-independent engine: regions, shapes, queues, database. |
-| `api/` | 14 standalone, platform-neutral SDK libraries (`server-api`, `commands-api`, `yaml-api`, `config-bit-api`, `menu-api`, `bit-api`, `predict-api`, `anvil-api`, `effects-api`, `maps-api`, `metrics-api`, `bstats-api`, `tags-api`, `units-api`). |
-| `rtp-plugin/` | Bukkit-family entry point and the shipped jar. |
-| `platforms/` | Spigot, Paper, Folia, Fabric, NeoForge and proxy adapters. |
-| `addons/` | Optional addons (GUI menu, countdown, integrations). |
-| `scripts/` | Whole-server discovery fuzzer (`bench_fuzz.py`), web-editor generator, storefront builder. |
-| `docs/` | Everything published on the documentation site. |
-| `devstack/` | Docker-based multi-server test environment. |
+<br>
+
+**[Full LeafRTP README](resource/LeafRTP/README.md)** · **[Download](https://modrinth.com/plugin/leafrtp)** · **[Quick Start](resource/LeafRTP/docs/admin/QUICK_START.md)** · **[Commands & Permissions](resource/LeafRTP/docs/admin/COMMANDS.md)** · **[Web Editor Guide](resource/LeafRTP/docs/admin/WEB_EDITOR_GUIDE.md)** · **[Proxy Mode](resource/LeafRTP/docs/admin/proxies/INDEX.md)** · **[FAQ](resource/LeafRTP/docs/admin/FAQ.md)**
+
+| Module / Directory | Gradle Path | Purpose |
+|---|---|---|
+| [`resource/LeafRTP`](resource/LeafRTP/rtp-api/) | `:rtp-api` | Public SPI for addon developers (custom shapes, vertical adjustors, landing checks, editor extensions). |
+| [`resource/LeafRTP`](resource/LeafRTP/rtp-core/) | `:rtp-core` | Platform-independent engine: region queues, spiral/Hilbert math, SQLite/MySQL/Postgres storage, web editor, PBIT/CBIT/IBIT. |
+| [`resource/LeafRTP`](resource/LeafRTP/rtp-neoforge/) | `:rtp-neoforge` | LeafRTP NeoForge integration entrypoint and event bindings. |
+| [`resource/LeafRTP`](resource/LeafRTP/rtp-plugin/) | `:rtp-plugin` | Unified multi-loader shaded jar (`LeafRTP-<version>.jar` and `LeafRTP-Pro-<version>.jar`) and 12-locale resource baseline. |
+| [`resource/LeafRTP`](resource/LeafRTP/addons/LeafRTPGuiAddon/README.md) | `:addons:LeafRTPGuiAddon:rtp-gui` | Multi-loader chest-inventory destination picker (`/rtp`) with ItemsAdder, Oraxen, Nexo, and HeadDatabase support. |
+| [`resource/LeafRTP`](resource/LeafRTP/addons/LeafRTPClaimAddon/README.md) | `:addons:LeafRTPClaimAddon` | Automatic claim-protection filtering (WorldGuard, GriefPrevention, GriefDefender, Towny, Lands, HuskTowns, FactionsUUID). |
+| [`resource/LeafRTP`](resource/LeafRTP/addons/LeafRTPActionAddon/README.md) | `:addons:LeafRTPActionAddon` | Declarative event/arena/challenge lifecycle engine (`definitions/actions/*.yml`, schematic pasting, scoreboard gates). |
+| [`resource/LeafRTP`](resource/LeafRTP/addons/LeafRTPCountdownAddon/README.md) | `:addons:LeafRTPCountdownAddon` | Boss-bar warmup countdowns and movement/damage cancellation hooks. |
+| [`resource/LeafRTP`](resource/LeafRTP/addons/LeafRTPRiftAddon/README.md) | `:addons:LeafRTPRiftAddon` | Physical portal/rift particle effects and trigger volumes. |
+
+</details>
+
+<details>
+<summary><b>LeafTreeGen (`resource/LeafTreeGen/`) - Modules and worldgen pipeline</b></summary>
+
+<br>
+
+**[Full LeafTreeGen README](resource/LeafTreeGen/README.md)** · **[Biome Tree Catalog](resource/LeafTreeGen/docs/biome-trees.md)** · **[ADR Index](resource/LeafTreeGen/docs/adr/README.md)** · **[Changelog](resource/LeafTreeGen/CHANGELOG.md)**
+
+| Module | Gradle Path | Purpose |
+|---|---|---|
+| `resource/LeafTreeGen/treegen-common/` | `:resource:LeafTreeGen:treegen-common` | Procedural voxel tree geometry, `.nbt` structure writer, jigsaw datapack generator, and `/leaftree` command tree. |
+| `resource/LeafTreeGen/treegen-paper/` | `:resource:LeafTreeGen:treegen-paper` | Paper/Folia sapling growth hooks,PDC item tagging, and runtime placement adapter. |
+| `resource/LeafTreeGen/treegen-fabric/` | `:resource:LeafTreeGen:treegen-fabric` | Fabric server adapter (`26.1+` unobf & `1.21.1` Mojmap). |
+| `resource/LeafTreeGen/treegen-neoforge/` | `:resource:LeafTreeGen:treegen-neoforge` | NeoForge server adapter (`26.1+` & `1.21.1`). |
+| `resource/LeafTreeGen/treegen-plugin/` | `:resource:LeafTreeGen:treegen-plugin` | Unified shaded deliverable (`LeafTreeGen-<version>.jar`) with SHA-256/512 checksums and PGP signing. |
 
 </details>
 
 ---
 
-## Documentation
+## 2. Real-Time Multi-Platform SDK (`api/*`) & Shared Carriers (`platforms/*`)
 
-**<https://dailystruggle.github.io/RTP/>** - searchable, and rebuilt on every merge. The same pages also ship inside the jar and unpack to `plugins/RTP/docs/` (`config/rtp/docs/` on Fabric / NeoForge), so they work offline and always match your installed version.
+All 14 modules under [`api/`](api/README.md) are general-purpose, MIT-licensed, Java 17+ libraries published to **Maven Central** (`io.github.dailystruggle:<module>:<version>`) and **JitPack** (`com.github.DailyStruggle.RTP:<module>:<tag>`). Any Minecraft plugin or mod can consume them without pulling in `LeafRTP`:
 
-| I want to... | Start here |
+- **Java 17 bytecode baseline** ([ADR-113](docs/adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)) across Minecraft 1.18+ through 26.x+.
+- **Zero `rtp-core` or `rtp-api` dependency**, enforced at build time by ArchUnit (`ADR-115`).
+- **Zero raw thread creation**; work runs on caller-supplied executors or regional `TaskScheduler` handles.
+- **Fail-closed contracts** on untrusted YAML, JSON, NBT, and command inputs.
+
+<details>
+<summary><b>Browse all 14 `api/*` SDK modules (5 functional layers)</b></summary>
+
+<br>
+
+Full documentation and Maven/Gradle snippets: **[`api/README.md`](api/README.md)** and **[`docs/FOR_PLUGIN_AUTHORS.md`](docs/FOR_PLUGIN_AUTHORS.md)**.
+
+#### Layer 1: Runtime & Platform Abstraction
+| Module | Gradle / Maven ID | Summary & Guide |
+|---|---|---|
+| [`api/server-api/`](api/server-api/README.md) | `server-api` | Platform identity (`PlatformFamily`), version range checks, regional/async `TaskScheduler`, and capability sub-interfaces (`ServerAccessor`). |
+| [`api/commands-api/`](api/commands-api/README.md) | `commands-api` | Permission-filtered `TreeCommand` hierarchy, `key=value` parameter validation, tick-budgeted dispatch, and Brigadier bridge. |
+| [`api/menu-api/`](api/menu-api/README.md) | `menu-api` | Declarative multi-page menus (`MenuDescriptor`), click actions, staging carts (`MenuSession`), expiring tokens, and `ServiceLoader` binding. |
+| [`api/effects-api/`](api/effects-api/README.md) | `effects-api` | Prototype-cloned sound, particle, title, bossbar, potion, firework, hologram, and volumetric wireframe effects. |
+
+#### Layer 2: Configuration, Units & Self-Testing (`PBIT` / `CBIT` / `IBIT`)
+| Module | Gradle / Maven ID | Summary & Guide |
+|---|---|---|
+| [`api/yaml-api/`](api/yaml-api/README.md) | `yaml-api` | Zero-dependency, comment-preserving YAML parser and atomic writer (`RtpYamlConfig`). |
+| [`api/units-api/`](api/units-api/README.md) | `units-api` | Human-friendly duration (`20t`, `5m`), distance (`256c`, `4r`, `2km`), and data-size (`256MB`) parsers. |
+| [`api/bit-api/`](api/bit-api/README.md) | `bit-api` | Power-On (`PBIT`), Continuous (`CBIT`), and Initiated (`IBIT`) Built-In Test runner, code registry (`BitCodeRegistry`), and diagnostic tables. |
+| [`api/config-bit-api/`](api/config-bit-api/README.md) | `config-bit-api` | YAML `@type` / `@range` / `@options` comment-directive schema validator, cross-key constraints, and locale parity checks. |
+
+#### Layer 3: Stochastic Control, Allocation & Telemetry
+| Module | Gradle / Maven ID | Summary & Guide |
+|---|---|---|
+| [`api/predict-api/`](api/predict-api/README.md) | `predict-api` | Lock-free `EwmaEstimator`, `BernoulliEstimator`, `AimdLimiter`, `BudgetPacer`, `ComparativeCostGovernor`, `WaterFillingAllocator`, and `ProbedShareAllocator`. |
+| [`api/metrics-api/`](api/metrics-api/README.md) | `metrics-api` | Portable TPS, MSPT, tick-budget utilization, heap, and Folia regional health SPI (`Metrics`, `MetricsSnapshot`). |
+| [`api/bstats-api/`](api/bstats-api/README.md) | `bstats-api` | Zero-dependency bStats v2 telemetry client (`BStatsService` and chart builders). |
+
+#### Layer 4: World Storage & Data Decode
+| Module | Gradle / Maven ID | Summary & Guide |
+|---|---|---|
+| [`api/anvil-api/`](api/anvil-api/README.md) | `anvil-api` | Off-tick read-only `.mca` / `.linear` region decoder (gzip, zlib, LZ4, Zstd), selective NBT reader, and load-free column/biome prefilters. |
+| [`api/tags-api/`](api/tags-api/README.md) | `tags-api` | Datapack block-tag JSON loader (`DiskTagSource`), cycle-safe `#namespace:tag` resolver, and `ADR-017` block-safety predicate compiler. |
+
+#### Layer 5: Cartography & Diagnostics Rendering
+| Module | Gradle / Maven ID | Summary & Guide |
+|---|---|---|
+| [`api/maps-api/`](api/maps-api/README.md) | `maps-api` | 128x128 in-game map-item canvas and PNG/BMP/Web-tile cartography (`HeatmapRenderer`, `DualSparklineRenderer`, `WebTileRenderer`). |
+
+</details>
+
+<details>
+<summary><b>Shared platform carriers & adapters (`platforms/*`)</b></summary>
+
+<br>
+
+[`platforms/`](platforms/) hosts the generic server and proxy platform carriers shared across plugins in the monorepo:
+
+| Directory | Gradle Path | Scope |
+|---|---|---|
+| `platforms/bukkit/` | `:bukkit:*` | Bukkit/Spigot `ServerAccessor`, `WorldEventHook`, and version carriers (`bukkit-common`, `v1_20_R1`, `v1_21_R1`, `v26_1_R1`). |
+| `platforms/paper/` | `:paper:*` | Paper async-chunk and adventure carriers (`paper-common`, `v1_20_R1`, `v1_21_R1`, `v26_1_R1`). |
+| `platforms/folia/` | `:folia:*` | Folia regionized-thread scheduler and entity-thread carriers (`folia-common`, `v1_20_R1`, `v1_21_R1`, `v26_1_R1`). |
+| `platforms/fabric/` | `:fabric:*` | Fabric `ServerAccessor`, `TaskScheduler`, lifecycle hooks, and unobfuscated 26.x carriers (`1.20.1`, `1.21.x`, `26.1+`). |
+| `platforms/neoforge/` | `:neoforge:*` | [NeoForge server carriers and adapters](platforms/neoforge/README.md) (`neoforge-common`, `1.21.1+`, `26.1+`). |
+| `platforms/proxy/` | `:proxy:*` | [Cross-server proxy orchestration](platforms/proxy/README.md) (`proxy-common`, `proxy-velocity`, `proxy-bungee`). |
+
+</details>
+
+---
+
+## 3. Verification, Fuzzing & Developer Tooling
+
+This repository treats verification as a first-class engineering product ([`docs/dev/VERIFICATION_GATES.md`](docs/dev/VERIFICATION_GATES.md)).
+
+<details>
+<summary><b>Whole-Server Discovery Fuzzer & Black-Box Benchmarks (`scripts/bench_fuzz.py`, `helpers/*`)</b></summary>
+
+<br>
+
+- **Whole-Server Discovery Fuzzer ([`scripts/bench_fuzz.py`](scripts/bench_fuzz.py), [`ADR-125`](docs/adr/ADR-125-whole-server-discovery-fuzzing.md)):**
+  - `python3 scripts/bench_fuzz.py --mode server` fuzzes an entire installed plugin/mod set with zero hardcoded command names or package prefixes.
+  - Discovers commands per permission tier (`default` vs `op`) from the live Brigadier `declare_commands` packet, drives a tier-stratified UCB1 bandit over command and GUI window-click sequences, detects acute tick stalls and sustained MSPT inflation against a same-seed vanilla baseline, captures host `jcmd` histograms and thread dumps, and runs `ddmin` jar isolation to emit both an operator mitigation and an author reproducer.
+- **[`helpers/StressTestRTP/`](helpers/StressTestRTP/README.md) (`:helpers:StressTestRTP`):**
+  - Standalone black-box benchmark plugin (`/rtpstress`) that measures cold-start latency, warm p50/p95/p99 latency, minimum TPS under burst, p95 MSPT, and heap footprint across any `/rtp`-style plugin (LeafRTP, BetterRTP, HuskHomes, EzRTP).
+- **[`helpers/PeriodicWorldSaver/`](helpers/PeriodicWorldSaver/README.md) (`:helpers:PeriodicWorldSaver`):**
+  - Tick-budgeted incremental world-save scheduler for benchmark and production servers.
+- **[`helpers/MockItemPlugins/`](helpers/MockItemPlugins/README.md) (`:helpers:MockItemPlugins`):**
+  - Lightweight stub jars (`MockItemsAdder`, `MockOraxen`, `MockNexo`, `MockHeadDatabase`) for headless custom-item integration tests.
+
+</details>
+
+<details>
+<summary><b>Multi-Server Devstack & Runtime Acceptance (`devstack/`)</b></summary>
+
+<br>
+
+**[Full Devstack Guide (`devstack/README.md`)](devstack/README.md)** · **[Testing Guide (`docs/dev/TESTING_GUIDE.md`)](docs/dev/TESTING_GUIDE.md)**
+
+- **`./devstack/run-acceptance.sh` (or `.\devstack\run-acceptance.ps1`):** Boots a multi-server Docker network (Velocity proxies, Paper/Folia/Fabric/NeoForge backends, Redis, MySQL, PostgreSQL) and drives a headless Mineflayer bot (`devstack/clients/mineflayer-bot.js`) through cross-server teleports, GUI chest menus, effect packet assertions, and mid-flight disconnect/killswitch recovery.
+- **`./devstack/run-versions-smoke.sh` & `./devstack/run-version-sweep.sh`:** Automated single-server smoke and version-matrix sweeps across Minecraft `1.18.2` through `26.3` (`ADR-113`).
+- **`./devstack/test-item-compat.sh`:** Single-server Paper harness verifying custom item resolution against stub item plugins.
+
+</details>
+
+<details>
+<summary><b>Repository AST, Local CI Gate & Support Bot (`corpus-atlas/`, `scripts/`, `discord-support-bot/`)</b></summary>
+
+<br>
+
+- **Repository AST & Decision-Preservation Hypergraph ([`corpus-atlas/`](corpus-atlas/), [`scripts/repo_ast.py`](scripts/repo_ast.py), [`ADR-115`](docs/adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph.md)):**
+  - Sub-25ms SQLite FTS5 + AST index mapping every Java class, SPI tier, config key, BIT code, `REQ-*` requirement, `S-00x` safety rule, and `ADR-*` record.
+  - Query from CLI or MCP (`corpus-atlas`):
+    ```sh
+    python3 scripts/repo_ast.py context TeleportPipelineTask
+    python3 scripts/repo_ast.py search "exponential moving average estimator"
+    python3 scripts/repo_ast.py impact RTPScheduler
+    python3 scripts/repo_ast.py audit
+    ```
+- **Local CI-Parity Gate ([`scripts/agent-gate.py`](scripts/agent-gate.py), [`scripts/ci-scope.py`](scripts/ci-scope.py)):**
+  - `python3 scripts/agent-gate.py` scopes uncommitted working-tree changes against the target branch and runs traceability, mojibake, front-page drift, Spotless, affected project-set builds (`-Pcoverage -PstaticAnalysis`), PBIT config checks, and the 80% changed-line coverage gate (`scripts/diff-coverage.py`).
+- **Discord Support & Release Bot ([`discord-support-bot/`](discord-support-bot/)):**
+  - Multi-product support triage and release announcer (`support-bot.yml`), with tag-prefix release discovery (`ADR-126`) and zero-hallucination config/BIT diagnosis backed by `corpus-atlas`.
+
+</details>
+
+---
+
+## 4. Build from Source & Repository Layout
+
+**Prerequisites:** Git and **JDK 21** (Gradle automatically provisions JDK 25 for the Minecraft 26.x carrier modules, or pass `-PexcludeJdk25` on a JDK-21-only host).
+
+```sh
+git clone https://github.com/DailyStruggle/RTP.git
+cd RTP
+
+# Build all deliverables (copied to build/libs/)
+./gradlew assemble                         # Windows: .\gradlew.bat assemble
+
+# Build a specific plugin or SDK module
+./gradlew :rtp-plugin:remapJar             # LeafRTP unified jar -> resource/LeafRTP/rtp-plugin/build/libs/
+./gradlew :resource:LeafTreeGen:treegen-plugin:build  # LeafTreeGen jar -> resource/LeafTreeGen/treegen-plugin/build/libs/
+./gradlew :predict-api:build               # Single api/* SDK module
+
+# Run verification gates
+python3 scripts/agent-gate.py              # Scoped PR gate (Spotless, tests, PMD, SpotBugs, JaCoCo)
+./gradlew spotlessApply                    # Auto-format Java/Gradle sources
+```
+
+<details>
+<summary><b>Complete monorepo directory layout</b></summary>
+
+<br>
+
+| Directory | Purpose |
 |---|---|
-| Install and run RTP on my server | [FOR_SERVER_ADMINS.md](docs/FOR_SERVER_ADMINS.md) |
-| Copy a setup for a common task | [Recipes](docs/admin/RECIPES.md) |
-| Write an addon | [FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md) |
-| Build a standalone multi-platform plugin or mod with the `api/*` SDK | [FOR_PLUGIN_AUTHORS.md](docs/FOR_PLUGIN_AUTHORS.md) |
-| Work on RTP itself | [FOR_CONTRIBUTORS.md](docs/FOR_CONTRIBUTORS.md) |
+| [`resource/LeafRTP`](resource/LeafRTP/README.md) | **LeafRTP** (`rtp-api`, `rtp-core`, `rtp-neoforge`, `rtp-plugin`) and its addons (`resource/LeafRTP/addons`). |
+| [`resource/LeafTreeGen/`](resource/LeafTreeGen/README.md) | **LeafTreeGen** (`treegen-common`, `treegen-paper`, `treegen-fabric`, `treegen-neoforge`, `treegen-plugin`). |
+| [`api/`](api/README.md) | 16 standalone, platform-neutral SDK libraries (`server-api`, `commands-api`, `menu-api`, `effects-api`, `yaml-api`, `units-api`, `bit-api`, `config-bit-api`, `predict-api`, `metrics-api`, `bstats-api`, `anvil-api`, `tags-api`, `maps-api`, `database-api`, `schematics-api`). |
+| [`platforms/`](platforms/) | Generic `bukkit`, `paper`, `folia`, `fabric`, `neoforge`, and `proxy` platform carriers and adapters. |
+| [`helpers/`](helpers/) | Standalone verification and server tools (`StressTestRTP`, `PeriodicWorldSaver`, `MockItemPlugins`). |
+| [`corpus-atlas/`](corpus-atlas/) | Deterministic repository AST indexer (`build_doc_index.py`), query engine (`corpus_atlas.py`), and MCP server (`mcp_server.py`). |
+| [`discord-support-bot/`](discord-support-bot/) | Multi-project Discord support bot, log/config doctor, and `#releases` publisher. |
+| [`scripts/`](scripts/) | Whole-server fuzzer (`bench_fuzz.py`), CI scope/gate (`ci-scope.py`, `agent-gate.py`), web editor generator (`generate_web_editor.py`), locale pipeline, and storefront builder (`scripts/release/`). |
+| [`devstack/`](devstack/README.md) | Docker Compose multi-server acceptance and version-sweep testbed. |
+| [`docs/`](docs/dev/INDEX.md) | User documentation ([`docs/admin/`](resource/LeafRTP/docs/admin/QUICK_START.md)), contributor guides ([`docs/dev/INDEX.md`](docs/dev/INDEX.md)), and Architecture Decision Records ([`docs/adr/README.md`](docs/adr/README.md)). |
+
+> **Flat Gradle coordinates:** `settings.gradle` maps moved directories (`api/*`, `platforms/*`, `resource/LeafRTP`) to flat Gradle project paths (`:server-api`, `:rtp-api`, `:rtp-core`, `:rtp-plugin`, `:addons:*`) so Maven Central, JitPack, and `project(':...')` dependencies remain stable.
+
+</details>
 
 ---
 
-## Contributing
+## Contributing & Support
 
-Bug fixes, translations, docs and addons are all welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and code style, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). In short: run `./gradlew build` and `./gradlew spotlessApply` before you open a pull request, and add a line to [CHANGELOG.md](CHANGELOG.md).
-
----
-
-## Support
-
-- Questions and setup help: [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) or the `#support` Forum in the `LeafCraft Plugin Support` Discord
-- Bugs: [open an issue](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md) with `/rtp version`, `/version`, `/rtp test` output, and an `mclo.gs` log link, after checking the [FAQ](docs/admin/FAQ.md)
-- Security problems: see [SECURITY.md](SECURITY.md); please don't open a public issue
-
-The full guide is in [SUPPORT.md](SUPPORT.md).
-
-**[RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** buys priority support (via BuiltByBit tickets or `@Pro Supporter` priority in the Discord `#support` Forum), including fixes for the problems you report, and funds development. It's the same MIT-licensed code as the free build.
+- **Contributing:** Read [CONTRIBUTING.md](CONTRIBUTING.md), [FOR_CONTRIBUTORS.md](docs/FOR_CONTRIBUTORS.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Run `python3 scripts/agent-gate.py` and `./gradlew spotlessApply` before opening a pull request.
+- **Support:** Ask questions in [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions) or the `#support` Forum in the `LeafCraft Plugin Support` Discord. See [SUPPORT.md](SUPPORT.md) for bug report templates and [SECURITY.md](SECURITY.md) for private vulnerability disclosure.
+- **Priority Support:** **[RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** provides contractual priority support (`@Pro Supporter`) and funds open-source development ([ADR-108](docs/adr/ADR-108-all-mit-licensing-pro-as-support.md), [leafrtp-ADR-087](resource/LeafRTP/docs/adr/leafrtp-ADR-087-release-cadence-contractual-pro-discretionary-lite.md)).
 
 ---
 
 ## License
 
-**MIT** ([`LICENSE`](LICENSE)). You may use, modify and redistribute all source in this repository and both the free and Pro jars, including commercially. Pro is a support tier, not a different licence ([ADR-108](docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)).
-
-Where a module or file ships its own `LICENSE` or SPDX header (for example the GPL-3.0-or-later NeoForge carriers), that grant governs the file. Releases published before 2026-10-05 keep the licence they shipped with.
+**MIT** ([`LICENSE`](LICENSE)). You may use, modify, and redistribute all source code in this repository and all shipped jars, including commercially ([ADR-108](docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)). Where a module or file ships its own `LICENSE` or SPDX header (for example the GPL-3.0-or-later NeoForge carriers), that grant governs the file.

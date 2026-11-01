@@ -8,12 +8,13 @@ import java.util.logging.Level;
 
 /**
  * Attributes completions from the plugin under test's <em>own</em> teleport
- * events, when it is LeafRTP (ADR-122 Decision 1 & 2).
+ * events, when it is LeafRTP (ADR-122 Decision 1 and 2).
  */
 public final class DirectTeleportProbe {
 
     static final String PRE_EVENT_CLASS = "io.github.dailystruggle.rtp.bukkit.events.PreTeleportEvent";
     static final String POST_EVENT_CLASS = "io.github.dailystruggle.rtp.bukkit.events.PostTeleportEvent";
+    static final String PIPELINE_TASK_CLASS = "io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask";
     static final double ARRIVAL_TOLERANCE_BLOCKS = 3.0;
 
     private final StressHost plugin;
@@ -59,8 +60,24 @@ public final class DirectTeleportProbe {
                 } catch (NoSuchMethodException ignored) {
                     worldName = null;
                 }
+            } else {
+                Class<?> task = findEventClass(plugin, PIPELINE_TASK_CLASS);
+                if (task != null) {
+                    pre = task;
+                    post = task;
+                    player = task.getMethod("player");
+                    uuid = player.getReturnType().getMethod("uuid");
+                    coords = task.getMethod("coords");
+                    x = coords.getReturnType().getMethod("x");
+                    z = coords.getReturnType().getMethod("z");
+                    try {
+                        worldName = coords.getReturnType().getMethod("worldName");
+                    } catch (NoSuchMethodException ignored) {
+                        worldName = null;
+                    }
+                }
             }
-        } catch (NoSuchMethodException | SecurityException e) {
+        } catch (Throwable e) {
             if (plugin != null && plugin.getLogger() != null) {
                 plugin.getLogger().log(Level.WARNING,
                         "[StressTestRTP] LeafRTP events present but their shape changed; "
@@ -83,14 +100,14 @@ public final class DirectTeleportProbe {
     private static Class<?> findEventClass(StressHost host, String className) {
         try {
             return Class.forName(className);
-        } catch (ClassNotFoundException ignored) {
+        } catch (Throwable ignored) {
         }
         if (host != null) {
             for (StressHost.LoadedPlugin p : host.loadedPlugins()) {
                 if (p != null && p.classLoader() != null) {
                     try {
                         return Class.forName(className, false, p.classLoader());
-                    } catch (ClassNotFoundException ignored) {
+                    } catch (Throwable ignored) {
                     }
                 }
             }
@@ -109,7 +126,15 @@ public final class DirectTeleportProbe {
         if (available() && plugin != null) {
             ClassLoader cl = preClass.getClassLoader();
             for (StressHost.LoadedPlugin p : plugin.loadedPlugins()) {
-                if (p != null && p.classLoader() == cl) { resolved = p.name(); break; }
+                if (p != null && ("rtp".equalsIgnoreCase(p.name()) || "leafrtp".equalsIgnoreCase(p.name()))) {
+                    resolved = p.name();
+                    break;
+                }
+            }
+            if (resolved == null) {
+                for (StressHost.LoadedPlugin p : plugin.loadedPlugins()) {
+                    if (p != null && p.classLoader() == cl) { resolved = p.name(); break; }
+                }
             }
         }
         ownerPluginName = resolved;
@@ -117,9 +142,35 @@ public final class DirectTeleportProbe {
         return resolved;
     }
 
+    @SuppressWarnings("unchecked")
     public void register() {
         if (registered || !available() || plugin == null) return;
         unsubscribe = plugin.registerDirectTeleportEvents(preClass, this::onPre, postClass, this::onPost);
+        if (unsubscribe == null && preClass == postClass) {
+            try {
+                java.lang.reflect.Field preField = preClass.getField("teleportPreActions");
+                java.lang.reflect.Field postField = postClass.getField("teleportPostActions");
+                Object preListObj = preField.get(null);
+                Object postListObj = postField.get(null);
+                if (preListObj instanceof java.util.List<?> preRaw
+                        && postListObj instanceof java.util.List<?> postRaw) {
+                    java.util.List<java.util.function.Consumer<Object>> preList =
+                            (java.util.List<java.util.function.Consumer<Object>>) preRaw;
+                    java.util.List<java.util.function.Consumer<Object>> postList =
+                            (java.util.List<java.util.function.Consumer<Object>>) postRaw;
+                    java.util.function.Consumer<Object> preHook = this::onPre;
+                    java.util.function.Consumer<Object> postHook = this::onPost;
+                    preList.add(preHook);
+                    postList.add(postHook);
+                    unsubscribe = () -> {
+                        preList.remove(preHook);
+                        postList.remove(postHook);
+                    };
+                }
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                plugin.getLogger().log(Level.FINE, "[StressTestRTP] TeleportPipelineTask hook fallback unavailable", e);
+            }
+        }
         if (unsubscribe == null) return;
         registered = true;
         plugin.getLogger().info("[StressTestRTP] LeafRTP teleport events detected; "
@@ -178,7 +229,7 @@ public final class DirectTeleportProbe {
     static String arrivalFailure(StressLocation at, String expectedWorld, double toX, double toZ) {
         if (at == null || at.world().isEmpty()) return "NOT_AT_DESTINATION";
         if (expectedWorld != null && !expectedWorld.isEmpty()
-                && !expectedWorld.equalsIgnoreCase(at.world())) {
+                && !worldsEquivalent(expectedWorld, at.world())) {
             return "NOT_AT_DESTINATION";
         }
         double dx = at.x() - toX, dz = at.z() - toZ;
@@ -186,10 +237,26 @@ public final class DirectTeleportProbe {
                 ? "" : "NOT_AT_DESTINATION";
     }
 
+    private static boolean worldsEquivalent(String a, String b) {
+        if (a.equalsIgnoreCase(b)) return true;
+        String na = normalizeWorldKey(a);
+        String nb = normalizeWorldKey(b);
+        return na.equals(nb);
+    }
+
+    private static String normalizeWorldKey(String w) {
+        String s = w.trim().toLowerCase(java.util.Locale.ROOT);
+        if (s.startsWith("minecraft:")) s = s.substring("minecraft:".length());
+        if ("world".equals(s)) return "overworld";
+        if ("world_nether".equals(s) || "dim-1".equals(s)) return "the_nether";
+        if ("world_the_end".equals(s) || "dim1".equals(s)) return "the_end";
+        return s;
+    }
+
     private String worldOf(Object event) {
         if (coordsWorld == null) return null;
         try {
-            Object task = getDoTeleport.invoke(event);
+            Object task = getDoTeleport != null ? getDoTeleport.invoke(event) : event;
             Object coords = task != null ? taskCoords.invoke(task) : null;
             Object w = coords != null ? coordsWorld.invoke(coords) : null;
             return w instanceof String s ? s : null;
@@ -204,8 +271,7 @@ public final class DirectTeleportProbe {
 
     private UUID playerOf(Object event, Method doTeleportAccessor) {
         try {
-            if (doTeleportAccessor == null) return null;
-            Object task = doTeleportAccessor.invoke(event);
+            Object task = doTeleportAccessor != null ? doTeleportAccessor.invoke(event) : event;
             if (task == null) return null;
             Object player = taskPlayer.invoke(task);
             if (player == null) return null;
@@ -218,7 +284,7 @@ public final class DirectTeleportProbe {
 
     private double[] coordsOf(Object event) {
         try {
-            Object task = getDoTeleport.invoke(event);
+            Object task = getDoTeleport != null ? getDoTeleport.invoke(event) : event;
             if (task == null) return null;
             Object coords = taskCoords.invoke(task);
             if (coords == null) return null;

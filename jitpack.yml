@@ -37,6 +37,6 @@ install:
       :tags-api:publishToMavenLocal
       :units-api:publishToMavenLocal
       :yaml-api:publishToMavenLocal
-      :rtp-proxy:rtp-proxy-common:publishToMavenLocal
+      :proxy:proxy-common:publishToMavenLocal
       :rtp-api:publishToMavenLocal
       :rtp-core:publishToMavenLocal

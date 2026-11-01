@@ -62,7 +62,7 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: devstack-plugin-jar
-          path: rtp-plugin/build/libs/
+          path: resource/LeafRTP/rtp-plugin/build/libs/
           retention-days: 1
 
   acceptance-smoke:
@@ -79,7 +79,7 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: devstack-plugin-jar
-          path: rtp-plugin/build/libs/
+          path: resource/LeafRTP/rtp-plugin/build/libs/
 
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -142,7 +142,7 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: devstack-plugin-jar
-          path: rtp-plugin/build/libs/
+          path: resource/LeafRTP/rtp-plugin/build/libs/
 
       - name: Grant execute permissions
         run: chmod +x devstack/*.sh

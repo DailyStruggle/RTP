@@ -337,7 +337,7 @@ class BitCoverageTest {
             writeExecRecord(out, 6L, "io/github/dailystruggle/rtp/neoforge/NeoForgeRTP", new boolean[] {true});
             boolean[] sixteenProbes = new boolean[16];
             for (int i = 0; i < 10; i++) sixteenProbes[i] = true;
-            writeExecRecord(out, 7L, "io/github/dailystruggle/rtp/anvil/AnvilReader", sixteenProbes);
+            writeExecRecord(out, 7L, "io/github/dailystruggle/anvil/AnvilReader", sixteenProbes);
             writeExecRecord(out, 8L, "io/github/dailystruggle/rtp/actionaddon/ActionAddon", new boolean[] {true, true, false});
             writeExecRecord(out, 9L, "io/github/dailystruggle/bit/BitRunner", new boolean[] {true, true});
             writeExecRecord(out, 10L, "org/yaml/snakeyaml/Yaml", new boolean[] {true, true, true});

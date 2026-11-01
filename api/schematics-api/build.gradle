@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+// schematics-api -- platform-neutral Sponge (.schem / .schematic) and Litematica (.litematic)
+// schematic decoder, in-memory cache, and 3D coordinate placement planner (leafrtp-ADR-041).
+// Pure Java 17 layered strictly on tags-api and server-api: zero rtp-core, rtp-api, or platform dependency.
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withJavadocJar()
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
+dependencies {
+    api project(':tags-api')
+    api project(':server-api')
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    testCompileOnly 'org.jetbrains:annotations:24.1.0'
+}

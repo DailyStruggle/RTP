@@ -43,7 +43,7 @@ jobs:
           JAVA_HOME: /opt/jdk
         with:
           project: 'RTP'
-          path: 'rtp-plugin/build/libs'
+          path: 'resource/LeafRTP/rtp-plugin/build/libs'
           format: 'ALL'
           # Gate on any non-trivial CVE (CVSS >= 4). Anything intentionally
           # accepted must carry a written justification in the suppression

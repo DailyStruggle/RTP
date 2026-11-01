@@ -9,14 +9,19 @@
 set -euo pipefail
 
 REQUIREMENTS_FILES=(
-  "docs/dev/REQUIREMENTS.md"
-  "rtp-api/REQUIREMENTS.md"
-  "rtp-core/REQUIREMENTS.md"
-  "platforms/rtp-bukkit/REQUIREMENTS.md"
-  "platforms/rtp-paper/REQUIREMENTS.md"
-  "platforms/rtp-folia/REQUIREMENTS.md"
+  "resource/LeafRTP/docs/dev/REQUIREMENTS.md"
+  "resource/LeafRTP/rtp-api/REQUIREMENTS.md"
+  "resource/LeafRTP/rtp-core/REQUIREMENTS.md"
+  "platforms/bukkit/REQUIREMENTS.md"
+  "platforms/paper/REQUIREMENTS.md"
+  "platforms/folia/REQUIREMENTS.md"
 )
-TRACEABILITY_FILE="docs/dev/TRACEABILITY.md"
+TRACEABILITY_FILE="resource/LeafRTP/docs/dev/TRACEABILITY.md"
+
+if [ ! -f "$TRACEABILITY_FILE" ]; then
+  echo "✅ Standalone repository (no $TRACEABILITY_FILE present); skipping RTP traceability check."
+  exit 0
+fi
 
 # Extract all REQ-* IDs from requirements files (bold label prefix: **REQ-...)
 req_ids=$(grep -ahoE 'REQ-[A-Z]+-[A-Z]+-[0-9]+' "${REQUIREMENTS_FILES[@]}" | sort -u)

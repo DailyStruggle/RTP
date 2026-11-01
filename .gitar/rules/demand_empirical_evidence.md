@@ -6,7 +6,7 @@ When a pull request is opened, updated, or marked ready for review:
 Check if the pull request modifies files in any of the following critical subsystems:
 - **Execution Pipelines:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tasks/teleport/`
 - **Resource Lifecycle:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tasks/MemoryTracker.java`
-- **Regional Threading:** `platforms/rtp-folia/`
+- **Regional Threading:** `platforms/folia/`
 - **Region Prefiltering:** `api/anvil-api/`
 
 ---

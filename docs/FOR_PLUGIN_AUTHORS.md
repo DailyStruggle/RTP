@@ -2,7 +2,7 @@
 
 **Current SDK Version:** `@version@`
 
-If you want to extend **LeafRTP** itself (for example with a custom region shape, safety verifier, or post-teleport hook), see [FOR_ADDON_DEVELOPERS.md](FOR_ADDON_DEVELOPERS.md) and the [Addon Quickstart](ADDON_QUICKSTART.md).
+If you want to extend **LeafRTP** itself (for example with a custom region shape, safety verifier, or post-teleport hook), see [FOR_ADDON_DEVELOPERS.md](../resource/LeafRTP/docs/FOR_ADDON_DEVELOPERS.md) and the [Addon Quickstart](../resource/LeafRTP/docs/ADDON_QUICKSTART.md).
 
 This guide is for developers building a **standalone Minecraft plugin or mod** - such as `OnePlayerSleep`, `TreeGen`, or `ChunkClaimLite` - that has nothing to do with random teleportation, but wants **Spigot, Paper, Folia, Fabric, NeoForge, and Velocity** support, comment-preserving YAML configs with self-testing directives, Brigadier commands, book/chest menus, adaptive Folia tick budgeting, and automated whole-server leak/stall fuzzing out of the box.
 
@@ -15,7 +15,7 @@ Roughly 80% of this repository is **platform-neutral infrastructure** (`api/*`, 
 - **Write once, run on 6 runtimes:** Your core plugin logic compiles against pure Java 17 interfaces (`server-api`, `commands-api`, `yaml-api`, `menu-api`, `effects-api`, `predict-api`). Thin platform carriers bind those interfaces to **Spigot, Paper, Folia, Fabric, NeoForge, and Velocity** without leaking `org.bukkit.*` or `net.minecraft.*` imports into your domain code.
 - **Zero-dependency foundations:** Core SDK libraries (`server-api`, `yaml-api`, `units-api`, `tags-api`, `bit-api`, `predict-api`, `bstats-api`, `metrics-api`) have **zero external runtime dependencies** and compile to Java 17 bytecode ([ADR-113](adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)).
 - **Folia-native by construction:** Regional thread ownership (`TaskScheduler.isOwnedByCurrentRegion`, `runAtLocation`) and adaptive per-region share allocation (`ProbedShareAllocator`, `AimdLimiter`, `BudgetPacer`) are first-class primitives, eliminating raw thread creation (`F-001`) and main-thread stalls (`S-005`).
-- **Built-In Test (PBIT / CBIT / IBIT):** Instead of waiting for operators to paste broken YAML files in Discord, `bit-api` and `config-bit-api` validate `@type`, `@options`, `@range`, `@pattern`, and locale key parity at startup (PBIT), track runtime anomalies without log spam (CBIT), and run interactive diagnostics on demand (IBIT; [ADR-121](adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)).
+- **Built-In Test (PBIT / CBIT / IBIT):** Instead of waiting for operators to paste broken YAML files in Discord, `bit-api` and `config-bit-api` validate `@type`, `@options`, `@range`, `@pattern`, and locale key parity at startup (PBIT), track runtime anomalies without log spam (CBIT), and run interactive diagnostics on demand (IBIT; [leafrtp-ADR-091](../resource/LeafRTP/docs/adr/leafrtp-ADR-091-built-in-test-for-configuration-and-the-action-engine.md)).
 - **Published to Maven Central & JitPack:** Consume only the modules your plugin needs via `io.github.dailystruggle:<module>:<version>` from `mavenCentral()` or `com.github.DailyStruggle.RTP:<module>:<tag>` from `jitpack.io` ([dev/PUBLISHING.md](dev/PUBLISHING.md)).
 
 ---
@@ -38,7 +38,9 @@ Pick only the SDK modules that match your plugin's requirements. Full module cat
 | EWMA cost estimation, AIMD throttling, max-min water-filling, Folia share allocation, unit-interval shaping curves, distribution samplers & polar spirals | `predict-api` | `EwmaEstimator`, `AimdLimiter`, `BudgetPacer`, `ComparativeCostGovernor`, `WaterFillingAllocator`, `WorkAttributionLedger`, `ProbedShareAllocator`, `UnitCurve`, `DistributionSampler`, `PolarCurve` |
 | In-game 2D map canvases, spatial heatmaps, sparklines & Mermaid chart rendering | `maps-api` | `MapBinding`, `MapCanvas`, `HeatmapRenderer`, `DualSparklineRenderer`, `ChartRenderer` |
 
-### All 14 `api/*` Maven Coordinates
+### All 16 `api/*` Maven Coordinates
+
+Every published `io.github.dailystruggle:<module>` artifact includes `-sources.jar`, `-javadoc.jar`, and embedded Markdown documentation under `META-INF/leaf-sdk/<module>/` (projected to `docs/sdk/<module>/` in downstream repositories).
 
 | Module | Maven Central Coordinate | Inter-Module Dependencies |
 |---|---|---|
@@ -55,7 +57,9 @@ Pick only the SDK modules that match your plugin's requirements. Full module cat
 | `metrics-api` | `io.github.dailystruggle:metrics-api:3.3.1` | *(none)* |
 | `bstats-api` | `io.github.dailystruggle:bstats-api:3.3.1` | *(none)* |
 | `predict-api` | `io.github.dailystruggle:predict-api:3.3.1` | *(none)* |
+| `database-api` | `io.github.dailystruggle:database-api:3.3.1` | *(none)* |
 | `anvil-api` | `io.github.dailystruggle:anvil-api:3.3.1` | `bit-api` |
+| `schematics-api` | `io.github.dailystruggle:schematics-api:3.3.1` | `tags-api`, `server-api` |
 
 ---
 
@@ -535,5 +539,5 @@ python3 scripts/bench_fuzz.py --mode server --active \
 ### Additional Reusable Repository Tooling (`scripts/*` & `devstack/*`)
 
 - **Zero-Backend Interactive Web Config Editor (`scripts/generate_web_editor.py`):** Generates a static HTML/JS configuration editor directly from the `@type`, `@options`, `@range`, and `@pattern` comment directives in your YAML files.
-- **Single-Source Storefront Builder (`scripts/release/build_front_pages.py`):** Compiles a single tagged Markdown source ([`docs/publishing/FRONT_PAGE.md`](publishing/FRONT_PAGE.md)) into platform-tailored pages for Modrinth, Hangar, SpigotMC (BBCode), CurseForge, and BuiltByBit.
+- **Single-Source Storefront Builder (`scripts/release/build_front_pages.py`):** Compiles a single tagged Markdown source ([`docs/publishing/FRONT_PAGE.md`](../resource/LeafRTP/docs/publishing/FRONT_PAGE.md)) into platform-tailored pages for Modrinth, Hangar, SpigotMC (BBCode), CurseForge, and BuiltByBit.
 - **Multi-Server Docker Devstack (`devstack/`):** Scriptable containers and headless Mineflayer acceptance runners (`devstack/run-acceptance.sh`) for validating cross-server Velocity/Redis/MySQL topologies.

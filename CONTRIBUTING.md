@@ -107,9 +107,9 @@ RTP uses a structured requirements workflow enforced by CI. If you add or modify
 
 The CI `Traceability Check` stage runs `scripts/check_traceability.sh` before the build and will fail with a list of untraced IDs if step 2 is skipped.
 
-For the full ID scheme and category reference, see [REQUIREMENTS.md](docs/dev/REQUIREMENTS.md).
-For term definitions used in requirements, see [GLOSSARY.md](docs/dev/GLOSSARY.md).
-For actor and stakeholder context, see [STAKEHOLDERS.md](docs/dev/STAKEHOLDERS.md).
+For the full ID scheme and category reference, see [REQUIREMENTS.md](resource/LeafRTP/docs/dev/REQUIREMENTS.md).
+For term definitions used in requirements, see [GLOSSARY.md](resource/LeafRTP/docs/dev/GLOSSARY.md).
+For actor and stakeholder context, see [STAKEHOLDERS.md](resource/LeafRTP/docs/dev/STAKEHOLDERS.md).
 
 ## Pull Requests
 

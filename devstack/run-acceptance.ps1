@@ -409,7 +409,8 @@ function Invoke-GradleBuild {
   # host directory corrupt that cache (ZipException: invalid LOC header).
   # ./jars/plugin is retained as the staging source for Sync-ProxyJars, which
   # fans the same uber-jar into each Velocity plugins dir.
-  $pluginLibs = Join-Path $root 'rtp-plugin\build\libs'
+  $pluginLibs = Join-Path $root 'resource\LeafRTP\rtp-plugin\build\libs'
+  if (-not (Test-Path $pluginLibs)) { $pluginLibs = Join-Path $root 'rtp-plugin\build\libs' }
   $pluginStage = Join-Path $PSScriptRoot 'jars\plugin'
   # Lobbies receive the SAME unified LeafRTP-Pro jar as backends: they participate
   # in the network (role: backend) but have no local destination region
@@ -1107,7 +1108,7 @@ function Test-RtpTest {
   # (materials, senders, formats, biomes, thread probes, menu surface) to a live
   # Paper/Folia runtime rather than a JVM mock, and - under -Coverage - flushes
   # the JaCoCo agent so the accessor paths credit server-bound coverage. See
-  # platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md.
+  # platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md.
   Write-Host "[rtptest] dispatching '/rtp test accessor' to backends + lobbies via rcon (per-service budget: 30s)..." -ForegroundColor Cyan
   $services = @('backend-a', 'backend-b', 'backend-c', 'backend-d', 'lobby-a', 'lobby-b')
   $anyFail = $false

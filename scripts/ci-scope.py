@@ -53,15 +53,27 @@ import subprocess
 import sys
 from pathlib import Path
 
-LEAF_ROOTS: tuple[str, ...] = ("addons", "helpers")
+LEAF_ROOTS: tuple[str, ...] = ("addons", "helpers", "resource", "plugins")
 
 # Mirrors the push paths-ignore list of .github/workflows/gradle.yml. GitHub's `*`
 # does not cross `/`, so `*.md` and `LICENSE*` match repo-root files only.
 IGNORED_PATTERNS: tuple[str, ...] = (
     "docs/**",
+    "resource/LeafRTP/docs/**",
+    "resource/leafrtp/docs/**",
+    "resource/LeafTreeGen/docs/**",
+    "resource/LeafRTP/python_test_scripts/**",
+    "resource/leafrtp/python_test_scripts/**",
     "site/**",
     "*.md",
     "mkdocs.yml",
+    "resource/LeafRTP/mkdocs.yml",
+    "resource/leafrtp/mkdocs.yml",
+    "resource/LeafRTP/mkdocs_hooks.py",
+    "resource/leafrtp/mkdocs_hooks.py",
+    "resource/LeafRTP/CHANGELOG.md",
+    "resource/leafrtp/CHANGELOG.md",
+    "resource/LeafTreeGen/CHANGELOG.md",
     ".github/ISSUE_TEMPLATE/**",
     "LICENSE*",
 )
@@ -70,16 +82,18 @@ ZERO_SHA = "0" * 40
 
 # Project set -> top-level Gradle path segments it owns. Order is output order.
 SETS: dict[str, tuple[str, ...]] = {
-    "core": ("rtp-api", "rtp-core", "server-api", "commands-api", "yaml-api", "units-api", "effects-api",
+    "core": ("rtp-api", "rtp-core", "server-api", "server-bukkit", "server-fabric", "server-neoforge",
+             "commands-api", "yaml-api", "units-api", "effects-api",
              "maps-api", "metrics-api", "bstats-api", "anvil-api", "bit-api", "tags-api",
-             "predict-api", "config-bit-api", "menu-api"),
-    "bukkit": ("rtp-bukkit", "rtp-paper", "rtp-folia"),
-    "fabric": ("rtp-fabric",),
-    "neoforge": ("rtp-neoforge",),
-    "proxy": ("rtp-proxy",),
+             "predict-api", "config-bit-api", "menu-api", "database-api", "schematics-api"),
+    "bukkit": ("bukkit", "paper", "folia", "rtp-bukkit", "rtp-paper", "rtp-folia"),
+    "fabric": ("fabric", "rtp-fabric"),
+    "neoforge": ("neoforge", "rtp-neoforge"),
+    "proxy": ("proxy", "rtp-proxy"),
     "plugin": ("rtp-plugin",),
     "addons": ("addons",),
     "helpers": ("helpers",),
+    "plugins": ("resource", "plugins"),
 }
 
 _INCLUDE_RE = re.compile(r"""^\s*include\s+['"]([^'"]+)['"]""", re.MULTILINE)
@@ -90,7 +104,7 @@ _PROJECT_REF_RE = re.compile(r"""(?:\bproject|findProject)\(\s*['"]:([^'"]+)['"]
 # A string literal that starts with a leaf path, optionally behind `../`
 # segments: "addons/LeafRTPActionAddon/src/...". Prose mentions inside a
 # sentence ("belongs to helpers/StressTestRTP.") do not start the literal.
-_LEAF_LITERAL_RE = re.compile(r"""["'](?:\.\./)*(addons|helpers)/([A-Za-z0-9_.-]+)/""")
+_LEAF_LITERAL_RE = re.compile(r"""["'](?:\.\./)*(?:(?:resource|plugins)/[Ll]eaf[Rr][Tt][Pp]/)?(addons|helpers|resource|plugins)/([A-Za-z0-9_.-]+)/""")
 
 
 def is_ignored(path: str) -> bool:
@@ -134,7 +148,14 @@ def project_dirs(settings_text: str, parents: bool = False) -> dict[str, str]:
 
 
 def owning_group(path: str) -> str | None:
-    """`addons:<Name>` or `helpers:<Name>` for a path inside a leaf project dir."""
+    """`addons:<Name>`, `helpers:<Name>`, or `resource:<Name>` for a path inside a leaf project dir."""
+    lower = path.lower()
+    if lower.startswith("resource/leafrtp/addons/"):
+        path = path[len("resource/LeafRTP/") :]
+    elif lower.startswith("plugins/leafrtp/addons/"):
+        path = path[len("plugins/leafrtp/") :]
+    elif lower.startswith("resource/leafrtp/") or lower.startswith("plugins/leafrtp/"):
+        return None
     parts = path.split("/")
     if len(parts) >= 3 and parts[0] in LEAF_ROOTS:
         return f"{parts[0]}:{parts[1]}"

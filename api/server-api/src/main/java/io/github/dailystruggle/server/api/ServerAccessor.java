@@ -1,10 +1,16 @@
 package io.github.dailystruggle.server.api;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Platform-neutral information, logging, and capability surface supplied by the running server.
@@ -13,7 +19,8 @@ import java.util.logging.Level;
  * hooks, and progress-bar control live directly on this interface, while domain-specific host
  * capabilities are composed through focused sub-interfaces ({@link ScoreboardAccessor}, {@link
  * WorldBorderAccessor}, {@link PaletteTagAccessor}, {@link EffectHandleBridge}, {@link
- * MenuContextAccessor}, and {@link CommandDispatchAccessor}) with safe default implementations.
+ * MenuContextAccessor}, {@link CommandDispatchAccessor}, and {@link SleepWorldAccessor}) with safe
+ * default implementations.
  *
  * @governedBy ADR-048
  * @governedBy ADR-049
@@ -26,7 +33,8 @@ public interface ServerAccessor
         PaletteTagAccessor,
         EffectHandleBridge,
         MenuContextAccessor,
-        CommandDispatchAccessor {
+        CommandDispatchAccessor,
+        SleepWorldAccessor {
   /**
    * Returns the server-reported version string.
    *
@@ -219,6 +227,310 @@ public interface ServerAccessor
    */
   default PlayerLifecycleHook getPlayerLifecycleHook() {
     return NoopPlayerLifecycleHook.INSTANCE;
+  }
+
+  /**
+   * Returns the platform {@link WorldEventHook} for subscribing to player block-interaction, block
+   * break, leaf decay, chunk load, and sapling growth events (ADR-049, ADR-115).
+   *
+   * @return the platform world event hook; never {@code null}
+   */
+  default WorldEventHook getWorldEventHook() {
+    return NoopWorldEventHook.INSTANCE;
+  }
+
+  /**
+   * Delivers a custom-tagged item stack specified by {@link TaggedItemSpec} to {@code playerName}
+   * (or {@code fallbackPlayerId} when {@code playerName} is omitted).
+   *
+   * @param fallbackPlayerId fallback online player UUID when {@code playerName} is blank
+   * @param playerName online player name, or {@code null}
+   * @param item item specification; must not be {@code null}
+   * @return {@code true} if the player was online and received the item
+   */
+  default boolean giveItem(UUID fallbackPlayerId, String playerName, TaggedItemSpec item) {
+    return false;
+  }
+
+  /**
+   * Drops a custom-tagged item stack specified by {@link TaggedItemSpec} naturally at {@code (x, y,
+   * z)} in {@code worldName}.
+   *
+   * @param worldName canonical world name
+   * @param x block X coordinate
+   * @param y block Y coordinate
+   * @param z block Z coordinate
+   * @param item item specification; must not be {@code null}
+   */
+  default void dropItem(String worldName, int x, int y, int z, TaggedItemSpec item) {}
+
+  /**
+   * Returns the root configuration or plugin data folder as a {@link Path}.
+   *
+   * @return root folder path; never {@code null}
+   */
+  default Path getRootFolder() {
+    return getPluginDirectory().toPath();
+  }
+
+  /**
+   * Resolves the filesystem directory for the given world or level name (for example, to write
+   * worldgen datapacks), or {@code null} if unknown.
+   *
+   * @param worldName canonical world name
+   * @return world directory path, or {@code null}
+   */
+  default Path getWorldFolder(String worldName) {
+    return null;
+  }
+
+  /**
+   * Returns the names of currently loaded worlds on this server.
+   *
+   * @return immutable list of world names; never {@code null}
+   */
+  default List<String> getWorldNames() {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Schedules a repeating task on the server or global region scheduler.
+   *
+   * @param task runnable to execute
+   * @param delayTicks initial delay in ticks
+   * @param periodTicks period between executions in ticks
+   */
+  default void scheduleRepeatingTask(Runnable task, long delayTicks, long periodTicks) {
+    scheduler().ifPresent(s -> s.runSyncTimer(task, delayTicks, periodTicks));
+  }
+
+  /**
+   * Schedules a one-shot delayed task anchored to the region owning {@code (chunkX, chunkZ)} in
+   * {@code worldName}.
+   *
+   * @param worldName canonical world name
+   * @param chunkX chunk X coordinate
+   * @param chunkZ chunk Z coordinate
+   * @param task runnable to execute
+   * @param delayTicks delay in ticks ({@code <= 0} executes as soon as the region thread is owned)
+   */
+  default void scheduleDelayedTask(
+      String worldName, int chunkX, int chunkZ, Runnable task, long delayTicks) {
+    if (delayTicks <= 0L) {
+      task.run();
+    } else {
+      scheduler().ifPresent(s -> s.runSyncDelayed(task, delayTicks));
+    }
+  }
+
+  /**
+   * Resolves the canonical biome identifier (e.g. {@code "minecraft:plains"}) at {@code (x, y, z)}
+   * in {@code worldName}.
+   *
+   * @param worldName canonical world name
+   * @param x block X coordinate
+   * @param y block Y coordinate
+   * @param z block Z coordinate
+   * @return biome key, or empty string if unavailable
+   */
+  default String getBiomeKey(String worldName, int x, int y, int z) {
+    return "";
+  }
+
+  /**
+   * Places a structure template identified by {@code structureKey} centered on {@code (x, y, z)} in
+   * {@code worldName}.
+   *
+   * @param worldName canonical world name
+   * @param x center X coordinate
+   * @param y base Y coordinate
+   * @param z center Z coordinate
+   * @param structureKey namespaced structure identifier
+   * @return {@code true} if the structure template was found and placed
+   */
+  default boolean placeStructure(String worldName, int x, int y, int z, String structureKey) {
+    return false;
+  }
+
+  /**
+   * Sets the block state at {@code (x, y, z)} in {@code worldName} without triggering physics
+   * cascades.
+   *
+   * @param worldName canonical world name
+   * @param x block X coordinate
+   * @param y block Y coordinate
+   * @param z block Z coordinate
+   * @param blockData serialized block state or material string
+   * @return {@code true} if the block was updated
+   */
+  default boolean setBlock(String worldName, int x, int y, int z, String blockData) {
+    return false;
+  }
+
+  /**
+   * Returns the current block state or material identifier at {@code (x, y, z)} in {@code
+   * worldName}, or {@code null} if the chunk is not loaded or not owned by the current region
+   * thread (S-005).
+   *
+   * @param worldName canonical world name
+   * @param x block X coordinate
+   * @param y block Y coordinate
+   * @param z block Z coordinate
+   * @return block identifier or {@code null}
+   */
+  default String getBlockState(String worldName, int x, int y, int z) {
+    return null;
+  }
+
+  /**
+   * Returns whether the block at {@code (x, y, z)} in {@code worldName} is air or a replaceable
+   * plant/snow/leaf/sapling block.
+   *
+   * @param worldName canonical world name
+   * @param x block X coordinate
+   * @param y block Y coordinate
+   * @param z block Z coordinate
+   * @return {@code true} if replaceable
+   */
+  default boolean isReplaceable(String worldName, int x, int y, int z) {
+    return true;
+  }
+
+  /**
+   * Returns the highest non-air block Y coordinate at {@code (x, z)} in {@code worldName}, or
+   * {@link Integer#MIN_VALUE} when unknown.
+   *
+   * @param worldName canonical world name
+   * @param x block X coordinate
+   * @param z block Z coordinate
+   * @return highest block Y or {@link Integer#MIN_VALUE}
+   */
+  default int getHighestBlockY(String worldName, int x, int z) {
+    return Integer.MIN_VALUE;
+  }
+
+  /**
+   * Returns the minimum build height for {@code worldName}.
+   *
+   * @param worldName canonical world name
+   * @return minimum build height (defaults to {@code -64})
+   */
+  default int getMinHeight(String worldName) {
+    return -64;
+  }
+
+  /**
+   * Returns whether chunk {@code (chunkX, chunkZ)} in {@code worldName} is currently loaded in
+   * memory without triggering synchronous chunk generation or I/O (S-005).
+   *
+   * @param worldName canonical world name
+   * @param chunkX chunk X coordinate
+   * @param chunkZ chunk Z coordinate
+   * @return {@code true} if the chunk is currently loaded
+   */
+  default boolean isChunkLoaded(String worldName, int chunkX, int chunkZ) {
+    return true;
+  }
+
+  /**
+   * Reads a named persistent per-chunk string value for {@code (chunkX, chunkZ)} in {@code
+   * worldName}, or {@code null} when none is stored or the chunk is unloaded (S-005).
+   *
+   * @param worldName canonical world name
+   * @param chunkX chunk X coordinate
+   * @param chunkZ chunk Z coordinate
+   * @param key metadata key
+   * @return stored string value or {@code null}
+   */
+  default String getChunkData(String worldName, int chunkX, int chunkZ, String key) {
+    return null;
+  }
+
+  /**
+   * Writes (or clears when {@code data} is {@code null}/empty) a named persistent per-chunk string
+   * value for {@code (chunkX, chunkZ)} in {@code worldName}.
+   *
+   * @param worldName canonical world name
+   * @param chunkX chunk X coordinate
+   * @param chunkZ chunk Z coordinate
+   * @param key metadata key
+   * @param data string payload, or {@code null}/empty to remove
+   */
+  default void setChunkData(String worldName, int chunkX, int chunkZ, String key, String data) {}
+
+  /**
+   * Atomically reads, transforms, and writes a named persistent per-chunk string value on the
+   * owning region thread without loading unloaded chunks (S-005).
+   *
+   * @param worldName canonical world name
+   * @param chunkX chunk X coordinate
+   * @param chunkZ chunk Z coordinate
+   * @param key metadata key
+   * @param updater transformation function
+   */
+  default void updateChunkData(
+      String worldName, int chunkX, int chunkZ, String key, UnaryOperator<String> updater) {
+    String updated = updater.apply(getChunkData(worldName, chunkX, chunkZ, key));
+    setChunkData(worldName, chunkX, chunkZ, key, updated);
+  }
+
+  /**
+   * Sends a plain or status message to the given player UUID (or console when {@code playerId} is
+   * {@code null} or the server console UUID).
+   *
+   * @param playerId recipient player UUID or console sentinel
+   * @param message message text
+   * @param error {@code true} if the message represents an error condition
+   */
+  default void sendMessage(UUID playerId, String message, boolean error) {}
+
+  /**
+   * Returns the running server's Minecraft DataVersion used when serializing structure NBT.
+   *
+   * @return Minecraft DataVersion integer
+   */
+  default int getDataVersion() {
+    return 3578;
+  }
+
+  /**
+   * Returns a JUL {@link Logger} for this server accessor.
+   *
+   * @return logger instance; never {@code null}
+   */
+  default Logger logger() {
+    return Logger.getLogger("ServerAccessor");
+  }
+
+  /**
+   * Sets a batch of block states inside a single chunk {@code (chunkX, chunkZ)} in {@code
+   * worldName} on its owning thread.
+   *
+   * @param worldName canonical world name
+   * @param chunkX chunk X coordinate
+   * @param chunkZ chunk Z coordinate
+   * @param blocks map from block coordinates to serialized block state strings
+   * @return {@code true} if the batch was applied or scheduled
+   */
+  default boolean setChunkBlocks(
+      String worldName, int chunkX, int chunkZ, Map<BlockPos3i, String> blocks) {
+    if (blocks == null || blocks.isEmpty()) return true;
+    boolean ok = true;
+    for (Map.Entry<BlockPos3i, String> entry : blocks.entrySet()) {
+      BlockPos3i pos = entry.getKey();
+      ok &= setBlock(worldName, pos.x(), pos.y(), pos.z(), entry.getValue());
+    }
+    return ok;
+  }
+
+  /**
+   * Resolves a command caller's live target or block coordinates for command defaults.
+   *
+   * @param callerId command caller UUID
+   * @return caller location snapshot, or {@code null} if unavailable
+   */
+  default CallerLocation resolveCallerLocation(UUID callerId) {
+    return null;
   }
 
   /** Hides and discards every progress bar previously shown by this server accessor. */

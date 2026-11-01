@@ -1,0 +1,31 @@
+{
+  "type": "minecraft:disk",
+  "config": {
+    "half_height": 1,
+    "radius": {
+      "type": "minecraft:uniform",
+      "min_inclusive": 2,
+      "max_inclusive": 5
+    },
+    "state_provider": {
+      "type": "minecraft:weighted_state_provider",
+      "entries": [
+        { "weight": 6, "data": { "Name": "minecraft:sand" } },
+        { "weight": 3, "data": { "Name": "minecraft:glass" } },
+        { "weight": 2, "data": { "Name": "minecraft:light_blue_stained_glass" } },
+        { "weight": 2, "data": { "Name": "minecraft:cyan_stained_glass" } },
+        { "weight": 1, "data": { "Name": "minecraft:lime_stained_glass" } }
+      ]
+    },
+    "target": {
+      "type": "minecraft:matching_blocks",
+      "blocks": [
+        "minecraft:dirt",
+        "minecraft:grass_block",
+        "minecraft:sand",
+        "minecraft:gravel",
+        "minecraft:stone"
+      ]
+    }
+  }
+}

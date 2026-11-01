@@ -7,11 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.dailystruggle.server.api.BookMenuSpec;
 import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.server.api.ServerAccessor;
 import io.github.dailystruggle.server.api.ServerAccessors;
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -499,5 +501,187 @@ class MenuApiTest {
     assertNull(
         MenuBindingSupport.discoverRenderer(
             Arrays.asList((MenuRendererProvider) null), List.of(" ", "book"), null));
+  }
+
+  @Test
+  @DisplayName("MenuBindingSupport converts MenuDescriptor to BookMenuSpec and routes via ServerAccessor")
+  void menuBindingSupportBookMenuSpecAndServerAccessorFallback() {
+    UUID viewer = UUID.randomUUID();
+    MenuDescriptor descriptor =
+        MenuDescriptor.builder("&1LeafSleuth Report")
+            .style("author", "LeafSleuth")
+            .addPage(
+                new MenuDescriptor.Page(
+                    List.of(
+                        new MenuDescriptor.Line(
+                            List.of(
+                                new MenuDescriptor.Fragment(
+                                    "&4#1 (12, -8)",
+                                    "&0Click to inspect",
+                                    new MenuAction.RunCommand("sleuth", "chunk", "world", "12", "-8")),
+                                MenuDescriptor.Fragment.plain(" "),
+                                new MenuDescriptor.Fragment(
+                                    "&2[TP]",
+                                    "&0Pre-fill /tp",
+                                    new MenuAction.SuggestInput("/tp 200 80 -120")),
+                                new MenuDescriptor.Fragment(
+                                    "&1[Next]",
+                                    "&0Page 2",
+                                    new MenuAction.ChangePage(1)),
+                                new MenuDescriptor.Fragment(
+                                    "&5[Docs]",
+                                    "&0Open docs",
+                                    new MenuAction.OpenExternalUri(URI.create("https://example.com/docs"))))))))
+            .build();
+
+    BookMenuSpec spec = MenuBindingSupport.toBookMenuSpec(descriptor);
+    assertEquals("&1LeafSleuth Report", spec.title());
+    assertEquals("LeafSleuth", spec.author());
+    assertEquals(1, spec.pages().size());
+    BookMenuSpec.Line line = spec.pages().get(0).lines().get(0);
+    assertEquals(5, line.fragments().size());
+    assertEquals(BookMenuSpec.ClickAction.RUN_COMMAND, line.fragments().get(0).clickAction());
+    assertEquals("/sleuth chunk world 12 -8", line.fragments().get(0).clickValue());
+    assertEquals(BookMenuSpec.ClickAction.NONE, line.fragments().get(1).clickAction());
+    assertEquals(BookMenuSpec.ClickAction.SUGGEST_COMMAND, line.fragments().get(2).clickAction());
+    assertEquals("/tp 200 80 -120", line.fragments().get(2).clickValue());
+    assertEquals(BookMenuSpec.ClickAction.CHANGE_PAGE, line.fragments().get(3).clickAction());
+    assertEquals("1", line.fragments().get(3).clickValue());
+    assertEquals(BookMenuSpec.ClickAction.OPEN_URL, line.fragments().get(4).clickAction());
+    assertEquals("https://example.com/docs", line.fragments().get(4).clickValue());
+
+    List<String> sentMessages = new ArrayList<>();
+    AtomicReference<BookMenuSpec> openedBook = new AtomicReference<>();
+    ServerAccessor chatFallbackAccessor =
+        new ServerAccessor() {
+          @Override
+          public String getServerVersion() {
+            return "1.21.4";
+          }
+
+          @Override
+          public String getPlatform() {
+            return "paper";
+          }
+
+          @Override
+          public Integer getServerIntVersion() {
+            return 21;
+          }
+
+          @Override
+          public void log(Level level, String message) {}
+
+          @Override
+          public void log(Level level, String message, Throwable throwable) {}
+
+          @Override
+          public void sendMessage(UUID playerId, String message, boolean error) {
+            sentMessages.add(message);
+          }
+        };
+
+    MenuRenderer fallbackRenderer =
+        MenuBindingSupport.discoverRendererOrAccessor(List.of("book", "chat"), chatFallbackAccessor);
+    fallbackRenderer.render(viewer, descriptor);
+    assertEquals(1, sentMessages.size());
+    assertTrue(sentMessages.get(0).contains("#1 (12, -8)"));
+
+    ServerAccessor bookOpeningAccessor =
+        new ServerAccessor() {
+          @Override
+          public String getServerVersion() {
+            return "1.21.4";
+          }
+
+          @Override
+          public String getPlatform() {
+            return "paper";
+          }
+
+          @Override
+          public Integer getServerIntVersion() {
+            return 21;
+          }
+
+          @Override
+          public void log(Level level, String message) {}
+
+          @Override
+          public void log(Level level, String message, Throwable throwable) {}
+
+          @Override
+          public boolean openBook(UUID player, BookMenuSpec book) {
+            openedBook.set(book);
+            return true;
+          }
+        };
+    MenuRenderer bookRenderer =
+        MenuBindingSupport.discoverRendererOrAccessor(List.of("book"), bookOpeningAccessor);
+    bookRenderer.render(viewer, descriptor);
+    assertEquals(spec, openedBook.get());
+    assertTrue(
+        BookContrastValidator.auditBookMenuSpec(spec).isEmpty(),
+        "Converted BookMenuSpec must satisfy both parchment page and dark hover contrast");
+    assertEquals("&7Click to inspect", line.fragments().get(0).hover());
+  }
+
+  @Test
+  @DisplayName(
+      "BookContrastValidator enforces WCAG contrast on both parchment pages (#F4E8C1) and dark hover tooltips (#100010)")
+  void bookContrastValidatorEnforcesDualSurfaceWcagContrast() {
+    // 1. Parchment page contrast: dark codes (&0, &1, &4, &5, &8) meet WCAG AA (>= 4.5:1); &2/&3 meet >= 2.2:1
+    for (char c : List.of('0', '1', '4', '5', '8')) {
+      assertTrue(
+          BookContrastValidator.parchmentContrastRatio(c)
+              >= BookContrastValidator.WCAG_AA_PARCHMENT_CONTRAST_RATIO,
+          "Dark code &" + c + " must achieve WCAG AA on parchment");
+    }
+    for (char c : List.of('2', '3')) {
+      assertTrue(
+          BookContrastValidator.parchmentContrastRatio(c)
+              >= BookContrastValidator.MIN_PARCHMENT_CONTRAST_RATIO,
+          "Accent code &" + c + " must achieve >= 2.2:1 on parchment");
+    }
+    // Pale codes (&e, &6, &f) fail on parchment
+    for (char c : List.of('e', '6', 'f')) {
+      assertTrue(
+          BookContrastValidator.parchmentContrastRatio(c) < 2.0,
+          "Pale code &" + c + " washes out on parchment");
+    }
+
+    // 2. Dark hover tooltip box (#100010): light codes (&f, &e, &6, &a, &b, &c, &d, &7) achieve >= 3.0:1
+    for (char c : List.of('f', 'e', '6', 'a', 'b', 'c', 'd', '7')) {
+      assertTrue(
+          BookContrastValidator.hoverContrastRatio(c)
+              >= BookContrastValidator.MIN_HOVER_CONTRAST_RATIO,
+          "Light hover code &" + c + " must achieve >= 3.0:1 on #100010");
+    }
+    // Dark parchment codes (&0, &1, &8) fail inside dark hover tooltips
+    for (char c : List.of('0', '1', '8')) {
+      assertTrue(
+          BookContrastValidator.hoverContrastRatio(c)
+              < BookContrastValidator.MIN_HOVER_CONTRAST_RATIO,
+          "Dark code &" + c + " is unreadable on #100010 hover background");
+    }
+
+    // 3. Audit catches both pale-on-parchment and dark-in-hover violations
+    MenuDescriptor badMenu =
+        MenuDescriptor.builder("&0Bad Menu")
+            .addPage(
+                new MenuDescriptor.Page(
+                    List.of(
+                        MenuDescriptor.Line.of(
+                            new MenuDescriptor.Fragment(
+                                "&eYellow on parchment", "&0Black on dark hover", null)))))
+            .build();
+    List<String> violations = BookContrastValidator.auditMenuDescriptor(badMenu);
+    assertEquals(2, violations.size(), "Expected 1 page violation + 1 hover violation: " + violations);
+
+    // 4. Sanitizers repair both surfaces into zero-violation BookMenuSpec
+    BookMenuSpec sanitized = MenuBindingSupport.toBookMenuSpec(badMenu);
+    assertTrue(
+        BookContrastValidator.auditBookMenuSpec(sanitized).isEmpty(),
+        "Sanitized BookMenuSpec must have zero contrast violations");
   }
 }

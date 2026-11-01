@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Folia per-region TPS sampler via {@link StressHost#regionTps(String, int, int)}
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  */
 public final class RegionTpsSampler {
 

@@ -84,4 +84,4 @@ boolean blocked = hazardRules.isUnsafe(state.path().toUpperCase(), state.propert
 
 ## Docs
 
-- ADR-017: [`../../docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../../docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md)
+- ADR-017: [`../../docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](docs/adr/tags-api-ADR-001-block-tags-and-state-predicates-in-safety-lists.md)

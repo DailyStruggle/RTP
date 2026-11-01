@@ -16,7 +16,7 @@ import java.util.function.IntSupplier;
 
 /**
  * Periodic sampler for TPS, MSPT, and heap-used (MB) via {@link StressHost}
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  */
 public final class TpsMsptHeapSampler {
 
@@ -39,8 +39,8 @@ public final class TpsMsptHeapSampler {
     private final AtomicReference<Double> spigotTps = new AtomicReference<>(-1.0);
     private final AtomicReference<Double> spigotMspt = new AtomicReference<>(-1.0);
 
-    private final boolean tpsNativeWorks;
-    private final boolean msptNativeWorks;
+    private volatile boolean tpsNativeWorks;
+    private volatile boolean msptNativeWorks;
 
     public static final String HEAP_SERIES_HEADER =
             "epoch_ms,elapsed_ms,heap_used_mb,heap_committed_mb,heap_max_mb,"
@@ -171,22 +171,29 @@ public final class TpsMsptHeapSampler {
     }
 
     private double readTps() {
-        if (tpsNativeWorks && plugin != null) {
+        if (plugin != null) {
             double v = plugin.nativeTps();
-            if (v >= 0.0) return v;
+            if (v >= 0.0) {
+                tpsNativeWorks = true;
+                return v;
+            }
         }
         return spigotTps.get();
     }
 
     private double readMspt() {
-        if (msptNativeWorks && plugin != null) {
+        if (plugin != null) {
             double v = plugin.nativeMspt();
-            if (v >= 0.0) return v;
+            if (v >= 0.0) {
+                msptNativeWorks = true;
+                return v;
+            }
         }
         return spigotMspt.get();
     }
 
     private void spigotMsptTick() {
+        if (msptNativeWorks) return;
         long now = System.nanoTime();
         if (spigotMsptLastWallNs > 0) {
             double ms = (now - spigotMsptLastWallNs) / 1_000_000.0;

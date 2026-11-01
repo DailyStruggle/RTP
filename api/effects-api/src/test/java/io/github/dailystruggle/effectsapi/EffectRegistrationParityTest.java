@@ -50,13 +50,13 @@ class EffectRegistrationParityTest {
 
     static {
         INITIALIZERS.put("bukkit",
-                "../../platforms/rtp-bukkit/rtp-bukkit-common/src/main/java/io/github/dailystruggle/effectsapi/bukkit/BukkitEffectsInitializer.java");
+                "../../platforms/bukkit/bukkit-common/src/main/java/io/github/dailystruggle/effectsapi/bukkit/BukkitEffectsInitializer.java");
         INITIALIZERS.put("fabric",
-                "../../platforms/rtp-fabric/rtp-fabric-common/src/main/java/io/github/dailystruggle/rtp/fabric/effects/FabricEffectsInitializer.java");
+                "../../platforms/fabric/fabric-common/src/main/java/io/github/dailystruggle/rtp/fabric/effects/FabricEffectsInitializer.java");
         INITIALIZERS.put("fabric-26.x",
                 "effects-api-fabric-unobf/src/main/java/io/github/dailystruggle/effectsapi/fabric_unobf/FabricEffectsInitializer.java");
         INITIALIZERS.put("neoforge",
-                "../../platforms/rtp-neoforge/rtp-neoforge-common/src/main/java/io/github/dailystruggle/rtp/neoforge/effects/local/NeoForgeEffectsInitializer.java");
+                "../../platforms/neoforge/neoforge-common/src/main/java/io/github/dailystruggle/rtp/neoforge/effects/local/NeoForgeEffectsInitializer.java");
 
         DECLARED_GAPS.put("bukkit", Set.of());
         DECLARED_GAPS.put("fabric", Set.of());

@@ -13,7 +13,7 @@ import java.util.logging.Level;
 
 /**
  * Read-only gauge of the Folia RTP scheduler's regional concurrency cap
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  */
 public final class SchedulerGauge {
 

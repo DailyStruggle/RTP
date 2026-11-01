@@ -5,9 +5,9 @@
 - **Superseded by:** -
 - **Related:**
   - [maps-api-ADR-001](maps-api-ADR-001-bootstrap.md) - module bootstrap, package layout, palette policy. This ADR is additive to it.
-  - [ADR-046](../../../docs/adr/ADR-046-maps-api-module.md) - umbrella `maps-api` module ADR (REQ-RTP-MAP-001..005).
-  - [ADR-047](../../../docs/adr/ADR-047-declarative-chart-composition-bridge.md) - `ChartSpec` + `MapDispatch` composition bridge.
-  - [ADR-039](../../../docs/adr/ADR-039-rtpadmin-diagnostic-surfaces.md) - biome map / bad-selection visualizations these renders reuse.
+  - [maps-api-ADR-003](maps-api-ADR-003-maps-api-module.md) - umbrella `maps-api` module ADR (REQ-RTP-MAP-001..005).
+  - [leafrtp-ADR-030](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-030-declarative-chart-composition-bridge.md) - `ChartSpec` + `MapDispatch` composition bridge.
+  - [leafrtp-ADR-025](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-025-rtpadmin-diagnostic-surfaces.md) - biome map / bad-selection visualizations these renders reuse.
   - `addons/LeafRTPGuiAddon/` - the destination-picker addon that motivates the GUI-slot use case (region icon rendered as a live biome map).
 
 ---
@@ -72,6 +72,6 @@ When a consumer needs one map per logical entity (e.g. one biome render per regi
 ## References
 
 - [maps-api-ADR-001](maps-api-ADR-001-bootstrap.md) - bootstrap, package layout, palette policy.
-- [ADR-046](../../../docs/adr/ADR-046-maps-api-module.md) - umbrella `maps-api` ADR (REQ-RTP-MAP-001..005).
-- [ADR-047](../../../docs/adr/ADR-047-declarative-chart-composition-bridge.md) - `ChartSpec` + `MapDispatch`.
-- [`.junie/AGENTS.md`](../../../.junie/AGENTS.md) - *Scheduler Usage* (no raw threads on backend JVMs) and the S-005 / REQ-RTP-MAP-002 threading rules this ADR defers to.
+- [maps-api-ADR-003](maps-api-ADR-003-maps-api-module.md) - umbrella `maps-api` ADR (REQ-RTP-MAP-001..005).
+- [leafrtp-ADR-030](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-030-declarative-chart-composition-bridge.md) - `ChartSpec` + `MapDispatch`.
+- [`.junie/AGENTS.md`](../../../../.junie/AGENTS.md) - *Scheduler Usage* (no raw threads on backend JVMs) and the S-005 / REQ-RTP-MAP-002 threading rules this ADR defers to.

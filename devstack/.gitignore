@@ -97,6 +97,10 @@ lobby-b/rtp-config/**
 !lobby-b/rtp-config/
 !backend-a/rtp-config/network.yml
 !backend-b/rtp-config/network.yml
+!backend-a/rtp-config/regions/
+!backend-a/rtp-config/regions/default.yml
+!backend-b/rtp-config/regions/
+!backend-b/rtp-config/regions/default.yml
 !lobby-a/rtp-config/network.yml
 !lobby-b/rtp-config/network.yml
 # Lite (plugin-message transport) seed variants, selected by run-acceptance.ps1

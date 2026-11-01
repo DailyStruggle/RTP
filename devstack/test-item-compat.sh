@@ -48,13 +48,13 @@ for stub in MockItemsAdder.jar MockOraxen.jar MockNexo.jar MockHeadDatabase.jar;
     fi
 done
 
-RTP_JAR="$(ls -t "$REPO_ROOT/rtp-plugin/build/libs"/LeafRTP*.jar 2>/dev/null | head -n 1 || true)"
+RTP_JAR="$(ls -t "$REPO_ROOT/resource/LeafRTP/rtp-plugin/build/libs"/LeafRTP*.jar "$REPO_ROOT/rtp-plugin/build/libs"/LeafRTP*.jar 2>/dev/null | head -n 1 || true)"
 if [ -n "$RTP_JAR" ]; then
     cp -f "$RTP_JAR" "$COMPAT_PLUGINS/LeafRTP.jar"
     echo "Staged LeafRTP: $(basename "$RTP_JAR")"
 fi
 
-GUI_JAR="$(ls -t "$REPO_ROOT/addons/LeafRTPGuiAddon/rtp-gui/build/libs"/LeafRTPGuiAddon*.jar 2>/dev/null | head -n 1 || true)"
+GUI_JAR="$(ls -t "$REPO_ROOT/resource/LeafRTP/addons/LeafRTPGuiAddon/rtp-gui/build/libs"/LeafRTPGuiAddon*.jar "$REPO_ROOT/addons/LeafRTPGuiAddon/rtp-gui/build/libs"/LeafRTPGuiAddon*.jar 2>/dev/null | head -n 1 || true)"
 if [ -n "$GUI_JAR" ]; then
     cp -f "$GUI_JAR" "$COMPAT_PLUGINS/LeafRTPGuiAddon.jar"
     echo "Staged LeafRTPGuiAddon: $(basename "$GUI_JAR")"

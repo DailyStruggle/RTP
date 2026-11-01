@@ -153,12 +153,12 @@ jobs:
       - name: Locate release artifacts
         id: artifacts
         run: |
-          PRO_JAR=$(find rtp-plugin/build/libs -maxdepth 1 -type f -name 'LeafRTP-Pro-*.jar' \
+          PRO_JAR=$(find resource/LeafRTP/rtp-plugin/build/libs -maxdepth 1 -type f -name 'LeafRTP-Pro-*.jar' \
             ! -name '*-dev.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)
 
           if [ -z "$PRO_JAR" ] || [ ! -f "$PRO_JAR" ]; then
-            echo "::error::Could not locate the LeafRTP-Pro jar under rtp-plugin/build/libs/"
-            ls -la rtp-plugin/build/libs/ || true
+            echo "::error::Could not locate the LeafRTP-Pro jar under resource/LeafRTP/rtp-plugin/build/libs/"
+            ls -la resource/LeafRTP/rtp-plugin/build/libs/ || true
             exit 1
           fi
 
@@ -171,7 +171,7 @@ jobs:
           echo "Found Pro jar: ${PRO_JAR}"
 
           # Locate SBOM
-          SBOM_FILE=$(find rtp-plugin/build/reports -maxdepth 2 -type f -name 'bom.json' | head -n 1)
+          SBOM_FILE=$(find resource/LeafRTP/rtp-plugin/build/reports -maxdepth 2 -type f -name 'bom.json' | head -n 1)
           if [ -n "$SBOM_FILE" ]; then
             echo "sbom_file=${SBOM_FILE}" >> "$GITHUB_OUTPUT"
             echo "Found SBOM: ${SBOM_FILE}"
@@ -185,8 +185,8 @@ jobs:
           # Pro / Full release notes only: the full section including **(Pro)**
           # bullets. The Lite-filtered notes are produced by release.yml for the
           # Modrinth and GitHub Release listings.
-          if [ ! -f CHANGELOG.md ]; then
-            echo "::warning::CHANGELOG.md not found; falling back to generic release notes."
+          if [ ! -f resource/LeafRTP/CHANGELOG.md ]; then
+            echo "::warning::resource/LeafRTP/CHANGELOG.md not found; falling back to generic release notes."
             echo "LeafRTP Pro ${VERSION}" > release-notes-pro.md
           else
             awk -v ver="$VERSION" '
@@ -197,7 +197,7 @@ jobs:
               }
               capture != 1 { next }
               { print }
-            ' CHANGELOG.md > release-notes-pro.md
+            ' resource/LeafRTP/CHANGELOG.md > release-notes-pro.md
 
             if [ ! -s release-notes-pro.md ]; then
               echo "::warning::No CHANGELOG.md section matched [${VERSION}]; using placeholder."

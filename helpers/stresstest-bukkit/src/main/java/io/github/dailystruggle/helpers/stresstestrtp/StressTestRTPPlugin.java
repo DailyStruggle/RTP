@@ -689,13 +689,114 @@ public final class StressTestRTPPlugin extends JavaPlugin implements StressHost,
 
     @Override
     public double nativeMspt() {
-        if (msptMethod == null) return -1.0;
+        if (!isFolia() && msptMethod != null) {
+            try {
+                Object v = msptMethod.invoke(Bukkit.getServer());
+                if (v instanceof Number n && n.doubleValue() >= 0.0) {
+                    return n.doubleValue();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (isFolia()) {
+            double foliaMspt = readFoliaMspt();
+            if (foliaMspt >= 0.0) {
+                return foliaMspt;
+            }
+        }
+        return -1.0;
+    }
+
+    private double readFoliaMspt() {
+        long now = System.nanoTime();
+        // 1. Aggregate 5s MSPT across active world regions via ThreadedRegionizer#computeForAllRegions
         try {
-            Object v = msptMethod.invoke(Bukkit.getServer());
-            return (v instanceof Number n) ? n.doubleValue() : -1.0;
-        } catch (Throwable t) {
+            double[] sumAndCount = new double[2];
+            for (World w : Bukkit.getWorlds()) {
+                if (w == null) continue;
+                Object handle = w.getClass().getMethod("getHandle").invoke(w);
+                if (handle == null) continue;
+                java.lang.reflect.Field regField = null;
+                for (Class<?> c = handle.getClass(); c != null && regField == null; c = c.getSuperclass()) {
+                    try {
+                        regField = c.getDeclaredField("regioniser");
+                        regField.setAccessible(true);
+                    } catch (NoSuchFieldException ignored) {
+                    }
+                }
+                if (regField == null) continue;
+                Object regioniser = regField.get(handle);
+                if (regioniser == null) continue;
+                Method computeAll = regioniser.getClass().getMethod("computeForAllRegions", Consumer.class);
+                Consumer<Object> visitor = region -> {
+                    double ms = extractFoliaRegionMspt(region, now);
+                    if (ms > 0.0) {
+                        sumAndCount[0] += ms;
+                        sumAndCount[1] += 1.0;
+                    }
+                };
+                computeAll.invoke(regioniser, visitor);
+            }
+            if (sumAndCount[1] > 0.0) {
+                return sumAndCount[0] / sumAndCount[1];
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            getLogger().log(java.util.logging.Level.FINE, "Folia regioniser MSPT read fallback", e);
+        }
+        // 2. If on a Folia region thread, read TickRegionScheduler#getCurrentRegion
+        try {
+            Class<?> trs = Class.forName("io.papermc.paper.threadedregions.TickRegionScheduler");
+            Object currentRegion = trs.getMethod("getCurrentRegion").invoke(null);
+            double ms = extractFoliaRegionMspt(currentRegion, now);
+            if (ms > 0.0) {
+                return ms;
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            getLogger().log(java.util.logging.Level.FINE, "Folia TickRegionScheduler MSPT read fallback", e);
+        }
+        // 3. Fallback: Folia global tick region report (RegionizedServer#getGlobalTickData)
+        try {
+            Class<?> rs = Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            Object globalHandle = rs.getMethod("getGlobalTickData").invoke(null);
+            double ms = extractFoliaScheduleHandleMspt(globalHandle, now);
+            if (ms > 0.0) {
+                return ms;
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            getLogger().log(java.util.logging.Level.FINE, "Folia RegionizedServer MSPT read fallback", e);
+        }
+        return -1.0;
+    }
+
+    private static double extractFoliaRegionMspt(Object region, long nowNs) {
+        if (region == null) return -1.0;
+        try {
+            Object data = region.getClass().getMethod("getData").invoke(region);
+            if (data == null) return -1.0;
+            Object scheduleHandle = data.getClass().getMethod("getRegionSchedulingHandle").invoke(data);
+            return extractFoliaScheduleHandleMspt(scheduleHandle, nowNs);
+        } catch (Throwable ignored) {
             return -1.0;
         }
+    }
+
+    private static double extractFoliaScheduleHandleMspt(Object scheduleHandle, long nowNs) {
+        if (scheduleHandle == null) return -1.0;
+        try {
+            Object report = scheduleHandle.getClass().getMethod("getTickReport5s", long.class)
+                    .invoke(scheduleHandle, nowNs);
+            if (report == null) return -1.0;
+            Object timePerTick = report.getClass().getMethod("timePerTickData").invoke(report);
+            if (timePerTick == null) return -1.0;
+            Object segAll = timePerTick.getClass().getMethod("segmentAll").invoke(timePerTick);
+            if (segAll == null) return -1.0;
+            Object avgNanos = segAll.getClass().getMethod("average").invoke(segAll);
+            if (avgNanos instanceof Number n && Double.isFinite(n.doubleValue()) && n.doubleValue() > 0.0) {
+                return n.doubleValue() / 1_000_000.0;
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1.0;
     }
 
     @Override

@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "leaf:japanese_temple",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 80539,
+    "spacing": 44,
+    "separation": 16,
+    "spread_type": "linear"
+  }
+}

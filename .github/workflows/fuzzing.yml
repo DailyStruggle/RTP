@@ -26,18 +26,18 @@ jobs:
           # Jazzer runs one @FuzzTest per invocation, so each method is its own job.
           - name: anvil-chunk-view
             project: ':anvil-api:test'
-            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzReadChunkView'
+            test: 'io.github.dailystruggle.anvil.AnvilRegionFuzzTest.fuzzReadChunkView'
           - name: anvil-column-probe
             project: ':anvil-api:test'
-            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzReadColumnProbe'
+            test: 'io.github.dailystruggle.anvil.AnvilRegionFuzzTest.fuzzReadColumnProbe'
           - name: anvil-lz4
             project: ':anvil-api:test'
-            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzLz4BlockDecoder'
+            test: 'io.github.dailystruggle.anvil.AnvilRegionFuzzTest.fuzzLz4BlockDecoder'
           - name: anvil-nbt
             project: ':anvil-api:test'
-            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzNbtReaders'
+            test: 'io.github.dailystruggle.anvil.AnvilRegionFuzzTest.fuzzNbtReaders'
           - name: resp-protocol
-            project: ':rtp-proxy:rtp-proxy-common:test'
+            project: ':proxy:proxy-common:test'
             test: 'io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocolFuzzTest.fuzzReadReply'
 
     steps:

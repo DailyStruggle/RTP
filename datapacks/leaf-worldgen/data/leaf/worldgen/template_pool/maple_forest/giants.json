@@ -1,0 +1,33 @@
+{
+  "name": "leaf:maple_forest/giants",
+  "fallback": "minecraft:empty",
+  "elements": [
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "leaf:maple_forest/maplebirch_birch_birch_log_birch_leaves_h18_s3601",
+        "processors": "minecraft:empty",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 2,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "leaf:maple_forest/maplebirch_birch_birch_log_birch_leaves_h23_s3602",
+        "processors": "minecraft:empty",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "leaf:maple_forest/maplebirch_birch_birch_log_birch_leaves_h26_s3603",
+        "processors": "minecraft:empty",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

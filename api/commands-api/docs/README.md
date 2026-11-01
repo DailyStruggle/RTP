@@ -1,8 +1,8 @@
-﻿# commands-api
+# commands-api
 
 Platform-agnostic command framework used by RTP. One command tree is authored against `commands-api` and dispatched on every platform: Bukkit / Paper / Folia via the Bukkit command dispatcher, Fabric (and planned Velocity) via the Brigadier bridge.
 
-This README is the **author-facing primer**. For the Brigadier bridge contract, recursion rules, suggestion-vs-validation split, and silent-failure isolation, see [`adr/commands-api-ADR-001-brigadier-bridge.md`](adr/commands-api-ADR-001-brigadier-bridge.md). For project-wide rules (S-00x, threading, architecture boundaries), see [`../../.junie/AGENTS.md`](../../.junie/AGENTS.md).
+This README is the **author-facing primer**. For the Brigadier bridge contract, recursion rules, suggestion-vs-validation split, and silent-failure isolation, see [`adr/commands-api-ADR-001-brigadier-bridge.md`](adr/commands-api-ADR-001-brigadier-bridge.md). For project-wide rules (S-00x, threading, architecture boundaries), see [`../../.junie/AGENTS.md`](../../../.junie/AGENTS.md).
 
 ---
 
@@ -16,7 +16,7 @@ This README is the **author-facing primer**. For the Brigadier bridge contract, 
 6. **Do not override the `args[]`-form `onCommand`** to hand-roll positional parsing. The parser already turned the wire into a parsed map; overriding it re-implements `TreeCommand` poorly and breaks tab-completion.
 7. **Tab-completion is free**: `CommandParameter.values()` is the enumerator. Override it to return a live set (e.g. world names, registered ids) and Brigadier and Bukkit both pick it up.
 
-The prefab-verb regression that motivated this primer ([commit history of `PrefabApplyCmd`](../src/main/java/io/github/dailystruggle/rtp/common/commands/prefab/PrefabApplyCmd.java)) violated rules 4 and 6: the verb took the prefab id as a bare positional and tried to recover it with a custom args-form override. The fix was to register a typed `PrefabIdParameter` and move the wire form to `apply id=<id>`. Every other RTP verb (`InfoCmd`, `ConfigCmd`, `ReloadCmd`, region/world parameters) already used the canonical pattern. Use it.
+The prefab-verb regression that motivated this primer ([commit history of `PrefabApplyCmd`](../../../resource/LeafRTP/rtp-core/src/main/java/io/github/dailystruggle/rtp/common/commands/prefab/PrefabApplyCmd.java)) violated rules 4 and 6: the verb took the prefab id as a bare positional and tried to recover it with a custom args-form override. The fix was to register a typed `PrefabIdParameter` and move the wire form to `apply id=<id>`. Every other RTP verb (`InfoCmd`, `ConfigCmd`, `ReloadCmd`, region/world parameters) already used the canonical pattern. Use it.
 
 ---
 
@@ -299,9 +299,9 @@ REQ-traceable tests should reference the REQ-* id in the class name (e.g. `ReqAp
 ## Cross-references
 
 - [`adr/commands-api-ADR-001-brigadier-bridge.md`](adr/commands-api-ADR-001-brigadier-bridge.md)  -  Brigadier bridge contract, recursion, suggestion-vs-validation split, silent-failure isolation.
-- [`../../docs/dev/DESIGN.md#brigadier-bridge-commands-api`](../../docs/dev/DESIGN.md)  -  implementation notes for the bridge.
-- [`../../docs/dev/REQUIREMENTS.md`](../../docs/dev/REQUIREMENTS.md)  -  S-007 (configurable command failure messages), REQ-RTP-F-013 (configurable user-facing strings), REQ-API-ARCH-005/006 (command framework contracts).
-- [`../../docs/dev/TRACEABILITY.md`](../../docs/dev/TRACEABILITY.md)  -  REQ-* to test mapping.
-- [`../../.junie/AGENTS.md`](../../.junie/AGENTS.md)  -  project-wide agent guide; the *Required Reading* table links back here for command-authoring tasks.
+- [`../../docs/dev/DESIGN.md#brigadier-bridge-commands-api`](../../../resource/LeafRTP/docs/dev/DESIGN.md)  -  implementation notes for the bridge.
+- [`../../docs/dev/REQUIREMENTS.md`](../../../resource/LeafRTP/docs/dev/REQUIREMENTS.md)  -  S-007 (configurable command failure messages), REQ-RTP-F-013 (configurable user-facing strings), REQ-API-ARCH-005/006 (command framework contracts).
+- [`../../docs/dev/TRACEABILITY.md`](../../../resource/LeafRTP/docs/dev/TRACEABILITY.md)  -  REQ-* to test mapping.
+- [`../../.junie/AGENTS.md`](../../../.junie/AGENTS.md)  -  project-wide agent guide; the *Required Reading* table links back here for command-authoring tasks.
 
 When in doubt: copy the shape of `InfoCmd`, `ConfigCmd`, or any of the `prefab/` verbs. They all use the canonical pattern documented above.

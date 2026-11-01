@@ -1,0 +1,180 @@
+# Multi-server devstack for LeafSleep acceptance & scale testing (4 backend shards):
+#   - redis (Redis 7)
+#   - proxy-a (Velocity on Java 25)
+#   - backend-a (Paper 1.21.11 on Java 25)
+#   - backend-b (Folia 1.21.11 on Java 25)
+#   - backend-c (Paper 1.21.11 on Java 25)
+#   - backend-d (Folia 1.21.11 on Java 25)
+#
+# Compatible with both Docker Engine and rootless Podman on SELinux Enforcing hosts.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: leafsleep-devstack-redis
+    security_opt:
+      - label=disable
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 2s
+      timeout: 1s
+      retries: 10
+
+  proxy-a:
+    image: itzg/mc-proxy:java25
+    container_name: leafsleep-devstack-proxy
+    user: "0:0"
+    security_opt:
+      - label=disable
+    environment:
+      TYPE: VELOCITY
+      MEMORY: 512M
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN: "TRUE"
+    ports:
+      - "127.0.0.1:25577:25577"
+    volumes:
+      - ./leafsleep-stack/proxy/velocity.toml:/server/velocity.toml
+      - ./leafsleep-stack/shared/forwarding.secret:/server/forwarding.secret
+      - ./leafsleep-stack/proxy/plugins:/server/plugins
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-a:
+    image: itzg/minecraft-server:java25
+    container_name: leafsleep-devstack-paper-a
+    user: "0:0"
+    security_opt:
+      - label=disable
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.11"
+      MEMORY: 2560M
+      ONLINE_MODE: "FALSE"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN: "TRUE"
+      SKIP_CHOWN_DATA: "TRUE"
+      PAUSE_WHEN_EMPTY_SECONDS: "-1"
+      VIEW_DISTANCE: "4"
+      SIMULATION_DISTANCE: "4"
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET}
+    volumes:
+      - ./leafsleep-stack/backend-a/plugins:/data/plugins
+      - ./leafsleep-stack/shared/ops.json:/data/ops.json
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./leafsleep-stack/shared/forwarding.secret:/data/forwarding.secret
+      - mc-image-cache:/data/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-b:
+    image: itzg/minecraft-server:java25
+    container_name: leafsleep-devstack-folia-b
+    user: "0:0"
+    security_opt:
+      - label=disable
+    environment:
+      EULA: "TRUE"
+      TYPE: FOLIA
+      VERSION: "1.21.11"
+      MEMORY: 2560M
+      ONLINE_MODE: "FALSE"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN: "TRUE"
+      SKIP_CHOWN_DATA: "TRUE"
+      PAUSE_WHEN_EMPTY_SECONDS: "-1"
+      VIEW_DISTANCE: "4"
+      SIMULATION_DISTANCE: "4"
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET}
+    volumes:
+      - ./leafsleep-stack/backend-b/plugins:/data/plugins
+      - ./leafsleep-stack/shared/ops.json:/data/ops.json
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./leafsleep-stack/shared/forwarding.secret:/data/forwarding.secret
+      - mc-image-cache:/data/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-c:
+    image: itzg/minecraft-server:java25
+    container_name: leafsleep-devstack-paper-c
+    user: "0:0"
+    security_opt:
+      - label=disable
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.21.11"
+      MEMORY: 2560M
+      ONLINE_MODE: "FALSE"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN: "TRUE"
+      SKIP_CHOWN_DATA: "TRUE"
+      PAUSE_WHEN_EMPTY_SECONDS: "-1"
+      VIEW_DISTANCE: "4"
+      SIMULATION_DISTANCE: "4"
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET}
+    volumes:
+      - ./leafsleep-stack/backend-c/plugins:/data/plugins
+      - ./leafsleep-stack/shared/ops.json:/data/ops.json
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./leafsleep-stack/shared/forwarding.secret:/data/forwarding.secret
+      - mc-image-cache:/data/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-d:
+    image: itzg/minecraft-server:java25
+    container_name: leafsleep-devstack-folia-d
+    user: "0:0"
+    security_opt:
+      - label=disable
+    environment:
+      EULA: "TRUE"
+      TYPE: FOLIA
+      VERSION: "1.21.11"
+      MEMORY: 2560M
+      ONLINE_MODE: "FALSE"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN: "TRUE"
+      SKIP_CHOWN_DATA: "TRUE"
+      PAUSE_WHEN_EMPTY_SECONDS: "-1"
+      VIEW_DISTANCE: "4"
+      SIMULATION_DISTANCE: "4"
+      PATCH_DEFINITIONS: /paper-patches
+      REPLACE_ENV_VARIABLES: "TRUE"
+      ENV_VARIABLE_PREFIX: "CFG_"
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET}
+    volumes:
+      - ./leafsleep-stack/backend-d/plugins:/data/plugins
+      - ./leafsleep-stack/shared/ops.json:/data/ops.json
+      - ./shared/paper-patches:/paper-patches:ro
+      - ./leafsleep-stack/shared/forwarding.secret:/data/forwarding.secret
+      - mc-image-cache:/data/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  mc-image-cache:
+    external: true
+    name: devstack_mc-image-cache

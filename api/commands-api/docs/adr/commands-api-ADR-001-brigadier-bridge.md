@@ -15,7 +15,7 @@ Duplicating the command structure in Brigadier terms across platforms forces any
 
 A `BrigadierCommandAdapter` inside `commands-api` shall be provided to convert the `commands-api` tree into Brigadier nodes. Platform adapters (e.g., `rtp-fabric`) shall be thin registration shims that delegate to this adapter. The adapter shall carry a `compileOnly` dependency on Brigadier and shall not load on Bukkit platforms.
 
-For implementation and code-level details, see [DESIGN.md — Brigadier Bridge](../../../docs/dev/DESIGN.md#brigadier-bridge-commands-api).
+For implementation and code-level details, see [DESIGN.md — Brigadier Bridge](../../../../plugins/LeafRTP/docs/dev/DESIGN.md#brigadier-bridge-commands-api).
 
 ## Consequences
 
@@ -35,7 +35,7 @@ For implementation and code-level details, see [DESIGN.md — Brigadier Bridge](
 - `commands-api/src/main/` — command tree definition
 - `platforms/rtp-fabric/src/main/java/.../fabric/commands/RTPCmdFabric.java` — registration shim
 - [MULTI_PLATFORM_PLAN.md section Phase 3](../../../docs/dev/MULTI_PLATFORM_PLAN.md#phase-3-command-system-refinement)
-- [ARCHITECTURE.md](../../../docs/dev/ARCHITECTURE.md) — dependency rule: `rtp-core` and `rtp-api` do not import platform-specific classes (ArchUnit-enforced)
+- [ARCHITECTURE.md](../../../../docs/dev/ARCHITECTURE.md) — dependency rule: `rtp-core` and `rtp-api` do not import platform-specific classes (ArchUnit-enforced)
 
 ---
 

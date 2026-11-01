@@ -82,7 +82,7 @@ LeafRTP completed 30,914 of 30,914 teleports across both ramps, with 0 exact-blo
 | **JustRTP** | 14 | 4,186 / 4,186 | 368 / 1,619 / 2,425 / 4,668 ms | 20.0-22.9 ms | 19.82 | 0 |
 | **BetterRTP** | 11 | 16,789 / 16,789 | 197 / 510 / 805 / 1,706 ms | 22.6-33.6 ms | 18.76 | 1 |
 
-BetterRTP timed out on every attempt in the ladder runs (dispatch issue), so its row comes from 11 later BetterRTP-only paced runs (`20261010-180827` to `20261011-014150`: six 60 s stages and five 600 s stages at 5 TP/s) and is not pooled the same way as the others. JakesRTP had the lowest latency at this rate; at 40 and 80 TP/s in the same ladders its MSPT reached 96 ms and 295 ms ([`BENCHMARK_ANALYSIS.md`](../../docs/dev/BENCHMARK_ANALYSIS.md)). The three LeafRTP repeats came 20-48 s after the first landing on the same block (runs `20261009-131313`, `20261010-021445`, `20261010-070617`); the higher-rate stages of the same runs repeated more often and are not in this table.
+BetterRTP timed out on every attempt in the ladder runs (dispatch issue), so its row comes from 11 later BetterRTP-only paced runs (`20261010-180827` to `20261011-014150`: six 60 s stages and five 600 s stages at 5 TP/s) and is not pooled the same way as the others. JakesRTP had the lowest latency at this rate; at 40 and 80 TP/s in the same ladders its MSPT reached 96 ms and 295 ms ([`BENCHMARK_ANALYSIS.md`](../../resource/LeafRTP/docs/dev/BENCHMARK_ANALYSIS.md)). The three LeafRTP repeats came 20-48 s after the first landing on the same block (runs `20261009-131313`, `20261010-021445`, `20261010-070617`); the higher-rate stages of the same runs repeated more often and are not in this table.
 
 ---
 

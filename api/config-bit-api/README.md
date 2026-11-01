@@ -26,6 +26,8 @@ dependencies {
 - `ConfigSnapshot` - side-effect-free, read-only directory or in-memory YAML snapshot (`ConfigSnapshot.read(Path)`, `ConfigSnapshot.of(Map)`, `withOverlay(Map)`), resolving localized keys via `.lang.yml` rename maps without mutating running state.
 - `DirectiveCodes` - `BitCode` mapping for directive validation findings (`DirectiveCodes.DEFAULT` under namespace `CFG`, or caller-supplied codes).
 - `MessageParityCodes` - `BitCode` mapping and finding translator (`MessageParityCodes.DEFAULT`) for `MessageKeyParity.Gap` and operator message-file checks (`bundledFindings(...)`, `operatorFindings(...)`).
+- `BytecodeCausalGraphScanner` - zero-classloading JVM `.class` causal graph mapper, white-box command schema extractor (`BytecodeCommandSchema`), and Order-1 / Order-2 claim delivery auditor (`scanJar(Path)`, `analyzeClasses(...)`) reporting `Claims: <X> -> Does Not Deliver: <Y>` findings across commands, `@EventHandler` / `@SubscribeEvent` listeners (`REGISTERED_UNCONDITIONAL`, `REGISTERED_CONFIG_GATED`, `UNREGISTERED`), and async supplier/lambda chains.
+- `LlmCausalChainAuditor` - optional subscribed LLM causal-chain auditor and AST-grounded fault explainer (`explainProvenFuzzFault(...)`, `enrichFindingsWithExplanations(...)`, `auditCausalChainsWithLlm(...)`) that verifies every cited `Class#method` symbol against `CausalGraphReport#closedWorldSymbols()`.
 
 ## Usage
 
@@ -63,5 +65,5 @@ findings.addAll(boundsCheck.evaluate(snapshot));
 
 ## Docs
 
-- ADR-064: [`../../docs/adr/ADR-064-config-comment-format-summary-line-as-menu-hover.md`](../../docs/adr/ADR-064-config-comment-format-summary-line-as-menu-hover.md)
-- ADR-121: [`../../docs/adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md`](../../docs/adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)
+- ADR-064: [`../../docs/adr/ADR-064-config-comment-format-summary-line-as-menu-hover.md`](../yaml-api/docs/adr/yaml-api-ADR-003-config-comment-format-summary-line-as-menu-hover.md)
+- ADR-121: [`../../docs/adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md`](../../resource/LeafRTP/docs/adr/leafrtp-ADR-091-built-in-test-for-configuration-and-the-action-engine.md)

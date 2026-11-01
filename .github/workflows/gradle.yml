@@ -2,23 +2,35 @@ name: Java CI with Gradle
 
 on:
   push:
-    branches: [ V3, V2, V1 ]
+    branches: [ main, V3, V2, V1 ]
     paths-ignore:
       - 'docs/**'
+      - 'resource/LeafRTP/docs/**'
+      - 'resource/LeafTreeGen/docs/**'
+      - 'resource/LeafRTP/python_test_scripts/**'
       - 'site/**'
       - '*.md'
       - 'mkdocs.yml'
+      - 'resource/LeafRTP/mkdocs.yml'
+      - 'resource/LeafRTP/mkdocs_hooks.py'
+      - 'resource/LeafRTP/CHANGELOG.md'
+      - 'resource/LeafTreeGen/CHANGELOG.md'
       - '.github/ISSUE_TEMPLATE/**'
       - 'LICENSE*'
   # No paths-ignore on pull_request: `ci-ok` must report on every PR, or a
   # required check stays "Expected". Docs-only PRs get scope `none` instead.
   pull_request:
-    branches: [ V3, V2, V1 ]
+    branches: [ main, V3, V2, V1 ]
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
 
 # Job graph (one job per project set, chained along project(':...') edges;
 # `changes` verifies the chain against the Gradle graph on every run):
@@ -56,6 +68,7 @@ jobs:
       plugin: ${{ steps.scope.outputs.plugin }}
       addons: ${{ steps.scope.outputs.addons }}
       helpers: ${{ steps.scope.outputs.helpers }}
+      plugins: ${{ steps.scope.outputs.plugins }}
       core_tasks: ${{ steps.scope.outputs.core_tasks }}
       bukkit_tasks: ${{ steps.scope.outputs.bukkit_tasks }}
       fabric_tasks: ${{ steps.scope.outputs.fabric_tasks }}
@@ -64,6 +77,7 @@ jobs:
       plugin_tasks: ${{ steps.scope.outputs.plugin_tasks }}
       addons_tasks: ${{ steps.scope.outputs.addons_tasks }}
       helpers_tasks: ${{ steps.scope.outputs.helpers_tasks }}
+      plugins_tasks: ${{ steps.scope.outputs.plugins_tasks }}
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -169,7 +183,7 @@ jobs:
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: core
-      tasks: ${{ needs.changes.outputs.core_tasks }} ${{ needs.changes.outputs.scope == 'full' && 'checkBinaryCompatibility' || '' }}
+      tasks: ${{ needs.changes.outputs.core_tasks }} ${{ needs.changes.outputs.scope == 'full' && needs.changes.outputs.plugin_tasks != '' && 'checkBinaryCompatibility' || '' }}
 
   proxy:
     needs: [changes, core]
@@ -222,14 +236,26 @@ jobs:
       tasks: ${{ needs.changes.outputs.addons_tasks }}
       artifact-name: RTP-Addon-Artifacts
       artifact-path: |
-        addons/*/build/libs/
-        addons/*/*/build/libs/
+        resource/LeafRTP/addons/*/build/libs/
+        resource/LeafRTP/addons/*/*/build/libs/
+
+  plugins:
+    needs: [changes, core, bukkit, fabric, neoforge, helpers]
+    if: ${{ !cancelled() && needs.changes.outputs.plugins == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    uses: ./.github/workflows/gradle-set.yml
+    with:
+      set: plugins
+      tasks: ${{ needs.changes.outputs.plugins_tasks }}
+      artifact-name: RTP-Plugin-Siblings-Artifacts
+      artifact-path: |
+        resource/*/build/libs/
+        resource/*/*/build/libs/
 
   # Shaded rtp-plugin jar (bundles the platforms and addons). Skipped for
   # addon/helper-only PRs (scope `leaf`); every merge to V1/V2/V3 builds it.
   plugin:
     needs: [changes, core, proxy, bukkit, fabric, neoforge, addons]
-    if: ${{ !cancelled() && needs.changes.outputs.plugin == 'true' && needs.changes.outputs.scope == 'full' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !cancelled() && needs.changes.outputs.plugin == 'true' && needs.changes.outputs.plugin_tasks != '' && needs.changes.outputs.scope == 'full' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: plugin
@@ -240,7 +266,7 @@ jobs:
   # Merges the JaCoCo / PMD XML of every set job that ran, then gates
   # changed-line coverage and runs SonarCloud (ADR-094) over the whole project.
   analysis:
-    needs: [changes, core, proxy, bukkit, fabric, neoforge, helpers, addons, plugin]
+    needs: [changes, core, proxy, bukkit, fabric, neoforge, helpers, addons, plugins, plugin]
     if: ${{ !cancelled() && needs.changes.outputs.scope == 'full' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     env:
@@ -308,7 +334,7 @@ jobs:
             BASELINE="origin/$BASE_REF"
           else
             BASELINE="$BEFORE_SHA"
-            if [ -z "$BASELINE" ] || [ "$BASELINE" = "0000000000000000000000000000000000000000" ]; then
+            if [ -z "$BASELINE" ] || [ "$BASELINE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BASELINE}^{commit}" 2>/dev/null; then
               BASELINE="HEAD~1"
             fi
           fi
@@ -333,7 +359,7 @@ jobs:
   # The single required status check. Fails when any job failed or was
   # cancelled; skipped jobs count as passing.
   ci-ok:
-    needs: [changes, checks, build-reduced-jdk21, core, proxy, bukkit, fabric, neoforge, helpers, addons, plugin, analysis]
+    needs: [changes, checks, build-reduced-jdk21, core, proxy, bukkit, fabric, neoforge, helpers, addons, plugins, plugin, analysis]
     if: always()
     runs-on: ubuntu-latest
 

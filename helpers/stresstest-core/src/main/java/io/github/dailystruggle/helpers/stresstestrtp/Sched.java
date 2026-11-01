@@ -15,7 +15,7 @@ import java.util.logging.Logger;
 /**
  * Cross-platform scheduling facade in {@code stresstest-core} routing through
  * {@link StressHost} while preserving all timer-lifecycle accounting, fire
- * bounds, and reflective cancellation guarantees (ADR-122 Decision 1 & 2).
+ * bounds, and reflective cancellation guarantees (ADR-122 Decision 1 and 2).
  */
 public final class Sched {
 

@@ -14,7 +14,8 @@ dependencies {
     // provide Brigadier at runtime (e.g. Fabric, NeoForge) resolve it via
     // the platform, while pure Java consumers do not force a runtime dependency.
     compileOnly 'com.mojang:brigadier:1.2.9'
-    implementation 'org.jetbrains:annotations:24.1.0'
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    testCompileOnly 'org.jetbrains:annotations:24.1.0'
 
     // Brigadier needed at test runtime to exercise the adapter.
     testImplementation 'com.mojang:brigadier:1.2.9'

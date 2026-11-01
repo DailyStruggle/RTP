@@ -8,8 +8,8 @@ Task router for the `metrics-api` subproject. Read only what your task needs.
 | Why the SPI was split out of `rtp-core`; what stayed behind | [`adr/metrics-api-ADR-001-module-extraction.md`](adr/metrics-api-ADR-001-module-extraction.md) |
 | Implementing a platform `MetricsBinding` | [`../README.md`](../README.md) (*How to implement a binding*) |
 | Adding plugin-specific counters | `MetricsExtension` Javadoc + `MetricsSnapshot#withExtension` |
-| Project-wide metrics design, catalogue, `/rtp info` surface | [`../../docs/dev/METRICS_PLAN.md`](../../docs/dev/METRICS_PLAN.md) |
-| Requirement traceability (REQ-RTP-OBS-001/002/003) | [`../../docs/dev/TRACEABILITY.md`](../../docs/dev/TRACEABILITY.md) |
+| Project-wide metrics design, catalogue, `/rtp info` surface | [`../../docs/dev/METRICS_PLAN.md`](../../../resource/LeafRTP/docs/dev/METRICS_PLAN.md) |
+| Requirement traceability (REQ-RTP-OBS-001/002/003) | [`../../docs/dev/TRACEABILITY.md`](../../../resource/LeafRTP/docs/dev/TRACEABILITY.md) |
 
 ## Module contents
 
