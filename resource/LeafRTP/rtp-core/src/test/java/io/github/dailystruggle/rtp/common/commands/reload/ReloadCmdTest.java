@@ -93,6 +93,28 @@ public class ReloadCmdTest {
         assertTrue(result);
     }
 
+    @Test
+    void onCommand_rejectsWhenReloadAlreadyInProgress_andSendsAlreadyReloadingMessage() {
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "admin-busy", null);
+        accessor.addPlayer(player);
+
+        RTP.reloading.set(true);
+        try {
+            boolean result = reloadCmd.onCommand(senderId, new HashMap<>(), null);
+            assertTrue(result);
+            assertTrue(RTP.reloading.get(), "Existing reload flag must remain set");
+            assertTrue(
+                    player.sentMessages.stream().anyMatch(m -> m != null && m.toLowerCase().contains("already")),
+                    "Sender must receive the alreadyReloading message");
+            assertTrue(
+                    accessor.logMessages.stream().anyMatch(l -> l.contains("WARNING") && l.contains("reload is already running")),
+                    "Overlapping reload rejection must be logged at WARNING");
+        } finally {
+            RTP.reloading.set(false);
+        }
+    }
+
     // ── addCommands ───────────────────────────────────────────────────────────
 
     @Test

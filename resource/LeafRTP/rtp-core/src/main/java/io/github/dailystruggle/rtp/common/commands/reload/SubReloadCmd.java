@@ -101,7 +101,10 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
   @SuppressWarnings("java:S3516") // Method returns true on reload completion
   public boolean subReloadSingle(UUID senderId, ConfigParser<?> parser) {
     if (ActiveConfigs.get() == null || parser == null) return false;
-    if (!RTP.reloading.compareAndSet(false, true)) return false;
+    if (!RTP.reloading.compareAndSet(false, true)) {
+      sendAlreadyReloading(senderId);
+      return false;
+    }
 
     RTPServerAccessor serverAccessor = RTPRuntime.serverAccessor();
     String msg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.reloading, ""));
@@ -148,7 +151,10 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
   @SuppressWarnings("java:S3516") // Method returns true on reload completion
   public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
     if (ActiveConfigs.get() == null || parser == null) return false;
-    if (!RTP.reloading.compareAndSet(false, true)) return false;
+    if (!RTP.reloading.compareAndSet(false, true)) {
+      sendAlreadyReloading(senderId);
+      return false;
+    }
 
     RTPServerAccessor serverAccessor = RTPRuntime.serverAccessor();
     RTPCommandSender commandSender = serverAccessor != null ? serverAccessor.getSender(senderId) : null;
@@ -271,6 +277,18 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
       if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
       serverAccessor.sendMessage(RTPAPI.serverId, targetSenderId, msg);
     }
+  }
+
+  private void sendAlreadyReloading(UUID senderId) {
+    String busy =
+        msg(
+            SystemMessages.alreadyReloading,
+            "&c[P0] A configuration reload is already in progress.");
+    RTPServerAccessor serverAccessor = RTPRuntime.serverAccessor();
+    if (!busy.isEmpty() && serverAccessor != null) {
+      serverAccessor.sendMessage(RTPAPI.serverId, senderId, busy);
+    }
+    RTPRuntime.log(Level.WARNING, "[RTP] /rtp reload rejected: a reload is already running");
   }
 
   private boolean candidateAccepted(UUID senderId) {
