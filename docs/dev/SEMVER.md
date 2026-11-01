@@ -1,7 +1,7 @@
 # Semantic Versioning (SemVer) Contract
 
 > **Scope:** Repository-wide versioning policy, public API definition, internal boundary classification, and binary compatibility commitments.
-> **Related:** [DEPRECATION_POLICY.md](DEPRECATION_POLICY.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ADR-011](../adr/ADR-011-rtp-api-separate-module.md), [ADR-094](../adr/ADR-094-quality-engineering-gates.md).
+> **Related:** [DEPRECATION_POLICY.md](DEPRECATION_POLICY.md), [ARCHITECTURE.md](ARCHITECTURE.md), [leafrtp-ADR-008](../../resource/LeafRTP/docs/adr/leafrtp-ADR-008-rtp-api-separate-module.md), [ADR-094](../adr/ADR-094-quality-engineering-gates.md).
 
 ---
 
@@ -47,7 +47,7 @@ The public API is designed for third-party addon developers, external integratio
    - **`bstats-api` (`io.github.dailystruggle.bstats.api.*`):** Dependency-free bStats v2 client SPI.
    - **`server-api` (`io.github.dailystruggle.server.api.*`):** Platform-neutral server identity, `PlatformFamily`, and logging SPI.
    - **`units-api` (`io.github.dailystruggle.rtp.common.selection.region.util.*`):** Temporal, spatial, and data-size unit parsers.
-   - **`anvil-api` (`io.github.dailystruggle.rtp.anvil.*`):** Platform-neutral Anvil chunk and region file decoders, and the `RegionFileReader` SPI for addon-supplied region formats.
+   - **`anvil-api` (`io.github.dailystruggle.anvil.*`):** Platform-neutral Anvil chunk and region file decoders, and the `RegionFileReader` SPI for addon-supplied region formats.
    - **`tags-api` (`io.github.dailystruggle.rtp.tags.*`):** Block and biome tag query interfaces.
    - **`yaml-api` (`io.github.dailystruggle.rtp.common.configuration.yaml.*`):** Hand-rolled zero-dependency YAML parser AST types (`RtpYaml*`).
 

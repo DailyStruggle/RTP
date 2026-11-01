@@ -15,7 +15,7 @@ import java.util.Set;
 
 /**
  * Platform-neutral hierarchical configuration store for {@code stresstest-core}
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  *
  * <p>Provides dot-separated path lookups ({@code ramp.pass.max-mspt-p95}),
  * section views ({@link #getConfigurationSection(String)}), programmatic

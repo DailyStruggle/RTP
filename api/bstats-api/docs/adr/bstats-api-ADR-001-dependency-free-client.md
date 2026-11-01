@@ -5,8 +5,8 @@
 - **Superseded by:** none.
 - **Related:**
   - [metrics-api-ADR-001](../../../metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md): sibling cross-plugin `*-api` precedent (neutral package root, ArchUnit guard).
-  - [ADR-024](../../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md): separate bStats service id for the lite assembly.
-  - [`docs/dev/METRICS_PLAN.md`](../../../../docs/dev/METRICS_PLAN.md) *bStats Integration*: chart catalogue and privacy rules.
+  - [leafrtp-ADR-016](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-016-rtp-lite-assembly-variant.md): separate bStats service id for the lite assembly.
+  - [`docs/dev/METRICS_PLAN.md`](../../../../plugins/LeafRTP/docs/dev/METRICS_PLAN.md) *bStats Integration*: chart catalogue and privacy rules.
   - Rule F-001 in [`docs/dev/RULES.md`](../../../../docs/dev/RULES.md): no raw threads in backend code.
 
 ---
@@ -88,5 +88,5 @@ chart and the software name keep loaders separable. Bukkit supplies `BukkitBStat
 
 ## References
 
-- [`docs/dev/METRICS_PLAN.md`](../../../../docs/dev/METRICS_PLAN.md)
-- [`docs/dev/TRACEABILITY.md`](../../../../docs/dev/TRACEABILITY.md)
+- [`docs/dev/METRICS_PLAN.md`](../../../../plugins/LeafRTP/docs/dev/METRICS_PLAN.md)
+- [`docs/dev/TRACEABILITY.md`](../../../../plugins/LeafRTP/docs/dev/TRACEABILITY.md)

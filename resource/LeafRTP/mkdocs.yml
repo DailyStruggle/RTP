@@ -1,0 +1,158 @@
+site_name: LeafRTP - Minecraft Random Teleport (/rtp & /wild) Plugin & Mod
+site_description: Easy-to-use, lag-free Minecraft random teleport (/rtp and /wild) plugin and mod for Paper, Spigot, Folia, Fabric, NeoForge, and Velocity. Works out of the box with a visual browser map editor and in-game setup wizard.
+site_author: DailyStruggle
+# Published location. Needed for canonical URLs, a correct sitemap.xml, and the
+# theme's social/share links; without it Material emits relative canonicals.
+site_url: https://dailystruggle.github.io/RTP/
+repo_name: DailyStruggle/RTP
+repo_url: https://github.com/DailyStruggle/RTP
+edit_uri: edit/V3/resource/LeafRTP/docs/
+
+# Serve the tracked Markdown under resource/LeafRTP/docs/ directly; no separate content copy.
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: green
+      accent: green
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: green
+      accent: green
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - content.tabs.link
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  # Admonitions used across docs/site (!!! note / warning / tip).
+  - admonition
+  - pymdownx.details
+  # Content tabs (=== "...") used in docs/site pages.
+  - pymdownx.tabbed:
+      alternate_style: true
+  # Fenced code, syntax highlighting, and nested blocks. The mermaid custom
+  # fence keeps ```mermaid blocks as <div class="mermaid"> instead of a plain
+  # code block, so Material's bundled Mermaid.js renders them client-side
+  # (works in Firefox; a bare fence without this leaves the diagram undrawn).
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      use_pygments: true
+      guess_lang: false
+  - pymdownx.inlinehilite
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  # Client-side search ships with Material; no extra dependency needed.
+  - search
+
+# Build hooks. mkdocs_hooks.py expands the single-source `@version@` stamp (from
+# gradle.properties) into every page, mirroring the jar's copyDocs token
+# expansion so the website shows the real version instead of the literal token.
+hooks:
+  - mkdocs_hooks.py
+
+extra_javascript:
+  - assets/javascripts/rtp-support-doctor.js
+
+# Narrative + operator-facing pages are the hand-authored nav. The internal
+# engineering trees (dev/, adr/, architecture/) are still built so deep links
+# resolve, but mkdocs_hooks.py marks them noindex and drops them from the
+# sitemap, so search engines index the operator docs only.
+nav:
+  - Home: index.md
+  - Getting started:
+      - Server administrators: FOR_SERVER_ADMINS.md
+      - Quick start: admin/QUICK_START.md
+      - Intended usage: site/intended-usage.md
+      - What NOT to do: site/what-not-to-do.md
+      - Prefabs: admin/PREFABS.md
+      - Commands: admin/COMMANDS.md
+      - Actions & arenas: admin/ACTIONS.md
+      - FAQ: admin/FAQ.md
+      - Common recipes: admin/RECIPES.md
+      - Features: site/features.md
+      - Migration guide: admin/MIGRATION.md
+  - Operations:
+      - Runbook: admin/RUNBOOK.md
+      - Web Workspace & Editor: admin/WEB_EDITOR_GUIDE.md
+      - Hazard register: dev/HAZARDS.md
+      - Addons: admin/ADDONS.md
+      - Custom items & menus: admin/CUSTOM_ITEMS.md
+      - Claim compatibility: admin/CLAIM_PLUGIN_COMPATIBILITY.md
+  - Configuration:
+      - Overview: admin/configuration/CONFIGURATION.md
+      - Config lifecycle: admin/configuration/CONFIG_LIFECYCLE.md
+      - Core (config.yml): admin/configuration/CORE_CONFIG.md
+      - Regions: admin/configuration/REGIONS.md
+      - Worlds: admin/configuration/WORLDS.md
+      - Schematics: admin/configuration/SCHEMATICS.md
+      - Safety: admin/configuration/SAFETY.md
+      - Performance: admin/configuration/PERFORMANCE.md
+      - Economy: admin/configuration/ECONOMY.md
+      - Events & effects: admin/configuration/EVENTS_AND_EFFECTS.md
+      - Integrations: admin/configuration/INTEGRATIONS.md
+      - Messages: admin/configuration/MESSAGES.md
+      - Language: admin/configuration/LANGUAGE.md
+      - Logging: admin/configuration/LOGGING.md
+      - Metrics: admin/configuration/METRICS.md
+      - Spatial memory TTL: admin/configuration/TTL.md
+  - Proxy mode:
+      - Overview: admin/proxies/INDEX.md
+      - Configuration (network.yml): admin/proxies/CONFIGURATION.md
+      - Single-backend verification: admin/proxies/SINGLE_BACKEND_VERIFICATION.md
+      - Cross-server verification: admin/proxies/CROSS_SERVER_VERIFICATION.md
+  - Developers:
+      - Why LeafRTP exists: site/why.md
+      - How it works: site/how-it-works.md
+      - Testing and quality gates: site/quality-gates.md
+      - Shape algorithm testing & charts: site/shape-algorithms.md
+      - Addon developers: FOR_ADDON_DEVELOPERS.md
+      - Addon quickstart: ADDON_QUICKSTART.md
+      - Contributors: FOR_CONTRIBUTORS.md
+
+# site/README.md and site/index.md both render to site/index.html; the README
+# is a repo-only authoring note (linked from MAP.md via its GitHub URL), so drop
+# it from the build to avoid the conflict rather than publishing a duplicate.
+exclude_docs: |
+  /site/README.md
+  # MAP.md is an internal, agent-oriented catalog of the dev/adr/architecture
+  # trees; it is meaningless to operators, so it is kept out of the site.
+  /MAP.md
+  # publishing/FRONT_PAGE.md is the tagged storefront source; its edition and
+  # audience blocks are only resolved by scripts/release/build_front_pages.py.
+  /publishing/
+
+# Internal-only trees are built (noindex) but deliberately absent from the
+# hand-authored nav, so do not warn about them.
+not_in_nav: |
+  /dev/
+  /adr/
+  /architecture/
+  /assets/
+  /site/README.md
+  /site/index.md

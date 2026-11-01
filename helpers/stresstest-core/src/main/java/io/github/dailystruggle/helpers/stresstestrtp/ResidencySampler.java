@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Peak residency accounting: resident chunks and plugin chunk tickets held
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  */
 public final class ResidencySampler {
 

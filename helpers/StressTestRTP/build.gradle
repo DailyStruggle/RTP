@@ -1,7 +1,7 @@
 // helpers/StressTestRTP — umbrella Bukkit/Paper/Folia artifact packaging
 // stresstest-core + stresstest-bukkit (ADR-122 Decision 1 & 3).
 plugins {
-    id 'java'
+    id 'java-library'
     id 'com.gradleup.shadow'
 }
 
@@ -15,7 +15,10 @@ java {
 
 dependencies {
     implementation project(':helpers:stresstest-core')
-    implementation project(':helpers:stresstest-bukkit')
+    implementation 'org.jacoco:org.jacoco.core:0.8.12'
+    // Declared as `api` so Shadow's UnusedTracker seeds reachability from the Bukkit
+    // carrier entry point without excluding stresstest-core's transitive dependencies.
+    api project(':helpers:stresstest-bukkit')
     compileOnly 'org.spigotmc:spigot-api:1.20.4-R0.1-SNAPSHOT'
 
     testImplementation project(':helpers:stresstest-core')
@@ -42,6 +45,13 @@ shadowJar {
     archiveClassifier.set('')
     // ADR-122 Decision 3: shade and relocate server-api so it never clashes with an installed LeafRTP jar.
     relocate 'io.github.dailystruggle.server.api', 'io.github.dailystruggle.helpers.stresstestrtp.shaded.server.api'
+    // Strip unused classes from shaded libraries (JaCoCo analysis/instrumentation/report
+    // packages and transitive ASM) by tracing reachability from the stresstest-bukkit root.
+    minimize()
+    exclude 'org/jetbrains/annotations/**'
+    exclude 'org/intellij/lang/annotations/**'
+    exclude 'META-INF/maven/**'
+    exclude 'META-INF/versions/*/module-info.class'
 }
 
 jar {

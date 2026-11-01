@@ -5,7 +5,7 @@
 
 ## Context
 
-LeafRTP ships unified multi-platform "fat" assembly jars (`LeafRTP-Pro-<ver>.jar` and `LeafRTP-<ver>.jar`), as established in [ADR-010](ADR-010-versioned-platform-adapter-submodules.md) and [ADR-024](ADR-024-rtp-lite-assembly-variant.md). To support cross-version server deployments without requiring operators to download version-specific builds, the unified jar bundles multiple NMS and platform version carriers:
+LeafRTP ships unified multi-platform "fat" assembly jars (`LeafRTP-Pro-<ver>.jar` and `LeafRTP-<ver>.jar`), as established in [ADR-010](ADR-010-versioned-platform-adapter-submodules.md) and [leafrtp-ADR-016](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-016-rtp-lite-assembly-variant.md). To support cross-version server deployments without requiring operators to download version-specific builds, the unified jar bundles multiple NMS and platform version carriers:
 - 7 Bukkit/Paper version adapter submodules (`v1_20_R1`, `v1_20_R2`, `v1_20_R3`, `v1_20_R4`, `v1_21_R1`, `v1_21_R5`, `v1_21_R11`)
 - 7 Fabric version carrier submodules (`v1_20_R1` through `v26_3_R1`)
 
@@ -27,7 +27,7 @@ Adopt **Active Baseline Target Normalization (Option B)** for live-server and wh
    Dormant legacy version shims (`**/bukkit/v1_20*/**`, `**/bukkit/v1_21_R1/**`, `**/bukkit/v1_21_R5/**`, and legacy Fabric carriers) are excluded from the `jacocoServerReport` class tree, formalizing that their identical instruction paths are transitively attested by the active baseline target.
 
 3. **Shaded Third-Party Decompression Codec Exclusion:**
-   Shaded third-party compression libraries (`**/lz4/**`) packaged in the unified distribution jar are excluded from coverage analysis, matching the previous retirement and cleanup of HikariCP ([ADR-101](ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement.md)).
+   Shaded third-party compression libraries (`**/lz4/**`) packaged in the unified distribution jar are excluded from coverage analysis, matching the previous retirement and cleanup of HikariCP ([leafrtp-ADR-079](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-079-in-house-sql-connection-pool-and-hikaricp-retirement.md)).
 
 4. **Structural Parity Verification:**
    Cross-version adapter parity shall be maintained via static interface conformance and automated AST/bytecode parity checks to guarantee that dormant legacy adapters introduce no divergent business logic from the active baseline.

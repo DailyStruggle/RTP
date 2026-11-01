@@ -4,7 +4,7 @@
 > Scope: whole repository. Goal: make "enterprise quality and compatibility" a claim
 > that an outside reviewer can verify without the maintainer's help.
 > Companion docs: [COVERAGE_PLAN.md](COVERAGE_PLAN.md) (rtp-core tactics),
-> [TRACEABILITY.md](TRACEABILITY.md), [REQUIREMENTS.md](REQUIREMENTS.md).
+> [TRACEABILITY.md](../../resource/LeafRTP/docs/dev/TRACEABILITY.md), [REQUIREMENTS.md](REQUIREMENTS.md).
 > Decision record: [ADR-094](../adr/ADR-094-quality-engineering-gates.md) records the
 > gating architecture (tiered logic tests, opt-in PMD static analysis, server-less
 > changed-line coverage) that this plan executes.
@@ -81,10 +81,10 @@ graph. These are instruction / branch percentages, not estimates.
 | `maps-api` | 96.2 | 84.6 | 210 | Raised from 67.6 / 48.6 on 2026-09-10. Strict `0.90 / 0.80` JaCoCo gate enforced. |
 | `anvil-api` | 91.7 | 82.7 | 460 | Raised from 71.1 / 60.3 on 2026-09-10. Strict `0.90 / 0.80` JaCoCo gate enforced. |
 | `tags-api` | 98.2 | 90.9 | 24 | Raised from 84.5 / 74.4 on 2026-09-10. Enforced Stage A floor `0.95 / 0.85`. |
-| `bit-api` | >= 90.0 | >= 80.0 | - | Standalone Built-In Test contract and code registry ([ADR-121](../adr/ADR-121-built-in-test-for-configuration-and-the-action-engine.md)). Strict `0.90 / 0.80` JaCoCo gate enforced. |
+| `bit-api` | >= 90.0 | >= 80.0 | - | Standalone Built-In Test contract and code registry ([leafrtp-ADR-091](../../resource/LeafRTP/docs/adr/leafrtp-ADR-091-built-in-test-for-configuration-and-the-action-engine.md)). Strict `0.90 / 0.80` JaCoCo gate enforced. |
 | `bstats-api` | >= 90.0 | >= 80.0 | - | Dependency-free bStats v2 client ([bstats-api-ADR-001](../../api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)). Strict `0.90 / 0.80` JaCoCo gate enforced. |
 | `units-api` | 86.3 | 67.9 | - | Temporal, spatial, and data-size parsers extracted from `rtp-core`. Enforced floor `0.85 / 0.66`. |
-| `server-api` | >= 90.0 | >= 80.0 | - | Platform-neutral `ServerAccessor`, `PlatformFamily`, and `ServerAccessors` SPI ([ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md)). Covered by `ServerAccessorsTest` and `BootstrapLogBufferTest`. |
+| `server-api` | >= 90.0 | >= 80.0 | - | Platform-neutral `ServerAccessor`, `PlatformFamily`, and `ServerAccessors` SPI ([effects-api-ADR-008](../../api/effects-api/docs/adr/effects-api-ADR-008-effects-through-neutral-server-accessor.md)). Covered by `ServerAccessorsTest` and `BootstrapLogBufferTest`. |
 
 `effects-api` (21.9 / 19.7) is listed with the platform set below: two of its three
 largest packages (`effectsapi/fabric`, `effectsapi/bukkit`) are platform bindings.
@@ -97,7 +97,7 @@ largest packages (`effectsapi/fabric`, `effectsapi/bukkit`) are platform binding
 | `rtp-plugin` | 13.7 | 17,292 | 40% (it is an assembler; most lines are wiring) |
 | `rtp-fabric-common` | 11.5 | 13,751 | 40-50% |
 | `rtp-bukkit-common` | 21.2 | 8,221 | 50-60% |
-| `rtp-folia-common` | 8.7 | 5,855 | JaCoCo not the metric - platform-coupled; exercised by the in-game `test` command against a live Folia server + devstack acceptance harness. Server-bound paths and their owning `rtp test *` subcommands are inventoried in [`platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md`](../../platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md). Suite verified green 2026-09-11 (item 21). |
+| `rtp-folia-common` | 8.7 | 5,855 | JaCoCo not the metric - platform-coupled; exercised by the in-game `test` command against a live Folia server + devstack acceptance harness. Server-bound paths and their owning `rtp test *` subcommands are inventoried in [`platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md`](../../platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md). Suite verified green 2026-09-11 (item 21). |
 | `effects-api` | 21.9 | 7,295 | 60% overall, 90% on `common/` |
 | `rtp-paper-common` | 15.9 | 1,475 | 60% |
 | `rtp-proxy-velocity` | 50.1 | 1,906 | 70% |
@@ -475,7 +475,7 @@ identifiers unquoted to match the folded columns.
       "realistic ceiling" in section 2.2 is therefore aspirational, not a floor.
       **Follow-up (2026-09-11):** the honest coverage metric for this module is a
       server-bound-path inventory, not JaCoCo. Committed as
-      [`platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md`](../../platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md):
+      [`platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md`](../../platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md):
       it maps every platform-only path to its owning `rtp test *` subcommand and
       names the gaps (live force-load ticketing, block placement/restore, world
       persistence, region timers, client effects, teleport-landing assertion).
@@ -622,7 +622,7 @@ identifiers unquoted to match the folded columns.
       / NeoForge / Velocity / BungeeCord) x MC version x Java version, each cell marked
       **tested / best-effort / unsupported**. No cell may say "should work".
       **Done (2026-09-12):** Authored and published canonical matrix at
-      [`docs/dev/SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md), referenced in `INDEX.md` and
+      [`docs/dev/SUPPORT_MATRIX.md`](../../resource/LeafRTP/docs/dev/SUPPORT_MATRIX.md), referenced in `INDEX.md` and
       `MAP.md`. Details definitions for Tested / Best-effort / Unsupported, mandates Java 21+
       across all platforms (REQ-RTP-SYS-001), covers server platforms (Paper + forks, Folia,
       Spigot, Fabric, NeoForge) across MC 1.19.4 through 26.x, proxies (Velocity 3.3.x+,
@@ -667,8 +667,8 @@ identifiers unquoted to match the folded columns.
       `wiki/Migrating.md` per-major and backed by a test.
       **Done (2026-09-12):**
       - Documented config upgrade and schema versioning lifecycle in
-        [`docs/admin/configuration/CONFIG_LIFECYCLE.md`](../admin/configuration/CONFIG_LIFECYCLE.md)
-        and [`docs/admin/MIGRATION.md`](../admin/MIGRATION.md).
+        [`docs/admin/configuration/CONFIG_LIFECYCLE.md`](../../resource/LeafRTP/docs/admin/configuration/CONFIG_LIFECYCLE.md)
+        and [`docs/admin/MIGRATION.md`](../../resource/LeafRTP/docs/admin/MIGRATION.md).
       - Backed by automated unit test suites in `rtp-core`: `ConfigParserUpdateTest` (verifies
         automatic version detection, `.old1` file rotation, default extraction, and user value
         overlay), `ConfigParserLocaleSwitchTest`, `MultiConfigParserLocaleSwitchTest`, and
@@ -761,7 +761,7 @@ identifiers unquoted to match the folded columns.
       history table.
 - [x] 46\. One-page licensing clarity across `LICENSE` / `LICENSE-MIT` and the
       Pro / Lite split (ADR-024, superseded by ADR-100 and ADR-108). Ambiguity blocks adoption more than bugs do.
-      **Done (2026-09-12, updated 2026-10-05 per [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md)):** Created [`docs/dev/LICENSING.md`](LICENSING.md) detailing the all-MIT licensing model (superseding ADR-061's open-core split), per-module license mapping, Lite vs Pro technical parity and support-tier differentiation ([ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md), [ADR-117](../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)), commercial usage guidelines, and build-time compliance auditing.
+      **Done (2026-09-12, updated 2026-10-05 per [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md)):** Created [`docs/dev/LICENSING.md`](LICENSING.md) detailing the all-MIT licensing model (superseding ADR-061's open-core split), per-module license mapping, Lite vs Pro technical parity and support-tier differentiation ([leafrtp-ADR-078](../../resource/LeafRTP/docs/adr/leafrtp-ADR-078-superseding-adr-024-sla-and-support-tier.md), [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md), [leafrtp-ADR-087](../../resource/LeafRTP/docs/adr/leafrtp-ADR-087-release-cadence-contractual-pro-discretionary-lite.md)), commercial usage guidelines, and build-time compliance auditing.
 - [x] 47\. Add severity + status columns to `POTENTIAL_BUGS.md` so it reads as a
       managed backlog rather than a pile of open defects.
       **Done (2026-09-12):** Updated [`docs/dev/POTENTIAL_BUGS.md`](POTENTIAL_BUGS.md) adding explicit
@@ -782,7 +782,7 @@ identifiers unquoted to match the folded columns.
       `rtp-core/build.gradle` lines 33 and 144, where an em dash was corrupted.
       **Done (2026-09-12):**
       - Created automated scanner/verification tool [`scripts/check-mojibake.py`](../../scripts/check-mojibake.py).
-      - Repaired all live mojibake sequences in `rtp-core/build.gradle`, `platforms/rtp-fabric/*/build.gradle`,
+      - Repaired all live mojibake sequences in `rtp-core/build.gradle`, `platforms/fabric/*/build.gradle`,
         and `docs/dev/MULTI_SERVER_PLAN.md`.
       - Wired `python3 scripts/check-mojibake.py` into both CI test jobs in `.github/workflows/gradle.yml`.
 - [x] 50\. Sweep the stray untracked `.bak` files out of the working tree

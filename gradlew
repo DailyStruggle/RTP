@@ -64,11 +64,20 @@
 #
 ##############################################################################
 
-# Transparent concurrency serialization for concurrent LLM tasks / processes
+# Transparent concurrency serialization for concurrent LLM tasks / processes (ADR-115):
+# Delegates to gradle/rtp-gradle-lock.py (POSIX python3 + fcntl.flock) to compute the sorted
+# transitive project(':...') dependency closure from settings.gradle and build.gradle and acquire
+# per-module flock locks in deterministic lexicographical order (matching gradle/rtp-gradle-lock.ps1).
 if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
-    export RTP_GRADLE_LOCKED=1
+    APP_DIR=$(cd "${0%/*}" 2>/dev/null && pwd -P) || APP_DIR=.
+    LOCK_HELPER="${RTP_GRADLE_LOCK_HELPER:-$APP_DIR/gradle/rtp-gradle-lock.py}"
+    if [ -f "$LOCK_HELPER" ] && command -v python3 >/dev/null 2>&1 && python3 -c "import fcntl" >/dev/null 2>&1; then
+        exec python3 "$LOCK_HELPER" "$0" "$@"
+    fi
 
-    # Inspect arguments to extract module target if non-conflicting
+    FALLBACK_MSG="${RTP_GRADLE_FALLBACK_MSG:-[gradlew] python3/fcntl unavailable ($LOCK_HELPER); using POSIX sh lock fallback.}"
+    printf '%s\n' "$FALLBACK_MSG" >&2
+    export RTP_GRADLE_LOCKED=1
     TARGET_MODULE=""
     NON_MODULE_TASKS=0
     MULTIPLE_MODULES=0
@@ -110,16 +119,16 @@ if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
     LOCK_SUFFIX="build"
     if [ -n "$TARGET_MODULE" ] && [ "$NON_MODULE_TASKS" -eq 0 ] && [ "$MULTIPLE_MODULES" -eq 0 ]; then
         LOCK_SUFFIX="mod_${TARGET_MODULE}"
-        # A module whose build files reference another top-level project shares that project's build
-        # outputs with any concurrent run that also depends on it (e.g. :effects-api:remapJar under both
-        # :rtp-core and :rtp-plugin), so such runs take the global lock. gradle/rtp-gradle-lock.ps1
-        # locks the dependency closure instead; flock here has too few descriptors for that.
-        APP_DIR=$(cd "${0%/*}" 2>/dev/null && pwd -P) || APP_DIR=.
+        # Without python3 (gradle/rtp-gradle-lock.py), POSIX sh has too few descriptors to lock a
+        # multi-module dependency closure, so fall back to the global build lock when the target's
+        # build files reference another in-tree project.
         mod_dir=$(sed -n "s/^[[:space:]]*project([[:space:]]*['\"]:${TARGET_MODULE}['\"][[:space:]]*)\.projectDir[[:space:]]*=[[:space:]]*file([[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" "$APP_DIR/settings.gradle" 2>/dev/null | head -n 1)
         [ -n "$mod_dir" ] || mod_dir="$TARGET_MODULE"
         if [ -d "$APP_DIR/$mod_dir" ] && find "$APP_DIR/$mod_dir" -name build -prune -o \( -name build.gradle -o -name build.gradle.kts \) \
                 -exec grep -ho "project([[:space:]]*\(path[[:space:]]*[:=][[:space:]]*\)\{0,1\}['\"]:[A-Za-z0-9_.:-]*" {} + 2>/dev/null \
                 | sed "s/.*['\"]://; s/:.*//" | grep -qvxF "$TARGET_MODULE"; then
+            CROSS_DEP_MSG="${RTP_GRADLE_CROSS_DEP_MSG:-[gradlew] :${TARGET_MODULE} references in-tree projects; POSIX sh fallback acquiring global lock.}"
+            printf '%s\n' "$CROSS_DEP_MSG" >&2
             LOCK_SUFFIX="build"
         fi
     fi

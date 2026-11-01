@@ -135,4 +135,30 @@ class DistributionSamplerTest {
                 avgHammingDistance >= 24.0 && avgHammingDistance <= 40.0,
                 "Expected ~32-bit avalanche Hamming distance, got " + avgHammingDistance);
     }
+
+    @Test
+    @DisplayName("sampleWeightedIndex, spreadPoolWeight, normalizePoolWeights, and gridCellSample satisfy discrete sampling contracts")
+    void weightedPoolAndGridSampling() {
+        int[] weights = {10, 30, 60};
+        assertEquals(0, DistributionSampler.sampleWeightedIndex(weights, bound -> 5));
+        assertEquals(1, DistributionSampler.sampleWeightedIndex(weights, bound -> 10));
+        assertEquals(1, DistributionSampler.sampleWeightedIndex(weights, bound -> 39));
+        assertEquals(2, DistributionSampler.sampleWeightedIndex(weights, bound -> 40));
+        assertEquals(2, DistributionSampler.sampleWeightedIndex(weights, bound -> 99));
+        assertEquals(-1, DistributionSampler.sampleWeightedIndex(new int[0], bound -> 0));
+        assertEquals(-1, DistributionSampler.sampleWeightedIndex(new int[] {0, -5}, bound -> 0));
+
+        assertEquals(2520, DistributionSampler.spreadPoolWeight(1, 1));
+        assertEquals(840, DistributionSampler.spreadPoolWeight(1, 3));
+
+        int[] normalized = DistributionSampler.normalizePoolWeights(new int[] {2520, 1260}, 150);
+        assertArrayEquals(new int[] {150, 75}, normalized);
+        assertArrayEquals(new int[] {10, 20}, DistributionSampler.normalizePoolWeights(new int[] {10, 20}, 150));
+
+        int[] targetA = DistributionSampler.gridCellSample(7, -5, 4, 12345L, 99);
+        int[] targetB = DistributionSampler.gridCellSample(6, -8, 4, 12345L, 99);
+        assertArrayEquals(targetA, targetB, "Chunks in the same 4x4 cell must resolve to the same target chunk");
+        assertTrue(targetA[0] >= 4 && targetA[0] < 8);
+        assertTrue(targetA[1] >= -8 && targetA[1] < -4);
+    }
 }

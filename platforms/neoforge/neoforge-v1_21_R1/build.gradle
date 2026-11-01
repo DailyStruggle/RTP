@@ -1,0 +1,54 @@
+// Phase N1 — NeoForge per-MC carrier for the 1.21.x line (NeoForge 21.1.x).
+//
+// Mirrors platforms/fabric/fabric-v1_21_R1 (rtp-fabric-ADR-001): this
+// submodule supplies the actual runtime mod jar pinned to its MC version and
+// hosts any NM-typed surfaces that drift across MC revs (the version adapter).
+// rtp-neoforge-common holds the version-agnostic glue and compiles against the
+// same 1.21.1 Mojmap line purely to typecheck.
+//
+// NeoForge is Mojmap-at-runtime on 1.20.4+, so unlike the Fabric v26_*_R1
+// carriers there is no obf/unobf split here (NEOFORGE_NOTES.md section 5); the
+// per-version isolation is purely about absorbing Mojmap name drift, never
+// leaking it into rtp-core / rtp-api.
+//
+// Included BY DEFAULT and merged into the unified LeafRTP-Pro jar; drop it with
+// `-PexcludeNeoforge` (see settings.gradle) on hosts without network access for
+// the NeoForge userdev artifacts.
+
+plugins {
+    // Version pinned centrally in settings.gradle pluginManagement.plugins {}
+    // (2.0.78 -- the proven, host-cached version this 1.21.x line builds with).
+    // Apply with a bare id so this carrier and rtp-neoforge-common share one
+    // moddev classloader. Only the experimental, JDK-25-gated 26.1 carrier
+    // overrides to a newer moddev (in its own build.gradle).
+    id 'net.neoforged.moddev'
+}
+
+ext {
+    minecraftVersion = '1.21.1'
+    neoforgeVersion  = '21.1.95'
+}
+
+neoForge {
+    version = neoforgeVersion
+
+    // Dev-launch run config (NEOFORGE_NOTES.md section 8). The Phase N1 exit gate is a
+    // single /rtp round-trip on a dev server launched via `:neoforge:neoforge-v1_21_R1:runServer`.
+    runs {
+        server {
+            server()
+        }
+    }
+
+    mods {
+        rtp {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // Version-agnostic NeoForge glue + the platform-neutral RTP modules it
+    // re-exports (rtp-api / rtp-core / commands-api / anvil-api).
+    implementation project(':neoforge:neoforge-common')
+}

@@ -77,7 +77,7 @@ def main(argv: list[str]) -> int:
         if result.returncode != 0:
             raise SystemExit(f"gradle build failed (exit {result.returncode})")
 
-    libs_dir = repo_root / "addons" / "LeafRTPGuiAddon" / "rtp-gui" / "build" / "libs"
+    libs_dir = repo_root / "resource" / "LeafRTP" / "addons" / "LeafRTPGuiAddon" / "rtp-gui" / "build" / "libs"
     jars = sorted(libs_dir.glob("LeafRTPGuiAddon-*.jar"),
                   key=lambda p: p.stat().st_mtime, reverse=True) if libs_dir.exists() else []
     if not jars:

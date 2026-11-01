@@ -1,0 +1,42 @@
+{
+  "name": "leaf:taiga/giants",
+  "fallback": "minecraft:empty",
+  "elements": [
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "leaf:taiga/spruce_spruce_spruce_log_spruce_leaves_h57_s3508",
+        "processors": "minecraft:empty",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "leaf:taiga/spruce_spruce_spruce_log_spruce_leaves_h68_s3508",
+        "processors": "minecraft:empty",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 2,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "leaf:taiga/spruce_spruce_spruce_log_spruce_leaves_h75_s3509",
+        "processors": "minecraft:empty",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "leaf:taiga/spruce_spruce_spruce_log_spruce_leaves_h82_s3509",
+        "processors": "minecraft:empty",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

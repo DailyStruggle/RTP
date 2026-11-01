@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "leaf:volcano",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 80517,
+    "spacing": 24,
+    "separation": 8,
+    "spread_type": "linear"
+  }
+}

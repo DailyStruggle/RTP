@@ -1,0 +1,1106 @@
+package io.github.dailystruggle.rtp.fabric.v26_2_R1;
+
+import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
+import io.github.dailystruggle.anvil.AnvilColumnProbeAdapter;
+import io.github.dailystruggle.anvil.AnvilProbeSupport;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.storage.LevelResource;
+
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+
+/**
+ * MC 26.1.2 RTPWorld wrapper.
+ *
+ * <p>Lives in {@code rtp-fabric-V26_2_R1} (Loom unobfuscated, no intermediary
+ * remapping) so its compiled bytecode references {@code net.minecraft.server.level.ServerLevel}
+ * and friends by Mojang names - which is the actual class layout on a deobfuscated
+ * 26.1.2 runtime. Common's {@code FabricRTPWorld} cannot link there because its
+ * constant pool contains intermediary aliases ({@code class_3218} etc.) that
+ * don't exist on that runtime.
+ *
+ * <p>Includes an ADR-016 anvil pre-filter override of {@code probeChunkColumn}
+ * (parity with {@code FabricRTPWorldUnobf}) so {@code ScanTask} / {@code PregenTask}
+ * / {@code QueueTask} can cheaply reject ungenerated chunks via {@code .mca}
+ * reads instead of falling back to {@code runFullLoadPath} and tripping the
+ * 2s chunk-ticket budget.
+ */
+public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
+
+    private final String name;
+    private final UUID id;
+
+    /**
+     * Weak live-chunk cache keyed by {@code (cz << 32) | cx}; vanilla's chunk holder keeps the
+     * referent alive while loaded, so this tier never retains a chunk the server has unloaded.
+     * Cleared referents are expunged via {@link #clearedChunks}. Parity with {@code FabricRTPWorldUnobf}.
+     */
+    private final ConcurrentHashMap<Long, KeyedChunkRef> chunkCache = new ConcurrentHashMap<>();
+    private final ReferenceQueue<ChunkAccess> clearedChunks = new ReferenceQueue<>();
+
+    private static final int RECENT_LOADED_CAP = 1024;
+
+    /**
+     * Bounded strong pin of recent live loads: keeps a fresh chunk resolvable through
+     * {@link #getCachedChunk(long)} after the temp load-ticket lapses (promotion verify window).
+     * Access-order LRU; the eldest pin drops past {@link #RECENT_LOADED_CAP}.
+     */
+    private final Map<Long, V26_2_R1FabricRTPChunk> recentlyLoadedChunks = Collections.synchronizedMap(
+            new LinkedHashMap<Long, V26_2_R1FabricRTPChunk>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, V26_2_R1FabricRTPChunk> eldest) {
+                    return size() > RECENT_LOADED_CAP;
+                }
+            });
+
+    private final AnvilProbeSupport anvilProbeSupport = new AnvilProbeSupport();
+
+    private static final class KeyedChunkRef extends WeakReference<ChunkAccess> {
+        final long key;
+
+        KeyedChunkRef(long key, ChunkAccess chunk, ReferenceQueue<ChunkAccess> queue) {
+            super(chunk, queue);
+            this.key = key;
+        }
+    }
+
+    private void expungeClearedChunks() {
+        for (Reference<? extends ChunkAccess> r; (r = clearedChunks.poll()) != null; ) {
+            chunkCache.remove(((KeyedChunkRef) r).key, r);
+        }
+    }
+
+    public V26_2_R1FabricRTPWorld(ServerLevel level) {
+        super(level);
+        this.name = resolveDimensionName(level);
+        // Stable UUID derived from the dimension name (matches FabricRTPWorld convention).
+        this.id = UUID.nameUUIDFromBytes(("rtp-fabric-world:" + this.name).getBytes());
+    }
+
+    private static String resolveDimensionName(ServerLevel level) {
+        // On MC 26.1.2 (verified via javap on the deobf jar) Level exposes its
+        // ResourceKey<Level> via dimension(); ResourceKey was renamed
+        // location() -> identifier() on this MC release.
+        try {
+            return level.dimension().identifier().toString();
+        } catch (Throwable t) {
+            return "unknown";
+        }
+    }
+
+    @Override public String name() { return name; }
+    @Override public UUID id() { return id; }
+
+    private static long key(int cx, int cz) {
+        return ((long) cx & 0xffffffffL) | ((long) cz << 32);
+    }
+
+    // --- Transient generation load-ticket (ported from V26_1_R1NeoForgeVersionAdapter) ---
+    // Without an explicit load-ticket the public getChunkFuture(create=true)
+    // resolves with no ChunkAccess on the deobf MC 26.x chunk system, which
+    // floods the log with nullChunk/asyncLoadNull and starves the kept cache.
+    // A dedicated, non-persistent (S-002: FLAG_PERSIST omitted), self-expiring
+    // (~30s = 600 ticks; a missed release self-heals) ticket type, applied on
+    // the server tick thread and released once the generation future resolves.
+    private static final int RTP_TICKET_RADIUS = 1;
+    private static final int RTP_TEMP_LOAD_TICKET_FLAGS =
+            TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION;
+    private static final TicketType RTP_TEMP_LOAD_TICKET_TYPE =
+            new TicketType(600L, RTP_TEMP_LOAD_TICKET_FLAGS);
+
+    private final java.util.Set<ChunkPos> activeTempLoadTickets = ConcurrentHashMap.newKeySet();
+    private volatile boolean inactive = false;
+
+    /**
+     * Apply the transient generation load-ticket for {@code cp}. Best-effort:
+     * a failure is logged at FINE and reported via the return value so the
+     * caller skips the matching removal. Must be invoked on the server tick thread.
+     */
+    private boolean tryAddTempLoadTicket(ServerLevel level, ChunkPos cp) {
+        if (inactive) return false;
+        try {
+            level.getChunkSource().addTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+            activeTempLoadTickets.add(cp);
+            return true;
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][V26_2_R1] temp load-ticket apply failed for chunk=" + cp + ": "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Release the transient generation load-ticket for {@code cp} on the server
+     * tick thread (hops via {@link MinecraftServer#execute} when called
+     * off-thread, e.g. from the chunk-future completion). The ticket type also
+     * carries a timeout, so a dropped removal self-heals.
+     */
+    private void scheduleTempLoadTicketRemoval(ServerLevel level, ChunkPos cp) {
+        MinecraftServer server = level.getServer();
+        Runnable remove = () -> {
+            activeTempLoadTickets.remove(cp);
+            try {
+                level.getChunkSource().removeTicketWithRadius(RTP_TEMP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+            } catch (Throwable t) {
+                RTP.log(Level.FINE,
+                        "[RTP][V26_2_R1] temp load-ticket release failed for chunk=" + cp + ": "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+        };
+        if (server != null && !server.isSameThread()) {
+            server.execute(remove);
+        } else {
+            remove.run();
+        }
+    }
+
+    /**
+     * Loads {@code (cx, cz)} at {@code ChunkStatus.FULL} and caches a
+     * {@link V26_2_R1FabricRTPChunk} wrapper, resolving the future with the
+     * chunk key.
+     *
+     * <p><b>Non-blocking dispatch (rtp-fabric-ADR-008, ported from the
+     * V26_1_R1NeoForgeVersionAdapter fix).</b> The transient generation
+     * load-ticket is applied on the server tick thread, then vanilla's public
+     * {@code ServerChunkCache#getChunkFuture(cx, cz, FULL, /*create=*&#47;true)}
+     * is invoked <i>off</i> the tick thread, where it takes its non-blocking
+     * {@code supplyAsync(() -> getChunkFutureMainThread(...), mainThreadProcessor)}
+     * branch and the normal server tick pumps generation to completion. Invoked
+     * <i>on</i> the tick thread the returned future is never driven (it hangs
+     * until the live-load deadline) or parks the tick loop; <i>without</i> the
+     * load-ticket {@code getChunkFuture(create=true)} resolves with no
+     * {@code ChunkAccess} on the deobf MC 26.x chunk system, flooding the log
+     * with {@code nullChunk/asyncLoadNull} and starving the kept cache.</p>
+     */
+    @Override
+    public CompletableFuture<Long> getChunkAt(int cx, int cz) {
+        return resolveChunkKey(cx, cz, true);
+    }
+
+    @Override
+    public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
+        return resolveChunkKey(cx, cz, false);
+    }
+
+    private CompletableFuture<Long> resolveChunkKey(int cx, int cz, boolean allowLive) {
+        if (inactive) return CompletableFuture.completedFuture(null);
+        ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
+        MinecraftServer server = level.getServer();
+        if (server == null) return CompletableFuture.completedFuture(null);
+        long k = key(cx, cz);
+        if (getLiveCachedChunk(k) != null) {
+            return CompletableFuture.completedFuture(k);
+        }
+        if (shouldPrefilter(cx, cz)) {
+            java.nio.file.Path worldFolder;
+            try {
+                worldFolder = server.getWorldPath(LevelResource.ROOT);
+            } catch (Throwable t) {
+                worldFolder = null;
+            }
+            if (worldFolder != null) {
+                String dim = dimensionRegionSubpath(worldFolder, level);
+                java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
+                return anvilProbeSupport
+                        .probeAndPublish(worldFolder, dim, cx, cz, k, rawUnsafe,
+                                s -> (RTPRuntime.serverAccessor() != null)
+                                        ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
+                                        : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s))
+                        .thenCompose(result -> {
+                            if (inactive) return CompletableFuture.completedFuture(null);
+                            io.github.dailystruggle.anvil.AnvilChunkView view = result.view();
+                            if (view != null) {
+                                return CompletableFuture.completedFuture(k);
+                            }
+                            return allowLive
+                                    ? loadLiveChunk(level, server, cx, cz, k)
+                                    : CompletableFuture.completedFuture(null);
+                        });
+            }
+        }
+        if (!allowLive && !isChunkLoaded(cx, cz)) return CompletableFuture.completedFuture(null);
+        return loadLiveChunk(level, server, cx, cz, k);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.Set<String> currentUnsafeBlocks() {
+        try {
+            if (ActiveConfigs.get() == null) return java.util.Collections.emptySet();
+            Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
+            if (raw instanceof java.util.Collection<?> c) {
+                java.util.Set<String> out = new java.util.HashSet<>(c.size());
+                for (Object o : c) if (o != null) out.add(o.toString());
+                return out;
+            }
+        } catch (Throwable ignored) {
+        }
+        return java.util.Collections.emptySet();
+    }
+
+    private CompletableFuture<Long> loadLiveChunk(
+            ServerLevel level, MinecraftServer server, int cx, int cz, long k) {
+        if (inactive) return CompletableFuture.completedFuture(null);
+        // Live-load entry: counted once here (getChunkAtAsync and getOrLoadChunk route through it).
+        totalChunkLoads.incrementAndGet();
+        final ChunkPos ticketPos = new ChunkPos(cx, cz);
+        // (1) Apply the transient generation load-ticket ON the tick thread, then
+        //     (2) invoke requestChunkFuture (the public getChunkFuture) OFF the
+        //     tick thread via RTP_CONTINUATION_EXECUTOR so vanilla self-pumps
+        //     generation. Release the ticket once the generation future settles.
+        return server.submit(() -> tryAddTempLoadTicket(level, ticketPos))
+                .thenComposeAsync(ticketAdded -> {
+                    if (inactive) {
+                        if (Boolean.TRUE.equals(ticketAdded)) {
+                            scheduleTempLoadTicketRemoval(level, ticketPos);
+                        }
+                        return CompletableFuture.completedFuture((ChunkAccess) null);
+                    }
+                    CompletableFuture<ChunkAccess> inner = requestChunkFuture(level, cx, cz);
+                    if (inner == null) inner = CompletableFuture.completedFuture((ChunkAccess) null);
+                    return inner.whenComplete((ca, ex) -> {
+                        if (Boolean.TRUE.equals(ticketAdded)) {
+                            scheduleTempLoadTicketRemoval(level, ticketPos);
+                        }
+                    });
+                }, RTP_CONTINUATION_EXECUTOR)
+                .thenApply(ca -> {
+                    if (ca == null || inactive) return null;
+                    expungeClearedChunks();
+                    chunkCache.put(k, new KeyedChunkRef(k, ca, clearedChunks));
+                    recentlyLoadedChunks.put(k, new V26_2_R1FabricRTPChunk(ca, level, id));
+                    anvilProbeSupport.evict(k);
+                    return k;
+                })
+                .exceptionally(t -> {
+                    RTP.log(Level.WARNING,
+                            "[RTP][V26_2_R1] getChunkAt(" + cx + "," + cz + ") failed for "
+                                    + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                    return null;
+                });
+    }
+
+    /** Cached resolver for {@code ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean)}. */
+    private static volatile java.lang.reflect.Method GET_CHUNK_FUTURE_METHOD;
+
+    /**
+     * Executor that hops RTP's chunk-future continuations OFF vanilla's
+     * completing thread. On the 26.x chunk system vanilla completes a
+     * {@code ChunkHolder}'s full-chunk future <i>inline on the server tick
+     * thread</i> from inside {@code DistanceManager.runAllUpdates}
+     * ({@code ChunkHolder.updateFutures} -> {@code CompletableFuture.complete}).
+     * If RTP chains its pipeline directly (via {@code thenApply}/{@code thenCompose})
+     * onto that future, the whole RTP pipeline runs re-entrantly mid-iteration
+     * and mutates the {@code DistanceManager}'s {@code chunksToUpdateFutures}
+     * set while it is being iterated -- the fastutil
+     * {@code ReferenceOpenHashSet$SetIterator} {@code wrapped == null} crash
+     * (NPE in {@code runAllUpdates}). Routing the first continuation through
+     * the async scheduler guarantees RTP work never executes inline during a
+     * chunk-system pulse (mirrors the rtp-fabric-ADR-008 off-thread
+     * self-dispatch rule the unobf carrier already follows).
+     */
+    private static final java.util.concurrent.Executor RTP_CONTINUATION_EXECUTOR =
+            r -> RTPRuntime.scheduler().runTaskAsynchronously(r);
+
+    /**
+     * Invoke vanilla's non-blocking {@code getChunkFuture(cx, cz, FULL, true)}
+     * and adapt the result to a {@code CompletableFuture<ChunkAccess>}. MUST be
+     * called OFF the server tick thread (see {@link #getChunkAt}): off-thread
+     * the public entry point takes vanilla's non-blocking
+     * {@code supplyAsync(mainThreadProcessor)} branch, which the normal server
+     * tick drains. The vanilla return type drifted
+     * ({@code Either<ChunkAccess,...>} on old lines, {@code ChunkResult<ChunkAccess>}
+     * on 1.20.5+), so the inner value is unwrapped reflectively (see
+     * {@link #unwrapChunk}). Returns {@code null} (an absent future) on a
+     * resolution failure so the caller attributes it through the standard
+     * {@code FailTypes.nullChunk} path (S-004 - no silent discard).
+     */
+    @SuppressWarnings("unchecked")
+    private CompletableFuture<ChunkAccess> requestChunkFuture(ServerLevel level, int cx, int cz) {
+        try {
+            ServerChunkCache cache = level.getChunkSource();
+            java.lang.reflect.Method getter = resolveGetChunkFutureMethod(cache);
+            Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
+            if (!(raw instanceof CompletableFuture<?> cf)) {
+                RTP.log(Level.WARNING,
+                        "[RTP][V26_2_R1] getChunkFuture returned non-CompletableFuture for chunk=("
+                                + cx + "," + cz + "): " + (raw == null ? "null" : raw.getClass()));
+                return null;
+            }
+            // thenApplyAsync (not thenApply): vanilla may complete `cf` inline on
+            // the server thread inside DistanceManager.runAllUpdates; hop the
+            // unwrap and every downstream RTP continuation onto the async
+            // scheduler so the pipeline never re-enters the chunk-ticket system
+            // mid-iteration (chunksToUpdateFutures CME). See RTP_CONTINUATION_EXECUTOR.
+            return ((CompletableFuture<Object>) cf)
+                    .thenApplyAsync(V26_2_R1FabricRTPWorld::unwrapChunk, RTP_CONTINUATION_EXECUTOR);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][V26_2_R1] requestChunkFuture(" + cx + "," + cz + ") failed for "
+                            + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return null;
+        }
+    }
+
+    private static java.lang.reflect.Method resolveGetChunkFutureMethod(ServerChunkCache cache)
+            throws ReflectiveOperationException {
+        java.lang.reflect.Method cached = GET_CHUNK_FUTURE_METHOD;
+        if (cached != null) return cached;
+        synchronized (V26_2_R1FabricRTPWorld.class) {
+            cached = GET_CHUNK_FUTURE_METHOD;
+            if (cached != null) return cached;
+            // Prefer the PUBLIC getChunkFuture over the inner getChunkFutureMainThread:
+            // getChunkAt invokes it OFF the tick thread where only the public entry
+            // point takes the non-blocking supplyAsync(mainThreadProcessor) branch.
+            // Binding the inner method off-thread returns a future the tick loop
+            // never drives (nullChunk/asyncLoadNull). Structural scan as fallback.
+            java.lang.reflect.Method found = null;
+            String[] preferredNames = { "getChunkFuture", "getChunkFutureMainThread" };
+            for (String pname : preferredNames) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                        if (!pname.equals(m.getName())) continue;
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
+                }
+                if (found != null) break;
+            }
+            if (found == null) {
+                for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                    for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                        Class<?>[] p = m.getParameterTypes();
+                        if (p.length != 4) continue;
+                        if (p[0] != int.class || p[1] != int.class) continue;
+                        if (p[2] != ChunkStatus.class) continue;
+                        if (p[3] != boolean.class) continue;
+                        m.setAccessible(true);
+                        found = m;
+                        break;
+                    }
+                }
+            }
+            if (found == null) {
+                throw new NoSuchMethodException(
+                        "ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean) not found on "
+                                + cache.getClass().getName());
+            }
+            GET_CHUNK_FUTURE_METHOD = found;
+            return found;
+        }
+    }
+
+    /**
+     * Unwrap the {@link ChunkAccess} from vanilla's {@code getChunkFuture}
+     * result, tolerant of both the {@code ChunkResult<ChunkAccess>} (1.20.5+)
+     * and legacy {@code Either<ChunkAccess,...>} shapes.
+     */
+    private static ChunkAccess unwrapChunk(Object result) {
+        if (result == null) return null;
+        if (result instanceof ChunkAccess ca) return ca;
+        // ChunkResult<ChunkAccess> (1.20.5+): orElse(null).
+        try {
+            java.lang.reflect.Method orElse = result.getClass().getMethod("orElse", Object.class);
+            Object v = orElse.invoke(result, (Object) null);
+            if (v instanceof ChunkAccess ca) return ca;
+        } catch (Throwable ignored) {
+            // fall through to the Either shape
+        }
+        // Either<ChunkAccess,...> (<=1.20.4): left().orElse(null).
+        try {
+            java.lang.reflect.Method left = result.getClass().getMethod("left");
+            Object opt = left.invoke(result);
+            if (opt != null) {
+                java.lang.reflect.Method orElse = opt.getClass().getMethod("orElse", Object.class);
+                Object v = orElse.invoke(opt, (Object) null);
+                if (v instanceof ChunkAccess ca) return ca;
+            }
+        } catch (Throwable ignored) {
+            // no recognised shape
+        }
+        return null;
+    }
+
+    /**
+     * Single-chunk {@link ChunkSet} mirroring common's {@code FabricRTPWorld#getChunkAtAsync}.
+     * The {@code done} future is completed on the same callback so consumers
+     * attaching via {@code thenCombine}/{@code allOf} are released and their
+     * dependent CF graph becomes GC-eligible.
+     */
+    @Override
+    public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
+        return getChunkAt(cx, cz).thenApply(k -> {
+            CompletableFuture<Boolean> done = new CompletableFuture<>();
+            ChunkSet set = new ChunkSet(this, cx, cz,
+                    Collections.singletonList(CompletableFuture.completedFuture(k)),
+                    done);
+            done.complete(k != null);
+            return set;
+        });
+    }
+
+    @Override
+    public boolean isChunkLoaded(int cx, int cz) {
+        try {
+            ServerChunkCache cache = world.getChunkSource();
+            return cache.hasChunk(cx, cz);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * Apply or release a non-persistent RTP-owned chunk ticket via the
+     * version adapter (see {@link V26_2_R1FabricVersionAdapter#applyTicket}).
+     *
+     * <p>Replaces the previous {@code level.setChunkForced(cx, cz, forceLoad)}
+     * call, which writes through to {@code level.dat#ForcedChunks} and would
+     * persist across an unclean shutdown (S-002 hazard). Tickets issued via
+     * {@code DistanceManager.addTicketWithRadius} live only for the JVM
+     * lifetime and never touch disk.</p>
+     */
+    @Override
+    protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+        if (forceLoad && inactive) return CompletableFuture.completedFuture(null);
+        ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
+        MinecraftServer server = level.getServer();
+        if (server == null) return CompletableFuture.completedFuture(null);
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+        if (adapter == null) {
+            CompletableFuture<Void> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new IllegalStateException(
+                    "V26_2_R1FabricRTPWorld.setForceLoadedImpl: FabricVersionAdapter not yet installed"
+                            + " (world=" + name + " chunk=(" + cx + "," + cz + "))"));
+            return failed;
+        }
+        Runnable action = () -> {
+            try {
+                io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle levelHandle =
+                        io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle.of(level);
+                CompletableFuture<Void> f = forceLoad
+                        ? adapter.applyTicket(levelHandle, cx, cz)
+                        : adapter.releaseTicket(levelHandle, cx, cz);
+                f.getNow(null);
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "[RTP][V26_2_R1] setForceLoadedImpl(" + cx + "," + cz + "," + forceLoad
+                                + ") failed for " + name + ": "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+        };
+        if (server.isSameThread()) {
+            action.run();
+            return CompletableFuture.completedFuture(null);
+        }
+        return server.submit(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    @Override
+    public CompletableFuture<Integer> getServerForceLoadedCount() {
+        // 26.1.2's ServerLevel does not expose a public getForcedChunks()
+        // accessor. Since RTP now uses non-persistent DistanceManager tickets
+        // (not setChunkForced), the relevant count is the plugin's own
+        // active-ticket count tracked by RTPWorld#chunkTickets.
+        return CompletableFuture.completedFuture((int) numForceLoaded());
+    }
+
+    private RTPChunk<?> getLiveCachedChunk(long key) {
+        V26_2_R1FabricRTPChunk pinned = recentlyLoadedChunks.get(key);
+        if (pinned != null) {
+            anvilProbeSupport.evict(key);
+            return pinned;
+        }
+        KeyedChunkRef ref = chunkCache.get(key);
+        if (ref == null) return null;
+        ChunkAccess chunk = ref.get();
+        if (chunk == null) {
+            chunkCache.remove(key, ref);
+            return null;
+        }
+        anvilProbeSupport.evict(key);
+        return new V26_2_R1FabricRTPChunk(chunk, world, id);
+    }
+
+    @Override
+    public RTPChunk<?> getCachedChunk(long key) {
+        RTPChunk<?> live = getLiveCachedChunk(key);
+        if (live != null) return live;
+        io.github.dailystruggle.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
+        if (view != null) {
+            int cx = (int) (key & 0xffffffffL);
+            int cz = (int) (key >> 32);
+            java.util.Set<String> reconciled = (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
+                    : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
+            return new V26_2_R1FabricRTPChunk(view, cx, cz, id, reconciled);
+        }
+        return null;
+    }
+
+    @Override
+    public void keepChunkAt(int cx, int cz) {
+        setForceLoaded(cx, cz, true);
+    }
+
+    @Override
+    public void forgetChunkAt(int cx, int cz) {
+        setForceLoaded(cx, cz, false);
+        // Drop our cached wrapper so a subsequent load re-enters the server submit
+        // path and observes any state changes that happened while unkept.
+        long k = key(cx, cz);
+        chunkCache.remove(k);
+        recentlyLoadedChunks.remove(k);
+        anvilProbeSupport.evict(k);
+    }
+
+    @Override
+    public void forgetChunks() {
+        inactive = true;
+        // S-002: drain every held keep-ticket before dropping the cache. setForceLoaded(false)
+        // decrements synchronously and releases inline when called on the server thread.
+        chunkTickets.forEach((k, count) -> {
+            int cx = (int) (k & 0xffffffffL);
+            int cz = (int) (k >> 32);
+            while (count.get() > 0) {
+                setForceLoaded(cx, cz, false);
+            }
+        });
+        ServerLevel level = world;
+        if (level != null) {
+            for (ChunkPos cp : activeTempLoadTickets) {
+                scheduleTempLoadTicketRemoval(level, cp);
+            }
+        }
+        activeTempLoadTickets.clear();
+        chunkCache.clear();
+        recentlyLoadedChunks.clear();
+        anvilProbeSupport.clear();
+    }
+
+    // ---------------------------------------------------------------------------
+    // ADR-016 anvil pre-filter -- column probe (parity with FabricRTPWorldUnobf)
+    //
+    // Without this override, RTPWorld's default probeChunkColumn returns a
+    // completed-null future, which the ScanTask / PregenTask / QueueTask
+    // probe-first fast paths treat as UNKNOWN and fall back to runFullLoadPath.
+    // On a fresh 26.1 world that means every prescan candidate force-loads its
+    // chunk, blows past the 2s ticket-apply budget, and emits the symptom in
+    // the bug report ("Chunk ticket application did not complete within 2s ...
+    // rejecting candidate"). Mirroring the unobf carrier's implementation
+    // gates the cheap reject on .mca-read-only data and reserves chunk loads
+    // for genuine accept candidates.
+    // ---------------------------------------------------------------------------
+    @Override
+    public CompletableFuture<ChunkColumnProbe> probeChunkColumn(
+            int cx, int cz, int minY, int maxY) {
+        if (minY > maxY) return CompletableFuture.completedFuture(null);
+        if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
+        ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
+        MinecraftServer server = level.getServer();
+        if (server == null) return CompletableFuture.completedFuture(null);
+
+        final java.nio.file.Path worldFolder;
+        try {
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][V26_2_R1] probeChunkColumn: getWorldPath threw for world="
+                            + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return CompletableFuture.completedFuture(null);
+        }
+        final String dim = dimensionRegionSubpath(worldFolder, level);
+        final int finalMinY = minY;
+        final int finalMaxY = maxY;
+
+        // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005).
+        return io.github.dailystruggle.anvil.AnvilPrefilter.probeColumnAsync(
+                worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
+            try {
+                if (err != null) throw err;
+                if (probe == null) return null;
+                return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
+                        s -> (RTPRuntime.serverAccessor() != null)
+                                ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
+                                : io.github.dailystruggle.anvil.PaletteIdentifierNormalizer.normalize(s)));
+            } catch (Throwable t) {
+                RTP.log(Level.FINE,
+                        "[RTP][V26_2_R1] probeChunkColumn failed for world=" + name
+                                + " chunk=(" + cx + "," + cz + "): "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+                return null;
+            }
+        });
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>MC 26.1 mirror of {@code BukkitRTPWorld#readBiomesInRegionFile}.
+     * Uses the two-arg {@code dimensionRegionSubpath(worldFolder, level)}
+     * to handle MC 26.1's unified {@code dimensions/<ns>/<path>/region/}
+     * layout alongside the legacy roots. S-005: no tick-thread chunk I/O.
+     */
+    @Override
+    public java.util.Map<Long, String> readBiomesInRegionFile(
+            int rcx, int rcz, int y) {
+        ServerLevel level = world;
+        if (level == null) return java.util.Collections.emptyMap();
+        MinecraftServer server = level.getServer();
+        if (server == null) return java.util.Collections.emptyMap();
+        final java.nio.file.Path worldFolder;
+        try {
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return java.util.Collections.emptyMap();
+        }
+        final String dim = dimensionRegionSubpath(worldFolder, level);
+        try {
+            java.nio.file.Path regionFile =
+                    io.github.dailystruggle.anvil.AnvilPrefilter
+                            .regionFileFor(worldFolder, dim, rcx << 5, rcz << 5);
+            if (regionFile == null) return java.util.Collections.emptyMap();
+            // One whole-file read under a pooled-buffer lease.
+            return io.github.dailystruggle.anvil.AnvilRegionSampler.readAllBiomes(
+                    regionFile, rcx, rcz, y, V26_2_R1FabricRTPWorld::canonicaliseBiome);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][V26_2_R1] readBiomesInRegionFile failed for world=" + name
+                            + " region=(" + rcx + "," + rcz + "): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Reads only the region header plus each requested chunk's sectors via {@link
+     * io.github.dailystruggle.anvil.AnvilRegionSampler} (ADR-104 section 4.6). S-005:
+     * blocking, off-tick only.
+     */
+    @Override
+    public java.util.Map<Long, String> sampleBiomesInRegionFile(
+            int rcx, int rcz, int y, int[] localIndices) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return java.util.Collections.emptyMap();
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            java.nio.file.Path regionFile =
+                    io.github.dailystruggle.anvil.AnvilPrefilter.regionFileFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5);
+            if (regionFile == null) return java.util.Collections.emptyMap();
+            return io.github.dailystruggle.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
+                    regionFile, rcx, rcz, y, localIndices, V26_2_R1FabricRTPWorld::canonicaliseBiome);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][V26_2_R1] sampleBiomesInRegionFile failed for world=" + name
+                            + " region=(" + rcx + "," + rcz + "): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public java.nio.file.Path anvilWorldFolder() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            return level.getServer().getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @Override
+    public String anvilDimensionSubpath() {
+        ServerLevel level = world;
+        java.nio.file.Path worldFolder = anvilWorldFolder();
+        if (level == null || worldFolder == null) return "";
+        try {
+            return dimensionRegionSubpath(worldFolder, level);
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** {@inheritDoc} S-005: blocking stat, off-tick only. */
+    @Override
+    public long regionFileModifiedMillis(int rcx, int rcz) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return -1L;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.anvil.AnvilRegionSampler.lastModifiedMillis(
+                    io.github.dailystruggle.anvil.AnvilPrefilter.regionFileFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5));
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][V26_2_R1] regionFileModifiedMillis failed for world=" + name
+                            + " region=(" + rcx + "," + rcz + "): " + t.getMessage());
+            return -1L;
+        }
+    }
+
+    /** {@inheritDoc} Lists this dimension's region directory; S-005: off-tick only. */
+    @Override
+    public java.util.List<int[]> listRegionFiles() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.anvil.RegionFileResolver.listAnvilRegionCoords(
+                    io.github.dailystruggle.anvil.RegionFileResolver.regionDirectoryFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level)));
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][V26_2_R1] listRegionFiles failed for world=" + name + ": " + t.getMessage(), t);
+            return null;
+        }
+    }
+
+    private static String canonicaliseBiome(String name) {
+        if (name == null) return null;
+        String up = name.toUpperCase(java.util.Locale.ROOT);
+        if (up.startsWith("MINECRAFT:")) return up.substring("MINECRAFT:".length());
+        return up;
+    }
+
+    // ---------------------------------------------------------------------------
+    // isChunkGenerated -- DATA-side region-file header probe.
+    //
+    // We must answer "will PRESCAN's anvil probe see anything for this chunk?"
+    // The previous server-side approach (ServerChunkCache#hasChunk +
+    // reflective ChunkMap#read) consulted live engine state, which on a fresh
+    // 26.1 world disagreed with what's actually on disk: many candidates were
+    // reported generated, prescan then returned null from the .mca read, and
+    // the pipeline fell back to runFullLoadPath one-by-one (2s ticket-budget
+    // warnings).
+    //
+    // This implementation consults the exact same bytes PRESCAN reads:
+    // AnvilPrefilter.regionFileFor + AnvilRegionByteCache.get + the Anvil
+    // location-table entry at index (cx&31) + ((cz&31) << 5). A zero
+    // sectorOffset/sectorCount means the chunk slot is empty -> not generated,
+    // so GENSCAN can route it through runFullLoadPath up front and PRESCAN
+    // is never asked about it. No JVM reflection, no engine state.
+    // ---------------------------------------------------------------------------
+    @Override
+    public boolean isChunkGenerated(int cx, int cz) {
+        ServerLevel level = world;
+        if (level == null) return true;
+        MinecraftServer server = level.getServer();
+        if (server == null) return true;
+
+        final java.nio.file.Path worldFolder;
+        try {
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return true;
+        }
+        try {
+            String dim = dimensionRegionSubpath(worldFolder, level);
+            java.nio.file.Path regionFile =
+                    io.github.dailystruggle.anvil.AnvilPrefilter
+                            .regionFileFor(worldFolder, dim, cx, cz);
+            // Missing region file = no chunk on disk for this 32x32 tile.
+            if (regionFile == null || !java.nio.file.Files.exists(regionFile)) {
+                return false;
+            }
+            // Binned fast path: a 1024-bit per-region-file occupancy bitmap
+            // amortises GENSCAN's per-chunk slot lookup across the entire 32x32
+            // tile. Built once per region file at first touch, reused until the
+            // .mca mtime advances. Avoids reparsing the location table on every
+            // sibling-chunk call.
+            return io.github.dailystruggle.anvil.AnvilRegionOccupancyCache
+                    .isOccupied(regionFile, cx, cz);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][V26_2_R1] isChunkGenerated anvil probe failed for world="
+                            + name + " chunk=(" + cx + "," + cz + "): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            // Conservative default per RTPWorld javadoc.
+            return true;
+        }
+    }
+
+    /**
+     * Applicability gate for the column probe -- parity with
+     * {@code FabricRTPWorldUnobf#shouldPrefilter}. Returns {@code true} only
+     * when the chunk is not currently loaded and
+     * {@code SafetyKeys.anvilPrefilterEnabled} is truthy. Any failure defaults
+     * to "skip prefilter" so the pipeline always has a safe fall-through.
+     */
+    private boolean shouldPrefilter(int cx, int cz) {
+        if (world == null) return false;
+        try {
+            if (isChunkLoaded(cx, cz)) return false;
+        } catch (Throwable ignored) {
+            return false;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            ConfigParser<SafetyKeys> safety =
+                    (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
+            if (safety == null) return true;
+            Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
+            if (raw instanceof Boolean b) return b;
+            if (raw != null) return Boolean.parseBoolean(raw.toString());
+            return true;
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
+    /**
+     * Map a {@link ServerLevel}'s dimension {@link Identifier} to the list of
+     * candidate on-disk region subdirectories used by vanilla, in priority
+     * order. MC 26.1 unified all dimensions under
+     * {@code <world>/dimensions/<ns>/<path>/region/}; pre-26 layouts still use
+     * the legacy roots ({@code "" for overworld, "DIM-1"/"DIM1"} for the
+     * nether/end). We return both so the probe can pick whichever exists on
+     * disk -- no need to know the engine's version a priori.
+     */
+    private static java.util.List<String> dimensionRegionSubpaths(ServerLevel level) {
+        if (level == null) return java.util.List.of("");
+        try {
+            Identifier loc = level.dimension().identifier();
+            String ns = loc.getNamespace();
+            String path = loc.getPath();
+            String unified = "dimensions/" + ns + "/" + path;
+            if ("minecraft".equals(ns)) {
+                if ("overworld".equals(path))  return java.util.List.of(unified, "");
+                if ("the_nether".equals(path)) return java.util.List.of(unified, "DIM-1");
+                if ("the_end".equals(path))    return java.util.List.of(unified, "DIM1");
+            }
+            return java.util.List.of(unified);
+        } catch (Throwable ignored) {
+            return java.util.List.of("");
+        }
+    }
+
+    /**
+     * Resolve the actual on-disk region subpath for {@code level}, preferring
+     * the first candidate from {@link #dimensionRegionSubpaths} whose
+     * {@code region/} directory exists. Falls back to the first candidate so
+     * callers always have a path to probe (and probes naturally miss for
+     * ungenerated tiles).
+     */
+    private static String dimensionRegionSubpath(java.nio.file.Path worldFolder, ServerLevel level) {
+        java.util.List<String> candidates = dimensionRegionSubpaths(level);
+        for (String c : candidates) {
+            java.nio.file.Path regionDir = c.isEmpty()
+                    ? worldFolder.resolve("region")
+                    : worldFolder.resolve(c).resolve("region");
+            try {
+                if (java.nio.file.Files.isDirectory(regionDir)) return c;
+            } catch (Throwable ignored) {
+                // try next
+            }
+        }
+        return candidates.get(0);
+    }
+
+    @Override
+    public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
+        ServerLevel level = world;
+        if (level == null) return "";
+        try {
+            Holder<Biome> holder = level.getBiome(new BlockPos(x, y, z));
+            // Holder#unwrapKey()'s ResourceKey on 26.1.2 exposes identifier() (was location()).
+            // Normalise through PaletteIdentifierNormalizer to match the form ScanTask /
+            // FabricServerAccessor.defaultBiomesFor / AnvilColumnProbeAdapter use
+            // (namespace-stripped, upper-cased). Without normalisation FULLSCAN's
+            // physical-biome check compares "MINECRAFT:PLAINS" against the
+            // namespace-stripped "PLAINS" in defaultBiomes and rejects every candidate.
+            String raw = holder.unwrapKey()
+                    .map(k -> {
+                        try { return k.identifier().toString(); }
+                        catch (Throwable t) { return ""; }
+                    })
+                    .orElseGet(() -> {
+                        // Fallback: registry reverse lookup via BuiltInRegistries.
+                        try {
+                            Identifier biomeId = level.registryAccess()
+                                    .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
+                                    .getKey(holder.value());
+                            return (biomeId == null) ? "" : biomeId.toString();
+                        } catch (Throwable t) {
+                            return "";
+                        }
+                    });
+            String n = io.github.dailystruggle.rtp.api.configuration
+                    .PaletteIdentifierNormalizer.normalize(raw);
+            return n == null ? "" : n;
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    @Override
+    public void platform(RTPLocation location) {
+        // No-op - safety platform placement is a follow-up phase. Pipeline still
+        // works without it (commit-time recheck remains authoritative).
+    }
+
+    /**
+     * ADR-058 - region-schematic paster. The decode/plan half is platform-neutral
+     * ({@link io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster}); the native
+     * block writes route back through {@link #setBlocks(java.util.List)} below. Shared instance -
+     * the paster is stateless.
+     */
+    private static final io.github.dailystruggle.rtp.api.schematic.SchematicPaster SCHEMATIC_PASTER =
+            new io.github.dailystruggle.rtp.api.schematic.WorldBlockSchematicPaster();
+
+    @Override
+    public io.github.dailystruggle.rtp.api.schematic.SchematicPaster schematicPaster() {
+        return SCHEMATIC_PASTER;
+    }
+
+    /**
+     * Native bulk block write (ADR-058). Parses each {@link io.github.dailystruggle.rtp.api.platform.BlockDelta}
+     * token through the vanilla {@code BlockStateParser} (the same parser {@code /setblock} uses,
+     * so the in-repo Sponge decoder's canonical {@code namespace:id[props]} tokens are accepted)
+     * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
+     *
+     * <p>Invoked on the server thread by the caller (the teleport pipeline dispatches the paste
+     * through {@code RTPRuntime.scheduler().runTask(location, ...)}). Performs block writes only and never
+     * loads chunks (S-005). A single undecodable token is counted as a skip and audited, never
+     * thrown (S-004).
+     *
+     * @return the number of blocks successfully placed
+     */
+    @Override
+    public int setBlocks(java.util.List<io.github.dailystruggle.rtp.api.platform.BlockDelta> blocks) {
+        ServerLevel level = world;
+        if (level == null || blocks == null || blocks.isEmpty()) return 0;
+        net.minecraft.core.HolderLookup<net.minecraft.world.level.block.Block> blockLookup;
+        try {
+            blockLookup = level.registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP][V26_2_R1] setBlocks could not resolve the block registry "
+                    + "lookup: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return 0;
+        }
+        int placed = 0;
+        String firstFailedToken = null;
+        for (io.github.dailystruggle.rtp.api.platform.BlockDelta delta : blocks) {
+            try {
+                net.minecraft.world.level.block.state.BlockState state =
+                        net.minecraft.commands.arguments.blocks.BlockStateParser
+                                .parseForBlock(blockLookup, delta.token(), false)
+                                .blockState();
+                // flags=2 (Block.UPDATE_CLIENTS): send to clients without triggering neighbour
+                // physics updates - a bulk world rewrite, not a player edit.
+                level.setBlock(new BlockPos(delta.x(), delta.y(), delta.z()), state, 2);
+                placed++;
+            } catch (Throwable e) {
+                if (firstFailedToken == null) firstFailedToken = delta.token();
+            }
+        }
+        if (firstFailedToken != null) {
+            RTP.log(Level.WARNING, "[RTP][V26_2_R1] setBlocks placed " + placed + " of "
+                    + blocks.size() + " block(s); at least one block-state token could not be "
+                    + "parsed and was skipped (S-004). First failure: '" + firstFailedToken + "'.");
+        }
+        return placed;
+    }
+
+    @Override
+    public boolean isInactive() {
+        return inactive || world == null || world.getServer() == null;
+    }
+
+    @Override
+    public void save() {
+        // Server saves on its own cadence; explicit per-world save is not
+        // required for /rtp's pipeline.
+    }
+
+    @Override
+    public int getMaxHeight() {
+        try {
+            // getMaxY() is the inclusive top block; RTPWorld#getMaxHeight is exclusive.
+            return world.getMaxY() + 1;
+        } catch (Throwable t) {
+            return 320;
+        }
+    }
+
+    @Override
+    public int getMinHeight() {
+        try {
+            return world.getMinY();
+        } catch (Throwable t) {
+            return -64;
+        }
+    }
+
+    @Override
+    public int getCacheSize() {
+        expungeClearedChunks();
+        return chunkCache.size();
+    }
+
+    @Override
+    public long getSeed() {
+        try {
+            return world.getSeed();
+        } catch (Throwable t) {
+            return 0L;
+        }
+    }
+
+    /** Fabric-internal accessor; not part of the platform-neutral API. */
+    public ServerLevel level() {
+        return world;
+    }
+}

@@ -16,8 +16,8 @@ The workflow that prevents these already operates in practice, but it is *implie
 
 - [`docs/dev/RULES.md`](../dev/RULES.md) - the D-family documentation rules (D-001 traceability, D-002 unambiguity, D-003 single source of truth, D-004 audience, D-005 propose-before-implementation) and the Document Type Catalog.
 - [`docs/adr/README.md`](README.md) and [`ADR-TEMPLATE.md`](ADR-TEMPLATE.md) - what an ADR is, sequential numbering, subproject ADR directories, and the never-delete/supersede convention.
-- [`docs/dev/REQUIREMENTS.md`](../dev/REQUIREMENTS.md) and the requirement-authoring style rules - `shall`/`shall not` phrasing, absolute state, what-not-how.
-- [`docs/dev/TRACEABILITY.md`](../dev/TRACEABILITY.md) - the REQ-* to class to test binding that closes the loop.
+- [`docs/dev/REQUIREMENTS.md`](../../plugins/LeafRTP/docs/dev/REQUIREMENTS.md) and the requirement-authoring style rules - `shall`/`shall not` phrasing, absolute state, what-not-how.
+- [`docs/dev/TRACEABILITY.md`](../../plugins/LeafRTP/docs/dev/TRACEABILITY.md) - the REQ-* to class to test binding that closes the loop.
 - [`.junie/AGENTS.md`](../../.junie/AGENTS.md) *Self-Updating Protocol* - the discovery-to-destination table that keeps the doc system itself current.
 
 None of those answers "why is the workflow shaped this way, and what were the alternatives?" - which is exactly an ADR's job. [ADR-018](ADR-018-agents-md-public-release-structure.md) established precedent for meta-level ADRs.
@@ -118,8 +118,8 @@ AI tooling (agentic LLM assistants) is an *optional* executor of human-directed 
 ## References
 
 - [`docs/dev/RULES.md`](../dev/RULES.md) - D-001..D-005 definitions and the Document Type Catalog.
-- [`docs/dev/REQUIREMENTS.md`](../dev/REQUIREMENTS.md) - requirement families and S-00x prohibitions.
-- [`docs/dev/TRACEABILITY.md`](../dev/TRACEABILITY.md) - REQ-* to class to test matrix.
+- [`docs/dev/REQUIREMENTS.md`](../../plugins/LeafRTP/docs/dev/REQUIREMENTS.md) - requirement families and S-00x prohibitions.
+- [`docs/dev/TRACEABILITY.md`](../../plugins/LeafRTP/docs/dev/TRACEABILITY.md) - REQ-* to class to test matrix.
 - [`docs/dev/LESSONS_LEARNED.md`](../dev/LESSONS_LEARNED.md) - dated engineering findings.
 - [`docs/dev/AI_USAGE.md`](../dev/AI_USAGE.md) - canonical AI-tooling rationale and boundaries.
 - [`docs/dev/PULL_REQUEST_PROCESS.md`](../dev/PULL_REQUEST_PROCESS.md) - operational pull request lifecycle, local pre-PR verification gates, and CI pipeline checks.

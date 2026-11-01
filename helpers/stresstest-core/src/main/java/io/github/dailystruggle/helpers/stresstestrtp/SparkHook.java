@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 /**
- * Optional integration with the spark profiler (ADR-122 Decision 1 & 7).
+ * Optional integration with the spark profiler (ADR-122 Decision 1 and 7).
  */
 public final class SparkHook {
 

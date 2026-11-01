@@ -1,0 +1,47 @@
+# --- RTP Region Configuration (devstack demo) ---
+# backend-b (Folia) default region -> Nether. Demonstrates per-server load
+# distribution: each backend's default lands in a distinct dimension.
+# maxY stays below the bedrock roof (y=128) and skylight is not required.
+
+# Cosmetic display name (color/gradient supported); advertised to lobbies.
+displayName: "&#ff5533Ashen Wastes"
+# Target world (Folia Nether save-folder name).
+world: "world_nether"
+# Use vanilla /worldborder radius if true
+worldBorderOverride: false
+
+shape:
+  name: "CIRCLE"
+  mode: "ACCUMULATE"
+  radius: 256
+  centerRadius: 64
+  centerX: 0
+  centerZ: 0
+  weight: 1.0
+  uniquePlacements: false
+  expand: false
+
+vert:
+  name: "JUMP"
+  minY: 32
+  maxY: 100
+  step: 8
+  requireSkyLight: false
+
+# If true, rtp.regions.<name> is required
+requirePermission: false
+# Region to redirect to if no permission
+override: "default"
+# Max pre-calculated safe locations
+cacheCap: 50
+# L3 backlog cache capacity; unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
+backlogCacheCap: 1000
+# Max chunks kept loaded for zero-latency
+activeChunkCap: 10
+# Economy cost override for this region
+price: 0.0
+# Precision for bad-location tracking (1-5)
+spatialResolution: 3
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

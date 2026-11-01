@@ -14,7 +14,7 @@ import java.util.logging.Level;
 
 /**
  * Setup-phase measurement of what one plugin chunk ticket actually costs
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  */
 public final class TicketFootprintProbe {
 

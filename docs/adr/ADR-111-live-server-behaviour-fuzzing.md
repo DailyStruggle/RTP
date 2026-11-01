@@ -3,7 +3,7 @@
 **Status:** Accepted (2026-10-13). Sections 2.1-2.5 and 2.8 record the behaviour that ships. Sections 2.6 and 2.7 (coverage feedback, fast fault mode, new oracles, action vocabulary) are accepted direction: each shall have its own approved proposal (Rule D-005) before implementation.
 **Date:** 2026-10-13
 **Relevant Requirements:** REQ-RTP-S-001, REQ-RTP-S-002, REQ-RTP-S-004
-**Related ADRs:** [ADR-102](ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening.md), [ADR-103](ADR-103-multi-version-platform-adapter-deduplication.md), [ADR-094](ADR-094-quality-engineering-gates.md), [ADR-080](ADR-080-opt-in-simulation-benchmark-tier.md), [ADR-091](ADR-091-headless-player-protocol-driver-for-devstack.md), [ADR-008](ADR-008-memory-tracker-active-gc.md), [ADR-012](ADR-012-chunk-reservation-abstraction.md)
+**Related ADRs:** [ADR-102](ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening.md), [ADR-103](ADR-103-multi-version-platform-adapter-deduplication.md), [ADR-094](ADR-094-quality-engineering-gates.md), [leafrtp-ADR-061](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-061-opt-in-simulation-benchmark-tier.md), [ADR-091](ADR-091-headless-player-protocol-driver-for-devstack.md), [leafrtp-ADR-006](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-006-memory-tracker-active-gc.md), [leafrtp-ADR-009](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-009-chunk-reservation-abstraction.md)
 
 ---
 
@@ -79,7 +79,7 @@ A non-leak finding shall not need amplification: it shall not go through the lad
 - **New oracles**, each with a control-subtracted signature:
   - silently dropped teleport (S-004): the command was sent and the bot got neither a teleport nor a reply within a bound;
   - unsafe landing (S-001): the block at the bot's arrival position fails the safety check;
-  - chunk-ticket or force-loaded chunk growth (S-002, [ADR-008](ADR-008-memory-tracker-active-gc.md), [ADR-012](ADR-012-chunk-reservation-abstraction.md)) as a checkpoint count in the leak fit;
+  - chunk-ticket or force-loaded chunk growth (S-002, [leafrtp-ADR-006](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-006-memory-tracker-active-gc.md), [leafrtp-ADR-009](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-009-chunk-reservation-abstraction.md)) as a checkpoint count in the leak fit;
   - tick-time excess over the control, replacing log-line stall heuristics as the scored signal;
   - thread and scheduled-task growth.
 - **Action vocabulary:** commands discovered from `plugin.yml` and tab completion, argument values learnt from tab completion, GUI clicks and chat, prioritised by the coverage each action type gains.
@@ -89,7 +89,7 @@ A non-leak finding shall not need amplification: it shall not go through the lad
 - Tier L runs shall be opt-in and local. They shall never be part of `gradlew test` or CI, consistent with the opt-in gates of [ADR-094](ADR-094-quality-engineering-gates.md).
 - Every oracle shall have a planted-bug test against the fake server in `scripts/tests/test_bench_fuzz.py` before it can affect the verdict.
 - A confirmed finding in LeafRTP shall be recorded in `docs/dev/POTENTIAL_BUGS.md`, or filed in the Linear tracker with the `source:bench` label.
-- A published claim about another plugin's findings shall follow the provenance and publication rules of [ADR-080](ADR-080-opt-in-simulation-benchmark-tier.md).
+- A published claim about another plugin's findings shall follow the provenance and publication rules of [leafrtp-ADR-061](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-061-opt-in-simulation-benchmark-tier.md).
 
 ---
 

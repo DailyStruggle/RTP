@@ -9,7 +9,7 @@ These rules apply to admin-facing config resources only. Internal Java/Kotlin
 code comments and KDoc are unaffected.
 
 The governing decision is recorded in
-[ADR-064](../adr/ADR-064-config-comment-format-summary-line-as-menu-hover.md);
+[yaml-api-ADR-003](../../api/yaml-api/docs/adr/yaml-api-ADR-003-config-comment-format-summary-line-as-menu-hover.md);
 this document is its canonical, example-rich style guide. The key architectural
 constraint: the **first comment line** of each option doubles as the option's
 **hover tooltip** in the config menu (ADR-035 / ADR-044), so it must read as a

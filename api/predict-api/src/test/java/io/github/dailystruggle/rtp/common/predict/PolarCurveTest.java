@@ -99,4 +99,59 @@ class PolarCurveTest {
         assertEquals(0.0, PolarCurve.annularRingRadius(-100.0, -50.0), 1e-12);
         assertEquals(innerR, PolarCurve.annularRingRadius(Double.NaN, innerSq), 1e-12);
     }
+
+    @Test
+    @DisplayName("spheroidSliceRadius, ellipsoidDistance, sphericalOffset, fanAngleOffset, and quadrantRotateXZ match analytic geometry")
+    void sphericalAndEllipsoidalPrimitives() {
+        assertEquals(10.0, PolarCurve.spheroidSliceRadius(10.0, 0.0, 5.0), 1e-12);
+        assertEquals(8.0, PolarCurve.spheroidSliceRadius(10.0, 3.0, 5.0), 1e-12);
+        assertEquals(8.0, PolarCurve.spheroidSliceRadius(10.0, -3.0, 5.0), 1e-12);
+        assertEquals(0.0, PolarCurve.spheroidSliceRadius(10.0, 5.0, 5.0), 1e-12);
+        assertEquals(0.0, PolarCurve.spheroidSliceRadius(0.0, 0.0, 5.0), 1e-12);
+
+        assertEquals(5.0, PolarCurve.ellipsoidDistance(3.0, 2.0, 0.0, 0.5), 1e-12); // dyScaled = 2 / 0.5 = 4 -> hypot(3, 4) = 5
+
+        double[] vec = PolarCurve.sphericalOffset(10.0, 0.0, Math.PI / 2.0);
+        assertEquals(10.0, vec[0], 1e-9);
+        assertEquals(0.0, vec[1], 1e-9);
+        assertEquals(0.0, vec[2], 1e-9);
+        assertArrayEquals(new double[] {0.0, 0.0, 0.0}, PolarCurve.sphericalOffset(0.0, 0.5, 0.5), 1e-12);
+
+        assertEquals(-15.0, PolarCurve.fanAngleOffset(0, 3, 15.0), 1e-12);
+        assertEquals(0.0, PolarCurve.fanAngleOffset(1, 3, 15.0), 1e-12);
+        assertEquals(15.0, PolarCurve.fanAngleOffset(2, 3, 15.0), 1e-12);
+        assertEquals(0.0, PolarCurve.fanAngleOffset(0, 1, 15.0), 1e-12);
+
+        assertArrayEquals(new int[] {-4, 3}, PolarCurve.quadrantRotateXZ(3, 4, 1));
+        assertArrayEquals(new int[] {-3, -4}, PolarCurve.quadrantRotateXZ(3, 4, 2));
+        assertArrayEquals(new int[] {4, -3}, PolarCurve.quadrantRotateXZ(3, 4, 3));
+        assertArrayEquals(new int[] {3, 4}, PolarCurve.quadrantRotateXZ(3, 4, 4));
+    }
+
+    @Test
+    @DisplayName("trace6ConnectedLine and traceSteepestOrthogonalLine produce strictly 6-connected lattice paths")
+    void trace6ConnectedAndSteepestOrthogonalPaths() {
+        var line = PolarCurve.trace6ConnectedLine(0.0, 0.0, 0.0, 4.0, 3.0, -2.0);
+        assertFalse(line.isEmpty());
+        assertArrayEquals(new int[] {0, 0, 0}, line.get(0));
+        assertArrayEquals(new int[] {4, 3, -2}, line.get(line.size() - 1));
+        for (int i = 1; i < line.size(); i++) {
+            int[] a = line.get(i - 1);
+            int[] b = line.get(i);
+            int manhattan = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]) + Math.abs(b[2] - a[2]);
+            assertEquals(1, manhattan, "Every step in trace6ConnectedLine must be face-adjacent");
+        }
+
+        var interior = PolarCurve.traceSteepestOrthogonalLine(0, 0, 0, 3, 2, 1);
+        assertEquals(5, interior.size()); // Manhattan distance 6 -> 5 interior points
+        int[] prev = {0, 0, 0};
+        for (int[] step : interior) {
+            int manhattan = Math.abs(step[0] - prev[0]) + Math.abs(step[1] - prev[1]) + Math.abs(step[2] - prev[2]);
+            assertEquals(1, manhattan);
+            prev = step;
+        }
+        int finalStep = Math.abs(3 - prev[0]) + Math.abs(2 - prev[1]) + Math.abs(1 - prev[2]);
+        assertEquals(1, finalStep);
+        assertTrue(PolarCurve.traceSteepestOrthogonalLine(0, 0, 0, 1, 0, 0).isEmpty());
+    }
 }

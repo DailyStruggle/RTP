@@ -1,0 +1,7 @@
+{
+  "pack": {
+    "description": "Leaf Worldgen - vanilla datapack worldgen (post-Iris). First test case: nested dark-forest rings (edge/body/core) demonstrating the biome-within-a-biome gradient via multi_noise humidity slicing.",
+    "pack_format": 71,
+    "supported_formats": [61, 71]
+  }
+}

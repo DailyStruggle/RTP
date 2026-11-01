@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:disk",
+  "config": {
+    "half_height": 0,
+    "radius": {
+      "type": "minecraft:uniform",
+      "min_inclusive": 1,
+      "max_inclusive": 3
+    },
+    "state_provider": {
+      "type": "minecraft:weighted_state_provider",
+      "entries": [
+        { "weight": 5, "data": { "Name": "minecraft:magma_block" } },
+        { "weight": 3, "data": { "Name": "minecraft:blackstone" } },
+        { "weight": 1, "data": { "Name": "minecraft:obsidian" } }
+      ]
+    },
+    "target": {
+      "type": "minecraft:matching_blocks",
+      "blocks": [
+        "minecraft:dirt",
+        "minecraft:grass_block",
+        "minecraft:coarse_dirt",
+        "minecraft:gravel",
+        "minecraft:stone"
+      ]
+    }
+  }
+}

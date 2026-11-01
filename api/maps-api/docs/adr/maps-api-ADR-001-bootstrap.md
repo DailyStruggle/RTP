@@ -4,9 +4,9 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Related:**
-  - [ADR-046](../../../docs/adr/ADR-046-maps-api-module.md) — umbrella ADR establishing the `maps-api/` module, its three-layer (Models / Renderers / Bindings) shape, the five `REQ-RTP-MAP-001..005` requirements, and the Mermaid subset.
-  - [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md) — Lite-assembly trim posture; this ADR specifies how `maps-api` participates.
-  - [ADR-026](../../../docs/adr/ADR-026-external-hook-api-surface.md) — `RTPHooks` registry pattern; the `MapBinding` slot lands in Stage 2 per the checklist.
+  - [maps-api-ADR-003](maps-api-ADR-003-maps-api-module.md) — umbrella ADR establishing the `maps-api/` module, its three-layer (Models / Renderers / Bindings) shape, the five `REQ-RTP-MAP-001..005` requirements, and the Mermaid subset.
+  - [leafrtp-ADR-016](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-016-rtp-lite-assembly-variant.md) — Lite-assembly trim posture; this ADR specifies how `maps-api` participates.
+  - [leafrtp-ADR-017](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-017-external-hook-api-surface.md) — `RTPHooks` registry pattern; the `MapBinding` slot lands in Stage 2 per the checklist.
   - [effects-api-ADR-003](../../../effects-api/docs/adr/effects-api-ADR-003-platform-split-bukkit-fabric.md) — in-module platform-split precedent that `maps-api` mirrors.
   - [commands-api-ADR-001](../../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) — Brigadier bridge precedent for the `/rtp map` subcommand (wired in Stage 2).
   - [`docs/dev/scratch/CHECKLIST-maps-api.md`](../../../docs/dev/scratch/CHECKLIST-maps-api.md) — multi-session implementation plan; this ADR satisfies row 1.20.
@@ -15,7 +15,7 @@
 
 ## Context
 
-[ADR-046](../../../docs/adr/ADR-046-maps-api-module.md) (Accepted, 2026-05-15) decided **that** `maps-api/` exists as a top-level sibling of `effects-api/` and `commands-api/`, and decided **what** it must host: three layers (Models, Renderers, Bindings), five REQs (`REQ-RTP-MAP-001..005`), a `NoopMapBinding` default, Bukkit-family and Fabric obf/unobf bindings in later stages, a Lite-only `NoopMapBinding` posture, an `RTPHooks` slot, and the in-house Mermaid subset.
+[maps-api-ADR-003](maps-api-ADR-003-maps-api-module.md) (Accepted, 2026-05-15) decided **that** `maps-api/` exists as a top-level sibling of `effects-api/` and `commands-api/`, and decided **what** it must host: three layers (Models, Renderers, Bindings), five REQs (`REQ-RTP-MAP-001..005`), a `NoopMapBinding` default, Bukkit-family and Fabric obf/unobf bindings in later stages, a Lite-only `NoopMapBinding` posture, an `RTPHooks` slot, and the in-house Mermaid subset.
 
 It deliberately did **not** lock the in-module bootstrap decisions that Stage 1 of the checklist needs to make concrete:
 
@@ -29,7 +29,7 @@ These three are scoped to the module's bootstrap, do not affect the umbrella dec
 
 ### 1. Package layout
 
-`maps-api/src/main/java/io/github/dailystruggle/mapsapi/` is partitioned as follows. Each subpackage owns its `package-info.java` referencing this ADR, the relevant ADR-046 section, and the inherited safety-rule numbers per [`.junie/AGENTS.md`](../../../.junie/AGENTS.md) *Prohibition Requirements*.
+`maps-api/src/main/java/io/github/dailystruggle/mapsapi/` is partitioned as follows. Each subpackage owns its `package-info.java` referencing this ADR, the relevant ADR-046 section, and the inherited safety-rule numbers per [`.junie/AGENTS.md`](../../../../.junie/AGENTS.md) *Prohibition Requirements*.
 
 | Subpackage | Layer | Allowed imports | Notes |
 |------------|-------|-----------------|-------|
@@ -77,9 +77,9 @@ Current posture:
 - The `maps-api` Gradle module always compiles every subpackage listed in section 1. There is no source-level Lite branch.
 - The `rtp-plugin` Lite shadow-jar ships the full `mapsapi/**` tree (no maps exclusions). `RTPBukkitLitePlugin#onEnable` installs `BukkitMapBinding` unconditionally; `RTPFabricMod` installs `FabricMapBinding`; `RTPNeoForgeMod` installs `NeoForgeMapBinding`.
 - `NoopMapBinding` remains the require-by-contract default (REQ-RTP-MAP-001) and the fallback installed only when no platform binding is available on the active runtime - not the sole binding on Lite.
-- The `liteJarStructureCheck` Gradle audit task (see [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md)) asserts `mapsapi/**` is **not** excluded from the Lite jar.
+- The `liteJarStructureCheck` Gradle audit task (see [leafrtp-ADR-016](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-016-rtp-lite-assembly-variant.md)) asserts `mapsapi/**` is **not** excluded from the Lite jar.
 
-*Superseded original posture (pre-2026-06-04):* the Lite shadow-jar was to exclude `io/github/dailystruggle/mapsapi/bukkit/**`, `io/github/dailystruggle/mapsapi/fabric/**`, `io/github/dailystruggle/mapsapi/render/mermaid/**`, and `io/github/dailystruggle/mapsapi/render/**` (except `Palette.class`), leaving `NoopMapBinding` as the only reachable binding on Lite. That trim was never an intentional monetization boundary and was reversed in lockstep with the Vault/economy reversal in [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md) (2026-06-01).
+*Superseded original posture (pre-2026-06-04):* the Lite shadow-jar was to exclude `io/github/dailystruggle/mapsapi/bukkit/**`, `io/github/dailystruggle/mapsapi/fabric/**`, `io/github/dailystruggle/mapsapi/render/mermaid/**`, and `io/github/dailystruggle/mapsapi/render/**` (except `Palette.class`), leaving `NoopMapBinding` as the only reachable binding on Lite. That trim was never an intentional monetization boundary and was reversed in lockstep with the Vault/economy reversal in [leafrtp-ADR-016](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-016-rtp-lite-assembly-variant.md) (2026-06-01).
 
 ## Alternatives Considered
 
@@ -138,13 +138,13 @@ Rationale for the deviation from the original draft vocabulary:
 
 ## References
 
-- [ADR-046](../../../docs/adr/ADR-046-maps-api-module.md) — umbrella ADR.
-- [`docs/dev/REQUIREMENTS.md`](../../../docs/dev/REQUIREMENTS.md) section 1.7 — `REQ-RTP-MAP-001..005`.
-- [`docs/dev/TRACEABILITY.md`](../../../docs/dev/TRACEABILITY.md) — REQ → class → test rows for the maps surface.
+- [maps-api-ADR-003](maps-api-ADR-003-maps-api-module.md) — umbrella ADR.
+- [`docs/dev/REQUIREMENTS.md`](../../../../plugins/LeafRTP/docs/dev/REQUIREMENTS.md) section 1.7 — `REQ-RTP-MAP-001..005`.
+- [`docs/dev/TRACEABILITY.md`](../../../../plugins/LeafRTP/docs/dev/TRACEABILITY.md) — REQ → class → test rows for the maps surface.
 - [`docs/dev/scratch/CHECKLIST-maps-api.md`](../../../docs/dev/scratch/CHECKLIST-maps-api.md) — multi-session implementation plan.
-- [ADR-024](../../../docs/adr/ADR-024-rtp-lite-assembly-variant.md) — Lite-assembly trim posture.
-- [ADR-026](../../../docs/adr/ADR-026-external-hook-api-surface.md) — `RTPHooks` registry pattern.
+- [leafrtp-ADR-016](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-016-rtp-lite-assembly-variant.md) — Lite-assembly trim posture.
+- [leafrtp-ADR-017](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-017-external-hook-api-surface.md) — `RTPHooks` registry pattern.
 - [effects-api-ADR-003](../../../effects-api/docs/adr/effects-api-ADR-003-platform-split-bukkit-fabric.md) — in-module platform-split precedent.
-- [rtp-fabric-ADR-009](../../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — Fabric obf/unobf carrier dispatch precedent.
+- [rtp-fabric-ADR-009](../../../../platforms/fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md) — Fabric obf/unobf carrier dispatch precedent.
 - [effects-api-ADR-006](../../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md) — Fabric obf/unobf split applied to `effects-api`.
 - [commands-api-ADR-001](../../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) — Brigadier bridge for `/rtp map` (Stage 2).

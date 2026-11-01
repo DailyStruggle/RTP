@@ -104,6 +104,14 @@ class FabricStressHostTest {
                     "server-api must be shaded and relocated into harness namespace");
             assertNull(zip.getEntry("io/github/dailystruggle/server/api/ServerAccessor.class"),
                     "unrelocated server-api must not exist in shadow jar");
+            assertNotNull(zip.getEntry("org/jacoco/core/data/ExecutionDataReader.class"),
+                    "JaCoCo execution-data reader used by CoverageProbe must be retained");
+            assertNull(zip.getEntry("org/jacoco/core/instr/Instrumenter.class"),
+                    "unused JaCoCo instrumentation classes must be stripped by minimize()");
+            assertNull(zip.getEntry("org/objectweb/asm/ClassVisitor.class"),
+                    "unused transitive ASM classes must be stripped by minimize()");
+            assertNull(zip.getEntry("org/jetbrains/annotations/NotNull.class"),
+                    "compile-only JetBrains annotations must be excluded from shadow jar");
             assertNotNull(zip.getEntry("fabric.mod.json"));
             assertNotNull(zip.getEntry("config.yml"));
         }

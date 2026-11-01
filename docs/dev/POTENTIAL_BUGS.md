@@ -105,11 +105,21 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Severity:** Medium
 - **Status:** Open
 - **Discovered during:** dividing Folia region-thread work per region (ADR-112)
-- **Location:** `platforms/rtp-folia/rtp-folia-common/.../entity/FoliaRTPPlayer.java` `teleportAsync(...).thenCompose` (~188-228); `FoliaRTPWorld#platform` (~1029-1105)
+- **Location:** `platforms/folia/folia-common/.../entity/FoliaRTPPlayer.java` `teleportAsync(...).thenCompose` (~188-228); `FoliaRTPWorld#platform` (~1029-1105)
 - **Symptom / hypothesis:** After `teleportAsync` completes on the destination region, the emergency platform is built inline with nested `runTask` per chunk and `setType` loops sized by `platformRadius`. It is player-facing, so the new per-region budget only charges it.
 - **Impact:** Many simultaneous arrivals in one region with large platforms can still extend that region's tick.
 - **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
 - **Linear:** RTP-93
+
+### 2026-10-30 - Untracked BytecodeCausalGraphScanner calls stale ParsedClass and MethodNode constructors
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** LeafRTP 3.3.2 version bump and changelog verification (`:config-bit-api:compileJava`)
+- **Location:** `api/config-bit-api/src/main/java/io/github/dailystruggle/rtp/common/bit/config/atlas/BytecodeCausalGraphScanner.java` lines 1877 (`new ParsedClass(...)`), 1933 and 2209 (`new MethodNode(...)`)
+- **Symptom / hypothesis:** `BytecodeCausalGraphScanner` passes the 8-argument `ParsedClass` constructor and the 25-argument `MethodNode` constructor, whereas `BytecodeConfigScanner.ParsedClass` now takes 9 arguments (adding `ParsedAnnotations`) and `MethodNode` takes 33 arguments.
+- **Impact:** `:config-bit-api:compileJava` and downstream modules that depend on `:config-bit-api` fail to compile while the untracked file is present in the source set.
+- **Suggested next step:** Update the `ParsedClass` and `MethodNode` constructor calls in `BytecodeCausalGraphScanner` to pass the new annotation and call-graph parameters from `BytecodeConfigScanner`.
 
 ### 2026-10-14 - LocationGenerator.joinSafely waits on work queued to the same pool
 

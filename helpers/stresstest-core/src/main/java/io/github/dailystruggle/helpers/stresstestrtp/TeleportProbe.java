@@ -7,7 +7,7 @@ import java.util.function.Consumer;
 
 /**
  * Attributes teleport occurrences back to in-flight {@link Attempt}s
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  */
 public final class TeleportProbe {
 

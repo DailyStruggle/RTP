@@ -15,7 +15,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Platform-neutral host SPI for {@code stresstest-core} (ADR-122 Decision 2 & 3).
+ * Platform-neutral host SPI for {@code stresstest-core} (ADR-122 Decision 2 and 3).
  *
  * <p>Extends {@link ServerAccessor} from {@code api/server-api} for server
  * identity and logging, and provides the only platform seam consumed by the
@@ -53,7 +53,7 @@ public interface StressHost extends ServerAccessor {
     }
 
     /**
-     * Metadata for a loaded plugin or mod on the host server (ADR-122 Decision 2 & 5).
+     * Metadata for a loaded plugin or mod on the host server (ADR-122 Decision 2 and 5).
      */
     record LoadedPlugin(
             String name,

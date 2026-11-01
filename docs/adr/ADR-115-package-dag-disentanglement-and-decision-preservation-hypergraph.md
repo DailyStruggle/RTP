@@ -149,8 +149,8 @@ ArchUnit Rule 11 (`SlicesRuleDefinition.slices().matching("io.github.dailystrugg
 
 ## References
 
-- Visual Architecture Specification & Diagram: [`docs/architecture/16-package-dag-and-decision-preservation-graph.md`](../architecture/16-package-dag-and-decision-preservation-graph.md)
+- Visual Architecture Specification & Diagram: [`docs/architecture/16-package-dag-and-decision-preservation-graph.md`](../../plugins/LeafRTP/docs/architecture/16-package-dag-and-decision-preservation-graph.md)
 - Development Workflow & D-005 Proposal Gate: [`docs/adr/ADR-000-development-workflow.md`](ADR-000-development-workflow.md)
 - ArchUnit Quality Engineering Gates: [`docs/adr/ADR-094-quality-engineering-gates.md`](ADR-094-quality-engineering-gates.md)
-- Absolute Prohibition Requirements (S-001..S-007): [`docs/dev/REQUIREMENTS.md`](../dev/REQUIREMENTS.md)
-- Requirements Traceability Matrix: [`docs/dev/TRACEABILITY.md`](../dev/TRACEABILITY.md)
+- Absolute Prohibition Requirements (S-001..S-007): [`docs/dev/REQUIREMENTS.md`](../../plugins/LeafRTP/docs/dev/REQUIREMENTS.md)
+- Requirements Traceability Matrix: [`docs/dev/TRACEABILITY.md`](../../plugins/LeafRTP/docs/dev/TRACEABILITY.md)

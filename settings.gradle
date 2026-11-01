@@ -116,6 +116,7 @@ def excludeJdk25 = startParameter.projectProperties.containsKey('excludeJdk25') 
         System.getenv('JITPACK') != null
 
 include 'rtp-api'
+project(':rtp-api').projectDir = file('resource/LeafRTP/rtp-api')
 // server-api -- reusable, platform-neutral server identity and logging SPI.
 include 'server-api'
 // Non-rtp-exclusive, platform-neutral API modules are grouped under the
@@ -182,6 +183,10 @@ include 'predict-api'
 include 'config-bit-api'
 // menu-api -- cross-platform declarative menu, session, token, and prompt SPI (ADR-035, ADR-044, ADR-048).
 include 'menu-api'
+// database-api -- zero-dependency SQL connection pooling, dialect abstraction, and Redis RESP2 client (leafrtp-ADR-079).
+include 'database-api'
+// schematics-api -- platform-neutral Sponge (.schem) and Litematica (.litematic) decoder, cache, and 3D placement planner (leafrtp-ADR-041).
+include 'schematics-api'
 
 // Relocate the grouped api/ modules on disk while keeping their flat Gradle
 // project paths (see the comment block above the include lines). The nested
@@ -204,43 +209,40 @@ project(':tags-api').projectDir       = file('api/tags-api')
 project(':predict-api').projectDir    = file('api/predict-api')
 project(':config-bit-api').projectDir = file('api/config-bit-api')
 project(':menu-api').projectDir       = file('api/menu-api')
+project(':database-api').projectDir   = file('api/database-api')
+project(':schematics-api').projectDir = file('api/schematics-api')
 
 include 'rtp-core'
+project(':rtp-core').projectDir = file('resource/LeafRTP/rtp-core')
 
-// RTP-exclusive server-side platform adapters are grouped under the
-// platforms/ folder to declutter the repo root, mirroring the api/ grouping.
-// The Gradle project paths and Maven coordinates are intentionally KEPT FLAT
-// (':rtp-bukkit:rtp-bukkit-common', ':rtp-fabric:rtp-fabric-common', etc.);
-// only the on-disk location moves, applied via the projectDir overrides at the
-// bottom of this section. This keeps every existing project(':...') dependency,
-// Maven coordinate, and ADR/doc reference valid. rtp-plugin (the shaded
-// deliverable, not an adapter) stays at the repo root; rtp-proxy (the proxy
-// side) is also grouped under platforms/ but keeps its flat Gradle paths.
-include 'rtp-bukkit:rtp-bukkit-common'
-include 'rtp-paper:rtp-paper-common'
-include 'rtp-folia:rtp-folia-common'
+// Shared server-side and proxy platform modules are grouped under the
+// platforms/ folder (bukkit, paper, folia, fabric, neoforge, proxy).
+include 'bukkit:bukkit-common'
+include 'paper:paper-common'
+include 'folia:folia-common'
 
-include 'rtp-bukkit:rtp-bukkit-v1_20_R1'
-include 'rtp-paper:rtp-paper-v1_20_R1'
-include 'rtp-folia:rtp-folia-v1_20_R1'
-include 'rtp-bukkit:rtp-bukkit-v1_21_R1'
-include 'rtp-paper:rtp-paper-v1_21_R1'
-include 'rtp-folia:rtp-folia-v1_21_R1'
-include 'rtp-bukkit:rtp-bukkit-v26_1_R1'
-include 'rtp-paper:rtp-paper-v26_1_R1'
-include 'rtp-folia:rtp-folia-v26_1_R1'
+include 'bukkit:bukkit-v1_20_R1'
+include 'paper:paper-v1_20_R1'
+include 'folia:folia-v1_20_R1'
+include 'bukkit:bukkit-v1_21_R1'
+include 'paper:paper-v1_21_R1'
+include 'folia:folia-v1_21_R1'
+include 'bukkit:bukkit-v26_1_R1'
+include 'paper:paper-v26_1_R1'
+include 'folia:folia-v26_1_R1'
 // rtp-plugin is the shaded Bukkit-family aggregator. It bundles the JDK-25
-// Fabric carriers (rtp-fabric-v26_1_R1 / *-unobf / effects-api-fabric-unobf)
+// Fabric carriers (fabric-v26_1_R1 / *-unobf / effects-api-fabric-unobf)
 // via project(...) dependencies, so it cannot be configured when those modules
 // are excluded. It is not part of the addon-API publish closure and nothing
 // depends on it, so it is dropped alongside the JDK-25 modules.
 if (!excludeJdk25) {
     include 'rtp-plugin'
+    project(':rtp-plugin').projectDir = file('resource/LeafRTP/rtp-plugin')
 }
 
 // Fabric platform adapter — first-class in-scope as of 2026-04-30 per ADR-022.
-// rtp-fabric-common applies fabric-loom (see its build.gradle); Loom is
-// scoped per ADR-022 section 3 to platforms/rtp-fabric/** and rtp-plugin only — it must
+// fabric-common applies fabric-loom (see its build.gradle); Loom is
+// scoped per ADR-022 section 3 to platforms/fabric/** and rtp-plugin only — it must
 // not leak into rtp-core, rtp-api, commands-api, effects-api, or any
 // Bukkit-family adapter.
 //
@@ -253,20 +255,20 @@ if (!excludeJdk25) {
 // stubs and are filled in as Phase 2.5 follow-ups. Note v26_1_R1 requires
 // JDK 25 + Loom 1.15 because MC 26.1 is deobfuscated; contributors without
 // JDK 25 will see only that submodule fail toolchain provisioning.
-include 'rtp-fabric:rtp-fabric-common'
-// rtp-fabric-common-unobf -- mojmap-bytecode sibling of rtp-fabric-common
+include 'fabric:fabric-common'
+// fabric-common-unobf -- mojmap-bytecode sibling of fabric-common
 // (rtp-fabric-ADR-009, paired with effects-api-ADR-006). Compiled under
-// unobfuscated 1.15 Loom (same regime as rtp-fabric-v26_1_R1) so its NM
+// unobfuscated 1.15 Loom (same regime as fabric-v26_1_R1) so its NM
 // constant-pool entries survive on a deobf MC 26.x runtime; consumed by
 // V26_*_R1FabricVersionAdapter via `api project(...)`. Requires JDK 25 +
 // fabric-loom 1.15+ (same toolchain as v26_1_R1).
 if (!excludeJdk25) {
-    include 'rtp-fabric:rtp-fabric-common-unobf'
+    include 'fabric:fabric-common-unobf'
 }
-include 'rtp-fabric:rtp-fabric-v1_20_R1'
-include 'rtp-fabric:rtp-fabric-v1_21_R1'
-include 'rtp-fabric:rtp-fabric-v1_21_R5'
-// rtp-fabric-v1_21_R11 — re-included 2026-05-06 after rtp-fabric-ADR-007
+include 'fabric:fabric-v1_20_R1'
+include 'fabric:fabric-v1_21_R1'
+include 'fabric:fabric-v1_21_R5'
+// fabric-v1_21_R11 — re-included 2026-05-06 after rtp-fabric-ADR-007
 // (Mojmap-name-decoupling) landed. The FabricVersionAdapter SPI now uses
 // project-owned wrapper records (RTPLevelHandle / RTPBlockHandle / etc.)
 // instead of net.minecraft.* types whose Mojmap names drift across point
@@ -275,7 +277,7 @@ include 'rtp-fabric:rtp-fabric-v1_21_R5'
 // TicketType(long expiryTicks, int flags) constructor with flags = 14
 // (FOR_LOADING | FOR_SIMULATION | RESETS_IDLE_TIMEOUT) — vanilla FORCED
 // minus the SERIALIZE bit, S-002 safe.
-include 'rtp-fabric:rtp-fabric-v1_21_R11'
+include 'fabric:fabric-v1_21_R11'
 // v26_1_R1 -- pinned to MC 26.1 (deobfuscated). Requires JDK 25 + fabric-loom 1.15+.
 // Re-enabled 2026-05-07 to test the inline-dependency hypothesis: per
 // rtp-fabric-ADR-001, the prior reason for excluding it was the
@@ -286,31 +288,31 @@ include 'rtp-fabric:rtp-fabric-v1_21_R11'
 // classloader, leaf module not configured by other Loom modules), so the
 // hypothesis is that the cast bug only fires when two Loom-using
 // subprojects share a classloader scope -- which is not the case here as
-// long as no rtp-plugin / rtp-fabric-common code path triggers Loom 1.11
+// long as no rtp-plugin / fabric-common code path triggers Loom 1.11
 // to read v26_1_R1's LoomGradleExtension.
 //
 // JDK 25 is provisioned per-subproject via Gradle's toolchain plugin --
 // the rest of the build remains on JDK 21. CI must have JDK 25 installed
 // (or `org.gradle.java.installations.auto-download=true`).
 if (!excludeJdk25) {
-    include 'rtp-fabric:rtp-fabric-v26_1_R1'
+    include 'fabric:fabric-v26_1_R1'
 }
 // v26_2_R1 -- EARLY/EXPERIMENTAL, pinned to the MC 26.2 pre-release
 // (26.2-rc-2). Same deobf regime as v26_1_R1 (Loom 1.15, JDK 25, no
 // mappings), cloned from it. See rtp-fabric-ADR-014. Re-pin the MC /
 // loader / fabric-api versions when 26.2 reaches final.
 if (!excludeJdk25) {
-    include 'rtp-fabric:rtp-fabric-v26_2_R1'
+    include 'fabric:fabric-v26_2_R1'
 }
 // v26_3_R1 -- MC 26.3 release. Same deobf regime as v26_1_R1/v26_2_R1
 // (Loom 1.15, JDK 25, no mappings). See rtp-fabric-ADR-015.
 if (!excludeJdk25) {
-    include 'rtp-fabric:rtp-fabric-v26_3_R1'
+    include 'fabric:fabric-v26_3_R1'
 }
 // v26_4_R1 -- MC 26.4 release. Same deobf regime as v26_1_R1/v26_2_R1/v26_3_R1
 // (Loom 1.15, JDK 25, no mappings). See rtp-fabric-ADR-017.
 if (!excludeJdk25) {
-    include 'rtp-fabric:rtp-fabric-v26_4_R1'
+    include 'fabric:fabric-v26_4_R1'
 }
 
 // Relocate the grouped platforms/ adapters on disk while keeping their flat
@@ -318,57 +320,57 @@ if (!excludeJdk25) {
 // Setting an intermediate parent's projectDir does not move its children in
 // Gradle, so every project (parent and per-version child) is overridden
 // explicitly. JDK-25 / unobf Fabric carriers are overridden only when included.
-project(':rtp-bukkit').projectDir                = file('platforms/rtp-bukkit')
-project(':rtp-bukkit:rtp-bukkit-common').projectDir   = file('platforms/rtp-bukkit/rtp-bukkit-common')
-project(':rtp-bukkit:rtp-bukkit-v1_20_R1').projectDir = file('platforms/rtp-bukkit/rtp-bukkit-v1_20_R1')
-project(':rtp-bukkit:rtp-bukkit-v1_21_R1').projectDir = file('platforms/rtp-bukkit/rtp-bukkit-v1_21_R1')
-project(':rtp-bukkit:rtp-bukkit-v26_1_R1').projectDir = file('platforms/rtp-bukkit/rtp-bukkit-v26_1_R1')
+project(':bukkit').projectDir                    = file('platforms/bukkit')
+project(':bukkit:bukkit-common').projectDir      = file('platforms/bukkit/bukkit-common')
+project(':bukkit:bukkit-v1_20_R1').projectDir    = file('platforms/bukkit/bukkit-v1_20_R1')
+project(':bukkit:bukkit-v1_21_R1').projectDir    = file('platforms/bukkit/bukkit-v1_21_R1')
+project(':bukkit:bukkit-v26_1_R1').projectDir    = file('platforms/bukkit/bukkit-v26_1_R1')
 
-project(':rtp-paper').projectDir                = file('platforms/rtp-paper')
-project(':rtp-paper:rtp-paper-common').projectDir   = file('platforms/rtp-paper/rtp-paper-common')
-project(':rtp-paper:rtp-paper-v1_20_R1').projectDir = file('platforms/rtp-paper/rtp-paper-v1_20_R1')
-project(':rtp-paper:rtp-paper-v1_21_R1').projectDir = file('platforms/rtp-paper/rtp-paper-v1_21_R1')
-project(':rtp-paper:rtp-paper-v26_1_R1').projectDir = file('platforms/rtp-paper/rtp-paper-v26_1_R1')
+project(':paper').projectDir                     = file('platforms/paper')
+project(':paper:paper-common').projectDir        = file('platforms/paper/paper-common')
+project(':paper:paper-v1_20_R1').projectDir      = file('platforms/paper/paper-v1_20_R1')
+project(':paper:paper-v1_21_R1').projectDir      = file('platforms/paper/paper-v1_21_R1')
+project(':paper:paper-v26_1_R1').projectDir      = file('platforms/paper/paper-v26_1_R1')
 
-project(':rtp-folia').projectDir                = file('platforms/rtp-folia')
-project(':rtp-folia:rtp-folia-common').projectDir   = file('platforms/rtp-folia/rtp-folia-common')
-project(':rtp-folia:rtp-folia-v1_20_R1').projectDir = file('platforms/rtp-folia/rtp-folia-v1_20_R1')
-project(':rtp-folia:rtp-folia-v1_21_R1').projectDir = file('platforms/rtp-folia/rtp-folia-v1_21_R1')
-project(':rtp-folia:rtp-folia-v26_1_R1').projectDir = file('platforms/rtp-folia/rtp-folia-v26_1_R1')
+project(':folia').projectDir                     = file('platforms/folia')
+project(':folia:folia-common').projectDir        = file('platforms/folia/folia-common')
+project(':folia:folia-v1_20_R1').projectDir      = file('platforms/folia/folia-v1_20_R1')
+project(':folia:folia-v1_21_R1').projectDir      = file('platforms/folia/folia-v1_21_R1')
+project(':folia:folia-v26_1_R1').projectDir      = file('platforms/folia/folia-v26_1_R1')
 
-project(':rtp-fabric').projectDir                  = file('platforms/rtp-fabric')
-project(':rtp-fabric:rtp-fabric-common').projectDir     = file('platforms/rtp-fabric/rtp-fabric-common')
-project(':rtp-fabric:rtp-fabric-v1_20_R1').projectDir   = file('platforms/rtp-fabric/rtp-fabric-v1_20_R1')
-project(':rtp-fabric:rtp-fabric-v1_21_R1').projectDir   = file('platforms/rtp-fabric/rtp-fabric-v1_21_R1')
-project(':rtp-fabric:rtp-fabric-v1_21_R5').projectDir   = file('platforms/rtp-fabric/rtp-fabric-v1_21_R5')
-project(':rtp-fabric:rtp-fabric-v1_21_R11').projectDir  = file('platforms/rtp-fabric/rtp-fabric-v1_21_R11')
+project(':fabric').projectDir                    = file('platforms/fabric')
+project(':fabric:fabric-common').projectDir      = file('platforms/fabric/fabric-common')
+project(':fabric:fabric-v1_20_R1').projectDir    = file('platforms/fabric/fabric-v1_20_R1')
+project(':fabric:fabric-v1_21_R1').projectDir    = file('platforms/fabric/fabric-v1_21_R1')
+project(':fabric:fabric-v1_21_R5').projectDir    = file('platforms/fabric/fabric-v1_21_R5')
+project(':fabric:fabric-v1_21_R11').projectDir   = file('platforms/fabric/fabric-v1_21_R11')
 if (!excludeJdk25) {
-    project(':rtp-fabric:rtp-fabric-common-unobf').projectDir = file('platforms/rtp-fabric/rtp-fabric-common-unobf')
-    project(':rtp-fabric:rtp-fabric-v26_1_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_1_R1')
-    project(':rtp-fabric:rtp-fabric-v26_2_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_2_R1')
-    project(':rtp-fabric:rtp-fabric-v26_3_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_3_R1')
-    project(':rtp-fabric:rtp-fabric-v26_4_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_4_R1')
+    project(':fabric:fabric-common-unobf').projectDir = file('platforms/fabric/fabric-common-unobf')
+    project(':fabric:fabric-v26_1_R1').projectDir     = file('platforms/fabric/fabric-v26_1_R1')
+    project(':fabric:fabric-v26_2_R1').projectDir     = file('platforms/fabric/fabric-v26_2_R1')
+    project(':fabric:fabric-v26_3_R1').projectDir     = file('platforms/fabric/fabric-v26_3_R1')
+    project(':fabric:fabric-v26_4_R1').projectDir     = file('platforms/fabric/fabric-v26_4_R1')
 }
 
 // Multi-server proxy support — umbrella ADR-036 Accepted 2026-05-14.
-// Phase 1: rtp-proxy-common ships the host-independent SPI, the reference
+// Phase 1: proxy-common ships the host-independent SPI, the reference
 // weighted-average BackendSelector (rtp-proxy-ADR-004), and the reference
 // InMemoryNetworkStateBinding (rtp-proxy-ADR-003). Pure-Java, no proxy-vendor
 // or backend-platform imports (rtp-proxy-ADR-001 section Package Boundary Rules).
-// rtp-proxy-velocity (Phase 2a) — no-op shell included 2026-05-18 after
+// proxy-velocity (Phase 2a) — no-op shell included 2026-05-18 after
 // rtp-proxy-ADR-006 was Accepted. Compile-only Velocity API dependency;
 // entry-point honors network.enabled:false as a strict no-op.
-// rtp-proxy-bungee (Phase 3) remains documentation-only until
+// proxy-bungee (Phase 3) remains documentation-only until
 // rtp-proxy-ADR-008 ratifies (still Proposed).
-include 'rtp-proxy:rtp-proxy-common'
-include 'rtp-proxy:rtp-proxy-velocity'
+include 'proxy:proxy-common'
+include 'proxy:proxy-velocity'
 
-// Relocate the rtp-proxy tree on disk under platforms/ while keeping its flat
+// Relocate the proxy tree on disk under platforms/ while keeping its flat
 // Gradle project paths. The implicit parent and each included child are
 // overridden explicitly (parent projectDir does not cascade to children).
-project(':rtp-proxy').projectDir                = file('platforms/rtp-proxy')
-project(':rtp-proxy:rtp-proxy-common').projectDir   = file('platforms/rtp-proxy/rtp-proxy-common')
-project(':rtp-proxy:rtp-proxy-velocity').projectDir = file('platforms/rtp-proxy/rtp-proxy-velocity')
+project(':proxy').projectDir                    = file('platforms/proxy')
+project(':proxy:proxy-common').projectDir       = file('platforms/proxy/proxy-common')
+project(':proxy:proxy-velocity').projectDir     = file('platforms/proxy/proxy-velocity')
 
 // NeoForge platform adapter — in-scope per ADR-033 and rtp-neoforge-ADR-001.
 // The NeoForge platform is part of the unified single-jar (rtp-plugin merges
@@ -384,16 +386,18 @@ project(':rtp-proxy:rtp-proxy-velocity').projectDir = file('platforms/rtp-proxy/
 // can be dropped on network-constrained hosts by passing `-PexcludeNeoforge`
 // (or setting the EXCLUDE_NEOFORGE env var). When excluded, rtp-plugin omits
 // the NeoForge merge and the unified jar simply carries no neoforge.mods.toml.
-// See platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md.
+// See platforms/neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md.
 def excludeNeoforge = startParameter.projectProperties.containsKey('excludeNeoforge') ||
         System.getenv('EXCLUDE_NEOFORGE') != null
 if (!excludeNeoforge) {
-    include 'rtp-neoforge:rtp-neoforge-common'
-    include 'rtp-neoforge:rtp-neoforge-v1_21_R1'
+    include 'neoforge:neoforge-common'
+    include 'neoforge:neoforge-v1_21_R1'
+    include 'rtp-neoforge'
 
-    project(':rtp-neoforge').projectDir                          = file('platforms/rtp-neoforge')
-    project(':rtp-neoforge:rtp-neoforge-common').projectDir      = file('platforms/rtp-neoforge/rtp-neoforge-common')
-    project(':rtp-neoforge:rtp-neoforge-v1_21_R1').projectDir    = file('platforms/rtp-neoforge/rtp-neoforge-v1_21_R1')
+    project(':neoforge').projectDir                     = file('platforms/neoforge')
+    project(':neoforge:neoforge-common').projectDir     = file('platforms/neoforge/neoforge-common')
+    project(':neoforge:neoforge-v1_21_R1').projectDir   = file('platforms/neoforge/neoforge-v1_21_R1')
+    project(':rtp-neoforge').projectDir                 = file('resource/LeafRTP/rtp-neoforge')
 
     // EARLY/EXPERIMENTAL 26.x carrier (MC 26.1, NeoForge 26.1.x). MC 26.1 runs
     // on Java 25, so this carrier pins a Java 25 toolchain and is gated by
@@ -402,10 +406,10 @@ if (!excludeNeoforge) {
     // shares the central moddev 2.0.141 pin (no per-module override). The
     // 1.21.1 carrier (Java 21) is unaffected and keeps the unified jar
     // NeoForge-capable on JDK-21 hosts. See
-    // platforms/rtp-neoforge/rtp-neoforge-v26_1_R1/build.gradle.
+    // platforms/neoforge/neoforge-v26_1_R1/build.gradle.
     if (!excludeJdk25) {
-        include 'rtp-neoforge:rtp-neoforge-v26_1_R1'
-        project(':rtp-neoforge:rtp-neoforge-v26_1_R1').projectDir = file('platforms/rtp-neoforge/rtp-neoforge-v26_1_R1')
+        include 'neoforge:neoforge-v26_1_R1'
+        project(':neoforge:neoforge-v26_1_R1').projectDir = file('platforms/neoforge/neoforge-v26_1_R1')
     }
 }
 
@@ -440,15 +444,26 @@ include 'addons:LeafRTPGuiAddon:rtp-gui-bukkit'
 // Single multi-loader assembly jar (shades common + every platform renderer +
 // all three loader descriptors), mirroring RTP's unified-jar model. Always built.
 include 'addons:LeafRTPGuiAddon:rtp-gui'
+project(':addons').projectDir                               = file('resource/LeafRTP/addons')
+project(':addons:LeafRTPCountdownAddon').projectDir         = file('resource/LeafRTP/addons/LeafRTPCountdownAddon')
+project(':addons:LeafRTPRiftAddon').projectDir              = file('resource/LeafRTP/addons/LeafRTPRiftAddon')
+project(':addons:LeafRTPClaimAddon').projectDir             = file('resource/LeafRTP/addons/LeafRTPClaimAddon')
+project(':addons:LeafRTPActionAddon').projectDir            = file('resource/LeafRTP/addons/LeafRTPActionAddon')
+project(':addons:LeafRTPGuiAddon').projectDir               = file('resource/LeafRTP/addons/LeafRTPGuiAddon')
+project(':addons:LeafRTPGuiAddon:rtp-gui-common').projectDir = file('resource/LeafRTP/addons/LeafRTPGuiAddon/rtp-gui-common')
+project(':addons:LeafRTPGuiAddon:rtp-gui-bukkit').projectDir = file('resource/LeafRTP/addons/LeafRTPGuiAddon/rtp-gui-bukkit')
+project(':addons:LeafRTPGuiAddon:rtp-gui').projectDir        = file('resource/LeafRTP/addons/LeafRTPGuiAddon/rtp-gui')
 // Fabric renderer carrier - deobf MC 26.x (Loom-unobf, JDK 25). Gated like the
 // RTP Fabric 26.x carriers: dropped on JDK-21-only / network-constrained hosts.
 if (!excludeJdk25) {
     include 'addons:LeafRTPGuiAddon:rtp-gui-fabric'
+    project(':addons:LeafRTPGuiAddon:rtp-gui-fabric').projectDir = file('resource/LeafRTP/addons/LeafRTPGuiAddon/rtp-gui-fabric')
 }
 // NeoForge renderer carrier - MC 26.x (ModDevGradle, JDK 25). Gated by both the
 // whole-NeoForge switch and the JDK-25 switch, matching rtp-neoforge-v26_1_R1.
 if (!excludeNeoforge && !excludeJdk25) {
     include 'addons:LeafRTPGuiAddon:rtp-gui-neoforge'
+    project(':addons:LeafRTPGuiAddon:rtp-gui-neoforge').projectDir = file('resource/LeafRTP/addons/LeafRTPGuiAddon/rtp-gui-neoforge')
 }
 
 // Standalone helper plugins (no rtp-api / rtp-core dependency).

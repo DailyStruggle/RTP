@@ -62,34 +62,54 @@ import java.util.regex.Pattern;
  * {@link FabricLoader} mod origins for jar ownership and JaCoCo coverage
  * {@code includes=}.
  */
-public final class StressTestFabricMod implements ModInitializer, StressHost {
+public final class StressTestFabricMod extends ModStressHostBase implements ModInitializer {
 
-    private static final Logger LOG = Logger.getLogger("StressTestRTP");
-    private static final Pattern MC_MINOR = Pattern.compile("(?:1\\.)?(\\d+)");
+    public StressTestFabricMod() {
+        super(resolveDefaultDataDir());
+    }
+
+    public StressTestFabricMod(Path dataDir) {
+        super(dataDir);
+    }
+
+    @Override
+    public void onInitialize() {
+        initializeFabric();
+    }
+
+    public static List<LoadedPlugin> discoverFabricMods(FabricLoader loader) {
+        return ModStressHostBase.discoverFabricMods(loader);
+    }
+}
+
+class ModStressHostBase implements StressHost {
+
+    protected static final Logger LOG = Logger.getLogger("StressTestRTP");
+    protected static final Pattern MC_MINOR = Pattern.compile("(?:1\\.)?(\\d+)");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
-    private final Path dataDir;
-    private volatile StressConfig config;
-    private volatile StressCoreRuntime runtime;
-    private volatile Object minecraftServer;
-    private volatile Thread serverThread;
-    private final AtomicLong tickCounter = new AtomicLong();
+    protected final Path dataDir;
+    protected volatile StressConfig config;
+    protected volatile StressCoreRuntime runtime;
+    protected volatile Object minecraftServer;
+    protected volatile Thread serverThread;
+    protected final AtomicLong tickCounter = new AtomicLong();
 
-    private final List<Consumer<StressPlayer>> joinListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<StressPlayer>> quitListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<TeleportEvent>> teleportListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<ChunkEvent>> chunkLoadListeners = new CopyOnWriteArrayList<>();
-    private final List<Consumer<ChunkEvent>> chunkUnloadListeners = new CopyOnWriteArrayList<>();
-    private final Map<UUID, StressLocation> lastLocations = new ConcurrentHashMap<>();
-    private final List<ScheduledTickTask> tickTasks = new CopyOnWriteArrayList<>();
+    protected final List<Consumer<StressPlayer>> joinListeners = new CopyOnWriteArrayList<>();
+    protected final List<Consumer<StressPlayer>> quitListeners = new CopyOnWriteArrayList<>();
+    protected final List<Consumer<TeleportEvent>> teleportListeners = new CopyOnWriteArrayList<>();
+    protected final List<Consumer<ChunkEvent>> chunkLoadListeners = new CopyOnWriteArrayList<>();
+    protected final List<Consumer<ChunkEvent>> chunkUnloadListeners = new CopyOnWriteArrayList<>();
+    protected final Map<UUID, StressLocation> lastLocations = new ConcurrentHashMap<>();
+    protected final List<ScheduledTickTask> tickTasks = new CopyOnWriteArrayList<>();
 
     private final ScheduledExecutorService asyncScheduler = Executors.newScheduledThreadPool(2, r -> {
-        Thread t = new Thread(r, "StressTestRTP-Fabric-Async");
+        Thread t = new Thread(r, "StressTestRTP-Mod-Async");
         t.setDaemon(true);
         return t;
     });
 
-    private static final class ScheduledTickTask {
+    protected static final class ScheduledTickTask {
         final Runnable task;
         final long periodTicks;
         volatile long nextFireTick;
@@ -106,15 +126,15 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
         }
     }
 
-    public StressTestFabricMod() {
+    protected ModStressHostBase() {
         this(resolveDefaultDataDir());
     }
 
-    public StressTestFabricMod(Path dataDir) {
+    protected ModStressHostBase(Path dataDir) {
         this.dataDir = dataDir != null ? dataDir : Path.of("config", "StressTestRTP");
     }
 
-    private static Path resolveDefaultDataDir() {
+    protected static Path resolveDefaultDataDir() {
         try {
             return FabricLoader.getInstance().getConfigDir().resolve("StressTestRTP");
         } catch (Throwable t) {
@@ -122,8 +142,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
         }
     }
 
-    @Override
-    public void onInitialize() {
+    protected void initializeFabric() {
         saveDefaultConfig();
         reloadStressConfig();
         registerFabricCallbacks();
@@ -135,6 +154,16 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
     public void onServerStarted(Object server) {
         this.minecraftServer = server;
         this.serverThread = Thread.currentThread();
+        if (!isCommandRegistered("rtpstress")) {
+            try {
+                Object commands = invokeAny(server, "getCommands", "getCommandManager", "method_3739");
+                Object disp = commands != null ? invokeAny(commands, "getDispatcher", "method_30852") : null;
+                if (disp instanceof CommandDispatcher<?> cd) {
+                    registerBrigadierCommand(cd);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     public void onServerStopping() {
@@ -314,10 +343,37 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
             java.lang.reflect.InvocationHandler handler) throws ReflectiveOperationException {
         Field f = holderClass.getField(fieldName);
         Object event = f.get(null);
-        Method register = event.getClass().getMethod("register", Object.class);
-        Method invoker = event.getClass().getMethod("invoker");
-        Class<?> listenerType = invoker.getReturnType();
-        Object proxy = Proxy.newProxyInstance(listenerType.getClassLoader(), new Class<?>[]{listenerType}, handler);
+        Class<?> eventType = f.getType();
+        Method register = eventType.getMethod("register", Object.class);
+        Method invoker = eventType.getMethod("invoker");
+        Class<?> listenerType = null;
+        if (f.getGenericType() instanceof java.lang.reflect.ParameterizedType pt
+                && pt.getActualTypeArguments().length > 0
+                && pt.getActualTypeArguments()[0] instanceof Class<?> c) {
+            listenerType = c;
+        }
+        if (listenerType == null || !listenerType.isInterface()) {
+            Object inv = invoker.invoke(event);
+            if (inv != null) {
+                Class<?>[] ifaces = inv.getClass().getInterfaces();
+                if (ifaces.length > 0) listenerType = ifaces[0];
+            }
+        }
+        final Class<?> resolvedType = listenerType;
+        java.lang.reflect.InvocationHandler safeHandler = (proxy, method, args) -> {
+            String mName = method.getName();
+            if ("equals".equals(mName) && args != null && args.length == 1) {
+                return proxy == args[0];
+            }
+            if ("hashCode".equals(mName)) {
+                return System.identityHashCode(proxy);
+            }
+            if ("toString".equals(mName)) {
+                return "StressTestRTPProxy[" + (resolvedType != null ? resolvedType.getName() : "unknown") + "]";
+            }
+            return handler.invoke(proxy, method, args);
+        };
+        Object proxy = Proxy.newProxyInstance(resolvedType.getClassLoader(), new Class<?>[]{resolvedType}, safeHandler);
         register.invoke(event, proxy);
     }
 
@@ -809,6 +865,16 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
             @Override
             public void sendMessage(String message) {
                 LOG.info("[StressTestRTP] " + message);
+                try {
+                    Class<?> compCls = Class.forName("net.minecraft.network.chat.Component");
+                    Method literal = compCls.getMethod("literal", String.class);
+                    Object comp = literal.invoke(null, message);
+                    Method sendSys = findMethod(source.getClass(), "sendSystemMessage", 1);
+                    if (sendSys != null) {
+                        sendSys.invoke(source, comp);
+                    }
+                } catch (Throwable ignored) {
+                }
             }
         };
     }
@@ -826,7 +892,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
         return null;
     }
 
-    private StressPlayer wrapPlayer(Object sp) {
+    protected StressPlayer wrapPlayer(Object sp) {
         return new StressPlayer() {
             @Override
             public UUID uuid() {
@@ -888,7 +954,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
                 if (clean == null || clean.isEmpty()) return false;
                 try {
                     Object srv = minecraftServer;
-                    Object source = invokeAny(sp, "createCommandSourceStack", "getCommandSource", "method_2995");
+                    Object source = invokeAny(sp, "createCommandSourceStack", "getCommandSource", "method_2995", "method_5671", "method_64396");
                     Object commands = srv != null ? invokeAny(srv, "getCommands", "getCommandManager", "method_3739") : null;
                     if (commands != null && source != null) {
                         Method pref = findMethod(commands.getClass(), "performPrefixedCommand", 2);
@@ -899,7 +965,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
                     }
                 } catch (Throwable ignored) {
                 }
-                dispatchConsoleCommand(clean);
+                dispatchConsoleCommand("execute as " + name() + " at @s run " + clean);
                 return true;
             }
         };
@@ -951,7 +1017,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
         };
     }
 
-    private ChunkEvent toChunkEvent(Object level, Object chunk, boolean newChunk) {
+    protected ChunkEvent toChunkEvent(Object level, Object chunk, boolean newChunk) {
         try {
             String wName = levelName(level);
             Object pos = invokeAny(chunk, "getPos", "method_12004");
@@ -974,12 +1040,12 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
         return null;
     }
 
-    private static String levelName(Object level) {
+    protected static String levelName(Object level) {
         if (level == null) return "minecraft:overworld";
         try {
             Object dim = invokeAny(level, "dimension", "getRegistryKey", "method_27983");
             if (dim != null) {
-                Object loc = invokeAny(dim, "location", "getValue", "method_29177");
+                Object loc = invokeAny(dim, "location", "identifier", "getValue", "method_29177");
                 if (loc != null) return loc.toString();
             }
         } catch (Throwable ignored) {
@@ -991,7 +1057,7 @@ public final class StressTestFabricMod implements ModInitializer, StressHost {
         return v instanceof Number n ? n.doubleValue() : 0.0;
     }
 
-    private static Object invokeAny(Object target, String... names) {
+    protected static Object invokeAny(Object target, String... names) {
         if (target == null) return null;
         Class<?> c = target.getClass();
         for (String name : names) {

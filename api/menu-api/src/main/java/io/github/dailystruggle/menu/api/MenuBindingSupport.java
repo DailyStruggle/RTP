@@ -1,5 +1,7 @@
 package io.github.dailystruggle.menu.api;
 
+import io.github.dailystruggle.server.api.BookMenuSpec;
+import io.github.dailystruggle.server.api.MenuContextAccessor;
 import io.github.dailystruggle.server.api.PlatformFamily;
 import io.github.dailystruggle.server.api.ServerAccessor;
 import io.github.dailystruggle.server.api.ServerAccessors;
@@ -15,10 +17,18 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Platform-neutral {@link ServiceLoader} discovery for {@link MenuRendererProvider} and {@link
- * AnvilInputOpenerProvider} gated by {@link PlatformFamily} (ADR-070).
+ * AnvilInputOpenerProvider} gated by {@link PlatformFamily}, plus {@link MenuDescriptor} to {@link
+ * BookMenuSpec} translation for {@link ServerAccessor}-backed book and chat rendering (ADR-035,
+ * ADR-048, ADR-070, ADR-115).
  *
  * <p>Resilient to {@link LinkageError} and {@link ServiceConfigurationError} so universal jars
  * containing multiple platform providers degrade gracefully on any server runtime.
+ *
+ * @governedBy ADR-035
+ * @governedBy ADR-048
+ * @governedBy ADR-070
+ * @governedBy ADR-115
+ * @trace REQ-SLEUTH-UI-001
  */
 public final class MenuBindingSupport {
 
@@ -209,5 +219,119 @@ public final class MenuBindingSupport {
     if (providerFamily == null) return true;
     if (running == null || running == PlatformFamily.UNKNOWN) return true;
     return providerFamily == running;
+  }
+
+  /**
+   * Discovers a {@link MenuRenderer} via {@link #discoverRenderer(List)} and, if no {@link
+   * MenuRendererProvider} is registered on the classpath, falls back to a {@link
+   * MenuContextAccessor#renderBookOrChat}-backed renderer bound to {@code accessor} (or {@link
+   * ServerAccessors#get()} when {@code accessor} is {@code null}).
+   *
+   * @param preferredIds ordered renderer identifiers (for example, {@code ["book", "chat"]})
+   * @param accessor explicit {@link MenuContextAccessor}, or {@code null} to query {@link
+   *     ServerAccessors#get()}
+   * @return resolved {@link MenuRenderer}, or {@code null} if neither a provider nor an accessor is
+   *     available
+   */
+  public static @Nullable MenuRenderer discoverRendererOrAccessor(
+      List<String> preferredIds, @Nullable MenuContextAccessor accessor) {
+    MenuRenderer discovered = discoverRenderer(preferredIds);
+    if (discovered != null) {
+      return discovered;
+    }
+    MenuContextAccessor resolved = accessor != null ? accessor : ServerAccessors.get();
+    if (resolved == null) {
+      return null;
+    }
+    boolean preferBook = false;
+    for (String id : preferredIds) {
+      if (id != null && id.trim().equalsIgnoreCase("book")) {
+        preferBook = true;
+        break;
+      }
+    }
+    final boolean allowBook = preferBook;
+    return (viewer, descriptor) -> {
+      BookMenuSpec spec = toBookMenuSpec(descriptor);
+      if (allowBook) {
+        resolved.renderBookOrChat(viewer, spec);
+      } else {
+        for (BookMenuSpec.Page page : spec.pages()) {
+          for (BookMenuSpec.Line line : page.lines()) {
+            resolved.sendInteractiveLine(viewer, line);
+          }
+        }
+      }
+    };
+  }
+
+  /**
+   * Converts a declarative {@link MenuDescriptor} into a platform-neutral {@link BookMenuSpec}
+   * ready for {@link MenuContextAccessor#openBook} or {@link MenuContextAccessor#renderBookOrChat}.
+   *
+   * @param descriptor source menu descriptor; must not be {@code null}
+   * @return translated {@link BookMenuSpec}
+   */
+  public static BookMenuSpec toBookMenuSpec(MenuDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    String author = descriptor.styleMetadata().getOrDefault("author", "Leaf");
+    List<BookMenuSpec.Page> pages = new ArrayList<>(descriptor.pages().size());
+    for (MenuDescriptor.Page page : descriptor.pages()) {
+      List<BookMenuSpec.Line> lines = new ArrayList<>(page.lines().size());
+      for (MenuDescriptor.Line line : page.lines()) {
+        List<BookMenuSpec.Fragment> fragments = new ArrayList<>(line.fragments().size());
+        for (MenuDescriptor.Fragment fragment : line.fragments()) {
+          fragments.add(toBookFragment(fragment));
+        }
+        lines.add(new BookMenuSpec.Line(fragments));
+      }
+      pages.add(new BookMenuSpec.Page(lines));
+    }
+    return new BookMenuSpec(descriptor.title(), author, pages);
+  }
+
+  /**
+   * Converts a single {@link MenuDescriptor.Fragment} and its {@link MenuAction} into a {@link
+   * BookMenuSpec.Fragment}.
+   *
+   * @param fragment menu descriptor fragment; must not be {@code null}
+   * @return translated {@link BookMenuSpec.Fragment}
+   */
+  public static BookMenuSpec.Fragment toBookFragment(MenuDescriptor.Fragment fragment) {
+    Objects.requireNonNull(fragment, "fragment");
+    String text = BookContrastValidator.sanitizeForParchmentPage(fragment.text());
+    String hover = BookContrastValidator.sanitizeForDarkHoverTooltip(fragment.hover());
+    MenuAction action = fragment.action();
+    if (action == null) {
+      return new BookMenuSpec.Fragment(text, hover, BookMenuSpec.ClickAction.NONE, null);
+    }
+    if (action instanceof MenuAction.RunCommand run) {
+      if (run.args().isEmpty()) {
+        return new BookMenuSpec.Fragment(text, hover, BookMenuSpec.ClickAction.NONE, null);
+      }
+      String joined = String.join(" ", run.args()).trim();
+      if (joined.isEmpty()) {
+        return new BookMenuSpec.Fragment(text, hover, BookMenuSpec.ClickAction.NONE, null);
+      }
+      String command = joined.startsWith("/") ? joined : "/" + joined;
+      return BookMenuSpec.Fragment.runCommand(text, hover, command);
+    }
+    if (action instanceof MenuAction.SuggestInput suggest) {
+      return BookMenuSpec.Fragment.suggestCommand(text, hover, suggest.prefix());
+    }
+    if (action instanceof MenuAction.ChangePage change) {
+      return BookMenuSpec.Fragment.changePage(text, hover, change.pageIndex());
+    }
+    if (action instanceof MenuAction.OpenExternalUri uri) {
+      return BookMenuSpec.Fragment.openUrl(text, hover, uri.uri().toString());
+    }
+    if (action instanceof MenuAction.OpenSubmenu submenu && !submenu.path().isEmpty()) {
+      String joined = String.join(" ", submenu.path()).trim();
+      if (!joined.isEmpty()) {
+        String command = joined.startsWith("/") ? joined : "/" + joined;
+        return BookMenuSpec.Fragment.runCommand(text, hover, command);
+      }
+    }
+    return new BookMenuSpec.Fragment(text, hover, BookMenuSpec.ClickAction.NONE, null);
   }
 }

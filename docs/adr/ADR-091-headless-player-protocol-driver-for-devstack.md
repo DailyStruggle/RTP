@@ -67,7 +67,7 @@ Provide a dedicated GitHub Actions workflow (`.github/workflows/devstack-accepta
 
 ## References
 
-- [ADR-036: Network Mode (Multi-Server, Multi-Proxy RTP)](ADR-036-network-mode-multi-server-multi-proxy.md)
+- [ADR-036: Network Mode (Multi-Server, Multi-Proxy RTP)](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-022-network-mode-multi-server-multi-proxy.md)
 - [devstack/README.md](../../devstack/README.md)
 - [devstack/run-acceptance.sh](../../devstack/run-acceptance.sh)
-- [ADR-090: Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset](ADR-090-test-driver-and-synthetic-mca-architecture.md)
+- [ADR-090: Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-071-test-driver-and-synthetic-mca-architecture.md)

@@ -63,4 +63,4 @@ TaskHandle handle = ServerAccessors.scheduler()
 
 ## Docs
 
-- ADR-116: [`../../docs/adr/ADR-116-effects-through-neutral-server-accessor.md`](../../docs/adr/ADR-116-effects-through-neutral-server-accessor.md)
+- ADR-116: [`../../docs/adr/ADR-116-effects-through-neutral-server-accessor.md`](../effects-api/docs/adr/effects-api-ADR-008-effects-through-neutral-server-accessor.md)

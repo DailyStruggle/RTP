@@ -585,7 +585,7 @@ This is the recommended dependency for out-of-repo addon authors (see
 
 ## Release Staging & Binary Distribution (Pro vs. Lite)
 
-Per **[ADR-117](../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)**, both jars share one version line (`version` in `gradle.properties`) and are built from the same commit. The editions differ in obligation, not in timing:
+Per **[leafrtp-ADR-087](../../resource/LeafRTP/docs/adr/leafrtp-ADR-087-release-cadence-contractual-pro-discretionary-lite.md)**, both jars share one version line (`version` in `gradle.properties`) and are built from the same commit. The editions differ in obligation, not in timing:
 
 1. **LeafRTP Pro (BuiltByBit / Commercial):**
    - **Trigger:** Automated on merging a release PR into `V3`/`V2`/`V1` (or manual `workflow_dispatch`) via `.github/workflows/release-bbb.yml`.
@@ -595,7 +595,27 @@ Per **[ADR-117](../adr/ADR-117-release-cadence-contractual-pro-discretionary-lit
 2. **LeafRTP Lite (Modrinth, Hangar, GitHub Releases):**
    - **Trigger:** Manual trigger via `.github/workflows/release.yml` (`workflow_dispatch`), run from the released commit: `gh workflow run release.yml --ref <branch-or-tag>`.
    - **Cadence:** Whenever the maintainer chooses to publish a version; there is no holding period. Lite may skip patch versions, and never ships a version or commit that no Pro release has shipped.
-   - **Actions:** Builds `LeafRTP-<version>.jar` (lite variant), attaches signatures and SBOM, creates the public GitHub Release, and publishes to Modrinth and Hangar with Lite-filtered release notes.
+   - **Actions:** Builds `LeafRTP-<version>.jar` (lite variant), attaches signatures and SBOM, creates the public GitHub Release (with `make_latest: true` for stable releases), and publishes to Modrinth and Hangar with Lite-filtered release notes.
+
+---
+
+## Multi-Product Monorepo Releases (`ADR-126`)
+
+The `DailyStruggle/RTP` repository (**Real-Time Process / Real-Time Program for Minecraft**) hosts both the 17-module real-time SDK and multiple standalone nested plugins (`LeafRTP` / `leafrtp`, `LeafTreeGen` / `leaftreegen`, `LeafSleep` / `leafsleep`, etc.). Per **[ADR-126](../adr/ADR-126-multi-product-monorepo-release-architecture.md)**, each product ships distinct GitHub Releases from the monorepo without colliding on tags or hijacking `/releases/latest`:
+
+| Product | Gradle Target | Tag Format | `make_latest` on `DailyStruggle/RTP` | Version & Changelog Source | Workflow |
+|---------|---------------|------------|--------------------------------------|----------------------------|----------|
+| **LeafRTP** (`leafrtp`, `DailyStruggle/RTP:V3`) | `:rtp-plugin:remapJar` / `:remapLiteJar` (`../../resource/LeafRTP`) | `v<semver>` (e.g. `v3.3.1`) | `true` (owns `/releases/latest`) | Root `gradle.properties` + `resource/LeafRTP/CHANGELOG.md` | `.github/workflows/release.yml` & `release-bbb.yml` |
+| **LeafSleep / OnePlayerSleep** (`leafsleep`, `DailyStruggle/OnePlayerSleep:main`) | `:resource:LeafSleep:leafsleep-plugin:build` | `leafsleep-v<semver>` / `oneplayersleep-v<semver>` | `false` | `resource/LeafSleep/leafsleep-plugin/build.gradle` + `resource/LeafSleep/CHANGELOG.md` | `.github/workflows/release-sleep.yml` |
+| **LeafTreeGen** (`leaftreegen`, `LeafCraftDev/LeafTreeGen:main`) | `:resource:LeafTreeGen:treegen-plugin:build` | `leaftreegen-v<semver>` (e.g. `leaftreegen-v0.2.0`) | `false` | `resource/LeafTreeGen/treegen-plugin/build.gradle` + `resource/LeafTreeGen/CHANGELOG.md` | `.github/workflows/release-treegen.yml` |
+| **Reserved Private Resources** (`leafsleuth`, `leafconfig`, `leafartifacts`, `leafshapemining` in `LeafCraftDev/MC:main`) | `:resource:<Product>:build` | `<product>-v<semver>` | `false` | `resource/<Product>/.../build.gradle` + `resource/<Product>/CHANGELOG.md` | `.github/workflows/release-<product>.yml` |
+
+### Key Multi-Product Release Invariants
+
+1. **Hyphenated Tag Namespaces (`<product>-v<semver>`):** Nested plugins use hyphen-delimited tags (`leaftreegen-v0.2.0`) rather than slashes so Git tag refs remain flat under `.git/refs/tags/` and URL-safe across JitPack and REST routers. `LeafRTP` retains bare `v<semver>` tags for backward compatibility with existing JitPack consumers.
+2. **Deterministic `/releases/latest` Ownership:** Only `.github/workflows/release.yml` (`LeafRTP`) sets `make_latest: true`. All nested plugin workflows explicitly set `make_latest: false` on `softprops/action-gh-release`.
+3. **Supply-Chain Parity:** Every product workflow signs its shaded jar via Gradle's in-memory PGP `signDeliverables` task (`SIGNING_KEY`), produces `.sha256` and `.sha512` checksums via `generateChecksums`, and attests SLSA build provenance via `actions/attest-build-provenance`.
+4. **Tag-Prefix Polling in `discord-support-bot`:** `discord-support-bot/support-bot.yml` configures `github_tag_prefix` per project (e.g. `["v", "leafrtp-v"]` for `leafrtp`, `["leaftreegen-v", "treegen-v"]` for `treegen`) so `fetch_latest_release()` resolves each plugin's latest release from `DailyStruggle/RTP` without cross-talk.
 
 ---
 

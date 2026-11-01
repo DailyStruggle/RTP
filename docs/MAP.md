@@ -3,43 +3,43 @@
 Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent that doesn't yet know which file to open. For task-based routing use [`dev/INDEX.md`](dev/INDEX.md).
 
 ## Top-level entry points
-- [`FOR_ADDON_DEVELOPERS.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/FOR_ADDON_DEVELOPERS.md) — router for addon authors (depends only on `rtp-api`); not bundled in the jar, read it in the public repository.
-- [`ADDON_QUICKSTART.md`](ADDON_QUICKSTART.md) — one-page "register a custom shape in ~20 lines" addon tutorial.
+- [`FOR_ADDON_DEVELOPERS.md`](https://github.com/dailystruggle/RTP/blob/V3/resource/LeafRTP/docs/FOR_ADDON_DEVELOPERS.md) — router for addon authors (depends only on `rtp-api`); not bundled in the jar, read it in the public repository.
+- [`ADDON_QUICKSTART.md`](../resource/LeafRTP/docs/ADDON_QUICKSTART.md) — one-page "register a custom shape in ~20 lines" addon tutorial.
 - [`FOR_CONTRIBUTORS.md`](FOR_CONTRIBUTORS.md) — router for core contributors.
-- [`FOR_SERVER_ADMINS.md`](FOR_SERVER_ADMINS.md) — router to `admin/`.
+- [`FOR_SERVER_ADMINS.md`](../resource/LeafRTP/docs/FOR_SERVER_ADMINS.md) — router to `admin/`.
 
 ## Engineering (`dev/`)
 - [`dev/INDEX.md`](dev/INDEX.md) — task → file+anchor router.
-- [`dev/ADDON_LOADING.md`](dev/ADDON_LOADING.md) — addon lifecycle, classloading, and isolation.
-- [`dev/ADDON_MENUS.md`](dev/ADDON_MENUS.md) — build a destination menu/GUI on `rtp-api`.
-- [`dev/ADDON_CROSS_SERVER.md`](dev/ADDON_CROSS_SERVER.md) — offer remote (network-mode) destinations from an addon.
+- [`dev/ADDON_LOADING.md`](../resource/LeafRTP/docs/dev/ADDON_LOADING.md) — addon lifecycle, classloading, and isolation.
+- [`dev/ADDON_MENUS.md`](../resource/LeafRTP/docs/dev/ADDON_MENUS.md) — build a destination menu/GUI on `rtp-api`.
+- [`dev/ADDON_CROSS_SERVER.md`](../resource/LeafRTP/docs/dev/ADDON_CROSS_SERVER.md) — offer remote (network-mode) destinations from an addon.
 - [`dev/AI_USAGE.md`](dev/AI_USAGE.md) — conventions for AI assistance in development.
-- [`dev/REQUIREMENTS.md`](dev/REQUIREMENTS.md) — absolute laws (REQ-*, S-00x). Normative.
+- [`dev/REQUIREMENTS.md`](../resource/LeafRTP/docs/dev/REQUIREMENTS.md) — absolute laws (REQ-*, S-00x). Normative.
 - [`dev/ARCHITECTURE.md`](dev/ARCHITECTURE.md) — module layout, import boundaries.
-- [`dev/CODE_TOUR.md`](dev/CODE_TOUR.md) — code tour and module walk-through.
-- [`dev/DESIGN.md`](dev/DESIGN.md) — threading, `MemoryTracker`, chunk reservation.
-- [`dev/GLOSSARY.md`](dev/GLOSSARY.md) — canonical domain terms.
+- [`dev/CODE_TOUR.md`](../resource/LeafRTP/docs/dev/CODE_TOUR.md) — code tour and module walk-through.
+- [`dev/DESIGN.md`](../resource/LeafRTP/docs/dev/DESIGN.md) — threading, `MemoryTracker`, chunk reservation.
+- [`dev/GLOSSARY.md`](../resource/LeafRTP/docs/dev/GLOSSARY.md) — canonical domain terms.
 - [`dev/RULES.md`](dev/RULES.md) — requirement/ADR authoring style.
-- [`dev/TRACEABILITY.md`](dev/TRACEABILITY.md) — REQ ↔ class ↔ test.
-- [`dev/CONCEPTS.md`](dev/CONCEPTS.md) — spiral math and selection concepts.
+- [`dev/TRACEABILITY.md`](../resource/LeafRTP/docs/dev/TRACEABILITY.md) — REQ ↔ class ↔ test.
+- [`dev/CONCEPTS.md`](../resource/LeafRTP/docs/dev/CONCEPTS.md) — spiral math and selection concepts.
 - [`dev/LESSONS_LEARNED.md`](dev/LESSONS_LEARNED.md) — dated pitfalls.
 - [`dev/ENTERPRISE_READINESS.md`](dev/ENTERPRISE_READINESS.md) — enterprise readiness roadmap and quality gates.
-- [`dev/SUPPORT_MATRIX.md`](dev/SUPPORT_MATRIX.md) — platform x Minecraft version x Java version support matrix.
+- [`dev/SUPPORT_MATRIX.md`](../resource/LeafRTP/docs/dev/SUPPORT_MATRIX.md) — platform x Minecraft version x Java version support matrix.
 - [`dev/DEPRECATION_POLICY.md`](dev/DEPRECATION_POLICY.md) — API evolution and deprecation lifecycle.
 - [`dev/COVERAGE_PLAN.md`](dev/COVERAGE_PLAN.md) — JaCoCo targets.
-- [`dev/EXTERNAL_HOOKS.md`](dev/EXTERNAL_HOOKS.md) — external hooks and reflection audit (ADR-026).
-- [`dev/CONFIG_COMMAND_SPEC.md`](dev/CONFIG_COMMAND_SPEC.md) — `/rtp config` command specification and grammar.
+- [`dev/EXTERNAL_HOOKS.md`](../resource/LeafRTP/docs/dev/EXTERNAL_HOOKS.md) — external hooks and reflection audit (ADR-026).
+- [`dev/CONFIG_COMMAND_SPEC.md`](../resource/LeafRTP/docs/dev/CONFIG_COMMAND_SPEC.md) — `/rtp config` command specification and grammar.
 - [`dev/CONFIG_COMMENT_STYLE.md`](dev/CONFIG_COMMENT_STYLE.md) — configuration comment guidelines and style.
-- [`dev/MULTI_SERVER_PLAN.md`](dev/MULTI_SERVER_PLAN.md) — proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated.
-- [`dev/METRICS_PLAN.md`](dev/METRICS_PLAN.md) — runtime metrics SPI (TPS / MSPT / heap / queue / pipeline); implementation eligible.
+- [`dev/MULTI_SERVER_PLAN.md`](../resource/LeafRTP/docs/dev/MULTI_SERVER_PLAN.md) — proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated.
+- [`dev/METRICS_PLAN.md`](../resource/LeafRTP/docs/dev/METRICS_PLAN.md) — runtime metrics SPI (TPS / MSPT / heap / queue / pipeline); implementation eligible.
 - [`dev/ROADMAP.md`](dev/ROADMAP.md) — pointer to the Linear `LeafRTP` team, where forward-looking work is tracked.
 - [`dev/POTENTIAL_BUGS.md`](dev/POTENTIAL_BUGS.md) — triage log for potential issues found during development.
 - [`dev/PUBLISHING.md`](dev/PUBLISHING.md) — publishing `rtp-api`/`rtp-core` for out-of-repo addons (JitPack active; Maven Central how-to).
 - [`dev/PULL_REQUEST_PROCESS.md`](dev/PULL_REQUEST_PROCESS.md) — pull request lifecycle, local verification gates, and CI pipeline reference.
 - [`dev/SEMVER.md`](dev/SEMVER.md) — semantic versioning policy and guarantees.
-- [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
+- [`dev/STAKEHOLDERS.md`](../resource/LeafRTP/docs/dev/STAKEHOLDERS.md) — roles.
 - [`dev/TESTING_GUIDE.md`](dev/TESTING_GUIDE.md) — test suites, test tiers, and verification guide.
-- [`dev/TRANSLATION_GUIDE.md`](dev/TRANSLATION_GUIDE.md) — localization, translations, and locale parity.
+- [`dev/TRANSLATION_GUIDE.md`](../resource/LeafRTP/docs/dev/TRANSLATION_GUIDE.md) — localization, translations, and locale parity.
 - [`dev/LICENSING.md`](dev/LICENSING.md) — dual licensing and dependency audit.
 
 ## Decisions (`adr/`)
@@ -149,62 +149,62 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - Subproject ADRs (`commands-api`, `effects-api`, `maps-api`, `metrics-api`, `rtp-fabric`, `rtp-neoforge`, `rtp-proxy`, addons) — see the *Subproject ADRs* table in [`adr/README.md`](adr/README.md).
 
 ## Architecture slices (`architecture/`)
-- [`architecture/01-teleport-execution-pipeline.md`](architecture/01-teleport-execution-pipeline.md)
-- [`architecture/02-budgeted-cache-generator.md`](architecture/02-budgeted-cache-generator.md)
-- [`architecture/03-chunk-ticket-lifecycle.md`](architecture/03-chunk-ticket-lifecycle.md)
-- [`architecture/04-active-gc-sweep.md`](architecture/04-active-gc-sweep.md)
-- [`architecture/05-scan-task-crawler.md`](architecture/05-scan-task-crawler.md)
-- [`architecture/06-plugin-setup-lifecycle.md`](architecture/06-plugin-setup-lifecycle.md)
-- [`architecture/07-rtp-command-region-selection.md`](architecture/07-rtp-command-region-selection.md)
-- [`architecture/08-location-selection-per-attempt.md`](architecture/08-location-selection-per-attempt.md)
-- [`architecture/09-configuration-load-and-reload.md`](architecture/09-configuration-load-and-reload.md)
-- [`architecture/10-shutdown-and-flush-lifecycle.md`](architecture/10-shutdown-and-flush-lifecycle.md)
-- [`architecture/11-configuration-write-and-persist.md`](architecture/11-configuration-write-and-persist.md)
-- [`architecture/12-network-model.md`](architecture/12-network-model.md)
-- [`architecture/13-dual-layer-shape-architecture-and-l3-selection.md`](architecture/13-dual-layer-shape-architecture-and-l3-selection.md)
-- [`architecture/14-group-placement-anchor-flow.md`](architecture/14-group-placement-anchor-flow.md)
+- [`architecture/01-teleport-execution-pipeline.md`](../resource/LeafRTP/docs/architecture/01-teleport-execution-pipeline.md)
+- [`architecture/02-budgeted-cache-generator.md`](../resource/LeafRTP/docs/architecture/02-budgeted-cache-generator.md)
+- [`architecture/03-chunk-ticket-lifecycle.md`](../resource/LeafRTP/docs/architecture/03-chunk-ticket-lifecycle.md)
+- [`architecture/04-active-gc-sweep.md`](../resource/LeafRTP/docs/architecture/04-active-gc-sweep.md)
+- [`architecture/05-scan-task-crawler.md`](../resource/LeafRTP/docs/architecture/05-scan-task-crawler.md)
+- [`architecture/06-plugin-setup-lifecycle.md`](../resource/LeafRTP/docs/architecture/06-plugin-setup-lifecycle.md)
+- [`architecture/07-rtp-command-region-selection.md`](../resource/LeafRTP/docs/architecture/07-rtp-command-region-selection.md)
+- [`architecture/08-location-selection-per-attempt.md`](../resource/LeafRTP/docs/architecture/08-location-selection-per-attempt.md)
+- [`architecture/09-configuration-load-and-reload.md`](../resource/LeafRTP/docs/architecture/09-configuration-load-and-reload.md)
+- [`architecture/10-shutdown-and-flush-lifecycle.md`](../resource/LeafRTP/docs/architecture/10-shutdown-and-flush-lifecycle.md)
+- [`architecture/11-configuration-write-and-persist.md`](../resource/LeafRTP/docs/architecture/11-configuration-write-and-persist.md)
+- [`architecture/12-network-model.md`](../resource/LeafRTP/docs/architecture/12-network-model.md)
+- [`architecture/13-dual-layer-shape-architecture-and-l3-selection.md`](../resource/LeafRTP/docs/architecture/13-dual-layer-shape-architecture-and-l3-selection.md)
+- [`architecture/14-group-placement-anchor-flow.md`](../resource/LeafRTP/docs/architecture/14-group-placement-anchor-flow.md)
 
 ## Public site - narrative pages (`site/`)
-- [`site/README.md`](https://github.com/dailystruggle/RTP/blob/V3/docs/site/README.md) — purpose + conventions for the narrative/non-functional page set (repo-only; not published to the site).
-- [`site/index.md`](site/index.md) — home / landing page.
-- [`site/why.md`](site/why.md) — motivation and the distribution algorithm.
-- [`site/intended-usage.md`](site/intended-usage.md) — the region mental model and recommended workflow.
-- [`site/what-not-to-do.md`](site/what-not-to-do.md) — anti-patterns (break-entirely vs. slow).
-- [`site/shape-algorithms.md`](site/shape-algorithms.md) — shape geometry selection and distribution mathematics.
+- [`site/README.md`](https://github.com/dailystruggle/RTP/blob/V3/resource/LeafRTP/docs/site/README.md) — purpose + conventions for the narrative/non-functional page set (repo-only; not published to the site).
+- [`site/index.md`](../resource/LeafRTP/docs/site/index.md) — home / landing page.
+- [`site/why.md`](../resource/LeafRTP/docs/site/why.md) — motivation and the distribution algorithm.
+- [`site/intended-usage.md`](../resource/LeafRTP/docs/site/intended-usage.md) — the region mental model and recommended workflow.
+- [`site/what-not-to-do.md`](../resource/LeafRTP/docs/site/what-not-to-do.md) — anti-patterns (break-entirely vs. slow).
+- [`site/shape-algorithms.md`](../resource/LeafRTP/docs/site/shape-algorithms.md) — shape geometry selection and distribution mathematics.
 
 ## Operator-facing (`admin/`)
-- [`admin/INDEX.md`](admin/INDEX.md) — operator portal and navigation index.
-- [`admin/QUICK_START.md`](admin/QUICK_START.md) — initial installation and 5-minute setup.
-- [`admin/COMMANDS.md`](admin/COMMANDS.md) — exhaustive command syntax and permissions reference.
-- [`admin/ACTIONS.md`](admin/ACTIONS.md) — scripted actions, gates, confinement, and arenas.
-- [`admin/ADDONS.md`](admin/ADDONS.md) — official and community addons catalog and ecosystem.
-- [`admin/PREFABS.md`](admin/PREFABS.md) — ready-to-use region and config prefabs.
-- [`admin/RECIPES.md`](admin/RECIPES.md) — common server configurations and administrative recipes.
-- [`dev/HAZARDS.md`](dev/HAZARDS.md) — failure modes + mitigations (absorbs `FAILURE_MODES.md`).
-- [`admin/FAQ.md`](admin/FAQ.md) — frequently asked questions.
-- [`admin/RUNBOOK.md`](admin/RUNBOOK.md) — incident response, TPS investigation, and operational diagnostics.
-- [`admin/MIGRATION.md`](admin/MIGRATION.md) — upgrading guides and migration procedures across versions.
-- [`admin/WEB_EDITOR_GUIDE.md`](admin/WEB_EDITOR_GUIDE.md) — ephemeral web config editor and browser interface guide.
-- [`admin/CLAIM_PLUGIN_COMPATIBILITY.md`](admin/CLAIM_PLUGIN_COMPATIBILITY.md) — claim integrations matrix and compatibility notes.
-- [`admin/CUSTOM_ITEMS.md`](admin/CUSTOM_ITEMS.md) — custom item resolution (ItemsAdder, Oraxen, Nexo, CustomModelData) and menu icon compatibility.
-- [`admin/configuration/CONFIGURATION.md`](admin/configuration/CONFIGURATION.md) — configuration architecture, defaults, and multi-file layout.
-- [`admin/configuration/CONFIG_LIFECYCLE.md`](admin/configuration/CONFIG_LIFECYCLE.md) — load, reload, schema evolution, and serialization lifecycle.
-- [`admin/configuration/CORE_CONFIG.md`](admin/configuration/CORE_CONFIG.md) — root `config.yml` reference.
-- [`admin/configuration/REGIONS.md`](admin/configuration/REGIONS.md) — region definitions, geometries, and spatial bounds.
-- [`admin/configuration/WORLDS.md`](admin/configuration/WORLDS.md) — world configurations and world-override regions.
-- [`admin/configuration/SAFETY.md`](admin/configuration/SAFETY.md) — safety predicates, hazard blocks, and biome filtering.
-- [`admin/configuration/PERFORMANCE.md`](admin/configuration/PERFORMANCE.md) — cache quotas, memory limits, and tick budget tuning.
-- [`admin/configuration/ECONOMY.md`](admin/configuration/ECONOMY.md) — economy hooks, vault costs, and price curves.
-- [`admin/configuration/EVENTS_AND_EFFECTS.md`](admin/configuration/EVENTS_AND_EFFECTS.md) — teleport visual/audio effects, particles, and event bindings.
-- [`admin/configuration/INTEGRATIONS.md`](admin/configuration/INTEGRATIONS.md) — claim plugins, world border, and third-party hooks.
-- [`admin/configuration/MESSAGES.md`](admin/configuration/MESSAGES.md) — user-facing messages, custom formatting, and placeholders.
-- [`admin/configuration/LANGUAGE.md`](admin/configuration/LANGUAGE.md) — multi-language localization and translation setup.
-- [`admin/configuration/LOGGING.md`](admin/configuration/LOGGING.md) — audit logging, teleport logs, and diagnostic verbosity.
-- [`admin/configuration/METRICS.md`](admin/configuration/METRICS.md) — runtime metrics, telemetry, and external monitoring exporters.
-- [`admin/configuration/SCHEMATICS.md`](admin/configuration/SCHEMATICS.md) — landing schematics, emergency platforms, and safety structures.
-- [`admin/configuration/TTL.md`](admin/configuration/TTL.md) — cause-based TTL and cache expiration policies.
-- [`admin/configuration/IN_GAME_CONFIG.md`](admin/configuration/IN_GAME_CONFIG.md) — managing settings live via in-game commands and menus.
-- [`admin/proxies/INDEX.md`](admin/proxies/INDEX.md) — network mode overview and multi-server architecture.
-- [`admin/proxies/CONFIGURATION.md`](admin/proxies/CONFIGURATION.md) — `network.yml` schema, proxy tokens, and transport bindings.
-- [`admin/proxies/SINGLE_BACKEND_VERIFICATION.md`](admin/proxies/SINGLE_BACKEND_VERIFICATION.md) — isolated single-backend test runbook.
-- [`admin/proxies/CROSS_SERVER_VERIFICATION.md`](admin/proxies/CROSS_SERVER_VERIFICATION.md) — multi-backend cross-server transfer verification runbook.
+- [`admin/INDEX.md`](../resource/LeafRTP/docs/admin/INDEX.md) — operator portal and navigation index.
+- [`admin/QUICK_START.md`](../resource/LeafRTP/docs/admin/QUICK_START.md) — initial installation and 5-minute setup.
+- [`admin/COMMANDS.md`](../resource/LeafRTP/docs/admin/COMMANDS.md) — exhaustive command syntax and permissions reference.
+- [`admin/ACTIONS.md`](../resource/LeafRTP/docs/admin/ACTIONS.md) — scripted actions, gates, confinement, and arenas.
+- [`admin/ADDONS.md`](../resource/LeafRTP/docs/admin/ADDONS.md) — official and community addons catalog and ecosystem.
+- [`admin/PREFABS.md`](../resource/LeafRTP/docs/admin/PREFABS.md) — ready-to-use region and config prefabs.
+- [`admin/RECIPES.md`](../resource/LeafRTP/docs/admin/RECIPES.md) — common server configurations and administrative recipes.
+- [`dev/HAZARDS.md`](../resource/LeafRTP/docs/dev/HAZARDS.md) — failure modes + mitigations (absorbs `FAILURE_MODES.md`).
+- [`admin/FAQ.md`](../resource/LeafRTP/docs/admin/FAQ.md) — frequently asked questions.
+- [`admin/RUNBOOK.md`](../resource/LeafRTP/docs/admin/RUNBOOK.md) — incident response, TPS investigation, and operational diagnostics.
+- [`admin/MIGRATION.md`](../resource/LeafRTP/docs/admin/MIGRATION.md) — upgrading guides and migration procedures across versions.
+- [`admin/WEB_EDITOR_GUIDE.md`](../resource/LeafRTP/docs/admin/WEB_EDITOR_GUIDE.md) — ephemeral web config editor and browser interface guide.
+- [`admin/CLAIM_PLUGIN_COMPATIBILITY.md`](../resource/LeafRTP/docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md) — claim integrations matrix and compatibility notes.
+- [`admin/CUSTOM_ITEMS.md`](../resource/LeafRTP/docs/admin/CUSTOM_ITEMS.md) — custom item resolution (ItemsAdder, Oraxen, Nexo, CustomModelData) and menu icon compatibility.
+- [`admin/configuration/CONFIGURATION.md`](../resource/LeafRTP/docs/admin/configuration/CONFIGURATION.md) — configuration architecture, defaults, and multi-file layout.
+- [`admin/configuration/CONFIG_LIFECYCLE.md`](../resource/LeafRTP/docs/admin/configuration/CONFIG_LIFECYCLE.md) — load, reload, schema evolution, and serialization lifecycle.
+- [`admin/configuration/CORE_CONFIG.md`](../resource/LeafRTP/docs/admin/configuration/CORE_CONFIG.md) — root `config.yml` reference.
+- [`admin/configuration/REGIONS.md`](../resource/LeafRTP/docs/admin/configuration/REGIONS.md) — region definitions, geometries, and spatial bounds.
+- [`admin/configuration/WORLDS.md`](../resource/LeafRTP/docs/admin/configuration/WORLDS.md) — world configurations and world-override regions.
+- [`admin/configuration/SAFETY.md`](../resource/LeafRTP/docs/admin/configuration/SAFETY.md) — safety predicates, hazard blocks, and biome filtering.
+- [`admin/configuration/PERFORMANCE.md`](../resource/LeafRTP/docs/admin/configuration/PERFORMANCE.md) — cache quotas, memory limits, and tick budget tuning.
+- [`admin/configuration/ECONOMY.md`](../resource/LeafRTP/docs/admin/configuration/ECONOMY.md) — economy hooks, vault costs, and price curves.
+- [`admin/configuration/EVENTS_AND_EFFECTS.md`](../resource/LeafRTP/docs/admin/configuration/EVENTS_AND_EFFECTS.md) — teleport visual/audio effects, particles, and event bindings.
+- [`admin/configuration/INTEGRATIONS.md`](../resource/LeafRTP/docs/admin/configuration/INTEGRATIONS.md) — claim plugins, world border, and third-party hooks.
+- [`admin/configuration/MESSAGES.md`](../resource/LeafRTP/docs/admin/configuration/MESSAGES.md) — user-facing messages, custom formatting, and placeholders.
+- [`admin/configuration/LANGUAGE.md`](../resource/LeafRTP/docs/admin/configuration/LANGUAGE.md) — multi-language localization and translation setup.
+- [`admin/configuration/LOGGING.md`](../resource/LeafRTP/docs/admin/configuration/LOGGING.md) — audit logging, teleport logs, and diagnostic verbosity.
+- [`admin/configuration/METRICS.md`](../resource/LeafRTP/docs/admin/configuration/METRICS.md) — runtime metrics, telemetry, and external monitoring exporters.
+- [`admin/configuration/SCHEMATICS.md`](../resource/LeafRTP/docs/admin/configuration/SCHEMATICS.md) — landing schematics, emergency platforms, and safety structures.
+- [`admin/configuration/TTL.md`](../resource/LeafRTP/docs/admin/configuration/TTL.md) — cause-based TTL and cache expiration policies.
+- [`admin/configuration/IN_GAME_CONFIG.md`](../resource/LeafRTP/docs/admin/configuration/IN_GAME_CONFIG.md) — managing settings live via in-game commands and menus.
+- [`admin/proxies/INDEX.md`](../resource/LeafRTP/docs/admin/proxies/INDEX.md) — network mode overview and multi-server architecture.
+- [`admin/proxies/CONFIGURATION.md`](../resource/LeafRTP/docs/admin/proxies/CONFIGURATION.md) — `network.yml` schema, proxy tokens, and transport bindings.
+- [`admin/proxies/SINGLE_BACKEND_VERIFICATION.md`](../resource/LeafRTP/docs/admin/proxies/SINGLE_BACKEND_VERIFICATION.md) — isolated single-backend test runbook.
+- [`admin/proxies/CROSS_SERVER_VERIFICATION.md`](../resource/LeafRTP/docs/admin/proxies/CROSS_SERVER_VERIFICATION.md) — multi-backend cross-server transfer verification runbook.

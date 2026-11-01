@@ -1,0 +1,23 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "stresstestrtp"
+version = "1.0.0"
+displayName = "StressTestRTP"
+description = "Platform-neutral stress-test driver and TPS/MSPT/heap/latency/leak/coverage harness for /rtp-style commands on NeoForge."
+
+[[dependencies.stresstestrtp]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.0,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.stresstestrtp]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21,)"
+ordering = "NONE"
+side = "BOTH"

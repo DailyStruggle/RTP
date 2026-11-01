@@ -1,0 +1,19 @@
+// LeafRTP NeoForge @Mod entry point, event bridge, database bootstrap, and test umbrella wiring (ADR-033, ADR-126).
+// Merged post-remap into the unified LeafRTP / LeafRTP-Pro jar by :rtp-plugin.
+plugins {
+    id 'net.neoforged.moddev'
+}
+
+ext {
+    minecraftVersion = '1.21.1'
+    neoforgeVersion  = '21.1.95'
+}
+
+neoForge {
+    version = neoforgeVersion
+}
+
+dependencies {
+    api project(':neoforge:neoforge-common')
+    testImplementation 'com.mojang:brigadier:1.2.9'
+}

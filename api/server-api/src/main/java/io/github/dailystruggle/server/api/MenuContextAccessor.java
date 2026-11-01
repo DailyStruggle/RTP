@@ -61,4 +61,57 @@ public interface MenuContextAccessor {
   default String menuRegionDescriptor(UUID player) {
     return "";
   }
+
+  /**
+   * Opens an interactive written-book view for {@code player} without mutating server-side
+   * inventory (ADR-035, ADR-044, ADR-048, ADR-049).
+   *
+   * @param player target online player UUID
+   * @param book platform-neutral book specification
+   * @return {@code true} if the book UI was opened for an online player; {@code false} when the
+   *     recipient is console, offline, or the runtime carrier does not support book packets
+   */
+  default boolean openBook(UUID player, BookMenuSpec book) {
+    return false;
+  }
+
+  /**
+   * Sends a single chat line with per-fragment hover tooltips and click actions ({@code
+   * RUN_COMMAND}, {@code SUGGEST_COMMAND}, {@code OPEN_URL}), degrading to plain colored chat text
+   * for console or non-interactive runtimes (ADR-035, ADR-048, ADR-049).
+   *
+   * @param player target player UUID (or {@code null} / server console UUID)
+   * @param line interactive line specification
+   */
+  default void sendInteractiveLine(UUID player, BookMenuSpec.Line line) {
+    if (line == null) {
+      return;
+    }
+    if (this instanceof ServerAccessor accessor) {
+      accessor.sendMessage(player, line.plainText(), false);
+    }
+  }
+
+  /**
+   * Attempts to open {@code book} as an in-game written book via {@link #openBook(UUID,
+   * BookMenuSpec)} and, if unavailable (console sender, offline player, or unsupported carrier),
+   * renders all pages line-by-line via {@link #sendInteractiveLine(UUID, BookMenuSpec.Line)} so
+   * hover and click affordances remain intact (ADR-035, ADR-048).
+   *
+   * @param player target player UUID (or {@code null} / console UUID)
+   * @param book book specification to render
+   */
+  default void renderBookOrChat(UUID player, BookMenuSpec book) {
+    if (book == null) {
+      return;
+    }
+    if (player != null && openBook(player, book)) {
+      return;
+    }
+    for (BookMenuSpec.Page page : book.pages()) {
+      for (BookMenuSpec.Line line : page.lines()) {
+        sendInteractiveLine(player, line);
+      }
+    }
+  }
 }

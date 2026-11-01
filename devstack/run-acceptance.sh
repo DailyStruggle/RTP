@@ -187,7 +187,8 @@ invoke_gradle_build() {
   fi
 
   # Stage Paper/Bukkit/Velocity plugin jar into backends + lobbies + fabric mods.
-  local pluginLibs="$repoRoot/rtp-plugin/build/libs"
+  local pluginLibs="$repoRoot/resource/LeafRTP/rtp-plugin/build/libs"
+  [ -d "$pluginLibs" ] || pluginLibs="$repoRoot/rtp-plugin/build/libs"
   local pluginStage="$scriptDir/jars/plugin"
   local backendDsts=("$scriptDir/backend-a/plugins" "$scriptDir/backend-b/plugins" "$scriptDir/lobby-a/plugins" "$scriptDir/lobby-b/plugins")
   local modDsts=("$scriptDir/backend-c/mods" "$scriptDir/backend-d/mods")
@@ -570,7 +571,7 @@ test_rtptest() {
   # console caller). Ties the server-bound RTPServerAccessor contract checks to a
   # live Paper/Folia runtime rather than a JVM mock, and (under the coverage
   # overlay) flushes the JaCoCo agent so accessor paths credit server-bound
-  # coverage. See platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md.
+  # coverage. See platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md.
   echo "[rtptest] dispatching '/rtp test accessor' to backends + lobbies via rcon (per-service budget: 30s)..."
   local services=(backend-a backend-b backend-c backend-d lobby-a lobby-b)
   local anyFail=0 svc rconOut deadline verdict

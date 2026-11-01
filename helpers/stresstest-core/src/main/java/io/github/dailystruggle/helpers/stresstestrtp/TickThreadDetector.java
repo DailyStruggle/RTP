@@ -2,7 +2,7 @@ package io.github.dailystruggle.helpers.stresstestrtp;
 
 /**
  * Thread-identity oracle: "is the calling thread a server tick thread?"
- * via {@link StressHost} (ADR-122 Decision 1 & 2).
+ * via {@link StressHost} (ADR-122 Decision 1 and 2).
  */
 public final class TickThreadDetector {
 

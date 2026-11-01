@@ -198,5 +198,46 @@ class UnitCurveTest {
         assertEquals(UnitCurve.gaussian(0.5, 0.5, 0.25), UnitCurve.ofGaussian(0.5, 0.25).applyAsDouble(0.5), 1e-12);
         assertEquals(UnitCurve.logarithmic(0.5, 4.0), UnitCurve.ofLogarithmic(4.0).applyAsDouble(0.5), 1e-12);
         assertEquals(UnitCurve.logarithmicTaper(0.5, 4.0), UnitCurve.ofLogarithmicTaper(4.0).applyAsDouble(0.5), 1e-12);
+        assertEquals(UnitCurve.smootherstep(0.25), UnitCurve.ofSmootherstep().applyAsDouble(0.25), 1e-12);
+        assertEquals(UnitCurve.circularArc(0.6), UnitCurve.ofCircularArc().applyAsDouble(0.6), 1e-12);
+        assertEquals(
+                UnitCurve.parabolicValley(0.25, 0.5, 0.4),
+                UnitCurve.ofParabolicValley(0.5, 0.4).applyAsDouble(0.25),
+                1e-12);
+    }
+
+    @Test
+    @DisplayName("smootherstep, circularArc, parabolicValley, radialFalloff, and runningMaxBreakouts satisfy curve invariants")
+    void extendedCurvesAndBreakouts() {
+        // Quintic smootherstep
+        assertEquals(0.0, UnitCurve.smootherstep(0.0), 1e-12);
+        assertEquals(0.5, UnitCurve.smootherstep(0.5), 1e-12);
+        assertEquals(1.0, UnitCurve.smootherstep(1.0), 1e-12);
+        assertEquals(1.0, UnitCurve.smootherstep(0.3) + UnitCurve.smootherstep(0.7), 1e-12);
+
+        // Circular arc (sqrt(1 - t^2))
+        assertEquals(1.0, UnitCurve.circularArc(0.0), 1e-12);
+        assertEquals(0.8, UnitCurve.circularArc(0.6), 1e-12);
+        assertEquals(0.0, UnitCurve.circularArc(1.0), 1e-12);
+        assertEquals(0.0, UnitCurve.circularArc(2.0), 1e-12);
+
+        // Parabolic valley
+        assertEquals(0.4, UnitCurve.parabolicValley(0.5, 0.5, 0.4), 1e-12);
+        assertEquals(1.0, UnitCurve.parabolicValley(0.0, 0.5, 0.4), 1e-12);
+        assertEquals(1.0, UnitCurve.parabolicValley(1.0, 0.5, 0.4), 1e-12);
+        assertEquals(0.5, UnitCurve.parabolicValley(0.5, Double.NaN, Double.NaN), 1e-12);
+
+        // Radial falloff
+        assertEquals(1.0, UnitCurve.radialFalloff(0.0, 4.0), 1e-12);
+        assertEquals(0.5, UnitCurve.radialFalloff(2.5, 4.0), 1e-12);
+        assertEquals(0.4, UnitCurve.radialFalloff(2.5, 4.0, 0.8), 1e-12);
+        assertEquals(0.0, UnitCurve.radialFalloff(10.0, 4.0), 1e-12);
+        assertEquals(0.0, UnitCurve.radialFalloff(1.0, -1.0), 1e-12);
+        assertEquals(0.0, UnitCurve.radialFalloff(1.0, 4.0, 0.0), 1e-12);
+
+        // Running-maximum breakouts
+        assertArrayEquals(new int[] {2, 5}, UnitCurve.runningMaxBreakouts(new int[] {1, 1, 3, 2, 3, 5, 4}, 1));
+        assertArrayEquals(new int[0], UnitCurve.runningMaxBreakouts(new int[] {1, 1, 1}, 1));
+        assertArrayEquals(new int[0], UnitCurve.runningMaxBreakouts(null, 0));
     }
 }

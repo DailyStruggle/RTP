@@ -1,0 +1,159 @@
+# RTP System Architecture and High-Reliability Design
+
+**Current Plugin Version:** `@version@`
+
+> **Note:** In the context of this architecture, **RTP** holds a dual meaning: **R**andom **T**ele**P**ort and **R**eal-**T**ime **P**rocess. This reflects the core design philosophy that the plugin's codebase should be structured and analyzed with the rigor of highly reliable server software.
+
+## System Overview and Operational Guarantees
+The system is engineered to provide strictly bounded, high-performance random teleportation by decoupling location generation from user execution. Unlike traditional plugins that execute unbounded location searches synchronously (which introduces unpredictable latency and server instability), RTP guarantees O(1) constant-time response for end-users via an asynchronous, strictly managed queue system.
+
+## Core Architectural Components
+
+### 1. Asynchronous Queue-Based Pre-Generation
+The core reliability mechanism of RTP is its `RegionQueueManager`. The system maintains a rigorous pipeline of pre-calculated, verified teleport locations.
+- **Constant-Time Execution**: End-user teleport requests are fulfilled instantly from the pre-verified queue, ensuring zero blocking on the main server thread.
+- **Bounded Computation Overhead**: The system asynchronously replenishes the queue within strict computational bounds, preventing server CPU spikes.
+- **State Isolation**: Both global and isolated per-user queues are maintained to prevent resource starvation and handle concurrent high-frequency requests reliably.
+
+#### 1.1 Cache Tier Model (Hot / Cold / Backlog)
+
+The general-purpose location pool inside `RegionQueueManager` is layered into tiers, each with a distinct cost / readiness profile. Tiers drain top-down on `/rtp` and are refilled bottom-up by `Region.execute()`.
+
+| Tier | Field | State of entries | Chunk I/O on use | Configuration cap | Persisted to DB |
+|---|---|---|---|---|---|
+| **Hot (kept)** | `keptLocations` (`LockFreeLocationBuffer`) | Fully verified; chunks currently held with `keep(true)` (plugin chunk ticket) | None - chunks already loaded | `activeChunkCap` | Yes |
+| **Cold (unkept)** | `unkeptLocations` (`LockFreeLocationBuffer`) | Cold-fill results (fully verified) and pre-filter-accepted backlog entries (surface screened only); chunk reservations released | One async chunk load on promotion to hot, which re-runs the vertical adjustor and then border, biome, safety and claims (`Region#promotionChecks`) | `cacheCap` | Yes |
+| **Backlog (binned)** *(implemented, [leafrtp-ADR-018](../adr/leafrtp-ADR-018-l3-backlog-cache.md))* | `backlogLocations` (`BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a per-entry `Validity` (`UNVERIFIED` / `VALIDATED` / `UNKNOWN` / `INVALIDATED`); head-blocking FIFO | None on the backlog itself; verification is region-prefilter only (Anvil `.mca` or an addon-registered format, [anvil-api-ADR-001](../../../../api/anvil-api/docs/adr/anvil-api-ADR-001-anvil-subsystem.md), [anvil-api-ADR-002](../../../../api/anvil-api/docs/adr/anvil-api-ADR-002-multi-format-region-support.md)); `UNKNOWN` entries are loaded and checked one at a time by the cold fill | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
+
+Refill / promotion flow:
+
+```
+shape pick ─▶ backlog ─(region-verified, in-order)─▶ cold (unkept) ─▶ hot (kept) ─▶ /rtp
+                     ▲ refill (pure math, no chunk I/O)
+                     │ verify: one bin (32×32 chunks = one region file) per Region.execute() pulse
+```
+
+Backlog design invariants ([leafrtp-ADR-018](../adr/leafrtp-ADR-018-l3-backlog-cache.md), which keeps its historical `L3` title as the record of the decision):
+
+- **Order preservation.** Entries are inserted in spiral-selection order and never reordered. The promotion contract to the cold stage is *head-only, contiguous-verified*: an unverified entry at the backlog head blocks all later entries from advancing, even if those later entries have already been anvil-verified. This preserves the spatial-distribution semantics established by the Archimedean spiral mapping ([leafrtp-ADR-001](../adr/leafrtp-ADR-001-archimedean-spiral-1d-mapping.md)).
+- **One bin per pulse.** Each `Region.execute()` pulse picks the bin (region file = 32 × 32 chunks; `.mca` or an addon-registered format per [anvil-api-ADR-002](../../../../api/anvil-api/docs/adr/anvil-api-ADR-002-multi-format-region-support.md)) containing the *oldest* unverified backlog entry, runs the region pre-filter for every backlog entry whose chunk lies inside that bin, and marks each entry's `verified` flag. This bounds per-pulse work (count-bound on Folia per [leafrtp-ADR-011](../adr/leafrtp-ADR-011-stale-chunk-guard-countbound-pipes.md)) and amortizes the single region-file read across all in-bin candidates.
+- **Region-prefilter-only verification.** Backlog verification is a cheap *rejection filter* that never loads a chunk. Prefilter passes (`VALIDATED`) drain into cold with no load and face the rest of the check at cold -> hot promotion: the chunk load that promotion already does, the vertical adjustor, then world border, biome, safety scan and claims (`Region#promotionChecks`). Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. Where the region pre-filter has no answer (ungenerated or unflushed chunks, an unregistered region format such as `.linear`, custom generators, no provider bound), entries go `UNKNOWN` and the single-flight cold fill takes them one at a time in place of a shape draw, checking each through the speculative pipeline with a load validated on load (ADR-110). A region file of ungenerated chunks therefore never becomes a burst of generation requests, and the backlog never stalls a freshly generated world.
+- **No DB persistence.** Unverified entries are not written through `installDatabaseCallbacks`; spiral re-selection after restart is cheap and avoids a "tentative row" schema delta.
+- **Default-off in lite.** The `rtp-lite` assembly ([leafrtp-ADR-016](../adr/leafrtp-ADR-016-rtp-lite-assembly-variant.md), superseded by [leafrtp-ADR-078](../adr/leafrtp-ADR-078-superseding-adr-024-sla-and-support-tier.md)) omits the key; runtime default `0` keeps the trimmed memory profile. The full assembly defaults to `1000`, sized well above `cacheCap` so binning yields meaningful amortization.
+- **Adaptive cost & admission governance.** Refill and promotion across the 3-tier cache are governed by measured-cost actuators backed by the `io.github.dailystruggle.rtp.common.predict` stochastic cost-modeling package: `ProbeFirstGovernor` ([leafrtp-ADR-084](../adr/leafrtp-ADR-084-measured-cost-probe-first-gate.md)) gates center-column probes by EWMA cost/reject rate, `LiveLoadGate` ([leafrtp-ADR-085](../adr/leafrtp-ADR-085-purpose-gated-live-loads.md)) bounds pinned native loads under `LoadPurpose.SPECULATIVE` to `activeChunkCap`, `ImmediateLoadGovernor` ([leafrtp-ADR-086](../adr/leafrtp-ADR-086-cost-governed-on-demand-chunk-reads.md)) governs thread-weighted Anvil deduplication and in-flight generation permits under `LoadPurpose.IMMEDIATE`, and `ComputeGovernor` ([leafrtp-ADR-068](../adr/leafrtp-ADR-068-adaptive-compute-governor.md)) paces pulse budgets against tick/heap headroom.
+
+Two further per-region buffers exist outside this tier model and are documented for completeness (they are *not* general-purpose tiers):
+
+- **Login reserve** — `loginLocations` (nullable, default-world only), [leafrtp-ADR-015](../adr/leafrtp-ADR-015-login-reserve-cache.md). Filled by `LoginCacheTask` on its own event-driven loop (startup burst + `PlayerQuitEvent`); consumed at join time before the regular `/rtp` path.
+- **Per-player queue / fast cache** — `perPlayerLocationQueue` + `playerQueue` + `fastLocations`. The fairness primitive for queued players and the per-player prefilled future for already-online clients.
+
+### 2. Concurrency and Platform-Specific Thread Safety
+RTP employs platform-specific adapters to ensure strict thread safety and optimal concurrent execution across disparate server environments:
+- **`rtp-bukkit`**: The Bukkit API exposes only `Consumer`-based async chunk overloads (the `CompletableFuture`-returning `World#getChunkAtAsync(int,int)` is a Paper addition). On pure Spigot the adapter reflectively probes for the Paper overload and, when absent, falls back to a synchronous `world.getChunkAt(...)` scheduled onto the primary thread via `Bukkit.getScheduler().runTask(...)`. The caller's `CompletableFuture` is unblocked, but the chunk I/O itself is not off-tick. Off-tick *safety evaluation* on pure Spigot is achieved only for candidates covered by the Anvil read-only pre-filter (ADR-016).
+- **`rtp-paper`**: Leverages asynchronous chunk loading APIs to prevent main-thread deadlocks.
+- **`rtp-folia`**: Implements strictly isolated region-based multithreading, guaranteeing thread safety and data integrity during concurrent state mutations.
+
+### 3. Deterministic Spatial Algorithms (Strict Execution Time Bounds)
+RTP replaces unbounded random geometric selections with deterministic algorithms to ensure predictable maximum execution times:
+- **Archimedean Spirals**: A custom 1D sequence mapping (using Archimedean spirals for CIRCLE and SQUARE shapes) is employed rather than naive 2D rerolling or image compression algorithms. The rationale for this choice — including alternatives considered and the original mathematical proof authored by the plugin's sole developer — is recorded in [leafrtp-ADR-001](../adr/leafrtp-ADR-001-archimedean-spiral-1d-mapping.md). This directly mitigates two critical failure modes in traditional implementations:
+  - **Distribution Skew (Clustering)**: Traditional algorithms inherently skew towards outer bounds. The 1D mapping ensures mathematically verified, perfectly uniform spatial distribution.
+  - **Non-Deterministic Execution (Unbounded Rerolling)**: Naive algorithms "reroll" upon hitting invalid sectors (e.g., oceans, protected regions), which causes execution time to decay exponentially as invalid space increases. By mapping 2D space to a 1D sequence, RTP preemptively subtracts "bad sectors" from the pool. This guarantees deterministic, stable computation time, completely eliminating the risk of infinite loops or execution timeouts.
+- **Stateful Memory Tracking**: The `MemoryShape` caching system persistently tracks invalid regions, ensuring the system never wastes cycles validating known bad states, maintaining algorithmic efficiency and deterministic behavior over time.
+- **Mathematical Distributions**: Spatial algorithms support Flat, Normal, and Exponential distributions to provide configurable, yet highly deterministic spatial selection.
+
+### 4. Persistent State and Fault Tolerance
+- **Database Integration**: All identified safe and unsafe spatial data is persistently committed to a reliable datastore (e.g., SQLite, MySQL, H2).
+- **Restart Resilience**: This continuous state persistence ensures the system's spatial knowledge survives server restarts, providing fault tolerance and preventing redundant validation overhead upon system recovery.
+
+### 5. Isolated Regional Contexts
+- RTP strictly isolates state between world regions, ensuring parameters such as spatial geometry, permissions, and queue capacities do not cause cross-region interference or race conditions.
+
+### 6. Active Task and Resource Tracking (Memory and Chunk Management)
+To guarantee system stability and prevent server exhaustion, RTP employs a rigorous `MemoryTracker` that acts as an active garbage collection and monitoring system:
+- **Task Pipeline Monitoring**: The tracker enforces strict lifespan boundaries on asynchronous execution pipelines (e.g., `TeleportPipelineTask`). If a task exceeds its expected execution window, it is flagged as a memory leak and forcefully pushed into a safe cleanup phase to prevent infinite looping and thread stalling.
+- **Chunk Allocation Management**: The system rigorously tracks active chunk tickets, distinguishing between pre-generation queue allocations and active player teleportations. This ensures that background location generation never overwhelms server RAM.
+- **Orphaned Allocation Recovery**: By actively monitoring queued locations and teleport data, the system instantly identifies abandoned allocations (e.g., when a player disconnects mid-teleport) and immediately releases associated chunks back to the server.
+
+## Extensibility and API Boundaries
+The `rtp-api` module provides a strict, defined interface for external integrations:
+- **Safe Extensibility**: Developers can inject custom `Shape` algorithms or claim-plugin validations (e.g., GriefPrevention) via the API without modifying or compromising the reliability guarantees of the `rtp-core` module.
+
+### Web Editor Extensions
+Addons contribute data, message handlers and tabs to the web editor through `RTPAPI.hooks().editorExtensions()` ([leafrtp-ADR-083](../adr/leafrtp-ADR-083-addon-editor-extensions-and-protocol-negotiation.md), extending [leafrtp-ADR-082](../adr/leafrtp-ADR-082-shape-curve-helpers-and-signed-editor-channel.md)). This follows the GUI-addon pattern: the GUI reads typed `rtp-api` objects that core fills from the network snapshot, and never reads heartbeats. In the same way, an editor extension supplies values, and core decides when and how they travel.
+
+Ownership split:
+
+| Concern | Owner |
+|---------|-------|
+| Transport, envelope, signing, trust, challenge / `seq` checks | core (`EditorChannel`, never published) |
+| Schedule: snapshot build, live-state polling, push pacing, bundles | core (`EditorSessionManager`, `EditorLiveFeed`) |
+| Type prefixing (`<id>.<type>`), routing, inbound rate limit | core (`EditorChannelWiring`) |
+| Budget shares and drop priority | core |
+| Snapshot data, live state, tab descriptors, message handling | extension (`EditorExtension`) |
+| Addon YAML validation and reload after Hot-Apply | extension (`validate`, `applied`) |
+| Rendering of tier 1 widgets; sandbox for tier 2 frames | page (`docs/editor/index.html`) |
+
+Invariants:
+- **Namespace.** Undotted types belong to core in every release. Extension types are `<id>.<local>`, and core adds and strips the prefix, so an extension can't send or receive another extension's or core's types.
+- **Negotiation.** The snapshot carries `protocol {channel, extensions}` and an `extensions[]` descriptor list, and `hello-reply` repeats them. Each peer ignores what it doesn't know: unknown members, unknown descriptor fields, unknown widget kinds as placeholders, and well-formed bundle items or frames with no handler, ignored without a drop. Neither side infers features from `pluginVersion`.
+- **Delivery.** Every message is `reply`, `latest` (coalesced, droppable) or `ordered` (held in order, refused when full). Pacing and bundling read the class, not a fixed type list.
+- **Budget.** Extension traffic counts against the session budget (2 MiB/min). It is also capped per extension (256 KiB/min) and for all extensions together (25 % of the budget), and it is dropped before core `land` / `hazard-delta`. Replies and `curve` are never dropped.
+- **Threading (S-005).** Snapshot and descriptor getters run on the async payload build. `stateJson()` runs on the feed's async tick. `onMessage` runs on the transport thread and must not block. `validate` / `applied` run on the Hot-Apply pipeline. None runs on a main or region thread. Work that needs the world is scheduled through `RTP.scheduler`.
+- **Isolation.** Every extension call is wrapped. An exception or an oversized result is logged, rate-limited to one line per extension per minute, and refused. Three failures mark the extension `failed` for that session, and core and other extensions carry on.
+- **No page-origin code.** Tier 1 descriptors are data rendered by the page as text and sanitised markdown. Tier 2 code runs only in an opaque-origin sandboxed iframe, checked by SHA-256 and reached over `postMessage`. It sees only its own extension's data, and it can stage but never apply.
+- **One write path (S-004).** Addon YAML listed in `configFiles()` joins the session `files` map and goes through Hot-Apply only: path checks, structural checks, then `validate`, `.bak`, atomic write and `applied`. Errors return in `apply_ack`.
+- **Fail closed (S-006).** The registry throws `IllegalStateException` before core loads. A session's extension list is fixed when its snapshot is built.
+
+## Platform Adapter Design Details
+
+> **Authoritative Specification:** For complete SPI function requirements, method-by-method contracts, threading rules, and a step-by-step implementation checklist for authoring a new platform adapter, see [`SERVER_ADAPTER_GUIDE.md`](SERVER_ADAPTER_GUIDE.md).
+
+### rtp-core Implementation Notes
+- **Lock-Free Configuration Storage**: Configuration data is stored in `EnumMap`/`ConcurrentHashMap` structures that guarantee O(1) read access. Public methods return immutable views or primitive values accessed via `FactoryValue.getData()`.
+- **Pipeline Phases**: The teleportation pipeline is divided into four phases — Setup, Load, Teleport, and Cleanup — each managed by `TeleportPipelineTask`. Every phase wraps exceptions to prevent corruption of subsequent phases.
+- **Resource Release on Exit**: On every exit path (normal, exception, cancellation), `TeleportPipelineTask.runCleanup()` releases chunk reservations, untracks teleport data, and decrements in-flight calculation counters.
+- **Pulse-Driven Maintenance**: Background maintenance is driven by `MemoryTracker.runDiagnostics()` and task-pipe processing via `RTPTaskPipe`. All pulsed tasks accept an available-time budget (in milliseconds) and cease execution once that budget is exhausted.
+- **Stochastic Cost Modeling & Adaptive Governors (`io.github.dailystruggle.rtp.common.predict`)**: Runtime pacing and branch selection use zero-dependency statistical estimators in `rtp-core`: `EwmaEstimator` (fractional Welford-variance EWMA and lock-free `7/8` integer decay), `BernoulliEstimator` (exponentially smoothed trial/rejection rates), `BudgetPacer` (task-pipe admission with single-task forward-progress and overrun-protection guarantees), `ComparativeCostGovernor`, and `CostContext`. These primitives drive the engine's adaptive governors:
+  - `ComputeGovernor` ([leafrtp-ADR-068](../adr/leafrtp-ADR-068-adaptive-compute-governor.md)): Demand-driven async/sync budget allocation, AIMD lag backoff, and multi-region concurrency bounding.
+  - `ProbeFirstGovernor` ([leafrtp-ADR-084](../adr/leafrtp-ADR-084-measured-cost-probe-first-gate.md)): Per-`(region, path)` EWMA cost gate deciding whether `probeChunkColumn` runs before full chunk resolution, flipping only on a sustained 3-standard-error gap with a `1/32..1/4` exploration floor.
+  - `LiveLoadGate` ([leafrtp-ADR-085](../adr/leafrtp-ADR-085-purpose-gated-live-loads.md)): Purpose-gated admission for `LoadPurpose.SPECULATIVE` queue refills, resolving from resident chunks or region files first (`getOrReadChunk`), pinning native loads up to `activeChunkCap`, falling back to unpinned cold loads without a success ring, and deferring under `HeapPressureMonitor` pressure.
+  - `ImmediateLoadGovernor` ([leafrtp-ADR-086](../adr/leafrtp-ADR-086-cost-governed-on-demand-chunk-reads.md)): Cost-governed on-demand (`LoadPurpose.IMMEDIATE`) resolution combining `< 1 us` MCA sector-offset checks (`AnvilRegionOccupancyCache`), thread-weighted Anvil deduplication bypass vs. pre-filtering ($P_{\text{reject}} > \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$), and bounded in-flight native generation semaphores (max 1 per region, 2 global; see [`docs/architecture/15-cost-governed-chunk-reads-and-native-admission.md`](../architecture/15-cost-governed-chunk-reads-and-native-admission.md)).
+- **Lifespan Enforcement**: `MemoryTracker` assigns a maximum lifespan to every `TeleportPipelineTask`. The diagnostic pulse forcefully invalidates and cleans up any task exceeding its lifespan.
+- **Concurrency Abstractions**: All blocking and async operations are dispatched via `SyncTaskProcessing` and `AsyncTaskProcessing` abstractions implementing `RTPRunnable`, keeping `rtp-core` free of direct platform imports.
+
+### rtp-api Implementation Notes
+- **Registration Guards**: Custom `Shape` / vertical-adjustor registration is an implementation-extension capability served at the `rtp-core` tier via the typed `RTP.addShape(Shape)` / `RTP.addVerticalAdjustor(VerticalAdjustor)` entry points (two-tier API model, [leafrtp-ADR-034](../adr/leafrtp-ADR-034-two-tier-api-extension-model.md)). The thin `rtp-api` contract no longer exposes untyped `addShape(Object)` shims. Contract-surface delegates that remain on `RTPAPI` (e.g. `hooks()`) still throw `IllegalStateException` if accessed before core is loaded (REQ-RTP-S-006).
+- **Location Generator Interface**: `ILocationGenerator` is the core abstraction through which `GenerationContext` flows; platform accessors implement this to wire into the teleport pipeline.
+- **Lock-Free Config Caching**: API-level configuration caches use `EnumMap` and `ConcurrentHashMap` to ensure high-throughput reads without synchronization bottlenecks.
+- **Exception Isolation**: Addon-supplied `Shape` or validation `Predicate`/`Function` implementations are called inside `try-finally` blocks so that unhandled addon exceptions do not escape into the core pipeline.
+
+### rtp-bukkit Implementation Notes
+- **Plugin Chunk Tickets**: Chunk retention is implemented via `world.addPluginChunkTicket(cx, cz, plugin)` and released via `world.removePluginChunkTicket(cx, cz, plugin)`. This is preferred over `Chunk.setForceLoaded(true)`, which permanently marks chunks in the world's force-loaded map and is not reclaimed on plugin disable.
+- **Time-Bounded Slicing**: Main-thread operations use `TimeBoundTaskPipe` to yield after a wall-clock time budget (e.g., 2 ms per tick) is exhausted, preventing TPS degradation.
+- **Forced Reclamation**: Player disconnect listeners call `reservation.close()` on all in-flight `TeleportPipelineTask` instances associated with that player.
+- **Chunk Load Path (pure Spigot)**: `BukkitRTPWorld.loadChunkFuture` reflectively probes for Paper's `World#getChunkAtAsync(int,int) → CompletableFuture<Chunk>`. On pure Spigot that overload is absent (Bukkit ships only the `Consumer`-based variants), so the fallback schedules a synchronous `world.getChunkAt(...)` onto the primary thread via `Bukkit.getScheduler().runTask(plugin, ...)`. This does **not** make chunk I/O itself off-tick on pure Spigot — the caller's future is simply unblocked while the load runs on tick. No blanket "fully async chunk loading on all platforms" claim is made for the `rtp-bukkit` adapter.
+- **Anvil Read-Only Pre-Filter (pure Spigot)**: To recover off-tick safety evaluation for the common case, `BukkitRTPWorld.getChunkAt` routes unloaded, vanilla-generator candidates through `AnvilPrefilter.probeDetailed(...)` (ADR-016). `REJECT` short-circuits without any chunk load; `ACCEPT` publishes an `AnvilChunkView` into a bounded `anvilCache` and the `BukkitRTPChunk` hybrid dispatches `isAir` / `isSafe` / `getSkyLight` / `getSurfaceHeight` from the off-tick view. `UNKNOWN` verdicts, already-loaded chunks, worlds with a custom `ChunkGenerator`, and I/O errors fall through to the main-thread-bounced `loadChunkFuture` path; prefilter coverage therefore defines effective off-tick coverage on pure Spigot.
+
+### rtp-paper Implementation Notes
+- **Async Chunk Loading**: `BukkitRTPWorld.getChunkAtAsync(cx, cz)` calls Paper's `world.getChunkAtAsync(cx, cz)`, returning a `CompletableFuture<Chunk>` that resolves on a Paper worker thread without touching the main thread.
+- **Callback-Only Pattern**: No `.join()` or synchronous waits are used on futures; all continuation logic is attached via `.thenApply` / `.whenComplete` callbacks, eliminating deadlock risk.
+- **Ticket Lifecycle**: Same plugin-owned chunk ticket approach as `rtp-bukkit`; Paper's async API handles ticket acquisition internally, and explicit release is still performed via `reservation.close()` in all exit paths.
+
+### rtp-folia Implementation Notes
+- **Thread Ownership Checks**: Before scheduling a regional task, the adapter calls `Bukkit.isOwnedByCurrentRegion(entity/location)`. If ownership is confirmed and the thread's per-region budget is not spent and nothing is queued for that region, the task runs immediately; otherwise it joins that region's queue.
+- **Per-Region Slices** ([rtp-folia-ADR-002](../../../../platforms/folia/docs/adr/rtp-folia-ADR-002-per-region-work-division-on-folia.md)): one-shot regional tasks join a FIFO per region cell (8x8 chunks). One slice per cell runs on the owning region thread via `RegionScheduler.run`, runs tasks until the thread's `RegionThreadBudget` (`syncAllottedTime` per region tick, never accumulating beyond one budget) or the 32-task cap is reached, then re-queues behind other regions. Slow or late regions run one task per slice and report `isRegionSaturated`, which cold-to-hot promotion uses to pick candidates elsewhere.
+- **Off-Region Continuations**: `FoliaRTPWorld` completes RTP chunk futures on Folia's async scheduler, so selection logic chained on a chunk load never runs on the region thread that loaded it; live block reads re-enter through `runTask`.
+- **Count-Bound Execution**: `CountBoundTaskPipe` bounds each drain by a fixed task count and by the time budget on the draining thread, and always runs one task when the budget is positive.
+- **Economy Delegation**: Vault economy calls (`withdraw`, `deposit`, `getBalance`) are never invoked on a Folia region thread. They are dispatched to `GlobalRegionScheduler` or `AsyncScheduler`, and results are piped back to the originating region via a follow-up scheduled task.
+- **Chunk Ticket Lifecycle**: `getChunkAtAsync` allocates a Folia chunk ticket for validation, and `reservation.close()` explicitly removes the ticket when the chunk is no longer needed, preventing permanent force-loading.
+
+### rtp-fabric Implementation Notes
+- **Event-Driven Bootstrap**: `FabricEventBridge` listens to `ServerLifecycleEvents` (`SERVER_STARTED`, `SERVER_STOPPING`), `ServerTickEvents`, and `ServerPlayConnectionEvents` via reflection-guarded proxies to survive trimmed or variant runtimes.
+- **Scheduling & Tick Budgeting**: `FabricScheduler` uses a private daemon thread pool for async execution and executes delayed/repeating tasks under a `TickBudget.syncNanos()` slice driven by `END_SERVER_TICK`.
+- **Mapping & Version Isolation**: `FabricVersionAdapterRegistry` decouples intermediary mappings from Mojang deobfuscated mappings across Minecraft versions.
+- **Commands**: Integrates with Brigadier via `FabricCommandRegistrar`.
+
+### rtp-neoforge Implementation Notes
+- **Mojmap Runtime**: Compiles directly against Mojang-mapped runtime names without intermediary mapping shims.
+- **Event Bus Wiring**: Driven by NeoForge `@EventBusSubscriber` / `@Mod` lifecycle events (`ServerStartedEvent`, `ServerStoppingEvent`, `ServerTickEvent.Post`, `RegisterCommandsEvent`).
+- **Scheduling**: `NeoForgeScheduler` drives sync tasks via `MinecraftServer.execute` and drains tick-budgeted timer queues during `ServerTickEvent.Post`.

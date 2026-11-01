@@ -1,6 +1,6 @@
 # anvil-api
 
-Platform-neutral, off-tick Minecraft region-file decoder and read-only surface/biome pre-filter (`io.github.dailystruggle.rtp.anvil`). Pure Java 17 layered only on `:bit-api` (no Bukkit, Paper, Folia, Fabric, NeoForge, or `rtp-core` dependency), allowing any standalone world tool, structure generator, or claim scanner (e.g. `TreeGen`, `WorldGuardLite`) to inspect unloaded chunks from disk without triggering main-thread chunk loads (S-005).
+Platform-neutral, off-tick Minecraft region-file decoder and read-only surface/biome pre-filter (`io.github.dailystruggle.anvil`). Pure Java 17 layered only on `:bit-api` (no Bukkit, Paper, Folia, Fabric, NeoForge, or `rtp-core` dependency), allowing any standalone world tool, structure generator, or claim scanner (e.g. `TreeGen`, `WorldGuardLite`) to inspect unloaded chunks from disk without triggering main-thread chunk loads (S-005).
 
 ## Coordinates
 
@@ -19,7 +19,8 @@ dependencies {
 
 - `AnvilPrefilter` - off-tick region-file probe entry point. Provides `probeDetailed(...)`, `probeSync(...)`, `probeSyncDetailed(...)`, batched `probeBatchSyncDetailed(...)`, `openSession(...)` (`RegionProbeSession`), and single-column `probeColumn(...)` / `probeColumnAsync(...)` / `squareJobAsync(...)` coalesced on `AnvilIoPool`.
 - `RegionFileReader` - format-neutral SPI (`readChunk(byte[], int, int)`, `isChunkGenerated(byte[], int, int)`) that unpacks raw region bytes into an `AnvilReader.ChunkEntry`. Built-in `AnvilReader.INSTANCE` supports compression modes 1 (GZIP), 2 (Zlib/Deflate), 3 (uncompressed), 4 (in-house `Lz4BlockDecoder`), and 5 (`DynamicZstdBinding`).
-- `RegionFormatRegistry` - thread-safe registry mapping file extensions (`.mca` built in; custom formats such as `.linear` registered via `register(extension, reader)` or `ServiceLoader<RegionFileReaderProvider>`) to their `RegionFileReader`.
+- `LcaRegionReader` / `LcaRegionWriter` / `LcaRegionFileStorage` - `.lca` (LeafCraft Anvil, `anvil-api-ADR-003`) reader, encoder, `.mca`/`.linear`/`.b_linear` <-> `.lca` transcoder, header-only (`10,304 B` / `~10.1 KiB` on-disk header prefix, `~25.6 KiB` total handle residency) `256-byte` Copy-on-Write (`CoW`) sub-slab allocator (`LcaLiveArchive`), 4-tier Extended Hamming `(72, 64)` SEC-DED bit-rot healer (`healRegionBitRot`, including uncompressed `ChunkFrame` header SEC-DED healing in `Mode B`), and multi-folder (`region/`, `entities/`, `poi/`) world storage session manager (`LcaWorldStorageSession`).
+- `RegionFormatRegistry` & `RegionFormatDetector` - thread-safe registry mapping file extensions (`.mca` and `.lca` built in; `.linear` registered dynamically via `LinearRegionReader.registerIfAvailable()`, and custom formats via `register(extension, reader)` or `ServiceLoader<RegionFileReaderProvider>`) to their `RegionFileReader`, paired with cached directory format profiling (`WorldFormatProfile`: `MCA`, `LINEAR`, `LCA`, `EMPTY`).
 - `AnvilChunkView` - immutable decoded chunk view over block sections (`List<PaletteSection>`) and biome sections (`List<BiomePaletteSection>`), exposing `blockIdAt(x, worldY, z)`, `isAir(...)`, `isSafe(...)`, `getBiomeAt(x, worldY, z)`, and `getBiomesPresent()`.
 - `ColumnProbe` - low-allocation center-column (`lx=8, lz=8`) and section view over a bounded `[minY, maxY]` window (`blockAt(worldY)`, `blockAt(localX, localZ, worldY)`, `biomeAt(worldY)`, `heightmapTopY()`, `hasHeightmap()`), skipping entities, block entities, and light arrays during NBT decode.
 - `ChunkCoord` - value record `(int x, int z)` with `regionX()`, `regionZ()`, and packed 64-bit `regionKey()` for grouping chunk probes by region file.
@@ -28,11 +29,11 @@ dependencies {
 ## Usage
 
 ```java
-import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
-import io.github.dailystruggle.rtp.anvil.AnvilPrefilter;
-import io.github.dailystruggle.rtp.anvil.ChunkCoord;
-import io.github.dailystruggle.rtp.anvil.ColumnProbe;
-import io.github.dailystruggle.rtp.anvil.Verdict;
+import io.github.dailystruggle.anvil.AnvilChunkView;
+import io.github.dailystruggle.anvil.AnvilPrefilter;
+import io.github.dailystruggle.anvil.ChunkCoord;
+import io.github.dailystruggle.anvil.ColumnProbe;
+import io.github.dailystruggle.anvil.Verdict;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -72,5 +73,6 @@ if (res != null && res.verdict() == Verdict.ACCEPT) {
 
 ## Docs
 
-- ADR-016: [`../../docs/adr/ADR-016-anvil-subsystem.md`](../../docs/adr/ADR-016-anvil-subsystem.md)
-- ADR-077: [`../../docs/adr/ADR-077-multi-format-region-support.md`](../../docs/adr/ADR-077-multi-format-region-support.md)
+- ADR-016: [`docs/adr/anvil-api-ADR-001-anvil-subsystem.md`](docs/adr/anvil-api-ADR-001-anvil-subsystem.md)
+- ADR-077: [`docs/adr/anvil-api-ADR-002-multi-format-region-support.md`](docs/adr/anvil-api-ADR-002-multi-format-region-support.md)
+- anvil-api-ADR-003: [`docs/adr/anvil-api-ADR-003-hilbert-roaring-gray-chunk-archive.md`](docs/adr/anvil-api-ADR-003-hilbert-roaring-gray-chunk-archive.md)

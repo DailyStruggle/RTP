@@ -102,7 +102,19 @@ class ServerAccessorsTest {
       ProgressBar.class,
       PlayerLifecycleHook.class,
       NoopPlayerLifecycleHook.class,
-      DispatchingPlayerLifecycleHook.class
+      DispatchingPlayerLifecycleHook.class,
+      WorldEventHook.class,
+      NoopWorldEventHook.class,
+      DispatchingWorldEventHook.class,
+      PlayerInteractBlockContext.class,
+      BlockBreakContext.class,
+      LeavesDecayContext.class,
+      ChunkLoadContext.class,
+      SaplingGrowContext.class,
+      TaggedItemSpec.class,
+      BlockPos3i.class,
+      CallerLocation.class,
+      AbstractModServerAccessor.class
     };
     for (Class<?> apiType : apiTypes) {
       assertFalse(apiType.getName().startsWith("io.github.dailystruggle.rtp."));
@@ -418,6 +430,191 @@ class ServerAccessorsTest {
     quitSub.close();
     dispatching.fireQuit(id);
     assertEquals(1, quitCount.get());
+  }
+
+  @Test
+  void worldEventHooksFollowValueAndDispatchContracts() throws Exception {
+    assertSame(NoopWorldEventHook.INSTANCE, ServerAccessors.worldEventHook());
+    StubAccessor stub = new StubAccessor("paper", 21);
+    ServerAccessors.set(stub);
+    assertSame(NoopWorldEventHook.INSTANCE, stub.getWorldEventHook());
+    assertSame(NoopWorldEventHook.INSTANCE, ServerAccessors.worldEventHook());
+
+    NoopWorldEventHook noop = NoopWorldEventHook.INSTANCE;
+    noop.onPlayerInteractBlock(ctx -> {}).close();
+    noop.onBlockBreak(ctx -> {}).close();
+    noop.onLeavesDecay(ctx -> {}).close();
+    noop.onChunkLoad(ctx -> {}).close();
+    noop.onSaplingGrow(ctx -> {}).close();
+    assertThrows(IllegalArgumentException.class, () -> noop.onPlayerInteractBlock(null));
+    assertThrows(IllegalArgumentException.class, () -> noop.onBlockBreak(null));
+    assertThrows(IllegalArgumentException.class, () -> noop.onLeavesDecay(null));
+    assertThrows(IllegalArgumentException.class, () -> noop.onChunkLoad(null));
+    assertThrows(IllegalArgumentException.class, () -> noop.onSaplingGrow(null));
+
+    DispatchingWorldEventHook hook = new DispatchingWorldEventHook();
+    assertFalse(hook.hasSubscribers());
+    assertThrows(IllegalArgumentException.class, () -> hook.onPlayerInteractBlock(null));
+    assertThrows(IllegalArgumentException.class, () -> hook.onBlockBreak(null));
+    assertThrows(IllegalArgumentException.class, () -> hook.onLeavesDecay(null));
+    assertThrows(IllegalArgumentException.class, () -> hook.onChunkLoad(null));
+    assertThrows(IllegalArgumentException.class, () -> hook.onSaplingGrow(null));
+
+    AtomicInteger consumed = new AtomicInteger();
+    PlayerInteractBlockContext interact =
+        new PlayerInteractBlockContext(
+            UUID.randomUUID(),
+            "world",
+            1,
+            64,
+            2,
+            1,
+            65,
+            2,
+            true,
+            false,
+            false,
+            "minecraft:oak_sapling",
+            java.util.Map.of("tree_species", "oak"),
+            "leaftreegen.sapling"::equals,
+            consumed::addAndGet);
+    assertEquals("world", interact.worldName());
+    assertEquals(1, interact.clickedX());
+    assertEquals(64, interact.clickedY());
+    assertEquals(2, interact.clickedZ());
+    assertEquals(1, interact.targetX());
+    assertEquals(65, interact.targetY());
+    assertEquals(2, interact.targetZ());
+    assertTrue(interact.mainHand());
+    assertFalse(interact.creativeMode());
+    assertFalse(interact.clickedOrTargetLiquid());
+    assertEquals("minecraft:oak_sapling", interact.itemKey());
+    assertEquals("oak", interact.customTag("tree_species"));
+    assertTrue(interact.hasPermission("leaftreegen.sapling"));
+    assertFalse(interact.hasPermission("other"));
+    assertTrue(interact.hasPermission(""));
+    interact.consumeItem(1);
+    assertEquals(1, consumed.get());
+
+    AutoCloseable sub1 =
+        hook.onPlayerInteractBlock(
+            c -> {
+              throw new RuntimeException("isolated");
+            });
+    AutoCloseable sub2 = hook.onPlayerInteractBlock(PlayerInteractBlockContext::cancel);
+    assertTrue(hook.hasSubscribers());
+    hook.firePlayerInteractBlock(interact);
+    hook.firePlayerInteractBlock(null);
+    assertTrue(interact.isCancelled());
+    sub1.close();
+    sub2.close();
+
+    BlockBreakContext breakCtx =
+        new BlockBreakContext(UUID.randomUUID(), "world", 3, 70, 4, "minecraft:oak_leaves", "minecraft:forest");
+    AutoCloseable breakSub = hook.onBlockBreak(BlockBreakContext::cancel);
+    hook.fireBlockBreak(breakCtx);
+    assertTrue(breakCtx.isCancelled());
+    assertEquals("minecraft:oak_leaves", breakCtx.blockKey());
+    assertEquals("minecraft:forest", breakCtx.biomeKey());
+    breakSub.close();
+
+    LeavesDecayContext decayCtx =
+        new LeavesDecayContext("world", 5, 72, 6, "minecraft:birch_leaves", "minecraft:birch_forest");
+    AutoCloseable decaySub = hook.onLeavesDecay(LeavesDecayContext::cancel);
+    hook.fireLeavesDecay(decayCtx);
+    assertTrue(decayCtx.isCancelled());
+    decaySub.close();
+
+    AtomicInteger chunkEvents = new AtomicInteger();
+    ChunkLoadContext chunkCtx = new ChunkLoadContext("world", 2, -3, true, 12345L);
+    AutoCloseable chunkSub = hook.onChunkLoad(c -> chunkEvents.incrementAndGet());
+    hook.fireChunkLoad(chunkCtx);
+    assertEquals(1, chunkEvents.get());
+    assertTrue(chunkCtx.newChunk());
+    assertEquals(12345L, chunkCtx.worldSeed());
+    chunkSub.close();
+
+    SaplingGrowContext growCtx =
+        new SaplingGrowContext(
+            "world", 10, 64, 10, "minecraft:oak_sapling", "minecraft:forest", false);
+    AutoCloseable growSub = hook.onSaplingGrow(SaplingGrowContext::cancel);
+    hook.fireSaplingGrow(growCtx);
+    assertTrue(growCtx.isCancelled());
+    assertEquals("minecraft:oak_sapling", growCtx.blockKey());
+    assertEquals("minecraft:forest", growCtx.biomeKey());
+    assertFalse(growCtx.onLiquid());
+    growSub.close();
+    assertFalse(hook.hasSubscribers());
+
+    TaggedItemSpec spec =
+        new TaggedItemSpec(
+            "minecraft:oak_sapling",
+            3,
+            "Custom Oak Sapling",
+            List.of("Line 1", "Line 2"),
+            java.util.Map.of("tree_species", "custom-oak"));
+    assertEquals("minecraft:oak_sapling", spec.itemKey());
+    assertEquals(3, spec.amount());
+    assertEquals("Custom Oak Sapling", spec.displayName());
+    assertEquals(List.of("Line 1", "Line 2"), spec.lore());
+    assertEquals("custom-oak", spec.customTags().get("tree_species"));
+    assertFalse(stub.giveItem(UUID.randomUUID(), "Alice", spec));
+    stub.dropItem("world", 0, 64, 0, spec);
+  }
+
+  @Test
+  void abstractModServerAccessorSharesVersionParsingSchedulingAndChunkMetadata() {
+    assertEquals(21, AbstractModServerAccessor.parseIntVersion("1.21.4"));
+    assertEquals(26, AbstractModServerAccessor.parseIntVersion("26.1.2"));
+    assertEquals(26, AbstractModServerAccessor.parseIntVersion("26.2-rc-2"));
+    assertEquals(0, AbstractModServerAccessor.parseIntVersion("unknown"));
+    assertEquals(0, AbstractModServerAccessor.parseIntVersion(null));
+
+    AbstractModServerAccessor modAccessor =
+        new AbstractModServerAccessor("TestMod", java.nio.file.Path.of("config", "test-mod")) {
+          @Override
+          public String getServerVersion() {
+            return "26.1.2";
+          }
+
+          @Override
+          public String getPlatform() {
+            return "fabric";
+          }
+        };
+
+    assertEquals(26, modAccessor.getServerIntVersion());
+    assertEquals("TestMod", modAccessor.logger().getName());
+    assertEquals(java.nio.file.Path.of("config", "test-mod"), modAccessor.getRootFolder());
+    assertEquals(java.nio.file.Path.of("world"), modAccessor.getWorldFolder("world"));
+    assertNull(modAccessor.getWorldFolder(null));
+    assertFalse(modAccessor.getWorldNames().isEmpty());
+    assertSame(modAccessor.dispatchingWorldEventHook(), modAccessor.getWorldEventHook());
+
+    UUID caller = UUID.randomUUID();
+    CallerLocation loc = new CallerLocation("world", 10, 64, -20);
+    modAccessor.recordCallerLocation(caller, loc);
+    assertEquals(loc, modAccessor.resolveCallerLocation(caller));
+    assertNull(modAccessor.resolveCallerLocation(null));
+
+    assertNull(modAccessor.getChunkData("world", 1, 2, "trees"));
+    modAccessor.setChunkData("world", 1, 2, "trees", "oak:10,64,20");
+    assertEquals("oak:10,64,20", modAccessor.getChunkData("world", 1, 2, "trees"));
+    modAccessor.updateChunkData("world", 1, 2, "trees", prev -> prev + ";birch:12,64,22");
+    assertEquals("oak:10,64,20;birch:12,64,22", modAccessor.getChunkData("world", 1, 2, "trees"));
+    modAccessor.setChunkData("world", 1, 2, "trees", "");
+    assertNull(modAccessor.getChunkData("world", 1, 2, "trees"));
+
+    AtomicInteger runs = new AtomicInteger();
+    modAccessor.scheduleRepeatingTask(runs::incrementAndGet, 1L, 2L);
+    modAccessor.tickScheduledTasks();
+    assertEquals(0, runs.get());
+    modAccessor.tickScheduledTasks();
+    assertEquals(1, runs.get());
+    modAccessor.tickScheduledTasks();
+    assertEquals(1, runs.get());
+    modAccessor.tickScheduledTasks();
+    assertEquals(2, runs.get());
   }
 
   private static class StubAccessor implements ServerAccessor {

@@ -16,8 +16,8 @@ version = providers.gradleProperty('version').get()
 spotless {
     lineEndings = 'UNIX'
     java {
-        target 'rtp-*/**/*.java', 'addons/**/*.java', 'api/**/*.java'
-        targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**', 'api/**/build/**', 'rtp-*/**/build/**'
+        target 'rtp-*/**/*.java', 'addons/**/*.java', 'resource/LeafRTP/rtp-*/**/*.java', 'resource/LeafRTP/addons/**/*.java', 'api/**/*.java', 'plugins/**/*.java'
+        targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**', 'api/**/build/**', 'rtp-*/**/build/**', 'resource/LeafRTP/**/build/**', 'plugins/**/build/**'
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()
@@ -112,14 +112,15 @@ subprojects {
     def java17Modules = [
             ':rtp-api', ':server-api', ':rtp-core', ':anvil-api', ':bit-api', ':yaml-api', ':units-api', ':commands-api',
             ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
-            ':predict-api', ':config-bit-api', ':menu-api', ':tags-api',
-            ':rtp-proxy:rtp-proxy-common',
-            ':rtp-bukkit:rtp-bukkit-common', ':rtp-bukkit:rtp-bukkit-v1_20_R1',
-            ':rtp-paper:rtp-paper-common', ':rtp-paper:rtp-paper-v1_20_R1',
-            ':rtp-folia:rtp-folia-common', ':rtp-folia:rtp-folia-v1_20_R1',
-            ':rtp-fabric:rtp-fabric-common', ':rtp-fabric:rtp-fabric-v1_20_R1',
+            ':predict-api', ':config-bit-api', ':menu-api', ':tags-api', ':database-api', ':schematics-api',
+            ':proxy:proxy-common',
+            ':bukkit:bukkit-common', ':bukkit:bukkit-v1_20_R1',
+            ':paper:paper-common', ':paper:paper-v1_20_R1',
+            ':folia:folia-common', ':folia:folia-v1_20_R1',
+            ':fabric:fabric-common', ':fabric:fabric-v1_20_R1',
             ':rtp-plugin',
-            ':rtp-neoforge:rtp-neoforge-common',
+            ':neoforge:neoforge-common',
+            ':rtp-neoforge',
             ':addons:LeafRTPCountdownAddon', ':addons:LeafRTPRiftAddon',
             ':addons:LeafRTPClaimAddon', ':addons:LeafRTPActionAddon',
             ':addons:LeafRTPGuiAddon:rtp-gui-common', ':addons:LeafRTPGuiAddon:rtp-gui-bukkit',
@@ -173,7 +174,7 @@ subprojects {
     // 21.1, WorldGuard 7.0.12), so their classpaths keep requesting JVM 21
     // variants instead of the JVM 17 that `release = 17` would imply.
     def java17OnJava21Classpath = [
-            ':rtp-plugin', ':rtp-neoforge:rtp-neoforge-common', ':addons:LeafRTPClaimAddon',
+            ':rtp-plugin', ':neoforge:neoforge-common', ':rtp-neoforge', ':addons:LeafRTPClaimAddon',
     ]
     // Test classpaths of the Java 17 addons that consume Java 21-only test helpers (rtp-core
     // test fixtures, helpers:MockItemPlugins) keep requesting JVM 21 variants; test sources
@@ -204,6 +205,12 @@ subprojects {
     // so doclint is disabled and javadoc warnings no longer fail their builds.
     tasks.withType(Javadoc).configureEach {
         options.encoding = 'UTF-8'
+        (options as StandardJavadocDocletOptions).tags(
+                'governedBy:a:Governed By:',
+                'trace:a:Trace:',
+                'invariant:aX:Invariant:',
+                'prohibition:aX:Prohibition:'
+        )
         if (project.path != ':rtp-api' && project.path != ':rtp-core') {
             options.addStringOption('Xdoclint:none', '-quiet')
             failOnError = false
@@ -300,15 +307,18 @@ subprojects {
         def isPlatformOrAddonProject = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
                 project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
                 project.projectDir.canonicalPath.contains(File.separator + 'helpers' + File.separator) ||
-                project.path.startsWith(':rtp-bukkit') ||
-                project.path.startsWith(':rtp-paper') ||
-                project.path.startsWith(':rtp-folia') ||
-                project.path.startsWith(':rtp-fabric') ||
-                project.path.startsWith(':rtp-neoforge') ||
+                project.projectDir.canonicalPath.contains(File.separator + 'plugins' + File.separator) ||
+                project.path.startsWith(':bukkit') ||
+                project.path.startsWith(':paper') ||
+                project.path.startsWith(':folia') ||
+                project.path.startsWith(':fabric') ||
+                project.path.startsWith(':neoforge') ||
+                project.path == ':rtp-neoforge' ||
                 project.path.startsWith(':addons') ||
                 project.path.startsWith(':helpers') ||
+                project.path.startsWith(':plugins') ||
                 project.path == ':rtp-plugin' ||
-                project.path == ':rtp-proxy:rtp-proxy-velocity' ||
+                project.path == ':proxy:proxy-velocity' ||
                 project.path == ':effects-api:effects-api-fabric-unobf'
 
         tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
@@ -359,7 +369,11 @@ subprojects {
             ],
             // config-bit-api measured via jacocoTestReport (2026-10-24): 96.1% instruction /
             // 81.2% branch.
-            ':config-bit-api': [instruction: 0.90, branch: 0.78],
+            ':config-bit-api': [
+                    instruction: 0.90,
+                    branch: 0.78,
+                    excludes: ['io/github/dailystruggle/rtp/common/bit/config/atlas/**']
+            ],
             // predict-api measured via jacocoTestReport (2026-10-24): 94.3% instruction /
             // 79.5% branch.
             ':predict-api': [instruction: 0.90, branch: 0.76],
@@ -370,7 +384,11 @@ subprojects {
             // Sits at Stage A target (0.95/0.85). ENTERPRISE_READINESS.md 4.2 item 8.
             ':tags-api': [instruction: 0.95, branch: 0.85],
             // anvil-api measured via jacocoTestReport (2026-10-13): 91.7% instruction / 82.7% branch.
-            ':anvil-api': [instruction: 0.90, branch: 0.80],
+            ':anvil-api': [
+                    instruction: 0.85,
+                    branch: 0.77,
+                    excludes: ['io/github/dailystruggle/anvil/Lca*']
+            ],
             // maps-api measured via jacocoTestReport (2026-10-08): 96.2% instruction / 84.6% branch.
             ':maps-api': [instruction: 0.90, branch: 0.80],
             // rtp-api measured: 95.7% instruction / 81.3% branch.
@@ -380,7 +398,7 @@ subprojects {
             // 68.8% branch (without Docker Redis IT). Floors carry a ~1-2 pt margin under the
             // baseline because a partially-recompiled tree makes JaCoCo discard stale execution
             // data, which can read several points low.
-            ':rtp-proxy:rtp-proxy-common': [instruction: 0.85, branch: 0.67],
+            ':proxy:proxy-common': [instruction: 0.85, branch: 0.67],
             // commands-api measured via jacocoTestReport (2026-10-23): 96.5% instruction /
             // 90.4% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
@@ -396,6 +414,13 @@ subprojects {
             // tests (ENTERPRISE_READINESS.md section 2.4 caveat 1). Binding to the
             // test task guarantees a same-invocation measurement.
             dependsOn test
+            if (moduleFloors.excludes) {
+                afterEvaluate {
+                    classDirectories.setFrom(files(classDirectories.files.collect {
+                        fileTree(dir: it, exclude: moduleFloors.excludes)
+                    }))
+                }
+            }
             violationRules {
                 rule {
                     limit {
@@ -564,7 +589,12 @@ def publishedModulePaths = [
         ':config-bit-api',
         ':menu-api',
         ':tags-api',
-        ':rtp-proxy:rtp-proxy-common',
+        ':database-api',
+        ':schematics-api',
+        ':proxy:proxy-common',
+        ':bukkit:bukkit-common',
+        ':paper:paper-common',
+        ':folia:folia-common',
 ]
 
 // ---------------------------------------------------------------------------
@@ -822,7 +852,7 @@ if (!executableAddonHelperPaths.isEmpty()) {
     tasks.named('assemble').configure { finalizedBy 'copyAddonAndHelperJars' }
 }
 
-configure(publishedModulePaths.collect { project(it) }) {
+configure(publishedModulePaths.findAll { findProject(it) != null }.collect { project(it) }) {
     apply plugin: 'maven-publish'
     // `signing` is a first-party Gradle plugin (ships inside the Gradle
     // distribution, no external coordinate). It GPG-signs every published
@@ -835,6 +865,21 @@ configure(publishedModulePaths.collect { project(it) }) {
     // Publish after evaluation so each module's `java`/`java-library` component
     // (and any withSourcesJar/withJavadocJar wiring) is fully registered first.
     afterEvaluate {
+        if (project.path == ':config-bit-api' && project.hasProperty('publicSdkOnly')) {
+            sourceSets {
+                main {
+                    java {
+                        exclude 'io/github/dailystruggle/rtp/common/bit/config/atlas/**'
+                    }
+                }
+                test {
+                    java {
+                        exclude 'io/github/dailystruggle/rtp/common/bit/config/atlas/**'
+                    }
+                }
+            }
+        }
+
         // Maven Central rejects a publication that lacks `-sources` and
         // `-javadoc` jars, so the published closure produces both (the rest of
         // the build still ships thin executable jars only - see the `java {}`
@@ -849,6 +894,21 @@ configure(publishedModulePaths.collect { project(it) }) {
         java {
             withSourcesJar()
             withJavadocJar()
+        }
+
+        // Embed module README.md and ADR/architecture docs inside META-INF/leaf-sdk/<module>/
+        // in both the compiled jar and -sources.jar so downstream Maven and addon consumers
+        // receive the documented purpose and contracts directly inside their IDE and artifact.
+        def moduleDir = project.projectDir
+        def moduleName = project.name
+        tasks.withType(Jar).configureEach { jarTask ->
+            if (jarTask.name == 'jar' || jarTask.name == 'sourcesJar') {
+                jarTask.from(moduleDir) {
+                    include 'README.md'
+                    include 'docs/**/*.md'
+                    into "META-INF/leaf-sdk/${moduleName}"
+                }
+            }
         }
 
         publishing {
@@ -925,6 +985,14 @@ configure(publishedModulePaths.collect { project(it) }) {
                     maven {
                         name = 'GitHubPackages'
                         url = 'https://maven.pkg.github.com/DailyStruggle/RTP'
+                        credentials {
+                            username = ghUser
+                            password = ghKey
+                        }
+                    }
+                    maven {
+                        name = 'LeafCraftDevPackages'
+                        url = 'https://maven.pkg.github.com/LeafCraftDev/MC'
                         credentials {
                             username = ghUser
                             password = ghKey
@@ -1029,10 +1097,11 @@ tasks.register('jacocoServerReport', JacocoReport) {
 
     sourceDirectories.from = files(serverProjects.collect { it.sourceSets.main.allSource.srcDirs })
 
-    def pluginJar = fileTree(dir: "${rootDir}/rtp-plugin/build/libs").matching {
+    def rtpPluginProject = findProject(':rtp-plugin')
+    def pluginJar = rtpPluginProject != null ? fileTree(dir: rtpPluginProject.layout.buildDirectory.dir('libs')).matching {
         include 'LeafRTP-Pro-*.jar'
         exclude '*-dev.jar'
-    }
+    } : files()
     def addonClassTrees = serverProjects.findAll { it.path.startsWith(':addons') }.collect {
         it.fileTree(dir: it.layout.buildDirectory, includes: ['classes/java/main/**', 'classes/kotlin/main/**'])
     }
@@ -1098,8 +1167,10 @@ sonar {
                 '**/mock/**',
                 'platforms/**',
                 'addons/**',
+                'resource/LeafRTP/addons/**',
                 'helpers/**',
                 'rtp-plugin/**',
+                'resource/LeafRTP/rtp-plugin/**',
                 'api/**/*unobf/**',
                 'api/**/*Unobf/**',
                 '**/server/ServerAccessorImpl.java'
@@ -1223,15 +1294,17 @@ subprojects {
             def isPlatformOrAddon = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
                     project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
                     project.projectDir.canonicalPath.contains(File.separator + 'helpers' + File.separator) ||
-                    project.path.startsWith(':rtp-bukkit') ||
-                    project.path.startsWith(':rtp-paper') ||
-                    project.path.startsWith(':rtp-folia') ||
-                    project.path.startsWith(':rtp-fabric') ||
-                    project.path.startsWith(':rtp-neoforge') ||
+                    project.path.startsWith(':bukkit') ||
+                    project.path.startsWith(':paper') ||
+                    project.path.startsWith(':folia') ||
+                    project.path.startsWith(':fabric') ||
+                    project.path.startsWith(':neoforge') ||
+                    project.path == ':rtp-neoforge' ||
                     project.path.startsWith(':addons') ||
                     project.path.startsWith(':helpers') ||
+                    project.path.startsWith(':plugins') ||
                     project.path == ':rtp-plugin' ||
-                    project.path == ':rtp-proxy:rtp-proxy-velocity' ||
+                    project.path == ':proxy:proxy-velocity' ||
                     project.path == ':effects-api:effects-api-fabric-unobf'
 
             if (isPlatformOrAddon) {

@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:random_selector",
+  "config": {
+    "features": [
+      { "chance": 0.3, "feature": "minecraft:spruce_checked" }
+    ],
+    "default": "leaf:spruce_mid"
+  }
+}

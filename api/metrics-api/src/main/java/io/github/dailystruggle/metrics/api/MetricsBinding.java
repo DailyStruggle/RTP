@@ -83,7 +83,7 @@ public interface MetricsBinding {
 
     /**
      * Sampled online player population {@code P_k} in the tick region owning chunk {@code (chunkX, chunkZ)}
-     * over the last completed {@code EntitySchedulerSampler} rotation (ADR-123 Section 5 & 11).
+     * over the last completed {@code EntitySchedulerSampler} rotation (ADR-123 Section 5 and 11).
      * Returns {@code -1} ({@code NEVER_SAMPLED}) on single-loop runtimes or before the first rotation completes.
      */
     default int regionSampledPlayers(UUID worldId, int chunkX, int chunkZ) { return -1; }
@@ -97,7 +97,7 @@ public interface MetricsBinding {
 
     /**
      * Cumulative count of consecutive-tick overruns ({@code > 60 ms}) observed by the Folia
-     * {@code EntitySchedulerSampler} for {@code rtp_governor_overruns_total} (ADR-123 Section 5 & 10).
+     * {@code EntitySchedulerSampler} for {@code rtp_governor_overruns_total} (ADR-123 Section 5 and 10).
      */
     default long regionSamplerOverrunsTotal() { return 0L; }
 

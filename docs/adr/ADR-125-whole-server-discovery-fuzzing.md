@@ -1,9 +1,9 @@
 # ADR-125 - Whole-Server Discovery Fuzzing: Protocol Discovery, Agentless Observation, Attribution After Detection
 
-**Status:** Accepted. Amends [ADR-111](ADR-111-live-server-behaviour-fuzzing.md) section 2.2 (*Plugin-agnostic* inputs, *Isolation*, *Same-run control* and *Stdlib Python*), and refines section 2.3 (*Attribution*) and section 2.7 (*Action vocabulary*), for a new whole-server mode only. Also amends [ADR-122](ADR-122-platform-neutral-stress-harness.md) decision 6 for server mode only (section 2.6). ADR-122 is itself Proposed: the carve-out takes effect only if both are accepted, and if ADR-122 is rejected the profile fields of section 2.6 are defined by this ADR alone. ADR-111 target mode is unchanged.
+**Status:** Accepted. Amends [ADR-111](ADR-111-live-server-behaviour-fuzzing.md) section 2.2 (*Plugin-agnostic* inputs, *Isolation*, *Same-run control* and *Stdlib Python*), and refines section 2.3 (*Attribution*) and section 2.7 (*Action vocabulary*), for a new whole-server mode only. Also amends [stress-test-ADR-001](../../helpers/StressTestRTP/docs/adr/stress-test-ADR-001-platform-neutral-stress-harness.md) decision 6 for server mode only (section 2.6). ADR-122 is itself Proposed: the carve-out takes effect only if both are accepted, and if ADR-122 is rejected the profile fields of section 2.6 are defined by this ADR alone. ADR-111 target mode is unchanged.
 **Date:** 2026-10-23
 **Relevant Requirements:** REQ-RTP-S-002, REQ-RTP-S-004
-**Related ADRs:** [ADR-111](ADR-111-live-server-behaviour-fuzzing.md), [ADR-122](ADR-122-platform-neutral-stress-harness.md), [ADR-091](ADR-091-headless-player-protocol-driver-for-devstack.md), [ADR-080](ADR-080-opt-in-simulation-benchmark-tier.md), [ADR-094](ADR-094-quality-engineering-gates.md)
+**Related ADRs:** [ADR-111](ADR-111-live-server-behaviour-fuzzing.md), [stress-test-ADR-001](../../helpers/StressTestRTP/docs/adr/stress-test-ADR-001-platform-neutral-stress-harness.md), [ADR-091](ADR-091-headless-player-protocol-driver-for-devstack.md), [leafrtp-ADR-061](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-061-opt-in-simulation-benchmark-tier.md), [ADR-094](ADR-094-quality-engineering-gates.md)
 
 ---
 
@@ -14,7 +14,7 @@
 A server admin with forty plugins does not know which plugin to suspect or which command to send. Three things in the current tool assume that knowledge:
 
 - **Vocabulary is fixed.** `ACTIONS` and `DEFAULT_CMDS` in `scripts/bench_fuzz.py` hold a short list of verbs and one namespaced command per known plugin. Section 2.7 planned discovery from `plugin.yml` and tab completion, which is Bukkit-only and does not reflect what a given permission level can actually run.
-- **Observation needs the harness.** Class histograms and plugin ownership come from StressTestRTP (`LeakProbe`), a Bukkit plugin. [ADR-122](ADR-122-platform-neutral-stress-harness.md) plans Fabric and NeoForge carriers, but they do not exist yet.
+- **Observation needs the harness.** Class histograms and plugin ownership come from StressTestRTP (`LeakProbe`), a Bukkit plugin. [stress-test-ADR-001](../../helpers/StressTestRTP/docs/adr/stress-test-ADR-001-platform-neutral-stress-harness.md) plans Fabric and NeoForge carriers, but they do not exist yet.
 - **Attribution needs package prefixes.** `ServerLogOracle` attributes frames through `PLUGIN_PACKAGES` plus `--plugin-packages`, and stalls are attributed to `Server`.
 
 Three properties of a running server make a target-free mode possible:
@@ -88,7 +88,7 @@ Three properties of a running server make a target-free mode possible:
 
 - ADR-111 section 2.8 holds: server mode is opt-in and local, never part of `gradlew test` or CI, and every oracle needs a planted-bug test against the fake server in `scripts/tests/` before it can affect the verdict.
 - The method shall be validated against a planted-bug fixture with neutral names (a Paper plugin and a Fabric mod: a session that leaks when the player quits before a short timer completes, and a radius-gated main-thread busy loop), and against the known BetterRTP 3.6.13 positive. No fixture, BetterRTP or class name shall appear in any input, oracle, rule or built-in denylist entry, and evidence runs shall pass no `--deny` entry that names them.
-- A published claim about another plugin's finding shall follow [ADR-080](ADR-080-opt-in-simulation-benchmark-tier.md).
+- A published claim about another plugin's finding shall follow [leafrtp-ADR-061](../../plugins/LeafRTP/docs/adr/leafrtp-ADR-061-opt-in-simulation-benchmark-tier.md).
 
 ---
 

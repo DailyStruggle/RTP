@@ -1,7 +1,7 @@
 # Deprecation and API Evolution Policy
 
 > **Scope:** Public API (`rtp-api`, SPI frameworks: `anvil-api`, `bit-api`, `bstats-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `server-api`, `tags-api`, `units-api`, `yaml-api`), platform carriers, and configuration keys.
-> **Related:** [ADR-000](../adr/ADR-000-development-workflow.md) (development workflow), [ADR-011](../adr/ADR-011-rtp-api-separate-module.md) (`rtp-api` separate module), [ADR-051](../adr/ADR-051-two-tier-api-extension-model.md) (two-tier API extension model), [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (Fabric), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) (NeoForge).
+> **Related:** [ADR-000](../adr/ADR-000-development-workflow.md) (development workflow), [leafrtp-ADR-008](../../resource/LeafRTP/docs/adr/leafrtp-ADR-008-rtp-api-separate-module.md) (`rtp-api` separate module), [leafrtp-ADR-034](../../resource/LeafRTP/docs/adr/leafrtp-ADR-034-two-tier-api-extension-model.md) (two-tier API extension model), [rtp-fabric-ADR-002](../../platforms/fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (Fabric), [rtp-neoforge-ADR-002](../../platforms/neoforge/docs/adr/rtp-neoforge-ADR-002-neoforge-platform-in-scope.md) (NeoForge).
 
 ---
 

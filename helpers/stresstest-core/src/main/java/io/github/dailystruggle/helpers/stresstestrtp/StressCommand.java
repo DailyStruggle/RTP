@@ -13,7 +13,7 @@ import java.util.Locale;
 import java.util.logging.Level;
 
 /**
- * Platform-neutral {@code /rtpstress} dispatcher (ADR-122 Decision 1 & 2).
+ * Platform-neutral {@code /rtpstress} dispatcher (ADR-122 Decision 1 and 2).
  */
 public final class StressCommand {
 

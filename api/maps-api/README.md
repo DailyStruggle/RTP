@@ -66,5 +66,5 @@ DualSparklineRenderer.INSTANCE.render(canvas, sparkline);
 
 ## Docs
 
-- ADR-046: [`../../docs/adr/ADR-046-maps-api-module.md`](../../docs/adr/ADR-046-maps-api-module.md)
+- ADR-046: [`../../docs/adr/ADR-046-maps-api-module.md`](docs/adr/maps-api-ADR-003-maps-api-module.md)
 - Subproject ADRs: [`docs/adr/maps-api-ADR-001-bootstrap.md`](docs/adr/maps-api-ADR-001-bootstrap.md), [`docs/adr/maps-api-ADR-002-gui-slot-render-and-offmain-packet-path.md`](docs/adr/maps-api-ADR-002-gui-slot-render-and-offmain-packet-path.md)

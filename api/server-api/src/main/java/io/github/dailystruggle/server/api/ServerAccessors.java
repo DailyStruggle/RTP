@@ -80,6 +80,21 @@ public final class ServerAccessors {
   }
 
   /**
+   * Returns the active {@link WorldEventHook} from the installed {@link ServerAccessor}, or {@link
+   * NoopWorldEventHook#INSTANCE} when none is installed.
+   *
+   * @return world event hook; never {@code null}
+   */
+  public static WorldEventHook worldEventHook() {
+    ServerAccessor current = accessor;
+    if (current == null) {
+      return NoopWorldEventHook.INSTANCE;
+    }
+    WorldEventHook hook = current.getWorldEventHook();
+    return hook != null ? hook : NoopWorldEventHook.INSTANCE;
+  }
+
+  /**
    * Installs or clears an explicit {@link ServerAccessor} delegate used for effect target
    * resolution and console command dispatch (ADR-116 Decision 2).
    *

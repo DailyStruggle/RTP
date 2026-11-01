@@ -79,7 +79,8 @@ foreach ($stub in $stubJars) {
 }
 
 # Copy LeafRTP jar
-$rtpLibs = Join-Path $repoRoot 'rtp-plugin\build\libs'
+$rtpLibs = Join-Path $repoRoot 'resource\LeafRTP\rtp-plugin\build\libs'
+if (-not (Test-Path $rtpLibs)) { $rtpLibs = Join-Path $repoRoot 'rtp-plugin\build\libs' }
 $rtpJar = Get-ChildItem -Path $rtpLibs -Filter 'LeafRTP-Pro-*.jar' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $rtpJar) {
     $rtpJar = Get-ChildItem -Path $rtpLibs -Filter 'LeafRTP-*.jar' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -92,7 +93,8 @@ if ($rtpJar) {
 }
 
 # Copy LeafRTPGuiAddon jar
-$guiLibs = Join-Path $repoRoot 'addons\LeafRTPGuiAddon\rtp-gui\build\libs'
+$guiLibs = Join-Path $repoRoot 'resource\LeafRTP\addons\LeafRTPGuiAddon\rtp-gui\build\libs'
+if (-not (Test-Path $guiLibs)) { $guiLibs = Join-Path $repoRoot 'addons\LeafRTPGuiAddon\rtp-gui\build\libs' }
 $guiJar = Get-ChildItem -Path $guiLibs -Filter 'LeafRTPGuiAddon-*.jar' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if ($guiJar) {
     Copy-Item -Force $guiJar.FullName (Join-Path $compatPluginsDir 'LeafRTPGuiAddon.jar')

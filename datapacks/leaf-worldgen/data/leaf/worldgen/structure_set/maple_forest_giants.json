@@ -1,0 +1,15 @@
+{
+  "structures": [
+    {
+      "structure": "leaf:maple_forest_giant",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 80093,
+    "spacing": 3,
+    "separation": 1,
+    "spread_type": "linear"
+  }
+}

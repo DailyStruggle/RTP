@@ -2,7 +2,7 @@
 
 `scripts/bench_fuzz.py --mode server` is the whole-server mode of the live-server behaviour fuzzer governed by [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md). The full ADR-125 design discovers the attack surface from the server itself, finds leaks and main-thread stalls by comparison with a vanilla baseline, and blames a jar only after the finding has reproduced; the shipped CLI slice implements only the defensive, non-executing **passive local audit** (`status: "passive_only"`).
 
-- **Governing decision:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (**Accepted** under Rule D-005; ADR `Accepted` status records architectural design approval, not implementation completeness). It amends [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) section 2.2 for server mode only, and extends the platform profile of [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md) with a server-mode carve-out from its decision 6 (isolation and `--plugin-packages` attribution). ADR-122 is Proposed.
+- **Governing decision:** [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md) (**Accepted** under Rule D-005; ADR `Accepted` status records architectural design approval, not implementation completeness). It amends [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) section 2.2 for server mode only, and extends the platform profile of [stress-test-ADR-001](../../helpers/StressTestRTP/docs/adr/stress-test-ADR-001-platform-neutral-stress-harness.md) with a server-mode carve-out from its decision 6 (isolation and `--plugin-packages` attribution). ADR-122 is Proposed.
 - **Status (passive CLI audit + `--active` live runner + offline callback-driven library):**
   - **Passive local audit (`scripts/bench_fuzz.py --mode server`, default):** runs the read-only passive local audit described in [Passive local audit (`--mode server`)](#passive-local-audit---mode-server) below (`status: "passive_only"`).
   - **Live active discovery fuzzing (`scripts/bench_fuzz.py --mode server --active`):** executes the active ADR-125 discovery, baseline, tier-stratified bandit exploration (including player-taxonomy bot archetypes `homesteader_reroll`, `explorer_wander`, and `coop_group`), `JcmdObserver` (`GC.class_histogram` and `Thread.print` locally, via `--ssh <host>` / `$BENCH_SSH_HOST`, or `--container`), live action shrinking (`shrink_bots`), numeric argument bisection (`bisect_numeric_arg`), and dependency-closed jar `ddmin` (`ddmin_jars`), guarded by four anti-abuse gates (disposable `--server-dir` + RCON password proof-of-ownership, RFC1918/Tailscale/local-hostname allow-list, offline-only `fz*` bots, and `DEFAULT_DENYLIST`).
@@ -41,7 +41,7 @@ python3 scripts/bench_fuzz.py --mode server --active \
     --episodes 40
 ```
 
-- **Player-taxonomy scenario shapes (`SCENARIO_SHAPES`):** alongside fault-oriented follow-ups (`quit_lt1s`, `quit_delay`, `rejoin`, `repeat`, `concurrent`, `window_click` with protocol-level `click` and `close_window`), `build_arm_program` exercises three player-taxonomy archetypes from [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md):
+- **Player-taxonomy scenario shapes (`SCENARIO_SHAPES`):** alongside fault-oriented follow-ups (`quit_lt1s`, `quit_delay`, `rejoin`, `repeat`, `concurrent`, `window_click` with protocol-level `click` and `close_window`), `build_arm_program` exercises three player-taxonomy archetypes from [`PLAYER_TAXONOMY_VALUATION.md`](../../resource/LeafRTP/docs/dev/PLAYER_TAXONOMY_VALUATION.md):
   - `homesteader_reroll` (*Mode 1 Reroll Cascade*): dispatches the command, inspects the landing with a short walk (`move`), rejects the site and dispatches two rapid rerolls before settling.
   - `explorer_wander` (*Mode 3 / Mode 4 Outward Traverse*): dispatches the command, traverses outward across chunks via `move` packets, and issues a follow-up command while moving.
   - `coop_group` (*Mode 8 Cooperative Group Settle*): joins multiple bots that coordinate commands and movement together.
@@ -289,6 +289,6 @@ Results, run IDs, episode counts and command coverage will be recorded here and 
 
 ## References
 
-- [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md), [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md), [ADR-122](../adr/ADR-122-platform-neutral-stress-harness.md), [ADR-080](../adr/ADR-080-opt-in-simulation-benchmark-tier.md)
+- [ADR-125](../adr/ADR-125-whole-server-discovery-fuzzing.md), [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md), [stress-test-ADR-001](../../helpers/StressTestRTP/docs/adr/stress-test-ADR-001-platform-neutral-stress-harness.md), [leafrtp-ADR-061](../../resource/LeafRTP/docs/adr/leafrtp-ADR-061-opt-in-simulation-benchmark-tier.md)
 - `scripts/bench_fuzz.py`, `scripts/bench_fuzz_server.py`, `scripts/bench_overnight.py`, `scripts/bench_setup.py`, `devstack/clients/bench-swarm.js`
 - Zeller and Hildebrandt, *Simplifying and Isolating Failure-Inducing Input*, IEEE TSE 28(2), 2002

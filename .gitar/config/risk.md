@@ -16,7 +16,7 @@ The following subsystems govern concurrent execution, direct hardware/JVM resour
   - `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tasks/MemoryTracker.java`
   - Chunk ticket acquisition and lifecycle adapters across all platforms.
 - **Regional Scheduling & Concurrency Adapters:**
-  - `platforms/rtp-folia/` (all classes)
+  - `platforms/folia/` (all classes)
   - `RTPScheduler` SPI implementations across Bukkit, Paper, Fabric, and NeoForge.
 - **Region Prefiltering & Chunk Format Decoders:**
   - `api/anvil-api/` (Anvil, Linear, and chunk layout decoders; ADR-016, ADR-077).

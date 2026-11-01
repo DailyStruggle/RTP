@@ -5,7 +5,7 @@
 > **Authoritative Current State:** See [`ENTERPRISE_READINESS.md` section 2.1 & section 10](ENTERPRISE_READINESS.md#10-definition-of-done-scorecard-reconciled-2026-10-08--all-met) and root `build.gradle` (`coverageFloors`).
 > - **`rtp-core` unit coverage:** Measured at **81.6% instruction / 65.8% branch** across >340 test suites, with an enforced unit JaCoCo floor of **`0.80` instruction / `0.64` branch** plus higher per-package floors (`tasks.teleport` `0.87/0.75`, `selection.region` `0.82/0.68`, `selection.worldborder` `0.99/0.89`) and a >= 60% PIT mutation threshold (`-Pmutation`).
 > - **Runtime-attested devstack coverage:** Server-bound `rtp-core` bootstrap and pipeline seams are verified by live devstack JaCoCo agents merged via `:jacocoServerReport` (see [`TESTING_GUIDE.md`](TESTING_GUIDE.md) and [`ENTERPRISE_READINESS.md` section 10.1](ENTERPRISE_READINESS.md#101-criterion-1-re-scope-runtime-attested-devstack-coverage)).
-> - **Platform-coupled modules:** `rtp-folia-common`'s unit suite is green (intentionally shallow at 8.7% instruction because Folia schedulers and world access are exercised in-game via `/rtp test *` and the devstack acceptance harness; inventoried in [`platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md`](../../platforms/rtp-folia/rtp-folia-common/docs/SERVER_BOUND_COVERAGE.md)).
+> - **Platform-coupled modules:** `rtp-folia-common`'s unit suite is green (intentionally shallow at 8.7% instruction because Folia schedulers and world access are exercised in-game via `/rtp test *` and the devstack acceptance harness; inventoried in [`platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md`](../../platforms/folia/folia-common/docs/SERVER_BOUND_COVERAGE.md)).
 
 ## Historical 2026-04-16 Baseline
 

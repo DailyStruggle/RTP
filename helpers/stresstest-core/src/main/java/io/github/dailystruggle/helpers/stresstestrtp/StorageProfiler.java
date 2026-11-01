@@ -175,7 +175,7 @@ public final class StorageProfiler {
             try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir)) {
                 for (Path p : ds) {
                     String fn = p.getFileName().toString().toLowerCase(Locale.ROOT);
-                    if (!fn.endsWith(".mca") && !fn.endsWith(".linear")) continue;
+                    if (!fn.endsWith(".mca") && !fn.endsWith(".linear") && !fn.endsWith(".lca")) continue;
                     if (probedFiles.contains(p.toAbsolutePath().toString())) continue;
                     found.add(p);
                 }

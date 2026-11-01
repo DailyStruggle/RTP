@@ -4,10 +4,10 @@
 - **Supersedes:** none.
 - **Superseded by:** none.
 - **Related:**
-  - [ADR-032](../../../docs/adr/ADR-032-teleport-pipeline-latency-histogram.md): the pipeline-latency histogram that stays in `rtp-core`.
-  - [`docs/dev/MULTI_SERVER_PLAN.md`](../../../docs/dev/MULTI_SERVER_PLAN.md): tracks the deferred sibling `proxy-api` extraction (see *Deferred sibling extraction* below) and the future `NetworkMetricsExtension`.
-  - [`docs/dev/METRICS_PLAN.md`](../../../docs/dev/METRICS_PLAN.md): project-wide metrics design, catalogue, and `/rtp info` surface.
-  - REQ-RTP-OBS-001/002/003 in [`docs/dev/REQUIREMENTS.md`](../../../docs/dev/REQUIREMENTS.md) and [`docs/dev/TRACEABILITY.md`](../../../docs/dev/TRACEABILITY.md).
+  - [leafrtp-ADR-019](../../../../plugins/LeafRTP/docs/adr/leafrtp-ADR-019-teleport-pipeline-latency-histogram.md): the pipeline-latency histogram that stays in `rtp-core`.
+  - [`docs/dev/MULTI_SERVER_PLAN.md`](../../../../plugins/LeafRTP/docs/dev/MULTI_SERVER_PLAN.md): tracks the deferred sibling `proxy-api` extraction (see *Deferred sibling extraction* below) and the future `NetworkMetricsExtension`.
+  - [`docs/dev/METRICS_PLAN.md`](../../../../plugins/LeafRTP/docs/dev/METRICS_PLAN.md): project-wide metrics design, catalogue, and `/rtp info` surface.
+  - REQ-RTP-OBS-001/002/003 in [`docs/dev/REQUIREMENTS.md`](../../../../plugins/LeafRTP/docs/dev/REQUIREMENTS.md) and [`docs/dev/TRACEABILITY.md`](../../../../plugins/LeafRTP/docs/dev/TRACEABILITY.md).
   - [maps-api-ADR-001](../../../maps-api/docs/adr/maps-api-ADR-001-bootstrap.md): sibling `*-api` module-bootstrap precedent.
 
 ---
@@ -125,7 +125,7 @@ enums) that is the same shape of plugin-agnostic SPI as `metrics-api`. A future 
 extraction (neutral root `io.github.dailystruggle.proxy.api.*`) is a *simple file transfer*
 with no reshaping: the RTP-teleport-specific reservation surface (`RtpDispatcher`,
 `RtpRequest`, `ReservationClient`, `ReservationToken`) stays in `rtp-proxy-common`. This
-remains deferred and is tracked in [`MULTI_SERVER_PLAN.md`](../../../docs/dev/MULTI_SERVER_PLAN.md);
+remains deferred and is tracked in [`MULTI_SERVER_PLAN.md`](../../../../plugins/LeafRTP/docs/dev/MULTI_SERVER_PLAN.md);
 it is recorded here only because it mirrors this ADR's neutral-root decision.
 
 ## Alternatives Considered
@@ -151,6 +151,6 @@ it is recorded here only because it mirrors this ADR's neutral-root decision.
 
 ## References
 
-- [`docs/dev/METRICS_PLAN.md`](../../../docs/dev/METRICS_PLAN.md)
-- [`docs/dev/REQUIREMENTS.md`](../../../docs/dev/REQUIREMENTS.md) (REQ-RTP-OBS-001/002/003)
-- [`docs/dev/TRACEABILITY.md`](../../../docs/dev/TRACEABILITY.md)
+- [`docs/dev/METRICS_PLAN.md`](../../../../plugins/LeafRTP/docs/dev/METRICS_PLAN.md)
+- [`docs/dev/REQUIREMENTS.md`](../../../../plugins/LeafRTP/docs/dev/REQUIREMENTS.md) (REQ-RTP-OBS-001/002/003)
+- [`docs/dev/TRACEABILITY.md`](../../../../plugins/LeafRTP/docs/dev/TRACEABILITY.md)

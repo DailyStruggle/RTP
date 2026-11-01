@@ -76,7 +76,8 @@ if (-not $SkipBuild) {
     }
 }
 
-$libsDir = Join-Path $repoRoot 'addons\LeafRTPGuiAddon\rtp-gui\build\libs'
+$libsDir = Join-Path $repoRoot 'resource\LeafRTP\addons\LeafRTPGuiAddon\rtp-gui\build\libs'
+if (-not (Test-Path $libsDir)) { $libsDir = Join-Path $repoRoot 'addons\LeafRTPGuiAddon\rtp-gui\build\libs' }
 $jar = Get-ChildItem -Path $libsDir -Filter 'LeafRTPGuiAddon-*.jar' -File -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if (-not $jar) {

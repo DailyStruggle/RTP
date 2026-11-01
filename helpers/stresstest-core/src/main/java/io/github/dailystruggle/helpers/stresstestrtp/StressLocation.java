@@ -2,7 +2,7 @@ package io.github.dailystruggle.helpers.stresstestrtp;
 
 /**
  * Platform-neutral immutable world coordinate used across {@code stresstest-core}
- * (ADR-122 Decision 1 & 2).
+ * (ADR-122 Decision 1 and 2).
  */
 public record StressLocation(String world, double x, double y, double z) {
 

@@ -1,0 +1,668 @@
+package io.github.dailystruggle.rtp.bukkitplatform.tools;
+
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends.PAPIChecker;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.PlatformHookBitComponent;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.server.api.GradientExpander;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import net.md_5.bungee.api.ChatColor;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.BaseComponent;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.HoverEvent;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.hover.content.Text;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
+
+public class SendMessage {
+  public static final Map<String, Function<UUID, String>> placeholders = PlaceholderProvider.placeholders;
+  private static final Pattern hexColorPattern1 = Pattern.compile("(&?#[0-9a-fA-F]{6})");
+  private static final List<Consumer<String>> interceptors = new CopyOnWriteArrayList<>();
+  /**
+   * Detects MiniMessage {@code <tag>} markup (named colours, {@code <#rrggbb>}
+   * hex, gradients, decorations, {@code <click:...>} / {@code <hover:...>}, and
+   * their closing {@code </tag>} forms). Deliberately conservative: it only
+   * matches a {@code <}, optional {@code /}, a leading letter or {@code #}, then
+   * a run of non-bracket characters up to a {@code >}. Plain legacy text that
+   * merely contains a lone {@code <} (e.g. a less-than sign) is left on the
+   * legacy color-code path.
+   */
+  private static final Pattern miniMessageTagPattern =
+      Pattern.compile("<(/?[a-zA-Z#][^<>]*)>");
+  private static final Pattern fontTagPattern =
+      Pattern.compile("<(?:font:[^<>]*|/font(?::[^<>]*)?)>", Pattern.CASE_INSENSITIVE);
+  /**
+   * Whether Adventure (and the MiniMessage + Gson serializer it relies on) is
+   * present on the runtime classpath. Paper, Folia, and their forks bundle it;
+   * a pure Spigot server does not. When {@code false}, MiniMessage markup is
+   * left untouched and rendered through the legacy color-code pipeline.
+   */
+  private static final boolean MINIMESSAGE_AVAILABLE = detectMiniMessage();
+
+  private static boolean detectMiniMessage() {
+    try {
+      Class.forName("net.kyori.adventure.text.minimessage.MiniMessage");
+      Class.forName("net.kyori.adventure.text.serializer.gson.GsonComponentSerializer");
+      return true;
+    } catch (ClassNotFoundException | LinkageError e) {
+      PlatformHookBitComponent.recordMessageFormatDegraded(
+          "SendMessage#detectMiniMessage", e.getClass().getSimpleName() + ": " + e.getMessage());
+      return false;
+    }
+  }
+  /**
+   * Level-aware interceptors. Receive the same formatted message that
+   * string-only {@link #interceptors} receive, plus the {@link Level} the
+   * caller supplied to {@link #log(Level, String)} / {@link #log(Level, String, Throwable)}.
+   * For non-log {@code sendMessage} paths (player chat, hover/click), the
+   * level is {@code null} - leveled interceptors should treat that as
+   * "unknown / not a warning".
+   *
+   * <p>This is the channel {@code rtp test full}'s {@code FullAudit} subscribes
+   * to so that per-step PASS/FAIL attribution counts only {@code WARNING}+ log
+   * events, not benign {@code INFO} {@code [RTP test/...]} chatter.
+   */
+  private static final List<BiConsumer<Level, String>> leveledInterceptors =
+      new CopyOnWriteArrayList<>();
+
+  private SendMessage() {}
+
+  public static void addInterceptor(Consumer<String> interceptor) {
+    interceptors.add(interceptor);
+  }
+
+  public static void removeInterceptor(Consumer<String> interceptor) {
+    interceptors.remove(interceptor);
+  }
+
+  /**
+   * Registers a level-aware interceptor. Required for callers (e.g. the
+   * {@code rtp test full} audit) that need to distinguish a real
+   * {@code WARNING}/{@code SEVERE} log event from a benign {@code INFO}
+   * line that merely contains an {@code [RTP}-tagged marker.
+   */
+  public static void addInterceptor(BiConsumer<Level, String> interceptor) {
+    leveledInterceptors.add(interceptor);
+  }
+
+  public static void removeInterceptor(BiConsumer<Level, String> interceptor) {
+    leveledInterceptors.remove(interceptor);
+  }
+
+  private static void intercept(String message) {
+    intercept(null, message);
+  }
+
+  private static void intercept(Level level, String message) {
+    for (Consumer<String> interceptor : interceptors) {
+      interceptor.accept(message);
+    }
+    if (!leveledInterceptors.isEmpty()) {
+      for (BiConsumer<Level, String> interceptor : leveledInterceptors) {
+        interceptor.accept(level, message);
+      }
+    }
+  }
+
+
+  public static void sendMessage(CommandSender target1, CommandSender target2, String message) {
+    if (message == null || message.isEmpty()) return;
+    sendMessage(target1, message);
+    if (!target1.getName().equals(target2.getName())) {
+      sendMessage(target2, message);
+    }
+  }
+
+  private static int resolveServerIntVersion() {
+    try {
+      if (RTPRuntime.serverAccessor() != null
+          && RTPRuntime.serverAccessor().getServerIntVersion() != null) {
+        return RTPRuntime.serverAccessor().getServerIntVersion();
+      }
+      io.github.dailystruggle.server.api.ServerAccessor acc =
+          io.github.dailystruggle.server.api.ServerAccessors.get();
+      if (acc != null && acc.getServerIntVersion() != null) {
+        return acc.getServerIntVersion();
+      }
+    } catch (Throwable ignored) {
+    }
+    return 21;
+  }
+
+  @SuppressWarnings("ConstantValue")
+  public static void sendMessage(CommandSender sender, String message) {
+    if (sender == null || message == null || message.isEmpty()) return;
+    // Bukkit.getLogger().info("[diag/sendMessage(CS)] entry sender=" + (sender == null ? "null" : sender.getClass().getSimpleName()) + " raw=\"" + message + "\"");
+    intercept(message);
+    // Bukkit.getLogger().info("[diag/sendMessage(CS)] after intercept(): \"" + message + "\"");
+    if (sender instanceof Player) sendMessage((Player) sender, message);
+    else {
+      OfflinePlayer console =
+          Bukkit.getServer() != null ? Bukkit.getOfflinePlayer(RTPAPI.serverId) : null;
+      if (resolveServerIntVersion() > 12 && sender.spigot() != null) {
+        BaseComponent[] components = toComponents(console, message);
+        sender.spigot().sendMessage(components);
+      } else {
+        sender.sendMessage(format(console, message));
+      }
+    }
+  }
+
+  @SuppressWarnings("ConstantValue")
+  public static void sendMessage(Player player, String message) {
+    if (player == null || message == null || message.isEmpty()) return;
+    intercept(message);
+    if (resolveServerIntVersion() > 12 && player.spigot() != null) {
+      BaseComponent[] components = toComponents(player, message);
+      player.spigot().sendMessage(components);
+    } else player.sendMessage(format(player, message));
+  }
+
+  public static void sendMessage(
+      RTPCommandSender sender, String message, String hover, String click) {
+    sendMessage(sender, message, hover, click, ClickEvent.Action.SUGGEST_COMMAND);
+  }
+
+  /**
+   * Overload that lets callers pick the {@link ClickEvent.Action}. Used by
+   * the menu chat renderer (ADR-050) to dispatch
+   * {@link ClickEvent.Action#RUN_COMMAND} clicks so every fragment auto-fires
+   * its literal {@code /rtp menu ...} command instead of suggesting it.
+   */
+  @SuppressWarnings("ConstantValue")
+  public static void sendMessage(
+      RTPCommandSender sender, String message, String hover, String click,
+      ClickEvent.Action clickAction) {
+    if (message.isEmpty()) return;
+    intercept(message);
+
+    OfflinePlayer player;
+    if (sender instanceof Player) player = (OfflinePlayer) sender;
+    else player = Bukkit.getServer() != null ? Bukkit.getOfflinePlayer(RTPAPI.serverId).getPlayer() : null;
+
+    if (resolveServerIntVersion() > 12) {
+      BaseComponent[] textComponents = toComponents(player, message);
+
+      if (hover != null && !hover.isEmpty()) {
+        BaseComponent[] hoverComponents = toComponents(player, hover);
+        HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents));
+        for (BaseComponent component : textComponents) {
+          component.setHoverEvent(hoverEvent);
+        }
+      }
+
+      if (click != null && !click.isEmpty()) {
+        ClickEvent clickEvent = new ClickEvent(clickAction, click);
+        for (BaseComponent component : textComponents) {
+          component.setClickEvent(clickEvent);
+        }
+      }
+
+      // In a version-independent rtp-plugin, we use the API to send messages.
+      // If it's a Bukkit server, we know the player's spigot() method is available if we check the
+      // server version.
+      if (resolveServerIntVersion() > 12) {
+        Player bukkitPlayer = Bukkit.getPlayer(sender.uuid());
+        if (bukkitPlayer != null) {
+          bukkitPlayer.spigot().sendMessage(textComponents);
+        } else if (sender.uuid().equals(RTPAPI.serverId)) {
+          Bukkit.getConsoleSender().spigot().sendMessage(textComponents);
+        }
+      }
+    } else sender.sendMessage(format(player, message));
+  }
+
+  /**
+   * Renders {@code text} into bungee {@link BaseComponent}s for dispatch.
+   *
+   * <p>When Adventure is available on the runtime classpath (Paper/Folia and
+   * forks) and {@code text} contains MiniMessage {@code <tag>} markup, the text
+   * is rendered through MiniMessage (placeholders resolved first via
+   * {@link #formatNoColor}, with no legacy color translation) and bridged into
+   * bungee components by {@link MiniMessageRenderer}. Otherwise (or if MiniMessage
+   * rendering fails for any reason) the legacy color-code pipeline
+   * ({@link #format} + {@link TextComponent#fromLegacyText}) is used, so existing
+   * {@code &}/hex configs keep rendering exactly as before.
+   */
+  public static BaseComponent[] toComponents(@Nullable OfflinePlayer player, @Nullable String text) {
+    return renderMarkup(player, text, new BaseComponent[0], mini -> mini, TextComponent::fromLegacyText);
+  }
+
+  /**
+   * Generic text-formatting entry point. Resolves all RTP / numeric / PlaceholderAPI
+   * placeholders and (optionally) translates legacy {@code &} and {@code #rrggbb} hex
+   * color codes into section-sign codes. This is the single engine the
+   * {@link #format}, {@link #formatDry}, and {@link #formatNoColor} convenience
+   * overloads delegate to.
+   *
+   * @param player the player whose UUID scopes placeholder resolution (console when null)
+   * @param text the raw text to resolve (returns {@code ""} when null)
+   * @param numericPlaceholders resolve numeric placeholders (requires the lang parser)
+   * @param translateColor translate legacy {@code &}/hex color codes
+   * @return the resolved text
+   */
+  public static String format(
+      @Nullable OfflinePlayer player,
+      @Nullable String text,
+      boolean numericPlaceholders,
+      boolean translateColor) {
+    if (text == null) return "";
+
+    // get uuid to be referenced by placeholder getters
+    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
+
+    text = PlaceholderProvider.fillPlaceholders(text, uuid);
+
+    if (numericPlaceholders && ActiveConfigs.get() != null) {
+      text = PlaceholderProvider.fillNumericPlaceholders(text);
+    }
+
+    // check PAPI exists and scan remaining PAPI placeholders
+    // todo: if a null player doesn't work with another PAPI import, blame that import for not
+    // verifying its inputs.
+    text = PAPIChecker.fillPlaceholders(player, text);
+
+    if (translateColor) {
+      text = ChatColor.translateAlternateColorCodes('&', text);
+      text = Hex2Color(text);
+    }
+    return text;
+  }
+
+  public static String format(@Nullable OfflinePlayer player, @Nullable String text) {
+    return format(player, text, true, true);
+  }
+
+  public static String formatDry(@Nullable OfflinePlayer player, @Nullable String text) {
+    return format(player, text, false, true);
+  }
+
+  public static String formatNoColor(@Nullable OfflinePlayer player, @Nullable String text) {
+    return format(player, text, true, false);
+  }
+
+  /**
+   * Shared MiniMessage-aware rendering engine behind {@link #toComponents} and
+   * {@link #toLegacyText}. When Adventure is available and {@code text} carries
+   * MiniMessage {@code <tag>} markup, placeholders are resolved via
+   * {@link #formatNoColor} (no legacy translation) and the result is rendered
+   * through MiniMessage, then handed to {@code miniFinisher}. Otherwise the legacy
+   * pipeline ({@link GradientExpander#expand} + {@link #format}) is used and the
+   * resolved legacy string is handed to {@code legacyFinisher}, so existing
+   * {@code &}/hex configs keep rendering exactly as before.
+   *
+   * @param empty the value to return when {@code text} is null
+   * @param miniFinisher converts the MiniMessage-rendered components into the result
+   * @param legacyFinisher converts the resolved legacy section-code string into the result
+   */
+  private static <T> T renderMarkup(
+      @Nullable OfflinePlayer player,
+      @Nullable String text,
+      T empty,
+      Function<BaseComponent[], T> miniFinisher,
+      Function<String, T> legacyFinisher) {
+    if (text == null) return empty;
+    // Resolve placeholders first (no legacy color translation) so that any
+    // MiniMessage/gradient markup introduced *by* a placeholder is detected and
+    // rendered rather than printed literally. The recurring failure mode is a
+    // prefix placeholder (e.g. [P0] -> "<rainbow>[RTP]</rainbow>") whose tag is
+    // absent from the raw, unresolved text and so would otherwise be missed by
+    // both the MiniMessage detector and GradientExpander.
+    String resolved = formatNoColor(player, text);
+    if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(resolved).find()) {
+      try {
+        return miniFinisher.apply(MiniMessageRenderer.render(resolved));
+      } catch (RuntimeException | LinkageError t) {
+        PlatformHookBitComponent.recordMessageFormatDegraded(
+            "MiniMessageRenderer#render", t.getClass().getSimpleName() + ": " + t.getMessage());
+        RTP.log(
+            Level.FINE,
+            "[RTP] MiniMessage render failed; falling back to legacy color codes for: " + text,
+            t);
+      }
+    }
+    // Expand gradient/rainbow/transition tags to per-character legacy hex codes
+    // so they render on servers that do not bundle Adventure (e.g. pure Spigot).
+    // On Paper/Folia the MiniMessage path above already handled them; this only
+    // fires when MINIMESSAGE_AVAILABLE is false or the MiniMessage render threw.
+    return legacyFinisher.apply(format(player, stripFontTags(GradientExpander.expand(resolved))));
+  }
+
+  static String stripFontTags(String text) {
+    if (text == null) return "";
+    return fontTagPattern.matcher(text).replaceAll("");
+  }
+
+  /**
+   * Package-private for tests. Rewrites every {@code #hhhhhh} / {@code &#hhhhhh} to
+   * {@code §x§h§h§h§h§h§h} in one pass. Runs after {@code translateAlternateColorCodes},
+   * which leaves {@code &#} intact because {@code #} is not a legacy code char.
+   */
+  static String Hex2Color(String text) {
+    if (text == null) return "";
+    Matcher matcher = hexColorPattern1.matcher(text);
+    if (!matcher.find()) return text;
+    StringBuilder out = new StringBuilder(text.length() + 32);
+    int last = 0;
+    do {
+      int end = matcher.end();
+      out.append(text, last, matcher.start()).append("§x");
+      for (int i = end - 6; i < end; i++) {
+        out.append('§').append(Character.toLowerCase(text.charAt(i)));
+      }
+      last = end;
+    } while (matcher.find());
+    return out.append(text, last, text.length()).toString();
+  }
+
+  /**
+   * Returns the ChatColor prefix for a given log level, or null if the level should be
+   * routed through the plain {@link Logger} path instead of the colored console-sender path.
+   */
+  private static @Nullable ChatColor colorFor(Level level) {
+    switch (level.intValue()) {
+      case 1000: // Level.SEVERE
+        return ChatColor.RED;
+      case 900: // Level.WARNING
+        return ChatColor.YELLOW;
+      case 800: // Level.INFO
+        return ChatColor.WHITE;
+      case 700: // Level.CONFIG
+        return ChatColor.GREEN;
+      case 500: // Level.FINE
+        return ChatColor.AQUA;
+      case 400: // Level.FINER
+        return ChatColor.DARK_AQUA;
+      case 300: // Level.FINEST
+        return ChatColor.GRAY;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Cached parsed {@code logging.yml#min_level} so the hot-path log gate doesn't re-parse
+   * on every call. The cache is keyed by the raw string read from config; if an admin
+   * edits the value (or {@code /rtp reload} swaps the parser instance), the next call
+   * sees a different string and re-parses. Defaults to {@link Level#ALL}.
+   */
+  private static volatile String cachedMinLevelRaw = "ALL";
+  private static volatile Level cachedMinLevel = Level.ALL;
+
+  /**
+   * Resolves the plugin-scoped minimum log level from {@code logging.yml#min_level}.
+   *
+   * <p>This value is the sole gate in {@link #isLoggable(Level)}. After parsing, the
+   * threshold is also pushed onto {@link Bukkit#getLogger()} (and its parent / handler
+   * chain) via {@link #applyToBukkitLogger(Level)} so that JUL-routed log calls - in
+   * particular the throwable-carrying {@code log} overload - aren't silently filtered
+   * by the server's default {@code INFO} threshold when an admin configures FINE-and-
+   * below verbosity in {@code logging.yml}.
+   *
+   * <p>Returns {@link Level#ALL} when the config parser hasn't been initialized yet
+   * (e.g. very early in startup) or when the configured value can't be parsed -
+   * keeping the gate purely additive in those cases.
+   */
+  private static Level resolveMinLevel() {
+    try {
+      if (ActiveConfigs.get() == null) return Level.ALL;
+      io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+              io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>
+          logging =
+              (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                      io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
+                  ActiveConfigs.get().getParser(
+                      io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
+      if (logging == null) return Level.ALL;
+      Object raw =
+          logging.getConfigValue(
+              io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.min_level, "ALL");
+      String name = (raw == null) ? "ALL" : raw.toString().trim().toUpperCase(java.util.Locale.ROOT);
+      if (name.isEmpty()) name = "ALL";
+      // Fast path: identical raw value → reuse parsed Level without re-parsing.
+      if (name.equals(cachedMinLevelRaw)) return cachedMinLevel;
+      Level parsed;
+      try {
+        parsed = Level.parse(name);
+      } catch (IllegalArgumentException ex) {
+        parsed = Level.ALL;
+      }
+      cachedMinLevelRaw = name;
+      cachedMinLevel = parsed;
+      applyToBukkitLogger(parsed);
+      return parsed;
+    } catch (RuntimeException | LinkageError t) {
+      PlatformHookBitComponent.recordMessageFormatDegraded(
+          "SendMessage#resolveMinLevel", t.getClass().getSimpleName() + ": " + t.getMessage());
+      return Level.ALL;
+    }
+  }
+
+  /**
+   * Lowers {@link Bukkit#getLogger()} (and its parent / root handlers) to at least the
+   * given level so records published via the throwable-carrying {@code log} overload -
+   * which always routes through the JUL logger so the stack trace is preserved - are
+   * not silently dropped by the server's default {@code INFO} threshold when an admin
+   * configures {@code logging.yml#min_level: FINE/FINER/FINEST}. Never raises the
+   * server's logger level (i.e. only relaxes filtering for our records).
+   */
+  private static void applyToBukkitLogger(Level desired) {
+    try {
+      Logger logger = Bukkit.getLogger();
+      if (logger == null) return;
+      // Walk up the parent chain (Minecraft / root) so JUL's effective level check passes.
+      Logger cursor = logger;
+      while (cursor != null) {
+        Level current = cursor.getLevel();
+        if (current == null || current.intValue() > desired.intValue()) {
+          cursor.setLevel(desired);
+        }
+        // Relax handlers attached to this logger so they actually emit the record.
+        for (java.util.logging.Handler h : cursor.getHandlers()) {
+          Level hl = h.getLevel();
+          if (hl == null || hl.intValue() > desired.intValue()) {
+            h.setLevel(desired);
+          }
+        }
+        cursor = cursor.getParent();
+      }
+    } catch (RuntimeException | LinkageError e) {
+      PlatformHookBitComponent.recordMessageFormatDegraded(
+          "SendMessage#applyToBukkitLogger", e.getClass().getSimpleName() + ": " + e.getMessage());
+    }
+  }
+
+  /** Returns the currently effective plugin-scoped minimum log level. */
+  public static Level getMinLevel() {
+    return resolveMinLevel();
+  }
+
+  /**
+   * Returns true if the level meets the plugin-scoped {@code logging.yml#min_level}
+   * threshold.
+   *
+   * <p>Historically this gate also consulted {@link Bukkit#getLogger()}'s level, but
+   * Bukkit's root logger defaults to {@code INFO} on most servers. That made the
+   * {@code min_level} setting effectively useless for {@code FINE}/{@code FINER}/
+   * {@code FINEST} verbosity (e.g. {@code ScanTask} debug logs at {@code FINE}/
+   * {@code FINER} were silently dropped even with {@code min_level: FINEST}). On
+   * modern servers ({@code >1.12}) RTP routes log output through
+   * {@link Bukkit#getConsoleSender()} rather than the JUL logger, so the JUL level
+   * filter doesn't naturally bound it anyway.
+   *
+   * <p>Callers that are about to perform expensive formatting should short-circuit on
+   * false so FINE/FINER/FINEST debug paths don't pay the placeholder/PAPI cost when
+   * disabled.
+   */
+  private static boolean isLoggable(Level level) {
+    if (level == null) return false;
+    return level.intValue() >= resolveMinLevel().intValue();
+  }
+
+  public static void log(Level level, String message) {
+    if (Objects.isNull(message) || message.isEmpty()) return;
+    if (!isLoggable(level)) return;
+
+    message = format(null, message);
+    // Defensive second pass: any '&' legacy codes that survived `format`
+    // (for example, codes re-introduced by a placeholder substitution after
+    // `translateAlternateColorCodes` already ran in format) are converted
+    // here so the literal '&c' never reaches the console sender on Folia.
+    message = ChatColor.translateAlternateColorCodes('&', message);
+    intercept(level, message);
+
+    if (level.intValue() >= Level.WARNING.intValue()) {
+      for (String s : message.split("\n")) {
+        Bukkit.getLogger().log(level, ChatColor.stripColor(s));
+      }
+      return;
+    }
+
+    if (RTPRuntime.serverAccessor().getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
+
+    ChatColor color = colorFor(level);
+    if (color == null) {
+      Bukkit.getLogger().log(level, message);
+      return;
+    }
+
+    // Map CONFIG → INFO for the legacy (<=1.12) Bukkit logger path; newer servers use the
+    // console-sender route which carries its own color and level via the component payload.
+    Level legacyLevel = (level.equals(Level.CONFIG)) ? Level.INFO : level;
+    boolean modern = RTPRuntime.serverAccessor().getServerIntVersion() > 12;
+
+    for (String s : message.split("\n")) {
+      String colored = color + s;
+      if (modern) {
+        Bukkit.getConsoleSender().spigot().sendMessage(toConsoleComponents(colored));
+      } else {
+        Bukkit.getLogger().log(legacyLevel, colored);
+      }
+    }
+  }
+
+  /**
+   * Renders a console log line into bungee {@link BaseComponent}s. When Adventure is
+   * available and the line carries MiniMessage {@code <tag>} markup (e.g. the
+   * {@code <rainbow>[RTP]</rainbow>} prefix from {@code messages.yml}), it is rendered
+   * through MiniMessage so the tags are parsed rather than printed literally to the
+   * console. Legacy {@code §} color codes already present in the line survive as text
+   * content and are interpreted by the console renderer. Falls back to the plain
+   * legacy path when Adventure is absent or MiniMessage rendering fails.
+   */
+  private static BaseComponent[] toConsoleComponents(String legacyText) {
+    if (MINIMESSAGE_AVAILABLE && miniMessageTagPattern.matcher(legacyText).find()) {
+      try {
+        return MiniMessageRenderer.render(legacyText);
+      } catch (RuntimeException | LinkageError t) {
+        PlatformHookBitComponent.recordMessageFormatDegraded(
+            "MiniMessageRenderer#consoleRender", t.getClass().getSimpleName() + ": " + t.getMessage());
+        RTP.log(
+            Level.FINE,
+            "[RTP] MiniMessage console render failed; falling back to legacy color codes for: "
+                + legacyText,
+            t);
+      }
+    }
+    // Mirror renderMarkup's fallback: expand <gradient>/<rainbow>/<transition>
+    // to per-character legacy hex so a "<rainbow>[RTP]</rainbow>" prefix never
+    // prints literally to the console when Adventure is absent or
+    // MiniMessageRenderer.render threw above.
+    return TextComponent.fromLegacyText(stripFontTags(GradientExpander.expand(legacyText)));
+  }
+
+  public static void log(Level level, String message, Throwable throwable) {
+    if (Objects.isNull(message) || message.isEmpty()) return;
+    if (!isLoggable(level)) return;
+
+    String formatted = format(null, message);
+    // See log(Level, String): defensive second pass against '&' codes
+    // re-introduced by placeholder substitution. Idempotent.
+    formatted = ChatColor.translateAlternateColorCodes('&', formatted);
+    intercept(level, formatted);
+
+    if (level.intValue() >= Level.WARNING.intValue()) {
+      String stripped = ChatColor.stripColor(formatted);
+      if (throwable == null) {
+        Bukkit.getLogger().log(level, stripped);
+      } else {
+        Bukkit.getLogger().log(level, stripped, throwable);
+      }
+      return;
+    }
+
+    ChatColor color = colorFor(level);
+    if (color == null) {
+      Bukkit.getLogger().log(level, message);
+    } else {
+      CommandSender.Spigot spigot = Bukkit.getConsoleSender().spigot();
+      // INFO keeps its historical "no color prefix" rendering in the throwable overload.
+      String prefixed = level.equals(Level.INFO) ? formatted : color + formatted;
+      spigot.sendMessage(toConsoleComponents(prefixed));
+    }
+
+    if (throwable != null) {
+      Bukkit.getLogger().log(level, message, throwable);
+    }
+  }
+
+  public static void title(
+      Player player, String title, String subtitle, int in, int stay, int out) {
+    if (player == null) return;
+    boolean noTitle = title == null || title.isEmpty();
+    boolean noSubtitle = subtitle == null || subtitle.isEmpty();
+
+    if (noTitle && noSubtitle) return;
+
+    if (title != null) {
+      title = toLegacyText(player, title);
+    }
+    if (subtitle != null) {
+      subtitle = toLegacyText(player, subtitle);
+    }
+
+    player.sendTitle(title, subtitle, in, stay, out);
+  }
+
+  /**
+   * Resolves {@code text} into a legacy section-code string suitable for the
+   * string-based {@code Player.sendTitle} sink.
+   *
+   * <p>Mirrors {@link #toComponents}: when Adventure is available and the text
+   * carries MiniMessage {@code <tag>} markup, it is rendered through MiniMessage
+   * (placeholders resolved via {@link #formatNoColor}, no legacy translation) and
+   * then flattened back to a legacy section-code string via
+   * {@code TextComponent.toLegacyText}. Otherwise the legacy {@link #format}
+   * pipeline is used, so existing {@code &}/hex configs render exactly as before.
+   */
+  public static String toLegacyText(@Nullable OfflinePlayer player, @Nullable String text) {
+    return renderMarkup(player, text, "", TextComponent::toLegacyText, legacy -> legacy);
+  }
+
+  public static void actionbar(Player player, String bar) {
+    if (player == null || bar == null || bar.isEmpty()) return;
+    // Route through the MiniMessage-aware renderer so action-bar text honors
+    // <tag> markup (e.g. <rainbow>) on Paper/Folia, while &/hex legacy configs
+    // keep rendering via the legacy fallback inside toComponents.
+    BaseComponent[] components = toComponents(player, bar);
+    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, components);
+  }
+}

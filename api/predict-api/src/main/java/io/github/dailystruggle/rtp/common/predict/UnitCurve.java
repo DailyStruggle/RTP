@@ -113,8 +113,8 @@ public interface UnitCurve extends DoubleUnaryOperator {
     }
 
     /**
-     * Evaluates the cubic Hermite smoothstep S-curve {@code 3t^2 - 2t^3} with zero derivatives at
-     * {@code t = 0.0} and {@code t = 1.0}.
+     * Evaluates the cubic Hermite smoothstep S-curve {@code 3t^2 - 2t^3} with zero first
+     * derivatives at {@code t = 0.0} and {@code t = 1.0}.
      *
      * @param t unit-interval parameter
      * @return smoothstep value in {@code [0.0, 1.0]}
@@ -122,6 +122,36 @@ public interface UnitCurve extends DoubleUnaryOperator {
     static double smoothstep(double t) {
         double u = clamp01(t);
         return u * u * (3.0 - 2.0 * u);
+    }
+
+    /**
+     * Evaluates Perlin's quintic Hermite smootherstep S-curve {@code 6t^5 - 15t^4 + 10t^3} with
+     * zero first and second derivatives at {@code t = 0.0} and {@code t = 1.0}.
+     *
+     * @param t unit-interval parameter
+     * @return smootherstep value in {@code [0.0, 1.0]}
+     */
+    static double smootherstep(double t) {
+        double u = clamp01(t);
+        return u * u * u * (u * (u * 6.0 - 15.0) + 10.0);
+    }
+
+    /**
+     * Evaluates the upper-quadrant unit circular arc {@code sqrt(max(0, 1 - clamp01(t)^2))},
+     * equaling {@code 1.0} at {@code t = 0.0} and {@code 0.0} at {@code t = 1.0}.
+     *
+     * @param t normalized axial offset in {@code [0.0, 1.0]}
+     * @return cross-sectional radius factor in {@code [0.0, 1.0]}
+     */
+    static double circularArc(double t) {
+        double u = clamp01(t);
+        if (u <= 0.0) {
+            return 1.0;
+        }
+        if (u >= 1.0) {
+            return 0.0;
+        }
+        return Math.sqrt(Math.max(0.0, 1.0 - u * u));
     }
 
     /**
@@ -135,6 +165,92 @@ public interface UnitCurve extends DoubleUnaryOperator {
         double u = clamp01(t);
         double centered = 2.0 * u - 1.0;
         return Math.max(0.0, 1.0 - centered * centered);
+    }
+
+    /**
+     * Evaluates a shifted parabolic valley/taper curve
+     * {@code floor + (1 - floor) * ((t - vertexOffset) / max(vertexOffset, 1 - vertexOffset))^2}
+     * reaching minimum {@code floor} at {@code t = vertexOffset} and {@code 1.0} at the farther
+     * boundary.
+     *
+     * @param t            unit-interval parameter
+     * @param vertexOffset normalized vertex position in {@code [0.0, 1.0]}
+     * @param floor        minimum value at the vertex in {@code [0.0, 1.0]}
+     * @return tapered value in {@code [floor, 1.0]}
+     */
+    static double parabolicValley(double t, double vertexOffset, double floor) {
+        double u = clamp01(t);
+        double v = Double.isFinite(vertexOffset) ? clamp01(vertexOffset) : 0.5;
+        double f = Double.isFinite(floor) ? clamp01(floor) : 0.5;
+        double span = Math.max(v, 1.0 - v);
+        double norm = (u - v) / span;
+        return clamp01(f + (1.0 - f) * norm * norm);
+    }
+
+    /**
+     * Evaluates a linear radial falloff envelope {@code clamp01(1.0 - max(0, distance) / (radius + 1.0))}.
+     *
+     * @param distance radial distance from center ({@code < 0} clamped to {@code 0})
+     * @param radius   outer envelope radius ({@code < 0} or non-finite returns {@code 0.0})
+     * @return falloff multiplier in {@code [0.0, 1.0]}
+     */
+    static double radialFalloff(double distance, double radius) {
+        if (!Double.isFinite(distance) || !Double.isFinite(radius) || radius < 0.0) {
+            return 0.0;
+        }
+        double d = Math.max(0.0, distance);
+        return clamp01(1.0 - (d / (radius + 1.0)));
+    }
+
+    /**
+     * Evaluates a density-scaled linear radial falloff envelope
+     * {@code clamp01(density) * radialFalloff(distance, radius)}.
+     *
+     * @param distance radial distance from center
+     * @param radius   outer envelope radius
+     * @param density  base density in {@code [0.0, 1.0]}
+     * @return effective probability in {@code [0.0, 1.0]}
+     */
+    static double radialFalloff(double distance, double radius, double density) {
+        if (!Double.isFinite(density) || density <= 0.0) {
+            return 0.0;
+        }
+        return clamp01(density) * radialFalloff(distance, radius);
+    }
+
+    /**
+     * Extracts the ascending indices where a 1D discrete profile strictly breaks above its
+     * running maximum ({@code profile[i] > runningMax}), seeded with {@code initialMax}.
+     *
+     * @param profile    discrete 1D sequence (may be {@code null} or empty)
+     * @param initialMax baseline maximum prior to index {@code 0}
+     * @return indices in {@code [0, profile.length)} where a new running maximum is reached
+     */
+    static int[] runningMaxBreakouts(int[] profile, int initialMax) {
+        if (profile == null || profile.length == 0) {
+            return new int[0];
+        }
+        int count = 0;
+        int runningMax = initialMax;
+        for (int v : profile) {
+            if (v > runningMax) {
+                runningMax = v;
+                count++;
+            }
+        }
+        if (count == 0) {
+            return new int[0];
+        }
+        int[] out = new int[count];
+        runningMax = initialMax;
+        int idx = 0;
+        for (int i = 0; i < profile.length; i++) {
+            if (profile[i] > runningMax) {
+                runningMax = profile[i];
+                out[idx++] = i;
+            }
+        }
+        return out;
     }
 
     /**
@@ -286,6 +402,35 @@ public interface UnitCurve extends DoubleUnaryOperator {
      */
     static UnitCurve ofLogarithmicTaper(double base) {
         return t -> logarithmicTaper(t, base);
+    }
+
+    /**
+     * Creates a composable {@link UnitCurve} for {@link #smootherstep(double)}.
+     *
+     * @return smootherstep curve operator
+     */
+    static UnitCurve ofSmootherstep() {
+        return UnitCurve::smootherstep;
+    }
+
+    /**
+     * Creates a composable {@link UnitCurve} for {@link #circularArc(double)}.
+     *
+     * @return circular arc curve operator
+     */
+    static UnitCurve ofCircularArc() {
+        return UnitCurve::circularArc;
+    }
+
+    /**
+     * Creates a composable {@link UnitCurve} for {@link #parabolicValley(double, double, double)}.
+     *
+     * @param vertexOffset normalized vertex position in {@code [0.0, 1.0]}
+     * @param floor        minimum value at vertex in {@code [0.0, 1.0]}
+     * @return parabolic valley curve operator
+     */
+    static UnitCurve ofParabolicValley(double vertexOffset, double floor) {
+        return t -> parabolicValley(t, vertexOffset, floor);
     }
 
     @Override

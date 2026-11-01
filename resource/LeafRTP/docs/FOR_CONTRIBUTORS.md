@@ -1,0 +1,55 @@
+# Start Here — Core Contributors
+
+**Current Plugin Version:** `@version@`
+
+This page guides developers who contribute to `rtp-core`, `rtp-api`, or a platform adapter module.
+If you are fixing a bug, adding a feature, or updating the architecture, start here.
+
+---
+
+## Recommended Reading Order
+
+### 1. [CONTRIBUTING.md](https://github.com/dailystruggle/RTP/blob/V3/CONTRIBUTING.md)
+Build instructions, code style rules, branch naming, the four-step requirement workflow, and CI expectations.
+Read this before opening a pull request.
+
+### 2. [ARCHITECTURE.md](../../../docs/dev/ARCHITECTURE.md)
+Module breakdown and architectural boundaries: what belongs in `rtp-core`, `rtp-api`, and each platform adapter.
+The architecture tests in `RTPArchitectureTest.java` enforce these boundaries — know them before writing code.
+
+### 3. [CONCEPTS.md](dev/CONCEPTS.md)
+Plain-language explanation of the teleport pipeline, queue system, and bounded selection algorithm.
+Useful context before diving into the implementation.
+
+### 4. [DESIGN.md](dev/DESIGN.md)
+Deep-dive into bounded execution, the `CountBoundTaskPipe`, `MemoryTracker`, and fault-tolerance contracts.
+The authoritative source on *why* the core is structured the way it is.
+
+### 5. [REQUIREMENTS.md](dev/REQUIREMENTS.md)
+Functional, non-functional, and architectural requirements with unique `REQ-*` IDs.
+Every new feature or fix must trace to an existing requirement or introduce a new one.
+
+### 6. [TRACEABILITY.md](dev/TRACEABILITY.md)
+The requirement → design decision → implementing class → test matrix.
+The `scripts/check_traceability.sh` CI script fails if any `REQ-*` ID lacks a row here — add the row before pushing.
+
+### 7. [STAKEHOLDERS.md](dev/STAKEHOLDERS.md)
+Actor definitions and their goals. Keeps requirements grounded in real user needs.
+
+### 8. [GLOSSARY.md](dev/GLOSSARY.md)
+Definitions for every domain term. Use these exact terms in code, comments, and commit messages for consistency.
+
+### 9. [docs/adr/](adr/README.md)
+Architecture Decision Records — the *why* behind key design choices and the alternatives that were rejected.
+Read the relevant ADRs before changing anything the decisions describe.
+
+### 10. [PULL_REQUEST_PROCESS.md](../../../docs/dev/PULL_REQUEST_PROCESS.md)
+The end-to-end pull request lifecycle: branching conventions, local pre-PR verification gates, CI pipeline anatomy, and definition of ready to merge.
+
+---
+
+## Reference Material
+
+- [PULL_REQUEST_PROCESS.md](../../../docs/dev/PULL_REQUEST_PROCESS.md) — pull request lifecycle, pre-PR verification checklist, and CI pipeline reference.
+- [HAZARDS.md](dev/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
+- [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/resource/LeafRTP/CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.

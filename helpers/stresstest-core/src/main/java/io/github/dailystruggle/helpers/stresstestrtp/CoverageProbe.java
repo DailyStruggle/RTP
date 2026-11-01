@@ -25,7 +25,7 @@ import java.util.zip.ZipFile;
 
 /**
  * Reads and resets the JaCoCo agent's execution data in this JVM and writes
- * the reached probes per class as JSON (ADR-111 section 2.6, ADR-122 Decision 1 & 5).
+ * the reached probes per class as JSON (ADR-111 section 2.6, ADR-122 Decision 1 and 5).
  * Probes are booleans, so the output records reached indices only, with no hit counts.
  */
 public final class CoverageProbe {

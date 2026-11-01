@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: MIT
+// database-api -- zero-dependency SQL connection pooling, dialect abstraction,
+// and RESP2 Redis client/pub-sub SDK module (ADR-113, ADR-115, leafrtp-ADR-079).
+// Pure Java 17 (java.base + java.sql): no Minecraft, Bukkit, or RTP domain dependencies.
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withJavadocJar()
+    withSourcesJar()
+}
+
+dependencies {
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+    testImplementation rootProject.libs.jazzer.junit
+    testRuntimeOnly 'com.h2database:h2:2.2.224'
+    testRuntimeOnly 'org.xerial:sqlite-jdbc:3.45.1.0'
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}
+
+test {
+    useJUnitPlatform()
+}

@@ -1,12 +1,14 @@
 package io.github.dailystruggle.rtp.common.predict;
 
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleSupplier;
+import java.util.function.IntUnaryOperator;
 
 /**
- * Deterministic and {@link ThreadLocalRandom}-backed continuous distribution samplers over
- * {@code [0.0, 1.0)} and integer index ranges {@code [0, range)}.
+ * Deterministic and {@link ThreadLocalRandom}-backed continuous and discrete distribution samplers
+ * over {@code [0.0, 1.0)} and integer index ranges {@code [0, range)}.
  *
  * <p>Provides:
  * <ul>
@@ -15,11 +17,18 @@ import java.util.function.DoubleSupplier;
  *   <li>Two-sided rejection-folded truncated Gaussian sampling with radial area-exponent
  *       correction ({@link #sampleTruncatedNormal(double, double, double, DoubleSupplier, DoubleSupplier)}),
  *       matching {@code NormalMemoryShape.sample} (ADR-001, ADR-009).</li>
- *   <li>Deterministic 64-bit FNV-1a + SplitMix64 seed derivation
- *       ({@link #variantSeed(String, long)}).</li>
+ *   <li>Discrete weighted inverse-CDF index sampling ({@link #sampleWeightedIndex(int[], IntUnaryOperator)}),
+ *       LCM pool weight spreading ({@link #spreadPoolWeight(int, int)}), and bounded pool weight
+ *       normalization ({@link #normalizePoolWeights(int[], int)}).</li>
+ *   <li>Deterministic 64-bit FNV-1a + SplitMix64 seed derivation ({@link #variantSeed(String, long)})
+ *       and 2D jittered structure-grid cell sampling ({@link #gridCellSample(int, int, int, long, int)}).</li>
  * </ul>
  *
  * <p>Zero external dependencies (REQ-PRED-NF-001, REQ-PRED-NF-002, ADR-115).
+ *
+ * @governedBy ADR-001
+ * @governedBy ADR-009
+ * @governedBy ADR-115
  */
 public final class DistributionSampler {
 
@@ -29,11 +38,19 @@ public final class DistributionSampler {
      */
     public static final int MAX_REJECTION_ATTEMPTS = 64;
 
+    /**
+     * Least common multiple of {@code 1..10} ({@code 2520}), used to spread a parent definition's
+     * placement weight evenly across {@code count} variants without rounding bias.
+     */
+    public static final int LCM_1_TO_10 = 2520;
+
     private static final long FNV1A_64_OFFSET_BASIS = 0xCBF29CE484222325L;
     private static final long FNV1A_64_PRIME = 0x00000100000001B3L;
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
     private static final long SPLITMIX_MUL_1 = 0xBF58476D1CE4E5B9L;
     private static final long SPLITMIX_MUL_2 = 0x94D049BB133111EBL;
+    private static final long GRID_CELL_PRIME_X = 341873128712L;
+    private static final long GRID_CELL_PRIME_Z = 132897987541L;
 
     private DistributionSampler() {
     }
@@ -213,5 +230,110 @@ public final class DistributionSampler {
         z = (z ^ (z >>> 30)) * SPLITMIX_MUL_1;
         z = (z ^ (z >>> 27)) * SPLITMIX_MUL_2;
         return z ^ (z >>> 31);
+    }
+
+    /**
+     * Samples a discrete index in {@code [0, weights.length)} with probability proportional to
+     * {@code max(0, weights[i])} using inverse-CDF roulette-wheel selection.
+     *
+     * @param weights       non-negative candidate weights
+     * @param boundedRandom random integer generator mapping {@code bound -> [0, bound)} (e.g. {@code rng::nextInt})
+     * @return selected index in {@code [0, weights.length)}, or {@code -1} if {@code weights} is
+     *         {@code null}, empty, or has zero total positive weight
+     */
+    public static int sampleWeightedIndex(int[] weights, IntUnaryOperator boundedRandom) {
+        Objects.requireNonNull(boundedRandom, "boundedRandom");
+        if (weights == null || weights.length == 0) {
+            return -1;
+        }
+        int totalWeight = 0;
+        for (int w : weights) {
+            if (w > 0) {
+                totalWeight += w;
+            }
+        }
+        if (totalWeight <= 0) {
+            return -1;
+        }
+        int r = boundedRandom.applyAsInt(totalWeight);
+        int current = 0;
+        for (int i = 0; i < weights.length; i++) {
+            int w = Math.max(0, weights[i]);
+            current += w;
+            if (r < current) {
+                return i;
+            }
+        }
+        return weights.length - 1;
+    }
+
+    /**
+     * Computes the per-variant pool weight {@code max(1, max(1, weight) * 2520 / max(1, variantCount))}
+     * so that {@code variantCount} variants together carry total weight proportional to
+     * {@code weight} regardless of how many variants are baked.
+     *
+     * @param weight       parent definition placement weight ({@code >= 1})
+     * @param variantCount number of variants splitting the parent weight ({@code >= 1})
+     * @return scaled per-variant weight {@code >= 1}
+     */
+    public static int spreadPoolWeight(int weight, int variantCount) {
+        return Math.max(1, Math.max(1, weight) * LCM_1_TO_10 / Math.max(1, variantCount));
+    }
+
+    /**
+     * Scales an array of positive pool weights proportionally so the maximum weight fits within
+     * {@code [1, maxWeight]} while clamping every entry to {@code >= 1}.
+     *
+     * @param weights   raw pool weights (may be {@code null} or empty)
+     * @param maxWeight inclusive upper bound (e.g. {@code 150} for Minecraft template pools)
+     * @return normalized weights in {@code [1, max(1, maxWeight)]}
+     */
+    public static int[] normalizePoolWeights(int[] weights, int maxWeight) {
+        if (weights == null || weights.length == 0) {
+            return new int[0];
+        }
+        int cap = Math.max(1, maxWeight);
+        int highest = 1;
+        for (int w : weights) {
+            if (w > highest) {
+                highest = w;
+            }
+        }
+        int[] out = new int[weights.length];
+        if (highest <= cap) {
+            for (int i = 0; i < weights.length; i++) {
+                out[i] = Math.max(1, weights[i]);
+            }
+            return out;
+        }
+        double scale = (double) cap / highest;
+        for (int i = 0; i < weights.length; i++) {
+            int scaled = (int) Math.round(weights[i] * scale);
+            out[i] = Math.min(cap, Math.max(1, scaled));
+        }
+        return out;
+    }
+
+    /**
+     * Computes the deterministic jittered target chunk coordinates {@code [targetChunkX, targetChunkZ]}
+     * for the structure-grid cell of size {@code spacing} containing {@code (chunkX, chunkZ)}.
+     *
+     * @param chunkX    chunk X coordinate
+     * @param chunkZ    chunk Z coordinate
+     * @param spacing   grid cell spacing in chunks (clamped to {@code >= 1})
+     * @param worldSeed world seed
+     * @param salt      per-structure or per-species salt
+     * @return two-element array {@code [targetChunkX, targetChunkZ]} inside the grid cell
+     */
+    public static int[] gridCellSample(int chunkX, int chunkZ, int spacing, long worldSeed, int salt) {
+        int s = Math.max(1, spacing);
+        int cellX = Math.floorDiv(chunkX, s);
+        int cellZ = Math.floorDiv(chunkZ, s);
+        long cellSeed = worldSeed + cellX * GRID_CELL_PRIME_X + cellZ * GRID_CELL_PRIME_Z + salt;
+        Random cellRandom = new Random(cellSeed);
+        return new int[] {
+            cellX * s + cellRandom.nextInt(s),
+            cellZ * s + cellRandom.nextInt(s)
+        };
     }
 }

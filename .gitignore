@@ -136,12 +136,14 @@ run/
 
 src/test/java/commonTestImpl/TestRTPServerAccessor.java
 /.gradle/
+**/.gradle/
 /build/
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
 !gradlew
 !gradlew.bat
 rtp-core/database/regionData/testRegion.fill
+resource/LeafRTP/rtp-core/database/regionData/testRegion.fill
 tmp.txt
 test_output.txt
 .output.txt
@@ -155,7 +157,7 @@ java_pid*.hprof
 /archive_rtp.html
 
 # Loom (Fabric) per-module gradle cache
-platforms/rtp-fabric/**/.gradle/
+platforms/fabric/**/.gradle/
 
 # StressTestRTP raw run data and analysis artifacts (not source)
 helpers/StressTestRTP/runs_analysis/input/
@@ -205,9 +207,13 @@ package-lock.json
 /*.png
 rtp-core/*.png
 rtp-core/docs/
+resource/LeafRTP/rtp-core/*.png
+resource/LeafRTP/rtp-core/docs/
 # Nested module path and plugin data dir produced when a test runs with rtp-core/ as cwd
 rtp-core/rtp-core/
 rtp-core/plugins/
+resource/LeafRTP/rtp-core/rtp-core/
+resource/LeafRTP/rtp-core/plugins/
 
 # Stray devstack artifacts (renamed lockfile copies, jars parked by audits)
 devstack/clients/package-lock.json.*
