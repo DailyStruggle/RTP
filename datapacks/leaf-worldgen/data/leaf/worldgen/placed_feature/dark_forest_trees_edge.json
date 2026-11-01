@@ -1,9 +1,0 @@
-{
-  "feature": "leaf:dark_forest_trees_edge",
-  "placement": [
-    { "type": "minecraft:count", "count": 4 },
-    { "type": "minecraft:in_square" },
-    { "type": "minecraft:heightmap", "heightmap": "OCEAN_FLOOR" },
-    { "type": "minecraft:biome" }
-  ]
-}
