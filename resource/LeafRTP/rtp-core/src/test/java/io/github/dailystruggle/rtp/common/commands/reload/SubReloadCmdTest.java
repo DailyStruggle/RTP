@@ -5,6 +5,8 @@ import static org.mockito.Mockito.*;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
+import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,11 +19,12 @@ public class SubReloadCmdTest {
     @TempDir
     Path tempDir;
 
+    private MockRTPServerAccessor accessor;
     private SubReloadCmd<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> cmd;
 
     @BeforeEach
     void setUp() {
-        RTPTestSetup.install(tempDir.toFile());
+        accessor = RTPTestSetup.install(tempDir.toFile());
         cmd = new SubReloadCmd<>(
                 null,
                 "performance",
@@ -79,13 +82,28 @@ public class SubReloadCmdTest {
 
     @Test
     void subReload_rejectsWhenReloadAlreadyInProgress() {
-        FactoryValue<?> parser = ActiveConfigs.get().getParser(
+        FactoryValue<?> singleParser = ActiveConfigs.get().getParser(
                 io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
-        assumeNotNull(parser);
+        FactoryValue<?> multiParser = ActiveConfigs.get().getParser(
+                io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
+        assumeNotNull(singleParser);
+        assumeNotNull(multiParser);
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "subreload-busy", null);
+        accessor.addPlayer(player);
         io.github.dailystruggle.rtp.common.RTP.reloading.set(true);
         try {
-            assertFalse(cmd.subReload(UUID.randomUUID(), parser),
-                    "Concurrent subReload while RTP.reloading is true must be rejected");
+            assertFalse(cmd.subReload(senderId, singleParser),
+                    "Concurrent single subReload while RTP.reloading is true must be rejected");
+            assertFalse(cmd.subReload(senderId, multiParser),
+                    "Concurrent multi subReload while RTP.reloading is true must be rejected");
+            assertEquals(2, player.sentMessages.stream()
+                    .filter(m -> m != null && m.toLowerCase().contains("already"))
+                    .count(),
+                    "Both single and multi subReload rejections must send alreadyReloading");
+            assertTrue(accessor.logMessages.stream()
+                    .anyMatch(l -> l.contains("WARNING") && l.contains("reload is already running")),
+                    "Sub-reload rejection must be logged at WARNING");
         } finally {
             io.github.dailystruggle.rtp.common.RTP.reloading.set(false);
         }

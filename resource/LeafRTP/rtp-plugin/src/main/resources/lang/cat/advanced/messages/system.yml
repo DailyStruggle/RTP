@@ -17,6 +17,7 @@ new_box: "&b[P0] sniffed a new box '[world]'"
 # placeholder: [filename] - name of file
 grooming: "&b[P0] grooming [filename]..."
 groomed_complete: "&b[P0] finished grooming [filename]."
+alreadyReloading: "&c[P0] Another kitty is already grooming the setup scrolls."
 reloadFailed: "&c[P0] Could not re-lick the setup scrolls. Peek at the tall-human console log."
 reloadRejected: "&c[P0] Grooming hissed away: [count] hairball(s) in setup; keeping current purr-ferences. First: [code] in [source] at [path]. Details: /rtp test subsystem=config"
 rearranging_whiskers: "&a[P0] rearranging [filename]..."

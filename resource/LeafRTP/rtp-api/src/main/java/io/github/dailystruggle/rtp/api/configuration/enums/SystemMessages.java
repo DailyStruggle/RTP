@@ -18,6 +18,8 @@ public enum SystemMessages {
   reloading,
   /** Sent to the command sender when a configuration reload completes successfully. */
   reloaded,
+  /** Sent when a configuration reload is requested while another reload is already running. */
+  alreadyReloading,
   /** Sent to the command sender when a configuration reload fails. */
   reloadFailed,
   /**

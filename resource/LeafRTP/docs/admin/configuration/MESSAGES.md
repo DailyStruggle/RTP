@@ -71,6 +71,7 @@ Feedback sent to the sender of `/rtp reload` (and `/rtp reload <file>`). `reload
 |---|---|---|
 | `reloading` | The reload started. | `[filename]` |
 | `reloaded` | The reload finished and the new config is active. | `[filename]` |
+| `alreadyReloading` | A reload was started while another reload is already in progress. | - |
 | `reloadFailed` | The reload threw an error. The cause is logged at `SEVERE` in the server log. | - |
 | `reloadRejected` | The configuration checks ([BIT.md](BIT.md)) found an `ERROR`; nothing was swapped and the running config is kept. Run `/rtp test subsystem=config` for the full list. | `[count]` error count; `[code]`, `[source]`, `[path]` of the first error |
 

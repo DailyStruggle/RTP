@@ -62,5 +62,6 @@ class MessageEnumsTest {
         // Guard a couple of stable, documented keys against accidental rename.
         assertEquals("scanStart", CommandMessages.valueOf("scanStart").name());
         assertNotNull(CommandMessages.menuInvalid);
+        assertEquals("alreadyReloading", SystemMessages.valueOf("alreadyReloading").name());
     }
 }

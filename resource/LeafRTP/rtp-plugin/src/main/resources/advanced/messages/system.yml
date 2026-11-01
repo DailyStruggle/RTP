@@ -21,6 +21,7 @@ newWorld: "&b[P0] detected a new world '[world]'"
 # placeholder: [filename] - name of file
 reloading: "&b[P0] loading [filename]..."
 reloaded: "&b[P0] successfully loaded [filename]."
+alreadyReloading: "&c[P0] A configuration reload is already in progress."
 reloadFailed: "&c[P0] Failed to reload configs. Check the server log."
 # Sent when /rtp reload (or Hot-Apply) is rejected by config PBIT; the running config is kept.
 # Placeholders: [count] error count, [code] [source] [path] of the first error.

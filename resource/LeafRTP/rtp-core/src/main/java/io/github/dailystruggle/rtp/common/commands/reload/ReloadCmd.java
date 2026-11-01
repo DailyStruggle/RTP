@@ -80,7 +80,15 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
 
-    RTP.reloading.set(true);
+    if (!RTP.reloading.compareAndSet(false, true)) {
+      String busy =
+          msg(
+              SystemMessages.alreadyReloading,
+              "&c[P0] A configuration reload is already in progress.");
+      if (!busy.isEmpty()) RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, busy);
+      RTPRuntime.log(Level.WARNING, "[RTP] /rtp reload rejected: a reload is already running");
+      return true;
+    }
 
     String msg = msg(SystemMessages.reloading, "");
     if (!msg.isEmpty()) {
