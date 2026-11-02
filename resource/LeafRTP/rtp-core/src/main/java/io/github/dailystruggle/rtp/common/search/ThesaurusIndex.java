@@ -18,6 +18,12 @@ import java.util.logging.Level;
  * <p>Provides bidirectional concept-to-keys and key-to-concepts mappings,
  * query token expansion with typo tolerance, and concept grouping for foreign
  * config importers, permission derivation, and in-game config search.
+ *
+ * @governedBy ADR-066
+ * @governedBy ADR-104
+ * @governedBy ADR-115
+ * @trace REQ-RTP-F-013
+ * @trace REQ-RTP-F-014
  */
 public final class ThesaurusIndex {
 
@@ -77,10 +83,10 @@ public final class ThesaurusIndex {
             }
 
             if (synonymsSection != null) {
+                populate(synonymsSection, conceptMap, keyMap);
                 if (THESAURUS_RESOURCE.equals(resourcePath)) {
                     seedFromSharedThesaurus(conceptMap, keyMap);
                 }
-                populate(synonymsSection, conceptMap, keyMap);
             }
         } catch (IOException | RuntimeException e) {
             RTPRuntime.log(Level.FINE, "[RTP] thesaurus resource unreadable (" + resourcePath + "): " + e);
@@ -142,7 +148,9 @@ public final class ThesaurusIndex {
                                  Map<String, Set<String>> keyMap) {
         for (Map.Entry<?, ?> e : rawSynonyms.entrySet()) {
             if (!(e.getKey() instanceof String word) || word.isBlank()) continue;
-            String normWord = FuzzySearchEngine.normalize(word);
+            String normWord = containsNonLatinChar(word)
+                    ? SearchThesaurus.normalizeUnicodeToken(word)
+                    : FuzzySearchEngine.normalize(word);
             if (normWord.isEmpty()) continue;
 
             Set<String> keys = conceptMap.computeIfAbsent(normWord, k -> new LinkedHashSet<>());
@@ -280,13 +288,40 @@ public final class ThesaurusIndex {
 
         for (Map.Entry<String, Set<String>> entry : conceptToKeys.entrySet()) {
             String word = entry.getKey();
-            if (word.isEmpty()) continue;
+            Set<String> entryKeys = entry.getValue();
+            if (word.isEmpty() || containsNonLatinChar(word) || entryKeys.isEmpty()) continue;
+            Iterator<String> it = entryKeys.iterator();
+            String firstKey = it.next();
+            String secondKey = it.hasNext() ? it.next() : "";
+
+            List<String> matchedConcepts = new ArrayList<>();
             for (Map.Entry<String, Set<String>> c : canonicalMap.entrySet()) {
-                for (String key : entry.getValue()) {
+                for (String key : entryKeys) {
                     if (c.getValue().contains(key)) {
-                        terms.get(c.getKey()).add(word);
+                        matchedConcepts.add(c.getKey());
                         break;
                     }
+                }
+            }
+            if (matchedConcepts.isEmpty()) continue;
+
+            for (Map.Entry<String, Set<String>> c : canonicalMap.entrySet()) {
+                Set<String> canonicalKeys = c.getValue();
+                if (canonicalKeys.contains(firstKey)) {
+                    if (matchedConcepts.size() == 1
+                            || c.getKey().equals(word)
+                            || canonicalKeys.contains(word)
+                            || (matchedConcepts.size() == 2
+                                    && matchedConcepts.contains("cooldown")
+                                    && matchedConcepts.contains("delay"))) {
+                        terms.get(c.getKey()).add(word);
+                    }
+                    break;
+                } else if (matchedConcepts.size() == 1
+                        && matchedConcepts.get(0).equals(c.getKey())
+                        && canonicalKeys.contains(secondKey)) {
+                    terms.get(c.getKey()).add(word);
+                    break;
                 }
             }
         }
@@ -294,5 +329,14 @@ public final class ThesaurusIndex {
         Map<String, Set<String>> frozen = new LinkedHashMap<>();
         terms.forEach((k, v) -> frozen.put(k, Set.copyOf(v)));
         return Collections.unmodifiableMap(frozen);
+    }
+
+    private static boolean containsNonLatinChar(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) > 0x024F) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -73,6 +73,7 @@ if (res != null && res.verdict() == Verdict.ACCEPT) {
 
 ## Docs
 
+- `.lca` Binary Format Interface Control Document (`LCA-ICD-1.0`): [`docs/ICD.md`](docs/ICD.md)
 - ADR-016: [`docs/adr/anvil-api-ADR-001-anvil-subsystem.md`](docs/adr/anvil-api-ADR-001-anvil-subsystem.md)
 - ADR-077: [`docs/adr/anvil-api-ADR-002-multi-format-region-support.md`](docs/adr/anvil-api-ADR-002-multi-format-region-support.md)
 - anvil-api-ADR-003: [`docs/adr/anvil-api-ADR-003-hilbert-roaring-gray-chunk-archive.md`](docs/adr/anvil-api-ADR-003-hilbert-roaring-gray-chunk-archive.md)

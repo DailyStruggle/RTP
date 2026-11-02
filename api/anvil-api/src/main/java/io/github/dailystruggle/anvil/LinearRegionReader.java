@@ -410,6 +410,7 @@ public final class LinearRegionReader implements RegionFileReader, BuiltInTestab
                     throw new CorruptRegionEntryException("BufferedLinear v3 invalid bucket lengths: orig="
                             + originalLen + " comp=" + compressedLen);
                 }
+                // Off-thread in-memory bucket parse (REQ-RTP-S-005: regionBytes is already pre-loaded on the async Anvil I/O pool)
                 byte[] bucketRaw = DynamicZstdBinding.decompress(
                         regionBytes, (int) bucketOffset + 8, compressedLen, Math.max(originalLen, 256));
                 ByteBuffer bucketBuf = ByteBuffer.wrap(bucketRaw);
@@ -422,22 +423,52 @@ public final class LinearRegionReader implements RegionFileReader, BuiltInTestab
                     if (sectionSize <= 0) {
                         continue;
                     }
-                    if (sectionSize < 16 || sectionSize > bucketBuf.remaining()) {
+                    int minSectionHeaderBytes = 8;
+                    if (sectionSize < minSectionHeaderBytes || sectionSize > bucketBuf.remaining()) {
                         throw new CorruptRegionEntryException("BufferedLinear v3 invalid chunk section size: " + sectionSize);
                     }
-                    int chunkLen = bucketBuf.getInt();
-                    bucketBuf.getLong(); // timestamp
-                    bucketBuf.getInt(); // xxHash32
-                    int bodyBytes = sectionSize - 16;
-                    if (chunkLen < 0 || chunkLen != bodyBytes || chunkLen > MAX_DECOMPRESSED_CHUNK_BYTES) {
-                        throw new CorruptRegionEntryException("BufferedLinear v3 chunk length mismatch: "
-                                + chunkLen + " vs " + bodyBytes);
+                    int sectionStart = bucketBuf.position();
+                    int firstWord = bucketBuf.getInt();
+                    int chunkLen;
+                    if (sectionSize >= 16 && firstWord == sectionSize - 16) {
+                        // Direct uncompressed [int chunkLen, long timestamp, int xxHash32, byte[] nbt]
+                        chunkLen = firstWord;
+                        bucketBuf.getLong(); // timestamp
+                        bucketBuf.getInt(); // xxHash32
+                        if (chunkLen < 0 || chunkLen > MAX_DECOMPRESSED_CHUNK_BYTES) {
+                            throw new CorruptRegionEntryException("BufferedLinear v3 chunk length out of bounds: " + chunkLen);
+                        }
+                        chunkSizes[chunkIndex] = chunkLen;
+                        chunkOffsets[chunkIndex] = currentOffset;
+                        payloadOut.write(bucketRaw, bucketBuf.position(), chunkLen);
+                        bucketBuf.position(sectionStart + sectionSize);
+                        currentOffset += chunkLen;
+                    } else {
+                        // CompressingOps LZ4 wrapper: [int uncompressedFrameLen (16 + nbtLen), byte[sectionSize - 4] lz4Block]
+                        int uncompressedFrameLen = firstWord;
+                        int lz4CompLen = sectionSize - 4;
+                        if (uncompressedFrameLen < 16 || uncompressedFrameLen > MAX_DECOMPRESSED_CHUNK_BYTES + 16) {
+                            throw new CorruptRegionEntryException("BufferedLinear v3 invalid inner LZ4 frame length: "
+                                    + uncompressedFrameLen + " (sectionSize=" + sectionSize + ")");
+                        }
+                        byte[] frameBytes = new byte[uncompressedFrameLen];
+                        Lz4BlockDecoder.decodeBlock(bucketRaw, bucketBuf.position(), lz4CompLen, frameBytes, 0, uncompressedFrameLen);
+                        bucketBuf.position(sectionStart + sectionSize);
+                        ByteBuffer frameBuf = ByteBuffer.wrap(frameBytes);
+                        int rawLenField = frameBuf.getInt();
+                        frameBuf.getLong(); // timestamp
+                        frameBuf.getInt(); // xxHash32
+                        int bodyBytes = uncompressedFrameLen - 16;
+                        chunkLen = (rawLenField == uncompressedFrameLen) ? bodyBytes : rawLenField;
+                        if (chunkLen < 0 || chunkLen != bodyBytes || chunkLen > MAX_DECOMPRESSED_CHUNK_BYTES) {
+                            throw new CorruptRegionEntryException("BufferedLinear v3 inner LZ4 chunk length mismatch: "
+                                    + rawLenField + " vs " + bodyBytes);
+                        }
+                        chunkSizes[chunkIndex] = chunkLen;
+                        chunkOffsets[chunkIndex] = currentOffset;
+                        payloadOut.write(frameBytes, 16, chunkLen);
+                        currentOffset += chunkLen;
                     }
-                    chunkSizes[chunkIndex] = chunkLen;
-                    chunkOffsets[chunkIndex] = currentOffset;
-                    payloadOut.write(bucketRaw, bucketBuf.position(), chunkLen);
-                    bucketBuf.position(bucketBuf.position() + chunkLen);
-                    currentOffset += chunkLen;
                 }
             }
         } else if (version == 2) {
@@ -455,22 +486,48 @@ public final class LinearRegionReader implements RegionFileReader, BuiltInTestab
                 if (sectionSize <= 0) {
                     continue;
                 }
-                if (sectionSize < 16 || sectionSize > streamBuf.remaining()) {
+                if (sectionSize < 8 || sectionSize > streamBuf.remaining()) {
                     throw new CorruptRegionEntryException("BufferedLinear v2 invalid section size: " + sectionSize);
                 }
-                int chunkLen = streamBuf.getInt();
-                streamBuf.getLong(); // timestamp
-                streamBuf.getInt(); // xxHash32
-                int bodyBytes = sectionSize - 16;
-                if (chunkLen < 0 || chunkLen != bodyBytes || chunkLen > MAX_DECOMPRESSED_CHUNK_BYTES) {
-                    throw new CorruptRegionEntryException("BufferedLinear v2 chunk length mismatch: "
-                            + chunkLen + " vs " + bodyBytes);
+                int sectionStart = streamBuf.position();
+                int firstWord = streamBuf.getInt();
+                if (sectionSize >= 16 && firstWord == sectionSize - 16) {
+                    int chunkLen = firstWord;
+                    streamBuf.getLong(); // timestamp
+                    streamBuf.getInt(); // xxHash32
+                    if (chunkLen < 0 || chunkLen > MAX_DECOMPRESSED_CHUNK_BYTES) {
+                        throw new CorruptRegionEntryException("BufferedLinear v2 chunk length out of bounds: " + chunkLen);
+                    }
+                    chunkSizes[chunkIndex] = chunkLen;
+                    chunkOffsets[chunkIndex] = currentOffset;
+                    payloadOut.write(streamRaw, streamBuf.position(), chunkLen);
+                    streamBuf.position(sectionStart + sectionSize);
+                    currentOffset += chunkLen;
+                } else {
+                    int uncompressedFrameLen = firstWord;
+                    int lz4CompLen = sectionSize - 4;
+                    if (uncompressedFrameLen < 16 || uncompressedFrameLen > MAX_DECOMPRESSED_CHUNK_BYTES + 16) {
+                        throw new CorruptRegionEntryException("BufferedLinear v2 invalid inner LZ4 frame length: "
+                                + uncompressedFrameLen + " (sectionSize=" + sectionSize + ")");
+                    }
+                    byte[] frameBytes = new byte[uncompressedFrameLen];
+                    Lz4BlockDecoder.decodeBlock(streamRaw, streamBuf.position(), lz4CompLen, frameBytes, 0, uncompressedFrameLen);
+                    streamBuf.position(sectionStart + sectionSize);
+                    ByteBuffer frameBuf = ByteBuffer.wrap(frameBytes);
+                    int rawLenField = frameBuf.getInt();
+                    frameBuf.getLong(); // timestamp
+                    frameBuf.getInt(); // xxHash32
+                    int bodyBytes = uncompressedFrameLen - 16;
+                    int chunkLen = (rawLenField == uncompressedFrameLen) ? bodyBytes : rawLenField;
+                    if (chunkLen < 0 || chunkLen != bodyBytes || chunkLen > MAX_DECOMPRESSED_CHUNK_BYTES) {
+                        throw new CorruptRegionEntryException("BufferedLinear v2 inner LZ4 chunk length mismatch: "
+                                + rawLenField + " vs " + bodyBytes);
+                    }
+                    chunkSizes[chunkIndex] = chunkLen;
+                    chunkOffsets[chunkIndex] = currentOffset;
+                    payloadOut.write(frameBytes, 16, chunkLen);
+                    currentOffset += chunkLen;
                 }
-                chunkSizes[chunkIndex] = chunkLen;
-                chunkOffsets[chunkIndex] = currentOffset;
-                payloadOut.write(streamRaw, streamBuf.position(), chunkLen);
-                streamBuf.position(streamBuf.position() + chunkLen);
-                currentOffset += chunkLen;
             }
         } else {
             throw new CorruptRegionEntryException("Unsupported BufferedLinear version: " + version);

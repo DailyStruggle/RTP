@@ -32,7 +32,7 @@ import java.util.zip.DeflaterOutputStream;
  * and Copy-on-Write (`CoW`) live-save slab allocator (`anvil-api-ADR-003` Sections 2.3, 3.1, 4, 5).
  *
  * <p>Manages the `256-byte` sub-slab pool via a size-indexed {@link TreeMap} free-list and a
- * dynamically shape-able shared `BlockState` & `Biome` dictionary (`nextSegmentLinkTrailer`),
+ * dynamically shape-able shared `BlockState` and `Biome` dictionary (`nextSegmentLinkTrailer`),
  * guaranteeing tear-free concurrent reads (`CBIT T8`) and `95%+` slab reuse across incremental saves.</p>
  *
  * @governedBy anvil-api-ADR-003
@@ -64,14 +64,22 @@ public final class LcaRegionWriter {
         if (MODE_B_FALLBACK_LOGGED.compareAndSet(false, true)) {
             java.util.logging.Logger.getLogger(LcaRegionWriter.class.getName()).log(
                     java.util.logging.Level.WARNING,
-                    "[LeafAnvil] Mode B (Zstd-1) was requested, but no Zstd runtime is available ({0}); gracefully falling back to Mode A (0-LZ).",
+                    "[LeafAnvil] Mode B (Zstd) was requested, but no Zstd runtime is available ({0}); gracefully falling back to Mode A (0-LZ).",
                     DynamicZstdBinding.pbitResult().diagnosticMessage());
         }
         return false;
     }
 
+    static int normalizeZstdLevel(int zstdLevel) {
+        return zstdLevel <= 0 ? 0 : Math.min(22, zstdLevel);
+    }
+
     static byte[] compressZstd1(byte[] raw) throws IOException {
         return LcaSectionCodec.compressZstd1(raw);
+    }
+
+    static byte[] compressZstd(byte[] raw, int zstdLevel) throws IOException {
+        return LcaSectionCodec.compressZstd(raw, zstdLevel);
     }
 
     /**
@@ -79,7 +87,15 @@ public final class LcaRegionWriter {
      * `modeBZstd == false`, or `Mode B: + Zstd-1` when `modeBZstd == true`).
      */
     public static byte[] transcodeFromMca(byte[] mcaBytes, int regionX, int regionZ, boolean modeBZstd) throws IOException {
-        return transcodeFromReader(AnvilReader.INSTANCE, mcaBytes, regionX, regionZ, modeBZstd);
+        int level = modeBZstd ? 1 : 0;
+        return transcodeFromReader(AnvilReader.INSTANCE, mcaBytes, regionX, regionZ, level);
+    }
+
+    /**
+     * Transcodes a vanilla `.mca` region buffer into `.lca` at the specified `zstdLevel` (`0` for Mode A `0-LZ`, `1..22` for Mode B; `ADR-115`, `S-005` off-thread).
+     */
+    public static byte[] transcodeFromMca(byte[] mcaBytes, int regionX, int regionZ, int zstdLevel) throws IOException {
+        return transcodeFromReader(AnvilReader.INSTANCE, mcaBytes, regionX, regionZ, zstdLevel);
     }
 
     /**
@@ -90,7 +106,17 @@ public final class LcaRegionWriter {
             RegionFileReader reader, byte[] srcBytes, int regionX, int regionZ, boolean modeBZstd
     ) throws IOException {
         return transcodeFromReader(
-                reader, srcBytes, regionX, regionZ, modeBZstd, LcaRegionReader.STORAGE_KIND_REGION_VOXEL);
+                reader, srcBytes, regionX, regionZ, modeBZstd ? 1 : 0, LcaRegionReader.STORAGE_KIND_REGION_VOXEL);
+    }
+
+    /**
+     * Transcodes all generated chunks from any {@link RegionFileReader} into `.lca` at `zstdLevel` (`ADR-115`, `S-005` off-thread).
+     */
+    public static byte[] transcodeFromReader(
+            RegionFileReader reader, byte[] srcBytes, int regionX, int regionZ, int zstdLevel
+    ) throws IOException {
+        return transcodeFromReader(
+                reader, srcBytes, regionX, regionZ, zstdLevel, LcaRegionReader.STORAGE_KIND_REGION_VOXEL);
     }
 
     /**
@@ -104,6 +130,17 @@ public final class LcaRegionWriter {
             int regionX,
             int regionZ,
             boolean modeBZstd,
+            int storageKind
+    ) throws IOException {
+        return transcodeFromReader(reader, srcBytes, regionX, regionZ, modeBZstd ? 1 : 0, storageKind);
+    }
+
+    public static byte[] transcodeFromReader(
+            RegionFileReader reader,
+            byte[] srcBytes,
+            int regionX,
+            int regionZ,
+            int zstdLevel,
             int storageKind
     ) throws IOException {
         int minSectionY = -4;
@@ -145,7 +182,7 @@ public final class LcaRegionWriter {
 
         int sectionCount = Math.max(1, maxSectionY - minSectionY + 1);
         LcaLiveArchive archive = createEmptyLiveArchive(
-                regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, modeBZstd,
+                regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, zstdLevel,
                 storageKind, DEFAULT_ROOT_DICT_CAPACITY_BYTES);
         for (int rz = 0; rz < 32; rz++) {
             for (int rx = 0; rx < 32; rx++) {
@@ -221,6 +258,11 @@ public final class LcaRegionWriter {
      * `ChunkFrame` header + SEC-DED parity (`anvil-api-ADR-003` Section 7.1 `CBIT T3c`).
      */
     public static byte[] convertModeAToModeB(byte[] modeABytes) throws IOException {
+        return convertModeAToModeB(modeABytes, 1);
+    }
+
+    public static byte[] convertModeAToModeB(byte[] modeABytes, int zstdLevel) throws IOException {
+        int effectiveLevel = Math.max(1, Math.min(22, zstdLevel));
         LcaLiveArchive src = openLiveArchive(modeABytes);
         int secCountVal = LcaSectionCodec.readUint16BE(modeABytes, 0x18);
         int origRootDictCap = (int) ((long) LcaRegionReader.LONG_BE_VIEW.get(modeABytes, 0x20) >>> 32);
@@ -280,7 +322,7 @@ public final class LcaRegionWriter {
             byte[] slice = Arrays.copyOfRange(modeABytes, byteOff, byteOff + byteLen);
             byte[] encoded = (codec1 == 1)
                     ? slice
-                    : LcaSectionCodec.encodeModeBChunkFrameWithUncompressedHeader(slice, headerLen);
+                    : LcaSectionCodec.encodeModeBChunkFrameWithUncompressedHeader(slice, headerLen, effectiveLevel);
             modeBFrames[i] = encoded;
             gens[i] = gen8;
             currentSlab += (encoded.length + 255) >>> LcaRegionReader.SLAB_SHIFT;
@@ -377,9 +419,24 @@ public final class LcaRegionWriter {
             int storageKind,
             int rootDictCapacityBytes
     ) {
+        return createEmptyLiveArchive(
+                regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                modeBZstd ? 1 : 0, storageKind, rootDictCapacityBytes);
+    }
+
+    public static LcaLiveArchive createEmptyLiveArchive(
+            int regionX,
+            int regionZ,
+            int minSectionY,
+            int sectionCount,
+            int defaultDataVersion,
+            int zstdLevel,
+            int storageKind,
+            int rootDictCapacityBytes
+    ) {
         int alignedDictCap = Math.max(256, (rootDictCapacityBytes + 255) & ~255);
         return new LcaLiveArchive(
-                regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, modeBZstd, storageKind, alignedDictCap);
+                regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, zstdLevel, storageKind, alignedDictCap);
     }
 
     /**
@@ -397,7 +454,7 @@ public final class LcaRegionWriter {
             boolean modeBZstd
     ) throws IOException {
         return createEmptyLiveArchive(
-                lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, modeBZstd,
+                lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, modeBZstd ? 1 : 0,
                 LcaRegionReader.STORAGE_KIND_REGION_VOXEL, DEFAULT_ROOT_DICT_CAPACITY_BYTES);
     }
 
@@ -412,8 +469,24 @@ public final class LcaRegionWriter {
             int storageKind,
             int rootDictCapacityBytes
     ) throws IOException {
+        return createEmptyLiveArchive(
+                lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                modeBZstd ? 1 : 0, storageKind, rootDictCapacityBytes);
+    }
+
+    public static LcaLiveArchive createEmptyLiveArchive(
+            Path lcaFile,
+            int regionX,
+            int regionZ,
+            int minSectionY,
+            int sectionCount,
+            int defaultDataVersion,
+            int zstdLevel,
+            int storageKind,
+            int rootDictCapacityBytes
+    ) throws IOException {
         LcaLiveArchive archive = createEmptyLiveArchive(
-                regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, modeBZstd,
+                regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, zstdLevel,
                 storageKind, rootDictCapacityBytes);
         if (lcaFile != null) {
             archive.bindBackingFile(lcaFile, true);
@@ -423,7 +496,7 @@ public final class LcaRegionWriter {
 
     /**
      * Opens an existing `.lca` byte array as a mutable live archive, scanning the `1,024` pointer
-     * directory words and chained dictionary segments in `< 15 us` to populate the `TreeMap` `256B`
+     * directory words and chained dictionary segments in {@code < 15 us} to populate the `TreeMap` `256B`
      * free-slab allocator (`anvil-api-ADR-003` Section 2.3).
      */
     public static LcaLiveArchive openLiveArchive(byte[] existingLcaBytes) throws CorruptRegionEntryException {
@@ -440,6 +513,10 @@ public final class LcaRegionWriter {
      * slab pool in heap.</p>
      */
     public static LcaLiveArchive openLiveArchive(Path lcaFile) throws IOException {
+        return openLiveArchive(lcaFile, 1);
+    }
+
+    public static LcaLiveArchive openLiveArchive(Path lcaFile, int preferredZstdLevel) throws IOException {
         FileChannel ch = FileChannel.open(lcaFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
         boolean ok = false;
         try {
@@ -451,7 +528,7 @@ public final class LcaRegionWriter {
                 throw new CorruptRegionEntryException("Invalid .lca file size: " + size + " in " + lcaFile);
             }
             int validLen = (int) size;
-            LcaLiveArchive archive = new LcaLiveArchive(lcaFile, ch, validLen);
+            LcaLiveArchive archive = new LcaLiveArchive(lcaFile, ch, validLen, preferredZstdLevel);
             ok = true;
             return archive;
         } finally {
@@ -475,12 +552,27 @@ public final class LcaRegionWriter {
             boolean modeBZstd,
             int storageKind
     ) throws IOException {
+        return openOrCreateLiveArchive(
+                lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                modeBZstd ? 1 : 0, storageKind);
+    }
+
+    public static LcaLiveArchive openOrCreateLiveArchive(
+            Path lcaFile,
+            int regionX,
+            int regionZ,
+            int minSectionY,
+            int sectionCount,
+            int defaultDataVersion,
+            int zstdLevel,
+            int storageKind
+    ) throws IOException {
         if (Files.exists(lcaFile) && Files.size(lcaFile) >= LcaRegionReader.SUPERBLOCK_SIZE
                 + LcaRegionReader.POINTER_DIRECTORY_SIZE + LcaRegionReader.FOOTER_SIZE) {
-            return openLiveArchive(lcaFile);
+            return openLiveArchive(lcaFile, zstdLevel);
         }
         return createEmptyLiveArchive(
-                lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, modeBZstd,
+                lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion, zstdLevel,
                 storageKind, DEFAULT_ROOT_DICT_CAPACITY_BYTES);
     }
 
@@ -496,6 +588,7 @@ public final class LcaRegionWriter {
         private final int sectionCount;
         private final int defaultDataVersion;
         private final boolean modeBZstd;
+        private final int zstdLevel;
         private final int storageKind;
         private final int rootDictCapacityBytes;
         private final int secDedTableOffset;
@@ -588,12 +681,28 @@ public final class LcaRegionWriter {
                 int storageKind,
                 int rootDictCapacityBytes
         ) {
+            this(regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                    modeBZstd ? 1 : 0, storageKind, rootDictCapacityBytes);
+        }
+
+        LcaLiveArchive(
+                int regionX,
+                int regionZ,
+                int minSectionY,
+                int sectionCount,
+                int defaultDataVersion,
+                int zstdLevel,
+                int storageKind,
+                int rootDictCapacityBytes
+        ) {
             this.regionX = regionX;
             this.regionZ = regionZ;
             this.minSectionY = minSectionY;
             this.sectionCount = sectionCount;
             this.defaultDataVersion = defaultDataVersion;
-            this.modeBZstd = resolveEffectiveModeB(modeBZstd);
+            int normLevel = normalizeZstdLevel(zstdLevel);
+            this.modeBZstd = resolveEffectiveModeB(normLevel > 0);
+            this.zstdLevel = this.modeBZstd ? normLevel : 0;
             this.storageKind = storageKind & 0xFF;
             this.rootDictCapacityBytes = rootDictCapacityBytes;
             this.secDedTableOffset = (LcaRegionReader.DICT_ROOT_OFFSET + rootDictCapacityBytes + 255) & ~255;
@@ -627,6 +736,7 @@ public final class LcaRegionWriter {
             this.sectionCount = parsed.sectionCount;
             this.defaultDataVersion = parsed.defaultDataVersion;
             this.modeBZstd = (parsed.flags & 8) != 0;
+            this.zstdLevel = this.modeBZstd ? 1 : 0;
             this.storageKind = parsed.storageKind;
 
             long dictOffsetAndLen = (long) LcaRegionReader.LONG_BE_VIEW.get(existingBytes, 0x20);
@@ -724,6 +834,10 @@ public final class LcaRegionWriter {
         }
 
         LcaLiveArchive(Path lcaFile, FileChannel ch, int validByteLength) throws IOException {
+            this(lcaFile, ch, validByteLength, 1);
+        }
+
+        LcaLiveArchive(Path lcaFile, FileChannel ch, int validByteLength, int preferredZstdLevel) throws IOException {
             int initRead = Math.min(validByteLength, 32768);
             byte[] initBuf = new byte[initRead];
             readChannelRangeStatic(ch, 0L, initBuf, 0, initRead, lcaFile);
@@ -746,7 +860,10 @@ public final class LcaRegionWriter {
             }
             this.storageKind = initBuf[0x0A] & 0xFF;
             int flags = initBuf[0x0B] & 0xFF;
-            this.modeBZstd = (flags & 8) != 0;
+            boolean fileFlagModeB = (flags & 8) != 0;
+            int normPref = normalizeZstdLevel(preferredZstdLevel);
+            this.modeBZstd = fileFlagModeB || resolveEffectiveModeB(normPref > 0);
+            this.zstdLevel = this.modeBZstd ? (normPref > 0 ? normPref : 1) : 0;
             this.regionX = LcaSectionCodec.readIntBE(initBuf, 0x0C);
             this.regionZ = LcaSectionCodec.readIntBE(initBuf, 0x10);
             this.minSectionY = LcaSectionCodec.readIntBE(initBuf, 0x14);
@@ -1790,7 +1907,7 @@ public final class LcaRegionWriter {
         }
 
         /**
-         * Repacks all live `256B` chunk slabs contiguously without re-encoding voxels (`< 0.2 ms`),
+         * Repacks all live `256B` chunk slabs contiguously without re-encoding voxels ({@code < 0.2 ms}),
          * eliminating free-list holes and truncating the backing file to the compacted EOF.
          */
         public synchronized void compact() throws IOException {
@@ -2477,7 +2594,8 @@ public final class LcaRegionWriter {
             }
 
             if (effectiveModeB) {
-                return LcaSectionCodec.encodeModeBChunkFrameWithUncompressedHeader(chunkFrame, headerLen);
+                return LcaSectionCodec.encodeModeBChunkFrameWithUncompressedHeader(
+                        chunkFrame, headerLen, Math.max(1, zstdLevel));
             }
             return chunkFrame;
         }

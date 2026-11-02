@@ -14,11 +14,11 @@ import net.md_5.bungee.chat.ComponentSerializer;
 /**
  * Adventure-backed MiniMessage renderer for the Bukkit family.
  *
- * <p>This class is intentionally isolated from {@link SendMessage}: every symbol
+ * <p>This class is intentionally isolated from {@code SendMessage}: every symbol
  * it references in the {@code net.kyori.adventure.*} namespace is only available
  * at runtime when the host server bundles Adventure (Paper, Folia, and any
  * server forked from them). On a pure Spigot server those classes are absent, so
- * {@link SendMessage} guards every entry point with a {@code Class.forName}
+ * {@code SendMessage} guards every entry point with a {@code Class.forName}
  * availability probe and never loads this class there. Keeping the Adventure
  * imports out of {@code SendMessage} avoids a {@code NoClassDefFoundError} at
  * link time on Spigot.
@@ -27,7 +27,7 @@ import net.md_5.bungee.chat.ComponentSerializer;
  * second send path (which would require {@code adventure-platform-bukkit} and an
  * {@code Audience} lifecycle), the component is serialized to the standard
  * Minecraft chat-component JSON and re-parsed into the bungee
- * {@link BaseComponent} graph the rest of {@link SendMessage} already dispatches
+ * {@link BaseComponent} graph the rest of {@code SendMessage} already dispatches
  * via {@code spigot().sendMessage(BaseComponent[])}. This preserves full
  * MiniMessage fidelity (named/hex colours, gradients, decorations, hover, click)
  * while reusing the existing transport.

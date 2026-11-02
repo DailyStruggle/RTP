@@ -59,6 +59,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     private final int sectionCount;
     private final int defaultDataVersion;
     private final boolean modeBZstd;
+    private final int zstdLevel;
     private final boolean autoMigrateLegacy;
     private final boolean backupMigratedLegacyFiles;
     private final int maxOpenRegions;
@@ -84,7 +85,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 -4,
                 24,
                 4671,
-                true,
+                1,
                 true,
                 true,
                 DEFAULT_MAX_OPEN_REGIONS,
@@ -103,6 +104,31 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             int maxOpenRegions,
             double compactFragmentationThreshold
     ) {
+        this(
+                storageDirectory,
+                storageKind,
+                minSectionY,
+                sectionCount,
+                defaultDataVersion,
+                modeBZstd ? 1 : 0,
+                autoMigrateLegacy,
+                backupMigratedLegacyFiles,
+                maxOpenRegions,
+                compactFragmentationThreshold);
+    }
+
+    public LcaRegionFileStorage(
+            Path storageDirectory,
+            int storageKind,
+            int minSectionY,
+            int sectionCount,
+            int defaultDataVersion,
+            int zstdLevel,
+            boolean autoMigrateLegacy,
+            boolean backupMigratedLegacyFiles,
+            int maxOpenRegions,
+            double compactFragmentationThreshold
+    ) {
         if (storageDirectory == null) {
             throw new IllegalArgumentException("storageDirectory must not be null");
         }
@@ -111,7 +137,8 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         this.minSectionY = minSectionY;
         this.sectionCount = Math.max(1, sectionCount);
         this.defaultDataVersion = defaultDataVersion;
-        this.modeBZstd = modeBZstd;
+        this.zstdLevel = LcaRegionWriter.normalizeZstdLevel(zstdLevel);
+        this.modeBZstd = this.zstdLevel > 0;
         this.autoMigrateLegacy = autoMigrateLegacy;
         this.backupMigratedLegacyFiles = backupMigratedLegacyFiles;
         this.maxOpenRegions = Math.max(1, maxOpenRegions);
@@ -479,7 +506,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
             if (Files.exists(lcaFile) && Files.size(lcaFile) >= LcaRegionReader.SUPERBLOCK_SIZE
                     + LcaRegionReader.POINTER_DIRECTORY_SIZE + LcaRegionReader.FOOTER_SIZE) {
-                result = LcaRegionWriter.openLiveArchive(lcaFile);
+                result = LcaRegionWriter.openLiveArchive(lcaFile, zstdLevel);
             } else if (autoMigrateLegacy) {
                 LcaRegionWriter.LcaLiveArchive migrated = tryMigrateLegacyRegion(regionX, regionZ, lcaFile);
                 if (migrated != null) {
@@ -496,7 +523,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 }
                 result = LcaRegionWriter.createEmptyLiveArchive(
                         lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
-                        modeBZstd, storageKind, LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES);
+                        zstdLevel, storageKind, LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES);
             }
             knownMissingRegions.remove(key);
 
@@ -551,7 +578,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
 
         byte[] srcBytes = Files.readAllBytes(legacyFile);
         byte[] lcaBytes = LcaRegionWriter.transcodeFromReader(
-                legacyReader, srcBytes, regionX, regionZ, modeBZstd, storageKind);
+                legacyReader, srcBytes, regionX, regionZ, zstdLevel, storageKind);
 
         Files.createDirectories(storageDirectory);
         Path tmpFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca.tmp");
@@ -571,7 +598,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 Files.move(legacyFile, bakFile, StandardCopyOption.REPLACE_EXISTING);
             }
         }
-        return LcaRegionWriter.openLiveArchive(targetLcaFile);
+        return LcaRegionWriter.openLiveArchive(targetLcaFile, zstdLevel);
     }
 
     private void closeArchiveQuietlyWithCompaction(LcaRegionWriter.LcaLiveArchive archive) throws IOException {
@@ -797,6 +824,23 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 boolean modeBZstd,
                 boolean autoMigrateLegacy
         ) {
+            this(
+                    dimensionDirectory,
+                    minSectionY,
+                    sectionCount,
+                    defaultDataVersion,
+                    modeBZstd ? 1 : 0,
+                    autoMigrateLegacy);
+        }
+
+        public LcaWorldStorageSession(
+                Path dimensionDirectory,
+                int minSectionY,
+                int sectionCount,
+                int defaultDataVersion,
+                int zstdLevel,
+                boolean autoMigrateLegacy
+        ) {
             this.dimensionDirectory = dimensionDirectory;
             this.voxelStorage = new LcaRegionFileStorage(
                     dimensionDirectory.resolve("region"),
@@ -804,7 +848,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    modeBZstd,
+                    zstdLevel,
                     autoMigrateLegacy,
                     true,
                     DEFAULT_MAX_OPEN_REGIONS,
@@ -815,7 +859,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    modeBZstd,
+                    zstdLevel,
                     autoMigrateLegacy,
                     true,
                     DEFAULT_MAX_OPEN_REGIONS,
@@ -826,7 +870,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    modeBZstd,
+                    zstdLevel,
                     autoMigrateLegacy,
                     true,
                     DEFAULT_MAX_OPEN_REGIONS,

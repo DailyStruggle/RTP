@@ -82,6 +82,16 @@ class ThesaurusIndexTest {
 
         // Should include thesaurus synonym words mapped to price
         assertTrue(grouped.get("cost").contains("money") || grouped.get("cost").contains("dinero"));
+
+        // Multi-concept AST class entries (e.g. polygon) and mixed-script keys (e.g. центрx) must not pollute center
+        Map<String, Set<String>> rtpCanonical = Map.of(
+                "radius", Set.of("radius", "maxradius", "minradius", "centerradius", "range"),
+                "center", Set.of("center", "centerx", "centerz")
+        );
+        Map<String, Set<String>> rtpGrouped = index.getConceptTerms(rtpCanonical);
+        assertFalse(rtpGrouped.get("center").contains("polygon"));
+        assertFalse(rtpGrouped.get("center").contains("x"));
+        assertFalse(rtpGrouped.get("radius").contains("polygon"));
     }
 
     @Test
