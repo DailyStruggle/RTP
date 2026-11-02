@@ -702,6 +702,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
         }
       }
     }
+    if (world == null) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] FoliaRTPWorld#isChunkLoaded called with null native World handle");
+      return false;
+    }
     try {
       return world.isChunkLoaded(cx, cz);
     } catch (Throwable t) {

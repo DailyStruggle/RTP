@@ -484,4 +484,97 @@ class LcaFaultInjectionAndEdgeCaseTest {
         assertThrows(IllegalArgumentException.class,
                 () -> AnvilSectorReader.readColumnProbe(null, 0, 0, 10, 5));
     }
+
+    @Test
+    @DisplayName("Mode A On-Disk Preservation & Zstd Level 0..22 Write Preference Separation")
+    void modeAFileOpenPreservesOnDiskSemanticsAndSupportsZstdLevelVariation(@TempDir Path tempDir) throws IOException {
+        Path modeAFile = tempDir.resolve("r.0.0.lca");
+        try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.createEmptyLiveArchive(
+                modeAFile, 0, 0, -4, 24, 4671, 0, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 4096)) {
+            archive.saveChunkCoW(0, 0, buildTestChunk(0, 0, "minecraft:stone", 8));
+            archive.saveChunkCoW(1, 0, buildTestChunk(1, 0, "minecraft:oak_planks", 10));
+            archive.flush();
+        }
+
+        // 1. Default 1-arg openLiveArchive(Path) on Mode A file inherits Mode A (zstdLevel = 0)
+        try (LcaRegionWriter.LcaLiveArchive reopenedDefault = LcaRegionWriter.openLiveArchive(modeAFile)) {
+            reopenedDefault.saveChunkCoW(3, 0, buildTestChunk(3, 0, "minecraft:dirt", 4));
+            AnvilReader.ChunkEntry c30 = reopenedDefault.readChunkEntry(3, 0);
+            assertNotNull(c30);
+            assertEquals(3, c30.compressionType, "1-arg openLiveArchive on Mode A file must write Mode A chunks");
+            reopenedDefault.removeChunk(3, 0);
+            reopenedDefault.flush();
+        }
+
+        // 2. Simulate crash on Mode A file and reopen via LcaRegionFileStorage (default zstdLevel = 1)
+        byte[] rawModeA = Files.readAllBytes(modeAFile);
+        assertEquals(0, rawModeA[0x0B] & 8, "Mode A superblock must not have DEFAULT_ZSTD1 bit set");
+        ByteBuffer.wrap(rawModeA).putLong(LcaRegionReader.POINTER_DIRECTORY_OFFSET + 8, 0xCAFE_BABE_DEAD_BEEFL);
+        byte[] crashedModeA = Arrays.copyOf(rawModeA, rawModeA.length + 256);
+        Arrays.fill(crashedModeA, rawModeA.length - 8, crashedModeA.length, (byte) 0x5A);
+        Files.write(modeAFile, crashedModeA);
+
+        try (LcaRegionFileStorage defaultStorage = new LcaRegionFileStorage(tempDir)) {
+            LcaRegionWriter.LcaLiveArchive reopened = defaultStorage.getOrOpenRegion(0, 0, false);
+            assertNotNull(reopened);
+            assertEquals(0, reopened.liveChunkHeaderHealedWords(),
+                    "Mode A slab scan must never run Mode B SEC-DED header healing on Mode A slabs");
+            assertEquals(1, reopened.liveSlabScanReconstructions(),
+                    "Mode A chunk (1,0) pointer must be reconstructed via Slab Reverse-Scan");
+
+            AnvilReader.ChunkEntry c00 = reopened.readChunkEntry(0, 0);
+            AnvilReader.ChunkEntry c10 = reopened.readChunkEntry(1, 0);
+            assertNotNull(c00);
+            assertNotNull(c10);
+            assertEquals(3, c00.compressionType, "Existing Mode A chunk (0,0) must remain Mode A (compressionType=3)");
+            assertEquals(3, c10.compressionType, "Reconstructed Mode A chunk (1,0) must have codec1=0 (compressionType=3)");
+            assertEquals(108L, ((Number) c00.root.get("LastUpdate")).longValue());
+            assertEquals(110L, ((Number) c10.root.get("LastUpdate")).longValue());
+        }
+
+        byte[] afterRecovery = Files.readAllBytes(modeAFile);
+        assertEquals(0, afterRecovery[0x0B] & 8,
+                "Superblock DEFAULT_ZSTD1 flag must remain 0 on Mode A file after recovery and close");
+
+        // 3. Vary zstdLevel across 0..22 (e.g. 6 and 22 on Mode A file, and 0 on Mode B file)
+        if (DynamicZstdBinding.isAvailable()) {
+            try (LcaRegionWriter.LcaLiveArchive modeAWithLevel6 = LcaRegionWriter.openLiveArchive(modeAFile, 6)) {
+                modeAWithLevel6.saveChunkCoW(2, 0, buildTestChunk(2, 0, "minecraft:deepslate", 6));
+                modeAWithLevel6.flush();
+
+                AnvilReader.ChunkEntry c00 = modeAWithLevel6.readChunkEntry(0, 0);
+                AnvilReader.ChunkEntry c20 = modeAWithLevel6.readChunkEntry(2, 0);
+                assertNotNull(c00);
+                assertNotNull(c20);
+                assertEquals(3, c00.compressionType, "Existing chunk (0,0) remains Mode A");
+                assertEquals(5, c20.compressionType, "Newly written chunk (2,0) uses Mode B (Zstd-6)");
+            }
+            assertEquals(0, Files.readAllBytes(modeAFile)[0x0B] & 8,
+                    "On-disk superblock flag must remain Mode A even when new chunks are written with zstdLevel=6");
+
+            // Now open a Mode B file with preferredZstdLevel = 0 (switch new writes to Mode A 0-LZ) and 22
+            Path modeBFile = tempDir.resolve("r.1.0.lca");
+            try (LcaRegionWriter.LcaLiveArchive modeB22 = LcaRegionWriter.createEmptyLiveArchive(
+                    modeBFile, 1, 0, -4, 24, 4671, 22, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 4096)) {
+                modeB22.saveChunkCoW(0, 0, buildTestChunk(32, 0, "minecraft:stone", 5));
+                modeB22.flush();
+            }
+            assertEquals(8, Files.readAllBytes(modeBFile)[0x0B] & 8,
+                    "Mode B file created with zstdLevel=22 must have DEFAULT_ZSTD1 set in superblock");
+
+            try (LcaRegionWriter.LcaLiveArchive modeBWithLevel0 = LcaRegionWriter.openLiveArchive(modeBFile, 0)) {
+                modeBWithLevel0.saveChunkCoW(1, 0, buildTestChunk(33, 0, "minecraft:granite", 5));
+                modeBWithLevel0.flush();
+
+                AnvilReader.ChunkEntry c00 = modeBWithLevel0.readChunkEntry(0, 0);
+                AnvilReader.ChunkEntry c10 = modeBWithLevel0.readChunkEntry(1, 0);
+                assertNotNull(c00);
+                assertNotNull(c10);
+                assertEquals(5, c00.compressionType, "Existing chunk (0,0) remains Mode B (Zstd-22)");
+                assertEquals(3, c10.compressionType, "Newly written chunk (1,0) uses Mode A (0-LZ)");
+            }
+            assertEquals(8, Files.readAllBytes(modeBFile)[0x0B] & 8,
+                    "On-disk superblock flag must remain Mode B even when new chunks are written with zstdLevel=0");
+        }
+    }
 }

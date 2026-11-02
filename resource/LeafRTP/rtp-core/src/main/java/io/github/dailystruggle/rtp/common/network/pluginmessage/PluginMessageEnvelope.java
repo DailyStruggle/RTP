@@ -107,7 +107,8 @@ public final class PluginMessageEnvelope {
         String body = signedBody(VERSION, sentAtMs, seq, canonical);
         StringBuilder sb = new StringBuilder(body.length() + 80).append(body);
         if (verifier != null) {
-            sb.append('\n').append(HMAC_KEY).append('=').append(verifier.sign(row.schemaVersion(), body));
+            int schemaVersion = row != null ? row.schemaVersion() : 1;
+            sb.append('\n').append(HMAC_KEY).append('=').append(verifier.sign(schemaVersion, body));
         }
         byte[] out = sb.toString().getBytes(StandardCharsets.UTF_8);
         return out.length > MAX_PAYLOAD_BYTES ? null : out;

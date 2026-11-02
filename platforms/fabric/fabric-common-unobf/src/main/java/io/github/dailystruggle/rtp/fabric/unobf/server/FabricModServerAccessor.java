@@ -104,6 +104,28 @@ public class FabricModServerAccessor extends AbstractModServerAccessor {
     public CustomPacketPayload.Type<RawPluginPayload> type() {
       return payloadType;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof RawPluginPayload that)) return false;
+      return java.util.Objects.equals(payloadType, that.payloadType)
+          && java.util.Arrays.equals(data, that.data);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * java.util.Objects.hashCode(payloadType) + java.util.Arrays.hashCode(data);
+    }
+
+    @Override
+    public String toString() {
+      return "RawPluginPayload[payloadType="
+          + payloadType
+          + ", data="
+          + java.util.Arrays.toString(data)
+          + "]";
+    }
   }
 
   private volatile MinecraftServer server;

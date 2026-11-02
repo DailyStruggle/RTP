@@ -152,7 +152,7 @@ Private / Author notes:
 
 </div>
 
-## What it is
+## Teleportation
 
 **{{name}} is a random teleport (RTP) plugin.** Drop the jar in and the default region works out of the box: `/rtp` or `/wild` sends a player to a random safe spot, and you can resize borders visually on a browser map (`/rtp editor`) or through the in-game setup wizard (`/rtp admin setup`). It finds and checks spots ahead of time, reading the world files on disk, and keeps a queue of checked spots ready.
 
@@ -219,7 +219,7 @@ More setups: [Features](../site/features.md#common-setups), [recipes](../admin/R
 
 1. Drop `{{jar}}` into `plugins/` (Spigot, Paper, Folia, Velocity, BungeeCord) or `mods/` (Fabric, NeoForge) and start the server.
 2. Type `/rtp` (or `/wild`).
-3. **Optional - adjust borders or settings:** Most servers only change how far players go (`radius: 4096b` and `centerRadius: 1024b` in `definitions/regions/default.yml`). Run `/rtp editor` to drag region borders on a browser map ([web workspace guide](../admin/WEB_EDITOR_GUIDE.md)), `/rtp admin setup` for the 60-second in-game wizard (worlds, radius presets, gameplay profile, and whether bare `/rtp` opens the GUI picker or teleports immediately; [quick-start guide](../admin/QUICK_START.md)), or `/rtp config import` to migrate from BetterRTP, JustRTP, or EzRTP ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
+3. **Optional - adjust borders or settings:** Most servers only change `radius: 4096b` and `centerRadius: 1024b` in `definitions/regions/default.yml`. Run `/rtp editor` to drag borders on a browser map ([web workspace guide](../admin/WEB_EDITOR_GUIDE.md)), `/rtp admin setup` for the in-game wizard ([quick-start guide](../admin/QUICK_START.md)), or `/rtp config import` to migrate from BetterRTP, JustRTP, or EzRTP ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
 
 (Advanced database, network proxy, and cache tuning: see the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).)
 
@@ -390,7 +390,7 @@ A: Rarely, and no player positions are tracked. Locations are drawn from a shuff
 A: Most `/rtp` calls are served from a queue of locations checked before anyone typed the command. The queue refills off the main thread: it skips ground it has already rejected and checks the rest against the region files before loading any chunk. Details are in [How it works](../site/how-it-works.md).
 
 **Q: Is it complicated to set up?**
-A: No. The default region is a standard circle (`CIRCLE`) with two distance settings (`radius: 4096b` and `centerRadius: 1024b` in `definitions/regions/default.yml`), and all selection and safety checks run automatically in the background. Pick either the browser map workspace (`/rtp editor`) or the in-game guided wizard (`/rtp admin setup`): both configure your worlds, region radii (by dragging the border on the map, clicking a preset, or typing a distance in an Anvil prompt), and presets with a diff preview before anything is written. You can also set a radius with one command (`/rtp config regions default shape.radius=10km`) or in the in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
+A: No. The default region is a standard circle (`CIRCLE`) with `radius: 4096b` and `centerRadius: 1024b` in `definitions/regions/default.yml`. Use `/rtp editor` to drag borders on a browser map, `/rtp admin setup` for the in-game wizard, or `/rtp config import` to translate an existing BetterRTP, JustRTP, or EzRTP folder with a diff preview before saving.
 
 **Q: How is the web editor secured? Does it open ports on my server?**
 A: Not to the outside. The hosted editor needs no inbound port or firewall change: your server connects outward over HTTPS/TLS, and you approve browser sessions from the server console or with a one-time trust token. Local mode (`/rtp editor local`) binds to `127.0.0.1` only for offline editing on the same machine.

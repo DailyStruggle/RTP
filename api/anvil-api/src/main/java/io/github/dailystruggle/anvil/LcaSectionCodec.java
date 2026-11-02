@@ -177,7 +177,7 @@ final class LcaSectionCodec {
         "minecraft:mossy_stone_bricks", "minecraft:cracked_stone_bricks", "minecraft:torch", "minecraft:lantern"
     };
     static final String[] STATIC_CORE_BASE_NAMES = new String[STATIC_CORE_STATES.length];
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     static final List<String>[] STATIC_CORE_SINGLETON_PALETTES = new List[STATIC_CORE_STATES.length];
     static final Map<String, Integer> STATIC_CORE_STATE_TO_ID = new LinkedHashMap<>(256);
 
@@ -250,7 +250,7 @@ final class LcaSectionCodec {
         "minecraft:small_end_islands", "minecraft:end_midlands", "minecraft:end_highlands", "minecraft:end_barrens",
         "minecraft:pale_garden"
     };
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     static final List<String>[] STATIC_CORE_SINGLETON_BIOMES = new List[STATIC_CORE_BIOMES.length];
     static final Map<String, Integer> STATIC_CORE_BIOME_TO_ID = new LinkedHashMap<>(128);
     static final byte[][] STATIC_CORE_STATE_NBT_BYTES = new byte[STATIC_CORE_STATES.length][];
@@ -738,6 +738,412 @@ final class LcaSectionCodec {
             v >>>= 7;
         }
         return len;
+    }
+
+    static final int BP_FLAG_HAS_CHUNK_PATCH_TAIL = 0x4000;
+    static final int PATCH_FLAG_VOXEL_DELTAS = 0x01;
+    static final int PATCH_FLAG_REPLACEMENT_OFFSET = 0x02;
+    static final int PATCH_FLAG_SKY_LIGHT = 0x04;
+    static final int PATCH_FLAG_BLOCK_LIGHT = 0x08;
+
+    /**
+     * Returns the initial Slab-Local Micro-Palette upper bound $\min_k(\mathtt{relStart}_k)$ across all
+     * non-uniform sections $k$ that precede $\mathtt{residualRelStart}$ (or $\mathtt{residualRelStart}$
+     * if no non-uniform section precedes it; `LCA-ICD-1.0` Section 6.5).
+     */
+    static int findFirstSectionRelStart(int[] relStarts, int sectionCount, int residualRelStart) {
+        int minStart = residualRelStart;
+        for (int k = 0; k < sectionCount; k++) {
+            int rk = relStarts[k];
+            if (rk >= 0 && rk < minStart) {
+                minStart = rk;
+            }
+        }
+        return minStart;
+    }
+
+    /**
+     * Order-independent upper bound $\mathtt{relEnd}_i$ for non-uniform `SectionFrame` $i$
+     * (`LCA-ICD-1.0` Section 6.4, `anvil-api-ADR-003` Section 4.1):
+     * $$\mathtt{relEnd}_i = \min\Bigl(\{\mathtt{relStart}_j \mid \mathtt{relStart}_j > \mathtt{relStart}_i\}
+     *   \cup \{B \in \{\mathtt{residualRelStart}, \mathtt{frameLen}\} \mid B > \mathtt{relStart}_i\}\Bigr)$$
+     */
+    static int findSectionRelEnd(
+            int[] relStarts, int idx, int sectionCount, int residualRelStart, int frameLen
+    ) {
+        int start = relStarts[idx];
+        int bestEnd = (residualRelStart > start && residualRelStart < frameLen)
+                ? residualRelStart
+                : frameLen;
+        for (int j = 0; j < sectionCount; j++) {
+            int rj = relStarts[j];
+            if (rj > start && rj < bestEnd) {
+                bestEnd = rj;
+            }
+        }
+        return bestEnd;
+    }
+
+    /**
+     * Upper bound $\mathtt{residualRelEnd}$ of the Residual Tail (`LCA-ICD-1.0` Section 8):
+     * $$\mathtt{residualRelEnd} = \min\Bigl(\{\mathtt{relStart}_j \mid \mathtt{relStart}_j > \mathtt{residualRelStart}\}
+     *   \cup \{\mathtt{frameLen}\}\Bigr)$$
+     */
+    static int findResidualRelEnd(int[] relStarts, int sectionCount, int residualRelStart, int frameLen) {
+        int bestEnd = frameLen;
+        for (int j = 0; j < sectionCount; j++) {
+            int rj = relStarts[j];
+            if (rj > residualRelStart && rj < bestEnd) {
+                bestEnd = rj;
+            }
+        }
+        return bestEnd;
+    }
+
+    /**
+     * Computes the 8-bit Extended Hamming `(72, 64)` SEC-DED parity byte over a 64-bit SplitMix
+     * digest of `buf[offset .. offset + length)` (`LCA-ICD-1.0` Section 8.3).
+     */
+    static int computePatchParity8(byte[] buf, int offset, int length) {
+        long h = 0x9E3779B97F4A7C15L ^ length;
+        for (int i = 0; i < length; i++) {
+            h = (h ^ (buf[offset + i] & 0xFFL)) * 0xBF58476D1CE4E5B9L;
+            h ^= h >>> 31;
+        }
+        h *= 0x94D049BB133111EBL;
+        h ^= h >>> 33;
+        return computeHammingSecDed8(h);
+    }
+
+    static int skipSectionFrame(byte[] buf, int offset, int limit) throws CorruptRegionEntryException {
+        if (offset + 2 > limit) {
+            throw new CorruptRegionEntryException("CBIT T5: SectionFrame truncated at offset " + offset);
+        }
+        int pos = offset;
+        int sectionHeader = buf[pos++] & 0xFF;
+        int blockMode = (sectionHeader >>> 4) & 3;
+        int skyMode = (sectionHeader >>> 2) & 3;
+        int blkMode = sectionHeader & 3;
+        if (blockMode == BLOCK_MODE_DELTA_ROARING || blockMode == BLOCK_MODE_FLAT_BITPACK) {
+            pos += 8;
+        }
+        int paletteLen = readVarInt(buf, pos, limit);
+        pos += varIntLen(paletteLen);
+        for (int i = 0; i < paletteLen; i++) {
+            int d = readVarInt(buf, pos, limit);
+            pos += varIntLen(d);
+        }
+        if (blockMode == BLOCK_MODE_UNIFORM || paletteLen == 1) {
+            // 0 bytes
+        } else if (blockMode == BLOCK_MODE_DELTA_ROARING || blockMode == BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+            for (int p = 1; p < paletteLen; p++) {
+                int word16 = readUint16BE(buf, pos);
+                pos += 2;
+                int tag = (word16 >>> 14) & 3;
+                int countOrIdx = word16 & 0x3FFF;
+                if (tag == TAG_SINGLETON) {
+                    // 0 extra bytes
+                } else if (tag == TAG_BITMAP) {
+                    pos += 512;
+                } else if (tag == TAG_DELTA_ARRAY) {
+                    for (int r = 0; r < countOrIdx; r++) {
+                        int b0 = buf[pos++] & 0xFF;
+                        if (b0 >= 240) pos++;
+                    }
+                } else {
+                    boolean subMode62 = (countOrIdx & 0x2000) != 0;
+                    int runCount = countOrIdx & 0x1FFF;
+                    for (int r = 0; r < runCount; r++) {
+                        int tok = buf[pos++] & 0xFF;
+                        if (subMode62) {
+                            int adjGap = (tok >>> 2) & 0x3F;
+                            int lenM1 = tok & 3;
+                            if (adjGap == 63) {
+                                int b0 = buf[pos++] & 0xFF;
+                                if (b0 >= 240) pos++;
+                            }
+                            if (lenM1 == 3) {
+                                int extra = readVarInt(buf, pos, limit);
+                                pos += varIntLen(extra);
+                            }
+                        } else {
+                            int adjGap = (tok >>> 4) & 0x0F;
+                            int lenM1 = tok & 0x0F;
+                            if (adjGap == 15) {
+                                int b0 = buf[pos++] & 0xFF;
+                                if (b0 >= 240) pos++;
+                            }
+                            if (lenM1 == 15) {
+                                int extra = readVarInt(buf, pos, limit);
+                                pos += varIntLen(extra);
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (blockMode == BLOCK_MODE_FLAT_BITPACK) {
+            int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(paletteLen - 1));
+            pos += (SECTION_VOXELS * flatBits + 7) >>> 3;
+        }
+        if (pos < limit) {
+            int b0 = buf[pos] & 0xFF;
+            if ((b0 & 0x80) != 0) {
+                pos++;
+            } else {
+                int bLen = readVarInt(buf, pos, limit);
+                pos += varIntLen(bLen);
+                for (int i = 0; i < bLen; i++) {
+                    int bId = readVarInt(buf, pos, limit);
+                    pos += varIntLen(bId);
+                }
+                if (bLen > 1) {
+                    int runCount = readVarInt(buf, pos, limit);
+                    pos += varIntLen(runCount);
+                    if (bLen <= 8) {
+                        pos += runCount;
+                    } else {
+                        for (int r = 0; r < runCount; r++) {
+                            int pIdx = readVarInt(buf, pos, limit);
+                            pos += varIntLen(pIdx) + 1;
+                        }
+                    }
+                }
+            }
+        }
+        if (skyMode == LIGHT_MODE_CONST || blkMode == LIGHT_MODE_CONST) {
+            pos++;
+        }
+        pos = skipLightChannel(buf, pos, limit, skyMode);
+        pos = skipLightChannel(buf, pos, limit, blkMode);
+        return pos;
+    }
+
+    static int findMaxPostResidualSectionStart(
+            byte[] buf,
+            int frameStart,
+            int sectionCount,
+            int sectionDirEnd,
+            int unitShift,
+            int residualStart,
+            int patchPayloadStart,
+            int patchPayloadLen,
+            int limitBytes
+    ) {
+        int maxPostSecStart = -1;
+        for (int i = 0; i < sectionCount; i++) {
+            int entry16 = readUint16BE(buf, frameStart + 24 + (i << 1));
+            if (entry16 != 0 && (entry16 & 0x8000) == 0) {
+                int secStart = frameStart + sectionDirEnd + ((entry16 - 1) << unitShift);
+                if (secStart > residualStart && secStart < limitBytes && secStart > maxPostSecStart) {
+                    maxPostSecStart = secStart;
+                }
+            }
+        }
+        if (patchPayloadStart > 0 && patchPayloadLen >= 3 && patchPayloadStart + patchPayloadLen <= limitBytes) {
+            try {
+                int pEnd = patchPayloadStart + patchPayloadLen - 1;
+                int pPos = patchPayloadStart;
+                int appCount = readVarInt(buf, pPos, pEnd);
+                pPos += varIntLen(appCount);
+                for (int i = 0; i < appCount; i++) {
+                    int tag = buf[pPos++] & 0xFF;
+                    if ((tag & 0x80) == 0 && (tag < 0x60 || tag >= 0x80)) {
+                        int uLen = readVarInt(buf, pPos, pEnd);
+                        pPos += varIntLen(uLen) + uLen;
+                    }
+                }
+                if (appCount > 0) {
+                    int propCount = readVarInt(buf, pPos, pEnd);
+                    pPos += varIntLen(propCount);
+                    for (int k = 0; k < propCount; k++) {
+                        int sIdx = readVarInt(buf, pPos, pEnd);
+                        pPos += varIntLen(sIdx);
+                        int pTag = buf[pPos++] & 0xFF;
+                        if (pTag == 0x40) {
+                            int gId = readVarInt(buf, pPos, pEnd);
+                            pPos += varIntLen(gId);
+                        }
+                    }
+                }
+                int secCount = readVarInt(buf, pPos, pEnd);
+                pPos += varIntLen(secCount);
+                for (int s = 0; s < secCount && pPos + 2 <= pEnd; s++) {
+                    pPos++; // secIdx
+                    int pFlags = buf[pPos++] & 0xFF;
+                    if ((pFlags & PATCH_FLAG_REPLACEMENT_OFFSET) != 0) {
+                        int replEntry16 = readUint16BE(buf, pPos);
+                        pPos += 2;
+                        if (replEntry16 != 0 && (replEntry16 & 0x8000) == 0) {
+                            int secStart = frameStart + sectionDirEnd + ((replEntry16 - 1) << unitShift);
+                            if (secStart > residualStart && secStart < limitBytes && secStart > maxPostSecStart) {
+                                maxPostSecStart = secStart;
+                            }
+                        }
+                    }
+                    if ((pFlags & PATCH_FLAG_VOXEL_DELTAS) != 0) {
+                        int dCount = readVarInt(buf, pPos, pEnd);
+                        pPos += varIntLen(dCount);
+                        for (int d = 0; d < dCount; d++) {
+                            pPos += 2;
+                            int dictId = readVarInt(buf, pPos, pEnd);
+                            pPos += varIntLen(dictId);
+                        }
+                    }
+                    if ((pFlags & PATCH_FLAG_SKY_LIGHT) != 0) {
+                        int m = buf[pPos++] & 0xFF;
+                        pPos = (m == LIGHT_MODE_CONST) ? (pPos + 1) : skipLightChannel(buf, pPos, pEnd, m);
+                    }
+                    if ((pFlags & PATCH_FLAG_BLOCK_LIGHT) != 0) {
+                        int m = buf[pPos++] & 0xFF;
+                        pPos = (m == LIGHT_MODE_CONST) ? (pPos + 1) : skipLightChannel(buf, pPos, pEnd, m);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return maxPostSecStart;
+    }
+
+    private static int skipLightChannel(byte[] buf, int pos, int limit, int mode) throws CorruptRegionEntryException {
+        if (mode == LIGHT_MODE_ABSENT || mode == LIGHT_MODE_CONST) {
+            return pos;
+        }
+        if (mode == LIGHT_MODE_RAW) {
+            return pos + 2048;
+        }
+        int planeModes8 = buf[pos++] & 0xFF;
+        for (int plane = 0; plane < 4; plane++) {
+            int pm = (planeModes8 >>> (plane << 1)) & 3;
+            if (pm == 2) {
+                int runCount = readVarInt(buf, pos, limit);
+                pos += varIntLen(runCount);
+                for (int r = 0; r < runCount; r++) {
+                    int tok = buf[pos++] & 0xFF;
+                    int adjGap = (tok >>> 4) & 0x0F;
+                    int lenM1 = tok & 0x0F;
+                    if (adjGap == 15) {
+                        int extra = readVarInt(buf, pos, limit);
+                        pos += varIntLen(extra);
+                    }
+                    if (lenM1 == 15) {
+                        int extra = readVarInt(buf, pos, limit);
+                        pos += varIntLen(extra);
+                    }
+                }
+            } else if (pm == 3) {
+                pos += 512;
+            }
+        }
+        return pos;
+    }
+
+    /**
+     * Splices or replaces the `HAS_CHUNK_PATCH_TAIL (0x4000)` field in an uncompressed `ChunkFrame`
+     * right before `bit 10` (`residualNbtSlice`), preserving any trailing `residualNbtSlice` and any
+     * post-residual appended `SectionFrame`s (`LCA-ICD-1.0` Section 8.3).
+     */
+    static byte[] injectChunkPatchTailIntoUncompressedFrame(
+            byte[] frame, int sectionCount, byte[] patchTailPayload
+    ) throws IOException {
+        int sectionDirEnd = 24 + (sectionCount << 1);
+        int chunkFlags = frame[21] & 0xFF;
+        boolean hasResidualNbt = (chunkFlags & 1) != 0;
+        boolean scale4B = (chunkFlags & 4) != 0;
+        int unitShift = scale4B ? 2 : 0;
+        int residualRelOffset = readUint16BE(frame, 22);
+        int residualRelStart = hasResidualNbt
+                ? sectionDirEnd + (residualRelOffset << unitShift)
+                : frame.length;
+
+        int[] relStarts = new int[sectionCount];
+        for (int i = 0; i < sectionCount; i++) {
+            int entry16 = readUint16BE(frame, 24 + (i << 1));
+            relStarts[i] = (entry16 != 0 && (entry16 & 0x8000) == 0)
+                    ? sectionDirEnd + ((entry16 - 1) << unitShift)
+                    : -1;
+        }
+        int residualRelEnd = findResidualRelEnd(relStarts, sectionCount, residualRelStart, frame.length);
+
+        byte[] patchPrefixAndPayload = new byte[varIntLen(patchTailPayload.length) + patchTailPayload.length];
+        int pOff = writeVarIntToBuf(patchPrefixAndPayload, 0, patchTailPayload.length);
+        System.arraycopy(patchTailPayload, 0, patchPrefixAndPayload, pOff, patchTailPayload.length);
+
+        if (!hasResidualNbt) {
+            int alignedRel = frame.length;
+            if (scale4B) {
+                alignedRel = (alignedRel + 3) & ~3;
+            }
+            int newResidualRelOffset = (alignedRel - sectionDirEnd) >>> unitShift;
+            byte[] out = new byte[alignedRel + 2 + patchPrefixAndPayload.length];
+            System.arraycopy(frame, 0, out, 0, frame.length);
+            out[21] = (byte) (chunkFlags | 1);
+            out[22] = (byte) ((newResidualRelOffset >>> 8) & 0xFF);
+            out[23] = (byte) (newResidualRelOffset & 0xFF);
+            out[alignedRel] = (byte) ((BP_FLAG_HAS_CHUNK_PATCH_TAIL >>> 8) & 0xFF);
+            out[alignedRel + 1] = (byte) (BP_FLAG_HAS_CHUNK_PATCH_TAIL & 0xFF);
+            System.arraycopy(patchPrefixAndPayload, 0, out, alignedRel + 2, patchPrefixAndPayload.length);
+            return out;
+        }
+
+        int pos = residualRelStart;
+        int limit = residualRelEnd;
+        int bpFlags = readUint16BE(frame, pos);
+        pos += 2;
+        if ((bpFlags & 8192) != 0) {
+            int mbnlLen = readVarInt(frame, pos, limit);
+            pos += varIntLen(mbnlLen) + mbnlLen;
+        }
+        if ((bpFlags & 32) != 0) pos++;
+        if ((bpFlags & 64) != 0) {
+            int slVer = readVarInt(frame, pos, limit);
+            pos += varIntLen(slVer);
+        }
+        if ((bpFlags & 128) != 0) pos++;
+        if ((bpFlags & 256) != 0) pos++;
+        if ((bpFlags & 512) != 0) {
+            int secHmCount = frame[pos++] & 0xFF;
+            for (int h = 0; h < secHmCount; h++) {
+                int code = frame[pos++] & 0xFF;
+                if (code >= STANDARD_HEIGHTMAP_NAMES.length) {
+                    int kLen = readVarInt(frame, pos, limit);
+                    pos += varIntLen(kLen) + kLen;
+                }
+                int payLen = readVarInt(frame, pos, limit);
+                pos += varIntLen(payLen) + payLen;
+            }
+        }
+        int patchInsertPos = pos;
+        int afterOldPatchPos = pos;
+        if ((bpFlags & BP_FLAG_HAS_CHUNK_PATCH_TAIL) != 0) {
+            int oldLen = readVarInt(frame, pos, limit);
+            afterOldPatchPos = pos + varIntLen(oldLen) + oldLen;
+        }
+        int deltaBytes = patchPrefixAndPayload.length - (afterOldPatchPos - patchInsertPos);
+        byte[] out = new byte[frame.length + deltaBytes];
+        System.arraycopy(frame, 0, out, 0, patchInsertPos);
+        int newBpFlags = bpFlags | BP_FLAG_HAS_CHUNK_PATCH_TAIL;
+        out[residualRelStart] = (byte) ((newBpFlags >>> 8) & 0xFF);
+        out[residualRelStart + 1] = (byte) (newBpFlags & 0xFF);
+        System.arraycopy(patchPrefixAndPayload, 0, out, patchInsertPos, patchPrefixAndPayload.length);
+        System.arraycopy(
+                frame,
+                afterOldPatchPos,
+                out,
+                patchInsertPos + patchPrefixAndPayload.length,
+                frame.length - afterOldPatchPos);
+
+        // If any out-of-order section was placed after residualRelStart, adjust its sectionOffsets[i] by deltaBytes
+        if (deltaBytes != 0) {
+            for (int i = 0; i < sectionCount; i++) {
+                if (relStarts[i] > residualRelStart) {
+                    int newRel = relStarts[i] + deltaBytes;
+                    int newEntry16 = ((newRel - sectionDirEnd) >>> unitShift) + 1;
+                    out[24 + (i << 1)] = (byte) ((newEntry16 >>> 8) & 0xFF);
+                    out[24 + (i << 1) + 1] = (byte) (newEntry16 & 0xFF);
+                }
+            }
+        }
+        return out;
     }
 
     /**
@@ -1739,7 +2145,7 @@ final class LcaSectionCodec {
         for (int i = 0; i < SECTION_VOXELS; i++) {
             int val = 0;
             for (int b = 0; b < flatBits; b++) {
-                if ((buf[pos + (bitPos >>> 3)] & (1 << (bitPos & 7))) != 0) {
+                if (((buf[pos + (bitPos >>> 3)] & 0xFF) & (1 << (bitPos & 7))) != 0) {
                     val |= (1 << b);
                 }
                 bitPos++;
@@ -2132,10 +2538,10 @@ final class LcaSectionCodec {
     ) {}
 
     static ResidualTailDecoded unpackResidualSectionAndNbt(
-            byte[] frame, int fOff, int residualRelStart, int frameLen, int minSectionY, int sectionCount
+            byte[] frame, int fOff, int residualRelStart, int residualRelEnd, int minSectionY, int sectionCount
     ) throws IOException {
         int pos = fOff + residualRelStart;
-        int limit = fOff + frameLen;
+        int limit = fOff + residualRelEnd;
         if (pos + 2 > limit) {
             return new ResidualTailDecoded(new LinkedHashMap<>(), Collections.emptyList(), Collections.emptyList(), false);
         }
@@ -2225,6 +2631,14 @@ final class LcaSectionCodec {
                     decodedHmByOrder.add(longs);
                     hmOut.put(hmKey, longs);
                 }
+            }
+            if ((bpFlags & BP_FLAG_HAS_CHUNK_PATCH_TAIL) != 0) {
+                int patchLen = readVarInt(frame, pos, tailLimit);
+                pos += varIntLen(patchLen);
+                if (patchLen < 3 || pos + patchLen > tailLimit) {
+                    throw new CorruptRegionEntryException("CBIT T5: Truncated chunkPatchTail in residual tail");
+                }
+                pos += patchLen;
             }
             if ((bpFlags & 1024) != 0 && pos < tailLimit) {
                 byte[] nbtSlice = Arrays.copyOfRange(frame, pos, tailLimit);
@@ -2716,6 +3130,605 @@ final class LcaSectionCodec {
             }
         }
         return pos;
+    }
+
+    static final class SectionPatch {
+        final int sectionIndex;
+        final int patchFlags;
+        final int replacementSectionEntry16;
+        final int[] yzxCoords;
+        final int[] dictIds;
+        final byte[] skyLight2048;
+        final byte[] blockLight2048;
+
+        SectionPatch(
+                int sectionIndex,
+                int patchFlags,
+                int replacementSectionEntry16,
+                int[] yzxCoords,
+                int[] dictIds,
+                byte[] skyLight2048,
+                byte[] blockLight2048
+        ) {
+            this.sectionIndex = sectionIndex;
+            this.patchFlags = patchFlags;
+            this.replacementSectionEntry16 = replacementSectionEntry16;
+            this.yzxCoords = yzxCoords;
+            this.dictIds = dictIds;
+            this.skyLight2048 = skyLight2048;
+            this.blockLight2048 = blockLight2048;
+        }
+    }
+
+    static final class ChunkPatchTail {
+        final SectionPatch[] sectionPatchesByIndex;
+        final int patchedSectionCount;
+
+        ChunkPatchTail(SectionPatch[] sectionPatchesByIndex, int patchedSectionCount) {
+            this.sectionPatchesByIndex = sectionPatchesByIndex;
+            this.patchedSectionCount = patchedSectionCount;
+        }
+
+        SectionPatch patchForSection(int secIdx) {
+            return (secIdx >= 0 && secIdx < sectionPatchesByIndex.length) ? sectionPatchesByIndex[secIdx] : null;
+        }
+
+        boolean hasPatchForSection(int secIdx) {
+            return patchForSection(secIdx) != null;
+        }
+    }
+
+    /**
+     * Encodes a `ChunkPatchTail` payload (`LCA-ICD-1.0` Section 8.3, `anvil-api-ADR-003` Section 4.3)
+     * including the trailing 1-byte Extended Hamming `(72, 64)` `patchParity8` syndrome.
+     */
+    static byte[] encodeChunkPatchTailBytes(
+            int baseLocalStateCount,
+            List<String> appendedStates,
+            int[] appendedGlobalStateIds,
+            List<SectionPatch> sectionPatches
+    ) {
+        ScratchArena arena = scratch();
+        byte[] buf = arena.byteStaging;
+        int pos = 0;
+
+        List<String> appStates = appendedStates == null ? Collections.emptyList() : appendedStates;
+        int appCount = appStates.size();
+        if (appCount == 0) {
+            pos = writeVarIntToBuf(buf, pos, 0);
+        } else {
+            pos = writeSlabLocalEntryList(buf, pos, appStates, STATIC_CORE_STATE_TO_ID, true);
+            int propCount = 0;
+            for (int i = 0; i < appCount; i++) {
+                if (appStates.get(i).indexOf('[') >= 0) {
+                    propCount++;
+                }
+            }
+            pos = writeVarIntToBuf(buf, pos, propCount);
+            for (int i = 0; i < appCount; i++) {
+                String s = appStates.get(i);
+                int bracket = s.indexOf('[');
+                if (bracket >= 0) {
+                    pos = writeVarIntToBuf(buf, pos, baseLocalStateCount + i);
+                    String propSuffix = s.substring(bracket);
+                    Integer propId = STATIC_CORE_PROP_TO_ID.get(propSuffix);
+                    if (propId != null) {
+                        buf[pos++] = (byte) (0x80 | (propId & 0x7F));
+                    } else {
+                        buf[pos++] = 0x40;
+                        int gid = (appendedGlobalStateIds != null && i < appendedGlobalStateIds.length)
+                                ? appendedGlobalStateIds[i]
+                                : 0;
+                        pos = writeVarIntToBuf(buf, pos, gid);
+                    }
+                }
+            }
+        }
+
+        List<SectionPatch> patches = sectionPatches == null ? Collections.emptyList() : sectionPatches;
+        pos = writeVarIntToBuf(buf, pos, patches.size());
+        for (int s = 0; s < patches.size(); s++) {
+            SectionPatch sp = patches.get(s);
+            buf[pos++] = (byte) (sp.sectionIndex & 0xFF);
+            buf[pos++] = (byte) (sp.patchFlags & 0xFF);
+            if ((sp.patchFlags & PATCH_FLAG_REPLACEMENT_OFFSET) != 0) {
+                buf[pos++] = (byte) ((sp.replacementSectionEntry16 >>> 8) & 0xFF);
+                buf[pos++] = (byte) (sp.replacementSectionEntry16 & 0xFF);
+            }
+            if ((sp.patchFlags & PATCH_FLAG_VOXEL_DELTAS) != 0) {
+                int dCount = sp.yzxCoords.length;
+                pos = writeVarIntToBuf(buf, pos, dCount);
+                for (int d = 0; d < dCount; d++) {
+                    int yzx = sp.yzxCoords[d] & 0x0FFF;
+                    buf[pos++] = (byte) ((yzx >>> 8) & 0xFF);
+                    buf[pos++] = (byte) (yzx & 0xFF);
+                    pos = writeVarIntToBuf(buf, pos, sp.dictIds[d]);
+                }
+            }
+            if ((sp.patchFlags & PATCH_FLAG_SKY_LIGHT) != 0) {
+                pos = encodePatchLightChannelToBuf(sp.skyLight2048, CURVE_TO_YZX[CURVE_Y_H2], arena, buf, pos);
+            }
+            if ((sp.patchFlags & PATCH_FLAG_BLOCK_LIGHT) != 0) {
+                pos = encodePatchLightChannelToBuf(sp.blockLight2048, CURVE_TO_YZX[CURVE_H3], arena, buf, pos);
+            }
+        }
+
+        int parity8 = computePatchParity8(buf, 0, pos);
+        buf[pos++] = (byte) parity8;
+        return Arrays.copyOf(buf, pos);
+    }
+
+    private static int encodePatchLightChannelToBuf(
+            byte[] light2048, int[] curveToYzx, ScratchArena arena, byte[] dst, int pos
+    ) {
+        int constNib = extractLightNibblesFast(light2048, arena.skyLightNibbles, 0);
+        if (constNib >= 0) {
+            dst[pos++] = (byte) LIGHT_MODE_CONST;
+            dst[pos++] = (byte) (constNib & 0x0F);
+            return pos;
+        }
+        int modeBytePos = pos++;
+        int grayEnd = encodeGrayLightPlanesToBuf(arena.skyLightNibbles, curveToYzx, arena, dst, pos);
+        if (grayEnd - pos < 2048) {
+            dst[modeBytePos] = (byte) LIGHT_MODE_GRAY_PLANES;
+            return grayEnd;
+        }
+        dst[modeBytePos] = (byte) LIGHT_MODE_RAW;
+        System.arraycopy(light2048, 0, dst, pos, 2048);
+        return pos + 2048;
+    }
+
+    private static int decodePatchLightChannel(
+            byte[] buf, int pos, int limit, int[] curveToYzx, boolean skipLighting, byte[][] outRef, ScratchArena arena
+    ) throws CorruptRegionEntryException {
+        if (pos >= limit) {
+            throw new CorruptRegionEntryException("CBIT T5: Truncated light patch mode byte");
+        }
+        int mode = buf[pos++] & 0xFF;
+        if (mode == LIGHT_MODE_CONST) {
+            if (pos >= limit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated const light patch nibble");
+            }
+            int c = buf[pos++] & 0x0F;
+            if (!skipLighting) {
+                byte[] arr = new byte[2048];
+                if (c != 0) {
+                    Arrays.fill(arr, (byte) ((c << 4) | c));
+                }
+                outRef[0] = arr;
+            }
+            return pos;
+        } else if (mode == LIGHT_MODE_GRAY_PLANES) {
+            pos = decodeGrayPlanes(buf, pos, limit, curveToYzx, arena);
+            if (!skipLighting) {
+                outRef[0] = packLightNibbles(arena.skyLightNibbles);
+            }
+            return pos;
+        } else if (mode == LIGHT_MODE_RAW) {
+            if (pos + 2048 > limit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated raw light patch payload");
+            }
+            if (!skipLighting) {
+                outRef[0] = Arrays.copyOfRange(buf, pos, pos + 2048);
+            }
+            return pos + 2048;
+        }
+        throw new CorruptRegionEntryException("CBIT T5: Invalid light patch mode " + mode);
+    }
+
+    /**
+     * Locates and decodes `HAS_CHUNK_PATCH_TAIL (0x4000)` inside the Residual Tail before section
+     * evaluation (`LCA-ICD-1.0` Section 8.3). Returns `null` in $O(1)$ (`~1 ns`, `0` allocations)
+     * when `(boilerplateFlags16 & 0x4000) == 0`.
+     */
+    static ChunkPatchTail locateAndDecodeChunkPatchTail(
+            byte[] frame,
+            int fOff,
+            int frameLen,
+            int residualRelStart,
+            int residualRelEnd,
+            int sectionCount,
+            int sectionDirEnd,
+            boolean scale4B,
+            boolean hasSlabLocalPalette,
+            SlabLocalPalette localPal,
+            List<String> regionCanonicalStates,
+            boolean needCanonicalStates,
+            boolean skipLighting,
+            int[] sectionEntries,
+            int[] sectionRelStarts
+    ) throws CorruptRegionEntryException {
+        if (residualRelStart + 2 > residualRelEnd || residualRelEnd > frameLen) {
+            return null;
+        }
+        int pos = fOff + residualRelStart;
+        int limit = fOff + residualRelEnd;
+        int bpFlags = readUint16BE(frame, pos);
+        if ((bpFlags & BP_FLAG_HAS_CHUNK_PATCH_TAIL) == 0) {
+            return null;
+        }
+        pos += 2;
+        if ((bpFlags & 8192) != 0) {
+            int mbnlLen = readVarInt(frame, pos, limit);
+            pos += varIntLen(mbnlLen);
+            if (mbnlLen < 0 || pos + mbnlLen > limit) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated MOTION_BLOCKING_NO_LEAVES prefix");
+            }
+            pos += mbnlLen;
+        }
+        if ((bpFlags & 32) != 0) {
+            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated ppEmptyCount");
+            pos++;
+        }
+        if ((bpFlags & 64) != 0) {
+            int slVer = readVarInt(frame, pos, limit);
+            pos += varIntLen(slVer);
+        }
+        if ((bpFlags & 128) != 0) {
+            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated lowBoundaryFlags");
+            pos++;
+        }
+        if ((bpFlags & 256) != 0) {
+            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated highBoundaryFlags");
+            pos++;
+        }
+        if ((bpFlags & 512) != 0) {
+            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated secHmCount");
+            int secHmCount = frame[pos++] & 0xFF;
+            for (int h = 0; h < secHmCount; h++) {
+                if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated secondary heightmap");
+                int code = frame[pos++] & 0xFF;
+                if (code >= STANDARD_HEIGHTMAP_NAMES.length) {
+                    int kLen = readVarInt(frame, pos, limit);
+                    pos += varIntLen(kLen) + kLen;
+                }
+                int payLen = readVarInt(frame, pos, limit);
+                pos += varIntLen(payLen) + payLen;
+                if (pos > limit) {
+                    throw new CorruptRegionEntryException("CBIT T5: Truncated secondary heightmap payload");
+                }
+            }
+        }
+
+        int patchTailByteLen = readVarInt(frame, pos, limit);
+        pos += varIntLen(patchTailByteLen);
+        if (patchTailByteLen < 3 || pos + patchTailByteLen > limit) {
+            throw new CorruptRegionEntryException("CBIT T5: Truncated chunkPatchTail payload (len=" + patchTailByteLen + ")");
+        }
+        int payloadEnd = pos + patchTailByteLen - 1;
+        int storedParity8 = frame[payloadEnd] & 0xFF;
+        int expectedParity8 = computePatchParity8(frame, pos, patchTailByteLen - 1);
+        if (storedParity8 != expectedParity8) {
+            throw new CorruptRegionEntryException("CBIT T6b: ChunkPatchTail parity syndrome mismatch (expected=0x"
+                    + Integer.toHexString(expectedParity8) + " actual=0x" + Integer.toHexString(storedParity8) + ")");
+        }
+
+        int pPos = pos;
+        int appendedStateCount = readVarInt(frame, pPos, payloadEnd);
+        pPos += varIntLen(appendedStateCount);
+        if (appendedStateCount < 0 || appendedStateCount > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid appendedStateCount " + appendedStateCount);
+        }
+        if (appendedStateCount > 0) {
+            if (!hasSlabLocalPalette || localPal == null) {
+                throw new CorruptRegionEntryException("CBIT T5: Appended micro-palette entries require hasSlabLocalPalette");
+            }
+            int baseCount = localPal.baseBlockNames.size();
+            pPos = readSlabLocalEntryList(
+                    frame, pPos, payloadEnd, appendedStateCount,
+                    STATIC_CORE_BASE_NAMES, STATIC_CORE_SINGLETON_PALETTES,
+                    localPal.baseBlockNames, localPal.singletonBasePalettes);
+            if (needCanonicalStates) {
+                for (int i = 0; i < appendedStateCount; i++) {
+                    localPal.canonicalStates.add(localPal.baseBlockNames.get(baseCount + i));
+                }
+            }
+            int appendedPropCount = readVarInt(frame, pPos, payloadEnd);
+            pPos += varIntLen(appendedPropCount);
+            if (appendedPropCount < 0 || appendedPropCount > appendedStateCount) {
+                throw new CorruptRegionEntryException("CBIT T5: Invalid appendedPropCount " + appendedPropCount);
+            }
+            for (int k = 0; k < appendedPropCount; k++) {
+                int stateIdx = readVarInt(frame, pPos, payloadEnd);
+                pPos += varIntLen(stateIdx);
+                if (stateIdx < baseCount || stateIdx >= baseCount + appendedStateCount || pPos >= payloadEnd) {
+                    throw new CorruptRegionEntryException("CBIT T5: Appended property suffix index out of range: " + stateIdx);
+                }
+                int propTag = frame[pPos++] & 0xFF;
+                if ((propTag & 0x80) != 0) {
+                    int propId = propTag & 0x7F;
+                    if (propId >= STATIC_CORE_PROP_SUFFIXES.length) {
+                        throw new CorruptRegionEntryException("CBIT T5: Invalid appended static property suffix " + propId);
+                    }
+                    if (needCanonicalStates) {
+                        localPal.canonicalStates.set(
+                                stateIdx, localPal.baseBlockNames.get(stateIdx) + STATIC_CORE_PROP_SUFFIXES[propId]);
+                    }
+                } else if (propTag == 0x40) {
+                    int globalId = readVarInt(frame, pPos, payloadEnd);
+                    pPos += varIntLen(globalId);
+                    if (needCanonicalStates) {
+                        if (regionCanonicalStates == null || globalId < 0 || globalId >= regionCanonicalStates.size()) {
+                            throw new CorruptRegionEntryException("CBIT T7: Appended globalStateId " + globalId + " out of range");
+                        }
+                        localPal.canonicalStates.set(stateIdx, regionCanonicalStates.get(globalId));
+                    }
+                } else {
+                    throw new CorruptRegionEntryException("CBIT T5: Invalid appended property tag 0x" + Integer.toHexString(propTag));
+                }
+            }
+        }
+
+        int patchedSecCount = readVarInt(frame, pPos, payloadEnd);
+        pPos += varIntLen(patchedSecCount);
+        if (patchedSecCount < 0 || patchedSecCount > sectionCount) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid patchedSectionCount " + patchedSecCount);
+        }
+        SectionPatch[] byIndex = new SectionPatch[sectionCount];
+        int unitShift = scale4B ? 2 : 0;
+        ScratchArena arena = scratch();
+        byte[][] lightRef = new byte[1][];
+
+        for (int s = 0; s < patchedSecCount; s++) {
+            if (pPos + 2 > payloadEnd) {
+                throw new CorruptRegionEntryException("CBIT T5: Truncated SectionPatch header");
+            }
+            int secIdx = frame[pPos++] & 0xFF;
+            int patchFlags = frame[pPos++] & 0xFF;
+            if (secIdx >= sectionCount) {
+                throw new CorruptRegionEntryException("CBIT T5: SectionPatch sectionIndex " + secIdx + " >= " + sectionCount);
+            }
+            if ((patchFlags & ~0x0F) != 0) {
+                throw new CorruptRegionEntryException("CBIT T5: Unsupported SectionPatch flags 0x" + Integer.toHexString(patchFlags));
+            }
+            int replEntry16 = 0;
+            if ((patchFlags & PATCH_FLAG_REPLACEMENT_OFFSET) != 0) {
+                if (pPos + 2 > payloadEnd) {
+                    throw new CorruptRegionEntryException("CBIT T5: Truncated replacementSectionEntry16");
+                }
+                replEntry16 = readUint16BE(frame, pPos);
+                pPos += 2;
+                sectionEntries[secIdx] = replEntry16;
+                if (replEntry16 != 0 && (replEntry16 & 0x8000) == 0) {
+                    int relPos = sectionDirEnd + ((replEntry16 - 1) << unitShift);
+                    if (relPos < sectionDirEnd || relPos >= frameLen || relPos == residualRelStart) {
+                        throw new CorruptRegionEntryException("CBIT T5: Replacement sectionOffset[" + secIdx + "] out of bounds: " + relPos);
+                    }
+                    for (int k = 0; k < sectionCount; k++) {
+                        if (k != secIdx && sectionRelStarts[k] == relPos) {
+                            throw new CorruptRegionEntryException("CBIT T5: Duplicate replacement sectionOffset at " + secIdx);
+                        }
+                    }
+                    sectionRelStarts[secIdx] = relPos;
+                } else {
+                    sectionRelStarts[secIdx] = -1;
+                }
+            }
+            int[] yzxCoords = null;
+            int[] dictIds = null;
+            if ((patchFlags & PATCH_FLAG_VOXEL_DELTAS) != 0) {
+                int deltaCount = readVarInt(frame, pPos, payloadEnd);
+                pPos += varIntLen(deltaCount);
+                if (deltaCount < 1 || deltaCount > SECTION_VOXELS) {
+                    throw new CorruptRegionEntryException("CBIT T6: Invalid voxel deltaCount " + deltaCount);
+                }
+                yzxCoords = new int[deltaCount];
+                dictIds = new int[deltaCount];
+                for (int d = 0; d < deltaCount; d++) {
+                    if (pPos + 2 > payloadEnd) {
+                        throw new CorruptRegionEntryException("CBIT T6: Truncated voxel delta coordinate");
+                    }
+                    int yzx12 = readUint16BE(frame, pPos);
+                    pPos += 2;
+                    if ((yzx12 & ~0x0FFF) != 0) {
+                        throw new CorruptRegionEntryException("CBIT T6: Voxel delta coordinate out of bounds: " + yzx12);
+                    }
+                    int dictId = readVarInt(frame, pPos, payloadEnd);
+                    pPos += varIntLen(dictId);
+                    yzxCoords[d] = yzx12;
+                    dictIds[d] = dictId;
+                }
+            }
+            byte[] skyPatch2048 = null;
+            if ((patchFlags & PATCH_FLAG_SKY_LIGHT) != 0) {
+                lightRef[0] = null;
+                pPos = decodePatchLightChannel(frame, pPos, payloadEnd, CURVE_TO_YZX[CURVE_Y_H2], skipLighting, lightRef, arena);
+                skyPatch2048 = lightRef[0];
+            }
+            byte[] blkPatch2048 = null;
+            if ((patchFlags & PATCH_FLAG_BLOCK_LIGHT) != 0) {
+                lightRef[0] = null;
+                pPos = decodePatchLightChannel(frame, pPos, payloadEnd, CURVE_TO_YZX[CURVE_H3], skipLighting, lightRef, arena);
+                blkPatch2048 = lightRef[0];
+            }
+            if ((patchFlags & (PATCH_FLAG_VOXEL_DELTAS | PATCH_FLAG_SKY_LIGHT | PATCH_FLAG_BLOCK_LIGHT)) != 0) {
+                byIndex[secIdx] = new SectionPatch(
+                        secIdx, patchFlags, replEntry16, yzxCoords, dictIds, skyPatch2048, blkPatch2048);
+            }
+        }
+        if (pPos != payloadEnd) {
+            throw new CorruptRegionEntryException("CBIT T5: ChunkPatchTail cursor mismatch (" + pPos + " != " + payloadEnd + ")");
+        }
+        return new ChunkPatchTail(byIndex, patchedSecCount);
+    }
+
+    static DecodedSection createUniformDecodedSection(
+            int sectionY,
+            int entry16,
+            boolean hasSlabLocalPalette,
+            List<String> dictCanonicalStates,
+            List<String> dictBaseNames,
+            List<String> dictBiomes,
+            List<BiomeTemplate> biomeTemplates,
+            int defaultBiomeDictId,
+            boolean skipLighting,
+            boolean skipBiomes
+    ) throws CorruptRegionEntryException {
+        String canonState = "minecraft:air";
+        String baseName = "minecraft:air";
+        List<String> biomePal = Collections.emptyList();
+        long[] packedBiomeLongs = null;
+        byte[] sky2048 = null;
+        byte[] blk2048 = null;
+
+        if (entry16 != 0 && (entry16 & 0x8000) != 0) {
+            int skyLight2 = (entry16 >>> 13) & 3;
+            int globalDictId = hasSlabLocalPalette ? (entry16 & 0x07FF) : (entry16 & 0x1FFF);
+            if (globalDictId >= dictBaseNames.size()) {
+                throw new CorruptRegionEntryException("CBIT T7: Inline globalDictId out of bounds: " + globalDictId);
+            }
+            baseName = dictBaseNames.get(globalDictId);
+            if (!skipLighting) {
+                if (globalDictId >= dictCanonicalStates.size()) {
+                    throw new CorruptRegionEntryException("CBIT T7: Inline globalDictId out of bounds: " + globalDictId);
+                }
+                canonState = dictCanonicalStates.get(globalDictId);
+                if (skyLight2 == 0b01 || skyLight2 == 0b10) {
+                    sky2048 = new byte[2048];
+                    Arrays.fill(sky2048, (byte) 0xFF);
+                }
+                if (skyLight2 == 0b10 || skyLight2 == 0b11) {
+                    blk2048 = new byte[2048];
+                    Arrays.fill(blk2048, (byte) 0xFF);
+                }
+            }
+            if (!skipBiomes) {
+                if (hasSlabLocalPalette && biomeTemplates != null && !biomeTemplates.isEmpty()) {
+                    int biomeTmplIdx = (entry16 >>> 11) & 3;
+                    if (biomeTmplIdx < biomeTemplates.size()) {
+                        BiomeTemplate tmpl = biomeTemplates.get(biomeTmplIdx);
+                        biomePal = tmpl.palette;
+                        packedBiomeLongs = tmpl.packedBiomeLongs;
+                    }
+                } else if (defaultBiomeDictId >= 0 && defaultBiomeDictId < dictBiomes.size()) {
+                    biomePal = List.of(dictBiomes.get(defaultBiomeDictId));
+                }
+            }
+        } else if (!skipBiomes && defaultBiomeDictId >= 0 && defaultBiomeDictId < dictBiomes.size()) {
+            biomePal = List.of(dictBiomes.get(defaultBiomeDictId));
+        }
+
+        return new DecodedSection(
+                sectionY,
+                CURVE_H3,
+                0L,
+                skipLighting ? Collections.emptyList() : List.of(canonState),
+                List.of(baseName),
+                null,
+                biomePal,
+                packedBiomeLongs,
+                sky2048,
+                blk2048
+        );
+    }
+
+    static DecodedSection applySectionPatch(
+            DecodedSection base,
+            SectionPatch patch,
+            List<String> dictCanonicalStates,
+            List<String> dictBaseNames,
+            boolean skipLighting
+    ) throws CorruptRegionEntryException {
+        if (patch == null) {
+            return base;
+        }
+        List<String> newCanonPal = base.blockStateCanonicalPalette;
+        List<String> newBasePal = base.blockBaseNamePalette;
+        long[] newPackedLongs = base.packedBlockLongs;
+
+        if ((patch.patchFlags & PATCH_FLAG_VOXEL_DELTAS) != 0 && patch.yzxCoords != null) {
+            ScratchArena arena = scratch();
+            int[] yzxIdx = arena.yzxPaletteIdx;
+            int basePalSize = (!skipLighting && !base.blockStateCanonicalPalette.isEmpty())
+                    ? base.blockStateCanonicalPalette.size()
+                    : base.blockBaseNamePalette.size();
+            if (base.packedBlockLongs == null || basePalSize <= 1) {
+                Arrays.fill(yzxIdx, 0);
+            } else {
+                int bits = PackedPaletteDecoder.bitsPerEntry(basePalSize);
+                int entriesPerLong = 64 / bits;
+                long mask = (1L << bits) - 1L;
+                int voxel = 0;
+                for (int w = 0; w < base.packedBlockLongs.length && voxel < SECTION_VOXELS; w++) {
+                    long word = base.packedBlockLongs[w];
+                    int lim = Math.min(entriesPerLong, SECTION_VOXELS - voxel);
+                    for (int s = 0; s < lim; s++) {
+                        yzxIdx[voxel++] = (int) (word & mask);
+                        word >>>= bits;
+                    }
+                }
+                while (voxel < SECTION_VOXELS) {
+                    yzxIdx[voxel++] = 0;
+                }
+            }
+
+            List<String> mutBase = new ArrayList<>(base.blockBaseNamePalette);
+            List<String> mutCanon = skipLighting ? Collections.emptyList() : new ArrayList<>(base.blockStateCanonicalPalette);
+            int totalStates = dictBaseNames.size();
+
+            for (int d = 0; d < patch.yzxCoords.length; d++) {
+                int yzx = patch.yzxCoords[d];
+                int dictId = patch.dictIds[d];
+                if (dictId < 0 || dictId >= totalStates) {
+                    throw new CorruptRegionEntryException("CBIT T7: Patch voxel dictId " + dictId + " >= " + totalStates);
+                }
+                int palIdx;
+                if (!skipLighting) {
+                    String canon = dictCanonicalStates.get(dictId);
+                    palIdx = mutCanon.indexOf(canon);
+                    if (palIdx < 0) {
+                        palIdx = mutCanon.size();
+                        mutCanon.add(canon);
+                        mutBase.add(dictBaseNames.get(dictId));
+                    }
+                } else {
+                    String bName = dictBaseNames.get(dictId);
+                    palIdx = mutBase.indexOf(bName);
+                    if (palIdx < 0) {
+                        palIdx = mutBase.size();
+                        mutBase.add(bName);
+                    }
+                }
+                yzxIdx[yzx] = palIdx;
+            }
+
+            boolean allZero = true;
+            for (int i = 0; i < SECTION_VOXELS; i++) {
+                if (yzxIdx[i] != 0) {
+                    allZero = false;
+                    break;
+                }
+            }
+            if (allZero) {
+                newBasePal = List.of(mutBase.get(0));
+                newCanonPal = skipLighting ? Collections.emptyList() : List.of(mutCanon.get(0));
+                newPackedLongs = null;
+            } else {
+                newBasePal = Collections.unmodifiableList(mutBase);
+                newCanonPal = skipLighting ? Collections.emptyList() : Collections.unmodifiableList(mutCanon);
+                newPackedLongs = packBlockLongs(yzxIdx, (!skipLighting ? mutCanon.size() : mutBase.size()));
+            }
+        }
+
+        byte[] newSky = (!skipLighting && (patch.patchFlags & PATCH_FLAG_SKY_LIGHT) != 0)
+                ? patch.skyLight2048
+                : base.skyLight2048;
+        byte[] newBlk = (!skipLighting && (patch.patchFlags & PATCH_FLAG_BLOCK_LIGHT) != 0)
+                ? patch.blockLight2048
+                : base.blockLight2048;
+
+        return new DecodedSection(
+                base.sectionY,
+                base.curveId,
+                base.octreeOccupancyMask64,
+                newCanonPal,
+                newBasePal,
+                newPackedLongs,
+                base.biomePalette,
+                base.packedBiomeLongs,
+                newSky,
+                newBlk
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -3295,12 +4308,16 @@ final class LcaSectionCodec {
         int nbtSliceOff = 0;
         int nbtSliceLen = 0;
 
+        int residualRelEnd = findResidualRelEnd(sectionRelStarts, sectionCount, residualRelStart, frameLen);
         if (hasResidualNbt) {
             int pos = fOff + residualRelStart;
-            int limit = fOff + frameLen;
+            int limit = fOff + residualRelEnd;
             if (pos + 2 <= limit) {
                 int tailLimit = limit;
                 bpFlags = readUint16BE(frame, pos);
+                if ((bpFlags & BP_FLAG_HAS_CHUNK_PATCH_TAIL) != 0) {
+                    return null;
+                }
                 pos += 2;
                 if ((bpFlags & 8192) != 0) {
                     mbnlLen = readVarInt(frame, pos, tailLimit);
@@ -3407,8 +4424,9 @@ final class LcaSectionCodec {
         byte[][] activeBiomeTemplateNbt;
 
         if (hasSlabLocalPalette) {
+            int paletteLimitRel = findFirstSectionRelStart(sectionRelStarts, sectionCount, residualRelStart);
             SlabLocalPaletteNbt localPal = decodeSlabLocalPaletteForNbt(
-                    frame, fOff, sectionDirEnd, residualRelStart, meta, arena);
+                    frame, fOff, sectionDirEnd, paletteLimitRel, meta, arena);
             activeStateNbt = localPal.stateNbtBytes;
             activeBiomeStrNbt = localPal.biomeStringNbtBytes;
             activeSingleBiomeCompoundNbt = localPal.singleBiomeCompoundNbtBytes;
@@ -3620,19 +4638,7 @@ final class LcaSectionCodec {
                 out[outPos++] = Nbt.TAG_END; // End section compound
             } else {
                 int relStart = sectionRelStarts[i];
-                int relEnd = relStart;
-                for (int j = i + 1; j < sectionCount; j++) {
-                    if (sectionRelStarts[j] >= 0) {
-                        if (sectionRelStarts[j] < relStart) {
-                            throw new CorruptRegionEntryException("CBIT T5: Non-monotonic sectionOffsets[] at " + j);
-                        }
-                        relEnd = sectionRelStarts[j];
-                        break;
-                    }
-                }
-                if (relEnd == relStart) {
-                    relEnd = residualRelStart;
-                }
+                int relEnd = findSectionRelEnd(sectionRelStarts, i, sectionCount, residualRelStart, frameLen);
                 outPos = decodeAndWriteSectionFrameToNbt(
                         frame, fOff + relStart, fOff + relEnd, sectionY,
                         activeStateNbt, activeBiomeStrNbt, activeSingleBiomeCompoundNbt,

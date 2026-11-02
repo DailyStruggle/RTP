@@ -197,6 +197,17 @@ DENYLIST = [
 # Zone 3 (Performance / How it works); a Zone 1 hit fails the build so the
 # plain-language top survives later passes. Link targets are not checked.
 ZONE1_START = "## What it is"
+ZONE1_START_HEADINGS = frozenset({
+    ZONE1_START,
+    "## Storage",
+    "## Teleportation",
+    "## Sleep",
+    "## Worldgen",
+    "## Configuration",
+    "## Diagnostics",
+    "## Fuzzing",
+    "## Overview",
+})
 ZONE1_JARGON = [
     (re.compile(r"TP/s"), "'TP/s' (say 'teleports per second')"),
     (re.compile(r"\bMSPT\b"), "'MSPT'"),
@@ -810,14 +821,14 @@ def check_denylist(target, text):
 
 
 def check_zone1_jargon(kept):
-    """Returns problems for jargon in Zone 1; empty when the page has no `## What it is`."""
-    if not any(line.strip() == ZONE1_START for _, line in kept):
+    """Returns problems for jargon in Zone 1; empty when the page has no Zone 1 heading."""
+    if not any(line.strip() in ZONE1_START_HEADINGS for _, line in kept):
         return []
     problems = []
     seen_start = False
     for n, line in kept:
         stripped = line.strip()
-        if stripped == ZONE1_START:
+        if stripped in ZONE1_START_HEADINGS:
             seen_start = True
         elif seen_start and stripped.startswith("## "):
             break

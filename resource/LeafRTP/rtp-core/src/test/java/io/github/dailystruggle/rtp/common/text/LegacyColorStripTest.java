@@ -176,8 +176,10 @@ class LegacyColorStripTest {
         assertNotNull(r);
         for (int i = 1; i < r.strippedToRaw.length; i++) {
             // Each retained character is at a strictly greater raw offset.
-            assert r.strippedToRaw[i] > r.strippedToRaw[i - 1]
-                    : "offset map not monotonic at " + i;
+            int idx = i;
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    r.strippedToRaw[i] > r.strippedToRaw[i - 1],
+                    () -> String.valueOf(idx));
         }
     }
 }

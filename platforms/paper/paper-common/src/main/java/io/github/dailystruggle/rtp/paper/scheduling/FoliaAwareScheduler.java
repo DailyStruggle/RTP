@@ -93,7 +93,11 @@ public class FoliaAwareScheduler implements RTPScheduler {
 
   @Override
   public void runTask(RTPLocation location, Runnable task) {
-    World world = bukkitWorld(location == null ? null : location.world());
+    if (location == null) {
+      runTaskAsynchronously(task);
+      return;
+    }
+    World world = bukkitWorld(location.world());
     if (world == null) {
       runTaskAsynchronously(task);
       return;

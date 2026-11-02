@@ -1231,9 +1231,10 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
     try {
       Object mcServer = Bukkit.getServer().getClass().getMethod("getServer").invoke(Bukkit.getServer());
       if (mcServer == null) return null;
+      Class<?> dispatcherType = Class.forName("com.mojang.brigadier.CommandDispatcher");
       for (Method m : mcServer.getClass().getMethods()) {
         if (m.getParameterCount() == 0
-            && m.getReturnType().getName().equals("com.mojang.brigadier.CommandDispatcher")) {
+            && dispatcherType.isAssignableFrom(m.getReturnType())) {
           return m.invoke(mcServer);
         }
       }
@@ -1245,7 +1246,7 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
           if (commandsObj == null) continue;
           for (Method cm : commandsObj.getClass().getMethods()) {
             if (cm.getParameterCount() == 0
-                && cm.getReturnType().getName().equals("com.mojang.brigadier.CommandDispatcher")) {
+                && dispatcherType.isAssignableFrom(cm.getReturnType())) {
               return cm.invoke(commandsObj);
             }
           }

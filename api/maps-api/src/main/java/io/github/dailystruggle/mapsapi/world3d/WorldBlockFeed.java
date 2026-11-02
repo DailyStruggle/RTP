@@ -182,6 +182,23 @@ public interface WorldBlockFeed {
             result = 31 * result + Arrays.hashCode(blockLightGrayPlanes);
             return result;
         }
+
+        @Override
+        public String toString() {
+            return "SubChunkSectionFrame[world=" + world
+                    + ", chunkX=" + chunkX
+                    + ", sectionY=" + sectionY
+                    + ", chunkZ=" + chunkZ
+                    + ", curveId=" + curveId
+                    + ", octreeOccupancyMask64=" + octreeOccupancyMask64
+                    + ", paletteBlockIds=" + paletteBlockIds
+                    + ", deltaGapRuns=" + Arrays.toString(deltaGapRuns)
+                    + ", skyLightConstant=" + skyLightConstant
+                    + ", blockLightConstant=" + blockLightConstant
+                    + ", skyLightGrayPlanes=" + Arrays.toString(skyLightGrayPlanes)
+                    + ", blockLightGrayPlanes=" + Arrays.toString(blockLightGrayPlanes)
+                    + "]";
+        }
     }
 
     /**
@@ -237,6 +254,67 @@ public interface WorldBlockFeed {
         @Override
         public byte[] surfaceHorizonHeader() {
             return surfaceHorizonHeader.clone();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof PacketDataBatch that)) return false;
+            return packetIndex == that.packetIndex
+                    && totalPackets == that.totalPackets
+                    && lodLevel == that.lodLevel
+                    && centerChunkX == that.centerChunkX
+                    && centerChunkZ == that.centerChunkZ
+                    && minSectionY == that.minSectionY
+                    && maxSectionY == that.maxSectionY
+                    && fitsInSinglePacket == that.fitsInSinglePacket
+                    && wireByteCount == that.wireByteCount
+                    && Double.compare(that.coldChunkLoadMicros, coldChunkLoadMicros) == 0
+                    && Double.compare(that.compressionRatioVsBlueMap, compressionRatioVsBlueMap) == 0
+                    && world.equals(that.world)
+                    && Arrays.equals(surfaceHorizonHeader, that.surfaceHorizonHeader)
+                    && subChunks.equals(that.subChunks)
+                    && localFallbackArchivePath.equals(that.localFallbackArchivePath);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(
+                    world,
+                    packetIndex,
+                    totalPackets,
+                    lodLevel,
+                    centerChunkX,
+                    centerChunkZ,
+                    minSectionY,
+                    maxSectionY,
+                    subChunks,
+                    fitsInSinglePacket,
+                    wireByteCount,
+                    localFallbackArchivePath,
+                    coldChunkLoadMicros,
+                    compressionRatioVsBlueMap);
+            return 31 * result + Arrays.hashCode(surfaceHorizonHeader);
+        }
+
+        @Override
+        public String toString() {
+            return "PacketDataBatch[world=" + world
+                    + ", packetIndex=" + packetIndex
+                    + ", totalPackets=" + totalPackets
+                    + ", lodLevel=" + lodLevel
+                    + ", centerChunkX=" + centerChunkX
+                    + ", centerChunkZ=" + centerChunkZ
+                    + ", minSectionY=" + minSectionY
+                    + ", maxSectionY=" + maxSectionY
+                    + ", surfaceHorizonHeader=" + Arrays.toString(surfaceHorizonHeader)
+                    + ", subChunks=" + subChunks
+                    + ", fitsInSinglePacket=" + fitsInSinglePacket
+                    + ", wireByteCount=" + wireByteCount
+                    + ", localFallbackArchivePath=" + localFallbackArchivePath
+                    + ", coldChunkLoadMicros=" + coldChunkLoadMicros
+                    + ", compressionRatioVsBlueMap=" + compressionRatioVsBlueMap
+                    + "]";
         }
     }
 
