@@ -95,11 +95,11 @@ public final class RespProtocol {
     /**
      * Reads a single RESP response object from the stream.
      * Returns:
-     *   - String for simple strings
-     *   - Long for integers
-     *   - byte[] for bulk strings (or null for nil bulk strings)
-     *   - List<Object> for arrays (or null for nil arrays)
-     *   - Throws RespException for Redis error replies
+     *   - {@code String} for simple strings
+     *   - {@code Long} for integers
+     *   - {@code byte[]} for bulk strings (or {@code null} for nil bulk strings)
+     *   - {@code List<Object>} for arrays (or {@code null} for nil arrays)
+     *   - Throws {@link RespException} for Redis error replies
      */
     public static Object readReply(InputStream in) throws IOException {
         return readReply(in, 0, new int[]{0});

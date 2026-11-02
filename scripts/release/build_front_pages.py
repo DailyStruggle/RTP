@@ -236,6 +236,11 @@ _TAGLINE_LINE = re.compile(r'tagline:\s*"([^"]+)"')
 # Short-version bullets are `[**Adjective**](link): fact.`; a label of one or two
 # words, never a sentence.
 SHORT_VERSION_START = "### The short version"
+SHORT_VERSION_HEADINGS = frozenset({
+    SHORT_VERSION_START,
+    "### TL;DR",
+    "### Summary",
+})
 _SHORT_BULLET = re.compile(r"^- \[\*\*[A-Z][\w-]*( [\w-]+)?\*\*\]\([^)]+\): \S")
 
 # Zone 2 (`## Common setups` through `## Features`, stopping at `## Performance`)
@@ -849,7 +854,7 @@ def check_short_version_labels(kept):
     inside = False
     for n, line in kept:
         stripped = line.strip()
-        if stripped == SHORT_VERSION_START:
+        if stripped in SHORT_VERSION_HEADINGS:
             inside = True
         elif inside and (stripped.startswith("<details") or stripped.startswith("#")):
             break
@@ -1044,18 +1049,18 @@ def check_shallow_ast_sections(kept):
             for pattern, label in _FRONT_PAGE_DEEP_JARGON:
                 if pattern.search(cleaned_line):
                     problems.append(f"line {line_no}: {label}: {raw.strip()[:120]}")
-        if node.h3 == SHORT_VERSION_START:
+        if node.h3 in SHORT_VERSION_HEADINGS:
             bullets = [raw.strip() for _, raw in node.lines if raw.strip().startswith("- ")]
             if len(bullets) >= 4:
                 joined = "\n".join(bullets)
                 if not _SHORT_VERSION_EASE_RE.search(joined):
                     problems.append(
-                        f"line {node.start_line}: '{SHORT_VERSION_START}' must include an ease-of-use "
+                        f"line {node.start_line}: '{node.h3}' must include an ease-of-use "
                         "bullet ([**Easy**], /rtp editor, or /rtp admin setup) in the main list"
                     )
                 if not _SHORT_VERSION_SAFE_RE.search(joined):
                     problems.append(
-                        f"line {node.start_line}: '{SHORT_VERSION_START}' must include a safety/claim "
+                        f"line {node.start_line}: '{node.h3}' must include a safety/claim "
                         "bullet ([**Safe**] or claim protection) in the main list"
                     )
         if node.h3 in _POST_STORY_SUMMARIES and node.h2 in ("## Why I made it", "## What paying gets you", ""):

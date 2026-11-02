@@ -70,6 +70,13 @@ final class LcaSectionCodec {
     static final int[][] CURVE_TO_YZX = new int[4][SECTION_VOXELS];
     static final int[][] YZX_TO_CURVE = new int[4][SECTION_VOXELS];
     static final int[] YZX_TO_OCTANT6 = new int[SECTION_VOXELS];
+    /**
+     * Precomputed `(wordIdx << 12) | (bitShift << 6) | octant6` indexed by `[bits][yzx]` for
+     * `bits in 4..12`, eliminating two integer divisions (`yzx / entriesPerLong`,
+     * `yzx % entriesPerLong`) and a second array lookup (`YZX_TO_OCTANT6[yzx]`) per voxel in
+     * `decodeDeltaRoaringBlocks`.
+     */
+    static final int[][] YZX_BITS_TO_PACKED_LOC = new int[13][SECTION_VOXELS];
 
     /**
      * Per-worker thread-local scratch arena (`anvil-api-ADR-003` Section 5.5) avoiding heap
@@ -333,7 +340,14 @@ final class LcaSectionCodec {
                     CURVE_TO_YZX[CURVE_H3][h3] = yzx;
                     YZX_TO_CURVE[CURVE_H3][yzx] = h3;
 
-                    YZX_TO_OCTANT6[yzx] = h3 >>> 6;
+                    int octant6 = h3 >>> 6;
+                    YZX_TO_OCTANT6[yzx] = octant6;
+                    for (int bits = 4; bits <= 12; bits++) {
+                        int entriesPerLong = 64 / bits;
+                        int wordIdx = yzx / entriesPerLong;
+                        int bitShift = (yzx % entriesPerLong) * bits;
+                        YZX_BITS_TO_PACKED_LOC[bits][yzx] = (wordIdx << 12) | (bitShift << 6) | octant6;
+                    }
                 }
             }
         }
@@ -646,9 +660,8 @@ final class LcaSectionCodec {
      */
     static long computeSuperblockChecksum64(byte[] buf, int offset) {
         long h = 0x9E3779B97F4A7C15L;
-        ByteBuffer bb = ByteBuffer.wrap(buf, offset, 56);
         for (int i = 0; i < 7; i++) {
-            long k = bb.getLong(offset + (i << 3));
+            long k = (long) LcaRegionReader.LONG_BE_VIEW.get(buf, offset + (i << 3));
             k *= 0xBF58476D1CE4E5B9L;
             k = Long.rotateLeft(k, 31);
             k *= 0x94D049BB133111EBL;
@@ -2012,6 +2025,7 @@ final class LcaSectionCodec {
             int bits,
             int entriesPerLong
     ) throws CorruptRegionEntryException {
+        int[] yzxToLoc = (bits >= 4 && bits <= 12) ? YZX_BITS_TO_PACKED_LOC[bits] : null;
         long decodedOctreeMask64 = 0L;
         for (int p = 1; p < paletteLen; p++) {
             if (pos + 2 > limit) {
@@ -2028,8 +2042,14 @@ final class LcaSectionCodec {
                     throw new CorruptRegionEntryException("CBIT T6: Singleton index out of bounds: " + countOrIdx);
                 }
                 int yzx = curveToYzx[countOrIdx];
-                setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
-                decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                if (yzxToLoc != null) {
+                    int loc = yzxToLoc[yzx];
+                    packedBlockLongs[loc >>> 12] |= pLong << ((loc >>> 6) & 63);
+                    decodedOctreeMask64 |= 1L << (loc & 63);
+                } else {
+                    setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
+                    decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                }
             } else if (tag == TAG_BITMAP) {
                 if (pos + 512 > limit) {
                     throw new CorruptRegionEntryException("CBIT T6: Truncated TAG_BITMAP container");
@@ -2041,8 +2061,14 @@ final class LcaSectionCodec {
                     for (int bit = 0; bit < 8; bit++) {
                         if ((mask8 & (1 << bit)) != 0) {
                             int yzx = curveToYzx[base + bit];
-                            setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
-                            decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                            if (yzxToLoc != null) {
+                                int loc = yzxToLoc[yzx];
+                                packedBlockLongs[loc >>> 12] |= pLong << ((loc >>> 6) & 63);
+                                decodedOctreeMask64 |= 1L << (loc & 63);
+                            } else {
+                                setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
+                                decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                            }
                         }
                     }
                 }
@@ -2064,8 +2090,14 @@ final class LcaSectionCodec {
                         throw new CorruptRegionEntryException("CBIT T6: TAG_DELTA_ARRAY cursor overflow: " + cursor);
                     }
                     int yzx = curveToYzx[cursor++];
-                    setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
-                    decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                    if (yzxToLoc != null) {
+                        int loc = yzxToLoc[yzx];
+                        packedBlockLongs[loc >>> 12] |= pLong << ((loc >>> 6) & 63);
+                        decodedOctreeMask64 |= 1L << (loc & 63);
+                    } else {
+                        setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
+                        decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                    }
                 }
             } else {
                 boolean subMode62 = (countOrIdx & 0x2000) != 0;
@@ -2125,10 +2157,19 @@ final class LcaSectionCodec {
                         throw new CorruptRegionEntryException("CBIT T6: Delta-Roaring run cursor exceeded 4096 ("
                                 + (cursor + runLen) + ")");
                     }
-                    for (int k = 0; k < runLen; k++) {
-                        int yzx = curveToYzx[cursor++];
-                        setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
-                        decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                    if (yzxToLoc != null) {
+                        int runEnd = cursor + runLen;
+                        while (cursor < runEnd) {
+                            int loc = yzxToLoc[curveToYzx[cursor++]];
+                            packedBlockLongs[loc >>> 12] |= pLong << ((loc >>> 6) & 63);
+                            decodedOctreeMask64 |= 1L << (loc & 63);
+                        }
+                    } else {
+                        for (int k = 0; k < runLen; k++) {
+                            int yzx = curveToYzx[cursor++];
+                            setPackedVoxel(packedBlockLongs, yzx, pLong, bits, entriesPerLong);
+                            decodedOctreeMask64 |= (1L << YZX_TO_OCTANT6[yzx]);
+                        }
                     }
                 }
             }
