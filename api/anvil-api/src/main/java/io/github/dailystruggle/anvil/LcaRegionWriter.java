@@ -1255,9 +1255,13 @@ public final class LcaRegionWriter {
             }
         }
 
-        public synchronized byte[] liveBuffer() {
+        public byte[] liveBuffer() {
             if (headerOnlyChannelMode) {
-                materializeFullBufferFromChannel();
+                synchronized (this) {
+                    if (headerOnlyChannelMode) {
+                        materializeFullBufferFromChannel();
+                    }
+                }
             }
             return buffer;
         }

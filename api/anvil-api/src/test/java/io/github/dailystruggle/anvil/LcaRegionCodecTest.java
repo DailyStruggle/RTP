@@ -951,8 +951,10 @@ class LcaRegionCodecTest {
         // 2. SEQUENTIAL WHOLE-REGION SWEEP BENCHMARK (Reading ALL N Chunks 0..N-1)
         //    Tests the claim: "Linear is great if it reads a whole region file"
         // =========================================================================
+        System.gc();
         int seqSweepsPerBatch = 4;
         long[] sweepBatchNs = new long[batches];
+        long[] sweepLcaAColdBatchNs = new long[batches];
 
         // 2a. Cold Whole-Region Sequential Sweep -> AnvilChunkView (all 64 chunks)
         for (int b = 0; b < batches; b++) {
@@ -970,7 +972,17 @@ class LcaRegionCodecTest {
         double seqMcaPerChunkUs = (seqMcaRegionMs * 1000.0) / numChunks;
 
         for (int b = 0; b < batches; b++) {
-            long start = System.nanoTime();
+            long startLca = System.nanoTime();
+            for (int s = 0; s < seqSweepsPerBatch; s++) {
+                LcaRegionReader.INSTANCE.invalidateFastDictCache();
+                for (int i = 0; i < numChunks; i++) {
+                    int[] c = coords.get(i);
+                    sink += LcaRegionReader.readChunkView(benchLcaA, c[0], c[1]).sections().size();
+                }
+            }
+            sweepLcaAColdBatchNs[b] = System.nanoTime() - startLca;
+
+            long startLin = System.nanoTime();
             for (int s = 0; s < seqSweepsPerBatch; s++) {
                 coldLinearBb.putLong(9, 1800000000L + b * 100L + s);
                 for (int i = 0; i < numChunks; i++) {
@@ -978,11 +990,14 @@ class LcaRegionCodecTest {
                     sink += AnvilReader.toView(LinearRegionReader.INSTANCE.readChunk(coldLinearBuf, c[0], c[1]).root).sections().size();
                 }
             }
-            sweepBatchNs[b] = System.nanoTime() - start;
+            sweepBatchNs[b] = System.nanoTime() - startLin;
         }
         Arrays.sort(sweepBatchNs);
+        Arrays.sort(sweepLcaAColdBatchNs);
         double seqLinearColdRegionMs = (sweepBatchNs[batches / 2] / 1_000_000.0) / seqSweepsPerBatch;
         double seqLinearColdPerChunkUs = (seqLinearColdRegionMs * 1000.0) / numChunks;
+        double seqLcaAColdRegionMs = (sweepLcaAColdBatchNs[batches / 2] / 1_000_000.0) / seqSweepsPerBatch;
+        double seqLcaAColdPerChunkUs = (seqLcaAColdRegionMs * 1000.0) / numChunks;
 
         for (int b = 0; b < batches; b++) {
             long start = System.nanoTime();
@@ -997,21 +1012,6 @@ class LcaRegionCodecTest {
         Arrays.sort(sweepBatchNs);
         double seqLinearWarmRegionMs = (sweepBatchNs[batches / 2] / 1_000_000.0) / seqSweepsPerBatch;
         double seqLinearWarmPerChunkUs = (seqLinearWarmRegionMs * 1000.0) / numChunks;
-
-        for (int b = 0; b < batches; b++) {
-            long start = System.nanoTime();
-            for (int s = 0; s < seqSweepsPerBatch; s++) {
-                LcaRegionReader.INSTANCE.invalidateFastDictCache();
-                for (int i = 0; i < numChunks; i++) {
-                    int[] c = coords.get(i);
-                    sink += LcaRegionReader.readChunkView(benchLcaA, c[0], c[1]).sections().size();
-                }
-            }
-            sweepBatchNs[b] = System.nanoTime() - start;
-        }
-        Arrays.sort(sweepBatchNs);
-        double seqLcaAColdRegionMs = (sweepBatchNs[batches / 2] / 1_000_000.0) / seqSweepsPerBatch;
-        double seqLcaAColdPerChunkUs = (seqLcaAColdRegionMs * 1000.0) / numChunks;
 
         for (int b = 0; b < batches; b++) {
             long start = System.nanoTime();

@@ -808,6 +808,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         }
         boolean hasResidualNbt = (frame[fOff + 21] & 1) != 0;
         int unitShift = scale4B ? 2 : 0;
+        int maxRelPos = -1;
         for (int i = 0; i < sectionCount; i++) {
             int entry16 = LcaSectionCodec.readUint16BE(frame, fOff + 24 + (i << 1));
             entriesOut[i] = entry16;
@@ -816,10 +817,14 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 if (relPos < sectionDirEnd || relPos >= frameLen || (hasResidualNbt && relPos == residualRelStart)) {
                     throw new CorruptRegionEntryException("CBIT T5: sectionOffsets[" + i + "] out of bounds: " + relPos);
                 }
-                for (int k = 0; k < i; k++) {
-                    if (relStarts[k] == relPos) {
-                        throw new CorruptRegionEntryException("CBIT T5: Duplicate non-uniform sectionOffsets[] at " + i);
+                if (relPos <= maxRelPos) {
+                    for (int k = 0; k < i; k++) {
+                        if (relStarts[k] == relPos) {
+                            throw new CorruptRegionEntryException("CBIT T5: Duplicate non-uniform sectionOffsets[] at " + i);
+                        }
                     }
+                } else {
+                    maxRelPos = relPos;
                 }
                 relStarts[i] = relPos;
             } else {
@@ -936,17 +941,17 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 ? sectionDirEnd + (residualNbtRelOffset << unitShift)
                 : frameLen;
 
-        int[] entries = new int[sectionCount];
-        int[] relStarts;
+        LcaSectionCodec.ScratchArena arena = LcaSectionCodec.scratch();
+        int[] entries = arena.sectionEntries.length >= sectionCount ? arena.sectionEntries : new int[sectionCount];
+        int[] relStarts = arena.sectionRelStarts.length >= sectionCount ? arena.sectionRelStarts : new int[sectionCount];
         if (snap.modeBBodyDeferred) {
-            relStarts = new int[sectionCount];
             for (int i = 0; i < sectionCount; i++) {
                 entries[i] = LcaSectionCodec.readUint16BE(frame, fOff + 24 + (i << 1));
                 relStarts[i] = -1;
             }
         } else {
             relStarts = computeSectionRelStarts(
-                    frame, fOff, frameLen, sectionCount, sectionDirEnd, residualRelStart, scale4B, entries);
+                    frame, fOff, frameLen, sectionCount, sectionDirEnd, residualRelStart, scale4B, entries, relStarts);
         }
 
         List<String> canonicalStates;
