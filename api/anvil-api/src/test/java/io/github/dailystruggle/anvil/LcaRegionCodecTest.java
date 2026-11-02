@@ -758,7 +758,36 @@ class LcaRegionCodecTest {
             }
         }
         assertFalse(coords.isEmpty(), "Benchmark fixture must contain at least one generated chunk");
+        if (coords.size() < 64) {
+            expandSingleChunkFixtureTo64Chunks(coords, chunkRoots);
+            datasetLabel = datasetLabel + " (expanded 64-chunk mountain fixture)";
+        }
 
+        runEmpiricalBenchmarkOnRoots(datasetLabel, coords, chunkRoots, 600, 500);
+
+        // Also verify that when `overworld_mountain_r.0.0.mca` is absent (such as in standalone downstream SDK exports
+        // that only ship `/anvil/real/1_21_R1/r.0.0.mca`), the 64-chunk fallback expansion satisfies all size and latency invariants.
+        if (Files.isRegularFile(mountainMcaPath)) {
+            byte[] fallbackMcaRaw = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
+            AnvilReader.ChunkEntry fallbackOrigin = AnvilReader.readChunkEntry(fallbackMcaRaw, 0, 0);
+            assertNotNull(fallbackOrigin);
+            List<int[]> fbCoords = new ArrayList<>();
+            List<LinkedHashMap<String, Object>> fbRoots = new ArrayList<>();
+            fbCoords.add(new int[] {0, 0});
+            fbRoots.add(fallbackOrigin.root);
+            expandSingleChunkFixtureTo64Chunks(fbCoords, fbRoots);
+            assertEquals(64, fbCoords.size());
+            runEmpiricalBenchmarkOnRoots("1_21_R1/r.0.0.mca (expanded 64-chunk mountain fixture)", fbCoords, fbRoots, 200, 200);
+        }
+    }
+
+    private static void runEmpiricalBenchmarkOnRoots(
+            String datasetLabel,
+            List<int[]> coords,
+            List<LinkedHashMap<String, Object>> chunkRoots,
+            int warmupIters,
+            int measureIters)
+            throws Exception {
         byte[] benchMca = buildMcaFromRoots(coords, chunkRoots);
         byte[] benchLinear = buildLinearFromRoots(coords, chunkRoots);
         LcaRegionWriter.LcaLiveArchive lcaModeAArchive =
@@ -787,8 +816,6 @@ class LcaRegionCodecTest {
             }
         }
 
-        int warmupIters = 600;
-        int measureIters = 500;
         long sink = 0;
 
         for (int i = 0; i < warmupIters; i++) {
@@ -802,6 +829,17 @@ class LcaRegionCodecTest {
             sink += LcaRegionReader.readSection(benchLcaA, benchLcaA.length, c[0], c[1], -4).palette().size();
             sink += LcaRegionReader.readSection(benchLcaA, benchLcaA.length, c[0], c[1], 4).palette().size();
             sink += lcaModeAArchive.saveChunkCoW(c[0], c[1], chunkRoots.get(idx));
+            if ((i & 7) == 0) {
+                byte[] warmNbt = Nbt.writeNamedRoot("", chunkRoots.get(idx));
+                ByteArrayOutputStream warmComp = new ByteArrayOutputStream(4096);
+                Deflater warmDef = new Deflater(Deflater.DEFAULT_COMPRESSION);
+                try (DeflaterOutputStream dos = new DeflaterOutputStream(warmComp, warmDef)) {
+                    dos.write(warmNbt);
+                } finally {
+                    warmDef.end();
+                }
+                sink += warmComp.size();
+            }
         }
 
         // Pre-build a deterministic random permutation of chunk indices for random-access workloads
@@ -1049,19 +1087,29 @@ class LcaRegionCodecTest {
         // =========================================================================
         // 3. RTP Terrain Window Probe ([48..112]) & Single-Section Partial Read
         // =========================================================================
-        long tMcaProbe = System.nanoTime();
-        for (int i = 0; i < measureIters; i++) {
-            int[] c = coords.get(randomOrder[i]);
-            sink += AnvilReader.readTerrainProbe(benchMca, benchMca.length, c[0], c[1], 48, 112).sections().size();
+        for (int b = 0; b < batches; b++) {
+            long start = System.nanoTime();
+            int base = b * batchRandomIters;
+            for (int i = 0; i < batchRandomIters; i++) {
+                int[] c = coords.get(randomOrder[base + i]);
+                sink += AnvilReader.readTerrainProbe(benchMca, benchMca.length, c[0], c[1], 48, 112).sections().size();
+            }
+            batchNs[b] = System.nanoTime() - start;
         }
-        double mcaTerrainProbeUs = (System.nanoTime() - tMcaProbe) / 1000.0 / measureIters;
+        Arrays.sort(batchNs);
+        double mcaTerrainProbeUs = (batchNs[batches / 2] / 1000.0) / batchRandomIters;
 
-        long tLcaProbe = System.nanoTime();
-        for (int i = 0; i < measureIters; i++) {
-            int[] c = coords.get(randomOrder[i]);
-            sink += LcaRegionReader.readTerrainProbe(benchLcaA, benchLcaA.length, c[0], c[1], 48, 112).sections().size();
+        for (int b = 0; b < batches; b++) {
+            long start = System.nanoTime();
+            int base = b * batchRandomIters;
+            for (int i = 0; i < batchRandomIters; i++) {
+                int[] c = coords.get(randomOrder[base + i]);
+                sink += LcaRegionReader.readTerrainProbe(benchLcaA, benchLcaA.length, c[0], c[1], 48, 112).sections().size();
+            }
+            batchNs[b] = System.nanoTime() - start;
         }
-        double lcaTerrainProbeUs = (System.nanoTime() - tLcaProbe) / 1000.0 / measureIters;
+        Arrays.sort(batchNs);
+        double lcaTerrainProbeUs = (batchNs[batches / 2] / 1000.0) / batchRandomIters;
 
         long tLcaSecNonUniform = System.nanoTime();
         for (int i = 0; i < measureIters; i++) {
@@ -1202,6 +1250,177 @@ class LcaRegionCodecTest {
                 ".lca Mode A (0-LZ) size (" + benchLcaA.length + ") must be smaller than .linear Zstd-1 (" + benchLinear.length + ")");
         assertTrue(benchLcaB.length < benchMca.length,
                 ".lca Mode B size (" + benchLcaB.length + ") must be smaller than .mca (" + benchMca.length + ")");
+    }
+
+    private static final String[] FALLBACK_TERRAIN_STATES = {
+        "minecraft:air",
+        "minecraft:deepslate",
+        "minecraft:stone",
+        "minecraft:tuff",
+        "minecraft:granite",
+        "minecraft:diorite",
+        "minecraft:andesite",
+        "minecraft:gravel",
+        "minecraft:dirt",
+        "minecraft:grass_block",
+        "minecraft:coal_ore",
+        "minecraft:iron_ore",
+        "minecraft:copper_ore",
+        "minecraft:gold_ore",
+        "minecraft:redstone_ore",
+        "minecraft:lapis_ore",
+        "minecraft:cobblestone"
+    };
+
+    private static void expandSingleChunkFixtureTo64Chunks(
+            List<int[]> coords, List<LinkedHashMap<String, Object>> chunkRoots) {
+        LinkedHashMap<String, Object> template = chunkRoots.get(0);
+        coords.clear();
+        chunkRoots.clear();
+
+        for (int idx = 0; idx < 64; idx++) {
+            int rx = idx & 7;
+            int rz = (idx >>> 3) & 7;
+            LinkedHashMap<String, Object> copy = new LinkedHashMap<>(template);
+            copy.put("xPos", rx);
+            copy.put("zPos", rz);
+            copy.put("LastUpdate", 1700000000L + idx * 37L);
+            copy.put("InhabitedTime", 120L + idx * 19L);
+
+            Object hmObj = template.get("Heightmaps");
+            if (hmObj instanceof Map<?, ?> hmMap) {
+                LinkedHashMap<String, Object> newHm = new LinkedHashMap<>();
+                int keyIdx = 0;
+                for (Map.Entry<?, ?> entry : hmMap.entrySet()) {
+                    String k = String.valueOf(entry.getKey());
+                    Object v = entry.getValue();
+                    if (v instanceof long[] arr) {
+                        long[] modArr = new long[arr.length];
+                        for (int w = 0; w < arr.length; w++) {
+                            long noise = mix64((idx + 1L) * 0x9E3779B97F4A7C15L ^ (keyIdx * 64L + w) * 0xBF58476D1CE4E5B9L);
+                            modArr[w] = arr[w] ^ (noise & 0x001F_0F87_C3E1_F078L);
+                        }
+                        newHm.put(k, modArr);
+                    } else {
+                        newHm.put(k, v);
+                    }
+                    keyIdx++;
+                }
+                copy.put("Heightmaps", newHm);
+            }
+
+            Object secsObj = template.get("sections");
+            if (secsObj instanceof Nbt.NbtList origSecs) {
+                List<Object> newSecItems = new ArrayList<>(origSecs.items.size());
+                for (int s = 0; s < origSecs.items.size(); s++) {
+                    Object item = origSecs.items.get(s);
+                    if (!(item instanceof Map<?, ?> secMap)) {
+                        newSecItems.add(item);
+                        continue;
+                    }
+                    LinkedHashMap<String, Object> secCopy = new LinkedHashMap<>();
+                    for (Map.Entry<?, ?> e : secMap.entrySet()) {
+                        secCopy.put(String.valueOf(e.getKey()), e.getValue());
+                    }
+                    int secY = secCopy.get("Y") instanceof Number n ? n.intValue() : (s - 4);
+                    if (secY >= -4 && secY <= 11) {
+                        secCopy.put("block_states", buildSynthesizedTerrainBlockStates(idx, secY));
+                        byte[] sky = new byte[2048];
+                        if (secY >= 4) {
+                            Arrays.fill(sky, (byte) 0xFF);
+                        }
+                        secCopy.put("SkyLight", sky);
+                        secCopy.remove("BlockLight");
+                    }
+                    newSecItems.add(secCopy);
+                }
+                copy.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, newSecItems));
+            }
+
+            coords.add(new int[] {rx, rz});
+            chunkRoots.add(copy);
+        }
+    }
+
+    private static LinkedHashMap<String, Object> buildSynthesizedTerrainBlockStates(int chunkIdx, int secY) {
+        int palSize = FALLBACK_TERRAIN_STATES.length; // 17 -> 5 bits per entry (entriesPerLong = 12, long[342])
+        int[] order = new int[palSize];
+        for (int i = 0; i < palSize; i++) {
+            order[i] = i;
+        }
+        long seed = mix64((chunkIdx + 1L) * 0x9E3779B97F4A7C15L ^ (secY + 16L) * 0xBF58476D1CE4E5B9L);
+        for (int i = palSize - 1; i > 0; i--) {
+            seed = mix64(seed + i);
+            int j = (int) (Long.remainderUnsigned(seed, i + 1));
+            int tmp = order[i];
+            order[i] = order[j];
+            order[j] = tmp;
+        }
+        String dominantName = secY < 0 ? "minecraft:deepslate" : "minecraft:stone";
+        int domLocalIdx = 0;
+        for (int i = 0; i < palSize; i++) {
+            if (FALLBACK_TERRAIN_STATES[order[i]].equals(dominantName)) {
+                domLocalIdx = i;
+                break;
+            }
+        }
+        if (domLocalIdx == 0) {
+            int swapWith = 1 + (Math.abs(chunkIdx * 5 + secY * 3) % (palSize - 1));
+            int tmp = order[0];
+            order[0] = order[swapWith];
+            order[swapWith] = tmp;
+            domLocalIdx = swapWith;
+        }
+
+        List<Object> paletteList = new ArrayList<>(palSize);
+        for (int i = 0; i < palSize; i++) {
+            LinkedHashMap<String, Object> entry = new LinkedHashMap<>();
+            entry.put("Name", FALLBACK_TERRAIN_STATES[order[i]]);
+            paletteList.add(entry);
+        }
+
+        int[] voxels = new int[4096];
+        Arrays.fill(voxels, domLocalIdx);
+        // Place 2 contiguous YZX strata/vein runs per minority state at deterministic per-(chunk, section) offsets
+        int cursor = (int) (Long.remainderUnsigned(seed, 97)) + 16;
+        for (int round = 0; round < 2; round++) {
+            for (int p = 0; p < palSize; p++) {
+                if (p == domLocalIdx) continue;
+                seed = mix64(seed + p * 31L + round * 131L);
+                int gap = 36 + (int) Long.remainderUnsigned(seed, 72);
+                int runLen = 10 + (int) Long.remainderUnsigned(seed >>> 16, 7);
+                cursor += gap;
+                if (cursor + runLen >= 4096) {
+                    cursor = (cursor + runLen) & 4095;
+                }
+                if (cursor + runLen <= 4096) {
+                    Arrays.fill(voxels, cursor, cursor + runLen, p);
+                    cursor += runLen;
+                }
+            }
+        }
+
+        // Pack 4,096 5-bit indices into long[342] (12 entries per 64-bit long, Mojang post-1.16 non-spanning layout)
+        long[] packed = new long[342];
+        int vIdx = 0;
+        for (int w = 0; w < packed.length && vIdx < 4096; w++) {
+            long word = 0L;
+            for (int slot = 0; slot < 12 && vIdx < 4096; slot++, vIdx++) {
+                word |= ((long) (voxels[vIdx] & 0x1F)) << (slot * 5);
+            }
+            packed[w] = word;
+        }
+
+        LinkedHashMap<String, Object> bs = new LinkedHashMap<>();
+        bs.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, paletteList));
+        bs.put("data", packed);
+        return bs;
+    }
+
+    private static long mix64(long z) {
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
     }
 
     private static byte[] buildMcaFromRoots(List<int[]> coords, List<LinkedHashMap<String, Object>> roots) throws IOException {

@@ -256,6 +256,96 @@ class LinearRegionReaderTest {
         assertNotNull(blEntry);
         assertEquals(5, blEntry.root.get("xPos"));
         assertEquals(9, blEntry.root.get("zPos"));
+
+        // 3. Construct Winds-Studio Leaf / Luminol BufferedLinear v3 (.b_linear) with inner LZ4 CompressingOps wrapper
+        ByteArrayOutputStream innerFrameOut = new ByteArrayOutputStream();
+        try (DataOutputStream fDos = new DataOutputStream(innerFrameOut)) {
+            fDos.writeInt(16 + nbt.length); // actualBodyLength = 16 + nbt.length
+            fDos.writeLong(1700000000L);
+            fDos.writeInt(0x12345678);
+            fDos.write(nbt);
+        }
+        byte[] innerFrameBytes = innerFrameOut.toByteArray();
+        byte[] lz4Compressed = net.jpountz.lz4.LZ4Factory.fastestInstance()
+                .fastCompressor()
+                .compress(innerFrameBytes);
+        ByteArrayOutputStream blLz4BucketUncompressed = new ByteArrayOutputStream();
+        try (DataOutputStream bDos = new DataOutputStream(blLz4BucketUncompressed)) {
+            for (int idx = bLinearBeginChunk; idx < bLinearBeginChunk + 64; idx++) {
+                if (idx == chunkIndex) {
+                    bDos.writeInt(4 + lz4Compressed.length); // sectionSize = 4 + lz4CompLen
+                    bDos.writeInt(innerFrameBytes.length);   // uncompressedFrameLen (16 + nbt.length)
+                    bDos.write(lz4Compressed);
+                } else {
+                    bDos.writeInt(0);
+                }
+            }
+        }
+        byte[] blLz4Raw = blLz4BucketUncompressed.toByteArray();
+        byte[] blLz4Zstd = com.github.luben.zstd.Zstd.compress(blLz4Raw);
+
+        ByteArrayOutputStream blLz4V3Out = new ByteArrayOutputStream();
+        try (DataOutputStream dos = new DataOutputStream(blLz4V3Out)) {
+            dos.writeLong(LinearRegionReader.BLINEAR_SIGNATURE);
+            dos.writeByte(3); // MASTER_FILE_VERSION_BUCKET
+            dos.writeByte(6); // compressionLevel
+            dos.writeInt(0x0721); // xxHash32Seed
+            for (int i = 0; i < 16; i++) {
+                dos.writeLong(i == bLinearBucketIdx ? 142L : 0L);
+            }
+            dos.writeInt(blLz4Raw.length);
+            dos.writeInt(blLz4Zstd.length);
+            dos.write(blLz4Zstd);
+        }
+        byte[] blLz4V3Bytes = blLz4V3Out.toByteArray();
+
+        assertTrue(reader.isChunkGenerated(blLz4V3Bytes, rx, rz));
+        assertFalse(reader.isChunkGenerated(blLz4V3Bytes, 0, 0));
+        AnvilReader.ChunkEntry blLz4Entry = reader.readChunk(blLz4V3Bytes, rx, rz);
+        assertNotNull(blLz4Entry);
+        assertEquals(5, blLz4Entry.root.get("xPos"));
+        assertEquals(9, blLz4Entry.root.get("zPos"));
+
+        // 4. Construct BufferedLinear v2 (.b_linear version=2) with both direct and LZ4-wrapped chunks
+        ByteArrayOutputStream blV2Stream = new ByteArrayOutputStream();
+        try (DataOutputStream sDos = new DataOutputStream(blV2Stream)) {
+            for (int idx = 0; idx < 1024; idx++) {
+                if (idx == chunkIndex) {
+                    sDos.writeInt(4 + lz4Compressed.length);
+                    sDos.writeInt(innerFrameBytes.length);
+                    sDos.write(lz4Compressed);
+                } else if (idx == 0) {
+                    sDos.writeInt(16 + nbt.length);
+                    sDos.writeInt(nbt.length);
+                    sDos.writeLong(1700000000L);
+                    sDos.writeInt(0x12345678);
+                    sDos.write(nbt);
+                } else {
+                    sDos.writeInt(0);
+                }
+            }
+        }
+        byte[] blV2Zstd = com.github.luben.zstd.Zstd.compress(blV2Stream.toByteArray());
+        ByteArrayOutputStream blV2Out = new ByteArrayOutputStream();
+        try (DataOutputStream dos = new DataOutputStream(blV2Out)) {
+            dos.writeLong(LinearRegionReader.BLINEAR_SIGNATURE);
+            dos.writeByte(2); // version 2
+            dos.write(new byte[9]); // 18-byte header total
+            dos.write(blV2Zstd);
+        }
+        byte[] blV2Bytes = blV2Out.toByteArray();
+        assertTrue(reader.isChunkGenerated(blV2Bytes, rx, rz));
+        assertTrue(reader.isChunkGenerated(blV2Bytes, 0, 0));
+        assertNotNull(reader.readChunk(blV2Bytes, rx, rz));
+        assertNotNull(reader.readChunk(blV2Bytes, 0, 0));
+
+        // 5. Exercise LcaRegionWriter and LcaRegionFileStorage zstdLevel (0, 1, 6) overloads
+        byte[] lcaZ0 = LcaRegionWriter.transcodeFromReader(reader, blV3Bytes, 0, 0, 0);
+        byte[] lcaZ1 = LcaRegionWriter.transcodeFromReader(reader, blV3Bytes, 0, 0, 1);
+        byte[] lcaZ6 = LcaRegionWriter.convertModeAToModeB(lcaZ0, 6);
+        assertTrue(LcaRegionReader.INSTANCE.isChunkGenerated(lcaZ0, rx, rz));
+        assertTrue(LcaRegionReader.INSTANCE.isChunkGenerated(lcaZ1, rx, rz));
+        assertTrue(LcaRegionReader.INSTANCE.isChunkGenerated(lcaZ6, rx, rz));
     }
 
     @Test

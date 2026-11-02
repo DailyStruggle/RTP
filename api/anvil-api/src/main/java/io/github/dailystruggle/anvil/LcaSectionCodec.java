@@ -336,7 +336,7 @@ final class LcaSectionCodec {
 
     @FunctionalInterface
     private interface ZstdCompressorInvoker {
-        byte[] compress(byte[] raw) throws Throwable;
+        byte[] compress(byte[] raw, int level) throws Throwable;
     }
 
     private static final ZstdCompressorInvoker ZSTD_COMPRESSOR = resolveZstdCompressor();
@@ -367,7 +367,8 @@ final class LcaSectionCodec {
                         ? DynamicZstdBinding.resolvedZstdClass
                         : Class.forName("com.github.luben.zstd.Zstd", true, cl);
                 Method compressMethod = zstdClass.getMethod("compress", byte[].class, int.class);
-                ZstdCompressorInvoker candidate = raw -> (byte[]) compressMethod.invoke(null, raw, 1);
+                ZstdCompressorInvoker candidate = (raw, level) ->
+                        (byte[]) compressMethod.invoke(null, raw, Math.max(1, Math.min(22, level)));
                 if (verifyCompressorCanary(candidate)) {
                     return candidate;
                 }
@@ -392,7 +393,7 @@ final class LcaSectionCodec {
                     Method maxLenMethod = compClass.getMethod("maxCompressedLength", int.class);
                     Method compressMethod = compClass.getMethod(
                             "compress", byte[].class, int.class, int.class, byte[].class, int.class, int.class);
-                    ZstdCompressorInvoker candidate = raw -> {
+                    ZstdCompressorInvoker candidate = (raw, level) -> {
                         int maxLen = (int) maxLenMethod.invoke(compressor, raw.length);
                         byte[] dst = new byte[maxLen];
                         int written = (int) compressMethod.invoke(compressor, raw, 0, raw.length, dst, 0, maxLen);
@@ -412,7 +413,7 @@ final class LcaSectionCodec {
     private static boolean verifyCompressorCanary(ZstdCompressorInvoker candidate) {
         try {
             byte[] probe = "LCA_MODE_B_CANARY".getBytes(StandardCharsets.UTF_8);
-            byte[] compressed = candidate.compress(probe);
+            byte[] compressed = candidate.compress(probe, 1);
             if (compressed == null || compressed.length == 0) {
                 return false;
             }
@@ -428,18 +429,28 @@ final class LcaSectionCodec {
     }
 
     static byte[] compressZstd1(byte[] raw) throws IOException {
+        return compressZstd(raw, 1);
+    }
+
+    /**
+     * Off-thread Zstd frame compressor (`REQ-RTP-S-005`). Invoked exclusively from asynchronous
+     * region I/O worker threads (`RTP-Anvil-IO`, Moonrise I/O pool, or offline batch converter);
+     * never called on the server main thread.
+     */
+    static byte[] compressZstd(byte[] raw, int level) throws IOException {
         if (ZSTD_COMPRESSOR == null) {
             throw new UnsupportedAnvilFormatException(
                     "DynamicZstdBinding unavailable for .lca Mode B: "
                             + DynamicZstdBinding.pbitResult().diagnosticMessage());
         }
+        int boundedLevel = Math.max(1, Math.min(22, level));
         try {
-            return ZSTD_COMPRESSOR.compress(raw);
+            return ZSTD_COMPRESSOR.compress(raw, boundedLevel);
         } catch (Throwable e) {
             Throwable cause = (e instanceof InvocationTargetException ite && ite.getCause() != null)
                     ? ite.getCause()
                     : e;
-            throw new CorruptRegionEntryException("Mode B Zstd-1 frame compression failed: " + cause.getMessage());
+            throw new CorruptRegionEntryException("Mode B Zstd-" + boundedLevel + " frame compression failed: " + cause.getMessage());
         }
     }
 
@@ -452,6 +463,10 @@ final class LcaSectionCodec {
      * header against bit rot, and Zstd-1 compressing only the body `[headerLen .. chunkFrame.length)`.
      */
     static byte[] encodeModeBChunkFrameWithUncompressedHeader(byte[] chunkFrame, int headerLen) throws IOException {
+        return encodeModeBChunkFrameWithUncompressedHeader(chunkFrame, headerLen, 1);
+    }
+
+    static byte[] encodeModeBChunkFrameWithUncompressedHeader(byte[] chunkFrame, int headerLen, int zstdLevel) throws IOException {
         int headerWords = (headerLen + 7) >>> 3;
         int bodyLen = Math.max(0, chunkFrame.length - headerLen);
         byte[] compressedBody;
@@ -459,7 +474,7 @@ final class LcaSectionCodec {
             compressedBody = new byte[0];
         } else {
             byte[] bodySlice = Arrays.copyOfRange(chunkFrame, headerLen, chunkFrame.length);
-            compressedBody = compressZstd1(bodySlice);
+            compressedBody = compressZstd(bodySlice, zstdLevel);
         }
         byte[] out = new byte[headerLen + headerWords + compressedBody.length];
         System.arraycopy(chunkFrame, 0, out, 0, headerLen);

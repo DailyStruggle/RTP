@@ -1316,7 +1316,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
      *       headers using their inline `headerWords` SEC-DED syndromes.</li>
      *   <li><b>Tier 2 (Self-Describing Slab Reverse-Scan):</b> When a pointer suffers multi-bit
      *       corruption (`DED`), zeroing, or offset variation (`CBIT T3b`), scans the `256B` sub-slab
-     *       pool for self-describing `0x5800_0000 | (chunkIdx << 16)` headers and reconstructs the
+     *       pool for self-describing {@code 0x5800_0000 | (chunkIdx << 16)} headers and reconstructs the
      *       damaged pointer directory entries.</li>
      * </ol>
      */
