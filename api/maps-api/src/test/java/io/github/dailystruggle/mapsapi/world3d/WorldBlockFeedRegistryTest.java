@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,6 +57,7 @@ class WorldBlockFeedRegistryTest {
         );
         assertEquals(active, copy);
         assertEquals(active.hashCode(), copy.hashCode());
+        assertArrayEquals(active.deltaGapRuns(), copy.deltaGapRuns());
 
         assertThrows(IllegalArgumentException.class, () -> new WorldBlockFeed.SubChunkSectionFrame(
                 "world", 0, 0, 0, 0, 0L, List.of(), new byte[0], (byte) 0, (byte) 0, new byte[0], new byte[0]
@@ -119,7 +121,12 @@ class WorldBlockFeedRegistryTest {
         assertEquals(1, WorldBlockFeedRegistry.allFeeds().size());
 
         WorldBlockFeed.PacketDataBatch batch = dummy.queryPacketBudgetedVolume("world", 144, 54, -96, 1, 1, 30_000);
+        WorldBlockFeed.PacketDataBatch batchCopy = dummy.queryPacketBudgetedVolume("world", 144, 54, -96, 1, 1, 30_000);
         assertArrayEquals(new byte[]{1, 2, 3}, batch.surfaceHorizonHeader());
+        assertEquals(batch, batchCopy);
+        assertEquals(batch.hashCode(), batchCopy.hashCode());
+        assertNotEquals(batch, dummy.queryPacketBudgetedVolume("world_nether", 144, 54, -96, 1, 1, 30_000));
+        assertArrayEquals(batch.surfaceHorizonHeader(), batchCopy.surfaceHorizonHeader());
         assertTrue(batch.fitsInSinglePacket());
         assertEquals(46.7, batch.coldChunkLoadMicros(), 0.01);
 

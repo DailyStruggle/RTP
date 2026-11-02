@@ -179,7 +179,7 @@ jobs:
   # job only runs core tests that read a touched addon's files, without japicmp.
   core:
     needs: changes
-    if: needs.changes.outputs.core == 'true'
+    if: needs.changes.outputs.core == 'true' && needs.changes.outputs.core_tasks != ''
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: core
@@ -187,7 +187,7 @@ jobs:
 
   proxy:
     needs: [changes, core]
-    if: ${{ !cancelled() && needs.changes.outputs.proxy == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !cancelled() && needs.changes.outputs.proxy == 'true' && needs.changes.outputs.proxy_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: proxy
@@ -195,7 +195,7 @@ jobs:
 
   bukkit:
     needs: [changes, core]
-    if: ${{ !cancelled() && needs.changes.outputs.bukkit == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !cancelled() && needs.changes.outputs.bukkit == 'true' && needs.changes.outputs.bukkit_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: bukkit
@@ -203,7 +203,7 @@ jobs:
 
   fabric:
     needs: [changes, core]
-    if: ${{ !cancelled() && needs.changes.outputs.fabric == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !cancelled() && needs.changes.outputs.fabric == 'true' && needs.changes.outputs.fabric_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: fabric
@@ -211,7 +211,7 @@ jobs:
 
   neoforge:
     needs: [changes, core]
-    if: ${{ !cancelled() && needs.changes.outputs.neoforge == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !cancelled() && needs.changes.outputs.neoforge == 'true' && needs.changes.outputs.neoforge_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: neoforge
@@ -219,7 +219,7 @@ jobs:
 
   helpers:
     needs: changes
-    if: needs.changes.outputs.helpers == 'true'
+    if: needs.changes.outputs.helpers == 'true' && needs.changes.outputs.helpers_tasks != ''
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: helpers
@@ -229,7 +229,7 @@ jobs:
 
   addons:
     needs: [changes, core, helpers]
-    if: ${{ !cancelled() && needs.changes.outputs.addons == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !cancelled() && needs.changes.outputs.addons == 'true' && needs.changes.outputs.addons_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: addons
@@ -241,7 +241,7 @@ jobs:
 
   plugins:
     needs: [changes, core, bukkit, fabric, neoforge, helpers]
-    if: ${{ !cancelled() && needs.changes.outputs.plugins == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    if: ${{ !cancelled() && needs.changes.outputs.plugins == 'true' && needs.changes.outputs.plugins_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: plugins
@@ -295,6 +295,7 @@ jobs:
           cache-cleanup: on-success
 
       - name: Cache SonarQube packages
+        if: env.SONAR_TOKEN != ''
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ~/.sonar/cache
@@ -349,6 +350,8 @@ jobs:
         if: env.SONAR_TOKEN != ''
         env:
           ALL_SETS: ${{ needs.changes.outputs.full }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
         run: |
           if [ "$ALL_SETS" = "true" ]; then
             ./gradlew sonar -PstaticAnalysis

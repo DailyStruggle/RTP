@@ -30,9 +30,10 @@
 | **Minority State Delta-Roaring Containers (`00..11`)** | `SectionFrame` BlockState Payload (`mode 01`) | `2 B .. 514 B` per state | [Section 7.2 Minority State Delta-Roaring Containers](#72-minority-state-delta-roaring-containers-blockencodingmode--01-or-11) |
 | **Flat Bit-Packed Voxel Ceiling (`leafrtp-ADR-072`)** | `SectionFrame` BlockState Payload (`mode 10`) | `ceil(4096 * b / 8) B` | [Section 7.3 Flat Bit-Packed Section Ceiling](#73-flat-bit-packed-section-ceiling-blockencodingmode--10) |
 | **Const Nibble & 4-Bitplane Gray-Code Lighting** | `SectionFrame` Lighting Payload | `0 B`, `1 B`, Gray, or `2,048 B` | [Section 7.4 Gray-Code Light Bitplanes](#74-gray-code-light-bitplanes-skylightmode--10-or-blocklightmode--10) |
-| **Residual Tail (`boilerplateFlags16` & `MOTION_BLOCKING_NO_LEAVES`)** | `ChunkFrame + residualRelStart` | Variable to `frameLen` | [Section 8 Layer 3c: Residual Tail](#8-layer-3c-residual-tail-motion_blocking_no_leaves--boilerplateflags16) |
+| **Residual Tail (`boilerplateFlags16` & `MOTION_BLOCKING_NO_LEAVES`)** | `ChunkFrame + residualRelStart` | Variable to `residualRelEnd` | [Section 8 Layer 3c: Residual Tail](#8-layer-3c-residual-tail-motion_blocking_no_leaves--boilerplateflags16) |
 | **Binary Heightmap Delta & Cross-Delta Streams** | `ResidualTail +0x02` (`bpFlags` bit `13` & bit `9`) | `~110 B` (`mbnl`) + secondary | [Section 8.1 Binary Heightmap Delta Streams](#81-binary-heightmap-delta-streams-mbnlstream--secondary-heightmaps) |
 | **`boilerplateFlags16` Residual Bitmask & Mojang NBT** | `ResidualTail +0x00` | `2 B` flags + fields | [Section 8.2 `boilerplateFlags16` Complete Bit Reference](#82-boilerplateflags16-complete-bit-reference) |
+| **`ChunkPatchTail` (`HAS_CHUNK_PATCH_TAIL = 0x4000`)** | `ResidualTail` (`bpFlags` bit `14`, before bit `10`) | `VarInt len` + patch payload | [Section 8.3 `ChunkPatchTail` Wire Layout](#83-chunkpatchtail-wire-layout-boilerplateflags16-bit-14--0x4000-has_chunk_patch_tail) |
 | **Static Core Token Tables (`160` Blocks, `65` Biomes, `128` Props)** | Referenced by `1-byte` tokens (`0x80\|id`, `0x60\|id`) | Constant lookup tables | [Section 9 Static Core Lookup Tables (`STATIC_CORE_*`)](#9-static-core-lookup-tables-static_core_) |
 | **Footer Canary (`"LCA1_END"`)** | `fileLength - 8 .. fileLength - 1` | `8 B` (`uint64`) | [Section 3 Top-Level File Layout](#3-top-level-file-layout-rrxrzlca) |
 
@@ -59,12 +60,13 @@
    - [6.5 Slab-Local Chunk Micro-Palette (`Part A` + `Part B`)](#65-slab-local-chunk-micro-palette-part-a--part-b)
 7. [Layer 4: $16 \times 16 \times 16$ Non-Uniform `SectionFrame` Layout](#7-layer-4-16-times-16-times-16-non-uniform-sectionframe-layout)
    - [7.1 3D Space-Filling Curve Permutations (`curveId = 0..3`)](#71-3d-space-filling-curve-permutations-curveid--03)
-   - [7.2 Minority State Delta-Roaring Containers (`blockEncodingMode == 01`)](#72-minority-state-delta-roaring-containers-blockencodingmode--01)
+   - [7.2 Minority State Delta-Roaring Containers (`blockEncodingMode == 01`)](#72-minority-state-delta-roaring-containers-blockencodingmode--01-or-11)
    - [7.3 Flat Bit-Packed Section Ceiling (`blockEncodingMode == 10`)](#73-flat-bit-packed-section-ceiling-blockencodingmode--10)
    - [7.4 Gray-Code Light Bitplanes (`skyLightMode == 10` or `blockLightMode == 10`)](#74-gray-code-light-bitplanes-skylightmode--10-or-blocklightmode--10)
 8. [Layer 3c: Residual Tail (`MOTION_BLOCKING_NO_LEAVES` & `boilerplateFlags16`)](#8-layer-3c-residual-tail-motion_blocking_no_leaves--boilerplateflags16)
    - [8.1 Binary Heightmap Delta Streams (`mbnlStream` & Secondary Heightmaps)](#81-binary-heightmap-delta-streams-mbnlstream--secondary-heightmaps)
    - [8.2 `boilerplateFlags16` Complete Bit Reference](#82-boilerplateflags16-complete-bit-reference)
+   - [8.3 `ChunkPatchTail` Wire Layout (`boilerplateFlags16` Bit `14` = `0x4000`, `HAS_CHUNK_PATCH_TAIL`)](#83-chunkpatchtail-wire-layout-boilerplateflags16-bit-14--0x4000-has_chunk_patch_tail)
 9. [Static Core Lookup Tables (`STATIC_CORE_*`)](#9-static-core-lookup-tables-static_core_)
    - [9.1 `STATIC_CORE_STATES` (`160` Base Block Identifiers)](#91-static_core_states-160-base-block-identifiers)
    - [9.2 `STATIC_CORE_BIOMES` (`65` Biome Identifiers)](#92-static_core_biomes-65-biome-identifiers)
@@ -156,8 +158,8 @@ Every `.lca` file covers a $32 \times 32$-chunk ($512 \times 512$-block) region 
 | ---: | :--- | :--- | :--- |
 | `0x00..0x07` | `uint64` | `magic` | `0x4C43415F56303031L` (`"LCA_V001"` ASCII) |
 | `0x08..0x09` | `uint16` | `formatVersion` | `0x0001` (Major `1`, Minor `0`) |
-| `0x0A` | `uint8` | `storageKind` | `0` = `REGION_VOXEL` (`region/`), `1` = `ENTITIES` (`entities/`), `2` = `POI` (`poi/`), `3` = `LEAFMAP_TILE` |
-| `0x0B` | `uint8` | `flags` | Bitmask:<br>- Bit `0` (`0x01`): `HAS_SHARED_DICT` (always `1`)<br>- Bit `1` (`0x02`): `HAS_LEAFMAP_LOD_HEADER` (`0` in standard region files; `.dlsh` sidecars used)<br>- Bit `2` (`0x04`): `HAS_TAIL_DELTA_RING` (`0`)<br>- Bit `3` (`0x08`): `DEFAULT_ZSTD1` (`1` if region defaults to Mode B `Zstd-1`)<br>- Bit `4` (`0x10`): `HAS_SECDED_PARITY` (`1` when `1,024 B` SEC-DED table is present) |
+| `0x0A` | `uint8` | `storageKind` | `0` = `REGION_VOXEL` (`region/`), `1` = `ENTITIES` (`entities/`), `2` = `POI` (`poi/`), `3` = `MAP_TILE` |
+| `0x0B` | `uint8` | `flags` | Bitmask:<br>- Bit `0` (`0x01`): `HAS_SHARED_DICT` (always `1`)<br>- Bit `1` (`0x02`): `HAS_LOD_HEADER` (`0` in standard region files; `.dlsh` sidecars used)<br>- Bit `2` (`0x04`): `HAS_TAIL_DELTA_RING` (`0`)<br>- Bit `3` (`0x08`): `DEFAULT_ZSTD1` (`1` if region defaults to Mode B `Zstd-1`)<br>- Bit `4` (`0x10`): `HAS_SECDED_PARITY` (`1` when `1,024 B` SEC-DED table is present) |
 | `0x0C..0x0F` | `int32` | `regionX` | Signed region $X$ coordinate ($\lfloor \text{chunkX} / 32 \rfloor$) |
 | `0x10..0x13` | `int32` | `regionZ` | Signed region $Z$ coordinate ($\lfloor \text{chunkZ} / 32 \rfloor$) |
 | `0x14..0x17` | `int32` | `minSectionY` | Minimum vertical section $Y$ index (e.g. `-4` for Overworld $Y = -64$, `0` for Nether/End $Y = 0$) |
@@ -257,7 +259,7 @@ Offset +0x06: uint16  usedPayloadBytes       // Active entry bytes following the
 Offset +0x08: StateEntry[segmentStateCount]:
                 VarInt  utf8ByteLen
                 byte[]  canonicalStateUtf8   // e.g. "minecraft:oak_stairs[facing=north,half=bottom,waterlogged=false]"
-                uint32  leafMapMaterialPacked// RGBA8 color + material flags for LeafMap LODs
+                uint32  materialPacked       // RGBA8 color + material flags for map LODs
               BiomeEntry[segmentBiomeCount]:
                 VarInt  utf8ByteLen
                 byte[]  biomeIdUtf8          // e.g. "minecraft:plains"
@@ -355,11 +357,13 @@ Each 16-bit big-endian entry `entry16 = sectionOffsets[i]` has three cases:
    - Let `unitShift = ((chunkFlags & 4) != 0) ? 2 : 0` (`1-byte` exact units when `scaleOffsets == 0`, `4-byte` units when `scaleOffsets == 1`).
    - The `SectionFrame` for section `i` starts at frame-relative byte offset:
      $$\mathtt{relStart}_i = \mathtt{sectionDirEnd} + \bigl((\mathtt{entry16} - 1) \ll \mathtt{unitShift}\bigr)$$
-   - The upper bound `relEnd_i` of `SectionFrame` `i` is the `relStart_j` of the next non-uniform section `j > i` (with `sectionOffsets[j] > 0` and bit `15 == 0`), or `residualRelStart` if `i` is the last non-uniform section in the chunk.
+   - **`CBIT T5` Disjoint Offset Invariant:** Every non-uniform `relStart_i` must satisfy $\mathtt{sectionDirEnd} \le \mathtt{relStart}_i < \mathtt{frameLen}$, $\mathtt{relStart}_i \neq \mathtt{residualRelStart}$ (when `hasResidualNbt == 1`), and $\mathtt{relStart}_i \neq \mathtt{relStart}_j$ for all $j \neq i$ (duplicate non-zero non-uniform `entry16` offsets are rejected).
+   - **Order-Independent Upper Bound `relEnd_i`:** `SectionFrame`s are not required to appear in monotonic vertical index order `i = 0 .. sectionCount - 1` (for example, a single modified section may be re-encoded and appended into the chunk's `256-byte` sub-slab slack either immediately before `residualRelStart` or after the Residual Tail). The upper bound `relEnd_i` of `SectionFrame` `i` is the smallest boundary offset strictly greater than `relStart_i`:
+     $$\mathtt{relEnd}_i = \min\Bigl(\{\mathtt{relStart}_j \mid \mathtt{relStart}_j > \mathtt{relStart}_i\} \cup \{B \in \{\mathtt{residualRelStart}, \mathtt{frameLen}\} \mid B > \mathtt{relStart}_i\}\Bigr)$$
 
 ### 6.5 Slab-Local Chunk Micro-Palette (`Part A` + `Part B`)
 
-When `hasSlabLocalPalette == 1` (`chunkFlags` bit `1`), the Slab-Local Micro-Palette starts immediately at `sectionDirEnd` (`24 + 2 * sectionCount`) and ends at the first non-uniform section's `relStart` (or `residualRelStart` if all sections in the chunk are inline uniform), with zero tail padding when `scaleOffsets == 0`.
+When `hasSlabLocalPalette == 1` (`chunkFlags` bit `1`), the initial Slab-Local Micro-Palette starts immediately at `sectionDirEnd` (`24 + 2 * sectionCount`) and ends at $\min_k(\mathtt{relStart}_k)$ across all non-uniform sections $k$ (or `residualRelStart` if no non-uniform section precedes `residualRelStart`), with zero tail padding when `scaleOffsets == 0`. Incremental chunk patches (`boilerplateFlags16` bit `14` = `0x4000`, `HAS_CHUNK_PATCH_TAIL`, Section 8.3) may append additional local entries (`localStateIdx = localStateCount .. localStateCount + appendedStateCount - 1`) without shifting or re-sorting indices `0 .. localStateCount - 1`.
 
 ```
 +-----------------------------------------------------------------------+ Offset sectionDirEnd
@@ -562,17 +566,20 @@ In Minecraft NBT, `SkyLight` and `BlockLight` are `byte[2048]` arrays where voxe
 
 ## 8. Layer 3c: Residual Tail (`MOTION_BLOCKING_NO_LEAVES` & `boilerplateFlags16`)
 
-When `hasResidualNbt == 1` (`chunkFlags` bit `0`), the Residual Tail starts at `residualRelStart = sectionDirEnd + (residualNbtRelOffset << unitShift)` and extends to `frameLen`:
+When `hasResidualNbt == 1` (`chunkFlags` bit `0`), the Residual Tail starts at `residualRelStart = sectionDirEnd + (residualNbtRelOffset << unitShift)` and extends to:
+$$\mathtt{residualRelEnd} = \min\Bigl(\{\mathtt{relStart}_j \mid \mathtt{relStart}_j > \mathtt{residualRelStart}\} \cup \{\mathtt{frameLen}\}\Bigr)$$
+Bounding the Residual Tail by `residualRelEnd` (rather than blindly reading to `frameLen`) allows out-of-order `SectionFrame`s to be appended in the `256-byte` sub-slab slack *after* the Residual Tail without being consumed by `bit 10` (`residualNbtSlice`).
 
 ```
-Offset +0x00: uint16  boilerplateFlags16    // Bitmask (bits 0..13) of compacted vanilla/Starlight fields
+Offset +0x00: uint16  boilerplateFlags16    // Bitmask (bits 0..14) of compacted vanilla/Starlight fields & patch tail
               [If bit 13 (0x2000): VarInt mbnlByteLen + byte[mbnlByteLen] mbnlStream (Section 8.1)]
               [If bit 5  (0x0020): uint8  ppEmptyCount]
               [If bit 6  (0x0040): VarInt starlightLightVersion]
               [If bit 7  (0x0080): uint8  lowBoundaryFlags  (section Y = minSectionY - 1)]
               [If bit 8  (0x0100): uint8  highBoundaryFlags (section Y = minSectionY + sectionCount)]
               [If bit 9  (0x0200): uint8  secHmCount + SecondaryHeightmapEntry[secHmCount]]
-              [If bit 10 (0x0400): byte[] residualNbtSlice (to frameLen; DEFLATE if bit 12 == 1, else raw Mojang NBT)]
+              [If bit 14 (0x4000): VarInt patchTailByteLen + byte[patchTailByteLen] chunkPatchTail (Section 8.3)]
+              [If bit 10 (0x0400): byte[] residualNbtSlice (to residualRelEnd; DEFLATE if bit 12 == 1, else raw Mojang NBT)]
 ```
 
 ### 8.1 Binary Heightmap Delta Streams (`mbnlStream` & Secondary Heightmaps)
@@ -617,10 +624,71 @@ Mojang packs `256` 9-bit column heights ($16 \times 16$) into `long[37]` (`7` en
 | `7` | `0x0080` | Read `uint8 lowFlags`; prepend boundary lighting section at `Y = (byte) (minSectionY - 1)` (`skyMode = lowFlags & 3`, `blkMode = (lowFlags >>> 2) & 3`, where `0` = absent, `1` = `byte[2048]` of `0x00`, `2` = `byte[2048]` of `0xFF`) |
 | `8` | `0x0100` | Read `uint8 highFlags`; append boundary lighting section at `Y = (byte) (minSectionY + sectionCount)` (`skyMode = highFlags & 3`, `blkMode = (highFlags >>> 2) & 3`) |
 | `9` | `0x0200` | Read secondary heightmaps (`uint8 secHmCount` + entries, Section 8.1) into `"Heightmaps"` |
-| `10` | `0x0400` | Remaining bytes `[pos .. frameLen)` contain a Mojang binary root `TAG_Compound` (containing non-empty `block_entities`, `structures`, custom tags, or `Entities`/`Sections` for `entities/` and `poi/` archives) |
+| `10` | `0x0400` | Remaining bytes `[pos .. residualRelEnd)` contain a Mojang binary root `TAG_Compound` (containing non-empty `block_entities`, `structures`, custom tags, or `Entities`/`Sections` for `entities/` and `poi/` archives) |
 | `11` | `0x0800` | Non-voxel chunk root (`entities/` or `poi/`): do **not** synthesize voxel chunk keys (`xPos`, `yPos`, `zPos`, `LastUpdate`, `InhabitedTime`, `Status`, `sections`); return only `DataVersion` + residual `TAG_Compound` entries |
 | `12` | `0x1000` | The residual `TAG_Compound` slice (`bit 10`) is `Zlib` (`DEFLATE`) compressed (used only in `Mode A` when residual NBT $\ge 256\text{ B}$; never set in `Mode B`) |
 | `13` | `0x2000` | Read `VarInt mbnlByteLen` + `byte[mbnlByteLen] mbnlStream` immediately following `boilerplateFlags16` and decode `"MOTION_BLOCKING_NO_LEAVES"` into `"Heightmaps"` (Section 8.1) |
+| `14` | `0x4000` | `HAS_CHUNK_PATCH_TAIL`: Read `VarInt patchTailByteLen` + `byte[patchTailByteLen] chunkPatchTail` immediately before `bit 10` (`residualNbtSlice`), containing appended Slab-Local Micro-Palette entries and per-section voxel/light/offset patches (Section 8.3) |
+
+### 8.3 `ChunkPatchTail` Wire Layout (`boilerplateFlags16` Bit `14` = `0x4000`, `HAS_CHUNK_PATCH_TAIL`)
+
+Placing `bit 14` (`0x4000`) with a `VarInt patchTailByteLen` prefix immediately before `bit 10` (`0x0400`, `residualNbtSlice`) allows `readChunkView`, `readColumnProbe`, and `readTerrainProbe` to jump to `residualRelStart`, skip the compact header flags (`mbnlStream`, etc.), and decode `chunkPatchTail` in $O(1)$ without parsing Mojang NBT or inflating Zlib streams, while leaving `bit 10` unambiguously delimited as `[pos .. residualRelEnd)`.
+
+```
++-----------------------------------------------------------------------+
+| VarInt  patchTailByteLen (total bytes of payload + 1B patchParity8)   |
++-----------------------------------------------------------------------+
+| 1. Appended Slab-Local Micro-Palette Extension                        |
+|    VarInt  appendedStateCount (M >= 0)                                |
+|    [If M > 0]:                                                        |
+|      BaseBlockEntry[M]  (assigned localStateIdx = K .. K + M - 1,     |
+|                          using Section 6.5 Part A entry encoding)     |
+|      VarInt appendedPropCount                                         |
+|      PropBinding[appendedPropCount]:                                  |
+|        VarInt localStateIdx (K .. K + M - 1)                          |
+|        uint8  propTag:                                                |
+|          - If (propTag & 0x80) != 0:                                  |
+|              propId = propTag & 0x7F -> STATIC_CORE_PROP_SUFFIXES     |
+|          - Else (propTag == 0x40):                                    |
+|              VarInt globalStateId -> Region Shared Dictionary[id]     |
++-----------------------------------------------------------------------+
+| 2. Per-Section Patch Records                                          |
+|    VarInt  patchedSectionCount (S >= 0)                               |
+|    SectionPatch[S]:                                                   |
+|      uint8   sectionIndex (0 .. sectionCount - 1, Y = minSectionY + i)|
+|      uint8   patchFlags:                                              |
+|                bit 0 (0x01): hasVoxelDeltas                           |
+|                bit 1 (0x02): hasReplacementSectionOffset              |
+|                bit 2 (0x04): hasSkyLightPatch                         |
+|                bit 3 (0x08): hasBlockLightPatch                       |
+|      [If (patchFlags & 0x02) != 0 (hasReplacementSectionOffset)]:     |
+|        uint16 newSectionEntry16 (overrides sectionOffsets[sectionIdx])|
+|      [If (patchFlags & 0x01) != 0 (hasVoxelDeltas)]:                  |
+|        VarInt deltaCount (1 .. 4096)                                  |
+|        For d = 0 .. deltaCount - 1:                                   |
+|          uint16 yzx12       (0 .. 4095: (y << 8) | (z << 4) | x)      |
+|          VarInt dictId      (localStateIdx 0..K+M-1 if slab-local,    |
+|                              else globalStateId)                      |
+|      [If (patchFlags & 0x04) != 0 (hasSkyLightPatch)]:                |
+|        uint8  skyPatchMode  (01=ConstNibble [uint8 c4],               |
+|                              10=GrayPlanes_YH2, 11=Raw2048B)          |
+|        byte[] skyPatchPayload                                         |
+|      [If (patchFlags & 0x08) != 0 (hasBlockLightPatch)]:              |
+|        uint8  blkPatchMode  (01=ConstNibble [uint8 c4],               |
+|                              10=GrayPlanes_H3,  11=Raw2048B)          |
+|        byte[] blkPatchPayload                                         |
++-----------------------------------------------------------------------+
+| 3. Integrity Syndrome Trailer                                         |
+|    uint8   patchParity8 (computeHammingSecDed8 over 64-bit SplitMix   |
+|                          hash of the preceding patchTailByteLen - 1 B)|
++-----------------------------------------------------------------------+
+```
+
+- **Pre-Section Resolution Order:** When `hasResidualNbt == 1` and `(boilerplateFlags16 & 0x4000) != 0`, readers decode `ChunkPatchTail` *before* iterating `sectionOffsets[0 .. sectionCount - 1]`:
+  1. Appended `BaseBlockEntry[M]` and `PropBinding` items extend the chunk's Slab-Local Micro-Palette from size `K` to `K + M`.
+  2. Any `SectionPatch` with `hasReplacementSectionOffset` (`0x02`) updates `entries[sectionIndex]` (and `relStarts[sectionIndex]`).
+  3. Inline-uniform sections (`(entry16 & 0x8000) != 0`) and non-uniform `SectionFrame`s can therefore reference appended local palette indices `K .. K + M - 1` directly.
+  4. After decoding base section `i` (whether originally void `0x0000`, inline-uniform `0x8000`, or a non-uniform `SectionFrame` validated by `CBIT T6b`), any `hasVoxelDeltas`, `hasSkyLightPatch`, or `hasBlockLightPatch` entries for `sectionIndex == i` are applied on top.
 
 ---
 
@@ -756,14 +824,15 @@ To read chunk `(chunkX, chunkZ)` from `r.<rx>.<rz>.lca`:
 3. **Locate & Unpack `ChunkFrame` (`CBIT T3b`, `T3c`):**
    - Seek to `fOff = slabOffset35 << 8`. Verify `(readInt32BE(fOff) & 0xFC00_0000) == 0x5800_0000` and `((readInt32BE(fOff) >>> 16) & 0x03FF) == chunkIdx`.
    - If `codec1 == 1` (`Mode B`), heal the `headerWords = (24 + 2 * sectionCount + 7) >>> 3` header words using the SEC-DED bytes at `fOff + headerLen` (Section 6.2), and `Zstd`-decompress `[fOff + headerLen + headerWords .. fOff + exactByteLen20)` to form the uncompressed `ChunkFrame`.
-4. **Decode Palette & Sections:**
-   - If `hasSlabLocalPalette` (`(chunkFlags & 2) != 0`), decode Part A (and Part B if blockstate properties `[...]` are needed) at `sectionDirEnd = 24 + 2 * sectionCount` (Section 6.5).
+4. **Decode Palette, Patch Tail & Sections:**
+   - If `hasSlabLocalPalette` (`(chunkFlags & 2) != 0`), decode the initial Part A (and Part B if blockstate properties `[...]` are needed) at `[sectionDirEnd .. min_k(relStart_k))` (Section 6.5).
+   - If `hasResidualNbt` (`(chunkFlags & 1) != 0`) and `(boilerplateFlags16 & 0x4000) != 0`, decode `ChunkPatchTail` (Section 8.3), appending any `BaseBlockEntry[M]` / `PropBinding` items to the Slab-Local Micro-Palette and applying any `hasReplacementSectionOffset` (`0x02`) overrides to `sectionOffsets[]`.
    - For each section `i = 0 .. sectionCount - 1` (`Y = minSectionY + i`), inspect `entry16 = sectionOffsets[i]`:
-     - `0x0000`: void/air section.
+     - `0x0000`: void/air section (or synthesized base if patched by `ChunkPatchTail`).
      - `(entry16 & 0x8000) != 0`: inline uniform section (Section 6.4).
-     - Otherwise: decode non-uniform `SectionFrame` at `relStart_i = sectionDirEnd + ((entry16 - 1) << unitShift)` (Section 7).
+     - Otherwise: decode non-uniform `SectionFrame` over `[relStart_i .. relEnd_i)` (Section 6.4 & Section 7), and apply any `SectionPatch` voxel/light deltas for `i`.
 5. **Decode Residual Tail (if `hasResidualNbt`, `(chunkFlags & 1) != 0`):**
-   - At `residualRelStart = sectionDirEnd + (residualNbtRelOffset << unitShift)`, read `boilerplateFlags16` and decode `mbnlStream` (when bit `13` is set) and any flagged residual fields (Section 8).
+   - At `residualRelStart = sectionDirEnd + (residualNbtRelOffset << unitShift)` up to `residualRelEnd = min({relStart_j | relStart_j > residualRelStart} U {frameLen})`, read `boilerplateFlags16` and decode `mbnlStream` (when bit `13` is set) and any flagged residual fields (Section 8).
 
 ### 10.2 4-Tier Bit-Rot Recovery & Self-Describing Slab Reverse-Scan
 
@@ -782,7 +851,7 @@ When `LcaRegionReader.healRegionBitRot(byte[])` or a fault-tolerant reader encou
      - Read `dvWord = readInt32BE(bytePos)`. (If the region defaults to `Mode B` (`(superblock[0x0B] & 0x08) != 0`) and `(dvWord & 0xFC00_0000) != 0x5800_0000`, first attempt Tier 1 header SEC-DED healing over `[bytePos .. bytePos + headerLen)` using `[bytePos + headerLen .. bytePos + headerLen + headerWords)`.)
      - If `(dvWord & 0xFC00_0000) == 0x5800_0000`, extract `slabChunkIdx = (dvWord >>> 16) & 0x03FF`.
      - If `needsSlabScan[slabChunkIdx]` is `true`, compute the frame's byte length `exactLen`:
-       - **In Mode A (`codec1 == 0`):** Read `chunkFlags = buf[bytePos + 0x15] & 0xFF`, `unitShift = ((chunkFlags & 4) != 0) ? 2 : 0`, and `residualRel = readUint16BE(bytePos + 0x16)`. Let `residualStart = bytePos + sectionDirEnd + (residualRel << unitShift)`. If `(chunkFlags & 1) == 0`, `exactLen = sectionDirEnd + (residualRel << unitShift)`. Otherwise read `bpFlags = readUint16BE(residualStart)` and advance past each active `boilerplateFlags16` field (`bit 13` `VarInt mbnlLen` + `mbnlStream`, `bit 5..9` fields, and `bit 10` residual NBT up to the next `0x5800_0000` slab header or `"LCA1_END"` footer).
+       - **In Mode A (`codec1 == 0`):** Read `chunkFlags = buf[bytePos + 0x15] & 0xFF`, `unitShift = ((chunkFlags & 4) != 0) ? 2 : 0`, and `residualRel = readUint16BE(bytePos + 0x16)`. Let `residualStart = bytePos + sectionDirEnd + (residualRel << unitShift)`. If `(chunkFlags & 1) == 0`, `exactLen = sectionDirEnd + (residualRel << unitShift)`. Otherwise read `bpFlags = readUint16BE(residualStart)` and advance past each active `boilerplateFlags16` field (`bit 13` `VarInt mbnlLen` + `mbnlStream`, `bit 5..9` fields, `bit 14` (`0x4000`) `VarInt patchTailByteLen` + `chunkPatchTail`, and `bit 10` residual NBT or any appended post-residual `SectionFrame`s up to the next `0x5800_0000` slab header or `"LCA1_END"` footer).
        - **In Mode B (`codec1 == 1`):** At `compStart = bytePos + sectionDirEnd + headerWords`, verify the 4-byte `Zstd` magic `0x28, 0xB5, 0x2F, 0xFD`, skip the `Zstd` frame header descriptor (`FHD`), and walk the 3-byte `Zstd` block headers (`lastBlock = blockHeader & 1`, `blockType = (blockHeader >>> 1) & 3`, `blockSize = blockHeader >>> 3`) until `lastBlock == 1` (plus 4-byte checksum if `FHD` bit `2` is set) to obtain `exactLen = zstdEnd - bytePos`.
      - Reconstruct `ptr64 = ((long) slab << 29) | ((regionDefaultModeB ? 1L : 0L) << 28) | ((exactLen & 0xFFFFFL) << 8) | 1L`, write `ptr64` to `0x0040 + (slabChunkIdx << 3)`, and write `computeHammingSecDed8(ptr64)` to `secDedTableByteOffset + slabChunkIdx`.
 3. **Tier 3 - Section-Granular `octreeOccupancyMask64` Quarantine (`CBIT T6`, `T6b`):**

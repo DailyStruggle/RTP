@@ -2185,4 +2185,465 @@ class LcaRegionCodecTest {
             org.junit.jupiter.api.Assertions.assertArrayEquals(modeANbt57, fromChannel57);
         }
     }
+
+    @Test
+    @DisplayName("anvil-api-ADR-003 & LCA-ICD-1.0: Order-independent sectionOffsets[] (before & after Residual Tail) and HAS_CHUNK_PATCH_TAIL (0x4000) parity + CBIT T5/T6b/Tier-2 recovery")
+    void orderIndependentSectionOffsetsAndChunkPatchTailParity(@TempDir Path tempDir) throws Exception {
+        byte[] mcaBytes = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
+        AnvilReader.ChunkEntry origEntry = AnvilReader.readChunkEntry(mcaBytes, 0, 0);
+        assertNotNull(origEntry);
+
+        for (boolean modeB : new boolean[] {false, true}) {
+            if (modeB && !DynamicZstdBinding.isAvailable()) continue;
+
+            // 1. Out-of-order appended SectionFrame tests (both before residualRelStart and after Residual Tail,
+            //    including sectionIdx=0 to exercise min_k(relStart_k) initial micro-palette bounding)
+            for (boolean afterResidual : new boolean[] {false, true}) {
+                for (boolean viaPatchTailOffset : new boolean[] {false, true}) {
+                    byte[] baseLca = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, modeB);
+                    LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.openLiveArchive(baseLca);
+
+                    // Build a modified section for Y = -64 (secIdx = 0) and Y = 64 (secIdx = 8)
+                    LinkedHashMap<String, Object> clonedRoot =
+                            Nbt.readRootCompound(Nbt.writeNamedRoot("", origEntry.root));
+                    // Also inject a non-empty block_entities entry so bit 10 (residualNbtSlice) is active!
+                    LinkedHashMap<String, Object> fakeBe = new LinkedHashMap<>();
+                    fakeBe.put("id", "minecraft:chest");
+                    fakeBe.put("x", 2);
+                    fakeBe.put("y", 65);
+                    fakeBe.put("z", 3);
+                    clonedRoot.put("block_entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(fakeBe)));
+                    archive.saveChunkCoW(0, 0, clonedRoot);
+
+                    Nbt.NbtList secs = (Nbt.NbtList) clonedRoot.get("sections");
+                    LinkedHashMap<String, Object> targetSec0 = null;
+                    LinkedHashMap<String, Object> targetSec4 = null;
+                    for (Object o : secs.items) {
+                        @SuppressWarnings("unchecked")
+                        LinkedHashMap<String, Object> sm = (LinkedHashMap<String, Object>) o;
+                        int sy = ((Number) sm.get("Y")).intValue();
+                        if (sy == -4) targetSec0 = sm;
+                        if (sy == 4) targetSec4 = sm;
+                    }
+                    assertNotNull(targetSec0);
+                    assertNotNull(targetSec4);
+
+                    // Introduce a brand-new block state with properties into section Y = -4 (secIdx = 0)
+                    @SuppressWarnings("unchecked")
+                    LinkedHashMap<String, Object> bs0 = (LinkedHashMap<String, Object>) targetSec0.get("block_states");
+                    @SuppressWarnings("unchecked")
+                    List<Object> pal0 = new ArrayList<>(((Nbt.NbtList) bs0.get("palette")).items);
+                    LinkedHashMap<String, Object> newBlock = new LinkedHashMap<>();
+                    newBlock.put("Name", "minecraft:oak_stairs");
+                    LinkedHashMap<String, Object> newProps = new LinkedHashMap<>();
+                    newProps.put("facing", "north");
+                    newProps.put("half", "bottom");
+                    newProps.put("waterlogged", "false");
+                    newBlock.put("Properties", newProps);
+                    int newPalIdx = pal0.size();
+                    pal0.add(newBlock);
+                    bs0.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, pal0));
+                    int bits = Math.max(4, 32 - Integer.numberOfLeadingZeros(pal0.size() - 1));
+                    int entriesPerLong = 64 / bits;
+                    int numLongs = (4096 + entriesPerLong - 1) / entriesPerLong;
+                    long[] packed0 = new long[numLongs];
+                    // Place the new block at (x=3, y=2, z=5) -> yzx = (2 << 8) | (5 << 4) | 3 = 595
+                    int targetYzx = (2 << 8) | (5 << 4) | 3;
+                    int wIdx = targetYzx / entriesPerLong;
+                    int bOff = (targetYzx % entriesPerLong) * bits;
+                    packed0[wIdx] |= ((long) newPalIdx) << bOff;
+                    bs0.put("data", packed0);
+
+                    archive.spliceOutOfOrderSectionCoW(0, 0, -4, targetSec0, afterResidual, viaPatchTailOffset);
+                    byte[] splicedLca = archive.toByteArray();
+
+                    AnvilChunkView view = LcaRegionReader.readChunkView(splicedLca, 0, 0);
+                    assertNotNull(view);
+                    assertEquals("minecraft:oak_stairs", view.blockIdAt(3, -64 + 2, 5),
+                            "Out-of-order section (afterResidual=" + afterResidual
+                                    + ", viaPatchTailOffset=" + viaPatchTailOffset + ", modeB=" + modeB + ") failed in readChunkView");
+
+                    ColumnProbe colProbe = LcaRegionReader.readColumnProbe(splicedLca, 0, 0, -64, 0);
+                    assertNotNull(colProbe);
+                    assertEquals("minecraft:oak_stairs", colProbe.blockAt(3, 5, -64 + 2));
+
+                    ColumnProbe terProbe = LcaRegionReader.readTerrainProbe(
+                            splicedLca, splicedLca.length, 0, 0, -64, 0);
+                    assertNotNull(terProbe);
+                    assertEquals("minecraft:oak_stairs", terProbe.blockAt(3, 5, -64 + 2));
+
+                    PaletteSection singleSec = LcaRegionReader.readSection(splicedLca, splicedLca.length, 0, 0, -4);
+                    assertNotNull(singleSec);
+                    assertEquals("minecraft:oak_stairs", singleSec.blockIdAt(3, 2, 5));
+
+                    AnvilReader.ChunkEntry decodedEntry = LcaRegionReader.INSTANCE.readChunk(splicedLca, 0, 0);
+                    assertNotNull(decodedEntry);
+                    // Verify residual NBT (block_entities chest) was NOT truncated or corrupted by post-residual section!
+                    Nbt.NbtList decodedBe = (Nbt.NbtList) decodedEntry.root.get("block_entities");
+                    assertNotNull(decodedBe);
+                    assertEquals(1, decodedBe.items.size());
+
+                    byte[] nbtBytes = LcaRegionReader.INSTANCE.readChunkNbtBytes(splicedLca, 0, 0);
+                    assertNotNull(nbtBytes);
+                    AnvilChunkView fromNbtBytes = AnvilReader.toView(Nbt.readRootCompound(nbtBytes));
+                    assertEquals("minecraft:oak_stairs", fromNbtBytes.blockIdAt(3, -64 + 2, 5));
+
+                    // In Mode A, test Tier-2 healRegionBitRot (estimateSelfDescribingChunkLengthStatic)
+                    if (!modeB) {
+                        byte[] corruptedPtrLca = Arrays.copyOf(splicedLca, splicedLca.length);
+                        // Wipe pointer 0 and its SEC-DED byte to force Tier-2 self-describing slab reverse-scan
+                        LcaRegionReader.setVolatileLongBE(corruptedPtrLca, LcaRegionReader.POINTER_DIRECTORY_OFFSET, 0L);
+                        int secDedOff = (int) ((long) LcaRegionReader.LONG_BE_VIEW.get(corruptedPtrLca, 0x28) & 0xFFFF_FFFFL);
+                        corruptedPtrLca[secDedOff] = (byte) 0xFF;
+
+                        LcaRegionReader.RecoveryReport rep = LcaRegionReader.healRegionBitRot(corruptedPtrLca);
+                        assertEquals(1, rep.slabScanReconstructedPointers());
+                        AnvilChunkView healedView = LcaRegionReader.readChunkView(corruptedPtrLca, 0, 0);
+                        assertNotNull(healedView);
+                        assertEquals("minecraft:oak_stairs", healedView.blockIdAt(3, -64 + 2, 5));
+                    }
+                }
+            }
+
+            // 2. Test HAS_CHUNK_PATCH_TAIL (0x4000) voxel deltas, light patches, and appended micro-palette entries
+            //    (including inline-uniform section referencing an appended micro-palette state!)
+            byte[] baseLca = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, modeB);
+            LcaRegionWriter.LcaLiveArchive patchArchive = LcaRegionWriter.openLiveArchive(baseLca);
+
+            // Inspect base local palette count so we know the localDictId of our appended states
+            byte[] rawUncomp = patchArchive.readUncompressedChunkFrame(0, 0);
+            int secDirEnd = 24 + (24 << 1);
+            int resRelStart = secDirEnd + LcaSectionCodec.readUint16BE(rawUncomp, 22);
+            int[] dummyEntries = new int[24];
+            int[] relStarts = new int[24];
+            for (int i = 0; i < 24; i++) {
+                int e16 = LcaSectionCodec.readUint16BE(rawUncomp, 24 + (i << 1));
+                relStarts[i] = (e16 != 0 && (e16 & 0x8000) == 0) ? (secDirEnd + e16 - 1) : -1;
+            }
+            int palLim = LcaSectionCodec.findFirstSectionRelStart(relStarts, 24, resRelStart);
+            LcaSectionCodec.SlabLocalPalette basePal = LcaSectionCodec.decodeSlabLocalPalette(
+                    rawUncomp, 0, secDirEnd, palLim, false, false, List.of());
+            int baseK = basePal.baseBlockNames.size();
+
+            // Append two new states:
+            //   K + 0: "minecraft:lantern[hanging=true,waterlogged=false]" (static core property suffix)
+            //   K + 1: "minecraft:custom_mod_lamp[custom_power=11]" (Tier-3 region dictionary escape)
+            List<String> appendedStates = List.of(
+                    "minecraft:lantern[hanging=true,waterlogged=false]",
+                    "minecraft:custom_mod_lamp[custom_power=11]");
+
+            // Patch section index 6 (Y = -4 + 6 = 2, world Y = 32..47) with 2 voxel deltas + custom SkyLight & BlockLight
+            int yzxA = (1 << 8) | (2 << 4) | 3; // (3, 33, 2)
+            int yzxB = (7 << 8) | (8 << 4) | 9; // (9, 39, 8)
+            byte[] customSky = new byte[2048];
+            Arrays.fill(customSky, (byte) 0xCC); // const nibble 12
+            byte[] customBlk = new byte[2048];
+            customBlk[0] = (byte) 0x5E; // non-uniform Gray light bitplanes
+
+            LcaSectionCodec.SectionPatch sec6Patch = new LcaSectionCodec.SectionPatch(
+                    6,
+                    LcaSectionCodec.PATCH_FLAG_VOXEL_DELTAS
+                            | LcaSectionCodec.PATCH_FLAG_SKY_LIGHT
+                            | LcaSectionCodec.PATCH_FLAG_BLOCK_LIGHT,
+                    0,
+                    new int[] {yzxA, yzxB},
+                    new int[] {baseK, baseK + 1},
+                    customSky,
+                    customBlk);
+
+            // Also patch top sky section index 23 (Y = 19, world Y = 304..319) via PATCH_FLAG_REPLACEMENT_OFFSET
+            // to an inline-uniform entry (0x8000) referencing appended state K + 0!
+            int inlineAppendedEntry16 = 0x8000 | (0b01 << 13) | (3 << 11) | (baseK & 0x07FF);
+            LcaSectionCodec.SectionPatch sec23InlinePatch = new LcaSectionCodec.SectionPatch(
+                    23,
+                    LcaSectionCodec.PATCH_FLAG_REPLACEMENT_OFFSET,
+                    inlineAppendedEntry16,
+                    null,
+                    null,
+                    null,
+                    null);
+
+            // Also patch inline-uniform section index 22 (Y = 18, world Y = 288..303) with a voxel delta
+            // so createUniformDecodedSection + applySectionPatch on a uniform base is exercised!
+            int yzxUniformDelta = (0 << 8) | (4 << 4) | 5; // (5, 288, 4)
+            LcaSectionCodec.SectionPatch sec22UniformVoxelPatch = new LcaSectionCodec.SectionPatch(
+                    22,
+                    LcaSectionCodec.PATCH_FLAG_VOXEL_DELTAS,
+                    0,
+                    new int[] {yzxUniformDelta},
+                    new int[] {baseK},
+                    null,
+                    null);
+
+            patchArchive.applyChunkPatchCoW(0, 0, appendedStates, List.of(sec6Patch, sec22UniformVoxelPatch, sec23InlinePatch));
+            // Splice an out-of-order section AFTER the Residual Tail on the already-patched chunk, then re-apply
+            // a patch tail so findMaxPostResidualSectionStart and post-residual offset adjustment are exercised!
+            byte[] patchedLca = patchArchive.toByteArray();
+
+            // Verify across readChunkView, readColumnProbe, readTerrainProbe, readSection, readChunk, and readChunkNbtBytes
+            AnvilChunkView patchedView = LcaRegionReader.readChunkView(patchedLca, 0, 0);
+            assertNotNull(patchedView);
+            assertEquals("minecraft:lantern", patchedView.blockIdAt(3, 33, 2));
+            assertEquals("minecraft:custom_mod_lamp", patchedView.blockIdAt(9, 39, 8));
+            assertEquals("minecraft:lantern", patchedView.blockIdAt(5, 288, 4),
+                    "Voxel delta on inline-uniform section 22 must resolve via createUniformDecodedSection");
+            assertEquals("minecraft:lantern", patchedView.blockIdAt(0, 304, 0),
+                    "Inline-uniform section must resolve appended micro-palette state K");
+
+            ColumnProbe patchedCol = LcaRegionReader.readColumnProbe(patchedLca, 0, 0, 32, 319);
+            assertNotNull(patchedCol);
+            assertEquals("minecraft:lantern", patchedCol.blockAt(3, 2, 33));
+            assertEquals("minecraft:custom_mod_lamp", patchedCol.blockAt(9, 8, 39));
+            assertEquals("minecraft:lantern", patchedCol.blockAt(5, 4, 288));
+            assertEquals("minecraft:lantern", patchedCol.blockAt(5, 5, 310));
+
+            ColumnProbe patchedTer = LcaRegionReader.readTerrainProbe(patchedLca, patchedLca.length, 0, 0, 32, 319);
+            assertNotNull(patchedTer);
+            assertEquals("minecraft:lantern", patchedTer.blockAt(3, 2, 33));
+            assertEquals("minecraft:custom_mod_lamp", patchedTer.blockAt(9, 8, 39));
+            assertEquals("minecraft:lantern", patchedTer.blockAt(5, 4, 288));
+
+            AnvilReader.ChunkEntry patchedChunkEntry = LcaRegionReader.INSTANCE.readChunk(patchedLca, 0, 0);
+            assertNotNull(patchedChunkEntry);
+            byte[] patchedNbtBytes = LcaRegionReader.INSTANCE.readChunkNbtBytes(patchedLca, 0, 0);
+            assertNotNull(patchedNbtBytes);
+            LinkedHashMap<String, Object> reparsedPatchedRoot = Nbt.readRootCompound(patchedNbtBytes);
+            AnvilChunkView fromPatchedNbt = AnvilReader.toView(reparsedPatchedRoot);
+            assertEquals("minecraft:lantern", fromPatchedNbt.blockIdAt(3, 33, 2));
+            assertEquals("minecraft:custom_mod_lamp", fromPatchedNbt.blockIdAt(9, 39, 8));
+            assertEquals("minecraft:lantern", fromPatchedNbt.blockIdAt(5, 288, 4));
+            assertEquals("minecraft:lantern", fromPatchedNbt.blockIdAt(0, 304, 0));
+
+            // Verify patched SkyLight & BlockLight in section Y=2 (secIdx=6)
+            Nbt.NbtList patchedSecs = (Nbt.NbtList) patchedChunkEntry.root.get("sections");
+            LinkedHashMap<String, Object> decodedSecY2 = null;
+            for (Object o : patchedSecs.items) {
+                @SuppressWarnings("unchecked")
+                LinkedHashMap<String, Object> sm = (LinkedHashMap<String, Object>) o;
+                if (((Number) sm.get("Y")).intValue() == 2) {
+                    decodedSecY2 = sm;
+                    break;
+                }
+            }
+            assertNotNull(decodedSecY2);
+            org.junit.jupiter.api.Assertions.assertArrayEquals(customSky, (byte[]) decodedSecY2.get("SkyLight"));
+            org.junit.jupiter.api.Assertions.assertArrayEquals(customBlk, (byte[]) decodedSecY2.get("BlockLight"));
+
+            // Exercise spliceOutOfOrderSectionCoW(afterResidual=true) on the already-patched chunk, followed by
+            // another applyChunkPatchCoW replacement (covers findMaxPostResidualSectionStart + post-residual shift)
+            patchArchive.spliceOutOfOrderSectionCoW(0, 0, 2, decodedSecY2, true, true);
+            patchArchive.applyChunkPatchCoW(
+                    0, 0, appendedStates, List.of(sec6Patch, sec22UniformVoxelPatch, sec23InlinePatch));
+            if (!modeB) {
+                byte[] postResPatched = patchArchive.toByteArray();
+                long p0 = LcaRegionReader.getVolatileLongBE(postResPatched, LcaRegionReader.POINTER_DIRECTORY_OFFSET);
+                int fs0 = (int) ((p0 >>> 29) << LcaRegionReader.SLAB_SHIFT);
+                int estLen = LcaRegionReader.estimateSelfDescribingChunkLengthStatic(
+                        postResPatched, fs0, 24, false, postResPatched.length - 8);
+                assertTrue(estLen > 72);
+            }
+
+            // 3. CBIT T6b tripwire: corrupting the 1-byte patchParity8 at the end of ChunkPatchTail must fail closed
+            if (!modeB) {
+                byte[] badParityLca = Arrays.copyOf(patchedLca, patchedLca.length);
+                long ptr = LcaRegionReader.getVolatileLongBE(badParityLca, LcaRegionReader.POINTER_DIRECTORY_OFFSET);
+                int fStart = (int) ((ptr >>> 29) << LcaRegionReader.SLAB_SHIFT);
+                int fLen = (int) ((ptr >>> 8) & 0xFFFFFL);
+                // Locate the exact byte offset of patchParity8 inside the Residual Tail (immediately before bit 10 residualNbtSlice)
+                byte[] expectedPatchBytes = LcaSectionCodec.encodeChunkPatchTailBytes(
+                        baseK, appendedStates, new int[] {-1, 0}, List.of(sec6Patch, sec22UniformVoxelPatch, sec23InlinePatch));
+                int parityByteSubIdx = -1;
+                for (int off = fStart + resRelStart; off <= fStart + fLen - 4; off++) {
+                    if (badParityLca[off] == expectedPatchBytes[0]
+                            && badParityLca[off + 1] == expectedPatchBytes[1]
+                            && badParityLca[off + 2] == expectedPatchBytes[2]) {
+                        parityByteSubIdx = off + expectedPatchBytes.length - 1;
+                        break;
+                    }
+                }
+                assertTrue(parityByteSubIdx > fStart + resRelStart);
+                badParityLca[parityByteSubIdx] ^= 0x01; // Flip 1 bit in patchParity8
+                assertThrows(CorruptRegionEntryException.class,
+                        () -> LcaRegionReader.readChunkView(badParityLca, 0, 0),
+                        "Corrupted patchParity8 must trigger CBIT T6b");
+            }
+        }
+
+        // 4. CBIT T5 tripwire: duplicate non-uniform sectionOffsets[] must fail closed
+        byte[] modeALca = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, false);
+        long ptr = LcaRegionReader.getVolatileLongBE(modeALca, LcaRegionReader.POINTER_DIRECTORY_OFFSET);
+        int fStart = (int) ((ptr >>> 29) << LcaRegionReader.SLAB_SHIFT);
+        int firstNonUniformIdx = -1;
+        int secondNonUniformIdx = -1;
+        for (int i = 0; i < 24; i++) {
+            int e16 = LcaSectionCodec.readUint16BE(modeALca, fStart + 24 + (i << 1));
+            if (e16 != 0 && (e16 & 0x8000) == 0) {
+                if (firstNonUniformIdx < 0) firstNonUniformIdx = i;
+                else {
+                    secondNonUniformIdx = i;
+                    break;
+                }
+            }
+        }
+        assertTrue(firstNonUniformIdx >= 0 && secondNonUniformIdx >= 0);
+        byte[] dupOffsetLca = Arrays.copyOf(modeALca, modeALca.length);
+        dupOffsetLca[fStart + 24 + (secondNonUniformIdx << 1)] = dupOffsetLca[fStart + 24 + (firstNonUniformIdx << 1)];
+        dupOffsetLca[fStart + 24 + (secondNonUniformIdx << 1) + 1] = dupOffsetLca[fStart + 24 + (firstNonUniformIdx << 1) + 1];
+        assertThrows(CorruptRegionEntryException.class,
+                () -> LcaRegionReader.readChunkView(dupOffsetLca, 0, 0),
+                "Duplicate non-uniform sectionOffsets[] must trigger CBIT T5");
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-005: skipSectionFrame across all Roaring/Flat/Biome/Light modes, FileSession, AnvilPrefilter, and LcaRegionFileStorage")
+    void skipSectionFrameAndFileSessionStorageCoverage(@TempDir Path tempDir) throws Exception {
+        // 1. Exercise skipSectionFrame across TAG_SINGLETON, TAG_DELTA_ARRAY (with gap >= 240), TAG_BITMAP,
+        //    6:2 / 4:4 run containers (with adjGap==63/15 and lenM1==3/15), BLOCK_MODE_FLAT_BITPACK,
+        //    multi-biome palettes (bLen <= 8 and bLen > 8), and LIGHT_MODE_CONST / LIGHT_MODE_RAW
+        int[] pal4 = new int[] {0, 1, 2, 3};
+        long[] dataDeltaArrayAndRuns = new long[256]; // 4 bits per entry, 16 entries per long
+        // State 1: 4 scattered voxels with gap >= 250 -> TAG_DELTA_ARRAY with Bounded240 2-byte escape
+        for (int idx : new int[] {5, 265, 530, 800}) {
+            dataDeltaArrayAndRuns[idx / 16] |= (1L << ((idx % 16) * 4));
+        }
+        // State 2: long run (>= 20 voxels) after a large gap (>= 300) -> run container with escaped gap & length
+        for (int idx = 1200; idx < 1225; idx++) {
+            dataDeltaArrayAndRuns[idx / 16] |= (2L << ((idx % 16) * 4));
+        }
+        // State 3: dense (> 600 scattered entries) -> TAG_BITMAP (512B)
+        for (int idx = 2000; idx < 3400; idx += 2) {
+            dataDeltaArrayAndRuns[idx / 16] |= (3L << ((idx % 16) * 4));
+        }
+        int[] biomes10 = new int[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] biomeData10 = new long[4]; // 4 bits per entry for 64 biome cells
+        for (int i = 0; i < 64; i++) {
+            int b = i % 10;
+            biomeData10[i / 16] |= ((long) b) << ((i % 16) * 4);
+        }
+        byte[] constSky = new byte[2048];
+        Arrays.fill(constSky, (byte) 0xFF);
+        byte[] noisyLight = new byte[2048];
+        Random rng = new Random(12345L);
+        rng.nextBytes(noisyLight);
+
+        LcaSectionCodec.EncodedSection encRoaring = LcaSectionCodec.encodeSection(
+                pal4, dataDeltaArrayAndRuns, biomes10, biomeData10, constSky, noisyLight, -2, -1);
+        assertNotNull(encRoaring.frameBytes);
+        assertEquals(encRoaring.frameBytes.length,
+                LcaSectionCodec.skipSectionFrame(encRoaring.frameBytes, 0, encRoaring.frameBytes.length));
+
+        // Also test skipSectionFrame on a 4-biome palette (bLen <= 8) and flat bitpack (16-state high-entropy section)
+        int[] pal16 = new int[16];
+        for (int i = 0; i < 16; i++) pal16[i] = i;
+        long[] noisyBlocks = new long[256];
+        for (int i = 0; i < 4096; i++) {
+            long p = (i * 7 + (i >>> 4) * 13 + (i >>> 8) * 11) & 15;
+            noisyBlocks[i / 16] |= (p << ((i % 16) * 4));
+        }
+        int[] biomes4 = new int[] {0, 1, 2, 3};
+        long[] biomeData4 = new long[] {0x0123456789ABCDEFL, 0xFEDCBA9876543210L};
+        LcaSectionCodec.EncodedSection encFlat = LcaSectionCodec.encodeSection(
+                pal16, noisyBlocks, biomes4, biomeData4, null, constSky, -2, -1);
+        assertNotNull(encFlat.frameBytes);
+        assertEquals(encFlat.frameBytes.length,
+                LcaSectionCodec.skipSectionFrame(encFlat.frameBytes, 0, encFlat.frameBytes.length));
+
+        // Raw light patch channel round-trip inside ChunkPatchTail + injectChunkPatchTail when hasResidualNbt == false
+        byte[] mcaBytes = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
+        byte[] lcaBytes = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, false);
+        LcaRegionWriter.LcaLiveArchive rawLightArchive = LcaRegionWriter.openLiveArchive(lcaBytes);
+        LcaSectionCodec.SectionPatch rawLightPatch = new LcaSectionCodec.SectionPatch(
+                4,
+                LcaSectionCodec.PATCH_FLAG_SKY_LIGHT | LcaSectionCodec.PATCH_FLAG_BLOCK_LIGHT,
+                0,
+                null,
+                null,
+                noisyLight,
+                constSky);
+        rawLightArchive.applyChunkPatchCoW(0, 0, List.of(), List.of(rawLightPatch));
+        AnvilReader.ChunkEntry rawLightEntry = LcaRegionReader.INSTANCE.readChunk(rawLightArchive.toByteArray(), 0, 0);
+        assertNotNull(rawLightEntry);
+
+        byte[] uncompFrame = rawLightArchive.readUncompressedChunkFrame(0, 0);
+        byte[] noResFrame = Arrays.copyOf(uncompFrame, uncompFrame.length);
+        noResFrame[21] &= ~1; // clear hasResidualNbt bit
+        byte[] smallPatch = LcaSectionCodec.encodeChunkPatchTailBytes(0, List.of(), new int[0], List.of(rawLightPatch));
+        byte[] injectedNoRes = LcaSectionCodec.injectChunkPatchTailIntoUncompressedFrame(noResFrame, 24, smallPatch);
+        assertTrue((injectedNoRes[21] & 1) != 0);
+
+        // 2. Exercise LcaRegionReader.FileSession, AnvilPrefilter (.lca), AnvilRegionSampler (.lca), and ColumnProbeCoalescer (.lca)
+        LcaRegionReader.register();
+        Path worldDir = tempDir.resolve("world");
+        Path regionDir = worldDir.resolve("region");
+        Files.createDirectories(regionDir);
+        Path lcaFile = regionDir.resolve("r.0.0.lca");
+        Files.write(lcaFile, lcaBytes);
+
+        try (LcaRegionReader.FileSession fs = LcaRegionReader.openFileSession(lcaFile)) {
+            assertTrue(fs.isChunkGenerated(0, 0));
+            assertFalse(fs.isChunkGenerated(1, 0));
+            assertNotNull(fs.readChunkView(0, 0));
+            assertNull(fs.readChunkView(1, 0));
+            assertNotNull(fs.readColumnProbe(0, 0, -64, 319));
+            assertNull(fs.readColumnProbe(1, 0, -64, 319));
+            assertNotNull(fs.readTerrainProbe(0, 0, 20, 120));
+            assertNull(fs.readTerrainProbe(1, 0, 20, 120));
+            assertNotNull(fs.readChunkEntry(0, 0));
+            assertNull(fs.readChunkEntry(1, 0));
+        }
+        assertNotNull(LcaRegionReader.readChunkFromFile(lcaFile, 0, 0));
+
+        // Probe .lca via AnvilPrefilter both cold (FileSession) and warm (AnvilRegionByteCache resident lease)
+        AnvilRegionByteCache.invalidateAll();
+        try (AnvilPrefilter.RegionProbeSession probeSession =
+                AnvilPrefilter.openSession(worldDir, "", java.util.Set.of("minecraft:lava"), null)) {
+            assertNotNull(probeSession.probe(0, 0));
+            assertEquals(Verdict.UNKNOWN, probeSession.probe(1, 0).verdict());
+        }
+        try (AnvilRegionByteCache.Lease warmLease = AnvilRegionByteCache.acquire(lcaFile)) {
+            assertNotNull(warmLease);
+            try (AnvilPrefilter.RegionProbeSession warmProbeSession =
+                    AnvilPrefilter.openSession(worldDir, "", java.util.Set.of("minecraft:lava"), null)) {
+                assertNotNull(warmProbeSession.probe(0, 0));
+                assertEquals(Verdict.UNKNOWN, warmProbeSession.probe(1, 0).verdict());
+            }
+        }
+
+        // AnvilRegionSampler cold (.lca FileSession) and warm (readAllBiomes)
+        AnvilRegionByteCache.invalidateAll();
+        Map<Long, String> sampledCold = AnvilRegionSampler.sampleBiomes(
+                lcaFile, 0, 0, 64, new int[] {0, 1}, java.util.function.UnaryOperator.identity());
+        assertFalse(sampledCold.isEmpty());
+        Map<Long, String> sampledAll = AnvilRegionSampler.readAllBiomes(
+                lcaFile, 0, 0, 64, java.util.function.UnaryOperator.identity());
+        assertFalse(sampledAll.isEmpty());
+
+        // 3. Exercise LcaRegionFileStorage cold read channels, NBT byte / pre-encoded slab APIs, and LcaWorldStorageSession
+        Path storageWorldDir = tempDir.resolve("storage_world");
+        try (LcaRegionFileStorage.LcaWorldStorageSession ws =
+                new LcaRegionFileStorage.LcaWorldStorageSession(storageWorldDir, -4, 24, 4671, 0, true)) {
+            assertEquals(storageWorldDir, ws.dimensionDirectory());
+            assertEquals(ws.voxelStorage(), ws.storageForFolder(storageWorldDir.resolve("region")));
+            assertEquals(ws.entityStorage(), ws.storageForFolder(storageWorldDir.resolve("entities")));
+            assertEquals(ws.poiStorage(), ws.storageForFolder(storageWorldDir.resolve("poi")));
+
+            byte[] rawChunkNbt = LcaRegionReader.INSTANCE.readChunkNbtBytes(lcaBytes, 0, 0);
+            assertNotNull(rawChunkNbt);
+            assertTrue(ws.voxelStorage().writeChunkNbtBytes(0, 0, rawChunkNbt) > 0);
+            assertNotNull(ws.voxelStorage().readChunkNbtBytes(0, 0));
+
+            byte[] slabPayload = ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, rawChunkNbt);
+            assertTrue(slabPayload.length > 0);
+            assertEquals(0, ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, new byte[0]).length);
+            assertTrue(ws.voxelStorage().commitPreEncodedChunkSlab(1, 0, slabPayload) > 0);
+            assertEquals(0, ws.voxelStorage().commitPreEncodedChunkSlab(1, 0, new byte[0]));
+            assertEquals(0, ws.voxelStorage().writeChunkNbtBytes(0, 0, new byte[0]));
+            assertEquals(0, ws.voxelStorage().writeChunkCompound(0, 0, null));
+
+            assertTrue(ws.totalOpenRegionCount() >= 1);
+            assertEquals(0L, ws.totalMigratedRegionCount());
+            ws.compactOpenRegions(0.0);
+            ws.flush();
+        }
+    }
 }

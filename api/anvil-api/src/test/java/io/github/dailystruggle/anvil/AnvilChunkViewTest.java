@@ -215,6 +215,7 @@ class AnvilChunkViewTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     @DisplayName("REQ-RTP-S-005 / ADR-016: region file reads, layout parsing and getHeightmapTopY run off the caller thread")
     void offTickRegionReadLayoutParseAndHeightmapTopYDecode(@TempDir Path tempDir) throws IOException {
         long callerThreadId = Thread.currentThread().getId();

@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.predict;
 
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoubleSupplier;
 import java.util.function.IntUnaryOperator;
@@ -330,10 +329,19 @@ public final class DistributionSampler {
         int cellX = Math.floorDiv(chunkX, s);
         int cellZ = Math.floorDiv(chunkZ, s);
         long cellSeed = worldSeed + cellX * GRID_CELL_PRIME_X + cellZ * GRID_CELL_PRIME_Z + salt;
-        Random cellRandom = new Random(cellSeed);
+        long mixX = mix64(cellSeed + GOLDEN_GAMMA);
+        long mixZ = mix64(cellSeed + (GOLDEN_GAMMA << 1));
+        int jitterX = (int) Long.remainderUnsigned(mixX, s);
+        int jitterZ = (int) Long.remainderUnsigned(mixZ, s);
         return new int[] {
-            cellX * s + cellRandom.nextInt(s),
-            cellZ * s + cellRandom.nextInt(s)
+            cellX * s + jitterX,
+            cellZ * s + jitterZ
         };
+    }
+
+    private static long mix64(long z) {
+        z = (z ^ (z >>> 30)) * SPLITMIX_MUL_1;
+        z = (z ^ (z >>> 27)) * SPLITMIX_MUL_2;
+        return z ^ (z >>> 31);
     }
 }

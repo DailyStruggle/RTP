@@ -408,18 +408,35 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         List<String> activeBaseBlockNames = meta.baseBlockNames;
         List<String> activeBiomes = meta.biomes;
         List<LcaSectionCodec.BiomeTemplate> activeBiomeTemplates = Collections.emptyList();
+        LcaSectionCodec.SlabLocalPalette localPal = null;
         if (hasSlabLocalPalette) {
-            LcaSectionCodec.SlabLocalPalette localPal = LcaSectionCodec.decodeSlabLocalPalette(
-                    frame, fOff, sectionDirEnd, residualRelStart, true, true, meta.canonicalStates);
+            int paletteLimitRel = LcaSectionCodec.findFirstSectionRelStart(
+                    sectionRelStarts, sectionCount, residualRelStart);
+            localPal = LcaSectionCodec.decodeSlabLocalPalette(
+                    frame, fOff, sectionDirEnd, paletteLimitRel, true, true, meta.canonicalStates);
             activeCanonicalStates = localPal.canonicalStates;
             activeBaseBlockNames = localPal.baseBlockNames;
             activeBiomes = localPal.biomes;
             activeBiomeTemplates = localPal.biomeTemplates;
         }
 
+        int residualRelEnd = LcaSectionCodec.findResidualRelEnd(
+                sectionRelStarts, sectionCount, residualRelStart, frameLen);
+        LcaSectionCodec.ChunkPatchTail patchTail = hasResidualNbt
+                ? LcaSectionCodec.locateAndDecodeChunkPatchTail(
+                        frame, fOff, frameLen, residualRelStart, residualRelEnd,
+                        sectionCount, sectionDirEnd, scale4B, hasSlabLocalPalette,
+                        localPal, meta.canonicalStates, true, false,
+                        sectionEntries, sectionRelStarts)
+                : null;
+        if (patchTail != null) {
+            residualRelEnd = LcaSectionCodec.findResidualRelEnd(
+                    sectionRelStarts, sectionCount, residualRelStart, frameLen);
+        }
+
         LcaSectionCodec.ResidualTailDecoded tail = hasResidualNbt
                 ? LcaSectionCodec.unpackResidualSectionAndNbt(
-                        frame, fOff, residualRelStart, frameLen, meta.minSectionY, sectionCount)
+                        frame, fOff, residualRelStart, residualRelEnd, meta.minSectionY, sectionCount)
                 : new LcaSectionCodec.ResidualTailDecoded(
                         new LinkedHashMap<>(), Collections.emptyList(), Collections.emptyList(), false);
 
@@ -448,11 +465,12 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
 
         for (int i = 0; i < sectionCount; i++) {
             int entry16 = sectionEntries[i];
-            if (entry16 == 0) {
+            LcaSectionCodec.SectionPatch secPatch = patchTail != null ? patchTail.patchForSection(i) : null;
+            if (entry16 == 0 && secPatch == null) {
                 continue;
             }
             int sectionY = meta.minSectionY + i;
-            if ((entry16 & 0x8000) != 0) {
+            if ((entry16 & 0x8000) != 0 && secPatch == null) {
                 int skyLight2 = (entry16 >>> 13) & 3;
                 int globalDictId = hasSlabLocalPalette ? (entry16 & 0x07FF) : (entry16 & 0x1FFF);
                 if (globalDictId >= activeCanonicalStates.size()) {
@@ -495,12 +513,24 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 }
                 sectionCompounds.add(secMap);
             } else {
-                int relStart = sectionRelStarts[i];
-                int relEnd = findSectionRelEnd(sectionRelStarts, i, sectionCount, residualRelStart);
-                LcaSectionCodec.DecodedSection dec = LcaSectionCodec.decodeSectionFrame(
-                        frame, fOff + relStart, fOff + relEnd, sectionY,
-                        activeCanonicalStates, activeBaseBlockNames, activeBiomes,
-                        activeBiomeTemplates, false, false);
+                LcaSectionCodec.DecodedSection dec;
+                if (entry16 == 0 || (entry16 & 0x8000) != 0) {
+                    dec = LcaSectionCodec.createUniformDecodedSection(
+                            sectionY, entry16, hasSlabLocalPalette,
+                            activeCanonicalStates, activeBaseBlockNames, activeBiomes,
+                            activeBiomeTemplates, defaultBiomeDictId, false, false);
+                } else {
+                    int relStart = sectionRelStarts[i];
+                    int relEnd = findSectionRelEnd(sectionRelStarts, i, sectionCount, residualRelStart, frameLen);
+                    dec = LcaSectionCodec.decodeSectionFrame(
+                            frame, fOff + relStart, fOff + relEnd, sectionY,
+                            activeCanonicalStates, activeBaseBlockNames, activeBiomes,
+                            activeBiomeTemplates, false, false);
+                }
+                if (secPatch != null) {
+                    dec = LcaSectionCodec.applySectionPatch(
+                            dec, secPatch, activeCanonicalStates, activeBaseBlockNames, false);
+                }
 
                 LinkedHashMap<String, Object> secMap = new LinkedHashMap<>();
                 secMap.put("Y", (byte) sectionY);
@@ -772,14 +802,20 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         if (sectionDirEnd > residualRelStart || residualRelStart > frameLen) {
             throw new CorruptRegionEntryException("CBIT T5: sectionOffsets/residualNbtRelOffset out of bounds");
         }
+        boolean hasResidualNbt = (frame[fOff + 21] & 1) != 0;
         int unitShift = scale4B ? 2 : 0;
         for (int i = 0; i < sectionCount; i++) {
             int entry16 = LcaSectionCodec.readUint16BE(frame, fOff + 24 + (i << 1));
             entriesOut[i] = entry16;
             if (entry16 != 0 && (entry16 & 0x8000) == 0) {
                 int relPos = sectionDirEnd + ((entry16 - 1) << unitShift);
-                if (relPos < sectionDirEnd || relPos >= residualRelStart) {
+                if (relPos < sectionDirEnd || relPos >= frameLen || (hasResidualNbt && relPos == residualRelStart)) {
                     throw new CorruptRegionEntryException("CBIT T5: sectionOffsets[" + i + "] out of bounds: " + relPos);
+                }
+                for (int k = 0; k < i; k++) {
+                    if (relStarts[k] == relPos) {
+                        throw new CorruptRegionEntryException("CBIT T5: Duplicate non-uniform sectionOffsets[] at " + i);
+                    }
                 }
                 relStarts[i] = relPos;
             } else {
@@ -789,18 +825,10 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         return relStarts;
     }
 
-    private static int findSectionRelEnd(int[] relStarts, int idx, int sectionCount, int residualRelStart)
-            throws CorruptRegionEntryException {
-        int start = relStarts[idx];
-        for (int j = idx + 1; j < sectionCount; j++) {
-            if (relStarts[j] >= 0) {
-                if (relStarts[j] < start) {
-                    throw new CorruptRegionEntryException("CBIT T5: Non-monotonic sectionOffsets[] at " + j);
-                }
-                return relStarts[j];
-            }
-        }
-        return residualRelStart;
+    private static int findSectionRelEnd(
+            int[] relStarts, int idx, int sectionCount, int residualRelStart, int frameLen
+    ) {
+        return LcaSectionCodec.findSectionRelEnd(relStarts, idx, sectionCount, residualRelStart, frameLen);
     }
 
     private static final class WindowDecodeResult {
@@ -923,10 +951,13 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         List<String> biomes;
         List<List<String>> singletonBiomePalettes;
         List<LcaSectionCodec.BiomeTemplate> biomeTemplates = Collections.emptyList();
+        LcaSectionCodec.SlabLocalPalette localPal = null;
 
         if (hasSlabLocalPalette) {
-            LcaSectionCodec.SlabLocalPalette localPal = LcaSectionCodec.decodeSlabLocalPalette(
-                    frame, fOff, sectionDirEnd, residualRelStart, false, decodeBiomes, Collections.emptyList());
+            int paletteLimitRel = LcaSectionCodec.findFirstSectionRelStart(
+                    relStarts, sectionCount, residualRelStart);
+            localPal = LcaSectionCodec.decodeSlabLocalPalette(
+                    frame, fOff, sectionDirEnd, paletteLimitRel, false, decodeBiomes, Collections.emptyList());
             canonicalStates = localPal.canonicalStates;
             baseBlockNames = localPal.baseBlockNames;
             singletonBasePalettes = localPal.singletonBasePalettes;
@@ -944,9 +975,21 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             singletonBiomePalettes = regionMeta.singletonBiomePalettes;
         }
 
+        int residualRelEnd = LcaSectionCodec.findResidualRelEnd(relStarts, sectionCount, residualRelStart, frameLen);
+        LcaSectionCodec.ChunkPatchTail patchTail = (!snap.modeBBodyDeferred && hasResidualNbt)
+                ? LcaSectionCodec.locateAndDecodeChunkPatchTail(
+                        frame, fOff, frameLen, residualRelStart, residualRelEnd,
+                        sectionCount, sectionDirEnd, scale4B, hasSlabLocalPalette,
+                        localPal, Collections.emptyList(), false, true,
+                        entries, relStarts)
+                : null;
+        if (patchTail != null) {
+            residualRelEnd = LcaSectionCodec.findResidualRelEnd(relStarts, sectionCount, residualRelStart, frameLen);
+        }
+
         int minEmittedSectionY = Integer.MAX_VALUE;
         for (int i = 0; i < sectionCount; i++) {
-            if (entries[i] != 0) {
+            if (entries[i] != 0 || (patchTail != null && patchTail.hasPatchForSection(i))) {
                 minEmittedSectionY = sb.minSectionY + i;
                 break;
             }
@@ -957,11 +1000,12 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
 
         for (int i = 0; i < sectionCount; i++) {
             int entry16 = entries[i];
-            if (entry16 == 0) continue;
+            LcaSectionCodec.SectionPatch secPatch = patchTail != null ? patchTail.patchForSection(i) : null;
+            if (entry16 == 0 && secPatch == null) continue;
             int sectionY = sb.minSectionY + i;
             if (sectionY < syMin || sectionY > syMax) continue;
 
-            if ((entry16 & 0x8000) != 0) {
+            if ((entry16 & 0x8000) != 0 && secPatch == null) {
                 int globalDictId = hasSlabLocalPalette ? (entry16 & 0x07FF) : (entry16 & 0x1FFF);
                 if (globalDictId >= singletonBasePalettes.size()) {
                     throw new CorruptRegionEntryException("CBIT T7: Inline globalDictId out of bounds: " + globalDictId);
@@ -978,14 +1022,32 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                         biomesOut.add(new BiomePaletteSection(sectionY, singletonBiomePalettes.get(defaultBiomeDictId), null));
                     }
                 }
+            } else if (entry16 == 0 || (entry16 & 0x8000) != 0) {
+                LcaSectionCodec.DecodedSection dec = LcaSectionCodec.createUniformDecodedSection(
+                        sectionY, entry16, hasSlabLocalPalette,
+                        canonicalStates, baseBlockNames, biomes,
+                        biomeTemplates, defaultBiomeDictId, true, !decodeBiomes);
+                dec = LcaSectionCodec.applySectionPatch(dec, secPatch, canonicalStates, baseBlockNames, true);
+                sectionsOut.add(dec.toPaletteSection());
+                if (decodeBiomes) {
+                    BiomePaletteSection bps = dec.toBiomePaletteSection();
+                    if (bps != null) {
+                        biomesOut.add(bps);
+                    } else if (defaultBiomeDictId >= 0 && defaultBiomeDictId < singletonBiomePalettes.size()) {
+                        biomesOut.add(new BiomePaletteSection(sectionY, singletonBiomePalettes.get(defaultBiomeDictId), null));
+                    }
+                }
             } else {
                 int relStart = relStarts[i];
-                int relEnd = findSectionRelEnd(relStarts, i, sectionCount, residualRelStart);
+                int relEnd = findSectionRelEnd(relStarts, i, sectionCount, residualRelStart, frameLen);
                 try {
                     LcaSectionCodec.DecodedSection dec = LcaSectionCodec.decodeSectionFrame(
                             frame, fOff + relStart, fOff + relEnd, sectionY,
                             canonicalStates, baseBlockNames, biomes,
                             biomeTemplates, true, !decodeBiomes);
+                    if (secPatch != null) {
+                        dec = LcaSectionCodec.applySectionPatch(dec, secPatch, canonicalStates, baseBlockNames, true);
+                    }
                     sectionsOut.add(dec.toPaletteSection());
                     if (decodeBiomes) {
                         BiomePaletteSection bps = dec.toBiomePaletteSection();
@@ -1403,10 +1465,10 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             int startSlab = (int) (meta.slabPoolBaseOffset >>> SLAB_SHIFT);
             int endSlab = (regionBytes.length - FOOTER_SIZE) >>> SLAB_SHIFT;
             boolean regionDefaultModeB = (meta.flags & 8) != 0;
-            for (int slab = startSlab; slab < endSlab; slab++) {
+            for (int slab = endSlab - 1; slab >= startSlab; slab--) {
                 int bytePos = slab << SLAB_SHIFT;
                 if (bytePos + headerLen > regionBytes.length - FOOTER_SIZE) {
-                    break;
+                    continue;
                 }
                 int dvWord = LcaSectionCodec.readIntBE(regionBytes, bytePos);
                 if ((dvWord & CHUNK_FRAME_SELF_TAG_MASK) != CHUNK_FRAME_SELF_TAG_MAGIC
@@ -1540,7 +1602,23 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                     pos += LcaSectionCodec.varIntLen(payLen) + payLen;
                 }
             }
-            if ((bpFlags & 1024) != 0 && pos < limitBytes) {
+            int patchPayloadStart = -1;
+            int patchPayloadLen = 0;
+            if ((bpFlags & LcaSectionCodec.BP_FLAG_HAS_CHUNK_PATCH_TAIL) != 0 && pos < limitBytes) {
+                patchPayloadLen = LcaSectionCodec.readVarInt(buf, pos, limitBytes);
+                pos += LcaSectionCodec.varIntLen(patchPayloadLen);
+                patchPayloadStart = pos;
+                pos += patchPayloadLen;
+            }
+            int maxPostSecStart = LcaSectionCodec.findMaxPostResidualSectionStart(
+                    buf, frameStart, sectionCount, sectionDirEnd, unitShift,
+                    residualStart, patchPayloadStart, patchPayloadLen, limitBytes);
+            if (maxPostSecStart >= 0) {
+                int secEnd = LcaSectionCodec.skipSectionFrame(buf, maxPostSecStart, limitBytes);
+                if (secEnd > pos && secEnd <= limitBytes) {
+                    pos = secEnd;
+                }
+            } else if ((bpFlags & 1024) != 0 && pos < limitBytes) {
                 for (int s = ((pos - frameStart + 255) >>> SLAB_SHIFT); ; s++) {
                     int candEnd = frameStart + (s << SLAB_SHIFT);
                     if (candEnd >= limitBytes) {

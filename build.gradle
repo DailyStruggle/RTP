@@ -276,7 +276,7 @@ subprojects {
         // -Xshare:off disables CDS so the test launcher's bootstrap-classpath
         // append no longer prints "Sharing is only supported for boot loader
         // classes ..." on every fork.
-        jvmArgs '-XX:+UseG1GC', '-XX:MaxMetaspaceSize=384m', '-XX:+EnableDynamicAgentLoading', '-Xshare:off'
+        jvmArgs '-XX:+UseG1GC', '-XX:MaxMetaspaceSize=384m', '-XX:+EnableDynamicAgentLoading', '-Xshare:off', '--enable-native-access=ALL-UNNAMED'
         maxParallelForks = testForks
         forkEvery = 20
         // Re-run when the tier toggle flips so cached results from the other
@@ -1091,7 +1091,7 @@ tasks.register('jacocoServerReport', JacocoReport) {
             '**/build/jacoco/backend*.exec'
     ])
 
-    def serverProjects = subprojects.findAll {
+    def serverProjects = (subprojects as Set).findAll {
         !it.name.toLowerCase().contains('fabric') && !it.name.toLowerCase().contains('neoforge')
     }
 
@@ -1142,8 +1142,8 @@ tasks.register('jacocoServerReport', JacocoReport) {
 
 sonar {
     properties {
-        property 'sonar.projectKey', 'DailyStruggle_RTP'
-        property 'sonar.organization', 'dailystruggle'
+        property 'sonar.projectKey', System.getenv('SONAR_PROJECT_KEY') ?: 'DailyStruggle_RTP'
+        property 'sonar.organization', System.getenv('SONAR_ORGANIZATION') ?: 'dailystruggle'
         property 'sonar.host.url', 'https://sonarcloud.io'
         property 'sonar.coverage.exclusions', [
                 '**/test/**',

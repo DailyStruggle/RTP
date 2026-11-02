@@ -89,6 +89,29 @@ public final class EmbeddedHttpServer implements AutoCloseable {
             return body.clone();
         }
 
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof HttpResponsePayload that)) return false;
+            return statusCode == that.statusCode
+                    && contentType.equals(that.contentType)
+                    && java.util.Arrays.equals(body, that.body);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(statusCode, contentType);
+            return 31 * result + java.util.Arrays.hashCode(body);
+        }
+
+        @Override
+        public String toString() {
+            return "HttpResponsePayload[statusCode=" + statusCode
+                    + ", contentType=" + contentType
+                    + ", body=" + java.util.Arrays.toString(body)
+                    + "]";
+        }
+
         public String bodyUtf8() {
             return new String(body, StandardCharsets.UTF_8);
         }

@@ -187,7 +187,7 @@ public abstract class AbstractServerAccessor extends BukkitPluginServerAccessor
     return io.github.dailystruggle.server.api.PlatformFamily.BUKKIT;
   }
 
-  private boolean isPaper() {
+  private static boolean isPaper() {
     try {
       Class.forName("com.destroystokyo.paper.PaperConfig");
       return true;
@@ -196,7 +196,7 @@ public abstract class AbstractServerAccessor extends BukkitPluginServerAccessor
     }
   }
 
-  private boolean isFolia() {
+  private static boolean isFolia() {
     try {
       Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
       return true;

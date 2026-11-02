@@ -1,4 +1,4 @@
-# anvil-api-ADR-003 - `.lca` Binary Specification: 3D Hilbert, Adaptive Delta-Roaring, Gray-Code Light & `LeafMap` Octree Streaming
+# anvil-api-ADR-003 - `.lca` Binary Specification: 3D Hilbert, Adaptive Delta-Roaring, Gray-Code Light & Octree Streaming
 
 **Status:** Accepted
 **Date:** 2026-10-30
@@ -25,7 +25,7 @@ Existing Minecraft region storage and web-map tile formats trade off disk size, 
 
 ## Decision
 
-Specify the `.lca` (LeafCraft Anvil) binary format for `api/anvil-api`, server persistence (`region/`, `entities/`, `poi/`), and `LeafMap` 3D octree and multi-span LOD streaming.
+Specify the `.lca` (LeafCraft Anvil) binary format for `api/anvil-api`, server persistence (`region/`, `entities/`, `poi/`), and 3D octree and multi-span LOD streaming.
 
 All multi-byte integers in header and directory structures are big-endian (`BE`) for `VarHandle` (`MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.BIG_ENDIAN)`) and Mojang `CompoundTag` sidecar compatibility.
 
@@ -55,8 +55,8 @@ All multi-byte integers in header and directory structures are big-endian (`BE`)
 | ---: | :--- | :--- | :--- |
 | `0x00..0x07` | `uint64` | `magic` | `0x4C43415F56303031L` (`"LCA_V001"` ASCII) |
 | `0x08..0x09` | `uint16` | `formatVersion` | `0x0001` (Major `1`, Minor `0`) |
-| `0x0A` | `uint8` | `storageKind` | `0 = REGION_VOXEL`, `1 = ENTITIES`, `2 = POI`, `3 = LEAFMAP_TILE` |
-| `0x0B` | `uint8` | `flags` | Bit `0`: `HAS_SHARED_DICT`; Bit `1`: `HAS_LEAFMAP_LOD_HEADER`; Bit `2`: `HAS_TAIL_DELTA_RING`; Bit `3`: `DEFAULT_ZSTD1`; Bit `4`: `HAS_SECDED_PARITY` |
+| `0x0A` | `uint8` | `storageKind` | `0 = REGION_VOXEL`, `1 = ENTITIES`, `2 = POI`, `3 = MAP_TILE` |
+| `0x0B` | `uint8` | `flags` | Bit `0`: `HAS_SHARED_DICT`; Bit `1`: `HAS_LOD_HEADER`; Bit `2`: `HAS_TAIL_DELTA_RING`; Bit `3`: `DEFAULT_ZSTD1`; Bit `4`: `HAS_SECDED_PARITY` |
 | `0x0C..0x0F` | `int32` | `regionX` | Region $X$ coordinate ($\lfloor \text{chunkX} / 32 \rfloor$) |
 | `0x10..0x13` | `int32` | `regionZ` | Region $Z$ coordinate ($\lfloor \text{chunkZ} / 32 \rfloor$) |
 | `0x14..0x17` | `int32` | `minSectionY` | World minimum section $Y$ (e.g. `-4` for $Y = -64$) |
@@ -77,14 +77,14 @@ $$\underbrace{\mathtt{slabOffset35}}_{\text{bits } 63..29} \;\big|\; \underbrace
 - **`slabOffset35` (bits `63..29`, 35 bits):** Starting file offset in `256-byte` sub-slabs (`actualByteOffset = slabOffset35 << 8`), addressing up to $8\text{ TiB}$ per region file. `0` indicates an ungenerated/absent chunk.
 - **`codec1` (bit `28`, 1 bit):** `0 = Mode A (Uncompressed Section Payload)`, `1 = Mode B (Uncompressed ChunkFrame Header + SEC-DED Parity + Zstd-1 Body)`.
 - **`exactByteLen20` (bits `27..8`, 20 bits):** Exact payload byte length ($1\text{ B} .. 1,048,575\text{ B}$). Allocated slab capacity is `allocatedSlabs = (exactByteLen20 + 255) >>> 8`. Uncompressed chunk materialization is bounded by `MAX_CHUNK_UNCOMPRESSED_BYTES = 16 MiB` (`CBIT T4`).
-- **`generation8` (bits `7..0`, 8 bits):** Monotonically incrementing wrapping save counter (`0..255`). Serves as an ABA concurrency guard for lock-free readers and an $O(1)$ cache-invalidation token for `LeafMap` and `LeafRTP`.
+- **`generation8` (bits `7..0`, 8 bits):** Monotonically incrementing wrapping save counter (`0..255`). Serves as an ABA concurrency guard for lock-free readers and an $O(1)$ cache-invalidation token for `LeafRTP` and map readers.
 
 #### 2.3 In-Memory `256B` Free-Slab Allocator, Header-Only Live Archive Residency & Copy-on-Write (`CoW`) Live-Save Invariant
 On region open (`LcaRegionWriter.openLiveArchive(Path)`), `LcaLiveArchive` reads only the `10,304 B` (`~10.1 KiB`, `0x0000..0x283F`) default on-disk region header prefix (`64 B` `Superblock`, `8,192 B` `1,024` pointer words, `1,024 B` default `Root Shared Dictionary`, and `1,024 B` `SEC-DED` parity table) plus the 8-byte footer canary into heap memory (`headerOnlyChannelMode = true`), scanning the $1,024$ pointer words in `< 15 us` to populate the size-indexed free-slab `TreeMap` while serving chunk reads and CoW slab writes positionally over its open `FileChannel`. This bounds per-region heap residency to `~10.1 KiB` of raw header bytes (`~5.15 MiB` across `512` open regions) and `~25.6 KiB` total per-handle footprint (`~12.8 MiB` across `512` open regions) once `prevChunkPointers[1024]`, per-chunk cache arrays, and decoded dictionary/allocator lookup structures are included, updating `LcaRegionReader.FILE_HEADER_CACHE` pointers in-place (`updateCachedPointer`) on save without evicting cached region headers. On chunk save:
 - **Copy-on-Write (`CoW`) Slab Rotation and Per-Thread Hazard Pointers:** Live saves never mutate an in-use chunk slab in-place while concurrent readers may be reading it. Before reclaiming the oldest slot of the 4-epoch CoW grace ring, the writer checks the 64-slot lock-free per-thread hazard pointer array (`PINNED_SLAB_STARTS` in `LcaRegionReader`): if a reader thread pins `[oldSlabOffset, oldSlabOffset + oldSlabs)`, retirement of that slab range is deferred until the reader unpins its slot. The writer pops the best-fit unpinned free interval $\ge \mathtt{newSlabs}$ from the `TreeMap` (or appends at EOF), writes the new chunk frame, issues a `VarHandle.releaseFence()`, updates the 1-byte Extended Hamming `(72, 64)` SEC-DED syndrome, CAS-swaps the 64-bit directory word (`newSlabOffset35 | codec1 | exactByteLen20 | ((generation8 + 1) & 0xFF)`), and records the previous pointer in `prevChunkPointers[chunkIdx]` for rollback. Unpinned old slabs return to the `TreeMap` pool for reuse (`95.0%--100.0%` slot reuse across $10,000$ saves).
 - **Exclusive Offline / Single-Writer Compaction:** Only when opened in exclusive offline maintenance mode with zero concurrent readers may a writer overwrite an existing slab in-place when `newSlabs <= currentSlabs`.
 
-### 3. Layer 2: Region Shared Dictionary & `LeafMap` Front-Loaded LOD Header
+### 3. Layer 2: Region Shared Dictionary & Front-Loaded LOD Header
 
 #### 3.1 Chained Region Shared `BlockState` & `Biome` Dictionary (Slack + Relative Continuation Pointer)
 ```
@@ -95,11 +95,11 @@ uint16  usedPayloadBytes           // Exact active entry bytes written in this s
 Entry[segmentStateCount]:
   VarInt  utf8ByteLen
   byte[]  canonicalStateString     // e.g. "minecraft:oak_stairs[facing=north,half=bottom,waterlogged=false]"
-  uint32  leafMapMaterialPacked    // RGBA8 average color + 4-bit roughness/emissive/foliage/water flags for LeafMap LODs
+  uint32  materialPacked           // RGBA8 average color + 4-bit roughness/emissive/foliage/water flags for map LODs
 BiomeEntry[segmentBiomeCount]:
   VarInt  utf8ByteLen
   byte[]  biomeIdString            // e.g. "minecraft:lush_caves"
-  uint32  foliageAndWaterTint      // Biome tint colors for LeafMap rendering
+  uint32  foliageAndWaterTint      // Biome tint colors for map rendering
 byte[]  slackPadding               // Zero-filled slack up to (segmentCapacityBytes - 8)
 uint64  nextSegmentLinkTrailer     // ALWAYS at the last 8 bytes of the segment (offset + segmentCapacityBytes - 8)
 ```
@@ -109,10 +109,10 @@ uint64  nextSegmentLinkTrailer     // ALWAYS at the last 8 bytes of the segment 
     $$\underbrace{\mathtt{nextSegmentRelSlabs32}}_{\text{bits } 63..32\text{ (int32)}} \;\big|\; \underbrace{\mathtt{nextSegmentCapacitySlabs24}}_{\text{bits } 31..8\text{ (uint24)}} \;\big|\; \underbrace{\mathtt{segmentFlags8}}_{\text{bits } 7..0}$$
     where `nextSegmentRelSlabs32` is a relative offset in `256-byte` sub-slabs from the start of the current segment to the next dictionary segment (`0` = terminal segment), and `nextSegmentCapacitySlabs24` is the capacity of that next segment in `256B` sub-slabs.
   - When a segment's slack is exhausted (`usedPayloadBytes + newEntryBytes > segmentCapacityBytes - 8`), the writer allocates a free slab range from the `TreeMap` (e.g., `256 B .. 4 KiB`), formats it as a continuation segment (with `nextSegmentLinkTrailer = 0`), and atomically writes the relative pointer into the current segment's trailer. This allows the shared dictionary to grow across chained segments while preserving monotonic global dictionary IDs (`0 .. totalStateCount - 1`); offline compaction can flatten chained segments into a single contiguous root arena.
-- **Material Metadata (`leafMapMaterialPacked`):** Embedding the 32-bit `leafMapMaterialPacked` word (`RGBA8` albedo + translucency/emissive/water flags) in the region dictionary once per state allows `LeafMap` to shade voxel or octree LOD cells in $O(1)$ from the `VarInt` state ID without parsing blockstate JSONs or textures during LOD streaming.
+- **Material Metadata (`materialPacked`):** Embedding the 32-bit `materialPacked` word (`RGBA8` albedo + translucency/emissive/water flags) in the region dictionary once per state allows map renderers to shade voxel or octree LOD cells in $O(1)$ from the `VarInt` state ID without parsing blockstate JSONs or textures during LOD streaming.
 
-#### 3.2 `LeafMap` & `LeafRTP` Multi-Span Analytical Index Integration (`.dlsh` / Optional Layer 2 Extension)
-To keep `.lca` region headers compact (`10,304 B` / `~10.1 KiB` on-disk header prefix, `~25.6 KiB` total `LcaLiveArchive` handle residency per open region), `lodHeaderOffsetAndLen` (`0x28..0x2F`) in standard server region archives points directly to the `1,024-byte` Extended Hamming `(72, 64)` SEC-DED pointer syndrome table (`flags` bit `4` = `HAS_SECDED_PARITY`), while `LeafMap`'s $512 \times 512$ (`262,144`-column) 2D `DualLayerSpiralHilbertCurve` (`H_2`) multi-span horizon index is maintained in standalone `.dlsh` sidecar caches (`leafmap-ADR-001`) or optional `HAS_LEAFMAP_LOD_HEADER` (`flags` bit `1`) segments:
+#### 3.2 Multi-Span Analytical Index Integration (`.dlsh` / Optional Layer 2 Extension)
+To keep `.lca` region headers compact (`10,304 B` / `~10.1 KiB` on-disk header prefix, `~25.6 KiB` total `LcaLiveArchive` handle residency per open region), `lodHeaderOffsetAndLen` (`0x28..0x2F`) in standard server region archives points directly to the `1,024-byte` Extended Hamming `(72, 64)` SEC-DED pointer syndrome table (`flags` bit `4` = `HAS_SECDED_PARITY`), while the $512 \times 512$ (`262,144`-column) 2D `DualLayerSpiralHilbertCurve` (`H_2`) multi-span horizon index is maintained in standalone `.dlsh` sidecar caches or optional `HAS_LOD_HEADER` (`flags` bit `1`) segments:
 1. **Region Occupancy and Safety Bitmaps:** Roaring containers for `generated_chunk_mask` (`1,024` bits), `rtp_safe_ground_mask` (`262,144` bits), and `water_column_mask`.
 2. **Progressive Multi-Span Surface and Cavity Columns (`LOD-3 -> LOD-0`):**
    - Stores up to $K=4$ vertical `(topY, bottomY, stateId, skyLight4 | blockLight4)` spans per $(x, z)$ column along `H_2` (retaining overhangs, bridges, floating islands, and cave roofs).
@@ -164,7 +164,10 @@ Each 16-bit entry in `sectionOffsets[i]` encodes either an inline constant secti
   - **`dictId13 >= 8192` Overflow Fallback:** If a region's chained dictionary exceeds `8,191` unique block states and a uniform section references `dictId >= 8192` (or has non-uniform light nibbles), the encoder shall not set bit `15`; instead it emits a 4-byte non-uniform `SectionFrame` (`bit 15 == 0`, `blockEncodingMode = 00 (Uniform)`, full `VarInt` dictionary ID), preventing 13-bit truncation.
 - **Bit `15 == 0` (`0x0001 .. 0x7FFF`):** 1-based relative offset from `sectionDirEnd = 24 + 2 * sectionCount` to the non-uniform `SectionFrame`:
   $$\mathtt{relStart}_i = \mathtt{sectionDirEnd} + \bigl((\mathtt{entry16}_i - 1) \ll \mathtt{unitShift}\bigr), \quad \mathtt{unitShift} = \begin{cases} 0 & (\mathtt{scaleOffsets} = 0,\text{ 1B exact units up to } 32\text{ KiB}) \\ 2 & (\mathtt{scaleOffsets} = 1,\text{ 4B units up to } 128\text{ KiB}) \end{cases}$$
-  - When `hasSlabLocalPalette == 1`, the Slab-Local Micro-Palette occupies `[sectionDirEnd .. relStart_firstNonUniform)` with zero tail padding when `scaleOffsets == 0`, and each non-uniform `SectionFrame` $i$ is bounded by the next non-uniform `relStart_j` ($j > i$) or `residualRelStart = sectionDirEnd + (residualNbtRelOffset << unitShift)`.
+  - When `hasSlabLocalPalette == 1`, the initial Slab-Local Micro-Palette occupies `[sectionDirEnd .. min_k(relStart_k))` with zero tail padding when `scaleOffsets == 0`.
+  - **Order-Independent Section Bounding (`CBIT T5`):** Non-uniform `SectionFrame`s may appear in any non-overlapping permutation inside `[sectionDirEnd .. frameLen)` (including out-of-order `SectionFrame`s appended in the `256-byte` sub-slab slack before `residualRelStart` or after the Residual Tail). Each non-uniform `SectionFrame` $i$ is bounded by:
+    $$\mathtt{relEnd}_i = \min\Bigl(\{\mathtt{relStart}_j \mid \mathtt{relStart}_j > \mathtt{relStart}_i\} \cup \{B \in \{\mathtt{residualRelStart}, \mathtt{frameLen}\} \mid B > \mathtt{relStart}_i\}\Bigr)$$
+    and the Residual Tail is bounded by $\mathtt{residualRelEnd} = \min(\{\mathtt{relStart}_j \mid \mathtt{relStart}_j > \mathtt{residualRelStart}\} \cup \{\mathtt{frameLen}\})$. Duplicate non-zero non-uniform `entry16` offsets are rejected by `CBIT T5`.
 
 #### 4.2 Three-Tier Palette Resolution & Slab-Local Micro-Palette (`chunkFlags` bit `1`)
 `.lca` resolves block states and biomes through a three-tier hierarchy designed so that sub-chunk terrain probes never parse blockstate properties while complex property strings are never duplicated across chunks:
@@ -179,13 +182,14 @@ Each 16-bit entry in `sectionOffsets[i]` encodes either an inline constant secti
 3. **Tier 3 - Chained Region Shared Dictionary (`0x2040` + `nextSegmentLinkTrailer`):**
    - Stores exotic or modded `BlockState` strings whose property suffixes are not in `STATIC_CORE_PROP_SUFFIXES` once per region, referenced from `Part B` via `0x40 + VarInt globalStateId` (or directly by section palettes when a region exceeds `8,191` states and `hasSlabLocalPalette = 0`).
 
-#### 4.3 `boilerplateFlags16`, Binary `MOTION_BLOCKING_NO_LEAVES` Stream & Single-Pass Residual Tail
-At `residualRelStart = sectionDirEnd + (residualNbtRelOffset << unitShift)`:
+#### 4.3 `boilerplateFlags16`, Binary `MOTION_BLOCKING_NO_LEAVES` Stream, `ChunkPatchTail` & Single-Pass Residual Tail
+At `residualRelStart = sectionDirEnd + (residualNbtRelOffset << unitShift)` up to `residualRelEnd = min({relStart_j | relStart_j > residualRelStart} U {frameLen})`:
 ```
-uint16  boilerplateFlags16         // Bitmask (bits 0..13) of compacted vanilla/Starlight fields and residual NBT flags
+uint16  boilerplateFlags16         // Bitmask (bits 0..14) of compacted vanilla/Starlight fields, patch tail, and residual NBT flags
 [If bit 13 (0x2000): VarInt mbnlByteLen + byte[mbnlByteLen] mbnlDeltaStream]
 byte[]  boilerplateFields          // Ordered fields enabled by boilerplateFlags16 bits 5..9
-byte[]  residualNbtPayload         // Optional Mojang TAG_Compound (raw in Mode B; DEFLATE if bit 12 set in Mode A)
+[If bit 14 (0x4000): VarInt patchTailByteLen + byte[patchTailByteLen] chunkPatchTail]
+byte[]  residualNbtPayload         // Optional Mojang TAG_Compound up to residualRelEnd (raw in Mode B; DEFLATE if bit 12 set in Mode A)
 ```
 - **`boilerplateFlags16` Bit Allocation:**
   - `Bit 0` (`0x0001`): Empty `block_entities` `TAG_List<TAG_Compound>` (`0 B`)
@@ -198,11 +202,12 @@ byte[]  residualNbtPayload         // Optional Mojang TAG_Compound (raw in Mode 
   - `Bit 7` (`0x0080`): Compact lower lighting boundary section at `Y = minSectionY - 1` (`1 B`: `skyMode2 | (blkMode2 << 2)`)
   - `Bit 8` (`0x0100`): Compact upper lighting boundary section at `Y = minSectionY + sectionCount` (`1 B`: `skyMode2 | (blkMode2 << 2)`)
   - `Bit 9` (`0x0200`): Secondary heightmaps (`uint8 count` + `(code8, VarInt payLen, payload)` entries using `0xFE, refIdx` for exact duplicate of an earlier heightmap or `0xFD, refIdx, numLongs` for best-reference cross-heightmap zero-run RLE)
-  - `Bit 10` (`0x0400`): Trailing residual `Nbt` `TAG_Compound` slice present
+  - `Bit 10` (`0x0400`): Trailing residual `Nbt` `TAG_Compound` slice present (`[pos .. residualRelEnd)`)
   - `Bit 11` (`0x0800`): Non-voxel root marker (`entities/` or `poi/` chunk payload)
   - `Bit 12` (`0x1000`): Residual `Nbt` slice is `DEFLATE`-compressed (applied only in uncompressed `Mode A` when `nbtBytes >= 256 B`; skipped in `Mode B` so `Zstd-1` compresses the entire `ChunkFrame` body in a single pass without nested compression)
   - `Bit 13` (`0x2000`): `MOTION_BLOCKING_NO_LEAVES` binary heightmap stream present (`VarInt mbnlByteLen` + `byte[mbnlByteLen] mbnlDeltaStream`).
-- Decoded in `LcaSectionCodec.unpackResidualSectionAndNbt` into a typed `ResidualTailDecoded(rootMap, lowBoundarySections, highBoundarySections, nonVoxelRoot)` record without injecting synthetic marker keys into the returned NBT map.
+  - `Bit 14` (`0x4000`, `HAS_CHUNK_PATCH_TAIL`): Length-prefixed `ChunkPatchTail` (`VarInt patchTailByteLen` + `byte[patchTailByteLen]`) placed immediately before `Bit 10` (`residualNbtPayload`), containing appended Slab-Local Micro-Palette entries (`Part A` + `Part B` for `localIdx >= K`), per-section voxel delta lists (`(uint16 yzx12, VarInt dictId)`), optional replacement section offset overrides, optional `SkyLight`/`BlockLight` section patches, and a 1-byte Extended Hamming `(72, 64)` `patchParity8` syndrome trailer.
+- Decoded in `LcaSectionCodec.unpackResidualSectionAndNbt` and `LcaSectionCodec.locateAndDecodeChunkPatchTail` without injecting synthetic marker keys into the returned NBT map.
 
 ### 5. Layer 4: $16 \times 16 \times 16$ Section Frame Layout (`BlockStates`, `Biomes`, `Light`)
 
@@ -276,12 +281,12 @@ Let $b = \max(1, \lceil \log_2 |P| \rceil)$ and `flatBytes = (4096 * b + 7) >>> 
   - **Packed 1-Byte `planeModes8` Header:** All four 2-bit plane mode tags are packed into a single leading byte `uint8 planeModes8 = m0 | (m1 << 2) | (m2 << 4) | (m3 << 6)`, where each 2-bit tag $m_k \in \{0,1,2,3\}$ selects `00 = All-0 (0 B)`, `01 = All-1 (0 B)`, `10 = Delta-Run Stream (VarInt runCount + adjGap4|len4 runs with gap = (r == 0) ? adjGap : adjGap + 1)`, or `11 = Raw 512B Bitmap ceiling`.
 - **Mode `11` (`LIGHT_MODE_RAW`):** Uncompressed `2,048-byte` nibble array ceiling when the 4 Gray bitplanes would reach or exceed `2,048 bytes`.
 
-#### 5.5 Thread-Local Scratch Arena (`AnvilIoPool` & `LeafMap` Workers)
-`LcaRegionReader`, `LcaSectionCodec`, and `LeafMapSubChunkPacketCodec` maintain a per-thread `ScratchArena` (`ThreadLocal<ScratchArena>`) holding pre-allocated `int[4096]` (`curvePaletteIdx`), `int[4096]` (`runPoolPacked` / `runPoolNext` single-pass $O(4096)$ minority run lists), and reusable `byte[16384]` output buffers (`~26 KiB` per worker thread alongside the `24 KiB` static curve lookup tables) to avoid per-call heap allocations during section reads and saves.
+#### 5.5 Thread-Local Scratch Arena (`AnvilIoPool` Workers)
+`LcaRegionReader` and `LcaSectionCodec` maintain a per-thread `ScratchArena` (`ThreadLocal<ScratchArena>`) holding pre-allocated `int[4096]` (`curvePaletteIdx`), `int[4096]` (`runPoolPacked` / `runPoolNext` single-pass $O(4096)$ minority run lists), and reusable `byte[16384]` output buffers (`~26 KiB` per worker thread alongside the `24 KiB` static curve lookup tables) to avoid per-call heap allocations during section reads and saves.
 
-### 6. `LeafMap` LOD and Sub-Chunk Streaming Architecture
+### 6. LOD and Sub-Chunk Streaming Architecture
 
-| Capability / Metric | BlueMap (`.mca` $\to$ Greedy Mesher $\to$ `.prbm` + `lowres`) | `LeafMap` on `.lca` (Octree / Multi-Span Stream) |
+| Capability / Metric | BlueMap (`.mca` $\to$ Greedy Mesher $\to$ `.prbm` + `lowres`) | `.lca` (Octree / Multi-Span Stream) |
 | :--- | :--- | :--- |
 | Per-Region Map Storage (`512x512` blocks) | `~58 MB` raw `.prbm` (`~12--18 MB` gzipped) stored alongside `.mca` | `0 B` when reading `.lca` directly, or `~433 KB/region` for standalone `.dlsh` multi-span cache |
 | Server LOD Extraction CPU | Background greedy-meshing + AO raycasting | `LOD-2` ($4^3$) extraction in `18.6 us/chunk` (`19 ms` per 1,024-chunk region) |
@@ -291,11 +296,11 @@ Let $b = \max(1, \lceil \log_2 |P| \rceil)$ and `flatBytes = (4096 * b + 7) >>> 
 
 #### Progressive Client Streaming Stages (WebGL2 / WebGPU)
 1. **Horizon Boot (`< 50 KB` initial payload):**
-   - The client fetches the `.lca` Layer 2 analytical header (`LOD-3` $\to$ `LOD-1` progressive `DualLayerSpiralHilbertCurve` multi-span runs + `leafMapMaterialPacked` palette).
+   - The client fetches the `.lca` Layer 2 analytical header (`LOD-3` $\to$ `LOD-1` progressive `DualLayerSpiralHilbertCurve` multi-span runs + `materialPacked` palette).
 2. **Midground Octree Streaming (`LOD-2` $4^3$ & `LOD-1` $2^3$):**
-   - As the camera moves, `LeafMap` reads the 8-byte `octreeOccupancyMask64` and dominant palette IDs from visible sections via `uint16[24]` offsets (`11.5--18.6 us/chunk`, skipping `0x0000` air and `0x8000` uniform sections in $O(1)$).
+   - As the camera moves, the map reader reads the 8-byte `octreeOccupancyMask64` and dominant palette IDs from visible sections via `uint16[24]` offsets (`11.5--18.6 us/chunk`, skipping `0x0000` air and `0x8000` uniform sections in $O(1)$).
 3. **Near-Camera Full Voxel and Cutaway (`LOD-0`):**
-   - For chunks near the camera or intersecting a $Y$-cutaway plane, `LeafMap` streams the `.lca` section Delta-Roaring slices (`~150--300 B/section`). The client shader walks the `gap4|len4` runs into a 3D texture or instanced octree buffer and applies `SkyLight` + `BlockLight` bitplane shading.
+   - For chunks near the camera or intersecting a $Y$-cutaway plane, the map reader streams the `.lca` section Delta-Roaring slices (`~150--300 B/section`). The client shader walks the `gap4|len4` runs into a 3D texture or instanced octree buffer and applies `SkyLight` + `BlockLight` bitplane shading.
 
 ### 7. Built-In Testing (`BIT`), Safety Tripwires & 4-Tier Bit-Rot Self-Healing (`REQ-RTP-S-004`, `REQ-RTP-S-005`)
 
@@ -307,7 +312,7 @@ Following `anvil-api-ADR-002`, `LcaRegionReader` implements `BuiltInTestable`:
   - `T2`: Verify `headerChecksum` over superblock bytes `0x00..0x37`.
   - `T3`, `T3b` & `T3c`: Verify chunk pointer bounds `(slabOffset35 << 8) + exactByteLen20 <= fileLength - 8`, verify the self-describing ChunkFrame header canary `(rawDvWord & 0xFC00_0000) == 0x5800_0000` with embedded `((rawDvWord >>> 16) & 0x03FF) == chunkIdx` to detect pointer offset variation in $O(1)$ (`T3b`), and in `Mode B` (`codec1 = 1`) verify and heal every 64-bit word of the uncompressed `ChunkFrame` header (`headerLen = 24 + 2 * sectionCount` bytes) via its `headerWords = (headerLen + 7) >>> 3` Extended Hamming `(72, 64)` SEC-DED syndromes before inspecting `sectionOffsets[]` or decompressing the Zstd body (`T3c`).
   - `T4`: Enforce per-chunk uncompressed allocation ceiling (`<= 16 MiB`).
-  - `T5`: Verify `sectionOffsets[i]` (scaled by `4B` or `16B` per `chunkFlags` bit `2`) stays strictly within `exactByteLen20`, and verify chained dictionary continuation pointers (`nextSegmentRelSlabs32`) are acyclic (`<= 64` segments) and bounded within `fileLength - 8`.
+  - `T5`: Verify `sectionOffsets[i]` (scaled by `1B` or `4B` per `chunkFlags` bit `2`) stays strictly within `[sectionDirEnd .. exactByteLen20)` with no duplicate non-uniform section offsets, and verify chained dictionary continuation pointers (`nextSegmentRelSlabs32`) are acyclic (`<= 64` segments) and bounded within `fileLength - 8`.
   - `T6` & `T6b`: Verify Delta-Roaring run cursor $h$ never exceeds $4,096$ (`T6`), and verify that the 64-bit `decodedOctreeMask64` accumulated from minority voxel octants matches the stored `octreeOccupancyMask64` header word (`T6b` spatial syndrome check, detecting corrupted interior run bytes even when $h \le 4,096$).
   - `T7`: Verify `VarInt` palette indices stay strictly `< stateCount`.
   - `T8`: On lock-free concurrent `FileChannel` / `mmap` reads, pin the target `slabOffset35` in `PINNED_SLAB_STARTS`, read `ptrBefore = getVolatile(chunkIdx)`, decode/copy the target slab, issue `VarHandle.loadLoadFence()`, and re-read `ptrAfter = getVolatile(chunkIdx)`. Because live writers use Copy-on-Write (`CoW`) slab allocation with hazard-pointer retirement (`Section 2.3`), `ptrBefore == ptrAfter` guarantees a tear-free snapshot across 256-save `generation8` wraps.
@@ -359,7 +364,7 @@ Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and lig
 - **Positive:**
   - **Storage Footprint:** Uncompressed Mode A (`299,784 B` on the 64-chunk mountain fixture, `60.5%` of `.mca`; `3.82 MB` on `r.0.0.mca`) is `-6.0%` smaller than `.linear Zstd-1` (`318,806 B` / `4.34 MB`) without LZ compression overhead; Mode B (`+ Zstd-1`, `251,400 B` / `2.35 MB`) reduces size by `49.3%--62.3%` vs. `.mca` and `21.1%--45.9%` vs. `.linear`.
   - **Read, Save, and LOD Latency:** Supports `66.92 us` cold 1-chunk reads (`46.7 us` on `r.0.0.mca`), `0.93--1.36 us` single-section reads, `231.1--369.8 us` single dirty chunk saves, and `18.6 us` / `11.5 us` `LOD-2` / `LOD-3` extraction.
-  - **Direct `LeafMap` Streaming:** Streams multi-span Hilbert columns, `octreeOccupancyMask64` octants, and `165 B` single-section deltas directly from `.lca` without separate `.prbm` mesh files.
+  - **Direct Map Streaming:** Streams multi-span Hilbert columns, `octreeOccupancyMask64` octants, and `165 B` single-section deltas directly from `.lca` without separate `.prbm` mesh files.
   - **In-File Slab Reuse:** The `uint64[1024]` atomic `256B` slab pointer directory and `uint16[24]` per-chunk section directory enable lock-free reader visibility and `95.0%--100.0%` slab reuse across $10,000$ saves.
 - **Negative / Trade-offs:**
   - Requires static `4,096`-entry curve permutation tables (`H_3`, `Y+H_2`, `XZY` = `24 KiB` total) and an in-memory `TreeMap` slab allocator per open region file (`~25.6 KiB` header residency), plus periodic idle compaction when section-delta tail rings are enabled.
@@ -371,6 +376,4 @@ Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and lig
 - [leafrtp-ADR-065](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-065-layered-spiral-hilbert-rle-index.md) - Layered Spiral-Hilbert RLE Index
 - [leafrtp-ADR-072](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-072-hybrid-bit-packed-and-16-bit-run-container-hazard-table.md) - Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
 - [leafconfig-ADR-001](../../../../resource/LeafConfig/docs/adr/leafconfig-ADR-001-universal-server-config-atlas-and-web-ide.md) - Universal Server Config Atlas & 3D World Map Workspace
-- [leafmap-ADR-001](../../../../resource/LeafMap/docs/adr/leafmap-ADR-001-zero-mesh-hca-3d-web-map-and-block-feed.md) - Standalone `.lca` / `.dlsh` 3D Web Map, Packet-Budgeted Sub-Chunk Streaming, and `LeafConfig` Block Feed
 - `io.github.dailystruggle.anvil.LcaRegionReader`, `io.github.dailystruggle.anvil.LcaRegionWriter`, `io.github.dailystruggle.anvil.LcaSectionCodec`, and `io.github.dailystruggle.anvil.LcaRegionCodecTest` (`api/anvil-api`)
-- `net.leaf.map.common.world3d.LeafMapWorld3DEngine` and `net.leaf.map.common.world3d.LeafMapSubChunkPacketCodec` (`resource/LeafMap/leafmap-common`)

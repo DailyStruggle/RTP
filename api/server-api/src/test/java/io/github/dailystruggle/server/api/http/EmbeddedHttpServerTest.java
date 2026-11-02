@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -45,6 +46,14 @@ class EmbeddedHttpServerTest {
 
             HttpResponsePayload methodNotAllowed = server.dispatchRequest("POST", "/api/status");
             assertEquals(405, methodNotAllowed.statusCode());
+
+            HttpResponsePayload bin1 = HttpResponsePayload.binary(200, "application/octet-stream", new byte[] {1, 2, 3});
+            HttpResponsePayload bin2 = HttpResponsePayload.binary(200, "application/octet-stream", new byte[] {1, 2, 3});
+            HttpResponsePayload bin3 = HttpResponsePayload.binary(200, "application/octet-stream", new byte[] {1, 2, 4});
+            assertEquals(bin1, bin2);
+            assertEquals(bin1.hashCode(), bin2.hashCode());
+            assertNotEquals(bin1, bin3);
+            assertEquals(3, bin1.body().length);
         }
     }
 }

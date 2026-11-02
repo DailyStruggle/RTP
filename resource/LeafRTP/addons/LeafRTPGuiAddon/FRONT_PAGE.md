@@ -17,7 +17,7 @@ the default layout is a DonutSMP-style chest menu, so an admin gets a working ui
 
 ---
 
-## what it does
+## menu
 
 - type `/rtp` or `/rtpgui` to open the menu. each slot is one destination the player has permission for: the default rtp, configured regions, and per-world targets.
 - icons are decorated from the engine, so players see ready / on-cooldown / the Vault cost / unavailable before they click.
