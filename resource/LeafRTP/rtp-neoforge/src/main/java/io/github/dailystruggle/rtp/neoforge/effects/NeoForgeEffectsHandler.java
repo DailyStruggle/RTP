@@ -82,7 +82,7 @@ public final class NeoForgeEffectsHandler {
             dispatch("rtp.effect.presetup", task.player());
         });
         TeleportPipelineTask.setupPostActions.add((task, ok) -> {
-            if (!ok || !effectParsingEnabled(parser) || task.player() == null) return;
+            if (!Boolean.TRUE.equals(ok) || !effectParsingEnabled(parser) || task.player() == null) return;
             dispatch("rtp.effect.postsetup", task.player());
         });
         TeleportPipelineTask.loadPreActions.add(task -> {

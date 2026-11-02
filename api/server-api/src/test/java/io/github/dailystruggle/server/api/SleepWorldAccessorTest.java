@@ -178,6 +178,15 @@ class SleepWorldAccessorTest {
       assertTrue(modAccessor.isModPlayerVanishedOrAfk(null, Set.of("vanished"), 0L, 0));
       assertTrue(modAccessor.isModPlayerVanishedOrAfk(null, Set.of(), 310_000L, 5));
       assertFalse(modAccessor.isModPlayerVanishedOrAfk(null, Set.of(), 120_000L, 5));
+      assertTrue(modAccessor.readModEntityTags(new Object()).isEmpty());
+      try (AutoCloseable sub =
+          modAccessor.registerMessagingChannel(
+              "test:err",
+              (id, bytes) -> {
+                throw new IllegalStateException("expected");
+              })) {
+        assertTrue(modAccessor.sendPluginMessage("test:err", new byte[] {1}));
+      }
     } finally {
       java.nio.file.Files.walk(tempDir)
           .sorted(java.util.Comparator.reverseOrder())

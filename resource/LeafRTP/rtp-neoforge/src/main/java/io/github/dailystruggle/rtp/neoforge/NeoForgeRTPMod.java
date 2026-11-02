@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.neoforge;
 
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.event.lifecycle.FMLDedicatedServerSetupEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
@@ -22,10 +23,13 @@ public class NeoForgeRTPMod {
     }
   }
 
+  @SuppressWarnings("java:S1172")
   public void onDedicatedServerSetup(FMLDedicatedServerSetupEvent event) {
     wireTestUmbrellaContext();
   }
 
+  @SubscribeEvent
+  @SuppressWarnings("java:S1172")
   public void onServerStarting(ServerStartingEvent event) {
     wireTestUmbrellaContext();
   }

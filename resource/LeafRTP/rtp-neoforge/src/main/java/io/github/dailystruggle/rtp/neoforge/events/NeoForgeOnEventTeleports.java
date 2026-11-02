@@ -91,8 +91,8 @@ public final class NeoForgeOnEventTeleports {
             boolean verbose = false;
             if (logging != null) {
                 Object o = logging.getConfigValue(LoggingKeys.event_join, false);
-                if (o instanceof Boolean) {
-                    verbose = (Boolean) o;
+                if (o instanceof Boolean b) {
+                    verbose = b;
                 } else if (o != null) {
                     verbose = Boolean.parseBoolean(o.toString());
                 }

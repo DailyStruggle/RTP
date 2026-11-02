@@ -79,7 +79,14 @@ public final class PerlinNoise {
     public static double grad(int hash, double x, double y, double z) {
         int h = hash & 15;
         double u = h < 8 ? x : y;
-        double v = h < 4 ? y : h == 12 || h == 14 ? x : z;
+        double v;
+        if (h < 4) {
+            v = y;
+        } else if (h == 12 || h == 14) {
+            v = x;
+        } else {
+            v = z;
+        }
         return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
     }
 

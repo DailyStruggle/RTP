@@ -29,8 +29,6 @@ concurrency:
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: read
 
 # Job graph (one job per project set, chained along project(':...') edges;
 # `changes` verifies the chain against the Gradle graph on every run):
@@ -180,6 +178,10 @@ jobs:
   core:
     needs: changes
     if: needs.changes.outputs.core == 'true' && needs.changes.outputs.core_tasks != ''
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: core
@@ -188,6 +190,10 @@ jobs:
   proxy:
     needs: [changes, core]
     if: ${{ !cancelled() && needs.changes.outputs.proxy == 'true' && needs.changes.outputs.proxy_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: proxy
@@ -196,6 +202,10 @@ jobs:
   bukkit:
     needs: [changes, core]
     if: ${{ !cancelled() && needs.changes.outputs.bukkit == 'true' && needs.changes.outputs.bukkit_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: bukkit
@@ -204,6 +214,10 @@ jobs:
   fabric:
     needs: [changes, core]
     if: ${{ !cancelled() && needs.changes.outputs.fabric == 'true' && needs.changes.outputs.fabric_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: fabric
@@ -212,6 +226,10 @@ jobs:
   neoforge:
     needs: [changes, core]
     if: ${{ !cancelled() && needs.changes.outputs.neoforge == 'true' && needs.changes.outputs.neoforge_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: neoforge
@@ -220,6 +238,10 @@ jobs:
   helpers:
     needs: changes
     if: needs.changes.outputs.helpers == 'true' && needs.changes.outputs.helpers_tasks != ''
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: helpers
@@ -230,6 +252,10 @@ jobs:
   addons:
     needs: [changes, core, helpers]
     if: ${{ !cancelled() && needs.changes.outputs.addons == 'true' && needs.changes.outputs.addons_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: addons
@@ -242,6 +268,10 @@ jobs:
   plugins:
     needs: [changes, core, bukkit, fabric, neoforge, helpers]
     if: ${{ !cancelled() && needs.changes.outputs.plugins == 'true' && needs.changes.outputs.plugins_tasks != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: plugins
@@ -256,6 +286,10 @@ jobs:
   plugin:
     needs: [changes, core, proxy, bukkit, fabric, neoforge, addons]
     if: ${{ !cancelled() && needs.changes.outputs.plugin == 'true' && needs.changes.outputs.plugin_tasks != '' && needs.changes.outputs.scope == 'full' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
     uses: ./.github/workflows/gradle-set.yml
     with:
       set: plugin

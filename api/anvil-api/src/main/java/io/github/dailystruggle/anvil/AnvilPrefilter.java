@@ -286,22 +286,6 @@ public final class AnvilPrefilter {
       return resolved;
     }
 
-    /** Decodes {@code (cx, cz)} directly into an {@link AnvilChunkView} when backed by {@link LcaRegionReader}. */
-    private AnvilChunkView readLcaView(int cx, int cz) throws IOException {
-      Path regionFile = resolved.path();
-      int rx = Math.floorMod(cx, 32);
-      int rz = Math.floorMod(cz, 32);
-      if (!leaseTried) {
-        leaseTried = true;
-        lease = AnvilRegionByteCache.acquire(regionFile);
-      }
-      if (lease == null) throw new RegionUnreadableException();
-      if (!LcaRegionReader.INSTANCE.isChunkGenerated(lease.buffer(), lease.length(), rx, rz)) {
-        return null;
-      }
-      return LcaRegionReader.readChunkView(lease.buffer(), lease.length(), rx, rz);
-    }
-
     /** Decodes {@code (cx, cz)} through this session's channel or lease. */
     private AnvilReader.ChunkEntry readEntry(int cx, int cz) throws IOException {
       Path regionFile = resolved.path();

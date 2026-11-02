@@ -224,8 +224,8 @@ public final class NeoForgeEventBridge {
                     (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
             if (perf == null) return;
             Object enabledObj = perf.getConfigValue(PerformanceKeys.loginCacheEnabled, false);
-            boolean enabled = (enabledObj instanceof Boolean)
-                    ? (Boolean) enabledObj
+            boolean enabled = (enabledObj instanceof Boolean b)
+                    ? b
                     : Boolean.parseBoolean(String.valueOf(enabledObj));
             if (!enabled) return;
 

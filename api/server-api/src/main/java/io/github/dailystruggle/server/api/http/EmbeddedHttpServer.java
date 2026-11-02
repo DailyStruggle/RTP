@@ -152,6 +152,7 @@ public final class EmbeddedHttpServer implements AutoCloseable {
      */
     @FunctionalInterface
     public interface RouteHandler {
+        @SuppressWarnings("java:S112")
         HttpResponsePayload handle(HttpRequestContext request) throws Exception;
     }
 

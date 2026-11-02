@@ -116,7 +116,12 @@ final class LcaSectionCodec {
         }
     }
 
+    @SuppressWarnings("java:S5164")
     private static final ThreadLocal<ScratchArena> SCRATCH = ThreadLocal.withInitial(ScratchArena::new);
+
+    static void clearThreadLocalScratch() {
+        SCRATCH.remove();
+    }
 
     /**
      * Extended Hamming `(72, 64)` SEC-DED syndrome tables (`anvil-api-ADR-003` Section 7.2).
@@ -336,7 +341,7 @@ final class LcaSectionCodec {
 
     @FunctionalInterface
     private interface ZstdCompressorInvoker {
-        byte[] compress(byte[] raw, int level) throws Throwable;
+        byte[] compress(byte[] raw, int level) throws ReflectiveOperationException;
     }
 
     private static final ZstdCompressorInvoker ZSTD_COMPRESSOR = resolveZstdCompressor();
@@ -1492,10 +1497,10 @@ final class LcaSectionCodec {
             int packed = poolPacked[node];
             int adjGap = packed >>> 16;
             int lm1 = packed & 0xFFFF;
-            size44 += 1 + (adjGap >= 15 ? (adjGap - 15 < 240 ? 1 : 2) : 0) + (lm1 >= 15 ? varIntLen(lm1 - 15) : 0);
-            size62 += 1 + (adjGap >= 63 ? (adjGap - 63 < 240 ? 1 : 2) : 0) + (lm1 >= 3 ? varIntLen(lm1 - 3) : 0);
+            size44 += 1 + (adjGap >= 15 ? boundedGap240Len(adjGap - 15) : 0) + (lm1 >= 15 ? varIntLen(lm1 - 15) : 0);
+            size62 += 1 + (adjGap >= 63 ? boundedGap240Len(adjGap - 63) : 0) + (lm1 >= 3 ? varIntLen(lm1 - 3) : 0);
             if (tVox == rCount) {
-                sizeArr += (adjGap < 240) ? 1 : 2;
+                sizeArr += boundedGap240Len(adjGap);
             }
             node = poolNext[node];
         }
@@ -1570,6 +1575,10 @@ final class LcaSectionCodec {
             cur = poolNext[cur];
         }
         return pos;
+    }
+
+    private static int boundedGap240Len(int val) {
+        return val < 240 ? 1 : 2;
     }
 
     private static int writeBoundedGap240(byte[] dst, int pos, int val) {
@@ -2004,7 +2013,6 @@ final class LcaSectionCodec {
             int entriesPerLong
     ) throws CorruptRegionEntryException {
         long decodedOctreeMask64 = 0L;
-        int[] nextPos = new int[1];
         for (int p = 1; p < paletteLen; p++) {
             if (pos + 2 > limit) {
                 throw new CorruptRegionEntryException("CBIT T6: Truncated minority container header for p=" + p);
@@ -2287,12 +2295,11 @@ final class LcaSectionCodec {
                 Arrays.fill(blk2048, (byte) ((c << 4) | c));
             }
         } else if (blkMode == LIGHT_MODE_GRAY_PLANES) {
-            pos = decodeGrayPlanes(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], arena);
+            decodeGrayPlanes(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], arena);
             blk2048 = packLightNibbles(arena.skyLightNibbles);
         } else {
             if (pos + 2048 > limit) throw new CorruptRegionEntryException("CBIT: Truncated raw BlockLight");
             blk2048 = Arrays.copyOfRange(buf, pos, pos + 2048);
-            pos += 2048;
         }
 
         return new DecodedSection(
@@ -2537,6 +2544,7 @@ final class LcaSectionCodec {
             boolean nonVoxelRoot
     ) {}
 
+    @SuppressWarnings("java:S1199")
     static ResidualTailDecoded unpackResidualSectionAndNbt(
             byte[] frame, int fOff, int residualRelStart, int residualRelEnd, int minSectionY, int sectionCount
     ) throws IOException {
@@ -4271,6 +4279,7 @@ final class LcaSectionCodec {
      * `TAG_Compound` byte array without allocating intermediate `LinkedHashMap` or `NbtList` trees.
      * Returns `null` if the chunk contains an un-compacted `_lca_boundary_` tag requiring map fallback.
      */
+    @SuppressWarnings({"java:S1168", "java:S1199"})
     static byte[] encodeChunkFrameToNbtBytes(
             ParsedHeaderAndDict meta,
             byte[] frame,
@@ -4868,7 +4877,7 @@ final class LcaSectionCodec {
         } else if (blkMode == LIGHT_MODE_GRAY_PLANES) {
             System.arraycopy(BLOCK_LIGHT_2048_HEADER_NBT, 0, out, outPos, BLOCK_LIGHT_2048_HEADER_NBT.length);
             outPos += BLOCK_LIGHT_2048_HEADER_NBT.length;
-            pos = decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], out, outPos);
+            decodeGrayPlanesDirectToPacked2048(buf, pos, limit, CURVE_TO_YZX[CURVE_H3], out, outPos);
             outPos += 2048;
         } else {
             if (pos + 2048 > limit) throw new CorruptRegionEntryException("CBIT: Truncated raw BlockLight");
@@ -4876,7 +4885,6 @@ final class LcaSectionCodec {
             outPos += BLOCK_LIGHT_2048_HEADER_NBT.length;
             System.arraycopy(buf, pos, out, outPos, 2048);
             outPos += 2048;
-            pos += 2048;
         }
 
         out[outPos++] = Nbt.TAG_END; // End section compound

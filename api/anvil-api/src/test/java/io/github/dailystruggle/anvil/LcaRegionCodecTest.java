@@ -2188,7 +2188,7 @@ class LcaRegionCodecTest {
 
     @Test
     @DisplayName("anvil-api-ADR-003 & LCA-ICD-1.0: Order-independent sectionOffsets[] (before & after Residual Tail) and HAS_CHUNK_PATCH_TAIL (0x4000) parity + CBIT T5/T6b/Tier-2 recovery")
-    void orderIndependentSectionOffsetsAndChunkPatchTailParity(@TempDir Path tempDir) throws Exception {
+    void orderIndependentSectionOffsetsAndChunkPatchTailParity() throws Exception {
         byte[] mcaBytes = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
         AnvilReader.ChunkEntry origEntry = AnvilReader.readChunkEntry(mcaBytes, 0, 0);
         assertNotNull(origEntry);
@@ -2314,7 +2314,6 @@ class LcaRegionCodecTest {
             byte[] rawUncomp = patchArchive.readUncompressedChunkFrame(0, 0);
             int secDirEnd = 24 + (24 << 1);
             int resRelStart = secDirEnd + LcaSectionCodec.readUint16BE(rawUncomp, 22);
-            int[] dummyEntries = new int[24];
             int[] relStarts = new int[24];
             for (int i = 0; i < 24; i++) {
                 int e16 = LcaSectionCodec.readUint16BE(rawUncomp, 24 + (i << 1));

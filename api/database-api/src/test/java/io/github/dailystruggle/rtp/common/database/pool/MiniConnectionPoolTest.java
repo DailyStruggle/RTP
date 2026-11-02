@@ -101,14 +101,15 @@ class MiniConnectionPoolTest {
   void testProxyEqualsHashCodeToStringAndClosedCalls() throws SQLException {
     try (Connection conn = pool.getConnection()) {
       assertEquals(conn, conn);
-      assertNotEquals(conn, "string");
+      assertNotEquals("string", conn);
+      assertFalse(conn.equals(null));
       assertNotEquals(0, conn.hashCode());
       assertNotNull(conn.toString());
       assertFalse(conn.isClosed());
 
       conn.close();
       assertTrue(conn.isClosed());
-      assertThrows(SQLException.class, () -> conn.createStatement());
+      assertThrows(SQLException.class, conn::createStatement);
 
       conn.close();
     }
