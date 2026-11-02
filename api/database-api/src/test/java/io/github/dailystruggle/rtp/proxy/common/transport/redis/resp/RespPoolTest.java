@@ -57,10 +57,7 @@ class RespPoolTest {
                             out.write("$-1\r\n".getBytes(StandardCharsets.UTF_8));
                         }
                         out.flush();
-                    } else if ("SET".equals(op)) {
-                        out.write("+OK\r\n".getBytes(StandardCharsets.UTF_8));
-                        out.flush();
-                    } else if ("DEL".equals(op)) {
+                    } else if ("DEL".equals(op) || "EVAL".equals(op) || "EVALSHA".equals(op)) {
                         out.write(":1\r\n".getBytes(StandardCharsets.UTF_8));
                         out.flush();
                     } else if ("TTL".equals(op) || "PTTL".equals(op) || "EXPIRE".equals(op) || "LLEN".equals(op) || "PUBLISH".equals(op)) {
@@ -77,9 +74,6 @@ class RespPoolTest {
                         out.flush();
                     } else if ("SCRIPT".equals(op)) {
                         out.write("$4\r\nsha1\r\n".getBytes(StandardCharsets.UTF_8));
-                        out.flush();
-                    } else if ("EVAL".equals(op) || "EVALSHA".equals(op)) {
-                        out.write(":1\r\n".getBytes(StandardCharsets.UTF_8));
                         out.flush();
                     } else if ("SUBSCRIBE".equals(op)) {
                         out.write("*3\r\n$9\r\nsubscribe\r\n$4\r\nchan\r\n:1\r\n".getBytes(StandardCharsets.UTF_8));
@@ -174,6 +168,16 @@ class RespPoolTest {
             pubSub.proceed(conn, "chan");
             assertEquals("hello", received.get());
             assertFalse(pubSub.isSubscribed());
+        }
+    }
+
+    @Test
+    @DisplayName("RespPool throws IllegalStateException on borrow timeout when pool is exhausted")
+    void testPoolExhaustionTimeout() throws IOException {
+        try (RespPool pool = new RespPool("127.0.0.1", port, 50, null, 1);
+                RespConnection held = pool.getResource()) {
+            assertNotNull(held);
+            assertThrows(IllegalStateException.class, pool::getResource);
         }
     }
 }

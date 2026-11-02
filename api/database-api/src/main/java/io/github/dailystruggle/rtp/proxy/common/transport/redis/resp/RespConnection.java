@@ -121,7 +121,7 @@ public class RespConnection implements Closeable {
 
     public synchronized String ping() throws IOException {
         Object res = executeCommand("PING");
-        return res instanceof String ? (String) res : RespProtocol.toUtf8((byte[]) res);
+        return res instanceof String string ? string : RespProtocol.toUtf8((byte[]) res);
     }
 
     public synchronized Object executeCommand(String... args) throws IOException {

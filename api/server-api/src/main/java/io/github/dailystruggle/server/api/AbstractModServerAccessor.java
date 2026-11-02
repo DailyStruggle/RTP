@@ -264,7 +264,7 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
     if (playerId == null || ( playerId.getMostSignificantBits() == 0L && playerId.getLeastSignificantBits() == 0L)) {
       return true;
     }
-    Boolean external = queryExternalPermission(playerId, permission);
+    Boolean external = queryExternalPermission(playerId, permission).orElse(null);
     if (external != null) {
       return external;
     }
@@ -318,7 +318,7 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
           return Set.copyOf(out);
         }
       } catch (ReflectiveOperationException | RuntimeException ex) {
-        logger.log(Level.FINEST, "Entity tag probe skipped for " + methodName, ex);
+        logger.log(Level.FINEST, ex, () -> "Entity tag probe skipped for " + methodName);
       }
     }
     return Set.of();
@@ -387,7 +387,7 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
               && m.getParameterCount() == 1
               && m.getParameterTypes()[0].isAssignableFrom(playerEntity.getClass())) {
             Object res = m.invoke(null, playerEntity);
-            if (res instanceof Boolean b && b) {
+            if (Boolean.TRUE.equals(res)) {
               return true;
             }
           }
@@ -400,7 +400,7 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
   }
 
   @SuppressWarnings("unchecked")
-  private Boolean queryExternalPermission(UUID playerId, String permission) {
+  private java.util.Optional<Boolean> queryExternalPermission(UUID playerId, String permission) {
     try {
       Class<?> permsCls = Class.forName("me.lucko.fabric.api.permissions.v0.Permissions");
       java.lang.reflect.Method m =
@@ -410,8 +410,8 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
         Class<?> tsCls = Class.forName("net.fabricmc.fabric.api.util.TriState");
         Object def = tsCls.getField("DEFAULT").get(null);
         Object state = ((CompletableFuture<Object>) future).getNow(def);
-        if (state == tsCls.getField("TRUE").get(null)) return Boolean.TRUE;
-        if (state == tsCls.getField("FALSE").get(null)) return Boolean.FALSE;
+        if (state == tsCls.getField("TRUE").get(null)) return java.util.Optional.of(Boolean.TRUE);
+        if (state == tsCls.getField("FALSE").get(null)) return java.util.Optional.of(Boolean.FALSE);
       }
     } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
       logger.log(Level.FINEST, "Optional fabric-permissions-api probe skipped", ex);
@@ -428,14 +428,14 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
             permData.getClass().getMethod("checkPermission", String.class).invoke(permData, permission);
         if (tristate != null) {
           String name = tristate.toString();
-          if ("TRUE".equalsIgnoreCase(name)) return Boolean.TRUE;
-          if ("FALSE".equalsIgnoreCase(name)) return Boolean.FALSE;
+          if ("TRUE".equalsIgnoreCase(name)) return java.util.Optional.of(Boolean.TRUE);
+          if ("FALSE".equalsIgnoreCase(name)) return java.util.Optional.of(Boolean.FALSE);
         }
       }
     } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
       logger.log(Level.FINEST, "Optional LuckPerms probe skipped", ex);
     }
-    return null;
+    return java.util.Optional.empty();
   }
 
   private record CachedOpsSnapshot(String path, long lastModified, long length, String body) {}
@@ -460,7 +460,7 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
         snap = new CachedOpsSnapshot(absPath, mtime, len, body);
         this.cachedOpsSnapshot = snap;
       } catch (IOException ex) {
-        logger.log(Level.FINE, "Could not read ops.json at " + target, ex);
+        logger.log(Level.FINE, ex, () -> "Could not read ops.json at " + target);
         return false;
       }
     }
@@ -506,7 +506,7 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
       try {
         receiver.accept(senderId, payload.clone());
       } catch (Throwable ex) {
-        logger.log(Level.FINE, "Plugin message receiver error on " + channel, ex);
+        logger.log(Level.FINE, ex, () -> "Plugin message receiver error on " + channel);
       }
     }
     return true;

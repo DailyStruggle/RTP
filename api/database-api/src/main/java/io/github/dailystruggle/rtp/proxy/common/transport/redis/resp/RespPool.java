@@ -87,7 +87,7 @@ public class RespPool implements Closeable {
         try {
             conn = pool.poll(timeoutMs, TimeUnit.MILLISECONDS);
             if (conn == null) {
-                throw new RuntimeException("Timeout waiting for idle connection from RespPool");
+                throw new IllegalStateException("Timeout waiting for idle connection from RespPool");
             }
             if (conn.isBroken()) {
                 conn.close();

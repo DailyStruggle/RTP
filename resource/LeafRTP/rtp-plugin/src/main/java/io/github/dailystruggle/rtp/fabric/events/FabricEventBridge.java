@@ -400,8 +400,8 @@ public final class FabricEventBridge {
             Object enabledObj = perf.getConfigValue(
                     io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.loginCacheEnabled,
                     false);
-            boolean enabled = (enabledObj instanceof Boolean)
-                    ? (Boolean) enabledObj
+            boolean enabled = (enabledObj instanceof Boolean b)
+                    ? b
                     : Boolean.parseBoolean(String.valueOf(enabledObj));
             if (!enabled) return;
 
@@ -618,10 +618,8 @@ public final class FabricEventBridge {
                 java.lang.reflect.Method m = server.getClass().getMethod(name);
                 Object result = m.invoke(server);
                 if (result instanceof Number n) return n.intValue();
-            } catch (NoSuchMethodException ignored) {
-                // try next
             } catch (Throwable ignored) {
-                // best-effort
+                // try next / best-effort
             }
         }
         return 0;
@@ -788,10 +786,8 @@ public final class FabricEventBridge {
             try {
                 java.lang.reflect.Method m = source.getClass().getMethod(name);
                 return m.invoke(source);
-            } catch (NoSuchMethodException ignored) {
-                // try next
             } catch (Throwable ignored) {
-                // best-effort; never throw into the event bus
+                // try next / best-effort; never throw into the event bus
             }
         }
         return null;

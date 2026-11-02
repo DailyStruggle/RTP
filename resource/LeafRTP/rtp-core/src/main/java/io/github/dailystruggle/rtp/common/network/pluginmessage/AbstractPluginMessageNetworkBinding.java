@@ -80,7 +80,11 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
     }
 
     /** Encode {@code row} for the wire (signed when a verifier is configured); {@code null} if oversized. */
+    @SuppressWarnings("java:S1168")
     protected byte[] encodeOutbound(BackendHeartbeat row) {
+        if (row == null) {
+            return null;
+        }
         long sentAt = clock.getAsLong();
         long seq = outboundSeq.incrementAndGet();
         byte[] payload = PluginMessageEnvelope.seal(row, verifier, sentAt, seq);

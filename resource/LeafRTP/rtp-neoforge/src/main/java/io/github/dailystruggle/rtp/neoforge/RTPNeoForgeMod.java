@@ -55,7 +55,7 @@ import java.util.logging.Level;
  * {@code RTP} singleton, schedules the {@code ChunkUnloadProcessor}, and drains
  * the startup tasks. The per-tick {@code onServerTick} drains the
  * accessor's scheduler and refreshes any version-adapter chunk tickets.</p>
- * <p>The remaining seams are left as TODO for the platform maintainer
+ * <p>The remaining seams are tracked for the platform maintainer
  * (project lead, {@code @leaf_26}) to fill in on a network-capable host where
  * the NeoForge/ModDevGradle artifacts resolve:</p>
  * <ul>
@@ -380,8 +380,8 @@ public final class RTPNeoForgeMod {
         // REQ-RTP-MAP-003 - release per-viewer map state on disconnect.
         NeoForgePlayerLifecycleHook lh = acc.getNeoForgePlayerLifecycleHook();
         if (lh != null) {
-          lh.onPlayerQuit(uuid ->
-              io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.firePlayerQuit(uuid));
+          lh.onPlayerQuit(
+              io.github.dailystruggle.rtp.common.commands.maps.MapDispatch::firePlayerQuit);
         }
         RTP.log(Level.INFO, "[RTP][NeoForge] map binding installed (NeoForgeMapBinding, carrier="
             + mapAdapter.mcVersion() + ").");
@@ -461,7 +461,7 @@ public final class RTPNeoForgeMod {
             + "permissions + menu/book/map/metrics/backend sinks installed; "
             + "/rtp command tree registers on RegisterCommandsEvent.");
     RtpBitStartup.schedule();
-    // TODO(@leaf_26): the S-00x regression guards + traceability rows,
+    // Follow-up(@leaf_26): the S-00x regression guards + traceability rows,
     // the live network-mode boot (reservation-token redemption, ADR-049),
     // and the native PvP combat tag (ADR-055). The version adapter
     // (installed in onServerStarted) supplies the S-005 async chunk

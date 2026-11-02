@@ -169,7 +169,8 @@ public final class BookContrastValidator {
       return pageText == null ? "" : pageText;
     }
     char[] chars = pageText.toCharArray();
-    for (int i = 0; i < chars.length - 1; i++) {
+    int i = 0;
+    while (i < chars.length - 1) {
       if (chars[i] == '&' || chars[i] == '\u00a7') {
         char next = Character.toLowerCase(chars[i + 1]);
         chars[i + 1] =
@@ -181,6 +182,8 @@ public final class BookContrastValidator {
               case 'd' -> '5';
               default -> chars[i + 1];
             };
+        i += 2;
+      } else {
         i++;
       }
     }
@@ -201,7 +204,8 @@ public final class BookContrastValidator {
       return hoverText;
     }
     char[] chars = hoverText.toCharArray();
-    for (int i = 0; i < chars.length - 1; i++) {
+    int i = 0;
+    while (i < chars.length - 1) {
       if (chars[i] == '&' || chars[i] == '\u00a7') {
         char next = Character.toLowerCase(chars[i + 1]);
         chars[i + 1] =
@@ -213,6 +217,8 @@ public final class BookContrastValidator {
               case '5' -> 'd';
               default -> chars[i + 1];
             };
+        i += 2;
+      } else {
         i++;
       }
     }
@@ -279,14 +285,17 @@ public final class BookContrastValidator {
     if (text == null || text.isEmpty()) {
       return;
     }
-    for (int i = 0; i < text.length() - 1; i++) {
+    int i = 0;
+    while (i < text.length() - 1) {
       char prefix = text.charAt(i);
       if (prefix != '&' && prefix != '\u00a7') {
+        i++;
         continue;
       }
       char code = Character.toLowerCase(text.charAt(i + 1));
       Integer rgb = LEGACY_COLOR_RGB.get(code);
       if (rgb == null) {
+        i++;
         continue;
       }
       if (parchmentSurface) {
@@ -316,7 +325,7 @@ public final class BookContrastValidator {
                   text));
         }
       }
-      i++;
+      i += 2;
     }
   }
 }

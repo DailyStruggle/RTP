@@ -58,7 +58,6 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     private final int minSectionY;
     private final int sectionCount;
     private final int defaultDataVersion;
-    private final boolean modeBZstd;
     private final int zstdLevel;
     private final boolean autoMigrateLegacy;
     private final boolean backupMigratedLegacyFiles;
@@ -138,7 +137,6 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         this.sectionCount = Math.max(1, sectionCount);
         this.defaultDataVersion = defaultDataVersion;
         this.zstdLevel = LcaRegionWriter.normalizeZstdLevel(zstdLevel);
-        this.modeBZstd = this.zstdLevel > 0;
         this.autoMigrateLegacy = autoMigrateLegacy;
         this.backupMigratedLegacyFiles = backupMigratedLegacyFiles;
         this.maxOpenRegions = Math.max(1, maxOpenRegions);
@@ -312,6 +310,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     /**
      * Reads and decodes the chunk NBT compound at world chunk coordinates `(chunkX, chunkZ)`, or `null` if absent.
      */
+    @SuppressWarnings({"java:S1168", "java:S1319"})
     public LinkedHashMap<String, Object> readChunkCompound(int chunkX, int chunkZ) throws IOException {
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
@@ -343,6 +342,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
      * Reads and serializes the chunk at world chunk coordinates `(chunkX, chunkZ)` into uncompressed
      * Mojang binary NBT bytes, or returns `null` if absent.
      */
+    @SuppressWarnings("java:S1168")
     public byte[] readChunkNbtBytes(int chunkX, int chunkZ) throws IOException {
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
@@ -467,7 +467,9 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
 
     /**
      * Retrieves or opens the disk-backed {@link LcaRegionWriter.LcaLiveArchive} for `(regionX, regionZ)`.
+     * Ownership is retained in {@link #regionCache} and closed on eviction or {@link #close()}.
      */
+    @SuppressWarnings({"java:S2095", "resource"})
     public LcaRegionWriter.LcaLiveArchive getOrOpenRegion(
             int regionX, int regionZ, boolean createIfAbsent
     ) throws IOException {
@@ -716,12 +718,6 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         }
         if (firstEx != null) {
             throw firstEx;
-        }
-    }
-
-    private void ensureOpen() throws IOException {
-        if (closed.get()) {
-            throw new IOException("LcaRegionFileStorage for " + storageDirectory + " is already closed");
         }
     }
 
