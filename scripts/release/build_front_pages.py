@@ -99,7 +99,7 @@ PRODUCTS = {
         "LeafSleep-x.y.z.jar",
         "LeafSleep-Pro-x.y.z.jar",
         ROOT / "resource" / "LeafSleep" / "docs" / "publishing" / "FRONT_PAGE.md",
-        repo_base="https://github.com/DailyStruggle/OnePlayerSleep",
+        repo_base="https://github.com/LeafCraftDev/LeafSleep",
         repo_branch="main",
     ),
     "leaftreegen": ProductSpec(
