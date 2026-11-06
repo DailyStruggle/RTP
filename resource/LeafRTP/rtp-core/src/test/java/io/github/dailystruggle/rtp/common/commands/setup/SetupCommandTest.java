@@ -455,4 +455,55 @@ class SetupCommandTest {
 
         assertTrue(statusCmd.onCommand(callerId, Map.of(), null));
     }
+
+    @Test
+    @DisplayName("SetupConfirmCmd and SetupStatusCmd offload baseline disk I/O to async scheduler")
+    void testSetupConfirmAndStatusOffloadBaselineIoToAsyncScheduler(@org.junit.jupiter.api.io.TempDir java.io.File tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir);
+        try {
+            java.util.List<Runnable> queuedAsync = new java.util.ArrayList<>();
+            io.github.dailystruggle.rtp.api.scheduling.RTPScheduler delegate =
+                    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
+            io.github.dailystruggle.rtp.api.scheduling.RTPScheduler queuingScheduler =
+                    org.mockito.Mockito.spy(delegate);
+            org.mockito.Mockito.doAnswer(inv -> {
+                queuedAsync.add(inv.getArgument(0));
+                return null;
+            }).when(queuingScheduler).runTaskAsynchronously(org.mockito.Mockito.any(Runnable.class));
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(queuingScheduler);
+
+            UUID callerId = UUID.randomUUID();
+            io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                    new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(callerId, "admin", null);
+            accessor.addPlayer(player);
+            SetupSessionRegistry registry = new SetupSessionRegistry();
+            SetupSession session = registry.getOrCreate(callerId);
+            session.setWorldChoice("single");
+            session.setGameplayChoice("survival");
+            session.setPerformanceChoice("low");
+
+            // 1. SetupStatusCmd must defer computeDiffPreview + message sending to async scheduler
+            SetupStatusCmd statusCmd = new SetupStatusCmd(null, registry);
+            player.sentMessages.clear();
+            assertTrue(statusCmd.onCommand(callerId, Map.of(), null));
+            assertTrue(player.sentMessages.isEmpty(), "SetupStatusCmd must defer diff preview I/O and output to async scheduler");
+            assertEquals(1, queuedAsync.size());
+            queuedAsync.remove(0).run();
+            assertFalse(player.sentMessages.isEmpty(), "Async status task must emit formatted status lines");
+
+            // 2. SetupConfirmCmd must defer loadLiveBaseline + file writes to async scheduler
+            // Seed an identity baseline on disk AFTER onCommand returns to prove loadLiveBaseline runs inside the async task
+            SetupConfirmCmd confirmCmd = new SetupConfirmCmd(null, registry);
+            assertTrue(confirmCmd.onCommand(callerId, Map.of(), null));
+            assertEquals(1, queuedAsync.size(), "SetupConfirmCmd must schedule applyTask even before reading baseline from disk");
+            java.io.File perfFile = new java.io.File(tempDir, "advanced/performance.yml");
+            assertFalse(perfFile.exists(), "SetupConfirmCmd must not write files before async task runs");
+            queuedAsync.remove(0).run();
+            assertTrue(perfFile.exists(), "Queued async confirm task must write advanced/performance.yml");
+        } finally {
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(null);
+        }
+    }
 }

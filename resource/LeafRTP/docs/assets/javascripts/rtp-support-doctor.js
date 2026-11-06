@@ -26,6 +26,16 @@
     'true', 'false', 'null', 'none', 'world', 'default', 'name', 'type', 'id',
     'get', 'set', 'run', 'list', 'map', 'int', 'string', 'double', 'float', 'boolean'
   ]);
+  const STOP_WORDS = new Set([
+    'the', 'and', 'for', 'with', 'when', 'how', 'why', 'does', 'what', 'where', 'which', 'who',
+    'from', 'into', 'that', 'this', 'these', 'those', 'there', 'their', 'them', 'they',
+    'rtp', 'leafrtp', 'leaf', 'leafcraft', 'plugin', 'plugins', 'server', 'servers', 'minecraft',
+    'make', 'making', 'made', 'get', 'getting', 'got', 'set', 'setting', 'use', 'using',
+    'want', 'need', 'can', 'could', 'would', 'should', 'will', 'have', 'has', 'had',
+    'change', 'changing', 'turn', 'work', 'working', 'way', 'more', 'less', 'very',
+    'some', 'any', 'all', 'every', 'time', 'players', 'player', 'user', 'users',
+    'certain', 'other', 'about', 'after', 'before', 'between', 'under', 'over'
+  ]);
 
   const TYPE_BADGE_COLORS = {
     CONFIG_KEY: { bg: '#1e3a5f', fg: '#89b4fa', label: 'CONFIG' },
@@ -45,14 +55,80 @@
   let cachedCorpus = null;
   let cachedIndexes = null;
 
+  function resolveSitePrefix() {
+    const p = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '';
+    if (/^\/mc(\/|$)/i.test(p)) return '/mc';
+    if (/^\/RTP(\/|$)/i.test(p)) return '/RTP';
+    return '/mc';
+  }
+
+  function normalizeSiteUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    const prefix = resolveSitePrefix();
+    return url
+      .replace(/^https?:\/\/dailystruggle\.github\.io\/RTP/i, 'https://docs.leafcraft.net/mc')
+      .replace(/^https?:\/\/docs\.leafcraft\.net\/mc\/leafrtp\/(admin|editor|site|dev|adr|FOR_)/i, 'https://docs.leafcraft.net/mc/$1')
+      .replace(/^\/mc\/leafrtp\/(admin|editor|site|dev|adr|FOR_)/i, '/mc/$1')
+      .replace(/^\/RTP(\/|$)/i, prefix + '$1');
+  }
+
+  function configDocUrlForFile(filePath) {
+    const prefix = resolveSitePrefix();
+    const fp = String(filePath || '').trim().toLowerCase();
+    if (!fp) return prefix + '/admin/configuration/CONFIGURATION/';
+    if (fp.includes('performance.yml')) return prefix + '/admin/configuration/PERFORMANCE/';
+    if (fp.includes('regions/') || fp === 'regions.yml') return prefix + '/admin/configuration/REGIONS/';
+    if (fp.includes('worlds/') || fp === 'worlds.yml') return prefix + '/admin/configuration/WORLDS/';
+    if (fp.includes('safety.yml')) return prefix + '/admin/configuration/SAFETY/';
+    if (fp === 'config.yml') return prefix + '/admin/configuration/CORE_CONFIG/';
+    if (fp.includes('economy.yml')) return prefix + '/admin/configuration/ECONOMY/';
+    if (fp.includes('effects.yml') || fp.includes('events.yml')) return prefix + '/admin/configuration/EVENTS_AND_EFFECTS/';
+    if (fp.includes('integrations.yml') || fp.includes('claims.yml')) return prefix + '/admin/configuration/INTEGRATIONS/';
+    if (fp.includes('lang.yml')) return prefix + '/admin/configuration/LANGUAGE/';
+    if (fp.includes('logging.yml')) return prefix + '/admin/configuration/LOGGING/';
+    if (fp.includes('messages.yml') || fp.includes('placeholders.yml')) return prefix + '/admin/configuration/MESSAGES/';
+    if (fp.includes('metrics.yml')) return prefix + '/admin/configuration/METRICS/';
+    if (fp.includes('schematics.yml')) return prefix + '/admin/configuration/SCHEMATICS/';
+    if (fp.includes('ttl.yml')) return prefix + '/admin/configuration/TTL/';
+    if (fp.startsWith('addons/') || fp.includes('menu')) return prefix + '/admin/ADDONS/';
+    if (fp.includes('actions/')) return prefix + '/admin/ACTIONS/';
+    if (fp.includes('custom_items')) return prefix + '/admin/CUSTOM_ITEMS/';
+    if (fp.includes('network.yml')) return prefix + '/admin/proxies/CONFIGURATION/';
+    return prefix + '/admin/configuration/CONFIGURATION/';
+  }
+
+  function cleanConfigDescription(desc, maxChars) {
+    if (!desc) return '';
+    const limit = maxChars || 220;
+    let base = String(desc).split('[Doc context:')[0].trim();
+    base = base.replace(/\(Inherited from.*?\)\s*$/i, '').trim();
+    if (base.length > limit) {
+      const cut = base.slice(0, limit);
+      const lastSpace = cut.lastIndexOf(' ');
+      base = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut) + '...';
+    }
+    return base;
+  }
+
   function resolveCorpusUrl() {
     const scripts = document.querySelectorAll('script[src*="rtp-support-doctor.js"]');
     if (scripts.length > 0) {
       const src = scripts[0].src || scripts[0].getAttribute('src') || '';
+      const qMatch = src.match(/\?v=([A-Za-z0-9._-]+)/);
+      const qSuffix = qMatch ? ('?v=' + qMatch[1]) : '';
       const base = src.replace(/javascripts\/rtp-support-doctor\.js.*$/, '');
-      return base + 'support-corpus.json';
+      return base + 'support-corpus.json' + qSuffix;
     }
-    return '/RTP/assets/support-corpus.json';
+    return resolveSitePrefix() + '/assets/support-corpus.json';
+  }
+
+  function resolveTriageApiBase() {
+    if (typeof window !== 'undefined' && window.RTP_BOT_API_URL) {
+      return String(window.RTP_BOT_API_URL).replace(/\/+$/, '');
+    }
+    const p = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '';
+    if (/^\/mc(\/|$)/i.test(p)) return '/mc';
+    return '';
   }
 
   function buildRelationalIndexes(corpus) {
@@ -63,30 +139,63 @@
     const edgesByDst = new Map();
     const claimsBySymbol = new Map();
     const conflictsBySymbol = new Map();
+    const sitePrefix = resolveSitePrefix();
+
+    // Index config files so `advanced/performance.yml`, `config.yml`, etc. are crosslinkable
+    const cfgList = Array.isArray(corpus.config_keys) ? corpus.config_keys : [];
+    const seenCfgFiles = new Set();
+    for (const c of cfgList) {
+      const fp = String(c.file_path || '').trim();
+      if (!fp || seenCfgFiles.has(fp)) continue;
+      seenCfgFiles.add(fp);
+      const docUrl = configDocUrlForFile(fp);
+      const fSym = {
+        id: 'cfgfile:' + fp,
+        name: fp,
+        type: 'CONFIG_KEY',
+        url: docUrl,
+        summary: 'View ' + fp + ' configuration reference'
+      };
+      byId.set(fSym.id, fSym);
+      byLookupToken.set(fp.toLowerCase(), fSym);
+      byLookupToken.set('plugins/rtp/' + fp.toLowerCase(), fSym);
+      const shortName = fp.split('/').pop().toLowerCase();
+      if (shortName.endsWith('.yml') && !byLookupToken.has(shortName)) {
+        byLookupToken.set(shortName, fSym);
+      }
+    }
 
     const syms = Array.isArray(corpus.ast_symbols) ? corpus.ast_symbols : [];
     for (const s of syms) {
       if (!s || !s.id) continue;
+      if (s.url) s.url = normalizeSiteUrl(s.url);
+      if (s.editor_url) s.editor_url = normalizeSiteUrl(s.editor_url);
+      if (s.type === 'CONFIG_KEY' && (!s.url || s.url.includes('/editor/'))) {
+        const fpPart = s.id.split(':').length >= 3 ? s.id.split(':')[1] : '';
+        s.url = configDocUrlForFile(fpPart);
+      }
+      if (s.summary) s.summary = cleanConfigDescription(s.summary, 200);
       byId.set(s.id, s);
+      if (s.type === 'BEHAVIORAL_SYMPTOM') continue;
       const nameLow = String(s.name || '').trim().toLowerCase();
-      if (nameLow && !AMBIGUOUS_CODE_TOKENS.has(nameLow)) {
+      if (nameLow && !AMBIGUOUS_CODE_TOKENS.has(nameLow) && !STOP_WORDS.has(nameLow)) {
         if (!byLookupToken.has(nameLow)) byLookupToken.set(nameLow, s);
       }
       if (s.type === 'CONFIG_KEY') {
         const kp = s.id.split(':').slice(2).join(':');
         const kpLow = kp.toLowerCase();
         const leafLow = kpLow.split('.').pop();
-        if (kpLow && !AMBIGUOUS_CODE_TOKENS.has(kpLow) && !byLookupToken.has(kpLow)) {
+        if (kpLow && !AMBIGUOUS_CODE_TOKENS.has(kpLow) && !STOP_WORDS.has(kpLow) && !byLookupToken.has(kpLow)) {
           byLookupToken.set(kpLow, s);
         }
-        if (leafLow && leafLow.length >= 4 && !AMBIGUOUS_CODE_TOKENS.has(leafLow) && !byLookupToken.has(leafLow)) {
+        if (leafLow && leafLow.length >= 4 && !AMBIGUOUS_CODE_TOKENS.has(leafLow) && !STOP_WORDS.has(leafLow) && !byLookupToken.has(leafLow)) {
           byLookupToken.set(leafLow, s);
         }
       }
       if (Array.isArray(s.aliases)) {
         for (const al of s.aliases) {
           const alLow = String(al || '').trim().toLowerCase();
-          if (alLow && alLow.length >= 4 && !AMBIGUOUS_CODE_TOKENS.has(alLow) && !byLookupToken.has(alLow)) {
+          if (alLow && alLow.length >= 4 && !alLow.includes(' ') && !AMBIGUOUS_CODE_TOKENS.has(alLow) && !STOP_WORDS.has(alLow) && !byLookupToken.has(alLow)) {
             byLookupToken.set(alLow, s);
           }
         }
@@ -102,7 +211,7 @@
         id: 'bit:' + (b.code || b.key),
         name: (b.code || (b.namespace + '-' + b.id)) + ' (' + b.key + ')',
         type: 'BIT_CODE',
-        url: '/RTP/admin/configuration/BIT/',
+        url: sitePrefix + '/admin/RUNBOOK/',
         editor_url: '',
         summary: '[' + b.severity + '] ' + b.remediation
       };
@@ -133,6 +242,7 @@
     const conflicts = Array.isArray(corpus.ast_conflicts) ? corpus.ast_conflicts : [];
     for (const cf of conflicts) {
       if (!cf || !cf.focal_symbol_id) continue;
+      if (cf.explanation) cf.explanation = cleanConfigDescription(cf.explanation, 260);
       const fid = cf.focal_symbol_id;
       if (!conflictsBySymbol.has(fid)) conflictsBySymbol.set(fid, []);
       conflictsBySymbol.get(fid).push(cf);
@@ -265,25 +375,31 @@
     }
 
     const tokens = (textLow.match(/[a-z0-9_./-]{3,64}/g) || []).slice(0, 56);
-    const expanded = new Set(tokens);
-    identWords.forEach((w) => expanded.add(w));
+    const directTokens = new Set(tokens.filter((t) => !STOP_WORDS.has(t)));
+    identWords.forEach((w) => {
+      if (!STOP_WORDS.has(w)) directTokens.add(w);
+    });
+    const expanded = new Set(directTokens);
     const aliases = corpus.locale_aliases || {};
     const syns = corpus.synonyms || {};
     for (const tok of tokens) {
       if (aliases[tok] && aliases[tok].key_path) {
-        expanded.add(aliases[tok].key_path.toLowerCase());
+        const aliasedKey = aliases[tok].key_path.toLowerCase();
+        expanded.add(aliasedKey);
+        directTokens.add(aliasedKey);
+        directTokens.add(aliasedKey.split('.').pop());
       }
       if (Array.isArray(syns[tok])) {
         syns[tok].forEach((s) => expanded.add(String(s).toLowerCase()));
       }
     }
 
-    // Relational AST Symbol & Symptom Resolution
+    // Relational AST Symbol & Symptom Resolution (direct query tokens only so synonyms don't trigger unrelated conflict alerts)
     const resolvedSymbols = [];
     const seenSymIds = new Set();
     const symList = Array.isArray(corpus.ast_symbols) ? corpus.ast_symbols : [];
     if (idx) {
-      for (const tok of expanded) {
+      for (const tok of directTokens) {
         const directSym = idx.byLookupToken.get(tok);
         if (directSym && !seenSymIds.has(directSym.id)) {
           seenSymIds.add(directSym.id);
@@ -293,17 +409,27 @@
     }
     // Match BEHAVIORAL_SYMPTOM nodes and CLI_COMMAND / ADR / REQ nodes by phrase/keyword overlap
     const scoredSymptoms = [];
-    const stopWords = new Set(['the', 'and', 'for', 'with', 'when', 'how', 'why', 'does', 'what', 'from', 'into', 'that', 'this', 'rtp']);
-    const queryWords = Array.from(identWords).filter((w) => !stopWords.has(w));
+    const stopWords = STOP_WORDS;
+    const queryWords = Array.from(identWords).filter((w) => !stopWords.has(w) && w.length >= 3);
+    const hasWholeWord = (textStr, word) => {
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp('\\b' + escaped + '\\b', 'i').test(textStr);
+    };
     for (const s of symList) {
       if (seenSymIds.has(s.id)) continue;
       if (s.type === 'BEHAVIORAL_SYMPTOM') {
         const hay = (s.name + ' ' + (s.aliases || []).join(' ')).toLowerCase();
         let overlap = 0;
+        let matchedWords = 0;
         for (const qw of queryWords) {
-          if (hay.includes(qw)) overlap += (s.name.toLowerCase().includes(qw) ? 3 : 1);
+          if (hasWholeWord(hay, qw)) {
+            matchedWords++;
+            overlap += (hasWholeWord(s.name.toLowerCase(), qw) ? 3 : 1);
+          }
         }
-        if (overlap >= 3) scoredSymptoms.push({ score: overlap, sym: s });
+        if (overlap >= 3 && (matchedWords >= 2 || queryWords.length === 1)) {
+          scoredSymptoms.push({ score: overlap, sym: s });
+        }
       } else if (s.type === 'CLI_COMMAND' && textLow.includes(s.name.toLowerCase())) {
         seenSymIds.add(s.id);
         resolvedSymbols.push(s);
@@ -385,11 +511,17 @@
     const scoredHelperCards = [];
     for (const hc of helperCards) {
       let score = seenSymIds.has(hc.id) ? 100 : 0;
+      let matchedWords = 0;
       const hay = (hc.title + ' ' + (hc.triggers || []).join(' ') + ' ' + (hc.quote || '')).toLowerCase();
       for (const qw of queryWords) {
-        if (hay.includes(qw)) score += (hc.title.toLowerCase().includes(qw) ? 18 : 6);
+        if (hasWholeWord(hay, qw)) {
+          matchedWords++;
+          score += (hasWholeWord(hc.title.toLowerCase(), qw) ? 18 : 6);
+        }
       }
-      if (score >= 18) scoredHelperCards.push({ score, card: hc });
+      if (score >= 100 || (score >= 24 && (matchedWords >= 2 || queryWords.length === 1))) {
+        scoredHelperCards.push({ score, card: hc });
+      }
     }
     scoredHelperCards.sort((a, b) => b.score - a.score);
     const helperBotCards = scoredHelperCards.slice(0, 3).map((x) => x.card);
@@ -436,7 +568,8 @@
     for (const c of cfgList) {
       const kpLow = (c.key_path || '').toLowerCase();
       const leaf = kpLow.split('.').pop();
-      const descLow = (c.description || '').toLowerCase();
+      const descClean = cleanConfigDescription(c.description || '', 240);
+      const descLow = descClean.toLowerCase();
       let score = 0;
       if (astRefBoost.has(leaf) || astRefBoost.has(kpLow)) {
         score += Math.max(astRefBoost.get(leaf) || 0, astRefBoost.get(kpLow) || 0);
@@ -445,11 +578,17 @@
         }
       }
       for (const tok of expanded) {
+        if (stopWords.has(tok)) continue;
         if (tok === kpLow || tok === leaf) score += 100;
         else if (kpLow.includes(tok) && tok.length >= 4) score += 45;
         else if (descLow.includes(tok) && tok.length >= 4) score += 12;
       }
-      if (score > 0) scoredCfg.push({ score, item: c });
+      if (score > 0) {
+        scoredCfg.push({
+          score,
+          item: Object.assign({}, c, { description: descClean })
+        });
+      }
     }
     scoredCfg.sort((a, b) => b.score - a.score);
     const seenCfgKeys = new Set();
@@ -512,18 +651,19 @@
       const sLow = (d.snippet || '').toLowerCase();
       let score = 0;
       for (const tok of expanded) {
-        if (tok.length < 3) continue;
+        if (tok.length < 3 || stopWords.has(tok)) continue;
         if (hLow.includes(tok)) score += 35;
         if (sLow.includes(tok)) score += 10;
       }
       if (score > 0) scoredDocs.push({ score, item: d });
     }
     scoredDocs.sort((a, b) => b.score - a.score);
-    const docHits = scoredDocs.slice(0, 5).map((x) => x.item);
+    const docHits = scoredDocs.slice(0, 5).map((x) => Object.assign({}, x.item, { url: normalizeSiteUrl(x.item.url) }));
 
     // Synthesize actionable `recommendedChanges` for one-click Web Editor staging
     const recommendedChanges = [];
     const seenRecTargets = new Set();
+    const sitePrefix = resolveSitePrefix();
     function buildCliCmd(fp, kp, val) {
       const leaf = String(kp || '').split('.').pop();
       if (String(fp || '').startsWith('definitions/regions/')) {
@@ -544,7 +684,7 @@
       seenRecTargets.add(targetId);
       const leaf = String(kp).split('.').pop();
       const valStr = String(val);
-      const reasonStr = String(reason || '');
+      const reasonStr = cleanConfigDescription(String(reason || ''), 190);
       recommendedChanges.push({
         file_path: fp,
         key_path: kp,
@@ -553,8 +693,8 @@
         default_value: String(defVal || ''),
         reason: reasonStr,
         cli_command: buildCliCmd(fp, kp, valStr),
-        editor_url: '/RTP/editor/?file=' + encodeURIComponent(fp) + '&key=' + encodeURIComponent(leaf) + '&search=' + encodeURIComponent(leaf),
-        editor_stage_url: '/RTP/editor/?file=' + encodeURIComponent(fp) + '&key=' + encodeURIComponent(leaf) + '&value=' + encodeURIComponent(valStr) + '&intent=' + encodeURIComponent(reasonStr.slice(0, 90))
+        editor_url: sitePrefix + '/editor/?file=' + encodeURIComponent(fp) + '&key=' + encodeURIComponent(leaf) + '&search=' + encodeURIComponent(leaf),
+        editor_stage_url: sitePrefix + '/editor/?file=' + encodeURIComponent(fp) + '&key=' + encodeURIComponent(leaf) + '&value=' + encodeURIComponent(valStr) + '&intent=' + encodeURIComponent(reasonStr.slice(0, 90))
       });
     }
 
@@ -563,8 +703,14 @@
         addRecChange(rc.file_path, rc.key_path, rc.recommended_value, rc.reason, rc.default_value);
       }
     }
-    if (/(?:\bgui\b|\bchest\b|\bmenu\b|\binventory\b|openonbarertp)/i.test(textLow)) {
-      addRecChange('addons/menus.yml', 'openOnBareRtp', 'false', 'Disable intercepting bare /rtp with the chest/book menu so /rtp teleports immediately.', 'false');
+    if (/(?:\bgui\b|\bchest\b|\bmenu\b|\binventory\b|openonbarertp|guimenu)/i.test(textLow)) {
+      addRecChange('addons/guimenu.yml', 'openOnBareRtp', 'false', 'Disable intercepting bare /rtp with the chest/book destination picker GUI so /rtp teleports immediately.', 'true');
+    }
+    if (/(?:\bfaster\b|\bfast\b|\bspeed\b|\binstant\b|\bquick\b|\bslow\b|\bdelay\b|\bwait\b|\bpregen\b|cachecap)/i.test(textLow)) {
+      addRecChange('definitions/regions/default.yml', 'cacheCap', '20', 'Pre-warm 20 safe teleport locations in the region queue so /rtp is zero-wait.', '10');
+      addRecChange('advanced/performance.yml', 'postTeleportQueueing', 'true', 'Immediately schedule a background refill task whenever a player consumes a cached location.', 'true');
+      addRecChange('advanced/performance.yml', 'period', '20', 'Run background queue refill checks every 20 ticks (1 second).', '20');
+      addRecChange('advanced/performance.yml', 'syncLoading', 'false', 'Keep chunk loading asynchronous (S-005) so background pre-generation never stalls the main thread.', 'false');
     }
     if (/(?:syncloading|\blag\b|\btps\b|\bmspt\b|\bspike|\bstall)/i.test(textLow)) {
       addRecChange('advanced/performance.yml', 'syncLoading', 'false', 'Keep chunk loading asynchronous (S-005); synchronous chunk loads stall the main server thread.', 'false');
@@ -600,10 +746,6 @@
 
     // Synthesize a deterministic Helper Bot summary from the relational graph
     const summaryParts = [];
-    if (conflictWarnings.length > 0) {
-      const cf = conflictWarnings[0];
-      summaryParts.push('🚨 Anti-Pattern Warning (' + cf.focal_name + '): ' + cf.explanation);
-    }
     if (helperBotCards.length > 0) {
       const hc = helperBotCards[0];
       const keysStr = (hc.governed_keys || []).map((k) => k.name).join(', ');
@@ -616,9 +758,14 @@
     } else if (bitFindings.length > 0) {
       const b0 = bitFindings[0];
       summaryParts.push('🩺 ' + (b0.code || (b0.namespace + '-' + b0.id)) + ' (' + b0.key + '): ' + b0.remediation);
+    } else if (recommendedChanges.length > 0) {
+      const rLines = recommendedChanges.slice(0, 3).map((rc) =>
+        '• `' + rc.file_path + '` → `' + rc.key_path + '`: `' + rc.recommended_value + '` — ' + rc.reason + (rc.cli_command ? ' (`' + rc.cli_command + '`)' : '')
+      );
+      summaryParts.push('🤖 Recommended Operator Settings:\n' + rLines.join('\n'));
     } else if (configHits.length > 0) {
       const c0 = configHits[0];
-      summaryParts.push('🔧 ' + c0.file_path + ' → ' + c0.key_path + ' (default: ' + c0.default_value + '): ' + c0.description);
+      summaryParts.push('🔧 `' + c0.file_path + '` → `' + c0.key_path + '` (default: `' + c0.default_value + '`): ' + c0.description);
     }
 
     return {
@@ -643,10 +790,11 @@
 
   async function triage(rawInput, options) {
     const opts = options || {};
-    const apiUrl = opts.apiUrl || window.RTP_BOT_API_URL;
-    if (apiUrl) {
+    const apiUrl = opts.apiUrl !== undefined ? opts.apiUrl : (window.RTP_BOT_API_URL || resolveTriageApiBase());
+    if (apiUrl || opts.useLlm) {
+      const endpoint = (apiUrl ? String(apiUrl).replace(/\/+$/, '') : '') + '/api/v1/triage';
       try {
-        const res = await fetch(apiUrl.replace(/\/+$/, '') + '/api/v1/triage', {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: rawInput || '', use_llm: !!opts.useLlm })
@@ -660,17 +808,108 @@
     return triageLocal(rawInput, corpus);
   }
 
+  function renderBotMarkdown(container, text) {
+    container.innerHTML = '';
+    const raw = String(text || '').trim();
+    if (!raw) return;
+    const blocks = raw.split(/\n{2,}/);
+    blocks.forEach((blk) => {
+      const lines = blk.split(/\r?\n/);
+      const isBulletBlock = lines.every((ln) => !ln.trim() || /^[-*•]\s+/.test(ln.trim()) || /^\s{2,}/.test(ln));
+      if (isBulletBlock && lines.some((ln) => /^[-*•]\s+/.test(ln.trim()))) {
+        const ul = document.createElement('ul');
+        ul.style.cssText = 'margin:6px 0 8px 18px;padding:0;display:flex;flex-direction:column;gap:6px;';
+        lines.forEach((ln) => {
+          const cleanLn = ln.trim().replace(/^[-*•]\s+/, '');
+          if (!cleanLn) return;
+          const li = document.createElement('li');
+          li.innerHTML = formatInlineMarkdown(cleanLn);
+          ul.appendChild(li);
+        });
+        container.appendChild(ul);
+      } else {
+        const p = document.createElement('div');
+        p.style.cssText = 'margin:0 0 8px 0;white-space:pre-wrap;';
+        p.innerHTML = formatInlineMarkdown(blk);
+        container.appendChild(p);
+      }
+    });
+  }
+
+  function renderSymbolCrosslinkHtml(rawToken, displayLabel) {
+    const label = displayLabel !== undefined ? displayLabel : rawToken;
+    const idx = cachedIndexes || (cachedCorpus ? buildRelationalIndexes(cachedCorpus) : null);
+    if (!idx) {
+      return '<code style="background:#313244;color:#a6e3a1;padding:1px 5px;border-radius:4px;font-size:12px;">' + label + '</code>';
+    }
+    const rawLow = String(rawToken || '').trim().toLowerCase();
+    const clean = String(rawToken || '')
+      .replace(/^`|`$/g, '')
+      .split('=')[0]
+      .split(':')[0]
+      .trim()
+      .toLowerCase()
+      .replace(/^(?:\.\/)?(?:plugins|config)\/(?:leaf)?rtp\//i, '');
+    const sym = idx.byLookupToken.get(rawLow) || idx.byLookupToken.get(clean);
+    if (!sym) {
+      return '<code style="background:#313244;color:#a6e3a1;padding:1px 5px;border-radius:4px;font-size:12px;">' + label + '</code>';
+    }
+    const href = normalizeSiteUrl(sym.url || (resolveSitePrefix() + '/'));
+    const tip = ((sym.type ? '[' + sym.type + '] ' : '') + (sym.name || '') + (sym.summary ? ' — ' + sym.summary : '')).replace(/"/g, '&quot;');
+    const sid = String(sym.id || '').replace(/"/g, '&quot;');
+    return (
+      '<a class="rtp-baked-xref" href="' + href + '" target="_blank" rel="noopener" data-rtp-symbol-id="' + sid + '" title="' + tip + '" style="text-decoration:none;">' +
+      '<code class="rtp-xref-chip" data-rtp-baked="1" data-rtp-symbol-id="' + sid + '" style="background:#313244;color:#89b4fa;padding:1px 5px;border-radius:4px;font-size:12px;border-bottom:1.5px dotted #89b4fa;">' + label + '</code>' +
+      '</a>'
+    );
+  }
+
+  function formatInlineMarkdown(str) {
+    let esc = String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    esc = esc.replace(/\[([^\]]+)\]\((?:&lt;)?(https?:\/\/[^\s)&]+|\/[^\s)&]+)(?:&gt;)?\)/g, (_m, label, u) => {
+      const norm = normalizeSiteUrl(u);
+      return '<a href="' + norm + '" target="_blank" rel="noopener" style="color:#89b4fa;text-decoration:underline;">' + label + '</a>';
+    });
+    esc = esc.replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, (_m, u) => {
+      const norm = normalizeSiteUrl(u);
+      return '<a href="' + norm + '" target="_blank" rel="noopener" style="color:#89b4fa;text-decoration:underline;">' + norm + '</a>';
+    });
+    esc = esc.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:#f5e0dc;">$1</strong>');
+    esc = esc.replace(/`([^`]+)`/g, (_m, codeTxt) => renderSymbolCrosslinkHtml(codeTxt, codeTxt));
+    // Also crosslink bare ADR-*, REQ-*, S-00*, and BIT citations outside HTML tags
+    const parts = esc.split(/(<a\b[\s\S]*?<\/a>|<code\b[\s\S]*?<\/code>|<[^>]+>)/g);
+    for (let i = 0; i < parts.length; i++) {
+      if (!parts[i] || parts[i].startsWith('<')) continue;
+      parts[i] = parts[i].replace(/\b((?:(?:leafanvil|leafrtp|treegen|sleuth|fuzz|sleep|anvil-api|commands-api)-)?ADR-\d{3}|REQ-[A-Z0-9-]+|S-00[1-7]|(?:RTP|CLAIM|ACTADDON|ANVIL|SLEUTH|TREEGEN|FUZZ)-\d{4})\b/g, (mTok) => {
+        return renderSymbolCrosslinkHtml(mTok, mTok);
+      });
+    }
+    return parts.join('');
+  }
+
   function injectRelationalStyles() {
     if (document.getElementById('rtp-relational-styles')) return;
     const style = document.createElement('style');
     style.id = 'rtp-relational-styles';
     style.textContent = [
+      'a.rtp-baked-xref {',
+      '  text-decoration: none !important;',
+      '  color: inherit;',
+      '}',
+      'a.rtp-prose-xref {',
+      '  color: #89b4fa !important;',
+      '  font-weight: 600;',
+      '  border-bottom: 1.5px dotted #89b4fa;',
+      '}',
       'code.rtp-xref-chip {',
       '  cursor: pointer;',
       '  border-bottom: 1.5px dotted #89b4fa;',
       '  transition: background-color 0.15s ease, color 0.15s ease;',
       '}',
-      'code.rtp-xref-chip:hover {',
+      'code.rtp-xref-chip:hover, a.rtp-prose-xref:hover {',
       '  background-color: rgba(137, 180, 250, 0.18);',
       '}',
       '#rtp-xref-popover {',
@@ -776,13 +1015,6 @@
       pop.appendChild(sumEl);
     }
 
-    if (conflicts.length > 0) {
-      const cfBox = document.createElement('div');
-      cfBox.style.cssText = 'background:rgba(243,139,168,0.14);border-left:3px solid #f38ba8;padding:6px 8px;border-radius:4px;margin-bottom:8px;color:#f38ba8;font-size:11.5px;';
-      cfBox.textContent = '🚨 Anti-Pattern Warning: ' + conflicts[0].explanation;
-      pop.appendChild(cfBox);
-    }
-
     if (allEdges.length > 0) {
       const relHdr = document.createElement('div');
       relHdr.style.cssText = 'font-weight:700;color:#a6e3a1;font-size:11px;margin-bottom:4px;';
@@ -808,15 +1040,6 @@
 
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;border-top:1px solid #313244;padding-top:8px;';
-    if (sym.editor_url) {
-      const edLink = document.createElement('a');
-      edLink.href = sym.editor_url;
-      edLink.target = '_blank';
-      edLink.rel = 'noopener';
-      edLink.style.cssText = 'color:#a6e3a1;font-weight:600;text-decoration:none;font-size:11.5px;';
-      edLink.textContent = '🧭 Spotlight in Web Editor';
-      actions.appendChild(edLink);
-    }
     if (sym.url) {
       const docLink = document.createElement('a');
       docLink.href = sym.url;
@@ -854,23 +1077,66 @@
     const matchedOnPage = new Map();
     const codeNodes = article.querySelectorAll('code');
     codeNodes.forEach((codeEl) => {
-      if (codeEl.closest('pre') || codeEl.closest('a') || codeEl.dataset.rtpXrefBound === '1') return;
+      if (codeEl.closest('pre') || codeEl.closest('a:not(.rtp-baked-xref)') || codeEl.dataset.rtpXrefBound === '1') return;
       const rawTxt = (codeEl.textContent || '').trim();
       if (rawTxt.length < 3 || rawTxt.length > 72) return;
       const cleanKey = rawTxt.replace(/^`|`$/g, '').split('=')[0].split(':')[0].trim().toLowerCase();
       if (AMBIGUOUS_CODE_TOKENS.has(cleanKey)) return;
 
-      const sym = cachedIndexes.byLookupToken.get(rawTxt.toLowerCase()) || cachedIndexes.byLookupToken.get(cleanKey);
+      const symIdAttr = codeEl.dataset.rtpSymbolId;
+      const sym = (symIdAttr && cachedIndexes.byId.get(symIdAttr)) ||
+        cachedIndexes.byLookupToken.get(rawTxt.toLowerCase()) ||
+        cachedIndexes.byLookupToken.get(cleanKey);
       if (!sym) return;
 
       codeEl.dataset.rtpXrefBound = '1';
       codeEl.dataset.rtpSymbolId = sym.id;
       codeEl.classList.add('rtp-xref-chip');
-      codeEl.title = (sym.type ? '[' + sym.type + '] ' : '') + (sym.summary || sym.name) + ' — Click to inspect relational AST graph';
-      codeEl.addEventListener('click', (ev) => {
+      const tipText = (sym.type ? '[' + sym.type + '] ' : '') + (sym.summary || sym.name) + ' — Click to inspect relational AST graph (Ctrl/Cmd+Click to open page)';
+      codeEl.title = tipText;
+
+      let parentAnchor = codeEl.closest('a.rtp-baked-xref');
+      if (!parentAnchor && codeEl.parentNode) {
+        const href = normalizeSiteUrl(sym.url || '');
+        if (href) {
+          parentAnchor = document.createElement('a');
+          parentAnchor.className = 'rtp-baked-xref';
+          parentAnchor.href = href;
+          parentAnchor.dataset.rtpSymbolId = sym.id;
+          parentAnchor.title = tipText;
+          codeEl.parentNode.insertBefore(parentAnchor, codeEl);
+          parentAnchor.appendChild(codeEl);
+        }
+      }
+
+      const handleActivation = (ev) => {
+        if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1) return;
         ev.preventDefault();
         ev.stopPropagation();
         showSymbolPopover(sym, codeEl);
+      };
+      if (parentAnchor) {
+        parentAnchor.addEventListener('click', handleActivation);
+      } else {
+        codeEl.addEventListener('click', handleActivation);
+      }
+      if (!matchedOnPage.has(sym.id)) {
+        matchedOnPage.set(sym.id, sym);
+      }
+    });
+
+    const proseLinks = article.querySelectorAll('a.rtp-prose-xref[data-rtp-symbol-id]');
+    proseLinks.forEach((aEl) => {
+      if (aEl.dataset.rtpXrefBound === '1') return;
+      const sid = aEl.dataset.rtpSymbolId;
+      const sym = sid ? cachedIndexes.byId.get(sid) : null;
+      if (!sym) return;
+      aEl.dataset.rtpXrefBound = '1';
+      aEl.addEventListener('click', (ev) => {
+        if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        showSymbolPopover(sym, aEl);
       });
       if (!matchedOnPage.has(sym.id)) {
         matchedOnPage.set(sym.id, sym);
@@ -880,6 +1146,8 @@
     // Also pull pre-indexed `page_crosslinks` for the current URL path
     const pageCrosslinks = cachedCorpus.page_crosslinks || {};
     const pathSlug = window.location.pathname
+      .replace(/^\/mc\/leafrtp\//i, '')
+      .replace(/^\/mc\//i, '')
       .replace(/^\/RTP\//i, '')
       .replace(/^\/+|\/+$/g, '')
       .replace(/\/index\.html$/i, '')
@@ -997,6 +1265,20 @@
     const inputEl = modal.querySelector('#rtp-doctor-input');
     const outEl = modal.querySelector('#rtp-doctor-output');
 
+    outEl.addEventListener('click', (ev) => {
+      const chip = ev.target.closest('.rtp-xref-chip[data-rtp-symbol-id], a.rtp-baked-xref[data-rtp-symbol-id]');
+      if (!chip) return;
+      if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1) return;
+      const sid = chip.getAttribute('data-rtp-symbol-id');
+      const idx = cachedIndexes || (cachedCorpus ? buildRelationalIndexes(cachedCorpus) : null);
+      const sym = (sid && idx && idx.byId.get(sid)) || null;
+      if (sym) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        showSymbolPopover(sym, chip);
+      }
+    });
+
     modal.querySelectorAll('#rtp-doctor-quick-prompts button[data-q]').forEach((qBtn) => {
       qBtn.addEventListener('click', () => {
         inputEl.value = qBtn.getAttribute('data-q') || '';
@@ -1004,10 +1286,17 @@
       });
     });
 
+    let activeRunId = 0;
+
     modal.querySelector('#rtp-doctor-run').addEventListener('click', async () => {
+      const myRunId = ++activeRunId;
+      const rawQuery = inputEl.value || '';
       outEl.textContent = 'Scanning relational AST graph & multi-plane corpus...';
-      const res = await triage(inputEl.value);
+      const corpus = await loadCorpus();
+      const res = triageLocal(rawQuery, corpus);
+      if (myRunId !== activeRunId) return;
       outEl.innerHTML = '';
+
       if (res.secretRedactions > 0 || res.secret_redactions > 0) {
         const redCnt = res.secretRedactions || res.secret_redactions;
         const warn = document.createElement('div');
@@ -1016,19 +1305,30 @@
         outEl.appendChild(warn);
       }
 
-      if (res.helperBotSummary || res.reply_markdown) {
-        const botCard = document.createElement('div');
-        botCard.style.cssText = 'background:#181825;border:1px solid #89b4fa;border-radius:8px;padding:10px 12px;margin-bottom:10px;white-space:pre-wrap;font-size:12.5px;';
-        botCard.textContent = res.helperBotSummary || res.reply_markdown;
-        outEl.appendChild(botCard);
-      }
+      const botCard = document.createElement('div');
+      botCard.style.cssText = 'background:#181825;border:1.5px solid #89b4fa;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.55;';
+      const botHeader = document.createElement('div');
+      botHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;border-bottom:1px solid #313244;padding-bottom:6px;';
+      const botTitle = document.createElement('strong');
+      botTitle.style.cssText = 'color:#89b4fa;font-size:13px;';
+      botTitle.textContent = '🤖 Operator Guidance';
+      const botStatus = document.createElement('span');
+      botStatus.style.cssText = 'color:#f9e2af;font-size:11.5px;font-weight:600;';
+      botStatus.textContent = '⚡ Synthesizing tailored answer (Gemini TPU)...';
+      botHeader.appendChild(botTitle);
+      botHeader.appendChild(botStatus);
+      const botBody = document.createElement('div');
+      renderBotMarkdown(botBody, res.helperBotSummary || res.reply_markdown || 'Analyzing configuration schema and operator docs...');
+      botCard.appendChild(botHeader);
+      botCard.appendChild(botBody);
+      outEl.appendChild(botCard);
 
-      const addSection = (title, items, renderItem) => {
+      const addSectionTo = (parentEl, title, items, renderItem) => {
         if (!items || !items.length) return;
         const h = document.createElement('div');
         h.style.cssText = 'font-weight:700;color:#a6e3a1;margin-top:10px;';
         h.textContent = title;
-        outEl.appendChild(h);
+        parentEl.appendChild(h);
         const ul = document.createElement('ul');
         ul.style.cssText = 'margin:4px 0 8px 18px;padding:0;';
         items.forEach((it) => {
@@ -1036,17 +1336,25 @@
           renderItem(li, it);
           ul.appendChild(li);
         });
-        outEl.appendChild(ul);
+        parentEl.appendChild(ul);
       };
 
-      addSection('🚨 Anti-Pattern vs. Architecture Invariant Warnings', res.conflictWarnings || res.flagged_conflicts, (li, cf) => {
-        li.style.color = '#f38ba8';
-        li.textContent = (cf.focal_name || cf.focal_symbol_id || '') + ': ' + (cf.explanation || cf.explanation_note || '') + ' → Recommended: ' + (cf.recommended_invariant || cf.side_b_target || '');
+      addSectionTo(outEl, '⚠️ YAML Schema & Range Issues', res.schemaIssues || res.schema_issues, (li, iss) => {
+        li.style.color = '#f9e2af';
+        li.textContent = (iss.file_path ? iss.file_path + ' → ' : '') + (iss.key || iss.key_path || '') + ': ' + (iss.reason || iss.issue || iss.message || '');
       });
 
-      addSection('⚡ Recommended Configuration Changes (Stage in Editor)', res.recommendedChanges || res.recommended_changes, (li, rc) => {
+      addSectionTo(outEl, '🩺 BIT Diagnostic Findings', res.bitFindings || res.bit_findings, (li, b) => {
+        li.textContent = (b.code || (b.namespace + '-' + b.id)) + ' (' + b.key + ', ' + b.severity + '): ' + b.remediation;
+      });
+
+      addSectionTo(outEl, '⚡ Recommended Configuration Changes', res.recommendedChanges || res.recommended_changes, (li, rc) => {
         const span = document.createElement('span');
-        span.innerHTML = '<code>' + (rc.file_path || '') + '</code> → <b>' + (rc.key_path || rc.leaf || '') + ': ' + (rc.recommended_value || '') + '</b> — ' + (rc.reason || '') + (rc.cli_command ? ' (<code>' + rc.cli_command + '</code>) ' : ' ');
+        const cleanReason = cleanConfigDescription(rc.reason || '', 190);
+        const fileHtml = renderSymbolCrosslinkHtml(rc.file_path || '', rc.file_path || '');
+        const keyLabel = (rc.key_path || rc.leaf || '') + ': ' + (rc.recommended_value || '');
+        const keyHtml = renderSymbolCrosslinkHtml(rc.key_path || rc.leaf || '', keyLabel);
+        span.innerHTML = fileHtml + ' → <b>' + keyHtml + '</b> — ' + formatInlineMarkdown(cleanReason) + (rc.cli_command ? ' (<code>' + rc.cli_command + '</code>) ' : ' ');
         li.appendChild(span);
         const leaf = String(rc.leaf || rc.key_path || '').split('.').pop();
         if (window.RTPIntentCapture && typeof window.RTPIntentCapture.applyDeepLink === 'function') {
@@ -1060,109 +1368,148 @@
               file: rc.file_path || '',
               key: leaf || '',
               value: String(rc.recommended_value || ''),
-              intent: rc.reason || ('Set ' + leaf + ' = ' + rc.recommended_value)
+              intent: cleanReason || ('Set ' + leaf + ' = ' + rc.recommended_value)
             });
             modal.style.display = 'none';
           });
           li.appendChild(stageBtn);
-        } else {
-          const stageLink = document.createElement('a');
-          stageLink.className = 'rtp-stage-change-link';
-          stageLink.href = rc.editor_stage_url || ('/RTP/editor/?file=' + encodeURIComponent(rc.file_path || '') + '&key=' + encodeURIComponent(leaf || '') + '&value=' + encodeURIComponent(rc.recommended_value || '') + '&intent=' + encodeURIComponent((rc.reason || '').slice(0, 90)));
-          stageLink.target = '_blank';
-          stageLink.rel = 'noopener';
-          stageLink.style.cssText = 'color:#a6e3a1;font-weight:700;text-decoration:none;margin-left:4px;';
-          stageLink.textContent = '[⚡ Stage in Web Editor (' + leaf + '=' + rc.recommended_value + ')]';
-          li.appendChild(stageLink);
         }
       });
 
-      addSection('⚠️ YAML Schema & Range Issues', res.schemaIssues || res.schema_issues, (li, iss) => {
-        li.style.color = '#f9e2af';
-        li.textContent = (iss.file_path ? iss.file_path + ' → ' : '') + (iss.key || iss.key_path || '') + ': ' + (iss.reason || iss.issue || iss.message || '');
-      });
-
-      addSection('🩺 BIT Diagnostic Findings', res.bitFindings || res.bit_findings, (li, b) => {
-        li.textContent = (b.code || (b.namespace + '-' + b.id)) + ' (' + b.key + ', ' + b.severity + '): ' + b.remediation;
-      });
-
-      addSection('🔧 Matching Configuration Keys', res.configHits || res.config_hits, (li, c) => {
-        const span = document.createElement('span');
-        span.textContent = c.file_path + ' → ' + c.key_path + ' (default: ' + c.default_value + (c.directives ? ', ' + c.directives : '') + ') — ' + c.description + ' ';
-        li.appendChild(span);
-        const leaf = String(c.key_path || '').split('.').pop();
-        if (window.RTPIntentCapture && typeof window.RTPIntentCapture.applyDeepLink === 'function') {
-          const spotBtn = document.createElement('button');
-          spotBtn.type = 'button';
-          spotBtn.style.cssText = 'background:#313244;color:#89b4fa;border:1px solid #45475a;border-radius:4px;padding:1px 7px;font-size:11.5px;font-weight:600;cursor:pointer;margin-left:4px;';
-          spotBtn.textContent = '🧭 Spotlight Key';
-          spotBtn.addEventListener('click', () => {
-            window.RTPIntentCapture.applyDeepLink({ file: c.file_path || '', key: leaf || '', intent: c.description || c.key_path });
-            modal.style.display = 'none';
-          });
-          li.appendChild(spotBtn);
-        } else {
-          const link = document.createElement('a');
-          link.href = '/RTP/editor/?file=' + encodeURIComponent(c.file_path || '') + '&key=' + encodeURIComponent(leaf || '') + '&search=' + encodeURIComponent(leaf || '');
-          link.target = '_blank';
-          link.rel = 'noopener';
-          link.style.cssText = 'color:#89b4fa;font-weight:600;text-decoration:none;margin-left:4px;';
-          link.textContent = '[🧭 Spotlight in Web Editor]';
-          li.appendChild(link);
-        }
-      });
-
-      addSection('🕸️ Relational AST Graph Connections (Gov(c) & Crosslinks)', res.astNeighbors || res.ast_subgraph_edges, (li, e) => {
-        const span = document.createElement('span');
-        span.textContent = (e.src_name || e.src) + ' —[' + e.rel + ']→ ';
-        li.appendChild(span);
-        const btnPivot = document.createElement('button');
-        btnPivot.type = 'button';
-        btnPivot.style.cssText = 'background:#313244;color:#89b4fa;border:1px solid #45475a;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:11.5px;cursor:pointer;';
-        btnPivot.textContent = e.dst_name || e.dst;
-        btnPivot.addEventListener('click', () => {
-          inputEl.value = e.dst_name || e.dst;
-          modal.querySelector('#rtp-doctor-run').click();
-        });
-        li.appendChild(btnPivot);
-      });
-
-      addSection('📌 Grounded Causal & Governance Claims', res.causalClaims || res.typed_causal_claims, (li, cl) => {
-        const desc = cl.claim || ((cl.src_name || cl.src) + ' —[' + cl.predicate + ']→ ' + (cl.dst_name || cl.dst));
-        li.textContent = desc + (cl.quote ? ' — "' + cl.quote + '"' : '');
-      });
-
-      addSection('🧩 Matching Engine Classes & Method Shorthand (AST)', res.codeHits || res.code_hits, (li, c) => {
-        let txt = c.class_name + ' [' + (c.subsystem || c.dag_tier || '') + ']: ' + c.summary;
-        if (c.jminor_method) {
-          txt += ' | Scope: ' + c.jminor_method;
-        } else if (Array.isArray(c.top_methods) && c.top_methods.length > 0) {
-          const m0 = c.top_methods[0];
-          const muts = (m0.effect_frame && Array.isArray(m0.effect_frame.mutates) && m0.effect_frame.mutates.length) ? (' mutates=' + m0.effect_frame.mutates.join(',')) : '';
-          txt += ' | Top Scope: ' + c.class_name + '#' + m0.method + ' (' + m0.signature + muts + ')';
-        }
-        if (c.effect_frame_summary) {
-          txt += ' [' + c.effect_frame_summary + ']';
-        }
-        li.textContent = txt;
-      });
-
-      addSection('📐 Requirement Traceability (REQ-* → Class → Test)', res.reqHits, (li, tr) => {
-        li.textContent = tr.req_id + ': ' + tr.summary + ' (Classes: ' + (tr.implementing_classes || []).join(', ') + ' | Tests: ' + (tr.test_classes || []).join(', ') + ')';
-      });
-
-      addSection('📖 Documentation Sections', res.docHits || res.doc_hits, (li, d) => {
+      addSectionTo(outEl, '📖 Documentation Sections', (res.docHits || res.doc_hits || []).slice(0, 3), (li, d) => {
         const a = document.createElement('a');
-        a.href = d.url;
+        a.href = normalizeSiteUrl(d.url);
         a.target = '_blank';
         a.rel = 'noopener';
-        a.style.color = '#89b4fa';
-        a.textContent = d.heading + ' (' + d.path + ')';
+        a.style.cssText = 'color:#89b4fa;text-decoration:underline;';
+        const cleanHeading = String(d.heading || d.title || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/`([^`]+)`/g, '<code style="background:#313244;color:#a6e3a1;padding:1px 4px;border-radius:4px;font-size:11.5px;">$1</code>');
+        a.innerHTML = cleanHeading;
         li.appendChild(a);
+        const cleanPath = String(d.path || '')
+          .replace(/^(?:resource|plugins)\/[^/]+\/docs\//i, '')
+          .replace(/^docs\//i, '');
+        if (cleanPath) {
+          const pathSpan = document.createElement('span');
+          pathSpan.style.cssText = 'color:#a6adc8;font-size:11.5px;margin-left:5px;';
+          pathSpan.textContent = '(' + cleanPath + ')';
+          li.appendChild(pathSpan);
+        }
       });
 
-      if (!outEl.childNodes.length) {
-        outEl.textContent = 'No matching BIT codes, config keys, AST symbols, or doc sections found.';
+      const cfgItems = res.configHits || res.config_hits || [];
+      const astItems = res.astNeighbors || res.ast_subgraph_edges || [];
+      const claimItems = res.causalClaims || res.typed_causal_claims || [];
+      const codeItems = res.codeHits || res.code_hits || [];
+      const reqItems = res.reqHits || [];
+      const totalTechCount = cfgItems.length + astItems.length + claimItems.length + codeItems.length + reqItems.length;
+
+      if (totalTechCount > 0) {
+        const techDetails = document.createElement('details');
+        techDetails.style.cssText = 'margin-top:12px;background:#11111b;border:1px solid #313244;border-radius:8px;padding:8px 12px;font-size:12px;color:#a6adc8;';
+        const techSummary = document.createElement('summary');
+        techSummary.style.cssText = 'cursor:pointer;font-weight:600;color:#89b4fa;user-select:none;';
+        techSummary.textContent = '🔍 Show matching config keys & technical AST diagnostics (' + cfgItems.length + ' keys, ' + codeItems.length + ' classes, ' + astItems.length + ' graph edges)';
+        techDetails.appendChild(techSummary);
+
+        addSectionTo(techDetails, '🔧 Matching Configuration Keys', cfgItems, (li, c) => {
+          const span = document.createElement('span');
+          const cleanDesc = cleanConfigDescription(c.description || '', 220);
+          span.textContent = c.file_path + ' → ' + c.key_path + ' (default: ' + c.default_value + (c.directives ? ', ' + c.directives : '') + ') — ' + cleanDesc + ' ';
+          li.appendChild(span);
+          const leaf = String(c.key_path || '').split('.').pop();
+          if (window.RTPIntentCapture && typeof window.RTPIntentCapture.applyDeepLink === 'function') {
+            const spotBtn = document.createElement('button');
+            spotBtn.type = 'button';
+            spotBtn.style.cssText = 'background:#313244;color:#89b4fa;border:1px solid #45475a;border-radius:4px;padding:1px 7px;font-size:11.5px;font-weight:600;cursor:pointer;margin-left:4px;';
+            spotBtn.textContent = '🧭 Spotlight Key';
+            spotBtn.addEventListener('click', () => {
+              window.RTPIntentCapture.applyDeepLink({ file: c.file_path || '', key: leaf || '', intent: cleanDesc || c.key_path });
+              modal.style.display = 'none';
+            });
+            li.appendChild(spotBtn);
+          }
+        });
+
+        addSectionTo(techDetails, '🕸️ Relational AST Graph Connections (Gov(c) & Crosslinks)', astItems, (li, e) => {
+          const span = document.createElement('span');
+          span.textContent = (e.src_name || e.src) + ' —[' + e.rel + ']→ ';
+          li.appendChild(span);
+          const btnPivot = document.createElement('button');
+          btnPivot.type = 'button';
+          btnPivot.style.cssText = 'background:#313244;color:#89b4fa;border:1px solid #45475a;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:11.5px;cursor:pointer;';
+          btnPivot.textContent = e.dst_name || e.dst;
+          btnPivot.addEventListener('click', () => {
+            inputEl.value = e.dst_name || e.dst;
+            modal.querySelector('#rtp-doctor-run').click();
+          });
+          li.appendChild(btnPivot);
+        });
+
+        addSectionTo(techDetails, '📌 Grounded Causal & Governance Claims', claimItems, (li, cl) => {
+          const desc = cl.claim || ((cl.src_name || cl.src) + ' —[' + cl.predicate + ']→ ' + (cl.dst_name || cl.dst));
+          li.textContent = desc + (cl.quote ? ' — "' + cl.quote + '"' : '');
+        });
+
+        addSectionTo(techDetails, '🧩 Matching Engine Classes & Method Shorthand (AST)', codeItems, (li, c) => {
+          let txt = c.class_name + ' [' + (c.subsystem || c.dag_tier || '') + ']: ' + c.summary;
+          if (c.jminor_method) {
+            txt += ' | Scope: ' + c.jminor_method;
+          } else if (Array.isArray(c.top_methods) && c.top_methods.length > 0) {
+            const m0 = c.top_methods[0];
+            const muts = (m0.effect_frame && Array.isArray(m0.effect_frame.mutates) && m0.effect_frame.mutates.length) ? (' mutates=' + m0.effect_frame.mutates.join(',')) : '';
+            txt += ' | Top Scope: ' + c.class_name + '#' + m0.method + ' (' + m0.signature + muts + ')';
+          }
+          if (c.effect_frame_summary) {
+            txt += ' [' + c.effect_frame_summary + ']';
+          }
+          li.textContent = txt;
+        });
+
+        addSectionTo(techDetails, '📐 Requirement Traceability (REQ-* → Class → Test)', reqItems, (li, tr) => {
+          li.textContent = tr.req_id + ': ' + tr.summary + ' (Classes: ' + (tr.implementing_classes || []).join(', ') + ' | Tests: ' + (tr.test_classes || []).join(', ') + ')';
+        });
+
+        outEl.appendChild(techDetails);
+      }
+
+      // Progressive enhancement: ask the live Gemini TPU / fallback triage backend for an operator-focused synthesis
+      try {
+        const apiBase = window.RTP_BOT_API_URL || resolveTriageApiBase();
+        const endpoint = (apiBase ? String(apiBase).replace(/\/+$/, '') : '') + '/api/v1/triage';
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: rawQuery, use_llm: true })
+        });
+        if (myRunId !== activeRunId) return;
+        if (resp.ok) {
+          const llmRes = await resp.json();
+          if (myRunId !== activeRunId) return;
+          if (llmRes && llmRes.reply_markdown) {
+            renderBotMarkdown(botBody, llmRes.reply_markdown);
+            if (llmRes.llm_used) {
+              const mName = llmRes.llm_model || 'gemini-3.5-flash-lite';
+              const isGemini = String(mName).toLowerCase().includes('gemini');
+              botStatus.style.color = '#a6e3a1';
+              botStatus.textContent = '✓ Verified ' + (isGemini ? 'Gemini TPU' : 'LLM') + ' (' + mName + ')';
+            } else {
+              botStatus.style.color = '#a6adc8';
+              botStatus.textContent = '✓ Schema-verified answer';
+            }
+          } else {
+            botStatus.textContent = '';
+          }
+        } else {
+          botStatus.textContent = '';
+        }
+      } catch (_err) {
+        if (myRunId === activeRunId) {
+          botStatus.textContent = '';
+        }
       }
     });
 

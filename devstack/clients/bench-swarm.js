@@ -149,12 +149,14 @@ const statsIntervalS = Math.max(0, intArg('--stats-interval-s', null, 30));
 const statsFile = getArg('--stats-file', 'BENCH_STATS_FILE', '');
 const statsFileIntervalS = Math.max(0.1, parseFloat(getArg('--stats-file-interval-s', null, '1')) || 1);
 const swapStuck = hasFlag('--swap-stuck', 'BENCH_SWAP_STUCK');
-const swapIdleS = Math.max(1, parseFloat(getArg('--swap-idle-s', null, '120')) || 120);
-const swapMinActivity = Math.max(1, intArg('--swap-min-activity', null, 5));
 const logChat = hasFlag('--log-chat', null);
 const keepWorld = hasFlag('--keep-world', 'BENCH_KEEP_WORLD');
 const fuzzTaskMode = hasFlag('--fuzz-task-mode', 'BENCH_FUZZ_TASK_MODE');
 const churnRename = hasFlag('--churn-rename', 'BENCH_CHURN_RENAME');
+const autonomousPolicy = hasFlag('--autonomous-policy', 'BENCH_AUTONOMOUS_POLICY');
+const policyMixRaw = getArg('--policy-mix', 'BENCH_POLICY_MIX', 'explorer,house,mineshaft,caving');
+const policyStepMs = Math.max(100, intArg('--policy-step-ms', 'BENCH_POLICY_STEP_MS', 400));
+const policyRtpCmd = getArg('--policy-rtp-cmd', 'BENCH_POLICY_RTP_CMD', '');
 const fuzzControlRaw = getArg('--fuzz-control', 'BENCH_FUZZ_CONTROL', '');
 const fuzzMode = fuzzControlRaw !== '';
 const fuzzSpawnTimeoutMs = Math.max(1000, intArg('--fuzz-spawn-timeout-ms', null, 30000));
@@ -243,6 +245,8 @@ const BUSY_RE = /already teleporting|already rtp'?ing|have some patience|cool ?d
 
 const stats = {
   connects: 0, spawns: 0, kicks: 0, ends: 0, errors: 0, deaths: 0, busyChat: 0, swaps: 0,
+  policySteps: 0, blocksDug: 0, blocksPlaced: 0, chunksVisited: 0,
+  visitedChunkSet: new Set(),
   kickReasons: new Map()
 };
 // Teleport (server position packet) times seen by this worker's bots in the last 60 s.
@@ -411,6 +415,9 @@ function connect(state) {
     state.spawnAt = state.lastTp = Date.now();
     state.failures = 0; // a clean spawn resets backoff
     console.log(`[bench] [${state.username}] spawned (${onlineCount()}/${count} online)`);
+    if (autonomousPolicy) {
+      startAutonomousPolicyLoop(state, bot);
+    }
   });
 
   bot.on('death', () => {
@@ -514,7 +521,11 @@ function writeStatsFile() {
   if (!statsFile) return;
   const { rx, tx } = wireTotals();
   const rec = { t: Date.now(), w: isWorker ? Number(process.env.BENCH_WORKER_ID) : 0,
-    rx, tx, online: onlineCount() };
+    rx, tx, online: onlineCount(),
+    policy_steps: stats.policySteps,
+    blocks_dug: stats.blocksDug,
+    blocks_placed: stats.blocksPlaced,
+    chunks_visited: stats.chunksVisited };
   if (swapStuck) rec.swaps = stats.swaps;
   const line = JSON.stringify(rec) + '\n';
   try { fs.appendFileSync(statsFile, line); } catch (e) {
@@ -539,14 +550,66 @@ function printStats(prefixLabel) {
     + ` kicks=${stats.kicks} ends=${stats.ends} errors=${stats.errors} deaths=${stats.deaths}`
     + ` busy_chat=${stats.busyChat} queued=${joinQueue.length} rss=${Math.round(mem.rss / 1048576)}MB`
     + ` rx_mb=${(w.rx / 1048576).toFixed(1)} tx_mb=${(w.tx / 1048576).toFixed(1)}`
+    + (autonomousPolicy ? ` steps=${stats.policySteps} dug=${stats.blocksDug} placed=${stats.blocksPlaced} chunks=${stats.chunksVisited}` : '')
     + (swapStuck ? ` swaps=${stats.swaps}` : '')
     + ` heap=${Math.round(mem.heapUsed / 1048576)}MB${top ? ' top_kicks: ' + top : ''}`);
 }
 
+function startAutonomousPolicyLoop(state, bot) {
+  const mix = policyMixRaw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const presets = mix.length > 0 ? mix : ['explorer', 'house', 'mineshaft', 'caving'];
+  const slotIdx = states.indexOf(state);
+  const globalIdx = startIndex + (slotIdx >= 0 ? slotIdx : 0);
+  const presetName = presets[globalIdx % presets.length];
+  const weights = decodePolicyWeights(presetName, 'autonomous_policy');
+  const rng = makeIntRng(1337 + globalIdx * 31);
+  const logits = new Int32Array(POLICY_NUM_ACTIONS);
+  state.botIdx = globalIdx;
+  state.persona = 'distinct';
+  state.conn = { spawned: true, ended: false, bot };
+  const ts = ensureTaskState(state, (globalIdx & 1) ? 32 : -32);
+  ts.yawIdx = globalIdx & 3;
+  ensureBiometricState(state, 'distinct');
+  const autoEp = {
+    id: `auto_${globalIdx}`,
+    cmd: policyRtpCmd || 'rtp',
+    autonomousSwarm: true,
+    aborted: null,
+    wakers: new Set(),
+    emit: () => {}
+  };
+  let stepIdx = 0;
+  const stepOnce = async () => {
+    if (shuttingDown || !state.online || state.bot !== bot) {
+      if (state.conn) state.conn.ended = true;
+      return;
+    }
+    try {
+      const ctx = computeContextInt8(bot, state);
+      const skillIdx = selectPolicyActionInt(weights, ctx, 10, rng, logits);
+      // Only send /rtp chat command if --policy-rtp-cmd was explicitly configured
+      const effIdx = (skillIdx === 1 && !policyRtpCmd) ? 3 : skillIdx;
+      const res = await executeMicroSkill(autoEp, state, bot, effIdx, stepIdx++);
+      stats.policySteps++;
+      if (res && res.skill) {
+        if (res.skill.startsWith('harvest_') || res.skill.startsWith('dig_')) stats.blocksDug++;
+        else if (res.skill.startsWith('place_')) stats.blocksPlaced++;
+      }
+      const p = posOf(bot) || ts.pos;
+      if (p) {
+        stats.visitedChunkSet.add(`${Math.floor(p.x) >> 4},${Math.floor(p.z) >> 4}`);
+        stats.chunksVisited = stats.visitedChunkSet.size;
+      }
+    } catch (e) { /* ignore transient step errors */ }
+    if (!shuttingDown && state.online && state.bot === bot) {
+      setTimeout(stepOnce, policyStepMs).unref();
+    }
+  };
+  setTimeout(stepOnce, 250 + (globalIdx % 8) * 50).unref();
+}
+
 function shutdown(signal) {
   if (shuttingDown) {
-    console.log('[bench] second signal; exiting now');
-    process.exit(1);
   }
   shuttingDown = true;
   console.log(`[bench] ${signal}: disconnecting ${onlineCount()} bot(s)`);
@@ -2541,25 +2604,35 @@ async function executeMicroSkill(ep, bs, bot, skillIdx, stepIdx) {
       if (bot) await fuzzMove(ep, bs, wireAct);
       break;
     }
-    case 'step_away_anchor': {
-      const dx = dirX * 2;
-      const dz = dirZ * 2;
-      ts.pos.x = (ts.pos.x + dx) | 0;
-      ts.pos.z = (ts.pos.z + dz) | 0;
-      ts.yawIdx = (ts.yawIdx + 1) & 3;
-      const cellKey = `${ts.pos.x >> 2},${ts.pos.z >> 2}`;
-      if (!ts.chunksExplored.has(cellKey)) {
-        ts.chunksExplored.add(cellKey);
-        progressed = true;
-        if ((ts.chunksExplored.size & 1) === 0) {
-          ts.cavesFound = (ts.cavesFound + 1) | 0;
-          ts.inv.emeralds = (ts.inv.emeralds + 1) | 0;
+      case 'step_away_anchor': {
+        const stride = (ep && ep.autonomousSwarm) ? 8 : 4;
+        const dx = dirX * stride;
+        const dz = dirZ * stride;
+        ts.pos.x = (ts.pos.x + dx) | 0;
+        ts.pos.z = (ts.pos.z + dz) | 0;
+        ts.awayLegStep = ((ts.awayLegStep || 0) + 1) | 0;
+        const legLen = Math.max(2, ts.awayLegLength || 2);
+        if (ts.awayLegStep >= legLen) {
+          ts.awayLegStep = 0;
+          ts.yawIdx = (ts.yawIdx + 1) & 3;
+          ts.awayTurnCount = ((ts.awayTurnCount || 0) + 1) | 0;
+          if ((ts.awayTurnCount & 1) === 0) {
+            ts.awayLegLength = Math.min(32, legLen + 1);
+          }
         }
+        const cellKey = `${ts.pos.x >> 2},${ts.pos.z >> 2}`;
+        if (!ts.chunksExplored.has(cellKey)) {
+          ts.chunksExplored.add(cellKey);
+          progressed = true;
+          if ((ts.chunksExplored.size & 1) === 0) {
+            ts.cavesFound = (ts.cavesFound + 1) | 0;
+            ts.inv.emeralds = (ts.inv.emeralds + 1) | 0;
+          }
+        }
+        wireAct = { a: 'move', dx, dz, ms: 100 };
+        if (bot) await fuzzMove(ep, bs, wireAct);
+        break;
       }
-      wireAct = { a: 'move', dx, dz, ms: 100 };
-      if (bot) await fuzzMove(ep, bs, wireAct);
-      break;
-    }
     case 'harvest_nearest': {
       const bonus = ts.inv.tool_tier >= 3 ? 2 : 1;
       if (ts.pos.y < 58 || ts.cavesFound >= 2) {

@@ -59,10 +59,10 @@ public final class WorldLandSurvey {
     private final Set<Long> missing = new HashSet<>();
     private final boolean truncated;
     private final Deque<int[]> priority = new ArrayDeque<>();
-    private int level;
-    private int cursor;
-    private long decodes;
-    private int filesRead;
+    private volatile int level;
+    private volatile int cursor;
+    private volatile long decodes;
+    private volatile int filesRead;
 
     /**
      * @param regionFiles listed region-file coordinates, or {@code null} to probe around the origin

@@ -85,7 +85,7 @@ SETS: dict[str, tuple[str, ...]] = {
     "core": ("rtp-api", "rtp-core", "server-api", "server-bukkit", "server-fabric", "server-neoforge",
              "commands-api", "yaml-api", "units-api", "effects-api",
              "maps-api", "metrics-api", "bstats-api", "anvil-api", "bit-api", "tags-api",
-             "predict-api", "config-bit-api", "menu-api", "database-api", "schematics-api"),
+             "predict-api", "config-bit-api", "bytecode-api", "menu-api", "database-api", "schematics-api"),
     "bukkit": ("bukkit", "paper", "folia", "rtp-bukkit", "rtp-paper", "rtp-folia"),
     "fabric": ("fabric", "rtp-fabric"),
     "neoforge": ("neoforge", "rtp-neoforge"),

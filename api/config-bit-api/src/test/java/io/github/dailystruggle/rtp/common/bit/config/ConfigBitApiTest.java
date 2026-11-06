@@ -235,4 +235,76 @@ class ConfigBitApiTest {
         assertEquals(1L, operatorFindings.stream()
                 .filter(f -> f.code().equals(MessageParityCodes.CFG_KEY_UNKNOWN.key())).count());
     }
+
+    @Test
+    @DisplayName("RTP-neutral io.github.dailystruggle.bit.config DirectiveSchemaParser and SleuthDiagnosticSnapshotSource parity")
+    void neutralPackageDirectiveSchemaParserAndSleuthSnapshotParity() {
+        String yamlText = """
+                # @type: integer
+                # @options: ["1", "2"]
+                # @range: [1, 10]
+                # @pattern: "^\\d+$"
+                # @unit: ticks
+                # @default: "1"
+                # @source: clock
+                rate: 2
+                plain: 1
+                """;
+        io.github.dailystruggle.yaml.YamlConfig yaml = io.github.dailystruggle.yaml.YamlConfig.parse(yamlText);
+        io.github.dailystruggle.bit.config.DirectiveSchemaParser parsed =
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parse(yaml.getComment("rate"));
+        assertEquals("integer", parsed.type());
+        assertEquals(List.of("1", "2"), parsed.options());
+        assertEquals(1.0, parsed.rangeMin());
+        assertEquals(10.0, parsed.rangeMax());
+        assertFalse(parsed.rangeMalformed());
+        assertTrue(parsed.hasRange());
+        assertTrue(parsed.hasPattern());
+        assertTrue(parsed.hasChecks());
+        assertEquals("ticks", parsed.unit());
+        assertEquals("1", parsed.defaultValue());
+        assertEquals("clock", parsed.source());
+
+        assertEquals(
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.EMPTY,
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parse("")
+        );
+        assertEquals(
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.EMPTY,
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parse((String) null)
+        );
+        assertEquals(
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.EMPTY,
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parse(List.of())
+        );
+        assertEquals(
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.EMPTY,
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parse((List<String>) null)
+        );
+        assertEquals(
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.EMPTY,
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.from(null)
+        );
+        assertEquals(
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.EMPTY,
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parse("just a plain comment")
+        );
+        io.github.dailystruggle.bit.config.DirectiveSchemaParser fromLines =
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parse(List.of("@type: boolean"));
+        assertEquals("boolean", fromLines.type());
+        assertFalse(fromLines.hasRange());
+        assertFalse(fromLines.hasPattern());
+        assertTrue(fromLines.hasChecks());
+
+        Map<String, io.github.dailystruggle.bit.config.DirectiveSchemaParser> all =
+                io.github.dailystruggle.bit.config.DirectiveSchemaParser.parseAll(yaml);
+        assertEquals(1, all.size());
+        assertTrue(all.containsKey("rate"));
+
+        io.github.dailystruggle.bit.config.SleuthDiagnosticSnapshotSource emptySrc =
+                new io.github.dailystruggle.bit.config.SleuthDiagnosticSnapshotSource() {};
+        assertTrue(emptySrc.diagnosticHotspots().isEmpty());
+        assertTrue(emptySrc.diagnosticIdentityComparisons().isEmpty());
+        assertTrue(emptySrc.diagnosticForensicCases().isEmpty());
+    }
 }

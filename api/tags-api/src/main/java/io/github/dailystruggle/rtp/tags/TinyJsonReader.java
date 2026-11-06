@@ -22,6 +22,9 @@ import java.util.Map;
  */
 public final class TinyJsonReader {
 
+  /** Maximum container nesting depth before failing closed with {@link JsonParseException}. */
+  public static final int MAX_DEPTH = 128;
+
   /** Raised when the input is not well-formed or not within the supported subset. */
   public static final class JsonParseException extends RuntimeException {
     private static final long serialVersionUID = 1L;
@@ -50,7 +53,7 @@ public final class TinyJsonReader {
     if (json == null) throw new JsonParseException("input is null", 0);
     TinyJsonReader r = new TinyJsonReader(json);
     r.skipWs();
-    Object value = r.readValue();
+    Object value = r.readValue(0);
     r.skipWs();
     if (r.pos != r.src.length()) {
       throw new JsonParseException("trailing content after value", r.pos);
@@ -58,13 +61,16 @@ public final class TinyJsonReader {
     return value;
   }
 
-  private Object readValue() {
+  private Object readValue(int depth) {
+    if (depth > MAX_DEPTH) {
+      throw new JsonParseException("nesting deeper than " + MAX_DEPTH, pos);
+    }
     skipWs();
     if (pos >= src.length()) throw new JsonParseException("unexpected end of input", pos);
     char c = src.charAt(pos);
     return switch (c) {
-      case '{' -> readObject();
-      case '[' -> readArray();
+      case '{' -> readObject(depth);
+      case '[' -> readArray(depth);
       case '"' -> readString();
       case 't', 'f' -> readBoolean();
       case 'n' -> readNull();
@@ -75,7 +81,7 @@ public final class TinyJsonReader {
     };
   }
 
-  private Map<String, Object> readObject() {
+  private Map<String, Object> readObject(int depth) {
     expect('{');
     Map<String, Object> map = new LinkedHashMap<>();
     skipWs();
@@ -88,7 +94,7 @@ public final class TinyJsonReader {
       String key = readString();
       skipWs();
       expect(':');
-      Object value = readValue();
+      Object value = readValue(depth + 1);
       map.put(key, value);
       skipWs();
       char next = peek();
@@ -103,7 +109,7 @@ public final class TinyJsonReader {
     }
   }
 
-  private List<Object> readArray() {
+  private List<Object> readArray(int depth) {
     expect('[');
     List<Object> list = new ArrayList<>();
     skipWs();
@@ -112,7 +118,7 @@ public final class TinyJsonReader {
       return Collections.unmodifiableList(list);
     }
     while (true) {
-      Object value = readValue();
+      Object value = readValue(depth + 1);
       list.add(value);
       skipWs();
       char next = peek();
@@ -148,7 +154,14 @@ public final class TinyJsonReader {
           case 'u' -> {
             if (pos + 4 > src.length())
               throw new JsonParseException("truncated \\u escape", pos);
-            int code = Integer.parseInt(src.substring(pos, pos + 4), 16);
+            int code = 0;
+            for (int k = 0; k < 4; k++) {
+              int d = Character.digit(src.charAt(pos + k), 16);
+              if (d < 0) {
+                throw new JsonParseException("malformed \\u escape", pos + k);
+              }
+              code = (code << 4) | d;
+            }
             sb.append((char) code);
             pos += 4;
           }

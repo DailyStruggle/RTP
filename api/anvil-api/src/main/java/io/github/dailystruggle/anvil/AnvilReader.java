@@ -114,6 +114,92 @@ public final class AnvilReader implements RegionFileReader {
         return readChunkEntry(regionBytes, regionLength, cx, cz);
     }
 
+    @Override
+    public boolean patchChunkBlocks(
+            java.nio.file.Path regionFile,
+            int cx,
+            int cz,
+            java.util.Collection<BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        return LcaRegionWriter.patchMcaRegionFile(regionFile, cx, cz, patches, isReplaceable);
+    }
+
+    static byte[] patchChunkInMcaBytes(
+            byte[] regionBytes,
+            int cx,
+            int cz,
+            java.util.Collection<BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        if (!INSTANCE.isChunkGenerated(regionBytes, regionBytes.length, cx, cz)) {
+            return new byte[0];
+        }
+        ChunkEntry entry = readChunkEntry(regionBytes, regionBytes.length, cx, cz);
+        if (entry == null || entry.root == null || !RegionFileReader.isFullChunkRoot(entry.root)) {
+            return new byte[0];
+        }
+        if (patches == null || patches.isEmpty()) {
+            return regionBytes;
+        }
+        if (!RegionFileReader.applyPatchesToChunkRoot(entry.root, patches, isReplaceable)) {
+            return regionBytes;
+        }
+        byte[] updatedNbt = Nbt.writeNamedRoot("", entry.root);
+        return writeCompressedChunkToMcaBytes(regionBytes, cx, cz, updatedNbt);
+    }
+
+    private static byte[] writeCompressedChunkToMcaBytes(
+            byte[] regionBytes, int cx, int cz, byte[] uncompressedNbt) throws IOException {
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream(uncompressedNbt.length);
+        try (java.util.zip.DeflaterOutputStream dos = new java.util.zip.DeflaterOutputStream(baos)) {
+            dos.write(uncompressedNbt);
+        }
+        byte[] compressed = baos.toByteArray();
+        int declaredLen = 1 + compressed.length;
+        int totalBytes = 4 + declaredLen;
+        int neededSectors = (totalBytes + SECTOR_SIZE - 1) / SECTOR_SIZE;
+        if (neededSectors <= 0 || neededSectors > 255) {
+            throw new IOException("Encoded chunk requires invalid sector count: " + neededSectors);
+        }
+
+        int index = (cx & 31) + ((cz & 31) << 5);
+        int locOff = index * 4;
+        int oldSectorOffset =
+                ((regionBytes[locOff] & 0xFF) << 16)
+                        | ((regionBytes[locOff + 1] & 0xFF) << 8)
+                        | (regionBytes[locOff + 2] & 0xFF);
+        int oldSectorCount = regionBytes[locOff + 3] & 0xFF;
+
+        byte[] out;
+        int targetSectorOffset;
+        if (oldSectorOffset >= 2
+                && neededSectors <= oldSectorCount
+                && (long) (oldSectorOffset + neededSectors) * SECTOR_SIZE <= regionBytes.length) {
+            out = regionBytes.clone();
+            targetSectorOffset = oldSectorOffset;
+        } else {
+            targetSectorOffset = Math.max(2, (regionBytes.length + SECTOR_SIZE - 1) / SECTOR_SIZE);
+            out = java.util.Arrays.copyOf(
+                    regionBytes, (targetSectorOffset + neededSectors) * SECTOR_SIZE);
+        }
+
+        int byteStart = targetSectorOffset * SECTOR_SIZE;
+        int byteEnd = (targetSectorOffset + neededSectors) * SECTOR_SIZE;
+        java.util.Arrays.fill(out, byteStart, byteEnd, (byte) 0);
+        ByteBuffer.wrap(out, byteStart, 4).putInt(declaredLen);
+        out[byteStart + 4] = 2; // zlib
+        System.arraycopy(compressed, 0, out, byteStart + 5, compressed.length);
+
+        out[locOff] = (byte) ((targetSectorOffset >>> 16) & 0xFF);
+        out[locOff + 1] = (byte) ((targetSectorOffset >>> 8) & 0xFF);
+        out[locOff + 2] = (byte) (targetSectorOffset & 0xFF);
+        out[locOff + 3] = (byte) neededSectors;
+
+        int tsOff = SECTOR_SIZE + locOff;
+        int epochSec = (int) (System.currentTimeMillis() / 1000L);
+        ByteBuffer.wrap(out, tsOff, 4).putInt(epochSec);
+        return out;
+    }
+
     /**
      * Reads the chunk at region-local coordinates {@code (cx, cz)} from {@code regionBytes}.
      *

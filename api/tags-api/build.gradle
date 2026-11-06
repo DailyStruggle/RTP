@@ -24,4 +24,5 @@ tasks.withType(JavaCompile).configureEach {
 dependencies {
     compileOnly 'org.jetbrains:annotations:24.1.0'
     testCompileOnly 'org.jetbrains:annotations:24.1.0'
+    testImplementation rootProject.libs.jazzer.junit
 }

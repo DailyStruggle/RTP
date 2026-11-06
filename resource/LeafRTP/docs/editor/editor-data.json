@@ -67,9 +67,9 @@
   },
   "backlogcachecap": {
    "title": "backlogCacheCap",
-   "desc": "Capacity of the **L3 Backlog Cache** unverified staging buffer (ADR-028).\n\n### How It Works\n- Pre-picks candidate coordinates along the spiral without performing any chunk loads or database writes.\n- Each region pulse picks the oldest candidate, determines its 32x32 Anvil/Linear region file bin, and classifies all candidates in that bin off-tick in one amortized pass.\n- Keeps the verified `cacheCap` constantly replenished so `/rtp` teleports are instantaneous.\n- On `rtp-lite`, defaults to `0` (disabled) to conserve RAM.",
-   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Capacity of the <b>L3 Backlog Cache</b> unverified staging buffer (ADR-028).</p>\n<h4 style=\"margin:12px 0 6px; color:var(--green); font-size:0.9rem;\">How It Works</h4>\n<ul style=\"margin:6px 0 6px 18px; padding:0; font-size:0.82rem; line-height:1.4;\">\n<li style=\"margin-bottom:4px;\">Pre-picks candidate coordinates along the spiral without performing any chunk loads or database writes.</li>\n<li style=\"margin-bottom:4px;\">Each region pulse picks the oldest candidate, determines its 32x32 Anvil/Linear region file bin, and classifies all candidates in that bin off-tick in one amortized pass.</li>\n<li style=\"margin-bottom:4px;\">Keeps the verified <code style=\\\"color:var(--yellow);\\\"><b>cacheCap</b></code> constantly replenished so <code style=\\\"color:var(--yellow);\\\"><b>/rtp</b></code> teleports are instantaneous.</li>\n<li style=\"margin-bottom:4px;\">On <code style=\\\"color:var(--yellow);\\\"><b>rtp-lite</b></code>, defaults to <code style=\\\"color:var(--yellow);\\\"><b>0</b></code> (disabled) to conserve RAM.</li>\n</ul>",
-   "meta": "Type: Integer | Default: 1000 (lite: 0) | Docs: REGIONS.md (ADR-028)",
+   "desc": "Capacity of the **L3 Backlog Cache** unverified staging buffer (ADR-028).\n\n### How It Works\n- Pre-picks candidate coordinates along the spiral without performing any chunk loads or database writes.\n- Each region pulse picks the oldest candidate, determines its 32x32 Anvil/Linear region file bin, and classifies all candidates in that bin off-tick in one amortized pass.\n- Keeps the verified `cacheCap` constantly replenished so `/rtp` teleports are instantaneous.",
+   "html": "<p style=\"margin:6px 0; font-size:0.82rem; line-height:1.4;\">Capacity of the <b>L3 Backlog Cache</b> unverified staging buffer (ADR-028).</p>\n<h4 style=\"margin:12px 0 6px; color:var(--green); font-size:0.9rem;\">How It Works</h4>\n<ul style=\"margin:6px 0 6px 18px; padding:0; font-size:0.82rem; line-height:1.4;\">\n<li style=\"margin-bottom:4px;\">Pre-picks candidate coordinates along the spiral without performing any chunk loads or database writes.</li>\n<li style=\"margin-bottom:4px;\">Each region pulse picks the oldest candidate, determines its 32x32 Anvil/Linear region file bin, and classifies all candidates in that bin off-tick in one amortized pass.</li>\n<li style=\"margin-bottom:4px;\">Keeps the verified <code style=\\\"color:var(--yellow);\\\"><b>cacheCap</b></code> constantly replenished so <code style=\\\"color:var(--yellow);\\\"><b>/rtp</b></code> teleports are instantaneous.</li>\n</ul>",
+   "meta": "Type: Integer | Default: 1000 | Docs: REGIONS.md (ADR-028)",
    "defaultVal": "1000",
    "defaultSnippet": "backlogCacheCap: 1000"
   },
@@ -1780,10 +1780,45 @@
    "cancel"
   ],
   "speed": [
+   "cacheCap",
+   "postTeleportQueueing",
+   "period",
+   "syncLoading",
+   "autoTune",
+   "minQueueFilled",
    "teleport-delay",
    "teleportDelay",
-   "cooldown",
-   "warmup"
+   "cooldown"
+  ],
+  "faster": [
+   "cacheCap",
+   "postTeleportQueueing",
+   "period",
+   "syncLoading",
+   "autoTune",
+   "minQueueFilled",
+   "maxMSPT"
+  ],
+  "fast": [
+   "cacheCap",
+   "postTeleportQueueing",
+   "period",
+   "syncLoading",
+   "autoTune"
+  ],
+  "instant": [
+   "cacheCap",
+   "postTeleportQueueing",
+   "period",
+   "minQueueFilled"
+  ],
+  "slow": [
+   "cacheCap",
+   "postTeleportQueueing",
+   "period",
+   "syncLoading",
+   "maxMSPT",
+   "autoTune"
   ],
   "timer": [
    "teleport-delay",
@@ -1822,6 +1857,11 @@
   ],
   "performance": [
    "cacheCap",
+   "postTeleportQueueing",
+   "period",
+   "syncLoading",
+   "autoTune",
+   "maxMSPT",
    "backlogCacheCap",
    "activeChunkCap",
    "ttl"

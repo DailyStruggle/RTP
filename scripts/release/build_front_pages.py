@@ -26,10 +26,11 @@ pipe tables, links, images, badges, **bold**, *italic*, `code`, centred <div>,
 <details>/<summary>, ---) and rejects anything else instead of guessing. Numbered
 steps ("1. ...") pass through as plain text lines. Local image references
 (![alt](../assets/img/...)) are validated against disk and rewritten to absolute
-raw GitHub URLs during rendering for all storefront targets. Relative links
-(`../admin/COMMANDS.md#anchor`) are validated against disk and rewritten: published
-docs become https://dailystruggle.github.io/RTP/... pages (same mapping as mkdocs
-directory URLs), anything else becomes a GitHub blob/tree URL.
+https://docs.leafcraft.net/mc/... asset URLs (or raw GitHub URLs for LeafRTP)
+during rendering for all storefront targets. Relative links (`../admin/COMMANDS.md#anchor`)
+are validated against disk and rewritten: published docs become
+https://docs.leafcraft.net/mc/... pages (same mapping as mkdocs directory URLs),
+anything else becomes a GitHub blob/tree URL.
 
 Usage:
     python scripts/release/build_front_pages.py                  # write all outputs
@@ -98,7 +99,7 @@ PRODUCTS = {
         "LeafSleep-x.y.z.jar",
         "LeafSleep-Pro-x.y.z.jar",
         ROOT / "resource" / "LeafSleep" / "docs" / "publishing" / "FRONT_PAGE.md",
-        repo_base="https://github.com/DailyStruggle/OnePlayerSleep",
+        repo_base="https://github.com/LeafCraftDev/LeafSleep",
         repo_branch="main",
     ),
     "leaftreegen": ProductSpec(
@@ -108,7 +109,7 @@ PRODUCTS = {
         "LeafTreeGen-x.y.z.jar",
         "LeafTreeGen-Pro-x.y.z.jar",
         ROOT / "resource" / "LeafTreeGen" / "docs" / "publishing" / "FRONT_PAGE.md",
-        repo_base="https://github.com/LeafCraftDev/LeafTreeGen",
+        repo_base="https://docs.leafcraft.net/mc/leaftreegen",
         repo_branch="main",
     ),
     "leafconfig": ProductSpec(
@@ -118,25 +119,26 @@ PRODUCTS = {
         "LeafConfig-x.y.z.jar",
         "LeafConfig-Pro-x.y.z.jar",
         ROOT / "resource" / "LeafConfig" / "docs" / "publishing" / "FRONT_PAGE.md",
+        repo_base="https://docs.leafcraft.net/mc/leafconfig",
     ),
     "leafsleuth": ProductSpec(
         "leafsleuth",
         "LeafSleuth",
-        "LeafSleuth-Pro",
+        "LeafSleuth",
         "LeafSleuth-x.y.z.jar",
-        "LeafSleuth-Pro-x.y.z.jar",
+        "LeafSleuth-x.y.z.jar",
         ROOT / "resource" / "LeafSleuth" / "docs" / "publishing" / "FRONT_PAGE.md",
-        repo_base="https://github.com/LeafCraftDev/LeafSleuth",
+        repo_base="https://docs.leafcraft.net/mc/leafsleuth",
         repo_branch="main",
     ),
     "leaffuzz": ProductSpec(
         "leaffuzz",
         "LeafFuzz",
         None,
-        "LeafFuzz-0.1.0.jar",
+        "LeafFuzz-0.1.1.jar",
         None,
         ROOT / "resource" / "LeafFuzz" / "docs" / "publishing" / "FRONT_PAGE.md",
-        repo_base="https://github.com/LeafCraftDev/LeafFuzz",
+        repo_base="https://docs.leafcraft.net/mc/leaffuzz",
         repo_branch="main",
     ),
     "leafanvil": ProductSpec(
@@ -146,7 +148,7 @@ PRODUCTS = {
         "LeafAnvil-x.y.z.jar",
         "LeafAnvil-x.y.z.jar",
         ROOT / "resource" / "LeafAnvil" / "docs" / "publishing" / "FRONT_PAGE.md",
-        repo_base="https://github.com/LeafCraftDev/LeafAnvil",
+        repo_base="https://docs.leafcraft.net/mc/leafanvil",
         repo_branch="main",
     ),
 }
@@ -343,7 +345,7 @@ DRIFT_WARN = 0.15
 
 HEADING_COLOR = "#27AE60"
 RAW_BASE = "https://raw.githubusercontent.com/dailystruggle/RTP/V3"
-SITE_BASE = "https://dailystruggle.github.io/RTP"  # mkdocs.yml site_url
+SITE_BASE = "https://docs.leafcraft.net/mc"  # unified Minecraft docs site on bamboo
 DOCS_DIR = LEAFRTP_DOCS
 # Mirrors mkdocs.yml exclude_docs: these docs have no page on the website.
 SITE_EXCLUDED = ("site/README.md", "MAP.md", "publishing/")
@@ -459,7 +461,7 @@ def _substitute(line_no, line, target):
 
 
 def _resolve_images(line_no, line, source_dir=SOURCE.parent, raw_base=RAW_BASE):
-    """Rewrites local image paths to absolute raw-GitHub URLs, validating existence on disk."""
+    """Rewrites local image paths to absolute URLs (docs.leafcraft.net/mc or raw GitHub), validating existence on disk."""
     def repl(m):
         alt = m.group("alt")
         src = m.group("src")
@@ -483,27 +485,63 @@ def _resolve_images(line_no, line, source_dir=SOURCE.parent, raw_base=RAW_BASE):
         except ValueError:
             raise FrontPageError(f"line {line_no}: local image '{src}' resolves outside the repository: {candidate}")
 
-        eff_raw_base = raw_base
         if raw_base == RAW_BASE:
             owner = _match_product_for_rel(rel_to_root)
-            if owner is not None and owner.repo_base != REPO_BASE and owner.repo_base.startswith("https://github.com/"):
-                repo_slug = owner.repo_base[len("https://github.com/"):].strip("/")
-                eff_raw_base = f"https://raw.githubusercontent.com/{repo_slug}/{owner.repo_branch}"
+            if owner is not None and owner.product_id != "leafrtp":
+                res_dir = owner.source.parents[2]
+                docs_dir = res_dir / "docs"
+                if candidate.is_relative_to(docs_dir):
+                    asset_rel = candidate.relative_to(docs_dir).as_posix()
+                else:
+                    asset_rel = candidate.relative_to(res_dir).as_posix()
+                new_url = f"{SITE_BASE.rstrip('/')}/{owner.product_id}/{asset_rel}{suffix}"
+                return f"![{alt}]({new_url})"
 
+        eff_raw_base = raw_base
         new_url = f"{eff_raw_base.rstrip('/')}/{rel_to_root}{suffix}"
         return f"![{alt}]({new_url})"
 
     return _IMAGE.sub(repl, line)
 
 
-def _site_url(docs_rel):
+def _site_url(docs_rel, prefix=""):
     """Website URL (mkdocs directory URLs) for a docs-relative .md path, or None if unpublished."""
     if any(docs_rel == x or (x.endswith("/") and docs_rel.startswith(x)) for x in SITE_EXCLUDED):
         return None
-    parts = docs_rel[:-3].split("/")
-    if parts[-1] in ("index", "README"):
+    parts = [p for p in docs_rel[:-3].split("/") if p]
+    if parts and parts[-1] in ("index", "README"):
         parts.pop()
-    return SITE_BASE + "/" + "/".join(parts) + ("/" if parts else "")
+    if prefix:
+        parts = [prefix.strip("/"), *parts]
+    return SITE_BASE.rstrip("/") + "/" + "/".join(parts) + ("/" if parts else "")
+
+
+def _repo_md_site_url(candidate: pathlib.Path, rel: str) -> str | None:
+    """Maps any published repo Markdown path (LeafRTP, sibling product, or api/*) to its SITE_BASE URL."""
+    try:
+        docs_rel = candidate.relative_to(DOCS_DIR).as_posix()
+        return _site_url(docs_rel)
+    except ValueError:
+        pass
+    owner = _match_product_for_rel(rel)
+    if owner is not None:
+        res_dir = owner.source.parents[2]
+        docs_dir = res_dir / "docs"
+        prefix = "" if owner.product_id == "leafrtp" else owner.product_id
+        if candidate.is_relative_to(docs_dir):
+            return _site_url(candidate.relative_to(docs_dir).as_posix(), prefix=prefix)
+        if candidate.is_relative_to(res_dir):
+            return _site_url(candidate.relative_to(res_dir).as_posix(), prefix=prefix)
+    api_dir = ROOT / "api"
+    if candidate.is_relative_to(api_dir):
+        api_parts = candidate.relative_to(api_dir).as_posix().split("/")
+        if len(api_parts) >= 2:
+            mod_name = api_parts[0]
+            sub_parts = api_parts[1:]
+            if sub_parts[0] == "docs" and len(sub_parts) >= 2:
+                sub_parts = sub_parts[1:]
+            return _site_url("/".join(sub_parts), prefix=mod_name)
+    return None
 
 
 def _match_product_for_rel(rel):
@@ -573,12 +611,9 @@ def _resolve_doc_links(line_no, line, source_dir=SOURCE.parent, repo_base=REPO_B
             eff_repo_branch = owner.repo_branch
         url = None
         if cross_product and rel.lower().endswith("/docs/publishing/front_page.md"):
-            url = eff_repo_base
+            url = f"{SITE_BASE.rstrip('/')}/{owner.product_id}/"
         elif (candidate.is_file() or sibling_product_md) and candidate.suffix == ".md":
-            try:
-                url = _site_url(candidate.relative_to(DOCS_DIR).as_posix())
-            except ValueError:
-                pass
+            url = _repo_md_site_url(candidate, rel)
         if url is None:
             kind = "tree" if candidate.is_dir() else "blob"
             url = f"{eff_repo_base}/{kind}/{eff_repo_branch}/{rel}"

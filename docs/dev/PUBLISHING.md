@@ -583,19 +583,19 @@ This is the recommended dependency for out-of-repo addon authors (see
 
 ---
 
-## Release Staging & Binary Distribution (Pro vs. Lite)
+## Release Staging & Binary Distribution (Free Default vs. Pro Support)
 
 Per **[leafrtp-ADR-087](../../resource/LeafRTP/docs/adr/leafrtp-ADR-087-release-cadence-contractual-pro-discretionary-lite.md)**, both jars share one version line (`version` in `gradle.properties`) and are built from the same commit. The editions differ in obligation, not in timing:
 
-1. **LeafRTP Pro (BuiltByBit / Commercial):**
+1. **LeafRTP (Free Default — Modrinth, Hangar, GitHub Releases):**
+   - **Trigger:** Manual trigger via `.github/workflows/release.yml` (`workflow_dispatch`), run from the released commit: `gh workflow run release.yml --ref <branch-or-tag>`.
+   - **Cadence:** Whenever the maintainer chooses to publish a version; there is no holding period. The free channel may skip patch versions, and never ships a version or commit that no Pro release has shipped.
+   - **Actions:** Builds `LeafRTP-<version>.jar` (the default artifact), attaches signatures and SBOM, creates the public GitHub Release (with `make_latest: true` for stable releases), and publishes to Modrinth and Hangar.
+
+2. **LeafRTP Pro (Extra Priority Support — BuiltByBit):**
    - **Trigger:** Automated on merging a release PR into `V3`/`V2`/`V1` (or manual `workflow_dispatch`) via `.github/workflows/release-bbb.yml`.
    - **Actions:** Tags the repository with `v<version>`, builds `LeafRTP-Pro-<version>.jar`, generates SBOM and signatures, and publishes immediately to BuiltByBit.
    - **Scope:** Every release, including patch releases cut to resolve a paying customer's reported problem under the support terms.
-
-2. **LeafRTP Lite (Modrinth, Hangar, GitHub Releases):**
-   - **Trigger:** Manual trigger via `.github/workflows/release.yml` (`workflow_dispatch`), run from the released commit: `gh workflow run release.yml --ref <branch-or-tag>`.
-   - **Cadence:** Whenever the maintainer chooses to publish a version; there is no holding period. Lite may skip patch versions, and never ships a version or commit that no Pro release has shipped.
-   - **Actions:** Builds `LeafRTP-<version>.jar` (lite variant), attaches signatures and SBOM, creates the public GitHub Release (with `make_latest: true` for stable releases), and publishes to Modrinth and Hangar with Lite-filtered release notes.
 
 ---
 
@@ -606,7 +606,7 @@ The `DailyStruggle/RTP` repository (**Real-Time Process / Real-Time Program for 
 | Product | Gradle Target | Tag Format | `make_latest` on `DailyStruggle/RTP` | Version & Changelog Source | Workflow |
 |---------|---------------|------------|--------------------------------------|----------------------------|----------|
 | **LeafRTP** (`leafrtp`, `DailyStruggle/RTP:V3`) | `:rtp-plugin:remapJar` / `:remapLiteJar` (`../../resource/LeafRTP`) | `v<semver>` (e.g. `v3.3.1`) | `true` (owns `/releases/latest`) | Root `gradle.properties` + `resource/LeafRTP/CHANGELOG.md` | `.github/workflows/release.yml` & `release-bbb.yml` |
-| **LeafSleep / OnePlayerSleep** (`leafsleep`, `DailyStruggle/OnePlayerSleep:main`) | `:resource:LeafSleep:leafsleep-plugin:build` | `leafsleep-v<semver>` / `oneplayersleep-v<semver>` | `false` | `resource/LeafSleep/leafsleep-plugin/build.gradle` + `resource/LeafSleep/CHANGELOG.md` | `.github/workflows/release-sleep.yml` |
+| **LeafSleep / OnePlayerSleep** (`leafsleep`, `LeafCraftDev/LeafSleep:main`) | `:resource:LeafSleep:leafsleep-plugin:build` | `leafsleep-v<semver>` / `oneplayersleep-v<semver>` | `false` | `resource/LeafSleep/leafsleep-plugin/build.gradle` + `resource/LeafSleep/CHANGELOG.md` | `.github/workflows/release-sleep.yml` |
 | **LeafTreeGen** (`leaftreegen`, `LeafCraftDev/LeafTreeGen:main`) | `:resource:LeafTreeGen:treegen-plugin:build` | `leaftreegen-v<semver>` (e.g. `leaftreegen-v0.2.0`) | `false` | `resource/LeafTreeGen/treegen-plugin/build.gradle` + `resource/LeafTreeGen/CHANGELOG.md` | `.github/workflows/release-treegen.yml` |
 | **Reserved Private Resources** (`leafsleuth`, `leafconfig`, `leafartifacts`, `leafshapemining` in `LeafCraftDev/MC:main`) | `:resource:<Product>:build` | `<product>-v<semver>` | `false` | `resource/<Product>/.../build.gradle` + `resource/<Product>/CHANGELOG.md` | `.github/workflows/release-<product>.yml` |
 

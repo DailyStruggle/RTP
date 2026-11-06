@@ -149,8 +149,32 @@ public class FoliaSchedulerGovernanceTest {
 
     // Async timeout watchdog executes
     asyncScheduler.executeAll();
-
     assertTrue(timeoutFired.get(), "Timeout callback must fire cleanly on deadline expiration");
     assertFalse(interactiveExecuted.get(), "Task must not execute after deadline timeout");
+  }
+
+  @Test
+  @DisplayName("ADR-087: maxRegionalInflight resolves from system property or performance.yml with <=0 uncapped")
+  void testResolveMaxRegionalInflightConfigurableAndUncapped() throws Exception {
+    String prev = System.getProperty("rtp.folia.maxRegionalInflight");
+    try {
+      System.setProperty("rtp.folia.maxRegionalInflight", "0");
+      FoliaSchedulerImpl uncapped =
+          new FoliaSchedulerImpl(STUB_PLUGIN, regionScheduler, asyncScheduler, globalScheduler);
+      assertEquals(Integer.MAX_VALUE, uncapped.getMaxRegionalInflight(),
+          "maxRegionalInflight<=0 must uncap the regional permit pool");
+
+      System.setProperty("rtp.folia.maxRegionalInflight", "128");
+      FoliaSchedulerImpl custom =
+          new FoliaSchedulerImpl(STUB_PLUGIN, regionScheduler, asyncScheduler, globalScheduler);
+      assertEquals(128, custom.getMaxRegionalInflight(),
+          "positive maxRegionalInflight override must set exact permit cap");
+    } finally {
+      if (prev == null) {
+        System.clearProperty("rtp.folia.maxRegionalInflight");
+      } else {
+        System.setProperty("rtp.folia.maxRegionalInflight", prev);
+      }
+    }
   }
 }

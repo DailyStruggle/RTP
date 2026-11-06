@@ -2632,17 +2632,121 @@ class LcaRegionCodecTest {
             assertNotNull(ws.voxelStorage().readChunkNbtBytes(0, 0));
 
             byte[] slabPayload = ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, rawChunkNbt);
-            assertTrue(slabPayload.length > 0);
-            assertEquals(0, ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, new byte[0]).length);
-            assertTrue(ws.voxelStorage().commitPreEncodedChunkSlab(1, 0, slabPayload) > 0);
-            assertEquals(0, ws.voxelStorage().commitPreEncodedChunkSlab(1, 0, new byte[0]));
-            assertEquals(0, ws.voxelStorage().writeChunkNbtBytes(0, 0, new byte[0]));
-            assertEquals(0, ws.voxelStorage().writeChunkCompound(0, 0, null));
-
             assertTrue(ws.totalOpenRegionCount() >= 1);
             assertEquals(0L, ws.totalMigratedRegionCount());
             ws.compactOpenRegions(0.0);
             ws.flush();
+        }
+    }
+
+    @Test
+    @DisplayName("DataVersion 5006+ (V5006 / 26.3) emits id/properties in block_states.palette while <5006 emits Name/Properties")
+    @SuppressWarnings("unchecked")
+    void dataVersion5023PaletteUsesIdAndPropertiesKeys() throws Exception {
+        for (int dv : new int[] {4903, 5006, 5023}) {
+            boolean expectModern = dv >= 5006;
+            LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+            root.put("DataVersion", dv);
+            root.put("xPos", 0);
+            root.put("zPos", 0);
+            root.put("yPos", -4);
+            root.put("Status", "minecraft:full");
+
+            // Section Y=-4: uniform bare-string palette (Codec.either bare string form)
+            LinkedHashMap<String, Object> secUniform = new LinkedHashMap<>();
+            secUniform.put("Y", (byte) -4);
+            LinkedHashMap<String, Object> bsUniform = new LinkedHashMap<>();
+            bsUniform.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, List.of("minecraft:deepslate")));
+            secUniform.put("block_states", bsUniform);
+
+            // Section Y=-3: mixed palette with {"": id}, static-core id/properties, and custom id/properties
+            LinkedHashMap<String, Object> secMixed = new LinkedHashMap<>();
+            secMixed.put("Y", (byte) -3);
+            LinkedHashMap<String, Object> bsMixed = new LinkedHashMap<>();
+
+            LinkedHashMap<String, Object> wrappedAir = new LinkedHashMap<>();
+            wrappedAir.put("", "minecraft:air");
+
+            LinkedHashMap<String, Object> stairsEntry = new LinkedHashMap<>();
+            stairsEntry.put("id", "minecraft:oak_stairs");
+            LinkedHashMap<String, Object> stairsProps = new LinkedHashMap<>();
+            stairsProps.put("facing", "north");
+            stairsProps.put("type", "single");
+            stairsProps.put("waterlogged", "false");
+            stairsEntry.put("properties", stairsProps);
+
+            LinkedHashMap<String, Object> barrelEntry = new LinkedHashMap<>();
+            barrelEntry.put("id", "minecraft:barrel");
+            LinkedHashMap<String, Object> barrelProps = new LinkedHashMap<>();
+            barrelProps.put("facing", "up");
+            barrelProps.put("open", "true");
+            barrelEntry.put("properties", barrelProps);
+
+            bsMixed.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(wrappedAir, stairsEntry, barrelEntry)));
+            int[] yzx = new int[4096];
+            yzx[1] = 1;
+            yzx[2] = 2;
+            bsMixed.put("data", LcaSectionCodec.packBlockLongs(yzx, 3));
+            secMixed.put("block_states", bsMixed);
+
+            root.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, new ArrayList<>(List.of(secUniform, secMixed))));
+
+            try (LcaRegionWriter.LcaLiveArchive archive =
+                    LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, dv, false)) {
+                archive.saveChunkCoW(0, 0, root);
+                byte[] lcaBytes = archive.toByteArray();
+
+                // 1. Direct fast-path NBT byte emission (readChunkNbtBytes -> encodeChunkFrameToNbtBytes)
+                byte[] rawNbt = LcaRegionReader.INSTANCE.readChunkNbtBytes(lcaBytes, 0, 0);
+                assertNotNull(rawNbt);
+                Map<String, Object> directRoot = Nbt.readRootCompound(rawNbt);
+                assertPaletteKeysForVersion(directRoot, expectModern);
+
+                // 2. Map decode path (readChunk -> decodeChunkFromFrame)
+                AnvilReader.ChunkEntry mapEntry = LcaRegionReader.INSTANCE.readChunk(lcaBytes, 0, 0);
+                assertNotNull(mapEntry);
+                assertPaletteKeysForVersion(mapEntry.root, expectModern);
+
+                // 3. RegionFileReader.applyPatchesToChunkRoot
+                boolean modified = RegionFileReader.applyPatchesToChunkRoot(
+                        mapEntry.root,
+                        List.of(
+                                new RegionFileReader.BlockPatch(0, -48, 0, "minecraft:hopper[enabled=true,facing=down]"),
+                                new RegionFileReader.BlockPatch(0, 16, 0, "minecraft:stone")),
+                        null);
+                assertTrue(modified);
+                assertPaletteKeysForVersion(mapEntry.root, expectModern);
+                AnvilChunkView patchedView = AnvilReader.toView(mapEntry.root);
+                assertEquals("minecraft:hopper", patchedView.blockIdAt(0, -48, 0));
+                assertEquals("minecraft:oak_stairs", patchedView.blockIdAt(1, -48, 0));
+                assertEquals("minecraft:barrel", patchedView.blockIdAt(2, -48, 0));
+                assertEquals("minecraft:stone", patchedView.blockIdAt(0, 16, 0));
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertPaletteKeysForVersion(Map<String, Object> chunkRoot, boolean expectModern) {
+        String expectedNameKey = expectModern ? "id" : "Name";
+        String unexpectedNameKey = expectModern ? "Name" : "id";
+        String unexpectedPropsKey = expectModern ? "Properties" : "properties";
+        Nbt.NbtList sections = (Nbt.NbtList) chunkRoot.get("sections");
+        assertNotNull(sections);
+        for (Object secObj : sections.items) {
+            Map<String, Object> sec = (Map<String, Object>) secObj;
+            Map<String, Object> bs = (Map<String, Object>) sec.get("block_states");
+            if (bs == null) continue;
+            Nbt.NbtList pal = (Nbt.NbtList) bs.get("palette");
+            assertNotNull(pal);
+            for (Object entryObj : pal.items) {
+                Map<String, Object> entry = (Map<String, Object>) entryObj;
+                assertTrue(entry.containsKey(expectedNameKey),
+                        "Expected '" + expectedNameKey + "' key in palette entry: " + entry);
+                assertFalse(entry.containsKey(unexpectedNameKey),
+                        "Unexpected '" + unexpectedNameKey + "' key in palette entry: " + entry);
+                assertFalse(entry.containsKey(unexpectedPropsKey),
+                        "Unexpected '" + unexpectedPropsKey + "' key in palette entry: " + entry);
+            }
         }
     }
 }

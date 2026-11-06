@@ -80,6 +80,8 @@ class LcaFaultInjectionAndEdgeCaseTest {
     private static final class QuotaFaultInjectingFileChannel extends FileChannel {
         private final FileChannel delegate;
         private final AtomicLong maxQuotaBytes;
+        private final AtomicLong positionalReadCalls = new AtomicLong();
+        private final AtomicLong sizeCalls = new AtomicLong();
 
         QuotaFaultInjectingFileChannel(FileChannel delegate, long initialQuotaBytes) {
             this.delegate = delegate;
@@ -88,6 +90,14 @@ class LcaFaultInjectionAndEdgeCaseTest {
 
         void setMaxQuotaBytes(long quotaBytes) {
             this.maxQuotaBytes.set(quotaBytes);
+        }
+
+        long positionalReadCalls() {
+            return positionalReadCalls.get();
+        }
+
+        long sizeCalls() {
+            return sizeCalls.get();
         }
 
         @Override
@@ -124,6 +134,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
 
         @Override
         public long size() throws IOException {
+            sizeCalls.incrementAndGet();
             return delegate.size();
         }
 
@@ -150,6 +161,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
 
         @Override
         public int read(ByteBuffer dst, long position) throws IOException {
+            positionalReadCalls.incrementAndGet();
             return delegate.read(dst, position);
         }
 
@@ -650,6 +662,151 @@ class LcaFaultInjectionAndEdgeCaseTest {
                 assertEquals(105L, ((Number) c00.root.get("LastUpdate")).longValue());
                 assertEquals(107L, ((Number) c10.root.get("LastUpdate")).longValue());
             }
+        }
+    }
+
+    @Test
+    @DisplayName("Benchmark & Verify: Out-of-cache 16k-border open syscalls, LRU promotion, and header cache eviction")
+    void benchmarkOutOfCacheRegionOpenAndLruPromotion(@TempDir Path tempDir) throws IOException {
+        Path fullRegion = tempDir.resolve("r.0.0.lca");
+        LinkedHashMap<String, Object> baseChunk = buildTestChunk(0, 0, "minecraft:stone", 3);
+        try (LcaRegionWriter.LcaLiveArchive init = LcaRegionWriter.createEmptyLiveArchive(
+                fullRegion, 0, 0, -4, 24, 4671, 0, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 4096)) {
+            for (int cz = 0; cz < 32; cz++) {
+                for (int cx = 0; cx < 32; cx++) {
+                    baseChunk.put("xPos", cx);
+                    baseChunk.put("zPos", cz);
+                    init.saveChunkInitial(cx, cz, baseChunk);
+                }
+            }
+            init.flush();
+        }
+
+        long fsize = Files.size(fullRegion);
+        try (FileChannel raw = FileChannel.open(fullRegion, StandardOpenOption.READ, StandardOpenOption.WRITE);
+             QuotaFaultInjectingFileChannel counted = new QuotaFaultInjectingFileChannel(raw, Long.MAX_VALUE)) {
+            long t0 = System.nanoTime();
+            try (LcaRegionWriter.LcaLiveArchive reopened = new LcaRegionWriter.LcaLiveArchive(
+                    fullRegion, counted, (int) fsize, 0)) {
+                long openNs = System.nanoTime() - t0;
+                System.out.printf("[BENCH-OPEN] 1024-chunk clean open: %.2f us | pread calls=%d | size calls=%d%n",
+                        openNs / 1000.0, counted.positionalReadCalls(), counted.sizeCalls());
+                assertEquals(2L, counted.positionalReadCalls(),
+                        "Clean SEC-DED-verified 1024-chunk open must only read header prefix + 8B footer canary (2 pread calls)");
+                assertEquals(0L, counted.sizeCalls(),
+                        "Clean SEC-DED-verified 1024-chunk open must not call ch.size() per chunk");
+                assertTrue(reopened.hasChunk(31, 31));
+            }
+        }
+
+        // Measure 200 sequential re-opens of the 1024-chunk region
+        long tLoop0 = System.nanoTime();
+        for (int iter = 0; iter < 200; iter++) {
+            try (LcaRegionWriter.LcaLiveArchive reopened = LcaRegionWriter.openLiveArchive(fullRegion, 0)) {
+                assertTrue(reopened.hasChunk(iter & 31, (iter >>> 5) & 31));
+            }
+        }
+        long loopNs = System.nanoTime() - tLoop0;
+        System.out.printf("[BENCH-OPEN-LOOP] 200 x 1024-chunk openLiveArchive: %.2f us/open (total %.2f ms)%n",
+                (loopNs / 1000.0) / 200.0, loopNs / 1_000_000.0);
+
+        // Verify Second-Chance Clock LRU promotion keeps hot region (0,0) resident when cold regions overflow cache
+        Path lruDir = tempDir.resolve("lru-test");
+        Files.createDirectories(lruDir);
+        try (LcaRegionFileStorage lruStorage = new LcaRegionFileStorage(
+                lruDir, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, -4, 24, 4671, 0, false, false, 2, 0.35)) {
+            LcaRegionWriter.LcaLiveArchive r0 = lruStorage.getOrOpenRegion(0, 0, true);
+            r0.saveChunkCoW(0, 0, buildTestChunk(0, 0, "minecraft:stone", 2));
+            LcaRegionWriter.LcaLiveArchive r1 = lruStorage.getOrOpenRegion(1, 0, true);
+            r1.saveChunkCoW(0, 0, buildTestChunk(32, 0, "minecraft:dirt", 2));
+
+            // Touch r1 via getOrOpenRegion(1,0) after r0 gets demoted by r2, or promote r0 before opening r2:
+            // Clear r1's initial recency bit by sweeping with r2, after re-promoting r0
+            LcaRegionWriter.LcaLiveArchive r2 = lruStorage.getOrOpenRegion(2, 0, true);
+            r2.saveChunkCoW(0, 0, buildTestChunk(64, 0, "minecraft:oak_planks", 2));
+            // Touch r1 so r1 gets promoted, then open r3 -> r2 (unpromoted) must be evicted while r1 stays open
+            assertTrue(lruStorage.doesChunkExist(32, 0));
+            LcaRegionWriter.LcaLiveArchive r3 = lruStorage.getOrOpenRegion(3, 0, true);
+            assertNotNull(r3);
+            assertTrue(r1.isChannelOpen(), "Recently accessed region (1,0) must be promoted and remain open");
+            assertFalse(r2.isChannelOpen(), "Unpromoted region (2,0) must be evicted before promoted region (1,0)");
+        }
+    }
+
+    @Test
+    @DisplayName("Concurrent Chunky-style multi-worker reads and dictionary growth never publish stale cachedParsedDict (CBIT T7)")
+    void concurrentChunkyStyleWriteAndReadDoesNotPublishStaleSlabLocalGlobalStateIdDict(@TempDir Path tempDir) throws Exception {
+        Path regionFile = tempDir.resolve("r.0.5.lca");
+        try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.openOrCreateLiveArchive(
+                regionFile, 0, 5, -4, 24, 5023, 1, LcaRegionReader.STORAGE_KIND_REGION_VOXEL)) {
+            archive.saveChunkCoW(0, 0, buildTestChunk(0, 160, "minecraft:stone", 4));
+
+            java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(true);
+            java.util.concurrent.atomic.AtomicReference<Throwable> readerError =
+                    new java.util.concurrent.atomic.AtomicReference<>();
+            Thread[] readers = new Thread[4];
+            for (int t = 0; t < readers.length; t++) {
+                readers[t] = new Thread(() -> {
+                    while (running.get() && readerError.get() == null) {
+                        try {
+                            byte[] nbt = archive.readChunkNbtBytes(0, 0);
+                            if (nbt == null || nbt.length == 0) {
+                                readerError.compareAndSet(null, new AssertionError("Null NBT on (0,0)"));
+                            }
+                        } catch (Throwable ex) {
+                            readerError.compareAndSet(null, ex);
+                        }
+                    }
+                }, "lca-reader-" + t);
+                readers[t].setDaemon(true);
+                readers[t].start();
+            }
+
+            try {
+                int stateCounter = 0;
+                for (int round = 0; round < 60 && readerError.get() == null; round++) {
+                    int rx = 1 + (round % 30);
+                    int rz = 1 + ((round / 30) % 30);
+                    LinkedHashMap<String, Object> chunk = buildTestChunk(rx, 160 + rz, "minecraft:stone", 2);
+                    @SuppressWarnings("unchecked")
+                    Nbt.NbtList sections = (Nbt.NbtList) chunk.get("sections");
+                    @SuppressWarnings("unchecked")
+                    LinkedHashMap<String, Object> sec0 = (LinkedHashMap<String, Object>) sections.items.get(0);
+                    @SuppressWarnings("unchecked")
+                    LinkedHashMap<String, Object> bs = (LinkedHashMap<String, Object>) sec0.get("block_states");
+                    @SuppressWarnings("unchecked")
+                    Nbt.NbtList pal = (Nbt.NbtList) bs.get("palette");
+                    for (int k = 0; k < 4; k++) {
+                        int id = ++stateCounter;
+                        LinkedHashMap<String, Object> entry = new LinkedHashMap<>();
+                        entry.put("Name", "minecraft:stone_brick_slab[type=bottom,waterlogged=true,ruin_id=" + id + "]");
+                        pal.items.add(entry);
+                    }
+                    int[] yzx = new int[4096];
+                    for (int i = 0; i < 4096; i++) {
+                        yzx[i] = i % pal.items.size();
+                    }
+                    bs.put("data", LcaSectionCodec.packBlockLongs(yzx, pal.items.size()));
+
+                    byte[] preEncoded = archive.encodeChunkPayloadForSlab(rx, rz, chunk);
+                    archive.commitPreEncodedChunkCoW(rx, rz, preEncoded);
+                    // Give concurrent readers a micro-window to finish publishing any stale snapshot before reading (rx, rz)
+                    Thread.yield();
+                    byte[] decoded = archive.readChunkNbtBytes(rx, rz);
+                    assertNotNull(decoded);
+                    assertTrue(decoded.length > 64);
+                }
+            } finally {
+                running.set(false);
+                for (Thread r : readers) {
+                    r.join(5000);
+                }
+            }
+            if (readerError.get() != null) {
+                fail("Concurrent reader failed", readerError.get());
+            }
+            byte[] finalRead = archive.readChunkNbtBytes(22, 2);
+            assertNotNull(finalRead);
         }
     }
 }

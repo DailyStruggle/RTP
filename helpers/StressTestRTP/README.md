@@ -99,7 +99,7 @@ plugin's command by prefixing the plugin name (`rtp:rtp` vs.
 ```yaml
 target-commands:
   - label: "rtp"
-    command: "rtp:rtp player:{player}"
+    command: "rtp:rtp player={player}"
   - label: "betterrtp"
     command: "betterrtp:rtp tp {player}"
   - label: "essentialsx"
@@ -113,9 +113,9 @@ Attempts are dispatched **round-robin** across the list, and the CSV's
 (`/rtpstress export`) prints a per-target breakdown when more than one
 label is observed.
 
-> **RTP / RTP-Pro syntax:** RTP's command parser uses `key:value`
-> arguments (see `docs/admin/COMMANDS.md`). Bare `/rtp <name>` is
-> rejected as `invalid command`. Always use `rtp:rtp player:{player}` for
+> **RTP / RTP-Pro syntax:** RTP's command parser uses `key=value`
+> arguments (see `api/commands-api/docs/README.md`). Bare `/rtp <name>` is
+> rejected as `invalid command`. Always use `rtp:rtp player={player}` for
 > the in-tree plugin; only competitors typically take a positional name.
 
 > **Per-target sender:** an entry may set `sender: console` or
@@ -596,7 +596,7 @@ front-page comparison table:
 ```
 StressTestRTP run summary
 generated: 2026-05-01T17:42:13
-target-commands: rtp=`rtp:rtp player:{player}`, betterrtp=`betterrtp:rtp tp {player}`
+target-commands: rtp=`rtp:rtp player={player}`, betterrtp=`betterrtp:rtp tp {player}`
 attempts: 184 (ok=181)
 
 --- Front-page comparison columns (all targets, combined) ---

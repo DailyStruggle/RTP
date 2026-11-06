@@ -1,5 +1,5 @@
 /**
- * Platform-neutral 3D world block, {@code .hca v2} / {@code .dlsh} sub-chunk slice, and
+ * Platform-neutral 3D world block, {@code .lca} / {@code .dlsh} sub-chunk slice, and
  * client-side drawing kernel delivery SPI ({@code maps-api-ADR-003}, {@code anvil-api-ADR-003}).
  *
  * <p>Enables standalone 3D world map engines such as {@code LeafMap} to deliver both the

@@ -291,8 +291,18 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
   @Override
   public Set<String> getOnlinePlayerNames() {
     Set<String> out = new HashSet<>();
-    for (Player p : Bukkit.getOnlinePlayers()) {
-      out.add(p.getName());
+    for (PlayerSleepSnapshot snap : playerSleepSnapshotCache.values()) {
+      if (snap != null && snap.playerName() != null) {
+        out.add(snap.playerName());
+      }
+    }
+    try {
+      for (Player p : Bukkit.getOnlinePlayers()) {
+        if (p != null && p.getName() != null) {
+          out.add(p.getName());
+        }
+      }
+    } catch (RuntimeException ignored) {
     }
     return Collections.unmodifiableSet(out);
   }
@@ -747,7 +757,21 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
     World world = Bukkit.getWorld(worldName);
     if (world == null) return false;
     try {
-      world.getBlockAt(x, y, z).setBlockData(getCachedBlockData(blockData), false);
+      BlockData bd = getCachedBlockData(blockData);
+      if (!isOwnedByCurrentRegion(world, x >> 4, z >> 4)) {
+        scheduleDelayedTask(
+            worldName,
+            x >> 4,
+            z >> 4,
+            () -> {
+              if (world.isChunkLoaded(x >> 4, z >> 4)) {
+                world.getBlockAt(x, y, z).setBlockData(bd, false);
+              }
+            },
+            0L);
+        return true;
+      }
+      world.getBlockAt(x, y, z).setBlockData(bd, false);
       return true;
     } catch (Exception ex) {
       logger()
@@ -846,11 +870,22 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
                 : null);
     if (target == null) return false;
     ItemStack stack = buildItemStack(spec);
-    target
-        .getInventory()
-        .addItem(stack)
-        .values()
-        .forEach(leftover -> target.getWorld().dropItemNaturally(target.getLocation(), leftover));
+    Runnable deliver =
+        () -> {
+          if (!target.isOnline()) return;
+          target
+              .getInventory()
+              .addItem(stack)
+              .values()
+              .forEach(
+                  leftover ->
+                      target.getWorld().dropItemNaturally(target.getLocation(), leftover));
+        };
+    if (isEntityOwnedByCurrentRegion(target)) {
+      deliver.run();
+    } else {
+      runOnEntityOrMain(target, deliver);
+    }
     return true;
   }
 
@@ -858,8 +893,14 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
   public void dropItem(String worldName, int x, int y, int z, TaggedItemSpec spec) {
     World world = Bukkit.getWorld(worldName);
     if (world == null || spec == null) return;
+    ItemStack stack = buildItemStack(spec);
     Location dropAt = new Location(world, x + 0.5, y + 0.5, z + 0.5);
-    world.dropItemNaturally(dropAt, buildItemStack(spec));
+    if (isOwnedByCurrentRegion(world, x >> 4, z >> 4)) {
+      world.dropItemNaturally(dropAt, stack);
+    } else {
+      scheduleDelayedTask(
+          worldName, x >> 4, z >> 4, () -> world.dropItemNaturally(dropAt, stack), 0L);
+    }
   }
 
   @SuppressWarnings("deprecation")

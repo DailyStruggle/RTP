@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -54,11 +55,25 @@ class RegionFileResolverTest {
 
     @Test
     @DisplayName("regionDirectoryFor maps null/empty to the overworld and nests dimension subpaths")
-    void regionDirectoryFor(@TempDir Path world) {
+    void regionDirectoryFor(@TempDir Path world) throws IOException {
         assertEquals(world.resolve("region"), RegionFileResolver.regionDirectoryFor(world, null));
         assertEquals(world.resolve("region"), RegionFileResolver.regionDirectoryFor(world, ""));
         assertEquals(world.resolve("DIM-1").resolve("region"),
                 RegionFileResolver.regionDirectoryFor(world, "DIM-1"));
+        assertEquals(world.resolve("DIM1").resolve("region"),
+                RegionFileResolver.regionDirectoryFor(world, "DIM1"));
+
+        Path unifiedOverworld = Files.createDirectories(
+                world.resolve("dimensions").resolve("minecraft").resolve("overworld").resolve("region"));
+        Path unifiedNether = Files.createDirectories(
+                world.resolve("dimensions").resolve("minecraft").resolve("the_nether").resolve("region"));
+        Path unifiedEnd = Files.createDirectories(
+                world.resolve("dimensions").resolve("minecraft").resolve("the_end").resolve("region"));
+
+        assertEquals(unifiedOverworld, RegionFileResolver.regionDirectoryFor(world, null));
+        assertEquals(unifiedOverworld, RegionFileResolver.regionDirectoryFor(world, ""));
+        assertEquals(unifiedNether, RegionFileResolver.regionDirectoryFor(world, "DIM-1"));
+        assertEquals(unifiedEnd, RegionFileResolver.regionDirectoryFor(world, "DIM1"));
     }
 
     @Test
@@ -184,5 +199,111 @@ class RegionFileResolverTest {
 
         // Absent chunk in pure MCA directory returns null directly
         assertNull(RegionFileResolver.resolveExisting(world, "", 64, 64));
+    }
+
+    @Test
+    @DisplayName("patchChunkBlocks performs storage-agnostic read-modify-write across .lca and .mca regions")
+    void patchChunkBlocksAcrossLcaAndMca(@TempDir Path tmp) throws IOException {
+        java.util.LinkedHashMap<String, Object> root = new java.util.LinkedHashMap<>();
+        root.put("DataVersion", 4671);
+        root.put("xPos", 0);
+        root.put("zPos", 0);
+        root.put("Status", "minecraft:full");
+
+        java.util.LinkedHashMap<String, Object> sec4 = new java.util.LinkedHashMap<>();
+        sec4.put("Y", (byte) 4);
+        java.util.LinkedHashMap<String, Object> bs = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashMap<String, Object> airEntry = new java.util.LinkedHashMap<>();
+        airEntry.put("Name", "minecraft:air");
+        java.util.LinkedHashMap<String, Object> stoneEntry = new java.util.LinkedHashMap<>();
+        stoneEntry.put("Name", "minecraft:stone");
+        bs.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(airEntry, stoneEntry)));
+        int[] yzx = new int[4096];
+        yzx[PackedPaletteDecoder.entryIndex(2, 0, 2)] = 1; // (2, 64, 2) = stone
+        bs.put("data", LcaSectionCodec.packBlockLongs(yzx, 2));
+        sec4.put("block_states", bs);
+        root.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(sec4)));
+        byte[] rawNbt = Nbt.writeNamedRoot("", root);
+
+        List<RegionFileReader.BlockPatch> patches = List.of(
+                new RegionFileReader.BlockPatch(2, 64, 2, "minecraft:oak_leaves[distance=1,persistent=false]"),
+                new RegionFileReader.BlockPatch(2, 68, 2, "minecraft:oak_leaves[distance=1,persistent=false]"));
+
+        // 1. Test on .lca world
+        Path lcaWorld = tmp.resolve("lca-world");
+        Path lcaRegionDir = Files.createDirectories(lcaWorld.resolve("region"));
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(lcaRegionDir)) {
+            storage.writeChunkNbtBytes(0, 0, rawNbt);
+        }
+        RegionFormatDetector.INSTANCE.invalidateCache();
+        RegionFileResolver.invalidateMemo();
+
+        assertTrue(RegionFileResolver.patchChunkBlocks(
+                lcaWorld, "", 0, 0, patches, state -> state != null && state.contains("air")));
+        RegionFileResolver.ResolvedRegion resolvedLca =
+                RegionFileResolver.resolveExisting(lcaWorld, "", 0, 0);
+        assertNotNull(resolvedLca);
+        AnvilChunkView lcaView =
+                LcaRegionReader.readChunkView(Files.readAllBytes(resolvedLca.path()), 0, 0);
+        assertNotNull(lcaView);
+        assertEquals("minecraft:stone", lcaView.blockIdAt(2, 64, 2),
+                "Non-replaceable stone block must be preserved during .lca RMW");
+        assertEquals("minecraft:oak_leaves", lcaView.blockIdAt(2, 68, 2),
+                "Replaceable air block must be updated to oak_leaves during .lca RMW");
+
+        // 2. Test on .mca world
+        Path mcaWorld = tmp.resolve("mca-world");
+        Path mcaRegionDir = Files.createDirectories(mcaWorld.resolve("region"));
+        byte[] lcaBytes = Files.readAllBytes(lcaRegionDir.resolve("r.0.0.lca"));
+        try (LcaRegionFileStorage cleanLca = new LcaRegionFileStorage(tmp.resolve("clean-lca"))) {
+            cleanLca.writeChunkNbtBytes(0, 0, rawNbt);
+            lcaBytes = Files.readAllBytes(tmp.resolve("clean-lca").resolve("r.0.0.lca"));
+        }
+        Files.write(mcaRegionDir.resolve("r.0.0.mca"), LcaRegionWriter.transcodeToMca(lcaBytes));
+        RegionFormatDetector.INSTANCE.invalidateCache();
+        RegionFileResolver.invalidateMemo();
+
+        assertTrue(RegionFileResolver.patchChunkBlocks(
+                mcaWorld, "", 0, 0, patches, state -> state != null && state.contains("air")));
+        RegionFileResolver.ResolvedRegion resolvedMca =
+                RegionFileResolver.resolveExisting(mcaWorld, "", 0, 0);
+        assertNotNull(resolvedMca);
+        AnvilChunkView mcaView =
+                AnvilReader.readChunkView(Files.readAllBytes(resolvedMca.path()), 0, 0);
+        assertNotNull(mcaView);
+        assertEquals("minecraft:stone", mcaView.blockIdAt(2, 64, 2),
+                "Non-replaceable stone block must be preserved during .mca RMW");
+        assertEquals("minecraft:oak_leaves", mcaView.blockIdAt(2, 68, 2),
+                "Replaceable air block must be updated to oak_leaves during .mca RMW");
+
+        // 3. Edge cases: new section creation, void_air force-clearing, no-op duplicate patch,
+        // empty patches, unallocated chunk, and null worldFolder.
+        List<RegionFileReader.BlockPatch> extraPatches = List.of(
+                new RegionFileReader.BlockPatch(2, 64, 2, "minecraft:void_air"), // force-clear stone -> air
+                new RegionFileReader.BlockPatch(2, 68, 2, "minecraft:oak_leaves[distance=1,persistent=false]"), // already same state
+                new RegionFileReader.BlockPatch(5, 80, 5, "oak_log[axis=y]")); // new section Y=5 without namespace prefix
+        assertTrue(RegionFileResolver.patchChunkBlocks(
+                lcaWorld, "", 0, 0, extraPatches, state -> state != null && state.contains("air")));
+        assertTrue(RegionFileResolver.patchChunkBlocks(
+                mcaWorld, "", 0, 0, extraPatches, state -> state != null && state.contains("air")));
+        assertTrue(RegionFileResolver.patchChunkBlocks(
+                lcaWorld, "", 0, 0, List.of(), null));
+        assertTrue(RegionFileResolver.patchChunkBlocks(
+                mcaWorld, "", 0, 0, List.of(), null));
+        assertFalse(RegionFileResolver.patchChunkBlocks(
+                lcaWorld, "", 7, 7, extraPatches, null));
+        assertFalse(RegionFileResolver.patchChunkBlocks(
+                mcaWorld, "", 7, 7, extraPatches, null));
+        assertFalse(RegionFileResolver.patchChunkBlocks(
+                null, "", 0, 0, extraPatches, null));
+        assertFalse(RegionFileResolver.patchChunkBlocks(
+                tmp.resolve("non-existent-world"), "", 0, 0, extraPatches, null));
+        assertFalse(dummyReader().patchChunkBlocks(resolvedMca.path(), 0, 0, extraPatches, null));
+
+        AnvilChunkView mcaAfterExtra =
+                AnvilReader.readChunkView(Files.readAllBytes(resolvedMca.path()), 0, 0);
+        assertNotNull(mcaAfterExtra);
+        assertEquals("minecraft:air", mcaAfterExtra.blockIdAt(2, 64, 2));
+        assertEquals("minecraft:oak_log", mcaAfterExtra.blockIdAt(5, 80, 5));
     }
 }

@@ -28,7 +28,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -209,11 +208,12 @@ public class OnEventTeleports implements Listener {
     if (event.isAnchorSpawn() || event.isBedSpawn()) {
       if (future.isDone()) {
         try {
-          region.queueManager.keptLocations.add(future.get());
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        } catch (ExecutionException ignored) {
-
+          RTPLocation cachedLocation = future.getNow(null);
+          if (cachedLocation != null) {
+            region.queueManager.keptLocations.add(cachedLocation);
+          }
+        } catch (RuntimeException e) {
+          RTP.log(Level.WARNING, e.getMessage(), e);
         }
       } else {
         future.thenAccept(cachedLocation -> region.queueManager.keptLocations.add(cachedLocation));
@@ -245,13 +245,8 @@ public class OnEventTeleports implements Listener {
     if (future.isDone()) {
       RTPLocation location;
       try {
-        location = future.get();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        RTP.log(Level.WARNING, e.getMessage(), e);
-        RTPTeleportCancel.refund(player.getUniqueId());
-        return;
-      } catch (ExecutionException e) {
+        location = future.getNow(null);
+      } catch (RuntimeException e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
         RTPTeleportCancel.refund(player.getUniqueId());
         return;

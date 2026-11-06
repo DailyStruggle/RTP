@@ -76,6 +76,11 @@ public final class AnvilProbeSupport {
       long key,
       Set<String> rawUnsafe,
       UnaryOperator<String> reconciler) {
+    AnvilChunkView cached = cache.get(key);
+    if (cached != null) {
+      return CompletableFuture.completedFuture(
+          new AnvilPrefilter.ProbeResult(Verdict.ACCEPT, cached));
+    }
     return AnvilPrefilter
         .probeDetailed(worldFolder, dimSubpath, cx, cz, rawUnsafe, reconciler)
         .thenApply(result -> {

@@ -71,6 +71,33 @@ public final class AnvilRegionOccupancyCache {
    */
   public static boolean isOccupied(Path regionFile, int cx, int cz) {
     if (regionFile == null) return false;
+    int rx = Math.floorMod(cx, 32);
+    int rz = Math.floorMod(cz, 32);
+    Path fileNamePath = regionFile.getFileName();
+    if (fileNamePath != null) {
+      String fileName = fileNamePath.toString();
+      if (fileName.endsWith(".lca")) {
+        try {
+          return LcaRegionReader.isChunkGeneratedInFile(regionFile, rx, rz);
+        } catch (IOException e) {
+          return false;
+        }
+      }
+      if (!fileName.endsWith(".mca")) {
+        int dot = fileName.lastIndexOf('.');
+        if (dot >= 0) {
+          RegionFileReader reader = RegionFormatRegistry.getReader(fileName.substring(dot));
+          if (reader != null) {
+            try (AnvilRegionByteCache.Lease lease = AnvilPrefilter.residentLease(regionFile)) {
+              if (lease != null) {
+                return reader.isChunkGenerated(lease.buffer(), lease.length(), rx, rz);
+              }
+            } catch (Throwable ignored) {
+            }
+          }
+        }
+      }
+    }
     AnvilRegionHeaderCache.Header header;
     try {
       header = AnvilRegionHeaderCache.get(regionFile);
@@ -89,8 +116,6 @@ public final class AnvilRegionOccupancyCache {
         CACHE.put(regionFile, new Entry(bitmap, header.mtime()));
       }
     }
-    int rx = Math.floorMod(cx, 32);
-    int rz = Math.floorMod(cz, 32);
     int index = rx + (rz << 5);
     return (bitmap[index >>> 6] & (1L << (index & 63))) != 0L;
   }
