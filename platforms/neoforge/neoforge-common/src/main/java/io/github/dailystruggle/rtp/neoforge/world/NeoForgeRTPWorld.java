@@ -503,14 +503,20 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         });
     }
 
+    public CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ) {
+        final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
+        return loadLiveChunk(chunkX, chunkZ, key, GenerationBudget.currentReservation());
+    }
+
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
-        return getChunkAt(cx, cz).thenApply(key -> {
+        return loadLiveChunk(cx, cz).thenApply(key -> {
+            if (key == null) return null;
             CompletableFuture<Boolean> done = new CompletableFuture<>();
             ChunkSet set = new ChunkSet(this, cx, cz,
                 Collections.singletonList(CompletableFuture.completedFuture(key)),
                 done);
-            done.complete(key != null);
+            done.complete(true);
             return set;
         });
     }

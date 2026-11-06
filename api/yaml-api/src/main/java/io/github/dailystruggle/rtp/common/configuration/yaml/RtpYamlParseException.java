@@ -10,7 +10,7 @@ package io.github.dailystruggle.rtp.common.configuration.yaml;
  * the stable identifier intended to map to a {@code messages.yml} key
  * (see ADR-025).</p>
  */
-public final class RtpYamlParseException extends RuntimeException {
+public class RtpYamlParseException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 

@@ -440,4 +440,48 @@ class RtpYamlReaderTest {
         RtpYamlParseException ex2 = assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("flow: " + flowSeq));
         assertEquals("rtpYaml.syntax.maxDepth", ex2.messageKey());
     }
+
+    @Test
+    @DisplayName("Paper/Spigot indentless sequences and empty {} flow mappings parse cleanly")
+    void paperIndentlessSequencesAndEmptyFlowMappingsParseCleanly() {
+        String spigotStyle = """
+                advancements:
+                  disable-saving: false
+                  disabled:
+                  - minecraft:story/disabled
+                stats:
+                  disable-saving: false
+                  forced-stats: {}
+                """;
+        io.github.dailystruggle.yaml.YamlConfig cfg = io.github.dailystruggle.yaml.YamlConfig.parse(spigotStyle);
+        assertEquals(java.util.List.of("minecraft:story/disabled"), cfg.getStringList("advancements.disabled"));
+        assertNotNull(cfg.getConfigurationSection("stats.forced-stats"));
+        assertTrue(cfg.getConfigurationSection("stats.forced-stats").getKeys(false).isEmpty());
+
+        io.github.dailystruggle.yaml.YamlConfig helpStyle = io.github.dailystruggle.yaml.YamlConfig.parse("# Bukkit help.yml\n{}\n");
+        assertTrue(helpStyle.getKeys(false).isEmpty());
+
+        String paperGlobalStyle = """
+                anticheat:
+                  obfuscation:
+                    items:
+                      model-overrides:
+                        minecraft:elytra:
+                          also-obfuscate: []
+                          dont-obfuscate:
+                          - minecraft:damage
+                          sanitize-count: true
+                messages:
+                  no-permission: <red>I'm sorry, but you do not have permission to perform this command.
+                    Please contact the server administrators if you believe that this is in error.
+                  use-display-name-in-quit-message: false
+                """;
+        io.github.dailystruggle.yaml.YamlConfig paperGlobal = io.github.dailystruggle.yaml.YamlConfig.parse(paperGlobalStyle);
+        assertTrue(paperGlobal.getBoolean("anticheat.obfuscation.items.model-overrides.minecraft:elytra.sanitize-count", false));
+        assertEquals(
+                java.util.List.of("minecraft:damage"),
+                paperGlobal.getStringList("anticheat.obfuscation.items.model-overrides.minecraft:elytra.dont-obfuscate")
+        );
+        assertTrue(paperGlobal.getString("messages.no-permission", "").contains("Please contact the server administrators"));
+    }
 }

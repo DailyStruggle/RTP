@@ -16,6 +16,7 @@ import java.util.Set;
 public final class GeometryPointGenerator {
 
     private static final int MAX_APERTURE_POINTS = 32;
+    private static final int MAX_PLANAR_SURFACE_POINTS = 256;
 
     private GeometryPointGenerator() {
     }
@@ -319,6 +320,108 @@ public final class GeometryPointGenerator {
         return Collections.unmodifiableList(list.subList(0, MAX_APERTURE_POINTS));
     }
 
+    /**
+     * Generates 2D planar face surface points across all bounding faces within
+     * {@code maxPlaneDistance} of {@code viewerPos}, while carving out an open pass-through
+     * aperture window of radius {@code passThroughRadius} around the viewer and their orthogonal
+     * plane projection as they approach or pass through the face.
+     * Capped to at most {@value #MAX_PLANAR_SURFACE_POINTS} points.
+     */
+    public static List<Vector3d> generatePlanarSurfaceWithPassThrough(
+            SpatialBounds bounds,
+            Vector3d viewerPos,
+            double maxPlaneDistance,
+            double passThroughRadius,
+            double step
+    ) {
+        Objects.requireNonNull(bounds, "bounds must not be null");
+        Objects.requireNonNull(viewerPos, "viewerPos must not be null");
+        if (maxPlaneDistance <= 0.0) {
+            return List.of();
+        }
+        double distToHull = bounds.distanceToPlaneProjectedBounds(viewerPos);
+        if (distToHull > maxPlaneDistance) {
+            return List.of();
+        }
+        double effStep = step <= 0.1 ? 1.0 : step;
+        double passRadius = Math.max(0.0, passThroughRadius);
+        double passRadiusSq = passRadius * passRadius;
+        Set<Vector3d> points = new LinkedHashSet<>();
+
+        double minX = bounds.minX();
+        double maxX = bounds.maxX();
+        double minY = bounds.minY();
+        double maxY = bounds.maxY();
+        double minZ = bounds.minZ();
+        double maxZ = bounds.maxZ();
+        double px = viewerPos.x();
+        double py = viewerPos.y();
+        double pz = viewerPos.z();
+
+        if (Math.abs(minX - px) <= maxPlaneDistance) {
+            collectPlanarFaceX(minX, minY, maxY, minZ, maxZ, viewerPos, passRadiusSq, effStep, points);
+        }
+        if (Math.abs(px - maxX) <= maxPlaneDistance) {
+            collectPlanarFaceX(maxX, minY, maxY, minZ, maxZ, viewerPos, passRadiusSq, effStep, points);
+        }
+        if (Math.abs(minY - py) <= maxPlaneDistance) {
+            collectPlanarFaceY(minY, minX, maxX, minZ, maxZ, viewerPos, passRadiusSq, effStep, points);
+        }
+        if (Math.abs(py - maxY) <= maxPlaneDistance) {
+            collectPlanarFaceY(maxY, minX, maxX, minZ, maxZ, viewerPos, passRadiusSq, effStep, points);
+        }
+        if (Math.abs(minZ - pz) <= maxPlaneDistance) {
+            collectPlanarFaceZ(minZ, minX, maxX, minY, maxY, viewerPos, passRadiusSq, effStep, points);
+        }
+        if (Math.abs(pz - maxZ) <= maxPlaneDistance) {
+            collectPlanarFaceZ(maxZ, minX, maxX, minY, maxY, viewerPos, passRadiusSq, effStep, points);
+        }
+
+        return List.copyOf(points);
+    }
+
+    private static void collectPlanarFaceX(
+            double x, double minY, double maxY, double minZ, double maxZ,
+            Vector3d viewerPos, double passRadiusSq, double step, Set<Vector3d> out
+    ) {
+        for (double y = minY; y <= maxY && out.size() < MAX_PLANAR_SURFACE_POINTS; y += step) {
+            for (double z = minZ; z <= maxZ && out.size() < MAX_PLANAR_SURFACE_POINTS; z += step) {
+                Vector3d pt = new Vector3d(x, y, z);
+                if (pt.distanceSquared(viewerPos) > passRadiusSq) {
+                    out.add(pt);
+                }
+            }
+        }
+    }
+
+    private static void collectPlanarFaceY(
+            double y, double minX, double maxX, double minZ, double maxZ,
+            Vector3d viewerPos, double passRadiusSq, double step, Set<Vector3d> out
+    ) {
+        for (double x = minX; x <= maxX && out.size() < MAX_PLANAR_SURFACE_POINTS; x += step) {
+            for (double z = minZ; z <= maxZ && out.size() < MAX_PLANAR_SURFACE_POINTS; z += step) {
+                Vector3d pt = new Vector3d(x, y, z);
+                if (pt.distanceSquared(viewerPos) > passRadiusSq) {
+                    out.add(pt);
+                }
+            }
+        }
+    }
+
+    private static void collectPlanarFaceZ(
+            double z, double minX, double maxX, double minY, double maxY,
+            Vector3d viewerPos, double passRadiusSq, double step, Set<Vector3d> out
+    ) {
+        for (double x = minX; x <= maxX && out.size() < MAX_PLANAR_SURFACE_POINTS; x += step) {
+            for (double y = minY; y <= maxY && out.size() < MAX_PLANAR_SURFACE_POINTS; y += step) {
+                Vector3d pt = new Vector3d(x, y, z);
+                if (pt.distanceSquared(viewerPos) > passRadiusSq) {
+                    out.add(pt);
+                }
+            }
+        }
+    }
+
     private static void collectFacePerimeterPointsX(
             double x, double minY, double maxY, double minZ, double maxZ,
             Vector3d q, double radiusSq, double step, Set<Vector3d> out
@@ -330,6 +433,11 @@ public final class GeometryPointGenerator {
         for (double z = minZ; z <= maxZ; z += step) {
             addIfWithin(new Vector3d(x, minY, z), q, radiusSq, out);
             addIfWithin(new Vector3d(x, maxY, z), q, radiusSq, out);
+        }
+        for (double y = minY; y <= maxY && out.size() < MAX_APERTURE_POINTS; y += step) {
+            for (double z = minZ; z <= maxZ && out.size() < MAX_APERTURE_POINTS; z += step) {
+                addIfWithin(new Vector3d(x, y, z), q, radiusSq, out);
+            }
         }
     }
 
@@ -345,6 +453,11 @@ public final class GeometryPointGenerator {
             addIfWithin(new Vector3d(minX, y, z), q, radiusSq, out);
             addIfWithin(new Vector3d(maxX, y, z), q, radiusSq, out);
         }
+        for (double x = minX; x <= maxX && out.size() < MAX_APERTURE_POINTS; x += step) {
+            for (double z = minZ; z <= maxZ && out.size() < MAX_APERTURE_POINTS; z += step) {
+                addIfWithin(new Vector3d(x, y, z), q, radiusSq, out);
+            }
+        }
     }
 
     private static void collectFacePerimeterPointsZ(
@@ -358,6 +471,11 @@ public final class GeometryPointGenerator {
         for (double y = minY; y <= maxY; y += step) {
             addIfWithin(new Vector3d(minX, y, z), q, radiusSq, out);
             addIfWithin(new Vector3d(maxX, y, z), q, radiusSq, out);
+        }
+        for (double x = minX; x <= maxX && out.size() < MAX_APERTURE_POINTS; x += step) {
+            for (double y = minY; y <= maxY && out.size() < MAX_APERTURE_POINTS; y += step) {
+                addIfWithin(new Vector3d(x, y, z), q, radiusSq, out);
+            }
         }
     }
 

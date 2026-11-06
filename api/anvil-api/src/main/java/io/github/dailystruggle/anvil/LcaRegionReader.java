@@ -293,6 +293,53 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         return decodeChunkFromFrame(meta, snap, rx, rz);
     }
 
+    @Override
+    public boolean patchChunkBlocks(
+            Path regionFile,
+            int rx,
+            int rz,
+            java.util.Collection<BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        if (regionFile == null || !Files.isRegularFile(regionFile)) {
+            return false;
+        }
+        validateCoordinates(rx, rz);
+        Boolean livePatched = LcaRegionWriter.tryPatchOpenLiveArchive(
+                regionFile, rx, rz, patches, isReplaceable);
+        if (livePatched != null) {
+            if (livePatched) {
+                invalidateFastDictCache();
+                FILE_HEADER_CACHE.remove(regionFile);
+                FILE_HEADER_CACHE.remove(regionFile.toAbsolutePath().normalize());
+            }
+            return livePatched;
+        }
+        try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.openLiveArchive(regionFile)) {
+            if (!archive.hasChunk(rx, rz)) {
+                return false;
+            }
+            byte[] rawNbt = archive.readChunkNbtBytes(rx, rz);
+            if (rawNbt == null || rawNbt.length == 0) {
+                return false;
+            }
+            LinkedHashMap<String, Object> root = Nbt.readRootCompound(rawNbt);
+            if (!RegionFileReader.isFullChunkRoot(root)) {
+                return false;
+            }
+            if (patches == null || patches.isEmpty()) {
+                return true;
+            }
+            if (RegionFileReader.applyPatchesToChunkRoot(root, patches, isReplaceable)) {
+                byte[] updatedNbt = Nbt.writeNamedRoot("", root);
+                archive.saveChunkNbtBytes(rx, rz, updatedNbt);
+                invalidateFastDictCache();
+                FILE_HEADER_CACHE.remove(regionFile);
+                FILE_HEADER_CACHE.remove(regionFile.toAbsolutePath().normalize());
+            }
+            return true;
+        }
+    }
+
     static AnvilReader.ChunkEntry decodeChunkFromRawSlab(
             LcaSectionCodec.ParsedHeaderAndDict meta,
             int rx,
@@ -484,7 +531,8 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 secMap.put("Y", (byte) sectionY);
                 LinkedHashMap<String, Object> bsMap = new LinkedHashMap<>();
                 bsMap.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND,
-                        List.of(LcaSectionCodec.parseCanonicalStateToNbtCompound(activeCanonicalStates.get(globalDictId)))));
+                        List.of(LcaSectionCodec.parseCanonicalStateToNbtCompound(
+                                activeCanonicalStates.get(globalDictId), chunkDataVersion))));
                 secMap.put("block_states", bsMap);
 
                 if (hasSlabLocalPalette && !activeBiomeTemplates.isEmpty()) {
@@ -541,7 +589,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 LinkedHashMap<String, Object> bsMap = new LinkedHashMap<>();
                 List<Object> palCompounds = new ArrayList<>(dec.blockStateCanonicalPalette.size());
                 for (String canonical : dec.blockStateCanonicalPalette) {
-                    palCompounds.add(LcaSectionCodec.parseCanonicalStateToNbtCompound(canonical));
+                    palCompounds.add(LcaSectionCodec.parseCanonicalStateToNbtCompound(canonical, chunkDataVersion));
                 }
                 bsMap.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, palCompounds));
                 if (dec.packedBlockLongs != null) {
@@ -1886,6 +1934,10 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         return LcaSectionCodec.parseCanonicalStateToNbtCompound(canonicalState);
     }
 
+    static LinkedHashMap<String, Object> parseCanonicalStateToNbtCompound(String canonicalState, int dataVersion) {
+        return LcaSectionCodec.parseCanonicalStateToNbtCompound(canonicalState, dataVersion);
+    }
+
     static String decodeStatusOrdinal(int ordinal) {
         return LcaSectionCodec.decodeStatusOrdinal(ordinal);
     }
@@ -1904,7 +1956,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
     // Positional Single-Chunk FileChannel Reader & Header Cache (ADR-016 / anvil-api-ADR-003)
     // -------------------------------------------------------------------------
 
-    private static final int FILE_HEADER_CACHE_CAPACITY = 1024;
+    private static final int FILE_HEADER_CACHE_CAPACITY = 4096;
     private static final int INITIAL_FILE_SCRATCH_BYTES = 64 * 1024;
     @SuppressWarnings("java:S5164")
     private static final ThreadLocal<byte[]> FILE_SCRATCH =
@@ -1916,7 +1968,9 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
     }
 
     private static final ConcurrentHashMap<Path, CachedFileHeader> FILE_HEADER_CACHE =
-            new ConcurrentHashMap<>(FILE_HEADER_CACHE_CAPACITY);
+            new ConcurrentHashMap<>(1024);
+    private static final java.util.concurrent.ConcurrentLinkedQueue<Path> FILE_HEADER_CLOCK_QUEUE =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     static final class CachedFileHeader {
         final byte[] headerBytes;
@@ -1925,6 +1979,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         final long mtime;
         volatile long fileSize;
         volatile long checkedNanos;
+        volatile boolean clockBit = false;
         volatile LcaSectionCodec.ParsedHeaderAndDict parsedDict;
 
         CachedFileHeader(
@@ -1990,6 +2045,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 h.fileSize = newFileSize;
             }
             h.checkedNanos = System.nanoTime();
+            h.clockBit = true;
             if (dictModified) {
                 h.parsedDict = null;
             }
@@ -2005,6 +2061,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
 
     public static void invalidateAllFileCaches() {
         FILE_HEADER_CACHE.clear();
+        FILE_HEADER_CLOCK_QUEUE.clear();
     }
 
     public static boolean hasValidFileHeader(Path regionFile) {
@@ -2332,7 +2389,21 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         }
     }
 
-    private static CachedFileHeader getOrLoadFileHeader(Path regionFile) throws IOException {
+    static CachedFileHeader peekCachedFileHeader(Path regionFile) {
+        if (regionFile == null) return null;
+        CachedFileHeader h = freshFileHeader(regionFile);
+        if (h != null) return h;
+        CachedFileHeader existing = FILE_HEADER_CACHE.get(regionFile);
+        if (existing == null) return null;
+        long mtime = fileMtimeOrMinusOne(regionFile);
+        if (mtime < 0L) {
+            invalidateFileCache(regionFile);
+            return null;
+        }
+        return revalidateFileHeader(regionFile, mtime);
+    }
+
+    static CachedFileHeader getOrLoadFileHeader(Path regionFile, FileChannel channel) throws IOException {
         if (regionFile == null) return null;
         CachedFileHeader h = freshFileHeader(regionFile);
         if (h != null) return h;
@@ -2343,6 +2414,9 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         }
         h = revalidateFileHeader(regionFile, mtime);
         if (h != null) return h;
+        if (channel != null && channel.isOpen()) {
+            return loadFileHeader(regionFile, channel, mtime);
+        }
         try (FileChannel ch = FileChannel.open(regionFile, StandardOpenOption.READ)) {
             return loadFileHeader(regionFile, ch, mtime);
         } catch (NoSuchFileException e) {
@@ -2351,11 +2425,16 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         }
     }
 
+    private static CachedFileHeader getOrLoadFileHeader(Path regionFile) throws IOException {
+        return getOrLoadFileHeader(regionFile, null);
+    }
+
     private static CachedFileHeader freshFileHeader(Path regionFile) {
         long window = AnvilRegionByteCache.revalidateIntervalNanos();
         if (window <= 0L) return null;
         CachedFileHeader h = FILE_HEADER_CACHE.get(regionFile);
         if (h != null && System.nanoTime() - h.checkedNanos < window) {
+            h.clockBit = true;
             return h;
         }
         return null;
@@ -2365,6 +2444,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         CachedFileHeader h = FILE_HEADER_CACHE.get(regionFile);
         if (h == null || h.mtime != mtime) return null;
         h.checkedNanos = System.nanoTime();
+        h.clockBit = true;
         return h;
     }
 
@@ -2382,11 +2462,19 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         if (fileSize < prefixLen + FOOTER_SIZE) {
             return null;
         }
-        byte[] headerBytes = new byte[prefixLen];
-        readChannelFully(ch, headerBytes, 0, prefixLen, 0L, regionFile);
+        int initialReadLen = (int) Math.min(fileSize, 16384L);
+        byte[] initialBuf = new byte[initialReadLen];
+        readChannelFully(ch, initialBuf, 0, initialReadLen, 0L, regionFile);
+        byte[] headerBytes = initialReadLen == prefixLen
+                ? initialBuf
+                : Arrays.copyOf(initialBuf, prefixLen);
 
         byte[] footerBytes = new byte[FOOTER_SIZE];
-        readChannelFully(ch, footerBytes, 0, FOOTER_SIZE, fileSize - FOOTER_SIZE, regionFile);
+        if (fileSize <= initialReadLen) {
+            System.arraycopy(initialBuf, (int) (fileSize - FOOTER_SIZE), footerBytes, 0, FOOTER_SIZE);
+        } else {
+            readChannelFully(ch, footerBytes, 0, FOOTER_SIZE, fileSize - FOOTER_SIZE, regionFile);
+        }
 
         long magic = (long) LONG_BE_VIEW.get(headerBytes, 0);
         long footerCanary = (long) LONG_BE_VIEW.get(footerBytes, 0);
@@ -2419,20 +2507,46 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                     && secDedOff >= DICT_ROOT_OFFSET
                     && (long) secDedOff + SECDED_TABLE_SIZE <= fileSize - FOOTER_SIZE) {
                 secDedBytes = new byte[SECDED_TABLE_SIZE];
-                readChannelFully(ch, secDedBytes, 0, SECDED_TABLE_SIZE, secDedOff, regionFile);
+                if (secDedOff + SECDED_TABLE_SIZE <= initialReadLen) {
+                    System.arraycopy(initialBuf, secDedOff, secDedBytes, 0, SECDED_TABLE_SIZE);
+                } else {
+                    readChannelFully(ch, secDedBytes, 0, SECDED_TABLE_SIZE, secDedOff, regionFile);
+                }
             }
         }
 
         CachedFileHeader h = new CachedFileHeader(
                 headerBytes, secDedBytes, new SuperblockFastMeta(minSectionY, sectionCount), mtime, fileSize, System.nanoTime());
-        if (FILE_HEADER_CACHE.size() >= FILE_HEADER_CACHE_CAPACITY) {
-            Iterator<Path> it = FILE_HEADER_CACHE.keySet().iterator();
-            if (it.hasNext()) {
-                FILE_HEADER_CACHE.remove(it.next());
+        evictFileHeaderCacheIfNeeded();
+        if (FILE_HEADER_CACHE.put(regionFile, h) == null) {
+            FILE_HEADER_CLOCK_QUEUE.offer(regionFile);
+        }
+        return h;
+    }
+
+    private static void evictFileHeaderCacheIfNeeded() {
+        int maxScans = (FILE_HEADER_CACHE_CAPACITY << 1) + 8;
+        int scans = 0;
+        while (FILE_HEADER_CACHE.size() >= FILE_HEADER_CACHE_CAPACITY && scans++ < maxScans) {
+            Path cand = FILE_HEADER_CLOCK_QUEUE.poll();
+            if (cand == null) {
+                Iterator<Path> it = FILE_HEADER_CACHE.keySet().iterator();
+                if (it.hasNext()) {
+                    FILE_HEADER_CACHE.remove(it.next());
+                }
+                break;
+            }
+            CachedFileHeader chdr = FILE_HEADER_CACHE.get(cand);
+            if (chdr == null) {
+                continue;
+            }
+            if (chdr.clockBit) {
+                chdr.clockBit = false;
+                FILE_HEADER_CLOCK_QUEUE.offer(cand);
+            } else {
+                FILE_HEADER_CACHE.remove(cand, chdr);
             }
         }
-        FILE_HEADER_CACHE.put(regionFile, h);
-        return h;
     }
 
     private static LcaSectionCodec.ParsedHeaderAndDict loadDictionaryFromChannel(

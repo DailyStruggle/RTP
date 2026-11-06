@@ -82,9 +82,11 @@ public final class RegionFileResolver {
      * within one window, well under the chunk-save cadence. Blocking stat: off the tick thread (S-005).
      */
     public static ResolvedRegion resolveExisting(Path worldFolder, String dimensionSubpath, int cx, int cz) {
-        Path dir = regionDirectoryFor(worldFolder, dimensionSubpath);
+        Path keyDir = (dimensionSubpath == null || dimensionSubpath.isEmpty())
+                ? worldFolder.resolve("region")
+                : worldFolder.resolve(dimensionSubpath).resolve("region");
         String baseName = "r." + (cx >> 5) + "." + (cz >> 5);
-        Path key = dir.resolve(baseName + ".mca");
+        Path key = keyDir.resolve(baseName + ".mca");
         long window = AnvilRegionByteCache.revalidateIntervalNanos();
         if (window > 0L) {
             Memo memo;
@@ -95,6 +97,7 @@ public final class RegionFileResolver {
                 return memo.region();
             }
         }
+        Path dir = regionDirectoryFor(worldFolder, dimensionSubpath);
         ResolvedRegion found = resolveOnDisk(dir, baseName);
         if (window > 0L) {
             synchronized (MEMO) {
@@ -110,6 +113,57 @@ public final class RegionFileResolver {
             MEMO.clear();
         }
         RegionFormatDetector.INSTANCE.invalidateCache();
+    }
+
+    private static final java.util.concurrent.ConcurrentHashMap<Path, java.util.concurrent.locks.ReentrantLock>
+            REGION_PATCH_LOCKS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Storage-agnostic read-modify-write entry point that resolves the active region file for
+     * chunk {@code (cx, cz)} in {@code (worldFolder, dimensionSubpath)} (supporting {@code .mca},
+     * {@code .lca}, and any registered {@link RegionFileReader}) and applies {@code patches} to
+     * the saved chunk if it exists on disk.
+     *
+     * @param worldFolder      the root world directory
+     * @param dimensionSubpath dimension subdirectory (e.g., {@code "DIM-1"}, {@code "DIM1"}, or {@code ""})
+     * @param cx               world chunk X coordinate
+     * @param cz               world chunk Z coordinate
+     * @param patches          block updates to apply inside chunk {@code (cx, cz)}
+     * @param isReplaceable    predicate testing whether an existing block state in the saved chunk may be overwritten
+     * @return {@code true} if the chunk exists on disk and was processed, or {@code false} if not yet saved
+     * @throws IOException on I/O failure
+     */
+    public static boolean patchChunkBlocks(
+            Path worldFolder,
+            String dimensionSubpath,
+            int cx,
+            int cz,
+            java.util.Collection<RegionFileReader.BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        if (worldFolder == null) {
+            return false;
+        }
+        ResolvedRegion resolved = resolveExisting(worldFolder, dimensionSubpath, cx, cz);
+        if (resolved == null || resolved.path() == null || resolved.reader() == null) {
+            return false;
+        }
+        Path regionPath = resolved.path().toAbsolutePath().normalize();
+        if (!Files.isRegularFile(regionPath)) {
+            return false;
+        }
+        java.util.concurrent.locks.ReentrantLock lock =
+                REGION_PATCH_LOCKS.computeIfAbsent(regionPath, k -> new java.util.concurrent.locks.ReentrantLock());
+        lock.lock();
+        try {
+            boolean patched = resolved.reader().patchChunkBlocks(
+                    regionPath, cx & 31, cz & 31, patches, isReplaceable);
+            if (patched) {
+                AnvilRegionByteCache.invalidateAll();
+            }
+            return patched;
+        } finally {
+            lock.unlock();
+        }
     }
 
     /** Existing region file for {@code baseName} in {@code dir}, or {@code null}. */
@@ -185,9 +239,30 @@ public final class RegionFileResolver {
      */
     public static Path regionDirectoryFor(Path worldFolder, String dimensionSubpath) {
         if (dimensionSubpath == null || dimensionSubpath.isEmpty()) {
-            return worldFolder.resolve("region");
+            Path legacy = worldFolder.resolve("region");
+            if (!Files.isDirectory(legacy)) {
+                Path unified = worldFolder.resolve("dimensions").resolve("minecraft").resolve("overworld").resolve("region");
+                if (Files.isDirectory(unified)) {
+                    return unified;
+                }
+            }
+            return legacy;
         }
-        return worldFolder.resolve(dimensionSubpath).resolve("region");
+        Path subDir = worldFolder.resolve(dimensionSubpath).resolve("region");
+        if (!Files.isDirectory(subDir)) {
+            if ("DIM-1".equals(dimensionSubpath)) {
+                Path unified = worldFolder.resolve("dimensions").resolve("minecraft").resolve("the_nether").resolve("region");
+                if (Files.isDirectory(unified)) {
+                    return unified;
+                }
+            } else if ("DIM1".equals(dimensionSubpath)) {
+                Path unified = worldFolder.resolve("dimensions").resolve("minecraft").resolve("the_end").resolve("region");
+                if (Files.isDirectory(unified)) {
+                    return unified;
+                }
+            }
+        }
+        return subDir;
     }
 
     private static final Pattern ANVIL_FILE = Pattern.compile("r\\.(-?\\d{1,7})\\.(-?\\d{1,7})\\.mca");

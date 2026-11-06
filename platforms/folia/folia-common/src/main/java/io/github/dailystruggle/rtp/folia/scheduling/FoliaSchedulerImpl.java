@@ -152,7 +152,35 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   }
 
   public FoliaSchedulerImpl(Plugin plugin, RegionScheduler rs, AsyncScheduler as, GlobalRegionScheduler gs) {
-    this(plugin, rs, as, gs, Math.max(1, Runtime.getRuntime().availableProcessors() / 2), 2500L);
+    this(plugin, rs, as, gs, resolveMaxRegionalInflight(plugin), 2500L);
+  }
+
+  static int resolveMaxRegionalInflight(Plugin plugin) {
+    String prop = System.getProperty("rtp.folia.maxRegionalInflight");
+    if (prop != null && !prop.isBlank()) {
+      try {
+        int v = Integer.parseInt(prop.trim());
+        return (v <= 0) ? Integer.MAX_VALUE : v;
+      } catch (NumberFormatException e) {
+        RTP.log(Level.FINE, "[RTP] Invalid rtp.folia.maxRegionalInflight property: " + prop, e);
+      }
+    }
+    try {
+      if (plugin != null && plugin.getDataFolder() != null) {
+        java.io.File perfFile = new java.io.File(plugin.getDataFolder(), "advanced/performance.yml");
+        if (perfFile.isFile()) {
+          org.bukkit.configuration.file.YamlConfiguration cfg =
+              org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(perfFile);
+          if (cfg.contains("maxRegionalInflight")) {
+            int v = cfg.getInt("maxRegionalInflight", 0);
+            return (v <= 0) ? Integer.MAX_VALUE : v;
+          }
+        }
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP] Failed reading maxRegionalInflight from performance.yml: " + t.getMessage());
+    }
+    return Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
   }
 
   public FoliaSchedulerImpl(Plugin plugin, RegionScheduler rs, AsyncScheduler as, GlobalRegionScheduler gs,

@@ -78,8 +78,6 @@ public class ScanStartCmd extends ScanSubCmd {
       }
 
       shape.clear();
-      shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-      ScanTask.delete(region.name);
       long spatialRes = region.getSettings().spatialResolution();
       MultiConfigParser<RegionKeys> multiConfigParser = (MultiConfigParser<RegionKeys>) ActiveConfigs.get().getParser(RegionKeys.class);
       if (multiConfigParser != null) {
@@ -93,7 +91,14 @@ public class ScanStartCmd extends ScanSubCmd {
 
       ScanTask task = new ScanTask(region, 0L);
       ScanTasks.current().put(region.name, task);
-      RTPRuntime.scheduler().runTaskAsynchronously(task);
+      String saveFileName = region.name + "_" + region.cacheKey();
+      String worldName = region.getWorld().name();
+      String regionName = region.name;
+      RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+        shape.save(saveFileName, worldName);
+        ScanTask.delete(regionName);
+        RTPRuntime.scheduler().runTaskAsynchronously(task);
+      });
       if (ActiveConfigs.get() == null) continue;
       String msg = String.valueOf(ActiveConfigs.get().getConfigValue(CommandMessages.scanStart, ""));
       if (msg == null || msg.isEmpty()) continue;

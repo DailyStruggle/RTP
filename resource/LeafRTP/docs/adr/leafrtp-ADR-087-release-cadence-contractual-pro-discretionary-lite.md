@@ -41,7 +41,7 @@ The actual difference between the editions is obligation, as with Red Hat Enterp
   - Pro's value is stated as what is actually guaranteed: response and fixes for the buyer's problem.
 - **Negative / Trade-offs:**
   - Lite can lag Pro when the maintainer does not publish a patch to the free channels; that lag is a choice, not a policy, and the code is public either way.
-  - Both workflows still publish under `v<version>`; `release.yml` renames the shared GitHub Release to "rtp-lite <version>" when Lite ships that version.
+  - Both workflows still publish under `v<version>`; `release.yml` titles the shared GitHub Release `"LeafRTP <version>"` when the free default release ships that version.
 
 ## References
 

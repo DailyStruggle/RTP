@@ -523,6 +523,163 @@ public final class LcaRegionWriter {
         return openLiveArchive(lcaFile, -1);
     }
 
+    static boolean patchMcaRegionFile(
+            Path regionFile,
+            int cx,
+            int cz,
+            java.util.Collection<RegionFileReader.BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        if (regionFile == null || !Files.isRegularFile(regionFile)) {
+            return false;
+        }
+        try (FileChannel ch = FileChannel.open(
+                regionFile, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+            long size = ch.size();
+            if (size < 8192L || size > Integer.MAX_VALUE) {
+                return false;
+            }
+            byte[] regionBytes = new byte[(int) size];
+            ByteBuffer readBuf = ByteBuffer.wrap(regionBytes);
+            while (readBuf.hasRemaining()) {
+                if (ch.read(readBuf) < 0) {
+                    break;
+                }
+            }
+            byte[] updated = AnvilReader.patchChunkInMcaBytes(
+                    regionBytes, cx, cz, patches, isReplaceable);
+            if (updated == null || updated.length == 0) {
+                return false;
+            }
+            if (updated != regionBytes) {
+                ch.position(0L);
+                ByteBuffer writeBuf = ByteBuffer.wrap(updated);
+                while (writeBuf.hasRemaining()) {
+                    ch.write(writeBuf);
+                }
+                ch.truncate(updated.length);
+            }
+            return true;
+        }
+    }
+
+    private static final String OPEN_LIVE_ARCHIVES_PROP =
+            "leafcraft.anvil.openLiveArchives";
+
+    @SuppressWarnings("unchecked")
+    private static Map<Path, Object> openLiveArchivesRegistry() {
+        java.util.Properties props = System.getProperties();
+        synchronized (props) {
+            Object existing = props.get(OPEN_LIVE_ARCHIVES_PROP);
+            if (existing instanceof Map<?, ?> map) {
+                return (Map<Path, Object>) map;
+            }
+            Map<Path, Object> created = new ConcurrentHashMap<>();
+            props.put(OPEN_LIVE_ARCHIVES_PROP, created);
+            return created;
+        }
+    }
+
+    static void registerOpenLiveArchive(Path lcaFile, Object archive) {
+        if (lcaFile == null || archive == null) {
+            return;
+        }
+        openLiveArchivesRegistry().putIfAbsent(lcaFile.toAbsolutePath().normalize(), archive);
+    }
+
+    static void unregisterOpenLiveArchive(Path lcaFile, Object archive) {
+        if (lcaFile == null || archive == null) {
+            return;
+        }
+        openLiveArchivesRegistry().remove(lcaFile.toAbsolutePath().normalize(), archive);
+    }
+
+    /**
+     * If {@code regionFile} is currently held open by an active {@link LcaLiveArchive} in this JVM
+     * (including across shaded plugin classloaders such as {@code LeafAnvil}), patches chunk
+     * {@code (rx, rz)} directly through that synchronized live archive instance and returns
+     * {@link Boolean#TRUE} or {@link Boolean#FALSE}. Returns {@code null} when no open live archive
+     * owns {@code regionFile}.
+     */
+    @SuppressWarnings("java:S1168")
+    static Boolean tryPatchOpenLiveArchive(
+            Path regionFile,
+            int rx,
+            int rz,
+            java.util.Collection<RegionFileReader.BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        if (regionFile == null) {
+            return null;
+        }
+        Path norm = regionFile.toAbsolutePath().normalize();
+        Object openArchive = openLiveArchivesRegistry().get(norm);
+        if (openArchive == null) {
+            return null;
+        }
+        synchronized (openArchive) {
+            return invokeOpenArchivePatch(norm, openArchive, rx, rz, patches, isReplaceable);
+        }
+    }
+
+    @SuppressWarnings("java:S1168")
+    private static Boolean invokeOpenArchivePatch(
+            Path norm,
+            Object openArchive,
+            int rx,
+            int rz,
+            java.util.Collection<RegionFileReader.BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable) throws IOException {
+        try {
+            Class<?> cls = openArchive.getClass();
+            boolean isOpen = (boolean) cls.getMethod("isChannelOpen").invoke(openArchive);
+            if (!isOpen) {
+                unregisterOpenLiveArchive(norm, openArchive);
+                return null;
+            }
+            boolean has = (boolean) cls.getMethod("hasChunk", int.class, int.class)
+                    .invoke(openArchive, rx, rz);
+            if (!has) {
+                return Boolean.FALSE;
+            }
+            byte[] rawNbt = (byte[]) cls.getMethod("readChunkNbtBytes", int.class, int.class)
+                    .invoke(openArchive, rx, rz);
+            return applyAndSaveOpenArchiveNbt(cls, openArchive, norm, rx, rz, rawNbt, patches, isReplaceable);
+        } catch (java.lang.reflect.InvocationTargetException ite) {
+            if (ite.getCause() instanceof IOException ioe) {
+                throw ioe;
+            }
+            throw new IOException("Failed to patch open live .lca archive " + norm, ite.getCause());
+        } catch (ReflectiveOperationException roe) {
+            return null;
+        }
+    }
+
+    private static Boolean applyAndSaveOpenArchiveNbt(
+            Class<?> cls,
+            Object openArchive,
+            Path norm,
+            int rx,
+            int rz,
+            byte[] rawNbt,
+            java.util.Collection<RegionFileReader.BlockPatch> patches,
+            java.util.function.Predicate<String> isReplaceable)
+            throws IOException, ReflectiveOperationException {
+        if (rawNbt == null || rawNbt.length == 0) {
+            return Boolean.FALSE;
+        }
+        LinkedHashMap<String, Object> root = Nbt.readRootCompound(rawNbt);
+        if (!RegionFileReader.isFullChunkRoot(root)) {
+            return Boolean.FALSE;
+        }
+        if (patches != null && !patches.isEmpty()
+                && RegionFileReader.applyPatchesToChunkRoot(root, patches, isReplaceable)) {
+            byte[] updatedNbt = Nbt.writeNamedRoot("", root);
+            cls.getMethod("saveChunkNbtBytes", int.class, int.class, byte[].class)
+                    .invoke(openArchive, rx, rz, updatedNbt);
+            LcaRegionReader.invalidateFileCache(norm);
+        }
+        return Boolean.TRUE;
+    }
+
     // Factory method: FileChannel ownership transfers to the returned LcaLiveArchive on success
     @SuppressWarnings({"java:S2095", "java:S2093", "resource"})
     public static LcaLiveArchive openLiveArchive(Path lcaFile, int preferredZstdLevel) throws IOException {
@@ -662,6 +819,7 @@ public final class LcaRegionWriter {
 
         private final TreeMap<Integer, Integer> freeByStart = new TreeMap<>();
         private final TreeMap<Integer, TreeSet<Integer>> freeBySize = new TreeMap<>();
+        private boolean freeSlabPoolInitialized = false;
 
         // 4-epoch CoW grace ring + Epoch-Based Reclamation (EBR) retirement gate (anvil-api-ADR-003 Section 2.3 & T8)
         private static final int COW_GRACE_EPOCHS = 4;
@@ -730,6 +888,7 @@ public final class LcaRegionWriter {
 
             registerOrGetBlockStateId("minecraft:air");
             registerOrGetBiomeId("minecraft:plains");
+            this.freeSlabPoolInitialized = true;
             writeSuperblockAndFooter();
             this.dirty = true;
         }
@@ -768,7 +927,7 @@ public final class LcaRegionWriter {
                     ? existingBytes
                     : Arrays.copyOf(existingBytes, minRequiredCap + 131072);
 
-            List<int[]> allocatedIntervals = new ArrayList<>(1032);
+            int maxCursorSlab = this.slabPoolBaseSlab;
             int segOffset = LcaRegionReader.DICT_ROOT_OFFSET;
             int segCap = this.rootDictCapacityBytes;
             while (true) {
@@ -776,7 +935,10 @@ public final class LcaRegionWriter {
                 int capSlabs = (segCap + 255) >>> LcaRegionReader.SLAB_SHIFT;
                 DictSegmentMeta segMeta = new DictSegmentMeta(segOffset, segCap);
                 if (segOffset >= (this.slabPoolBaseSlab << LcaRegionReader.SLAB_SHIFT)) {
-                    allocatedIntervals.add(new int[] {startSlab, startSlab + capSlabs});
+                    int segEndSlab = startSlab + capSlabs;
+                    if (segEndSlab > maxCursorSlab) {
+                        maxCursorSlab = segEndSlab;
+                    }
                 }
 
                 int segStateCount = LcaSectionCodec.readIntBE(existingBytes, segOffset);
@@ -820,28 +982,21 @@ public final class LcaRegionWriter {
                 segCap = nextCapSlabs24 << LcaRegionReader.SLAB_SHIFT;
             }
 
-            // Scan 1,024 chunk pointers in < 15 us to populate TreeMap free-slab pool (Section 2.3)
+            // Scan 1,024 chunk pointers in < 2 us to find activeEndSlab; TreeMap free-slab pool is built lazily on first write
             for (int i = 0; i < 1024; i++) {
                 long ptr = (long) LcaRegionReader.LONG_BE_VIEW.get(
                         existingBytes, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3));
                 int slabStart = (int) (ptr >>> 29);
                 int byteLen = (int) ((ptr >>> 8) & 0xFFFFFL);
                 if (slabStart > 0 && byteLen > 0) {
-                    int slabs = (byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT;
-                    allocatedIntervals.add(new int[] {slabStart, slabStart + slabs});
+                    int slabEnd = slabStart + ((byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                    if (slabEnd > maxCursorSlab) {
+                        maxCursorSlab = slabEnd;
+                    }
                 }
             }
-            allocatedIntervals.sort((a, b) -> Integer.compare(a[0], b[0]));
-            int cursorSlab = this.slabPoolBaseSlab;
-            for (int[] iv : allocatedIntervals) {
-                if (iv[0] > cursorSlab) {
-                    returnFreeSlabs(cursorSlab, iv[0] - cursorSlab);
-                }
-                if (iv[1] > cursorSlab) {
-                    cursorSlab = iv[1];
-                }
-            }
-            this.activeEndSlab = Math.max(this.slabPoolBaseSlab, cursorSlab);
+            this.activeEndSlab = Math.max(this.slabPoolBaseSlab, maxCursorSlab);
+            this.freeSlabPoolInitialized = false;
             writeFooterCanary();
         }
 
@@ -924,7 +1079,7 @@ public final class LcaRegionWriter {
                 readChannelRangeStatic(ch, initRead, this.buffer, initRead, headerPrefixBytes - initRead, lcaFile);
             }
 
-            List<int[]> allocatedIntervals = new ArrayList<>(1032);
+            int maxCursorSlab = this.slabPoolBaseSlab;
             int segOffset = LcaRegionReader.DICT_ROOT_OFFSET;
             int segCap = this.rootDictCapacityBytes;
             int segmentHops = 0;
@@ -941,7 +1096,10 @@ public final class LcaRegionWriter {
                 int capSlabs = (segCap + 255) >>> LcaRegionReader.SLAB_SHIFT;
                 DictSegmentMeta segMeta = new DictSegmentMeta(segOffset, segCap);
                 if (segOffset >= headerPrefixBytes) {
-                    allocatedIntervals.add(new int[] {startSlab, startSlab + capSlabs});
+                    int segEndSlab = startSlab + capSlabs;
+                    if (segEndSlab > maxCursorSlab) {
+                        maxCursorSlab = segEndSlab;
+                    }
                 }
 
                 byte[] segBuf;
@@ -1001,6 +1159,7 @@ public final class LcaRegionWriter {
             this.headerOnlyChannelMode = true;
 
             boolean hasSecDed = (flags & 16) != 0;
+            boolean verifySlabHeadersOnOpen = !hasSecDed || crashFooterRecovered;
             boolean[] needsOpenScan = null;
             for (int i = 0; i < 1024; i++) {
                 int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
@@ -1041,42 +1200,33 @@ public final class LcaRegionWriter {
                             || slabStartLong > Integer.MAX_VALUE
                             || byteLen < 24
                             || byteEnd > effectivePayloadLimit
-                            || !isSlabValidForChunkOnChannel(ch, ptr, i, effectivePayloadLimit)) {
+                            || (verifySlabHeadersOnOpen && !isSlabValidForChunkOnChannel(ch, ptr, i, effectivePayloadLimit))) {
                         if (needsOpenScan == null) needsOpenScan = new boolean[1024];
                         needsOpenScan[i] = true;
                         continue;
                     }
-                    int slabStart = (int) slabStartLong;
-                    int slabs = (byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT;
-                    allocatedIntervals.add(new int[] {slabStart, slabStart + slabs});
+                    int slabEnd = (int) slabStartLong + ((byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                    if (slabEnd > maxCursorSlab) {
+                        maxCursorSlab = slabEnd;
+                    }
                 }
             }
 
             if (needsOpenScan != null) {
-                reconstructCorruptPointersOnOpen(ch, needsOpenScan, effectivePayloadLimit, allocatedIntervals);
+                int recoveredMaxSlab = reconstructCorruptPointersOnOpen(ch, needsOpenScan, effectivePayloadLimit, null);
+                if (recoveredMaxSlab > maxCursorSlab) {
+                    maxCursorSlab = recoveredMaxSlab;
+                }
             }
 
-            allocatedIntervals.sort((a, b) -> Integer.compare(a[0], b[0]));
-            int cursorSlab = this.slabPoolBaseSlab;
-            for (int[] iv : allocatedIntervals) {
-                if (iv[0] > cursorSlab) {
-                    returnFreeSlabs(cursorSlab, iv[0] - cursorSlab);
-                }
-                if (iv[1] > cursorSlab) {
-                    cursorSlab = iv[1];
-                }
-            }
+            this.freeSlabPoolInitialized = false;
             if (!crashFooterRecovered) {
                 int fileEndSlab = (validByteLength - LcaRegionReader.FOOTER_SIZE) >>> LcaRegionReader.SLAB_SHIFT;
-                if (fileEndSlab > cursorSlab) {
-                    returnFreeSlabs(cursorSlab, fileEndSlab - cursorSlab);
-                    cursorSlab = fileEndSlab;
-                }
-                this.activeEndSlab = Math.max(this.slabPoolBaseSlab, cursorSlab);
+                this.activeEndSlab = Math.max(this.slabPoolBaseSlab, Math.max(maxCursorSlab, fileEndSlab));
                 this.lastSyncedFooterOffset = validByteLength - LcaRegionReader.FOOTER_SIZE;
                 writeFooterCanary();
             } else {
-                this.activeEndSlab = Math.max(this.slabPoolBaseSlab, cursorSlab);
+                this.activeEndSlab = Math.max(this.slabPoolBaseSlab, maxCursorSlab);
                 this.lastSyncedFooterOffset = -1;
                 this.dirty = true;
                 this.crashFooterRepairs++;
@@ -1090,6 +1240,7 @@ public final class LcaRegionWriter {
                     LcaRegionReader.invalidateFileCache(lcaFile);
                 }
             }
+            registerOpenLiveArchive(lcaFile, this);
         }
 
         private boolean isSlabValidForChunkOnChannel(
@@ -1107,7 +1258,7 @@ public final class LcaRegionWriter {
             int headerLen = 24 + (this.sectionCount << 1);
             int headerWords = (headerLen + 7) >>> 3;
             int readLen = Math.min(byteLen, headerLen + headerWords);
-            if (byteOffset + readLen > ch.size()) {
+            if (byteOffset + readLen > effectivePayloadLimit) {
                 return false;
             }
             byte[] hdr = new byte[readLen];
@@ -1126,9 +1277,10 @@ public final class LcaRegionWriter {
                     && ((dvWord >>> 16) & 0x03FF) == expectedChunkIdx;
         }
 
-        private void reconstructCorruptPointersOnOpen(
+        private int reconstructCorruptPointersOnOpen(
                 FileChannel ch, boolean[] needsOpenScan, int effectivePayloadLimit, List<int[]> allocatedIntervals
         ) throws IOException {
+            int maxRecoveredEndSlab = this.slabPoolBaseSlab;
             int headerLen = 24 + (this.sectionCount << 1);
             int headerWords = (headerLen + 7) >>> 3;
             int maxSlab = effectivePayloadLimit >>> LcaRegionReader.SLAB_SHIFT;
@@ -1189,13 +1341,20 @@ public final class LcaRegionWriter {
                     int slabStart = (int) (recoveredPtr >>> 29);
                     int byteLen = (int) ((recoveredPtr >>> 8) & 0xFFFFFL);
                     int slabs = (byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT;
-                    allocatedIntervals.add(new int[] {slabStart, slabStart + slabs});
+                    int endSlab = slabStart + slabs;
+                    if (endSlab > maxRecoveredEndSlab) {
+                        maxRecoveredEndSlab = endSlab;
+                    }
+                    if (allocatedIntervals != null) {
+                        allocatedIntervals.add(new int[] {slabStart, endSlab});
+                    }
                     this.liveSlabScanReconstructions++;
                     this.selfHealingDiagnostics.add("Tier-2 Slab Reverse-Scan reconstructed pointer on open for chunkIdx=" + i);
                 } else {
                     this.selfHealingDiagnostics.add("Cleared unreferenced/dangling crash pointer on open for chunkIdx=" + i);
                 }
             }
+            return maxRecoveredEndSlab;
         }
 
         private int estimateSlabLengthOnChannel(
@@ -1321,11 +1480,11 @@ public final class LcaRegionWriter {
         public long diskChannelBytesWritten() {
             return diskChannelBytesWritten;
         }
-
         synchronized void attachOpenChannel(Path file, FileChannel openChannel) {
             this.backingFile = file;
             this.channel = openChannel;
             this.lastSyncedFooterOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+            registerOpenLiveArchive(file, this);
         }
 
         synchronized void bindBackingFile(Path file, boolean writeInitialState) throws IOException {
@@ -1357,8 +1516,8 @@ public final class LcaRegionWriter {
                         StandardOpenOption.WRITE);
                 this.lastSyncedFooterOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
             }
+            registerOpenLiveArchive(file, this);
         }
-
         private void writeChannelRange(long fileOffset, byte[] src, int srcOffset, int length) throws IOException {
             if (channel == null || !channel.isOpen() || length <= 0) {
                 return;
@@ -1478,6 +1637,7 @@ public final class LcaRegionWriter {
          * Returns the total number of `256B` sub-slabs currently sitting in the free-slab pool.
          */
         public synchronized int freeSlabCount() {
+            ensureFreeSlabPoolInitialized();
             int free = 0;
             for (int count : freeByStart.values()) {
                 free += count;
@@ -1663,44 +1823,42 @@ public final class LcaRegionWriter {
             if (d != null) {
                 return d;
             }
-            List<String> statesSnapshot;
-            List<String> biomesSnapshot;
             synchronized (this) {
                 d = this.cachedParsedDict;
                 if (d != null) {
                     return d;
                 }
-                statesSnapshot = new ArrayList<>(idToBlockState);
-                biomesSnapshot = new ArrayList<>(idToBiome);
+                int stateCount = this.idToBlockState.size();
+                List<String> canonicalStates = new ArrayList<>(stateCount);
+                List<String> baseBlockNames = new ArrayList<>(stateCount);
+                List<List<String>> singletonBasePalettes = new ArrayList<>(stateCount);
+                for (String canonical : this.idToBlockState) {
+                    String baseName = LcaSectionCodec.stripBlockProperties(canonical);
+                    canonicalStates.add(canonical);
+                    baseBlockNames.add(baseName);
+                    singletonBasePalettes.add(List.of(baseName));
+                }
+                int biomeCount = this.idToBiome.size();
+                List<String> biomes = new ArrayList<>(biomeCount);
+                List<List<String>> singletonBiomePalettes = new ArrayList<>(biomeCount);
+                for (String biomeId : this.idToBiome) {
+                    biomes.add(biomeId);
+                    singletonBiomePalettes.add(List.of(biomeId));
+                }
+                int flags = 1 | (modeBZstd ? 8 : 0) | 16;
+                long slabPoolBaseOffset = (long) slabPoolBaseSlab << LcaRegionReader.SLAB_SHIFT;
+                d = new LcaSectionCodec.ParsedHeaderAndDict(
+                        storageKind, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                        flags, slabPoolBaseOffset,
+                        Collections.unmodifiableList(canonicalStates),
+                        Collections.unmodifiableList(baseBlockNames),
+                        Collections.unmodifiableList(singletonBasePalettes),
+                        Collections.unmodifiableList(biomes),
+                        Collections.unmodifiableList(singletonBiomePalettes)
+                );
+                this.cachedParsedDict = d;
+                return d;
             }
-            List<String> canonicalStates = new ArrayList<>(statesSnapshot.size());
-            List<String> baseBlockNames = new ArrayList<>(statesSnapshot.size());
-            List<List<String>> singletonBasePalettes = new ArrayList<>(statesSnapshot.size());
-            for (String canonical : statesSnapshot) {
-                String baseName = LcaSectionCodec.stripBlockProperties(canonical);
-                canonicalStates.add(canonical);
-                baseBlockNames.add(baseName);
-                singletonBasePalettes.add(List.of(baseName));
-            }
-            List<String> biomes = new ArrayList<>(biomesSnapshot.size());
-            List<List<String>> singletonBiomePalettes = new ArrayList<>(biomesSnapshot.size());
-            for (String biomeId : biomesSnapshot) {
-                biomes.add(biomeId);
-                singletonBiomePalettes.add(List.of(biomeId));
-            }
-            int flags = 1 | (modeBZstd ? 8 : 0) | 16;
-            long slabPoolBaseOffset = (long) slabPoolBaseSlab << LcaRegionReader.SLAB_SHIFT;
-            d = new LcaSectionCodec.ParsedHeaderAndDict(
-                    storageKind, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
-                    flags, slabPoolBaseOffset,
-                    Collections.unmodifiableList(canonicalStates),
-                    Collections.unmodifiableList(baseBlockNames),
-                    Collections.unmodifiableList(singletonBasePalettes),
-                    Collections.unmodifiableList(biomes),
-                    Collections.unmodifiableList(singletonBiomePalettes)
-            );
-            this.cachedParsedDict = d;
-            return d;
         }
 
         /**
@@ -1732,6 +1890,7 @@ public final class LcaRegionWriter {
                     }
                     long payloadStartOffset = slabOffset35 << LcaRegionReader.SLAB_SHIFT;
                     long maxEnd = (long) activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+                    int hazardSlot = LcaRegionReader.pinHazardSlab((int) slabOffset35);
                     try {
                         if (payloadStartOffset < LcaRegionReader.DICT_ROOT_OFFSET
                                 || exactByteLen20 > LcaRegionReader.MAX_CHUNK_UNCOMPRESSED_BYTES
@@ -1740,14 +1899,30 @@ public final class LcaRegionWriter {
                         }
                         byte[] rawSlab = readAndHealChannelSlab(
                                 ch, backingFile, rx, rz, payloadStartOffset, codec1, exactByteLen20);
+                        VarHandle.loadLoadFence();
+                        long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
+                        if (ptrAfter != ptr && attempt == 0) {
+                            continue;
+                        }
                         return LcaRegionReader.decodeChunkFromRawSlab(
                                 getOrBuildParsedHeaderAndDict(),
                                 rx, rz, ptrByteOffset, ptr, codec1, exactByteLen20, generation8, rawSlab);
+                    } catch (java.nio.channels.ClosedChannelException e) {
+                        if (backingFile != null) {
+                            return LcaRegionReader.readChunkFromFile(backingFile, rx, rz);
+                        }
+                        throw e;
                     } catch (CorruptRegionEntryException e) {
-                        if (attempt == 0 && tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch)) {
+                        if (!ch.isOpen() && backingFile != null) {
+                            return LcaRegionReader.readChunkFromFile(backingFile, rx, rz);
+                        }
+                        long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
+                        if (attempt == 0 && (ptrAfter != ptr || tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch))) {
                             continue;
                         }
                         throw e;
+                    } finally {
+                        LcaRegionReader.unpinHazardSlab(hazardSlot);
                     }
                 }
             }
@@ -1802,6 +1977,7 @@ public final class LcaRegionWriter {
                     }
                     long payloadStartOffset = slabOffset35 << LcaRegionReader.SLAB_SHIFT;
                     long maxEnd = (long) this.activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+                    int hazardSlot = LcaRegionReader.pinHazardSlab((int) slabOffset35);
                     try {
                         if (payloadStartOffset < LcaRegionReader.DICT_ROOT_OFFSET
                                 || exactByteLen20 > LcaRegionReader.MAX_CHUNK_UNCOMPRESSED_BYTES
@@ -1810,14 +1986,30 @@ public final class LcaRegionWriter {
                         }
                         byte[] rawSlab = readAndHealChannelSlab(
                                 ch, bf, rx, rz, payloadStartOffset, codec1, exactByteLen20);
+                        VarHandle.loadLoadFence();
+                        long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
+                        if (ptrAfter != ptr && attempt == 0) {
+                            continue;
+                        }
                         return LcaRegionReader.decodeChunkNbtBytesFromRawSlab(
                                 getOrBuildParsedHeaderAndDict(),
                                 rx, rz, ptrByteOffset, ptr, codec1, exactByteLen20, generation8, rawSlab);
+                    } catch (java.nio.channels.ClosedChannelException e) {
+                        if (bf != null) {
+                            return LcaRegionReader.readChunkNbtBytesFromFile(bf, rx, rz);
+                        }
+                        throw e;
                     } catch (CorruptRegionEntryException e) {
-                        if (attempt == 0 && tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch)) {
+                        if (!ch.isOpen() && bf != null) {
+                            return LcaRegionReader.readChunkNbtBytesFromFile(bf, rx, rz);
+                        }
+                        long ptrAfter = LcaRegionReader.getVolatileLongBE(this.buffer, ptrByteOffset);
+                        if (attempt == 0 && (ptrAfter != ptr || tryRecoverLiveChunkPointer(rx, rz, chunkIdx, ch))) {
                             continue;
                         }
                         throw e;
+                    } finally {
+                        LcaRegionReader.unpinHazardSlab(hazardSlot);
                     }
                 }
             }
@@ -1917,7 +2109,20 @@ public final class LcaRegionWriter {
             persistPointerAndSecDed(chunkIdx);
 
             int oldSlabs = (oldByteLen + 255) >>> LcaRegionReader.SLAB_SHIFT;
-            returnFreeSlabs(oldSlabStart, oldSlabs);
+            int evictedStart = graceSlabStarts[graceCursor];
+            int evictedCount = graceSlabCounts[graceCursor];
+            if (evictedStart > 0 && evictedCount > 0) {
+                graceSlabStarts[graceCursor] = 0;
+                graceSlabCounts[graceCursor] = 0;
+                if (!LcaRegionReader.isSlabRangePinned(evictedStart, evictedCount)) {
+                    returnFreeSlabs(evictedStart, evictedCount);
+                } else {
+                    deferredRetireSlabs.add(new long[] {evictedStart, evictedCount, 0L});
+                }
+            }
+            graceSlabStarts[graceCursor] = oldSlabStart;
+            graceSlabCounts[graceCursor] = oldSlabs;
+            graceCursor = (graceCursor + 1) & (COW_GRACE_EPOCHS - 1);
             cachedHeightmapRef[chunkIdx] = null;
             cachedResidualBytes[chunkIdx] = null;
             return true;
@@ -1949,12 +2154,20 @@ public final class LcaRegionWriter {
             deferredRetireSlabs.clear();
             freeByStart.clear();
             freeBySize.clear();
+            freeSlabPoolInitialized = true;
 
-            // Collect all live chunk slabs in index order
+            // Collect all live chunk slabs in index order (single coalesced pread in headerOnlyChannelMode)
             byte[][] liveChunkPayloads = new byte[1024][];
             int[] liveChunkGens = new int[1024];
             boolean[] liveChunkModeB = new boolean[1024];
             int totalLiveSlabCount = 0;
+            int poolBaseByteOff = slabPoolBaseSlab << LcaRegionReader.SLAB_SHIFT;
+            int poolEndByteOff = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
+            byte[] coalescedPool = null;
+            if (headerOnlyChannelMode && channel != null && channel.isOpen() && poolEndByteOff > poolBaseByteOff) {
+                coalescedPool = new byte[poolEndByteOff - poolBaseByteOff];
+                readChannelRangeStatic(channel, poolBaseByteOff, coalescedPool, 0, coalescedPool.length, backingFile);
+            }
             for (int i = 0; i < 1024; i++) {
                 long ptr = LcaRegionReader.getVolatileLongBE(
                         buffer, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3));
@@ -1962,7 +2175,11 @@ public final class LcaRegionWriter {
                 int byteLen = (int) ((ptr >>> 8) & 0xFFFFFL);
                 if (slabStart > 0 && byteLen > 0) {
                     int byteOff = slabStart << LcaRegionReader.SLAB_SHIFT;
-                    if (headerOnlyChannelMode && channel != null && channel.isOpen()) {
+                    if (coalescedPool != null && byteOff >= poolBaseByteOff
+                            && (byteOff - poolBaseByteOff) + byteLen <= coalescedPool.length) {
+                        int relOff = byteOff - poolBaseByteOff;
+                        liveChunkPayloads[i] = Arrays.copyOfRange(coalescedPool, relOff, relOff + byteLen);
+                    } else if (headerOnlyChannelMode && channel != null && channel.isOpen()) {
                         byte[] pay = new byte[byteLen];
                         readChannelRangeStatic(channel, byteOff, pay, 0, byteLen, backingFile);
                         liveChunkPayloads[i] = pay;
@@ -2001,6 +2218,10 @@ public final class LcaRegionWriter {
                 for (int s = 0; s < dictSegments.size(); s++) {
                     flushDictSegment(dictSegments.get(s));
                 }
+                int chunkStartSlab = cursorSlab;
+                int chunkStartByteOff = chunkStartSlab << LcaRegionReader.SLAB_SHIFT;
+                int totalChunkPoolBytes = (totalLiveSlabCount << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE;
+                byte[] packedChunkPool = new byte[totalChunkPoolBytes];
                 for (int i = 0; i < 1024; i++) {
                     byte[] payload = liveChunkPayloads[i];
                     int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
@@ -2012,13 +2233,17 @@ public final class LcaRegionWriter {
                     int slabs = (payload.length + 255) >>> LcaRegionReader.SLAB_SHIFT;
                     int targetSlab = cursorSlab;
                     cursorSlab += slabs;
-                    writeSlabBytes(targetSlab, payload);
+                    int relDst = (targetSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
+                    System.arraycopy(payload, 0, packedChunkPool, relDst, payload.length);
                     long newPtr = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
                     buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
                     LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
                 }
                 activeEndSlab = cursorSlab;
-                lastSyncedFooterOffset = -1;
+                int footerRelOff = (activeEndSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
+                LcaRegionReader.setVolatileLongBE(packedChunkPool, footerRelOff, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
+                writeChannelRange(chunkStartByteOff, packedChunkPool, 0, packedChunkPool.length);
+                lastSyncedFooterOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
                 writeChannelRange(
                         LcaRegionReader.POINTER_DIRECTORY_OFFSET,
                         buffer,
@@ -2029,7 +2254,6 @@ public final class LcaRegionWriter {
                         buffer,
                         secDedTableOffset,
                         LcaRegionReader.SECDED_TABLE_SIZE);
-                writeFooterCanary();
                 channel.truncate(activeByteLength());
                 if (backingFile != null) {
                     LcaRegionReader.invalidateFileCache(backingFile);
@@ -2111,6 +2335,7 @@ public final class LcaRegionWriter {
                     dirty = false;
                 }
             } finally {
+                unregisterOpenLiveArchive(backingFile, this);
                 if (channel != null) {
                     try {
                         channel.close();
@@ -2131,6 +2356,7 @@ public final class LcaRegionWriter {
                     flush();
                 }
             } finally {
+                unregisterOpenLiveArchive(backingFile, this);
                 if (channel != null) {
                     try {
                         channel.close();
@@ -3383,10 +3609,6 @@ public final class LcaRegionWriter {
             pos += utfBytes.length;
             int materialPacked = computeLeafMapMaterialPacked(canonicalState);
             rawEntry[pos] = (byte) ((materialPacked >>> 24) & 0xFF);
-            rawEntry[pos + 1] = (byte) ((materialPacked >>> 16) & 0xFF);
-            rawEntry[pos + 2] = (byte) ((materialPacked >>> 8) & 0xFF);
-            rawEntry[pos + 3] = (byte) (materialPacked & 0xFF);
-
             DictSegmentMeta activeSeg = ensureDictSegmentCapacity(rawEntry.length);
             activeSeg.stateEntries.add(rawEntry);
             activeSeg.usedPayloadBytes += rawEntry.length;
@@ -3399,6 +3621,7 @@ public final class LcaRegionWriter {
             }
             int newId = idToBlockState.size();
             idToBlockState.add(canonicalState);
+            cachedParsedDict = null;
             blockStateToId.put(canonicalState, newId);
             return newId;
         }
@@ -3439,11 +3662,12 @@ public final class LcaRegionWriter {
             }
             int newId = idToBiome.size();
             idToBiome.add(biomeId);
+            cachedParsedDict = null;
             biomeToId.put(biomeId, newId);
             return newId;
         }
 
-        private DictSegmentMeta ensureDictSegmentCapacity(int entryBytes) {
+        private synchronized DictSegmentMeta ensureDictSegmentCapacity(int entryBytes) {
             DictSegmentMeta current = dictSegments.get(dictSegments.size() - 1);
             if (current.availableSlackBytes() >= entryBytes) {
                 return current;
@@ -3480,7 +3704,7 @@ public final class LcaRegionWriter {
             }
         }
 
-        private void rollbackDictionaryToBookmark(int stateBookmark, int biomeBookmark, int segBookmark) {
+        private synchronized void rollbackDictionaryToBookmark(int stateBookmark, int biomeBookmark, int segBookmark) {
             boolean modified = false;
             while (idToBlockState.size() > stateBookmark) {
                 String removed = idToBlockState.remove(idToBlockState.size() - 1);
@@ -3512,17 +3736,19 @@ public final class LcaRegionWriter {
                 dictSegments.remove(dictSegments.size() - 1);
                 modified = true;
             }
-            if (modified && !dictSegments.isEmpty()) {
-                DictSegmentMeta tail = dictSegments.get(dictSegments.size() - 1);
-                tail.linkTrailer = 0L;
-                try {
-                    flushDictSegment(tail);
-                } catch (RuntimeException ignored) {
+            if (modified) {
+                cachedParsedDict = null;
+                if (!dictSegments.isEmpty()) {
+                    DictSegmentMeta tail = dictSegments.get(dictSegments.size() - 1);
+                    tail.linkTrailer = 0L;
+                    try {
+                        flushDictSegment(tail);
+                    } catch (RuntimeException ignored) {
+                    }
                 }
             }
         }
-
-        private void flushDictSegment(DictSegmentMeta seg) {
+        private synchronized void flushDictSegment(DictSegmentMeta seg) {
             int offset = seg.byteOffset();
             int capBytes = seg.capacityBytes();
             cachedParsedDict = null;
@@ -3554,7 +3780,54 @@ public final class LcaRegionWriter {
             writeChannelRangeUnchecked(offset, staged, 0, capBytes);
         }
 
-        private int allocateSlabs(int neededSlabs, boolean trackTelemetry) {
+        private synchronized void ensureFreeSlabPoolInitialized() {
+            if (freeSlabPoolInitialized) {
+                return;
+            }
+            freeSlabPoolInitialized = true;
+            int maxIntervals = 1024 + dictSegments.size();
+            long[] packedIntervals = new long[maxIntervals];
+            int count = 0;
+            for (int s = 0; s < dictSegments.size(); s++) {
+                DictSegmentMeta seg = dictSegments.get(s);
+                int startSlab = seg.byteOffset >>> LcaRegionReader.SLAB_SHIFT;
+                if (startSlab >= this.slabPoolBaseSlab) {
+                    int endSlab = startSlab + ((seg.capacityBytes + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                    packedIntervals[count++] = ((long) startSlab << 32) | (endSlab & 0xFFFF_FFFFL);
+                }
+            }
+            for (int i = 0; i < 1024; i++) {
+                long ptr = (long) LcaRegionReader.LONG_BE_VIEW.get(
+                        this.buffer, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3));
+                if (ptr != 0L) {
+                    int slabStart = (int) (ptr >>> 29);
+                    int byteLen = (int) ((ptr >>> 8) & 0xFFFFFL);
+                    if (slabStart >= this.slabPoolBaseSlab && byteLen > 0) {
+                        int slabEnd = slabStart + ((byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                        packedIntervals[count++] = ((long) slabStart << 32) | (slabEnd & 0xFFFF_FFFFL);
+                    }
+                }
+            }
+            Arrays.sort(packedIntervals, 0, count);
+            int cursorSlab = this.slabPoolBaseSlab;
+            for (int k = 0; k < count; k++) {
+                long iv = packedIntervals[k];
+                int start = (int) (iv >>> 32);
+                int end = (int) iv;
+                if (start > cursorSlab) {
+                    returnFreeSlabs(cursorSlab, start - cursorSlab);
+                }
+                if (end > cursorSlab) {
+                    cursorSlab = end;
+                }
+            }
+            if (this.activeEndSlab > cursorSlab) {
+                returnFreeSlabs(cursorSlab, this.activeEndSlab - cursorSlab);
+            }
+        }
+
+        private synchronized int allocateSlabs(int neededSlabs, boolean trackTelemetry) {
+            ensureFreeSlabPoolInitialized();
             NavigableMap<Integer, TreeSet<Integer>> tail = freeBySize.tailMap(neededSlabs, true);
             if (!tail.isEmpty()) {
                 Map.Entry<Integer, TreeSet<Integer>> bestFitEntry = tail.firstEntry();
@@ -3592,7 +3865,7 @@ public final class LcaRegionWriter {
             return chosenStart;
         }
 
-        private void rollbackAllocatedSlabs(
+        private synchronized void rollbackAllocatedSlabs(
                 int allocatedStart,
                 int allocatedCount,
                 int prevActiveEndSlab,
@@ -3635,8 +3908,9 @@ public final class LcaRegionWriter {
             }
         }
 
-        private void returnFreeSlabs(int slabStart, int slabCount) {
+        private synchronized void returnFreeSlabs(int slabStart, int slabCount) {
             if (slabCount <= 0) return;
+            ensureFreeSlabPoolInitialized();
             int mergedStart = slabStart;
             int mergedCount = slabCount;
 
@@ -3656,12 +3930,12 @@ public final class LcaRegionWriter {
             insertFreeInterval(mergedStart, mergedCount);
         }
 
-        private void insertFreeInterval(int start, int count) {
+        private synchronized void insertFreeInterval(int start, int count) {
             freeByStart.put(start, count);
             freeBySize.computeIfAbsent(count, k -> new TreeSet<>()).add(start);
         }
 
-        private void removeFreeInterval(int start, int count) {
+        private synchronized void removeFreeInterval(int start, int count) {
             freeByStart.remove(start);
             TreeSet<Integer> set = freeBySize.get(count);
             if (set != null) {
@@ -3672,7 +3946,7 @@ public final class LcaRegionWriter {
             }
         }
 
-        private void writeSlabBytes(int startSlab, byte[] payload) {
+        private synchronized void writeSlabBytes(int startSlab, byte[] payload) {
             int byteOffset = startSlab << LcaRegionReader.SLAB_SHIFT;
             int paddedBytes = ((payload.length + 255) >>> LcaRegionReader.SLAB_SHIFT) << LcaRegionReader.SLAB_SHIFT;
             int footerOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
@@ -3714,14 +3988,14 @@ public final class LcaRegionWriter {
             writeChannelRangeUnchecked(byteOffset, buffer, byteOffset, paddedBytes);
         }
 
-        private void ensureBufferCapacity(int minCapacity) {
+        private synchronized void ensureBufferCapacity(int minCapacity) {
             if (minCapacity <= buffer.length) return;
             int step = Math.min(Math.max(buffer.length >>> 2, 16384), 262144);
             int newCap = Math.max(minCapacity, buffer.length + step);
             buffer = Arrays.copyOf(buffer, newCap);
         }
 
-        private void writeSuperblockAndFooter() {
+        private synchronized void writeSuperblockAndFooter() {
             int slabPoolBaseOffset = slabPoolBaseSlab << LcaRegionReader.SLAB_SHIFT;
             ensureBufferCapacity(slabPoolBaseOffset + LcaRegionReader.FOOTER_SIZE);
             ByteBuffer bb = ByteBuffer.wrap(buffer, 0, LcaRegionReader.SUPERBLOCK_SIZE);
@@ -3745,7 +4019,7 @@ public final class LcaRegionWriter {
             writeFooterCanary();
         }
 
-        private void writeFooterCanary() {
+        private synchronized void writeFooterCanary() {
             int footerOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
             if (headerOnlyChannelMode) {
                 if (channel != null && channel.isOpen() && footerOffset != lastSyncedFooterOffset) {

@@ -19,7 +19,7 @@ class RespProtocolFuzzTest {
         try {
             ByteArrayInputStream in = new ByteArrayInputStream(data);
             RespProtocol.readReply(in);
-        } catch (RespException | IOException | NumberFormatException expected) {
+        } catch (RespException | IOException expected) {
             // Expected safe fail-closed exceptions for corrupt or out-of-bounds streams
         }
     }

@@ -117,6 +117,25 @@ class TinyJsonReaderTest {
   }
 
   @Test
+  @DisplayName("rejects non-hex and signed \\u escape with JsonParseException")
+  void rejectsMalformedUnicodeEscape() {
+    assertThrows(
+        TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("\"\\uek??\""));
+    assertThrows(
+        TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("\"\\u+041\""));
+    assertThrows(
+        TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse("\"\\u-041\""));
+  }
+
+  @Test
+  @DisplayName("rejects nesting deeper than MAX_DEPTH with JsonParseException")
+  void rejectsDeepNesting() {
+    int depth = TinyJsonReader.MAX_DEPTH + 2;
+    String nested = "[".repeat(depth) + "]".repeat(depth);
+    assertThrows(TinyJsonReader.JsonParseException.class, () -> TinyJsonReader.parse(nested));
+  }
+
+  @Test
   @DisplayName("rejects floating-point numbers — outside supported subset")
   void rejectsFloat() {
     // The reader consumes 1, then sees '.' as trailing garbage.

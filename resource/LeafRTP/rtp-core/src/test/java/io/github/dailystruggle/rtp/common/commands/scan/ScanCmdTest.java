@@ -1023,4 +1023,59 @@ public class ScanCmdTest {
         assertTrue(resetResult);
         assertEquals(expected, shape.spatialResolution(), "'auto' spatialResolution should resolve via shape on scan reset");
     }
+
+    @Test
+    void scanCommands_offloadDiskIoToAsyncScheduler() throws Exception {
+        java.io.File dir = new java.io.File(tempDir.toFile(), "database" + java.io.File.separator + "regionData");
+        assertTrue(dir.mkdirs() || dir.isDirectory());
+        java.io.File scanFile = new java.io.File(dir, "default.scan");
+        assertTrue(scanFile.createNewFile() || scanFile.exists());
+
+        List<Runnable> queuedAsync = new ArrayList<>();
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler delegate = RTPRuntime.scheduler();
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler queuingScheduler = spy(delegate);
+        doAnswer(inv -> {
+            queuedAsync.add(inv.getArgument(0));
+            return null;
+        }).when(queuingScheduler).runTaskAsynchronously(any(Runnable.class));
+        RTPRuntime.setScheduler(queuingScheduler);
+
+        // 1. ScanStartCmd must not delete default.scan synchronously on the command thread
+        assertTrue(scanStartCmd.onCommand(senderId, paramsWithRegion("default"), null));
+        assertTrue(scanFile.exists(), "ScanStartCmd must offload ScanTask.delete and shape.save to async scheduler");
+        assertFalse(queuedAsync.isEmpty(), "ScanStartCmd must schedule async work");
+        ScanTasks.current().clear();
+        while (!queuedAsync.isEmpty()) {
+            Runnable r = queuedAsync.remove(0);
+            if (!(r instanceof ScanTask)) {
+                r.run();
+            }
+        }
+        assertFalse(scanFile.exists(), "Async task from ScanStartCmd must delete default.scan");
+
+        // 2. ScanPauseCmd must not call shape.save synchronously on the command thread
+        ScanTask runningTask = makeFakeTask();
+        ScanTasks.current().put("default", runningTask);
+        queuedAsync.clear();
+        java.io.File datFile = new java.io.File(dir, "shapeData_" + region.name + "_" + region.cacheKey() + ".dat");
+        if (datFile.exists()) {
+            assertTrue(datFile.delete());
+        }
+        assertTrue(scanPauseCmd.onCommand(senderId, paramsWithRegion("default"), null));
+        assertFalse(datFile.exists(), "ScanPauseCmd must not synchronously write shape file on the command thread");
+        while (!queuedAsync.isEmpty()) {
+            queuedAsync.remove(0).run();
+        }
+        ScanTasks.current().clear();
+
+        // 3. ScanResetCmd must not delete default.scan synchronously on the command thread
+        assertTrue(scanFile.createNewFile() || scanFile.exists());
+        assertTrue(scanResetCmd.onCommand(senderId, paramsWithRegion("default"), null));
+        assertTrue(scanFile.exists(), "ScanResetCmd must offload ScanTask.delete and shape.save to async scheduler");
+        assertFalse(queuedAsync.isEmpty(), "ScanResetCmd must schedule async reset I/O");
+        while (!queuedAsync.isEmpty()) {
+            queuedAsync.remove(0).run();
+        }
+        assertFalse(scanFile.exists(), "Async task from ScanResetCmd must delete default.scan");
+    }
 }

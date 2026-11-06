@@ -12,6 +12,7 @@ import io.github.dailystruggle.server.api.BlockBreakContext;
 import io.github.dailystruggle.server.api.BlockPos3i;
 import io.github.dailystruggle.server.api.BookMenuSpec;
 import io.github.dailystruggle.server.api.CallerLocation;
+import io.github.dailystruggle.server.api.ChunkLoadContext;
 import io.github.dailystruggle.server.api.PlayerBedEnterContext;
 import io.github.dailystruggle.server.api.PlayerBedLeaveContext;
 import io.github.dailystruggle.server.api.PlayerInteractBlockContext;
@@ -36,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.EntitySleepEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
@@ -249,6 +251,19 @@ public class FabricModServerAccessor extends AbstractModServerAccessor {
             dispatchingPlayerLifecycleHook().fireQuit(handler.player.getUUID());
           }
         });
+    ServerChunkEvents.CHUNK_LOAD.register(
+        (level, chunk, generated) -> {
+          if (level == null || chunk == null) return;
+          String worldName = resolveWorldName(level);
+          dispatchingWorldEventHook()
+              .fireChunkLoad(
+                  new ChunkLoadContext(
+                      worldName,
+                      chunk.getPos().x(),
+                      chunk.getPos().z(),
+                      generated,
+                      level.getSeed()));
+        });
   }
 
   private void ensureTickRegistered() {
@@ -380,6 +395,37 @@ public class FabricModServerAccessor extends AbstractModServerAccessor {
     return InteractionResult.PASS;
   }
 
+  /**
+   * Dispatches a tree-grow event to all active {@link FabricModServerAccessor} instances when
+   * {@code TreeGrower#growTree} runs (from either natural random ticks or bone meal).
+   *
+   * @return {@code true} if any listener cancelled vanilla tree growth
+   */
+  public static boolean onTreeGrow(ServerLevel level, BlockPos pos, BlockState state) {
+    if (level == null || pos == null || state == null) return false;
+    String blockKey = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+    boolean onLiquid =
+        !level.getFluidState(pos).isEmpty() || !level.getFluidState(pos.below()).isEmpty();
+    String worldName = resolveWorldName(level);
+    boolean cancelled = false;
+    for (FabricModServerAccessor accessor : ACTIVE_ACCESSORS) {
+      SaplingGrowContext ctx =
+          new SaplingGrowContext(
+              worldName,
+              pos.getX(),
+              pos.getY(),
+              pos.getZ(),
+              blockKey,
+              accessor.getBiomeKey(worldName, pos.getX(), pos.getY(), pos.getZ()),
+              onLiquid);
+      accessor.dispatchingWorldEventHook().fireSaplingGrow(ctx);
+      if (ctx.isCancelled()) {
+        cancelled = true;
+      }
+    }
+    return cancelled;
+  }
+
   private static Map<String, String> extractItemTags(ItemStack stack) {
     if (stack == null || stack.isEmpty()) return Map.of();
     CustomData data = stack.get(DataComponents.CUSTOM_DATA);
@@ -454,7 +500,7 @@ public class FabricModServerAccessor extends AbstractModServerAccessor {
   @Override
   public String getBiomeKey(String worldName, int x, int y, int z) {
     ServerLevel level = resolveLevel(worldName);
-    if (level == null) return "minecraft:plains";
+    if (level == null || !level.hasChunk(x >> 4, z >> 4)) return "minecraft:plains";
     return level
         .getBiome(new BlockPos(x, y, z))
         .unwrapKey()

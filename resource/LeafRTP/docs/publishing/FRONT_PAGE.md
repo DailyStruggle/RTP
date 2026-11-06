@@ -23,9 +23,9 @@ Voice (RULES.md D-006): first person, plain, no sales language. One person
 maintains this as a community project; write like that.
 Prefer numbers and caveats over adjectives. ASCII punctuation only.
 Images: local relative paths (e.g. ![alt](../assets/img/pic.png)); build_front_pages.py
-validates existence on disk and rewrites them to raw.githubusercontent.com URLs.
+validates existence on disk and rewrites them to absolute asset URLs.
 Doc links: relative paths (e.g. [text](../admin/COMMANDS.md#anchor)) are also
-validated on disk and rewritten: published docs become dailystruggle.github.io/RTP
+validated on disk and rewritten: published docs become docs.leafcraft.net/mc
 page URLs, anything else (code, directories, unpublished docs) becomes a GitHub URL.
 Prefer these over hand-written website URLs so a renamed or deleted page fails the build.
 
@@ -142,8 +142,8 @@ Private / Author notes:
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://adoptium.net/)
-[![Platforms](https://img.shields.io/badge/Platforms-Paper%20%7C%20Folia%20%7C%20Fabric%20%7C%20NeoForge%20%7C%20Velocity-orange)](https://dailystruggle.github.io/RTP/admin/QUICK_START/)
-[![Web Editor](https://img.shields.io/badge/Tooling-Visual%20Web%20Editor-2ea44f)](https://dailystruggle.github.io/RTP/editor/)
+[![Platforms](https://img.shields.io/badge/Platforms-Paper%20%7C%20Folia%20%7C%20Fabric%20%7C%20NeoForge%20%7C%20Velocity-orange)](https://docs.leafcraft.net/mc/admin/QUICK_START/)
+[![Web Editor](https://img.shields.io/badge/Tooling-Visual%20Web%20Editor-2ea44f)](https://docs.leafcraft.net/mc/editor/)
 <!-- only: markdown -->
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=coverage)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=bugs)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
@@ -182,19 +182,19 @@ On Folia, spots are checked against the world files on disk first, nothing waits
 
 **Ready on first start, with a visual browser map (`/rtp editor`), 18+ claim integrations, and 5 ms median `/rtp` response (Paper).**
 
-- [**Easy**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): draw region borders on a map in your browser (`/rtp editor`), run the 60-second `/rtp admin setup` wizard, or edit two distance settings (`radius` and `centerRadius`).
-- [**Safe**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): checks solid ground, slopes, hazards, and 16 claim plugins on Bukkit / Paper / Folia plus FTB Chunks and Open Parties and Claims on Fabric / NeoForge before teleporting.
+- [**Easy**](https://docs.leafcraft.net/mc/admin/WEB_EDITOR_GUIDE/): draw region borders on a map in your browser (`/rtp editor`), run the 60-second `/rtp admin setup` wizard, or edit two distance settings (`radius` and `centerRadius`).
+- [**Safe**](https://docs.leafcraft.net/mc/admin/CLAIM_PLUGIN_COMPATIBILITY/): checks solid ground, slopes, hazards, and 16 claim plugins on Bukkit / Paper / Folia plus FTB Chunks and Open Parties and Claims on Fabric / NeoForge before teleporting.
 - [**Fast**](#performance): 5 ms median from `/rtp` to arrival on Paper from a queue of pre-checked spots, up to 40 teleports per second on Paper and 180 per second on Folia at full server speed.
-- [**Portable**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads your BetterRTP, JustRTP or EzRTP config, previews it, and never overwrites without `overwrite=true`.
-- [**One jar**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): the same core on Paper, Spigot, Folia, Fabric and NeoForge, and on Velocity for `/rtp` across a network.
+- [**Portable**](https://docs.leafcraft.net/mc/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads your BetterRTP, JustRTP or EzRTP config, previews it, and never overwrites without `overwrite=true`.
+- [**One jar**](https://docs.leafcraft.net/mc/admin/QUICK_START/): the same core on Paper, Spigot, Folia, Fabric and NeoForge, and on Velocity for `/rtp` across a network.
 
 <details>
 <summary><b>More highlights</b></summary>
 
 - [**Distinct**](../site/how-it-works.md#spacing-between-players): spreads players evenly across the region so landings stay far apart without tracking player coordinates.
 - [**Custom terrain**](../site/how-it-works.md#region-file-pre-filter): spots are read from the world files on disk, including Iris, Terra, datapack and upgraded worlds.
-- [**Action engine**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): step-in wilderness portals, launch pads, party scatter, and claim or teammate teleports.
-- [**Self-checking**](https://dailystruggle.github.io/RTP/admin/configuration/BIT/): `/rtp reload` and `/rtp test` verify config files, region settings, and claim hooks before applying changes.
+- [**Action engine**](https://docs.leafcraft.net/mc/admin/ACTIONS/): step-in wilderness portals, launch pads, party scatter, and claim or teammate teleports.
+- [**Self-checking**](https://docs.leafcraft.net/mc/admin/configuration/BIT/): `/rtp reload` and `/rtp test` verify config files, region settings, and claim hooks before applying changes.
 
 </details>
 
@@ -204,9 +204,9 @@ Benchmark comparisons and hardware metrics are in [Performance](#performance).
 
 These work without extra plugins:
 
-- [**Spawn portals & launch pads**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Step-in trigger zones over portal frames or launch pads run teleports, with an optional countdown hologram and effects.
-- [**First-join random spawn**](https://dailystruggle.github.io/RTP/admin/RECIPES/#rtp-on-first-join-random-spawn-for-new-players): Grant `rtp.onevent.firstjoin` to send new players to random spots on login. A reserve cache keeps a destination ready.
-- [**Survival and resource worlds**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/): Players land far apart across the world border without clumping near spawn, with separate regions or radii per world (Overworld, Nether, End, or resource worlds).
+- [**Spawn portals & launch pads**](https://docs.leafcraft.net/mc/admin/ACTIONS/): Step-in trigger zones over portal frames or launch pads run teleports, with an optional countdown hologram and effects.
+- [**First-join random spawn**](https://docs.leafcraft.net/mc/admin/RECIPES/#rtp-on-first-join-random-spawn-for-new-players): Grant `rtp.onevent.firstjoin` to send new players to random spots on login. A reserve cache keeps a destination ready.
+- [**Survival and resource worlds**](https://docs.leafcraft.net/mc/admin/configuration/REGIONS/): Players land far apart across the world border without clumping near spawn, with separate regions or radii per world (Overworld, Nether, End, or resource worlds).
 
 More setups: [Features](../site/features.md#common-setups), [recipes](../admin/RECIPES.md), [actions guide](../admin/ACTIONS.md).
 
@@ -219,9 +219,9 @@ More setups: [Features](../site/features.md#common-setups), [recipes](../admin/R
 
 1. Drop `{{jar}}` into `plugins/` (Spigot, Paper, Folia, Velocity, BungeeCord) or `mods/` (Fabric, NeoForge) and start the server.
 2. Type `/rtp` (or `/wild`).
-3. **Optional - adjust borders or settings:** Most servers only change `radius: 4096b` and `centerRadius: 1024b` in `definitions/regions/default.yml`. Run `/rtp editor` to drag borders on a browser map ([web workspace guide](../admin/WEB_EDITOR_GUIDE.md)), `/rtp admin setup` for the in-game wizard ([quick-start guide](../admin/QUICK_START.md)), or `/rtp config import` to migrate from BetterRTP, JustRTP, or EzRTP ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
+3. **Optional - adjust borders or settings:** Most servers only change `radius: 4096b` and `centerRadius: 1024b` in `definitions/regions/default.yml`. Run `/rtp editor` to drag borders on a browser map ([web workspace guide](../admin/WEB_EDITOR_GUIDE.md)), `/rtp admin setup` for the in-game wizard ([quick-start guide](../admin/QUICK_START.md)), or `/rtp config import` to migrate from BetterRTP, JustRTP, or EzRTP ([switching guide](https://docs.leafcraft.net/mc/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
 
-(Advanced database, network proxy, and cache tuning: see the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).)
+(Advanced database, network proxy, and cache tuning: see the [admin guide](https://docs.leafcraft.net/mc/FOR_SERVER_ADMINS/).)
 
 ---
 
@@ -240,7 +240,7 @@ More: [Features](../site/features.md). Commands and permissions are in the colla
 
 ## Performance
 
-I measure throughput under load, response time from `/rtp` to arrival, and server speed stability. LeafRTP checks spots against region files (`.mca` and `.linear`) in the background and keeps a queue of verified destinations ready, so `/rtp` answers in about 5 ms on Paper without loading chunks on the main thread.
+I measure throughput under load, response time from `/rtp` to arrival, and server speed stability. LeafRTP checks spots against region files (`.mca`, `.linear`, and [`.lca`](https://docs.leafcraft.net/mc/leafanvil/)) in the background and keeps a queue of verified destinations ready, so `/rtp` answers in about 5 ms on Paper without loading chunks on the main thread.
 
 <!-- only: bbb -->
 Both LeafRTP downloads are built from the same code, and the LeafRTP rows apply to either.
@@ -263,6 +263,14 @@ These are snapshots of each plugin under one harness on my hardware, using the s
 
 Full latency tables, per-plugin setup controls, hardware rig details, and benchmark caveats: [`RESULTS.md`](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md), [`PRE_WRITEUP.md`](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/PRE_WRITEUP.md), and [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
 
+**NVMe sequential & random region-file I/O (16k radius, `46.48 GB` `.mca` vs `26.96 GB` `.lca`):**
+
+On the same NVMe rig (`1,024` to `4,096` region files across the `16k` radius), off-thread region pre-filtering and `.lca` ([`LeafAnvil`](https://docs.leafcraft.net/mc/leafanvil/)) measure:
+
+- **Random NVMe pre-filter I/O (`4,000` random chunks across `1,024` regions):** Column surface probes run at `6,783 cols/s` on 1 thread (`133.6 us` `p50`) and `94,157 cols/s` on 16 threads (`140.0 us` `p50`) on vanilla `.mca`, rising to **`18,199 cols/s`** on 1 thread (`51.6 us` `p50`, **`2.68x` faster**) and **`204,253 cols/s`** on 16 threads (`51.3 us` `p50`, `80.1 us` `p95`, **`2.17x` throughput**) on `.lca`. Full off-thread chunk decode scales from `2,339` to **`3,815 chunks/s`** on 1 thread (**`1.63x`**) and from `54,865` to **`186,592 chunks/s`** on 16 threads (**`3.40x` throughput**, **`13.6x` faster `p99`** at `191.6 us` vs `2,609.5 us`), while single-window terrain probes (`Y=[48..112]`) drop from `109.72 us` (`.mca`) to **`8.55 us`** (`.lca`, **`12.84x` faster**).
+- **Sequential NVMe scan:** `/rtp scan start` sequential region sweeps rise from `3,273 chunks/s` (`52,361 loc/s`) on `.mca` to **`5,251 chunks/s` (`84,014 loc/s`, `1.60x` faster)** on `.lca`, 64-chunk whole-region sequential terrain sweeps take **`0.48 ms`** on `.lca` vs `7.89 ms` on `.mca` (**`16.51x` faster**) and `5.84 ms` on `.linear` (**`12.23x` faster**), and `Chunky` existing-world scans (`16,641` chunks on Folia) finish in **`2.02 s` (`8,238.1 cps`, `3.51x` faster)** vs `7.10 s` (`2,343.8 cps`) on `.mca`.
+- **Sustained `16k`-radius Folia `26.2` NVMe chunk streaming (`63` runs, `4,096` regions):** Paired with `.lca`'s lock-free `10.1 KiB` region headers, Folia `26.2` sustains **`4,894 to 5,398 live chunks/s`** (`~300,000` chunks per 60s stage, **`23x to 35x` higher live chunk I/O** than `.mca` once the 256-region cache evicts across `4,096` files) with `0` region-hop stalls and **`5.76 s` median shutdown save** vs `63.03 s` on `.mca` (**`11.0x` faster**).
+
 **Where each plugin lands players (Paper 26.2, 4,096 teleports):**
 
 ![Cross-plugin destination scatter comparison](../assets/img/cross_plugin_destinations_scatter_chart.png)
@@ -276,7 +284,7 @@ Full latency tables, per-plugin setup controls, hardware rig details, and benchm
 All four stages run automatically in the background behind a standard `CIRCLE` or `SQUARE` region and block radius (`radius` and `centerRadius`), with no manual tuning:
 
 - **Spatial memory:** biomes and unsafe chunks (such as ocean or lava) are remembered across restarts so the server never re-checks known bad ground.
-- **Region-file pre-filter:** spots are read directly from `.mca` and `.linear` world files on disk and filtered off the main thread before loading a chunk.
+- **Region-file pre-filter:** spots are read directly from `.mca`, `.linear`, and `.lca` world files on disk and filtered off the main thread before loading a chunk.
 - **Pre-verified queue:** safe destinations wait in background queues; on Paper the median time from `/rtp` to arrival was 5 ms in the paced benchmark.
 - **Even player spacing:** locations are drawn in a shuffled order across the region so players spread out without tracking player coordinates.
 
@@ -288,7 +296,7 @@ Details, diagrams and charts: [How it works](../site/how-it-works.md) and [Spaci
 
 Every release is checked automatically before it ships, and includes built-in checks you can run on your server:
 
-- [**Built-in config & server checks**](https://dailystruggle.github.io/RTP/admin/configuration/BIT/): `/rtp reload` and `/rtp admin setup` validate YAML files before applying them, and `/rtp test` checks region selection, claim hooks, and teleport safety in game.
+- [**Built-in config & server checks**](https://docs.leafcraft.net/mc/admin/configuration/BIT/): `/rtp reload` and `/rtp admin setup` validate YAML files before applying them, and `/rtp test` checks region selection, claim hooks, and teleport safety in game.
 - [**Safety rule suite**](../dev/TRACEABILITY.md): dedicated automated tests enforce every safety rule (no unsafe blocks, no leaked chunk tickets, no claim bypasses, no main-thread chunk loading, and no silent teleport failures).
 - [**Stress & memory testing**](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/LEAK_FUZZING.md): scripted 48-bot stress runs and long-running memory checks verify that disconnected players, chunk tickets, and config reloads clean up cleanly.
 - [**Coverage & API stability**](../site/quality-gates.md): over 650 JUnit test classes, binary API compatibility checks against prior releases, and zero shaded library conflicts.
@@ -307,7 +315,7 @@ I built the rest in stages:
 - **v3:** Rebuilt so one jar runs across Paper, Spigot, Folia, Fabric, NeoForge and Velocity, with background region-file checks, automatic chunk cleanup, the browser map editor (`/rtp editor`), and guided in-game setup (`/rtp admin setup`). Additional rules were set for AI tooling: I design the architecture and record the decisions in the ADRs, and AI writes code inside those boundaries (adapters, unit tests, devstack configs) that I review before it lands.
 - **3.3.x:** Added built-in config self-tests (`/rtp test`), automatic background pacing, slope and hill checks, and the reproducible benchmark suite above.
 
-Design history, math derivations, and architecture decisions are recorded in [Why LeafRTP Exists](https://dailystruggle.github.io/RTP/site/why/) and the [Architecture Decision Records](https://dailystruggle.github.io/RTP/adr/). [AI Usage](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/AI_USAGE.md) covers what AI tooling writes here and what I don't use it for: system design, code review and git operations.
+Design history, math derivations, and architecture decisions are recorded in [Why LeafRTP Exists](https://docs.leafcraft.net/mc/site/why/) and the [Architecture Decision Records](https://docs.leafcraft.net/mc/adr/). [AI Usage](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/AI_USAGE.md) covers what AI tooling writes here and what I don't use it for: system design, code review and git operations.
 
 <!-- only: bbb-pro -->
 <!-- kind: promo -->
@@ -337,7 +345,7 @@ Everyday commands, core permissions, configuration files, common operator questi
 <details>
 <summary><b>Commands, permissions, configuration files</b></summary>
 
-**Everyday commands** (aliases: `/rtp`, `/wild`; see the [Full Command & Permission Reference](https://dailystruggle.github.io/RTP/admin/COMMANDS/)):
+**Everyday commands** (aliases: `/rtp`, `/wild`; see the [Full Command & Permission Reference](https://docs.leafcraft.net/mc/admin/COMMANDS/)):
 
 | Command | Description | Permission |
 | --- | --- | --- |
@@ -350,7 +358,7 @@ Everyday commands, core permissions, configuration files, common operator questi
 | `/rtp info` | Operator diagnostics | `rtp.info` |
 | `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
 
-**Core permissions** (full set in the [Full Command & Permission Reference](https://dailystruggle.github.io/RTP/admin/COMMANDS/#full-permission-reference) and `plugin.yml`):
+**Core permissions** (full set in the [Full Command & Permission Reference](https://docs.leafcraft.net/mc/admin/COMMANDS/#full-permission-reference) and `plugin.yml`):
 
 | Permission | Default | Grants |
 | --- | --- | --- |
@@ -374,7 +382,7 @@ Everyday commands, core permissions, configuration files, common operator questi
 
 Block-list token grammar (`unsafeBlocks` and `airBlocks` in `advanced/blocks.yml`): see [Safety configuration - Block Filters](../admin/configuration/SAFETY.md#block-filters-advancedblocksyml) and [Features - Claims and safety](../site/features.md#claims-and-safety).
 
-(Advanced database, network proxy, custom biomes, and message templates come with working defaults. See the [full configuration guide](https://dailystruggle.github.io/RTP/admin/configuration/CONFIGURATION/) for details.)
+(Advanced database, network proxy, custom biomes, and message templates come with working defaults. See the [full configuration guide](https://docs.leafcraft.net/mc/admin/configuration/CONFIGURATION/) for details.)
 
 **Soft dependencies (all optional):** Vault (for the economy charge), PlaceholderAPI, and the claim, combat-tag and hologram plugins listed above. PaperLib is no longer needed.
 
@@ -413,8 +421,8 @@ A: No, but they work well together. `/rtp scan` walks a region in the background
 **Q: Iris / Terra / custom datapack generators, or a world upgraded from an older version?**
 A: Yes. Region files are read directly: modded and namespaced IDs are kept, and `/rtp biome=<x>` matches what's on disk. Plugins that use the live noise-map lookup get this wrong after a version migration. Chunks that were never populated fall back to a live load.
 
-**Q: What about the Linear (.linear) region format?**
-A: Yes, with no setup. LeafRTP reads both standard Anvil (`.mca`) and Linear (`.linear`, v1 and v2) region files directly using the compression library your server already includes, so the jar bundles no extra libraries. If a file cannot be read directly, that spot is checked through the server's normal async chunk load instead.
+**Q: What about the Linear (.linear) or LeafAnvil (.lca) region formats?**
+A: Yes, with no setup. LeafRTP reads standard Anvil (`.mca`), Linear (`.linear`, v1 and v2), and [LeafAnvil](https://docs.leafcraft.net/mc/leafanvil/) (`.lca`) region files directly using the compression library your server already includes, so the jar bundles no extra libraries. If a file cannot be read directly, that spot is checked through the server's normal async chunk load instead.
 
 **Q: I'm on NeoForge.**
 A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as every other platform. I test it less than the Bukkit family and Fabric, and broader testing on the 26.x carrier is still ongoing. If you hit something there, it goes to the front of my list.
@@ -423,10 +431,10 @@ A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as 
 A: Run Arclight or Mohist and use this jar. A native Forge adapter isn't planned.
 
 **Q: Memory and server load: should I worry?**
-A: No. With the default settings, background queue checks use a few milliseconds per second while keeping destinations ready. If server speed drops or free memory runs low, background filling pauses automatically and any chunks held for the ready queue are released right away ([performance guide](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/)).
+A: No. With the default settings, background queue checks use a few milliseconds per second while keeping destinations ready. If server speed drops or free memory runs low, background filling pauses automatically and any chunks held for the ready queue are released right away ([performance guide](https://docs.leafcraft.net/mc/admin/configuration/PERFORMANCE/)).
 
 **Q: Can I use ItemsAdder, Oraxen, Nexo, or CustomModelData in the GUI menu?**
-A: Yes. Icons in `guimenu.yml` take `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:<id>`, `head:<player>`, `base64:<hash>` and `<MATERIAL>:<cmd>`. Most of the item plugins behind these prefixes are paid and closed source, so CI can't run them; those hooks are tested against stubs and open-source stand-ins, and support for them is best effort. If the item plugin is missing or its API changes, the icon falls back to a vanilla material. See [Custom Item & Menu Integration](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/).
+A: Yes. Icons in `guimenu.yml` take `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:<id>`, `head:<player>`, `base64:<hash>` and `<MATERIAL>:<cmd>`. Most of the item plugins behind these prefixes are paid and closed source, so CI can't run them; those hooks are tested against stubs and open-source stand-ins, and support for them is best effort. If the item plugin is missing or its API changes, the icon falls back to a vanilla material. See [Custom Item & Menu Integration](https://docs.leafcraft.net/mc/admin/CUSTOM_ITEMS/).
 
 <!-- only: bbb-pro -->
 <!-- kind: promo -->
@@ -436,7 +444,7 @@ A: The free one works exactly the same. Pay if you want priority support and a f
 <!-- /only -->
 
 **Q: How do I report a bug?**
-A: Open a GitHub issue with your server version, LeafRTP version, platform, the relevant config files and the error from the log. The [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) has a full reproduction template. Nightly CI boots 1.21.11 and 26.3, and I take reports for Minecraft 1.21.11 through the latest release; on older versions it should still run, and I'll look when I can (exact per-version status is in the [support matrix](../dev/SUPPORT_MATRIX.md)).
+A: Open a GitHub issue with your server version, LeafRTP version, platform, the relevant config files and the error from the log. The [admin guide](https://docs.leafcraft.net/mc/FOR_SERVER_ADMINS/) has a full reproduction template. Nightly CI boots 1.21.11 and 26.3, and I take reports for Minecraft 1.21.11 through the latest release; on older versions it should still run, and I'll look when I can (exact per-version status is in the [support matrix](../dev/SUPPORT_MATRIX.md)).
 
 </details>
 
@@ -446,7 +454,7 @@ A: Open a GitHub issue with your server version, LeafRTP version, platform, the 
 <!-- not: bbb-pro -->
 Support is me, in my spare time, so it's best effort.
 
-- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`), check the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/), or open a thread in the `LeafCraft Plugin Support` Discord `#support` Forum (or GitHub Discussions). I help with bugs and anything still unclear after that.
+- For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`), check the [admin guide](https://docs.leafcraft.net/mc/FOR_SERVER_ADMINS/), or open a thread in the `LeafCraft Plugin Support` Discord `#support` Forum (or GitHub Discussions). I help with bugs and anything still unclear after that.
 - A bug report in GitHub Issues or the `#support` Forum needs: `/version`, `/rtp version`, `/rtp test` output, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the server log uploaded to `mclo.gs`. If something's missing I'll ask for it.
 - "It doesn't work" isn't something I can act on. Tell me what you did, what you expected, and what happened instead.
 - There's no guaranteed response time. Safety bugs (bad landings, chunk leaks, claim bypasses) get looked at first.
@@ -458,7 +466,7 @@ Support comes from me, the person who wrote the code.
 
 - Tickets from this listing (BuiltByBit tickets or `#support` Forum threads opened with the `@Pro Supporter` role in `LeafCraft Plugin Support`) go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
 - Response time: 24-72 h on weekdays. Safety bugs go first regardless.
-- Bug reports with `/version`, `/rtp version`, `/rtp test` output, configs and an `mclo.gs` log link get fixed fastest. Most setup questions are answered right away in the [web workspace](../admin/WEB_EDITOR_GUIDE.md) (`/rtp editor`), the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/), or the `#support` Forum.
+- Bug reports with `/version`, `/rtp version`, `/rtp test` output, configs and an `mclo.gs` log link get fixed fastest. Most setup questions are answered right away in the [web workspace](../admin/WEB_EDITOR_GUIDE.md) (`/rtp editor`), the [admin guide](https://docs.leafcraft.net/mc/FOR_SERVER_ADMINS/), or the `#support` Forum.
 - Feature requests go in GitHub Discussions.
 <!-- /kind -->
 <!-- /only -->
@@ -469,12 +477,11 @@ Support comes from me, the person who wrote the code.
 
 ## Links
 
-- [**Documentation site**](https://dailystruggle.github.io/RTP/): every doc in one searchable place
-- [**Admin and configuration guide**](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/): install, configure, command reference
-- [**Addon / API developer guide**](https://dailystruggle.github.io/RTP/FOR_ADDON_DEVELOPERS/): `rtp-api` and examples
+- [**Documentation site**](https://docs.leafcraft.net/mc/): every doc in one searchable place
+- [**Admin and configuration guide**](https://docs.leafcraft.net/mc/FOR_SERVER_ADMINS/): install, configure, command reference
+- [**Addon / API developer guide**](https://docs.leafcraft.net/mc/FOR_ADDON_DEVELOPERS/): `rtp-api` and examples
 - [**Changelog**](../../CHANGELOG.md)
-- [**LeafSleep (`OnePlayerSleep`)**](https://github.com/DailyStruggle/OnePlayerSleep): multi-loader and cross-server sleep voting (`/sleep` & `/ops`) with population curves, tug-of-war cancel voting, and Phantom rest reset
-- [**LeafTreeGen**](https://github.com/LeafCraftDev/LeafTreeGen): procedural custom biome trees baked into native vanilla jigsaw worldgen datapacks
+- [**LeafTreeGen**](../../../LeafTreeGen/docs/publishing/FRONT_PAGE.md): procedural custom biome trees baked into native vanilla jigsaw worldgen datapacks
 - [**Source on GitHub**](https://github.com/dailystruggle/RTP): issues, contributions, the benchmark harness
 <!-- only: bbb-pro -->
 - [**Free download**](https://modrinth.com/plugin/leafrtp)

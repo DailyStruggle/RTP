@@ -29,22 +29,22 @@
 | **Safety Tag / Predicate Grammar** (`SafetyTokenParser`, `SafetyTokenExpander`; offline `tags-api` resolver) | **MIT** | Yes | `LICENSE` |
 | **Login Reserve Cache** (`LoginCacheTask`, ADR-023) | **MIT** | Yes | `LICENSE` |
 | **NeoForge Carrier & Adapters** (`rtp-neoforge-*`, `treegen-neoforge`, `leafsleep-neoforge`) | **GPL-3.0-or-later** | Yes (per GPL terms) | `neoforge.mods.toml` |
-| **Bundled Addons** (`LeafRTPClaimAddon`, `LeafRTPGuiAddon`, `LeafRTPCountdownAddon`, `LeafRTPActionAddon`, `LeafRTPRiftAddon`) | **MIT** unless the addon ships its own licence | Yes | Bundled in both Lite and Pro jars |
+| **Bundled Addons** (`LeafRTPClaimAddon`, `LeafRTPGuiAddon`, `LeafRTPCountdownAddon`, `LeafRTPActionAddon`, `LeafRTPRiftAddon`) | **MIT** unless the addon ships its own licence | Yes | Bundled in both Free and Pro jars |
 | **Sibling Showcase & Diagnostic Plugins** (`LeafTreeGen`, `LeafSleuth`, `LeafConfig`, `LeafSleep`, `LeafShapeMining`, `LeafArtifacts`) | **MIT** | Yes | root `LICENSE` |
 | **`LeafAnvil` Runtime Carrier** (`resource/LeafAnvil`, `LeafAnvil-<version>.jar`) | **LeafCraft Commercial (`LicenseRef-LeafCraft-Commercial`)** | Yes (licensed server/network) | `resource/LeafAnvil/LICENSE` (`.lca` spec `ICD.md` & `anvil-api` remain **MIT**) |
 | **Extension SPIs** (`SleuthExtensionProvider`, `SleuthExtensionRegistry`, `ConfigExtensionProvider`, `ConfigExtensionRegistry`) | **MIT** | Yes (including external commercial providers) | root `LICENSE` ([ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md)) |
-| **LeafRTP Lite Jar** (`LeafRTP-<version>.jar`) | **MIT** | Yes | `LICENSE-MIT` (bundled inside jar as `LICENSE`) |
-| **LeafRTP Pro Jar** (`LeafRTP-Pro-<version>.jar`) | **MIT** | Yes | root `LICENSE` (bundled inside jar) |
+| **LeafRTP Jar (Free Default)** (`LeafRTP-<version>.jar`) | **MIT** | Yes | `LICENSE-MIT` (bundled inside jar as `LICENSE`) |
+| **LeafRTP Pro Jar (Priority Support)** (`LeafRTP-Pro-<version>.jar`) | **MIT** | Yes | root `LICENSE` (bundled inside jar) |
 
 ---
 
-## 3. Edition Feature Comparison (Lite vs. Pro)
+## 3. Edition Comparison (Free Default vs. Pro Support)
 
-As detailed in [leafrtp-ADR-078](../../resource/LeafRTP/docs/adr/leafrtp-ADR-078-superseding-adr-024-sla-and-support-tier.md), [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md), and [leafrtp-ADR-051](../../resource/LeafRTP/docs/adr/leafrtp-ADR-051-claim-integrations-extracted-to-bundled-addon.md). Both jars ship the same code; the editions differ only in support and release cadence.
+As detailed in [leafrtp-ADR-078](../../resource/LeafRTP/docs/adr/leafrtp-ADR-078-superseding-adr-024-sla-and-support-tier.md), [ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md), and [leafrtp-ADR-051](../../resource/LeafRTP/docs/adr/leafrtp-ADR-051-claim-integrations-extracted-to-bundled-addon.md). Both jars ship the same code; the free download (`LeafRTP`) is the default, and `LeafRTP-Pro` adds priority/SLA support and contractual patch cadence.
 
-| Feature / Capability | LeafRTP (Lite) | LeafRTP Pro | Notes |
+| Feature / Capability | LeafRTP (Free Default) | LeafRTP Pro (Extra Support) | Notes |
 |---|:---:|:---:|---|
-| **License** | **MIT** | **MIT** | Lite jar bundles `LICENSE-MIT`; Pro jar ships the identical root `LICENSE`. |
+| **License** | **MIT** | **MIT** | Default jar bundles `LICENSE-MIT`; Pro jar ships the identical root `LICENSE`. |
 | **Support** | Community | Priority / SLA | Routed via marketplace buyer metadata (ADR-100). |
 | **Release cadence** | Versions the maintainer chooses to publish, no holding period | Every release, including patches owed to buyers | One version line for both jars (ADR-117). |
 | **Single-Server Random Teleport** | Yes | Yes | Identical Archimedean spiral and Hilbert curve candidate selection. |
@@ -54,22 +54,22 @@ As detailed in [leafrtp-ADR-078](../../resource/LeafRTP/docs/adr/leafrtp-ADR-078
 | **Folia Support** | Yes | Yes | Both editions ship the native `rtp-folia` adapter (ADR-100). |
 | **Storage / Persistence** | Full (SQLite / H2 / MySQL / PostgreSQL / Redis / YAML) | Full (SQLite / H2 / MySQL / PostgreSQL / Redis / YAML) | Both editions support the complete database suite and the in-house connection pool (ADR-100, ADR-101). |
 | **Cross-Server / Network Mode** | Full (Plugin-Message + Redis / SQL) | Full (Plugin-Message + Redis / SQL) | Both editions support zero-dependency `RespRedisClient` and multi-server proxy synchronization (ADR-100). |
-| **Login Reserve Cache (ADR-023)** | Yes | Yes | Pre-warms a dedicated queue for join-time teleports (`rtp.onevent.join`); `LoginCacheTask` retained in Lite (ADR-100). |
+| **Login Reserve Cache (ADR-023)** | Yes | Yes | Pre-warms a dedicated queue for join-time teleports (`rtp.onevent.join`); `LoginCacheTask` included in both (ADR-100). |
 | **Safety Lists & Predicates** | Full grammar | Full grammar | `#tag`, `[...]` predicates and `-` subtraction resolve against the live server tag registry in both editions (`rtp-api` / `rtp-core`; [`SAFETY.md`](../../resource/LeafRTP/docs/admin/configuration/SAFETY.md)). |
 | **Claim Plugin Integrations** | Yes (bundled addon) | Yes (bundled addon) | Both editions bundle `LeafRTPClaimAddon.jar` in `bundled-addons/` (self-extracting). |
 | **Economy / Vault Charging** | Yes | Yes | Optional per-region teleport charging supported in both editions (`economy.yml` shipped). |
 | **PlaceholderAPI (PAPI) Integration** | Yes | Yes | Supported in both editions when PlaceholderAPI is present. |
 | **Multilingual Support (`/rtp lang`)** | Yes | Yes | Complete `lang/**` locale trees and ADR-020 runtime switching included in both. |
 | **Interactive Book & Map Menus** | Yes | Yes | Maps API and book rendering available across both editions. |
-| **Anvil Prefilter (ADR-016, ADR-077)** | Yes | Yes | Off-tick chunk prefiltering enabled in both editions (`rtp-anvil` retained in Lite). Other region formats require an addon reader. |
+| **Anvil Prefilter (ADR-016, ADR-077)** | Yes | Yes | Off-tick chunk prefiltering enabled in both editions (`rtp-anvil` included in both). Other region formats require an addon reader. |
 | **Operator Documentation Extraction** | Yes | Yes | Both extract identical version-stamped `docs/**` via `JarUtils.extractDocs`. |
-| **Configuration Files Parity** | Yes | Yes | Lite inherits Pro `config.yml`, `advanced/*`, and definitions verbatim (ADR-024 amendment). |
+| **Configuration Files Parity** | Yes | Yes | Both ship identical `config.yml`, `advanced/*`, and definitions verbatim (ADR-024 amendment). |
 | **bStats Anonymous Telemetry** | Plugin ID 12277 | Plugin ID 30865 | Distinct metrics tracking IDs preserve separate install base analytics. |
 
 ---
 
 ## 4. Verification and Compliance
 
-- **Build-Time License Auditing:** The Gradle task `:rtp-plugin:liteJarStructureCheck` inspects the built Lite jar to verify that `LICENSE` contains the MIT terms (and no PolyForm text), while Folia, `LoginCacheTask`, SQL and Redis are retained per ADR-100.
-- **Network Transport Integrity:** The build audit verifies that the tier-1 `PluginMessageNetworkBinding` and proxy auto-detection classes, as well as the native `RespRedisClient` transport bindings, are preserved in Lite per ADR-100.
+- **Build-Time License Auditing:** The Gradle task `:rtp-plugin:liteJarStructureCheck` inspects the built default `LeafRTP-<version>.jar` to verify that `LICENSE` contains the MIT terms (and no PolyForm text), while Folia, `LoginCacheTask`, SQL and Redis are retained per ADR-100.
+- **Network Transport Integrity:** The build audit verifies that the tier-1 `PluginMessageNetworkBinding` and proxy auto-detection classes, as well as the native `RespRedisClient` transport bindings, are preserved in the default jar per ADR-100.
 - **Third-Party Dependency Compliance:** The plugin jars shade no third-party library (ADR-077); dependencies are audited via CycloneDX SBOM generation (`bom.json`) on every release. LZ4 region decode is in-house code (ADR-016 section 15); lz4-java is a test-scope dependency only and is not shipped.

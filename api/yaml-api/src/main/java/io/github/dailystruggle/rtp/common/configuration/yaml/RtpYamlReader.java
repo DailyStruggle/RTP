@@ -287,6 +287,11 @@ public final class RtpYamlReader {
                 throw new RtpYamlParseException("rtpYaml.syntax.unexpectedIndent",
                         "unexpected indentation", ln.lineNo, ln.indent);
             }
+            if (expectedIndent == 0 && mapping.entries().isEmpty()
+                    && stripInlineComment(ln.content).trim().equals("{}")) {
+                pos++;
+                continue;
+            }
             // A list item at mapping scope is an error; mappings have key: ... entries.
             if (ln.content.startsWith("- ") || ln.content.equals("-")) {
                 throw new RtpYamlParseException("rtpYaml.syntax.listAtMapping",
@@ -310,7 +315,7 @@ public final class RtpYamlReader {
             if (afterColon.isEmpty()) {
                 // Look ahead for an indented child block; otherwise this is an
                 // empty-scalar value (null).
-                child = parseChildBlock(ln.indent, depth + 1);
+                child = parseChildBlock(ln.indent, depth + 1, true);
             } else {
                 child = parseValue(afterColon, ln.lineNo, ln.indent + pk.keyLength + 2, ln.indent);
             }
@@ -329,6 +334,10 @@ public final class RtpYamlReader {
      * (when the next non-blank line is at a shallower indent or EOF).
      */
     private RtpYamlNode parseChildBlock(int parentIndent, int depth) {
+        return parseChildBlock(parentIndent, depth, false);
+    }
+
+    private RtpYamlNode parseChildBlock(int parentIndent, int depth, boolean allowIndentlessSeq) {
         if (depth > MAX_DEPTH) {
             throw new RtpYamlParseException("rtpYaml.syntax.maxDepth",
                     "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", currentLineNo(), parentIndent);
@@ -347,11 +356,12 @@ public final class RtpYamlReader {
             return new RtpYamlScalar("", RtpYamlScalar.Style.PLAIN);
         }
         RawLine next = lines.get(peek);
-        if (next.indent <= parentIndent) {
+        boolean nextIsSeq = next.content.startsWith("- ") || next.content.equals("-");
+        if (next.indent < parentIndent || (next.indent == parentIndent && !(allowIndentlessSeq && nextIsSeq))) {
             return new RtpYamlScalar("", RtpYamlScalar.Style.PLAIN);
         }
         // Decide: sequence if next starts with "- " or equals "-"; else mapping.
-        if (next.content.startsWith("- ") || next.content.equals("-")) {
+        if (nextIsSeq) {
             RtpYamlSequence seq = new RtpYamlSequence();
             seq.setSourcePosition(next.lineNo, next.indent);
             parseSequenceBody(seq, next.indent, depth + 1);
@@ -412,7 +422,7 @@ public final class RtpYamlReader {
                 ParsedKey pk = parseKey(new RawLine(ln.lineNo, ln.indent + 2, after, false, false));
                 RtpYamlNode child;
                 if (pk.afterColon.isEmpty()) {
-                    child = parseChildBlock(ln.indent + 2, depth + 1);
+                    child = parseChildBlock(ln.indent + 2, depth + 1, true);
                 } else {
                     child = parseValue(pk.afterColon, ln.lineNo,
                             ln.indent + 2 + pk.keyLength + 2, ln.indent + 2);
@@ -489,7 +499,7 @@ public final class RtpYamlReader {
             keyLen = i + 1;
             colonAt = c.indexOf(':', i + 1);
         } else {
-            colonAt = c.indexOf(':');
+            colonAt = findUnquotedKeyColon(c);
             if (colonAt < 0) {
                 throw new RtpYamlParseException("rtpYaml.syntax.missingColon",
                         "missing ':' in mapping entry", ln.lineNo, ln.indent);
@@ -509,6 +519,21 @@ public final class RtpYamlReader {
         afterColon = stripInlineComment(afterColon);
         afterColon = afterColon.stripTrailing();
         return new ParsedKey(keyText, keyLen, afterColon, false);
+    }
+
+    /**
+     * Finds the YAML key-value delimiter {@code ':'} in an unquoted mapping line,
+     * preferring a colon followed by whitespace or end-of-line so namespaced keys
+     * such as {@code minecraft:elytra:} or {@code minecraft:place_recipe:} are not
+     * split at the namespace separator.
+     */
+    private static int findUnquotedKeyColon(String c) {
+        for (int i = 0; i < c.length(); i++) {
+            if (c.charAt(i) == ':' && (i + 1 == c.length() || c.charAt(i + 1) == ' ')) {
+                return i;
+            }
+        }
+        return c.indexOf(':');
     }
 
     private static boolean looksLikeKey(String s) {
@@ -539,6 +564,14 @@ public final class RtpYamlReader {
      * text opens with an unquoted {@code [}, otherwise a scalar.
      */
     private static RtpYamlNode parseInlineValue(String text, int line, int column) {
+        if (!text.isEmpty() && text.charAt(0) == '{') {
+            String body = stripInlineComment(text).stripTrailing();
+            if ("{}".equals(body) || (body.startsWith("{") && body.endsWith("}") && body.substring(1, body.length() - 1).isBlank())) {
+                RtpYamlMapping emptyMap = new RtpYamlMapping();
+                emptyMap.setSourcePosition(line, column);
+                return emptyMap;
+            }
+        }
         if (!text.isEmpty() && text.charAt(0) == '[') {
             // Sequence items arrive without inline-comment stripping; mapping
             // values already had it, and a second pass is a no-op.
@@ -555,7 +588,43 @@ public final class RtpYamlReader {
         if (!candidate.isEmpty() && (candidate.charAt(0) == '|' || candidate.charAt(0) == '>')) {
             return parseBlockScalar(candidate, line, column + leadingSpaces, parentIndent);
         }
-        return parseInlineValue(text, line, column);
+        RtpYamlNode node = parseInlineValue(text, line, column);
+        if (node instanceof RtpYamlScalar scalar
+                && scalar.style() == RtpYamlScalar.Style.PLAIN
+                && pos < lines.size()) {
+            return foldPlainScalarContinuationLines(scalar, parentIndent);
+        }
+        return node;
+    }
+
+    private RtpYamlScalar foldPlainScalarContinuationLines(RtpYamlScalar scalar, int parentIndent) {
+        StringBuilder folded = null;
+        while (pos < lines.size()) {
+            RawLine next = lines.get(pos);
+            if (!isPlainContinuationLine(next, parentIndent)) {
+                break;
+            }
+            next.throwIfDeferredError();
+            if (folded == null) {
+                folded = new StringBuilder(scalar.rawValue());
+            }
+            String cont = stripInlineComment(next.content).trim();
+            if (!cont.isEmpty()) {
+                if (!folded.isEmpty()) {
+                    folded.append(' ');
+                }
+                folded.append(cont);
+            }
+            pos++;
+        }
+        return folded != null ? new RtpYamlScalar(folded.toString(), RtpYamlScalar.Style.PLAIN) : scalar;
+    }
+
+    private static boolean isPlainContinuationLine(RawLine next, int parentIndent) {
+        if (next.blank || next.comment || next.indent <= parentIndent) {
+            return false;
+        }
+        return !looksLikeKey(next.content) && !next.content.startsWith("- ") && !next.content.equals("-");
     }
 
     private RtpYamlScalar parseBlockScalar(String header, int line, int column, int parentIndent) {

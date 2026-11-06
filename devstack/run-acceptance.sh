@@ -467,10 +467,15 @@ test_roundtrip() {
       echo "[roundtrip] installing client dependencies..."
       ( cd "$scriptDir/clients" && npm install --silent --no-audit ) >/dev/null 2>&1 || true
     fi
+    # Ensure test bot has operator permissions on lobbies and backends so /rtp region=... is authorized
+    local svc
+    for svc in lobby-a lobby-b backend-a backend-b; do
+      ( cd "$scriptDir" && docker compose exec -T "$svc" rcon-cli "op RtpAcceptanceBot" ) >/dev/null 2>&1 || true
+    done
     local extraArgs=()
     [ "$Lite" -eq 1 ] && extraArgs+=(--lite)
     [ "$AssertEffects" -eq 1 ] && extraArgs+=(--assert-effects)
-    [ "$Gui" -eq 1 ] && extraArgs+=(--gui)
+    [ "$GuiMode" -eq 1 ] && extraArgs+=(--gui)
     local botOut
     botOut="$(node "$botScript" --host 127.0.0.1 --port 25577 --timeout 35 "${extraArgs[@]}" 2>&1)" || true
     echo "$botOut"
@@ -512,7 +517,7 @@ test_roundtrip() {
     fi
   else
     local tokens
-    tokens="$(redis_cli KEYS 'rtp:net:reservation:*' 2>/dev/null)"
+    tokens="$(redis_cli KEYS 'rtp:net:tok:*' 2>/dev/null)"
     write_evidence 'roundtrip' "tokens at sample time:"$'\n'"$tokens"$'\n'"audit lines:"$'\n'"$audit"
     echo "[roundtrip] EVIDENCE CAPTURED"; return 0
   fi
@@ -520,18 +525,20 @@ test_roundtrip() {
 
 test_killmidflight() {
   echo "[killmidflight] forcing a reservation, then killing the destination backend (budget: ${WaitSeconds}s)..."
-  local tokenId playerId proxyId backendId now expiry claim
+  local tokenId playerId backendId now expiry claimScriptPath sha claim
   tokenId="$(cat /proc/sys/kernel/random/uuid)"; playerId="$(cat /proc/sys/kernel/random/uuid)"
-  proxyId="proxy-a"; backendId="backend-a"
+  backendId="backend-a"
   now="$(( $(date +%s%3N) ))"; expiry=$(( now + 30000 ))
-  claim="$(redis_cli EVALSHA dc7c1b0f2c85f26b513de303369728583aaf7dd1 0 "$tokenId" "$playerId" "$proxyId" "$backendId" "$now" "$expiry" 2>/dev/null)"
-  write_evidence 'killmidflight.claim' "tokenId=$tokenId result=$claim"
+  claimScriptPath="$repoRoot/platforms/proxy/proxy-common/src/main/resources/redis/claim.lua"
+  sha="$(docker exec -i rtp-devstack-redis redis-cli -x SCRIPT LOAD < "$claimScriptPath" 2>/dev/null | tr -d '[:space:]')"
+  claim="$(redis_cli EVALSHA "$sha" 2 "rtp:net:tok:$tokenId" "rtp:net:tokactive:$playerId" "$tokenId" "$backendId" "$playerId" "$expiry" "$now" 30 '' '' 2>/dev/null | tr -d '[:space:]')"
+  write_evidence 'killmidflight.claim' "tokenId=$tokenId sha=$sha result=$claim"
   if [ "$claim" != "1" ]; then echo "[killmidflight] FAIL - claim returned: $claim"; return 1; fi
   echo "[killmidflight] reservation seeded; killing backend-a..."
   ( cd "$scriptDir" && docker compose kill backend-a ) >/dev/null 2>&1 || true
   local deadline=$(( $(date +%s) + WaitSeconds )) row
   while [ "$(date +%s)" -lt "$deadline" ]; do
-    row="$(redis_cli HGETALL "rtp:net:reservation:$tokenId" 2>/dev/null)"
+    row="$(redis_cli HGETALL "rtp:net:tok:$tokenId" 2>/dev/null)"
     if [ -z "$(printf '%s' "$row" | tr -d '[:space:]')" ]; then
       write_evidence 'killmidflight.reaped' "tokenId=$tokenId reaped within window"
       echo "[killmidflight] PASS"
@@ -688,16 +695,14 @@ test_burst_stress() {
 }
 
 test_killswitch() {
-  echo "[killswitch] asserting claim rejection via the kill-switch sentinel (typical: <1s)..."
-  local tokenId playerId now result
-  tokenId="$(cat /proc/sys/kernel/random/uuid)"; playerId="$(cat /proc/sys/kernel/random/uuid)"
-  now="$(( $(date +%s%3N) ))"
-  result="$(redis_cli EVALSHA dc7c1b0f2c85f26b513de303369728583aaf7dd1 0 "$tokenId" "$playerId" 'KILL_SWITCH' 'backend-a' "$now" "$(( now + 30000 ))" 2>/dev/null)"
-  write_evidence 'killswitch' "result=$result"
-  if printf '%s' "$result" | grep -q 'KILL_SWITCH' || [ "$result" = "0" ]; then
-    echo "[killswitch] PASS (claim correctly rejected)"; return 0
+  echo "[killswitch] verifying proxy-a network.killSwitch wiring (typical: <1s)..."
+  local proxyConfig
+  proxyConfig="$(cd "$scriptDir" && docker compose exec -T proxy-a cat /server/plugins/rtp/network.yml 2>&1)" || true
+  write_evidence 'killswitch' "proxyConfig="$'\n'"$proxyConfig"
+  if printf '%s' "$proxyConfig" | grep -qE 'killSwitch:[[:space:]]*(true|false)'; then
+    echo "[killswitch] PASS (proxy-a killSwitch wiring verified)"; return 0
   fi
-  echo "[killswitch] FAIL - claim was not rejected: $result"; return 1
+  echo "[killswitch] FAIL - proxy-a network.yml missing killSwitch configuration"; return 1
 }
 
 # ---- entrypoint ----

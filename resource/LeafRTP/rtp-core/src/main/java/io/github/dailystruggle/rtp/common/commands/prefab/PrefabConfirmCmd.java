@@ -99,10 +99,11 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
                 break;
         }
         PrefabNonceStore.Entry entry = cr.entry();
-        int changeCount = 0;
+        int totalChanges = 0;
         for (List<PrefabApplier.Change> changes : entry.perFileDiff().values()) {
-            changeCount += changes.size();
+            totalChanges += changes.size();
         }
+        final int changeCount = totalChanges;
 
         Optional<File> pluginDirOpt = PrefabDiskIO.resolvePluginDirectory(callerId, "confirm", entry.prefabId(),
                 "&cConfirm failed: plugin directory unavailable (server not fully initialised).");
@@ -111,7 +112,6 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         }
         File pluginDir = pluginDirOpt.get();
 
-        int retention = PrefabDiskIO.resolveBakRetention();
         // expandPerWorld prefabs synthesise a brand-new regions/<world>.yml per
         // loaded world. These are created through the same region-creation path
         // the /rtp config command uses (MultiConfigParser.addParser, which
@@ -121,148 +121,157 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         boolean expandPerWorld = PrefabRegistry.byId(entry.prefabId())
                 .map(Prefab::expandPerWorld).orElse(false);
         String defaultRegionFileId = "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID;
-        Map<String, String> candidateOverlays = new LinkedHashMap<>();
-        for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
-            String fileId = fe.getKey();
-            List<PrefabApplier.Change> changes = fe.getValue();
-            if (changes.isEmpty()) continue;
-            String templateFileId = (expandPerWorld
-                    && (fileId.startsWith("definitions/regions/") || fileId.startsWith("regions/"))
-                    && !fileId.equals(defaultRegionFileId)) ? defaultRegionFileId : null;
-            String path = pluginDir.toPath().toAbsolutePath().normalize()
-                    .relativize(PrefabDiskIO.resolveFile(pluginDir, fileId).toPath().toAbsolutePath().normalize())
-                    .toString().replace(File.separatorChar, '/');
-            try {
-                candidateOverlays.put(path,
-                        PrefabDiskIO.render(pluginDir, fileId, changes, templateFileId));
-            } catch (IOException renderFailure) {
-                RTPRuntime.log(Level.WARNING, "[prefab] candidate render failed for " + fileId, renderFailure);
-                send(callerId, "&cPrefab apply rejected because " + fileId + " could not be validated.");
-                return false;
-            }
-        }
-        ConfigCandidateGate.Result gate = ConfigCandidateGate.evaluate(pluginDir.toPath(), candidateOverlays);
-        if (gate.rejected()) {
-            ReloadSupport.sendReloadRejected(callerId, gate);
-            return false;
-        }
 
-        List<String> writtenFiles = new ArrayList<>();
-        List<String> writtenBaks = new ArrayList<>();
-        for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
-            String fileId = fe.getKey();
-            List<PrefabApplier.Change> changes = fe.getValue();
-            if (changes.isEmpty()) continue;
-            Map<String, Object> newTree = entry.newTrees().getOrDefault(fileId, java.util.Collections.emptyMap());
-            try {
-                Path bak = writeFile(pluginDir, fileId, newTree, changes, retention,
-                        expandPerWorld, defaultRegionFileId);
-                writtenFiles.add(fileId);
-                if (bak != null) writtenBaks.add(bak.getFileName().toString());
-            } catch (IOException ioe) {
-                RTPRuntime.log(Level.WARNING,
-                        "[prefab] confirm write FAILED: caller=" + callerId
-                                + " prefab=" + entry.prefabId()
-                                + " file=" + fileId + " - " + ioe.getMessage(), ioe);
-                send(callerId, "&cWrite failed for &f" + fileId + ".yml&c: " + ioe.getMessage());
-                send(callerId, "&7Other files (if any) already written remain on disk; "
-                        + "use &f/rtp admin prefab rollback " + entry.prefabId() + "&7 to restore.");
-                return false;
-            }
-        }
-
-        // Best-effort schematic install: if the applied prefab references a
-        // bundled `.schem` (the per-region `schematic` knob, ADR-058), extract
-        // it from the jar into `<pluginDir>/schematics/` so the paste resolves
-        // to a real file. Existing files are left untouched; a missing bundled
-        // resource is audited (S-004), never fatal to the apply.
-        List<String> installedSchematics = new ArrayList<>();
-        PrefabRegistry.byId(entry.prefabId()).ifPresent(prefab -> {
-            try {
-                PrefabSchematicInstaller.Result sr =
-                        PrefabSchematicInstaller.install(pluginDir, prefab);
-                installedSchematics.addAll(sr.installed());
-                if (!sr.installed().isEmpty()) {
-                    RTPRuntime.log(Level.INFO,
-                            "[prefab] schematic install: caller=" + callerId
-                                    + " prefab=" + entry.prefabId()
-                                    + " installed=" + sr.installed());
-                }
-                if (!sr.missingResource().isEmpty()) {
-                    RTPRuntime.log(Level.WARNING,
-                            "[prefab] schematic install: caller=" + callerId
-                                    + " prefab=" + entry.prefabId()
-                                    + " missing bundled resource(s)=" + sr.missingResource()
-                                    + " - paste will be a no-op until the file is supplied.");
-                }
-            } catch (IOException ioe) {
-                RTPRuntime.log(Level.WARNING,
-                        "[prefab] schematic install FAILED: caller=" + callerId
-                                + " prefab=" + entry.prefabId()
-                                + " - " + ioe.getMessage(), ioe);
-            }
-        });
-
-        // Best-effort reload: not fatal if it fails (the files are correct on
-        // disk; the operator can /rtp reload manually). Mirror ReloadCmd's
-        // user-facing chatter (SystemMessages.reloading / reloaded with
-        // [filename] -> "configs") so prefab confirm produces the same
-        // "loading configs..." / "successfully loaded configs." lines the
-        // operator sees on /rtp reload, instead of a silent swap.
-        boolean reloaded = false;
-        Throwable reloadFailure = null;
-        try {
-            if (ActiveConfigs.get() != null) {
-                emitReloadStatus(callerId,
-                        io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.reloading);
-                RTP.reloading.set(true);
+        Runnable confirmTask = () -> {
+            int retention = PrefabDiskIO.resolveBakRetention();
+            Map<String, String> candidateOverlays = new LinkedHashMap<>();
+            for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
+                String fileId = fe.getKey();
+                List<PrefabApplier.Change> changes = fe.getValue();
+                if (changes.isEmpty()) continue;
+                String templateFileId = (expandPerWorld
+                        && (fileId.startsWith("definitions/regions/") || fileId.startsWith("regions/"))
+                        && !fileId.equals(defaultRegionFileId)) ? defaultRegionFileId : null;
+                String path = pluginDir.toPath().toAbsolutePath().normalize()
+                        .relativize(PrefabDiskIO.resolveFile(pluginDir, fileId).toPath().toAbsolutePath().normalize())
+                        .toString().replace(File.separatorChar, '/');
                 try {
-                    reloaded = ActiveConfigs.get().reload();
-                } finally {
-                    RTP.reloading.set(false);
-                }
-                if (reloaded) {
-                    emitReloadStatus(callerId,
-                            io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.reloaded);
+                    candidateOverlays.put(path,
+                            PrefabDiskIO.render(pluginDir, fileId, changes, templateFileId));
+                } catch (IOException renderFailure) {
+                    RTPRuntime.log(Level.WARNING, "[prefab] candidate render failed for " + fileId, renderFailure);
+                    send(callerId, "&cPrefab apply rejected because " + fileId + " could not be validated.");
+                    return;
                 }
             }
-        } catch (RuntimeException re) {
-            reloadFailure = re;
-            RTP.reloading.set(false);
-        }
+            ConfigCandidateGate.Result gate = ConfigCandidateGate.evaluate(pluginDir.toPath(), candidateOverlays);
+            if (gate.rejected()) {
+                ReloadSupport.sendReloadRejected(callerId, gate);
+                return;
+            }
 
-        RTPRuntime.log(Level.INFO,
-                "[prefab] confirm OK: caller=" + callerId
-                        + " prefab=" + entry.prefabId()
-                        + " files=" + writtenFiles.size()
-                        + " changes=" + changeCount
-                        + " baks=" + writtenBaks.size()
-                        + " reload=" + reloaded);
+            List<String> writtenFiles = new ArrayList<>();
+            List<String> writtenBaks = new ArrayList<>();
+            for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
+                String fileId = fe.getKey();
+                List<PrefabApplier.Change> changes = fe.getValue();
+                if (changes.isEmpty()) continue;
+                Map<String, Object> newTree = entry.newTrees().getOrDefault(fileId, java.util.Collections.emptyMap());
+                try {
+                    Path bak = writeFile(pluginDir, fileId, newTree, changes, retention,
+                            expandPerWorld, defaultRegionFileId);
+                    writtenFiles.add(fileId);
+                    if (bak != null) writtenBaks.add(bak.getFileName().toString());
+                } catch (IOException ioe) {
+                    RTPRuntime.log(Level.WARNING,
+                            "[prefab] confirm write FAILED: caller=" + callerId
+                                    + " prefab=" + entry.prefabId()
+                                    + " file=" + fileId + " - " + ioe.getMessage(), ioe);
+                    send(callerId, "&cWrite failed for &f" + fileId + ".yml&c: " + ioe.getMessage());
+                    send(callerId, "&7Other files (if any) already written remain on disk; "
+                            + "use &f/rtp admin prefab rollback " + entry.prefabId() + "&7 to restore.");
+                    return;
+                }
+            }
 
-        send(callerId, "&aPrefab &f" + entry.prefabId() + "&a applied. Wrote "
-                + writtenFiles.size() + " file(s), " + changeCount + " change(s).");
-        if (!writtenBaks.isEmpty()) {
-            send(callerId, PrefabDiskIO.formatBackupSummary(writtenBaks));
-        }
-        if (!installedSchematics.isEmpty()) {
-            send(callerId, "&7Installed schematic(s): &f"
-                    + String.join(", ", installedSchematics));
-        }
-        if (reloaded) {
-            send(callerId, "&7Config reload completed.");
-        } else if (reloadFailure != null) {
-            send(callerId, "&eConfig reload failed: " + reloadFailure.getMessage()
-                    + " - try &f/rtp reload&e.");
+            // Best-effort schematic install: if the applied prefab references a
+            // bundled `.schem` (the per-region `schematic` knob, ADR-058), extract
+            // it from the jar into `<pluginDir>/schematics/` so the paste resolves
+            // to a real file. Existing files are left untouched; a missing bundled
+            // resource is audited (S-004), never fatal to the apply.
+            List<String> installedSchematics = new ArrayList<>();
+            PrefabRegistry.byId(entry.prefabId()).ifPresent(prefab -> {
+                try {
+                    PrefabSchematicInstaller.Result sr =
+                            PrefabSchematicInstaller.install(pluginDir, prefab);
+                    installedSchematics.addAll(sr.installed());
+                    if (!sr.installed().isEmpty()) {
+                        RTPRuntime.log(Level.INFO,
+                                "[prefab] schematic install: caller=" + callerId
+                                        + " prefab=" + entry.prefabId()
+                                        + " installed=" + sr.installed());
+                    }
+                    if (!sr.missingResource().isEmpty()) {
+                        RTPRuntime.log(Level.WARNING,
+                                "[prefab] schematic install: caller=" + callerId
+                                        + " prefab=" + entry.prefabId()
+                                        + " missing bundled resource(s)=" + sr.missingResource()
+                                        + " - paste will be a no-op until the file is supplied.");
+                    }
+                } catch (IOException ioe) {
+                    RTPRuntime.log(Level.WARNING,
+                            "[prefab] schematic install FAILED: caller=" + callerId
+                                    + " prefab=" + entry.prefabId()
+                                    + " - " + ioe.getMessage(), ioe);
+                }
+            });
+
+            // Best-effort reload: not fatal if it fails (the files are correct on
+            // disk; the operator can /rtp reload manually). Mirror ReloadCmd's
+            // user-facing chatter (SystemMessages.reloading / reloaded with
+            // [filename] -> "configs") so prefab confirm produces the same
+            // "loading configs..." / "successfully loaded configs." lines the
+            // operator sees on /rtp reload, instead of a silent swap.
+            boolean reloaded = false;
+            Throwable reloadFailure = null;
+            try {
+                if (ActiveConfigs.get() != null) {
+                    emitReloadStatus(callerId,
+                            io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.reloading);
+                    RTP.reloading.set(true);
+                    try {
+                        reloaded = ActiveConfigs.get().reload();
+                    } finally {
+                        RTP.reloading.set(false);
+                    }
+                    if (reloaded) {
+                        emitReloadStatus(callerId,
+                                io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.reloaded);
+                    }
+                }
+            } catch (RuntimeException re) {
+                reloadFailure = re;
+                RTP.reloading.set(false);
+            }
+
+            RTPRuntime.log(Level.INFO,
+                    "[prefab] confirm OK: caller=" + callerId
+                            + " prefab=" + entry.prefabId()
+                            + " files=" + writtenFiles.size()
+                            + " changes=" + changeCount
+                            + " baks=" + writtenBaks.size()
+                            + " reload=" + reloaded);
+
+            send(callerId, "&aPrefab &f" + entry.prefabId() + "&a applied. Wrote "
+                    + writtenFiles.size() + " file(s), " + changeCount + " change(s).");
+            if (!writtenBaks.isEmpty()) {
+                send(callerId, PrefabDiskIO.formatBackupSummary(writtenBaks));
+            }
+            if (!installedSchematics.isEmpty()) {
+                send(callerId, "&7Installed schematic(s): &f"
+                        + String.join(", ", installedSchematics));
+            }
+            if (reloaded) {
+                send(callerId, "&7Config reload completed.");
+            } else if (reloadFailure != null) {
+                send(callerId, "&eConfig reload failed: " + reloadFailure.getMessage()
+                        + " - try &f/rtp reload&e.");
+            } else {
+                send(callerId, "&7Config reload skipped; run &f/rtp reload&7 to pick up changes.");
+            }
+            send(callerId, "&7Rollback with: &f/rtp admin prefab rollback " + entry.prefabId());
+
+            // Notify addon subscribers that a prefab has been applied. This is a
+            // fire-and-forget, post-apply notification (the write and reload have
+            // already happened); the dispatcher isolates faulty subscribers so a
+            // single misbehaving addon cannot break the others or this command.
+            firePrefabApplied(entry.prefabId(), callerId, writtenFiles, entry.perFileDiff(), reloaded);
+        };
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(confirmTask);
         } else {
-            send(callerId, "&7Config reload skipped; run &f/rtp reload&7 to pick up changes.");
+            confirmTask.run();
         }
-        send(callerId, "&7Rollback with: &f/rtp admin prefab rollback " + entry.prefabId());
-
-        // Notify addon subscribers that a prefab has been applied. This is a
-        // fire-and-forget, post-apply notification (the write and reload have
-        // already happened); the dispatcher isolates faulty subscribers so a
-        // single misbehaving addon cannot break the others or this command.
-        firePrefabApplied(entry.prefabId(), callerId, writtenFiles, entry.perFileDiff(), reloaded);
         return true;
     }
 

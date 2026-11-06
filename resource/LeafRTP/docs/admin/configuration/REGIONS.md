@@ -29,7 +29,7 @@ You can create and update regions through:
 | `requirePermission` | Boolean | `false` | If true, players need `rtp.regions.<name>` permission to use this region. |
 | `override` | String | `"default"` | If a player lacks permission, they are redirected to this region instead. |
 | `cacheCap` | Integer | `50` | Maximum number of safe locations to pre-calculate and store in the background. |
-| `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
+| `backlogCacheCap` | Integer | `1000` | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
 | `cooldown` | Integer / Duration / String | (global fallback) | Cooldown duration between successful teleports using this region. Accepts raw seconds (`300`), duration strings (e.g. `5m`, `1h`, `40t`), or `"@config"` to inherit `defaults.cooldown` (or global `teleportCooldown`). Negative values / sentinels (`-1`, `infinite`, `permanent`) are not supported per region: they are ignored and the region falls back to the global `teleportCooldown` and shared timer. Tracks cooldowns independently per region. See [Teleport Cooldown and Warmup Delay](#teleport-cooldown-and-warmup-delay-cooldown--delay). |
@@ -370,7 +370,6 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 
 - **Leave at the default `1000`** if you have a large radius and want `/rtp` to feel instantaneous over long sessions: the backlog absorbs spiral selection pressure so that `cacheCap` rarely empties.
 - **Lower or set to `0`** on very small radii (< 1000 chunks) where the spiral exhausts quickly and the backlog mostly duplicates work, or on memory-tight servers.
-- **The lite jar** ships with `backlogCacheCap` omitted from `regions/default.yml`, so the in-code fallback resolves to `0` (disabled). Add the key explicitly to opt in on a lite deployment.
 - The backlog holds no chunk tickets and no in-flight teleport tasks, so a high cap has minimal runtime memory cost beyond the raw coordinate records themselves.
 
 ### Relationship to other caches

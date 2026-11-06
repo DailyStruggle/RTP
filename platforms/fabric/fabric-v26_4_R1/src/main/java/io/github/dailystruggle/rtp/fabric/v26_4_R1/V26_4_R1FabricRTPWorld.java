@@ -344,14 +344,27 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         return null;
     }
 
+    public CompletableFuture<Long> loadLiveChunk(int cx, int cz) {
+        ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
+        MinecraftServer server = level.getServer();
+        if (server == null) return CompletableFuture.completedFuture(null);
+        long k = key(cx, cz);
+        if (getLiveCachedChunk(k) != null) {
+            return CompletableFuture.completedFuture(k);
+        }
+        return loadLiveChunk(level, server, cx, cz, k);
+    }
+
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
-        return getChunkAt(cx, cz).thenApply(k -> {
+        return loadLiveChunk(cx, cz).thenApply(k -> {
+            if (k == null) return null;
             CompletableFuture<Boolean> done = new CompletableFuture<>();
             ChunkSet set = new ChunkSet(this, cx, cz,
                     Collections.singletonList(CompletableFuture.completedFuture(k)),
                     done);
-            done.complete(k != null);
+            done.complete(true);
             return set;
         });
     }

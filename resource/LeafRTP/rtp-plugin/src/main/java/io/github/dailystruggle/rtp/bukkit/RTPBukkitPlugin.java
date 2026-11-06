@@ -118,13 +118,23 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             new io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestUmbrellaScheduler(),
             null);
 
-    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats (id=30865)");
+    int bstatsServiceId =
+        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveServiceId(
+            RTPBukkitPlugin.class);
+    String bstatsVariant =
+        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveAssemblyVariant(
+            RTPBukkitPlugin.class);
+    RTP.log(
+        java.util.logging.Level.FINE,
+        "[RTP] onEnable ENTER -- initializing bStats (id=" + bstatsServiceId + ")");
     // Shared bStats entry point (bstats-api client + RTP chart catalogue). All chart
     // lambdas read CoreMetrics.instance().snapshot() and bucketise to keep submissions
     // privacy-safe and low-cardinality.
     io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
         new io.github.dailystruggle.rtp.bukkit.metrics.BukkitBStatsHost(this),
-        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full", getDataFolder());
+        bstatsServiceId,
+        bstatsVariant,
+        getDataFolder());
 
     // Install the platform-appropriate MetricsBinding so /rtp info, the bStats charts,
     // and every other Metrics.snapshot() consumer report live values instead of

@@ -14,7 +14,7 @@ Related pages:
 
 ## Prerequisites
 
-- A running Paper or Folia backend on Java 21+, RTP plugin installed (full jar, not lite - the lite build ships without the SQL/Redis drivers).
+- A running Paper or Folia backend on Java 21+, with the RTP plugin installed.
 - Docker available on the same host (or a reachable Redis 7+ instance on the network).
 - Console / op access to run `/rtp test network` from the server console or an opped player.
 

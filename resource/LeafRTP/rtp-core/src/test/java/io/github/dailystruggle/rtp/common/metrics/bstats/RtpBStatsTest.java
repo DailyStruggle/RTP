@@ -149,4 +149,67 @@ class RtpBStatsTest {
         assertEquals(List.of("main", "async", "later:5", "timer:2"), rtp.calls);
         assertEquals("h", rtp.cancelled);
     }
+
+    @Test
+    @DisplayName("Manifest distribution value maps free/lite to 12277 and supporter/default to 30865")
+    void distributionValueMapping() {
+        assertEquals(RtpBStats.LITE_SERVICE_ID, RtpBStats.resolveServiceIdFromDistribution("free"));
+        assertEquals(RtpBStats.LITE_SERVICE_ID, RtpBStats.resolveServiceIdFromDistribution(" FREE "));
+        assertEquals(RtpBStats.LITE_SERVICE_ID, RtpBStats.resolveServiceIdFromDistribution("lite"));
+        assertEquals("lite", RtpBStats.resolveVariantFromDistribution("free"));
+        assertEquals("lite", RtpBStats.resolveVariantFromDistribution("lite"));
+
+        assertEquals(RtpBStats.SERVICE_ID, RtpBStats.resolveServiceIdFromDistribution("supporter"));
+        assertEquals(RtpBStats.SERVICE_ID, RtpBStats.resolveServiceIdFromDistribution("full"));
+        assertEquals(RtpBStats.SERVICE_ID, RtpBStats.resolveServiceIdFromDistribution(null));
+        assertEquals(RtpBStats.SERVICE_ID, RtpBStats.resolveServiceIdFromDistribution(""));
+        assertEquals("full", RtpBStats.resolveVariantFromDistribution("supporter"));
+        assertEquals("full", RtpBStats.resolveVariantFromDistribution(null));
+
+        // Unpacked test classes without LeafRTP-Distribution default to supporter / 30865
+        assertEquals(RtpBStats.SERVICE_ID, RtpBStats.resolveServiceId(RtpBStatsTest.class));
+        assertEquals("full", RtpBStats.resolveAssemblyVariant(RtpBStatsTest.class));
+    }
+
+    @Test
+    @DisplayName("resolveServiceId reads LeafRTP-Distribution from anchor class jar manifest")
+    void resolvesDistributionFromAnchorJarManifest() throws Exception {
+        String entryPath = RtpBStatsTest.class.getName().replace('.', '/') + ".class";
+        byte[] classBytes;
+        try (java.io.InputStream in = RtpBStatsTest.class.getClassLoader().getResourceAsStream(entryPath)) {
+            classBytes = in.readAllBytes();
+        }
+
+        File freeJar = writeJarWithManifestDistribution("free", entryPath, classBytes);
+        try (java.net.URLClassLoader cl = new java.net.URLClassLoader(
+                new java.net.URL[]{freeJar.toURI().toURL()}, null)) {
+            Class<?> anchor = Class.forName(RtpBStatsTest.class.getName(), false, cl);
+            assertEquals(RtpBStats.LITE_SERVICE_ID, RtpBStats.resolveServiceId(anchor));
+            assertEquals("lite", RtpBStats.resolveAssemblyVariant(anchor));
+        }
+
+        File supporterJar = writeJarWithManifestDistribution("supporter", entryPath, classBytes);
+        try (java.net.URLClassLoader cl = new java.net.URLClassLoader(
+                new java.net.URL[]{supporterJar.toURI().toURL()}, null)) {
+            Class<?> anchor = Class.forName(RtpBStatsTest.class.getName(), false, cl);
+            assertEquals(RtpBStats.SERVICE_ID, RtpBStats.resolveServiceId(anchor));
+            assertEquals("full", RtpBStats.resolveAssemblyVariant(anchor));
+        }
+    }
+
+    private File writeJarWithManifestDistribution(String distribution, String classEntry, byte[] classBytes)
+            throws Exception {
+        pluginDir.mkdirs();
+        File jarFile = new File(pluginDir, "test-" + distribution + ".jar");
+        java.util.jar.Manifest mf = new java.util.jar.Manifest();
+        mf.getMainAttributes().put(java.util.jar.Attributes.Name.MANIFEST_VERSION, "1.0");
+        mf.getMainAttributes().putValue(RtpBStats.MANIFEST_DISTRIBUTION_ATTR, distribution);
+        try (java.util.jar.JarOutputStream jos = new java.util.jar.JarOutputStream(
+                new java.io.FileOutputStream(jarFile), mf)) {
+            jos.putNextEntry(new java.util.jar.JarEntry(classEntry));
+            jos.write(classBytes);
+            jos.closeEntry();
+        }
+        return jarFile;
+    }
 }

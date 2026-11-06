@@ -77,7 +77,7 @@ Nested under the `defaults:` block. Holds starter fallback templates and values 
 | `shape` | Block | (`CIRCLE` block) | Starter fallback shape block inherited whole by a region whose `shape` is still `"@config"`. Holds `radius` (default `4096b` / `256c`) and `centerRadius` (default `64` chunks / `1,024` blocks). Prefer setting `shape` per region via `/rtp editor` or `definitions/regions/<name>.yml`. See [REGIONS.md → Region Size](REGIONS.md#region-size-radius-and-centerradius). |
 | `vert` | Block | (`LINEAR` block) | Starter fallback vertical adjustor block (`minY`, `maxY`, `requireSkyLight`, `maxHillAngle`) inherited whole by a region whose `vert` is still `"@config"`. Prefer configuring `vert` per region in `/rtp editor` or `definitions/regions/<name>.yml` (especially for Nether `maxY: 120`, `requireSkyLight: false`). |
 | `cacheCap` | Integer | `50` | Default region `cacheCap` (max pre-calculated safe locations). |
-| `backlogCacheCap` | Integer | `1000` (lite: `0`) | Default region `backlogCacheCap` (L3 backlog buffer; `0` disables). |
+| `backlogCacheCap` | Integer | `1000` | Default region `backlogCacheCap` (L3 backlog buffer; `0` disables). |
 | `activeChunkCap` | Integer | `10` | Default region `activeChunkCap` (chunks kept loaded for zero-latency). |
 | `spatialResolution` | Integer / String | `"auto"` | Default region `spatialResolution` (bad-location tracking precision, positive integer or `"auto"`). |
 | `requirePermission` | Boolean | `false` | Default `requirePermission` for regions/worlds. |

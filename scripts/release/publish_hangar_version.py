@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Publishes a version of the LeafRTP Lite jar to Hangar (https://hangar.papermc.io/leaf26/LeafRTP).
+Publishes a version of the LeafRTP jar to Hangar (https://hangar.papermc.io/leaf26/LeafRTP).
 
-Hangar hosts the Lite assembly variant only (ADR-024); Pro is never published to
+Hangar hosts the free default LeafRTP download only; Pro is never published to
 nor advertised on Hangar. mc-publish (Kir-Antipov) supports only CurseForge /
 Modrinth / GitHub, so Hangar is handled here directly against the Hangar REST API
 using the Python standard library (no third-party actions).
@@ -127,9 +127,9 @@ def build_multipart(version_upload: dict, file_path: str) -> tuple:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Publish the LeafRTP Lite jar to Hangar.")
+    parser = argparse.ArgumentParser(description="Publish the LeafRTP jar to Hangar.")
     parser.add_argument("--project", default=DEFAULT_PROJECT, help="Hangar project slug or id (default: LeafRTP)")
-    parser.add_argument("--file", required=True, help="Path to the Lite jar to upload")
+    parser.add_argument("--file", required=True, help="Path to the LeafRTP jar to upload")
     parser.add_argument("--version", required=True, help="Version string (e.g. 3.3.0)")
     parser.add_argument("--changelog-file", help="Path to a markdown file used as the version description")
     parser.add_argument("--version-type", default="release", help="release | beta | alpha (default: release)")
@@ -137,7 +137,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not os.path.isfile(args.file):
-        print(f"::error::Lite jar not found: {args.file}", file=sys.stderr)
+        print(f"::error::LeafRTP jar not found: {args.file}", file=sys.stderr)
         sys.exit(1)
 
     description = ""

@@ -84,8 +84,6 @@ public class ScanResetCmd extends ScanSubCmd {
 
     MemoryShape<?> shape = (MemoryShape<?>) shapeObj;
     shape.clear();
-    shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-    ScanTask.delete(region.name);
 
     // restore spatialResolution from config so the region is ready for a fresh scan or normal use
     long spatialRes = region.getSettings().spatialResolution();
@@ -100,13 +98,20 @@ public class ScanResetCmd extends ScanSubCmd {
     }
     shape.setSpatialResolution(spatialRes);
 
-    if (ActiveConfigs.get() == null) return;
-    String msg = String.valueOf(ActiveConfigs.get().getConfigValue(CommandMessages.scanReset, ""));
-    if (msg == null || msg.isEmpty()) return;
-    msg = msg.replace("[scan_regions]", region.name);
-    msg = msg.replace("[scan_region]", region.name);
-    msg = msg.replace("[region]", region.name);
-    RTPRuntime.serverAccessor().announce(msg, "rtp.scan", "SCAN");
+    String saveFileName = region.name + "_" + region.cacheKey();
+    String worldName = region.getWorld().name();
+    String regionName = region.name;
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+      shape.save(saveFileName, worldName);
+      ScanTask.delete(regionName);
+      if (ActiveConfigs.get() == null) return;
+      String msg = String.valueOf(ActiveConfigs.get().getConfigValue(CommandMessages.scanReset, ""));
+      if (msg == null || msg.isEmpty()) return;
+      msg = msg.replace("[scan_regions]", regionName);
+      msg = msg.replace("[scan_region]", regionName);
+      msg = msg.replace("[region]", regionName);
+      RTPRuntime.serverAccessor().announce(msg, "rtp.scan", "SCAN");
+    });
   }
 
 }

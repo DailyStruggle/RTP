@@ -936,10 +936,16 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * fired by the ADR-016 stale-chunk guard) and removes the foot-gun. See
      * {@code POTENTIAL_BUGS.md} 2026-05-08 entry for the original report.</p>
      */
+    public CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ) {
+        final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
+        return loadLiveChunk(chunkX, chunkZ, key,
+                io.github.dailystruggle.rtp.common.tools.GenerationBudget.currentReservation());
+    }
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
         io.github.dailystruggle.rtp.common.tools.CfDiag.fabricGetChunkAtAsync.increment();
-        return getChunkAt(cx, cz).thenApply(key -> {
+        return loadLiveChunk(cx, cz).thenApply(key -> {
+            if (key == null) return null;
             io.github.dailystruggle.rtp.common.tools.CfDiag.chunkSetFabricGetChunk.increment();
             CompletableFuture<Boolean> done = new CompletableFuture<>();
             ChunkSet set = new ChunkSet(this, cx, cz,
@@ -952,7 +958,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             // branch on completion, not on the value, but Boolean.TRUE on
             // success / FALSE on null preserves a useful signal for future
             // cross-platform listeners.
-            done.complete(key != null);
+            done.complete(true);
             return set;
         });
     }

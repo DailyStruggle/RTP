@@ -23,6 +23,7 @@ All 14 modules uphold four shared architectural guarantees:
 - [`units-api`](units-api/README.md) - Dependency-free human-friendly temporal (`20t`, `1d12h`), spatial (`256c`, `4r`, `2km`), and data-size (`256MB`, `1GiB`) parsers with context-aware auto-interpretation (`DurationParser`, `DistanceParser`, `DataSizeParser`, `CacheMemoryCost`).
 - [`bit-api`](bit-api/README.md) - Plugin-agnostic Power-On, Continuous, and Initiated Built-In Test (`PBIT` / `CBIT` / `IBIT`) framework (`BitRunner`, `BitComponent`, `BitCodeRegistry`, `BitFinding`, `BitReport`, `BitOutputs`, `BitTable`, live JaCoCo/surface coverage).
 - [`config-bit-api`](config-bit-api/README.md) - Declarative YAML `@type` / `@options` / `@range` / `@pattern` comment-directive schema validation (`DirectiveSchemaParser`, `DirectiveValidator`), cross-key distance constraints (`ConfigConstraint`, `GenericConstraintCheck`), `@<file>` reference checks (`ReferenceSettingCheck`), and locale key-parity verification (`MessageKeyParity`).
+- [`bytecode-api`](bytecode-api/README.md) - Zero-classloading JVM `.class` constant-pool, config-key, and causal-graph bytecode scanner (`BytecodeConfigScanner`, `BytecodeCausalGraphScanner`, `JarConfigScanner`, `SchemaInferrer`, `ServerConfigAtlas`).
 
 ### 3. Stochastic Control, Allocation & Telemetry
 - [`predict-api`](predict-api/README.md) - Zero-dependency online statistical estimators (`EwmaEstimator`, `BernoulliEstimator`, `EwmaLinearFit`), lag-aware AIMD stability limiters (`AimdLimiter`), tick-budget pacers (`BudgetPacer`), variance-gated comparative cost governors (`ComparativeCostGovernor`), max-min water-filling (`WaterFillingAllocator`), per-actor dual-EWMA work attribution (`WorkAttributionLedger`), and Folia probed regional share allocation (`ProbedShareAllocator`).
@@ -52,6 +53,7 @@ All 14 modules uphold four shared architectural guarantees:
 | `units-api` | `:units-api` | `units-api` | `io.github.dailystruggle.rtp.common.selection.region.util` | Zero (JDK 17 only) | [`units-api/README.md`](units-api/README.md) |
 | `bit-api` | `:bit-api` | `bit-api` | `io.github.dailystruggle.bit` | Zero (JDK 17 only) | [`bit-api/README.md`](bit-api/README.md) |
 | `config-bit-api` | `:config-bit-api` | `config-bit-api` | `io.github.dailystruggle.rtp.common.bit.config` | `:yaml-api`, `:bit-api`, `:units-api` | [`config-bit-api/README.md`](config-bit-api/README.md) |
+| `bytecode-api` | `:bytecode-api` | `bytecode-api` | `io.github.dailystruggle.bytecode` | `:yaml-api`, `:server-api`, `:config-bit-api` | [`bytecode-api/README.md`](bytecode-api/README.md) |
 | `predict-api` | `:predict-api` | `predict-api` | `io.github.dailystruggle.rtp.common.predict` | Zero (JDK 17 only) | [`predict-api/README.md`](predict-api/README.md) |
 | `metrics-api` | `:metrics-api` | `metrics-api` | `io.github.dailystruggle.metrics.api` | Zero (JDK 17 only) | [`metrics-api/README.md`](metrics-api/README.md) |
 | `bstats-api` | `:bstats-api` | `bstats-api` | `io.github.dailystruggle.bstats.api` | Zero (JDK 17 only) | [`bstats-api/README.md`](bstats-api/README.md) |

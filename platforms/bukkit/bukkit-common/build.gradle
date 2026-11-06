@@ -65,4 +65,5 @@ dependencies {
     // boundary rules that lock the Spigot-exclusive Anvil read-only pre-filter
     // package in place (see ADR-016 / ADR-016 section 6).
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+    testImplementation rootProject.libs.jazzer.junit
 }

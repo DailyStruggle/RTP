@@ -27,12 +27,12 @@ import java.nio.file.StandardCopyOption;
  * {@link java.nio.file.Files#move(Path, Path, java.nio.file.CopyOption...)}
  * with {@link StandardCopyOption#ATOMIC_MOVE}.)</p>
  */
-public final class RtpYamlConfig extends RtpYamlSection {
+public class RtpYamlConfig extends RtpYamlSection {
 
     private File file;
     private final RtpYamlOptions options = new RtpYamlOptions();
 
-    private RtpYamlConfig(File file, RtpYamlMapping root) {
+    protected RtpYamlConfig(File file, RtpYamlMapping root) {
         super(root);
         this.file = file;
     }

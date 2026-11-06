@@ -181,6 +181,8 @@ include 'tags-api'
 include 'predict-api'
 // config-bit-api -- declarative YAML directive and constraint PBIT library (ADR-064, ADR-121).
 include 'config-bit-api'
+// bytecode-api -- zero-classloading JVM .class constant-pool, config-key, and causal-graph bytecode scanner (leafconfig-ADR-001, leaffuzz-ADR-001, ADR-125).
+include 'bytecode-api'
 // menu-api -- cross-platform declarative menu, session, token, and prompt SPI (ADR-035, ADR-044, ADR-048).
 include 'menu-api'
 // database-api -- zero-dependency SQL connection pooling, dialect abstraction, and Redis RESP2 client (leafrtp-ADR-079).
@@ -208,6 +210,7 @@ project(':anvil-api').projectDir      = file('api/anvil-api')
 project(':tags-api').projectDir       = file('api/tags-api')
 project(':predict-api').projectDir    = file('api/predict-api')
 project(':config-bit-api').projectDir = file('api/config-bit-api')
+project(':bytecode-api').projectDir   = file('api/bytecode-api')
 project(':menu-api').projectDir       = file('api/menu-api')
 project(':database-api').projectDir   = file('api/database-api')
 project(':schematics-api').projectDir = file('api/schematics-api')

@@ -249,16 +249,24 @@ public class NeoForgeModServerAccessor extends AbstractModServerAccessor {
   }
 
   private void onChunkLoad(ChunkEvent.Load event) {
-    if (!(event.getLevel() instanceof ServerLevel level)) return;
+    if (!(event.getLevel() instanceof ServerLevel level)
+        || !(event.getChunk() instanceof net.minecraft.world.level.chunk.LevelChunk)) {
+      return;
+    }
+    int cx = event.getChunk().getPos().x();
+    int cz = event.getChunk().getPos().z();
+    boolean isNew = event.isNewChunk();
+    long seed = level.getSeed();
     String worldName = resolveWorldName(level);
-    dispatchingWorldEventHook()
-        .fireChunkLoad(
-            new ChunkLoadContext(
-                worldName,
-                event.getChunk().getPos().x(),
-                event.getChunk().getPos().z(),
-                event.isNewChunk(),
-                level.getSeed()));
+    Runnable fire =
+        () ->
+            dispatchingWorldEventHook()
+                .fireChunkLoad(new ChunkLoadContext(worldName, cx, cz, isNew, seed));
+    if (level.getServer().isSameThread()) {
+      fire.run();
+    } else {
+      level.getServer().execute(fire);
+    }
   }
 
   private void onSaplingGrow(BlockGrowFeatureEvent event) {
@@ -434,7 +442,7 @@ public class NeoForgeModServerAccessor extends AbstractModServerAccessor {
   @Override
   public String getBiomeKey(String worldName, int x, int y, int z) {
     ServerLevel level = resolveLevel(worldName);
-    if (level == null) return "minecraft:plains";
+    if (level == null || !level.hasChunk(x >> 4, z >> 4)) return "minecraft:plains";
     return level
         .getBiome(new BlockPos(x, y, z))
         .unwrapKey()
