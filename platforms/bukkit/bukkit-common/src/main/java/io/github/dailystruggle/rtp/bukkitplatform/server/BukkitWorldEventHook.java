@@ -10,6 +10,7 @@ import io.github.dailystruggle.server.api.PlayerBedLeaveContext;
 import io.github.dailystruggle.server.api.PlayerInteractBlockContext;
 import io.github.dailystruggle.server.api.SaplingGrowContext;
 import io.github.dailystruggle.server.api.WorldTimeSkipContext;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -58,6 +59,8 @@ import org.bukkit.plugin.Plugin;
  * @governedBy ADR-115
  */
 public final class BukkitWorldEventHook extends DispatchingWorldEventHook implements Listener {
+
+  private static final Method TIME_SKIP_REASON_METHOD = resolveTimeSkipReasonMethod();
 
   private final DispatchingPlayerLifecycleHook playerLifecycleHook =
       new DispatchingPlayerLifecycleHook();
@@ -325,7 +328,7 @@ public final class BukkitWorldEventHook extends DispatchingWorldEventHook implem
     if (!hasSubscribers()) return;
     World world = event.getWorld();
     if (world == null) return;
-    String reason = event.getSkipReason() != null ? event.getSkipReason().name() : "NIGHT_SKIP";
+    String reason = readSkipReason(event);
     long skipAmount = event.getSkipAmount();
     long targetTime = (world.getTime() + skipAmount) % 24000L;
     WorldTimeSkipContext ctx =
@@ -333,6 +336,40 @@ public final class BukkitWorldEventHook extends DispatchingWorldEventHook implem
     fireWorldTimeSkip(ctx);
     if (ctx.isCancelled()) {
       event.setCancelled(true);
+    }
+  }
+
+  /**
+   * Resolves {@code TimeSkipEvent#getSkipReason()} reflectively so bytecode does not link against
+   * the legacy {@code ()Lorg/bukkit/event/world/TimeSkipEvent$SkipReason;} descriptor, which moved
+   * to {@code ClockTimeSkipEvent$SkipReason} in Paper 26.x.
+   */
+  static String readSkipReason(Object event) {
+    if (event == null) return "NIGHT_SKIP";
+    try {
+      Method getter =
+          (TIME_SKIP_REASON_METHOD != null && event instanceof TimeSkipEvent)
+              ? TIME_SKIP_REASON_METHOD
+              : event.getClass().getMethod("getSkipReason");
+      Object raw = getter.invoke(event);
+      if (raw instanceof Enum<?> enumValue) {
+        return enumValue.name();
+      }
+      if (raw != null) {
+        String resolved = readKeyedOrName(raw);
+        if (!resolved.isBlank()) return resolved;
+      }
+      return "NIGHT_SKIP";
+    } catch (Throwable t) {
+      return "NIGHT_SKIP";
+    }
+  }
+
+  private static Method resolveTimeSkipReasonMethod() {
+    try {
+      return TimeSkipEvent.class.getMethod("getSkipReason");
+    } catch (Throwable t) {
+      return null;
     }
   }
 
