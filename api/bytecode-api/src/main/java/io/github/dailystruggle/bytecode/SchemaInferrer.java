@@ -934,102 +934,102 @@ public final class SchemaInferrer {
                     + (defVal != null && !defVal.isEmpty() && !defVal.equals("default") ? " (matches default)." : "."));
         }
 
-        // 2. Category-specific player impact when changed
-        if (leaf.contains("chance") || leaf.contains("probability") || leaf.contains("percent")) {
-            String subject = humanizeSubject(kLow, leaf, "chance", "probability", "percent");
-            String maxStr = (schema.rangeMax() != null && schema.rangeMax() > 1.0) ? "100%" : "1.0 (100%)";
-            bullets.add("If increased (toward " + maxStr + "): " + capitalize(subject)
-                    + " triggers on a higher percentage of hits/actions (at " + maxStr + ", it triggers every single time).");
-            bullets.add("If decreased (toward 0.0 / 0%): " + capitalize(subject)
-                    + " triggers less often; setting 0.0 disables the effect completely.");
-            return bullets;
-        }
+        List<String> adjustmentBullets = new ArrayList<>();
 
-        if (isIntervalOrCooldown(leaf)) {
-            if (kLow.contains("hopper") || kLow.contains("transfer")) {
-                bullets.add("If increased (e.g. 16-20 ticks / 0.8s-1.0s): Hoppers pause longer between transfers — player sorting systems move items slower, but chunk tick (MSPT) lag drops significantly.");
-                bullets.add("If decreased (e.g. 1-4 ticks / 0.05s-0.2s): Hoppers move items much faster for high-speed player sorters, at the cost of higher server tick usage.");
-            } else if (kLow.contains("spawn") || kLow.contains("wave") || kLow.contains("arena") || kLow.contains("mob")) {
-                bullets.add("If increased (higher ticks/seconds): Longer breather between mob/boss spawns — gives players more time to heal and clear waves, and lowers active mob counts.");
-                bullets.add("If decreased (lower ticks/seconds): Waves spawn rapidly back-to-back, making combat much harder for players and increasing entity tick load.");
-            } else if (kLow.contains("teleport") || kLow.contains("rtp") || kLow.contains("warmup")) {
-                bullets.add("If increased: Players must stand still longer after running the command before teleporting.");
-                bullets.add("If decreased (0): Players teleport immediately with no warmup countdown.");
-            } else {
-                String subject = humanizeSubject(kLow, leaf, "ticks", "seconds", "ms", "cooldown", "interval", "delay");
-                bullets.add("If increased: Longer wait between " + subject + " actions (slower pace for players, lower server CPU/tick load).");
-                bullets.add("If decreased: Shorter wait — " + subject + " runs more frequently (faster response, higher server tick cost).");
-            }
-            return bullets;
-        }
-
-        if (leaf.contains("duration") || leaf.contains("timeout") || leaf.contains("ttl")) {
-            String subject = humanizeSubject(kLow, leaf, "seconds", "ticks", "duration", "timeout");
-            if (kLow.contains("tag") || kLow.contains("combat") || kLow.contains("pvp")) {
-                bullets.add("If increased (e.g. 20-60s): Players stay combat-tagged longer after taking or dealing a hit before they can safely log out or teleport.");
-                bullets.add("If decreased (e.g. 0-5s): Combat restrictions wear off sooner after a fight ends (0 disables combat tagging).");
-            } else {
-                bullets.add("If increased: " + capitalize(subject) + " lasts longer before expiring.");
-                bullets.add("If decreased: " + capitalize(subject) + " expires sooner (0 disables the timer).");
-            }
-            return bullets;
-        }
-
-        if (leaf.contains("multiplier") || leaf.contains("scale") || leaf.contains("factor")) {
-            String subject = humanizeSubject(kLow, leaf, "multiplier", "scale", "factor");
-            bullets.add("If increased (higher multiplier): Scales " + subject + " up (e.g. 2.0 = double strength/health per player), making encounters tougher.");
-            bullets.add("If decreased (closer to 1.0 or lower): Reduces " + subject + " scaling (1.0 = unscaled base value).");
-            return bullets;
-        }
-
-        if (leaf.contains("batch") || leaf.contains("amount") || leaf.contains("max") || leaf.contains("limit") || leaf.contains("cap") || leaf.contains("count")) {
-            String subject = humanizeSubject(kLow, leaf, "max", "limit", "cap", "count", "per", "batch");
-            if (kLow.contains("hopper") || kLow.contains("item")) {
-                bullets.add("If increased (e.g. 32-64 items): Moves larger stacks in a single transfer cycle, speeding up bulk chest/hopper throughput.");
-                bullets.add("If decreased (e.g. 1-4 items): Moves fewer items per cycle (1 = vanilla single-item hopper transfer).");
-            } else {
-                bullets.add("If increased: Raises the cap on " + subject + ", allowing more concurrent items/entities/tasks.");
-                bullets.add("If decreased: Tightens the cap on " + subject + " to conserve server memory and tick time.");
-            }
-            return bullets;
-        }
-
-        if ("enum".equals(schema.inferredType()) || !schema.options().isEmpty()) {
-            for (String opt : schema.options()) {
-                boolean isCur = opt.equalsIgnoreCase(val);
-                bullets.add(opt + (isCur ? " (Current): " : ": ") + explainEnumConstantForPlayers(opt, kLow));
-            }
-            return bullets;
-        }
-
+        // 2. Category-specific player impact when changed (discrete & spatial types first, then tunable numeric categories)
         if ("boolean".equals(schema.inferredType())) {
             String subject = humanizeSubject(kLow, leaf, "enable", "enabled", "allow", "deny");
             if (leaf.startsWith("deny") || leaf.startsWith("cancel") || leaf.startsWith("prevent")) {
                 String action = humanizeSubject(leaf, leaf, "deny", "cancel", "prevent");
-                bullets.add("true: Cancels/blocks " + action + " for players in this region or mode.");
-                bullets.add("false: Allows players to perform " + action + " normally.");
+                adjustmentBullets.add("true: Cancels/blocks " + action + " for players in this region or mode.");
+                adjustmentBullets.add("false: Allows players to perform " + action + " normally.");
             } else {
-                bullets.add("true: Turns on " + subject + " in-game.");
-                bullets.add("false: Turns off " + subject + " so the feature is skipped.");
+                adjustmentBullets.add("true: Turns on " + subject + " in-game.");
+                adjustmentBullets.add("false: Turns off " + subject + " so the feature is skipped.");
             }
-            return bullets;
-        }
-
-        if (schema.spatialGizmo() != SpatialGizmoKind.NONE) {
+        } else if ("enum".equals(schema.inferredType()) || !schema.options().isEmpty()) {
+            for (String opt : schema.options()) {
+                boolean isCur = opt.equalsIgnoreCase(val);
+                adjustmentBullets.add(opt + (isCur ? " (Current): " : ": ") + explainEnumConstantForPlayers(opt, kLow));
+            }
+        } else if (schema.spatialGizmo() != SpatialGizmoKind.NONE) {
             if (schema.spatialGizmo() == SpatialGizmoKind.RADIUS || schema.spatialGizmo() == SpatialGizmoKind.INNER_RADIUS) {
-                bullets.add("If increased: Expands the region/protection boundary further outward across the world map.");
-                bullets.add("If decreased: Shrinks the active zone tightly around its center coordinate.");
+                adjustmentBullets.add("If increased: Expands the region/protection boundary further outward across the world map.");
+                adjustmentBullets.add("If decreased: Shrinks the active zone tightly around its center coordinate.");
             } else if (schema.spatialGizmo() == SpatialGizmoKind.WORLD_REFERENCE) {
-                bullets.add("Changing world name: Moves this region, arena, or protection rule to the target Minecraft world.");
+                adjustmentBullets.add("Changing world name: Moves this region, arena, or protection rule to the target Minecraft world.");
             } else {
-                bullets.add("Changing coordinate: Shifts the center anchor point of this zone on the 2D world map.");
+                adjustmentBullets.add("Changing coordinate: Shifts the center anchor point of this zone on the 2D world map.");
             }
-            return bullets;
+        } else if (numVal != null && !isStructuralNumericIdentifier(leaf)) {
+            if (leaf.contains("chance") || leaf.contains("probability") || leaf.contains("percent")) {
+                String subject = humanizeSubject(kLow, leaf, "chance", "probability", "percent");
+                String maxStr = (schema.rangeMax() != null && schema.rangeMax() > 1.0) ? "100%" : "1.0 (100%)";
+                adjustmentBullets.add("If increased (toward " + maxStr + "): " + capitalize(subject)
+                        + " triggers on a higher percentage of hits/actions (at " + maxStr + ", it triggers every single time).");
+                adjustmentBullets.add("If decreased (toward 0.0 / 0%): " + capitalize(subject)
+                        + " triggers less often; setting 0.0 disables the effect completely.");
+            } else if (isIntervalOrCooldown(leaf)) {
+                if (kLow.contains("hopper") || kLow.contains("transfer")) {
+                    adjustmentBullets.add("If increased (e.g. 16-20 ticks / 0.8s-1.0s): Hoppers pause longer between transfers — player sorting systems move items slower, but chunk tick (MSPT) lag drops significantly.");
+                    adjustmentBullets.add("If decreased (e.g. 1-4 ticks / 0.05s-0.2s): Hoppers move items much faster for high-speed player sorters, at the cost of higher server tick usage.");
+                } else if (kLow.contains("spawn") || kLow.contains("wave") || kLow.contains("arena") || kLow.contains("mob")) {
+                    adjustmentBullets.add("If increased (higher ticks/seconds): Longer breather between mob/boss spawns — gives players more time to heal and clear waves, and lowers active mob counts.");
+                    adjustmentBullets.add("If decreased (lower ticks/seconds): Waves spawn rapidly back-to-back, making combat much harder for players and increasing entity tick load.");
+                } else if (kLow.contains("teleport") || kLow.contains("rtp") || kLow.contains("warmup")) {
+                    adjustmentBullets.add("If increased: Players must stand still longer after running the command before teleporting.");
+                    adjustmentBullets.add("If decreased (0): Players teleport immediately with no warmup countdown.");
+                } else {
+                    String subject = humanizeSubject(kLow, leaf, "ticks", "seconds", "ms", "cooldown", "interval", "delay");
+                    adjustmentBullets.add("If increased: Longer wait between " + subject + " actions (slower pace for players, lower server CPU/tick load).");
+                    adjustmentBullets.add("If decreased: Shorter wait — " + subject + " runs more frequently (faster response, higher server tick cost).");
+                }
+            } else if (leaf.contains("duration") || leaf.contains("timeout") || leaf.contains("ttl")) {
+                String subject = humanizeSubject(kLow, leaf, "seconds", "ticks", "duration", "timeout");
+                if (kLow.contains("tag") || kLow.contains("combat") || kLow.contains("pvp")) {
+                    adjustmentBullets.add("If increased (e.g. 20-60s): Players stay combat-tagged longer after taking or dealing a hit before they can safely log out or teleport.");
+                    adjustmentBullets.add("If decreased (e.g. 0-5s): Combat restrictions wear off sooner after a fight ends (0 disables combat tagging).");
+                } else {
+                    adjustmentBullets.add("If increased: " + capitalize(subject) + " lasts longer before expiring.");
+                    adjustmentBullets.add("If decreased: " + capitalize(subject) + " expires sooner (0 disables the timer).");
+                }
+            } else if (leaf.contains("multiplier") || leaf.contains("scale") || leaf.contains("factor")) {
+                String subject = humanizeSubject(kLow, leaf, "multiplier", "scale", "factor");
+                adjustmentBullets.add("If increased (higher multiplier): Scales " + subject + " up (e.g. 2.0 = double strength/health per player), making encounters tougher.");
+                adjustmentBullets.add("If decreased (closer to 1.0 or lower): Reduces " + subject + " scaling (1.0 = unscaled base value).");
+            } else if (leaf.contains("batch") || leaf.contains("amount") || leaf.contains("max") || leaf.contains("min")
+                    || leaf.contains("limit") || leaf.contains("cap") || leaf.contains("count")
+                    || leaf.contains("size") || leaf.contains("threads") || leaf.contains("workers")) {
+                String subject = humanizeSubject(kLow, leaf, "max", "min", "limit", "cap", "count", "per", "batch");
+                if (kLow.contains("hopper") || kLow.contains("item")) {
+                    adjustmentBullets.add("If increased (e.g. 32-64 items): Moves larger stacks in a single transfer cycle, speeding up bulk chest/hopper throughput.");
+                    adjustmentBullets.add("If decreased (e.g. 1-4 items): Moves fewer items per cycle (1 = vanilla single-item hopper transfer).");
+                } else {
+                    adjustmentBullets.add("If increased: Raises the cap on " + subject + ", allowing more concurrent items/entities/tasks.");
+                    adjustmentBullets.add("If decreased: Tightens the cap on " + subject + " to conserve server memory and tick time.");
+                }
+            } else if (leaf.contains("radius") || leaf.contains("distance") || leaf.contains("range")
+                    || "blocks".equals(schema.unit()) || "chunks".equals(schema.unit())) {
+                String subject = humanizeSubject(kLow, leaf, "blocks", "chunks");
+                adjustmentBullets.add("If increased: Expands the " + subject + " distance/range further outward.");
+                adjustmentBullets.add("If decreased: Restricts the " + subject + " to a tighter range.");
+            }
         }
 
-        bullets.add("If increased: Raises the " + humanizeSubject(kLow, leaf) + " threshold applied by the plugin.");
-        bullets.add("If decreased: Lowers the " + humanizeSubject(kLow, leaf) + " threshold.");
+        if (adjustmentBullets.isEmpty()) {
+            return List.of();
+        }
+
+        bullets.addAll(adjustmentBullets);
         return bullets;
+    }
+
+    private static boolean isStructuralNumericIdentifier(String leaf) {
+        return leaf.equals("version") || leaf.endsWith("-version")
+                || leaf.equals("port") || leaf.endsWith("-port")
+                || leaf.equals("seed") || leaf.endsWith("-seed")
+                || leaf.equals("id") || leaf.endsWith("-id")
+                || leaf.equals("protocol") || leaf.endsWith("-protocol");
     }
 
     private static String resolveEffectiveDefault(

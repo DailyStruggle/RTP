@@ -137,6 +137,24 @@ class RtpFabricCarriersDisjointTest {
         }
     }
 
+    @Test
+    @DisplayName("FabricModServerAccessor defers ServerChunkEvents.CHUNK_LOAD onto scheduleDelayedTask to avoid ChunkStatusTasks.full self-deadlock")
+    void fabricModServerAccessorDefersChunkLoadEventToTickQueue() throws IOException {
+        Path accessorFile = projectDir().resolve(
+                "../fabric-common-unobf/src/main/java/io/github/dailystruggle/rtp/fabric/unobf/server/FabricModServerAccessor.java").normalize();
+        assertTrue(Files.isRegularFile(accessorFile), "Accessor file not found: " + accessorFile);
+        String src = Files.readString(accessorFile);
+        int chunkLoadIdx = src.indexOf("ServerChunkEvents.CHUNK_LOAD.register(");
+        assertTrue(chunkLoadIdx >= 0, "ServerChunkEvents.CHUNK_LOAD registration not found in " + accessorFile);
+        int endMethodIdx = src.indexOf("private void ensureTickRegistered()", chunkLoadIdx);
+        assertTrue(endMethodIdx > chunkLoadIdx, "ensureTickRegistered not found after CHUNK_LOAD registration in " + accessorFile);
+        String chunkLoadBlock = src.substring(chunkLoadIdx, endMethodIdx);
+        assertTrue(chunkLoadBlock.contains("scheduleDelayedTask("),
+                "ServerChunkEvents.CHUNK_LOAD must defer fireChunkLoad via scheduleDelayedTask to avoid re-entrant ServerChunkCache#getChunk self-deadlock");
+        assertTrue(chunkLoadBlock.contains("fireChunkLoad(new ChunkLoadContext("),
+                "ServerChunkEvents.CHUNK_LOAD must dispatch ChunkLoadContext");
+    }
+
     private static List<String> prefixed(String prefix, List<String> in) {
         List<String> out = new ArrayList<>(in.size());
         for (String s : in) out.add(prefix + "/" + s);

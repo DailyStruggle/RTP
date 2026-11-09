@@ -916,4 +916,21 @@ Tracked here (moved 2026-05-29 from the now-completed metrics-api extraction pro
 
 ---
 
+## Inter-Server `.lca` Chunk Updates & Cross-Server `/rtp` Pre-Warming (`LCAS`, `leafanvil-ADR-002`, `leafanvil-ADR-003`)
+
+Because `LeafAnvil` (`LcaSectionBacking` + `LcaInMemoryChunkCoordinator` + `LcaWireStreamProtocol`) maintains a zero-translation in-memory section representation (`baseFrame` + `dirtyOverlay` `int[]` entries + `dirtySectionBitmask32` + `SECDED-64` syndrome), backend servers in a multi-server `LeafRTP` cluster can stream **sub-kilobyte section deltas (`EntryPatchDelta`)** and **pre-warmed `.lca` chunks (`EntryFullChunk`)** directly between server JVMs without `.mca` NBT serialization or main-thread voxel scans:
+
+1. **Dual-Mode Shadow Tracking on Each Backend Server (`evictToZeroBitShell`):**
+   - Chunks within `HOT_NATIVE_READ_CHUNK_RADIUS` of active players attach `LcaSectionBacking` in **Shadow-Tracked Native-Read Mode (`evictToZeroBitShell = false`)**: main-thread `getBlockState` reads execute directly against Mojang's native `SimpleBitStorage` (`0 ns` interception overhead), while `setBlockState` mirrors $O(1)$ mutations into `LcaSectionBacking`'s L1 `dirtyOverlay` and marks `TrackedChunkColumn#dirtySectionBitmask32`.
+   - Chunks outside the hot player radius (the non-ticked view-only / cold ring) are promoted to **Cold Evicted Mode (`evictToZeroBitShell = true`)**, evicting `SimpleBitStorage` `long[]` to the shared `0-bit` `ZeroBitStorage` shell and storing 4-bit nibble-packed minority ordinals (`CompactBaseIndex`) in RAM.
+2. **Zero-Translation Inter-Server Delta Export (`LcaInMemoryChunkCoordinator#exportDirtyChunkDeltasForInterServerSync`):**
+   - When a backend node modifies blocks in a shared border zone, replica shard, or hub region, `exportDirtyChunkDeltasForInterServerSync` extracts an `InterServerChunkUpdatePayload` (`INTER_SERVER_UPDATE_MAGIC = 0x4C434153`, `"LCAS"`) containing `sourceServerId`, `dimension`, `regionX`, `regionZ`, `epochSequence`, `previousBaselineSecDed64`, and an `EntryPatchDelta` carrying only the `1..24` mutated `SectionWireSlice`s (`~20–300 bytes` per chunk, compressed in a single `Zstd` frame via `LcaWireStreamProtocol#encodeInterServerUpdatePayload`).
+   - For cross-server `/rtp` destination pre-warming, `exportChunkForInterServerTransfer` exports an `EntryFullChunk` (`~3–8 KB` vs. `64+ KB` uncompressed NBT) over the active multi-server transport tier (Redis / Postgres / Plugin-Message).
+3. **Self-Healing Off-Thread Ingestion & Epoch Fencing (`applyInterServerChunkDeltaEntry`):**
+   - A receiving backend node verifies `EpochCommitFence` (`!fence.isUnloadedTombstoneCommitted(localIdx10)`) and checks `previousBaselineSecDed64 == localColumn.baselineSecDed64()` before folding incoming `SectionWireSlice` updates into `LcaSectionBacking` on `LcaCompactionExecutor` (`REQ-RTP-S-005`).
+   - Post-patch `SECDED-64` syndrome verification (`postPatchFull.secDedSyndrome64() == patchDelta.newSecDedSyndrome64()`) guarantees that missed pub/sub messages or bit flips return `InterServerApplyStatus.NEEDS_FULL_CHUNK_REFILL` / `SYNDROME_MISMATCH` (`REQ-RTP-S-004`) rather than silently corrupting peer chunk state.
+   - Live section coordinate updates (`InterServerSectionBlockCommit`) drain strictly on the owning server tick thread or Folia region thread (`drainPendingInterServerBlockCommits`, `Bukkit.isOwnedByCurrentRegion`).
+
+---
+
 *Self-update note*: any durable engineering lesson discovered while executing this plan goes to [`LESSONS_LEARNED.md`](../../../../docs/dev/LESSONS_LEARNED.md); incidental potential bugs go to [`POTENTIAL_BUGS.md`](../../../../docs/dev/POTENTIAL_BUGS.md); architecturally significant decisions get their own ADR. Do not bloat this file with implementation lore — it is a roadmap, not an encyclopaedia.

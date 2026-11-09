@@ -289,5 +289,27 @@ class WorldBlockFeedRegistryTest {
         assertThrows(IllegalArgumentException.class, () -> new WorldBlockFeed.InteractiveMapOverlay(
                 "zone:x", " ", null, null, null, null, 0, 0, 10, 0, null, null, null, 1, null, null
         ));
+
+        WorldBlockFeed.WorldMapDescriptor remoteWorld = WorldBlockFeed.WorldMapDescriptor.ofServer(
+                "survival-east", "world", "[survival-east] Overworld", "overworld",
+                -64, 319, 0, 68, 0, 0.0, 0.0, 16384.0, 6000L, false, 2, 128
+        );
+        assertEquals("survival-east", remoteWorld.serverId());
+        assertEquals("world", remoteWorld.localWorldName());
+        assertEquals("survival-east:world", remoteWorld.compositeWorldKey());
+
+        WorldBlockFeed.WorldMapDescriptor localWorld = WorldBlockFeed.WorldMapDescriptor.ofServer(
+                "local", "world", "Overworld", "overworld",
+                -64, 319, 0, 68, 0, 0.0, 0.0, 16384.0, 6000L, false, 1, 64
+        );
+        assertEquals("local", localWorld.serverId());
+        assertEquals("world", localWorld.localWorldName());
+        assertEquals("world", localWorld.compositeWorldKey());
+
+        WorldBlockFeed.ServerMapDescriptor srvDesc = new WorldBlockFeed.ServerMapDescriptor(
+                "survival-east", "Survival East", List.of("world", "world_nether"), 128, 65536L, 0L
+        );
+        assertEquals("survival-east", srvDesc.serverId());
+        assertEquals(2, srvDesc.worlds().size());
     }
 }

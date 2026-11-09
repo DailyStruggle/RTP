@@ -151,6 +151,16 @@ PRODUCTS = {
         repo_base="https://docs.leafcraft.net/mc/leafanvil",
         repo_branch="main",
     ),
+    "leafanvil-net": ProductSpec(
+        "leafanvil-net",
+        "LeafAnvil-Net",
+        None,
+        "LeafAnvil-Net-x.y.z.jar",
+        None,
+        ROOT / "resource" / "LeafAnvil" / "leafanvil-net" / "docs" / "publishing" / "FRONT_PAGE.md",
+        repo_base="https://docs.leafcraft.net/mc/leafanvil",
+        repo_branch="main",
+    ),
 }
 
 

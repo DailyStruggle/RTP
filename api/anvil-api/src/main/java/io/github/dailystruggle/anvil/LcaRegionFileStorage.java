@@ -880,25 +880,75 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 handler));
     }
 
+    private record ChunkPosExtractor(
+            java.lang.reflect.Field xField,
+            java.lang.reflect.Field zField,
+            Method xMethod,
+            Method zMethod
+    ) {
+        int[] extract(Object chunkPosObj, Class<?> cls) {
+            try {
+                if (xField != null && zField != null) {
+                    return new int[] {xField.getInt(chunkPosObj), zField.getInt(chunkPosObj)};
+                }
+                if (xMethod != null && zMethod != null) {
+                    return new int[] {
+                            ((Number) xMethod.invoke(chunkPosObj)).intValue(),
+                            ((Number) zMethod.invoke(chunkPosObj)).intValue()
+                    };
+                }
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalArgumentException(
+                        "Cannot extract (x, z) from ChunkPos object: " + cls.getName(), e);
+            }
+            throw new IllegalArgumentException(
+                    "Cannot extract (x, z) from ChunkPos object: " + cls.getName());
+        }
+    }
+
+    private static final ClassValue<ChunkPosExtractor> CHUNK_POS_EXTRACTORS = new ClassValue<>() {
+        @Override
+        protected ChunkPosExtractor computeValue(Class<?> cls) {
+            java.lang.reflect.Field xField = null;
+            java.lang.reflect.Field zField = null;
+            for (java.lang.reflect.Field f : cls.getFields()) {
+                String name = f.getName();
+                if ("x".equals(name)) {
+                    f.setAccessible(true);
+                    xField = f;
+                } else if ("z".equals(name)) {
+                    f.setAccessible(true);
+                    zField = f;
+                }
+            }
+            if (xField != null && zField != null) {
+                return new ChunkPosExtractor(xField, zField, null, null);
+            }
+            Method xMethod = null;
+            Method zMethod = null;
+            for (Method m : cls.getMethods()) {
+                if (m.getParameterCount() != 0) {
+                    continue;
+                }
+                String name = m.getName();
+                if ("x".equals(name)) {
+                    m.setAccessible(true);
+                    xMethod = m;
+                } else if ("z".equals(name)) {
+                    m.setAccessible(true);
+                    zMethod = m;
+                }
+            }
+            return new ChunkPosExtractor(null, null, xMethod, zMethod);
+        }
+    };
+
     public static int[] extractChunkPosCoords(Object chunkPosObj) {
         if (chunkPosObj == null) {
             throw new IllegalArgumentException("ChunkPos argument must not be null");
         }
         Class<?> cls = chunkPosObj.getClass();
-        try {
-            java.lang.reflect.Field xField = cls.getField("x");
-            java.lang.reflect.Field zField = cls.getField("z");
-            return new int[] {xField.getInt(chunkPosObj), zField.getInt(chunkPosObj)};
-        } catch (ReflectiveOperationException ignored) {
-            try {
-                Method xMethod = cls.getMethod("x");
-                Method zMethod = cls.getMethod("z");
-                return new int[] {((Number) xMethod.invoke(chunkPosObj)).intValue(),
-                        ((Number) zMethod.invoke(chunkPosObj)).intValue()};
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalArgumentException("Cannot extract (x, z) from ChunkPos object: " + cls.getName(), e);
-            }
-        }
+        return CHUNK_POS_EXTRACTORS.get(cls).extract(chunkPosObj, cls);
     }
 
     /**

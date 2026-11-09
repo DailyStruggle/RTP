@@ -255,14 +255,20 @@ public class FabricModServerAccessor extends AbstractModServerAccessor {
         (level, chunk, generated) -> {
           if (level == null || chunk == null) return;
           String worldName = resolveWorldName(level);
-          dispatchingWorldEventHook()
-              .fireChunkLoad(
-                  new ChunkLoadContext(
-                      worldName,
-                      chunk.getPos().x(),
-                      chunk.getPos().z(),
-                      generated,
-                      level.getSeed()));
+          int cx = chunk.getPos().x();
+          int cz = chunk.getPos().z();
+          long seed = level.getSeed();
+          // Fabric fires ServerChunkEvents.CHUNK_LOAD inside ChunkStatusTasks.full before the
+          // ChunkHolder FULL future completes; deferring to the tick queue prevents re-entrant
+          // ServerChunkCache#getChunk(..., FULL, true) self-deadlock on heightmap/block queries.
+          scheduleDelayedTask(
+              worldName,
+              cx,
+              cz,
+              () ->
+                  dispatchingWorldEventHook()
+                      .fireChunkLoad(new ChunkLoadContext(worldName, cx, cz, generated, seed)),
+              1L);
         });
   }
 

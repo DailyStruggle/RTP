@@ -121,6 +121,10 @@ The `devstack/` environment provides end-to-end integration testing for proxies,
 On Linux/POSIX runners or CI:
 ```bash
 ./devstack/run-acceptance.sh --scenario all
+./devstack/run-version-sweep.sh
+./devstack/test-leafsleep-acceptance.sh
+./devstack/test-treegen-acceptance.sh
+./devstack/test-item-compat.sh
 ```
 
 ---

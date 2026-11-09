@@ -48,6 +48,21 @@ CANDIDATE_VERSIONS = [
     "26.1", "26.1.1", "26.1.2", "26.2", "26.3",
 ]
 
+# Per-project candidate version lists (LeafFuzz / LeafSleuth / LeafTreeGen target 1.20+).
+VERSIONS_1_20_PLUS = [
+    v for v in CANDIDATE_VERSIONS if not v.startswith(("1.18", "1.19"))
+]
+PROJECT_CANDIDATE_VERSIONS = {
+    "leaffuzz": VERSIONS_1_20_PLUS,
+    "leafsleuth": VERSIONS_1_20_PLUS,
+    "leaftreegen": VERSIONS_1_20_PLUS,
+}
+
+
+def candidate_versions_for_project(project: str) -> list:
+    key = (project or "").strip().lower().split("/")[-1]
+    return list(PROJECT_CANDIDATE_VERSIONS.get(key, CANDIDATE_VERSIONS))
+
 
 def authenticate(api_key: str) -> str:
     url = f"{API_BASE}/authenticate?apiKey={urllib.parse.quote(api_key, safe='')}"
@@ -69,7 +84,8 @@ def authenticate(api_key: str) -> str:
     return jwt
 
 
-def valid_platform_versions() -> list:
+def valid_platform_versions(project: str = DEFAULT_PROJECT) -> list:
+    candidates = candidate_versions_for_project(project)
     url = f"{API_BASE}/platforms/{PLATFORM}/versions"
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT}, method="GET")
     known = set()
@@ -83,9 +99,9 @@ def valid_platform_versions() -> list:
     except (urllib.error.HTTPError, urllib.error.URLError) as e:
         # Non-fatal: fall back to the candidate list and let the upload validate.
         print(f"::warning::Could not fetch Hangar {PLATFORM} versions ({e}); using candidate list as-is.")
-        return list(CANDIDATE_VERSIONS)
-    filtered = [v for v in CANDIDATE_VERSIONS if v in known]
-    dropped = [v for v in CANDIDATE_VERSIONS if v not in known]
+        return list(candidates)
+    filtered = [v for v in candidates if v in known]
+    dropped = [v for v in candidates if v not in known]
     if dropped:
         print(f"::warning::Dropping MC versions Hangar does not recognize for {PLATFORM}: {', '.join(dropped)}")
     if not filtered:
@@ -127,9 +143,9 @@ def build_multipart(version_upload: dict, file_path: str) -> tuple:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Publish the LeafRTP jar to Hangar.")
+    parser = argparse.ArgumentParser(description="Publish a plugin jar to Hangar.")
     parser.add_argument("--project", default=DEFAULT_PROJECT, help="Hangar project slug or id (default: LeafRTP)")
-    parser.add_argument("--file", required=True, help="Path to the LeafRTP jar to upload")
+    parser.add_argument("--file", required=True, help="Path to the plugin jar to upload")
     parser.add_argument("--version", required=True, help="Version string (e.g. 3.3.0)")
     parser.add_argument("--changelog-file", help="Path to a markdown file used as the version description")
     parser.add_argument("--version-type", default="release", help="release | beta | alpha (default: release)")
@@ -137,7 +153,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not os.path.isfile(args.file):
-        print(f"::error::LeafRTP jar not found: {args.file}", file=sys.stderr)
+        print(f"::error::Plugin jar not found: {args.file}", file=sys.stderr)
         sys.exit(1)
 
     description = ""
@@ -153,7 +169,7 @@ def main() -> None:
         print("::error::HANGAR_TOKEN environment variable not set.", file=sys.stderr)
         sys.exit(1)
 
-    versions = valid_platform_versions() if not args.dry_run else list(CANDIDATE_VERSIONS)
+    versions = valid_platform_versions(args.project) if not args.dry_run else candidate_versions_for_project(args.project)
 
     version_upload = {
         "version": args.version,

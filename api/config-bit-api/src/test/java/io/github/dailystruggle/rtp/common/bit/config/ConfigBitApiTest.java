@@ -306,5 +306,31 @@ class ConfigBitApiTest {
         assertTrue(emptySrc.diagnosticHotspots().isEmpty());
         assertTrue(emptySrc.diagnosticIdentityComparisons().isEmpty());
         assertTrue(emptySrc.diagnosticForensicCases().isEmpty());
+
+        io.github.dailystruggle.bit.config.FuzzDiagnosticSnapshotSource emptyFuzzSrc =
+                new io.github.dailystruggle.bit.config.FuzzDiagnosticSnapshotSource() {};
+        assertTrue(emptyFuzzSrc.diagnosticFuzzScorecards().isEmpty());
+        assertTrue(emptyFuzzSrc.diagnosticFuzzWiringFindings().isEmpty());
+        assertTrue(emptyFuzzSrc.diagnosticFuzzRuntimeHazards().isEmpty());
+
+        var fuzzCard = new FuzzDiagnosticSnapshotSource.FuzzScorecardSummaryRecord(
+                null, null, null, null, null, null, null, null, null, -1, -2, -3, -4, -5
+        );
+        assertEquals("all", fuzzCard.targetName());
+        assertEquals("paper", fuzzCard.platformName());
+        assertEquals("PASS", fuzzCard.overallVerdict());
+        assertEquals(0, fuzzCard.indexedJars());
+
+        var fuzzWiring = new FuzzDiagnosticSnapshotSource.FuzzWiringFindingRecord(
+                null, null, null, null, null, null, null, null
+        );
+        assertEquals("plugin:unknown", fuzzWiring.artifactId());
+        assertEquals("CAUSAL_DEAD_CONFIG_KEY", fuzzWiring.kind());
+
+        var fuzzHazard = new FuzzDiagnosticSnapshotSource.FuzzRuntimeHazardRecord(
+                null, null, null, null, null, null, null, null
+        );
+        assertEquals("all", fuzzHazard.targetName());
+        assertEquals("MAIN_THREAD_HAZARD", fuzzHazard.category());
     }
 }

@@ -372,4 +372,252 @@ class LcaSectionBackingAndCompactionTest {
         assertEquals(0, staleSectionCommits.get(), "Zero stale section compaction commits allowed");
         assertEquals(0, staleFenceCommits.get(), "Zero stale EpochCommitFence commits allowed");
     }
+
+    @Test
+    @DisplayName("CompactBaseIndex POPCNT rank directory resolves O(1) reads, testMaybeHas, forEachStateCount, and minority scatter without decoder")
+    void compactBaseIndexPopcntRankLookupAndPaletteQueries() {
+        int[] voxels = new int[LcaSectionBacking.BULK_4096_CAPACITY];
+        java.util.Arrays.fill(voxels, 1); // majority state = 1
+        voxels[LcaSectionBacking.pos12(0, 0, 0)] = 10;
+        voxels[LcaSectionBacking.pos12(15, 15, 15)] = 20;
+        voxels[LcaSectionBacking.pos12(3, 7, 11)] = 30;
+        voxels[LcaSectionBacking.pos12(4, 7, 11)] = 30;
+
+        LcaSectionBacking.EncodedCompactFrame encoded =
+                LcaSectionBacking.encodeCompactSectionFrame(voxels, 15, 0);
+        assertEquals(1, encoded.majorityStateId());
+        assertTrue(encoded.frameBytes().length > 0 && encoded.frameBytes().length < 64);
+
+        // Construct with null decoder so CompactBaseIndex serves all lookups natively in O(1)
+        LcaSectionBacking backing = new LcaSectionBacking(encoded.frameBytes(), encoded.majorityStateId(), null);
+        for (int pos = 0; pos < LcaSectionBacking.BULK_4096_CAPACITY; pos++) {
+            int x = pos & 15;
+            int z = (pos >>> 4) & 15;
+            int y = (pos >>> 8) & 15;
+            assertEquals(voxels[pos], backing.getStateId(x, y, z), "Mismatch at pos12=" + pos);
+        }
+
+        assertTrue(backing.testMaybeHas(id -> id == 1));
+        assertTrue(backing.testMaybeHas(id -> id == 10));
+        assertTrue(backing.testMaybeHas(id -> id == 20));
+        assertTrue(backing.testMaybeHas(id -> id == 30));
+        assertFalse(backing.testMaybeHas(id -> id == 99));
+
+        java.util.Map<Integer, Integer> counts = new java.util.HashMap<>();
+        backing.forEachStateCount(counts::put);
+        assertEquals(4092, counts.get(1));
+        assertEquals(1, counts.get(10));
+        assertEquals(1, counts.get(20));
+        assertEquals(2, counts.get(30));
+
+        // Overwrite the only occurrence of state 10 at (0,0,0) with state 55
+        backing.setStateId(0, 0, 0, 55, 10L);
+        assertFalse(backing.testMaybeHas(id -> id == 10), "Overwritten singleton minority state must no longer match maybeHas");
+        assertTrue(backing.testMaybeHas(id -> id == 55), "Newly written overlay state must match maybeHas");
+
+        counts.clear();
+        backing.forEachStateCount(counts::put);
+        assertEquals(4092, counts.get(1));
+        assertNull(counts.get(10));
+        assertEquals(1, counts.get(55));
+        assertEquals(1, counts.get(20));
+        assertEquals(2, counts.get(30));
+
+        int[] reconstructed = new int[LcaSectionBacking.BULK_4096_CAPACITY];
+        java.util.Arrays.fill(reconstructed, backing.uniformStateId());
+        assertTrue(backing.forEachNonMajorityAndOverlayVoxel((pos12, stateId) -> reconstructed[pos12] = stateId));
+        assertEquals(55, reconstructed[LcaSectionBacking.pos12(0, 0, 0)]);
+        assertEquals(20, reconstructed[LcaSectionBacking.pos12(15, 15, 15)]);
+        assertEquals(30, reconstructed[LcaSectionBacking.pos12(3, 7, 11)]);
+        assertEquals(1, reconstructed[LcaSectionBacking.pos12(8, 8, 8)]);
+    }
+
+    @Test
+    @DisplayName("Single-pass fromDirectVoxels defers baseFrame[] allocation until requested and directly serializes clean/mutated vanilla wire format without copy()")
+    void directCompactIndexLazyBaseFrameAndDirectVanillaWireSerialization() {
+        int[] voxels = new int[LcaSectionBacking.BULK_4096_CAPACITY];
+        java.util.Arrays.fill(voxels, 1);
+        voxels[LcaSectionBacking.pos12(0, 0, 0)] = 10;
+        voxels[LcaSectionBacking.pos12(15, 15, 15)] = 20;
+        voxels[LcaSectionBacking.pos12(3, 7, 11)] = 30;
+        voxels[LcaSectionBacking.pos12(4, 7, 11)] = 30;
+
+        LcaSectionBacking direct = LcaSectionBacking.fromDirectVoxels(
+                voxels,
+                15,
+                0,
+                LcaSectionBacking.BULK_4096_CAPACITY,
+                0,
+                0,
+                id -> id != 0,
+                id -> false,
+                id -> false
+        );
+        assertFalse(direct.isBaseUniform());
+        assertFalse(direct.hasMaterializedBaseFrame(), "Direct single-pass index must not eagerly allocate byte[] baseFrame");
+        assertEquals(1, direct.uniformStateId());
+        assertEquals(10, direct.getStateId(0, 0, 0));
+        assertEquals(20, direct.getStateId(15, 15, 15));
+        assertEquals(30, direct.getStateId(3, 7, 11));
+        assertEquals(1, direct.getStateId(8, 8, 8));
+        assertFalse(direct.hasMaterializedBaseFrame(), "Voxel reads must use CompactBaseIndex without materializing baseFrame");
+
+        // Direct clean vanilla wire sizing & serialization (4 distinct states -> 4 bits per entry, 16 voxels/long -> 256 longs)
+        int expectedCleanSize = 1
+                + LcaSectionBacking.varIntByteSize(4)
+                + LcaSectionBacking.varIntByteSize(1)
+                + LcaSectionBacking.varIntByteSize(10)
+                + LcaSectionBacking.varIntByteSize(20)
+                + LcaSectionBacking.varIntByteSize(30)
+                + (256 * 8);
+        assertEquals(expectedCleanSize, direct.computeVanillaSerializedSize(15));
+        assertEquals(0, direct.ephemeralCopyCount(), "Direct wire sizing must not trigger ephemeral copy");
+
+        java.io.ByteArrayOutputStream cleanOut = new java.io.ByteArrayOutputStream();
+        direct.writeVanillaPalettedContainer(15, new LcaSectionBacking.VanillaWireSink() {
+            @Override
+            public void writeByte(int b) {
+                cleanOut.write(b & 0xFF);
+            }
+
+            @Override
+            public void writeVarInt(int v) {
+                int val = v;
+                while ((val & ~0x7F) != 0) {
+                    cleanOut.write((val & 0x7F) | 0x80);
+                    val >>>= 7;
+                }
+                cleanOut.write(val & 0x7F);
+            }
+
+            @Override
+            public void writeLong(long word) {
+                for (int shift = 56; shift >= 0; shift -= 8) {
+                    cleanOut.write((int) (word >>> shift) & 0xFF);
+                }
+            }
+        });
+        assertEquals(expectedCleanSize, cleanOut.size());
+        assertEquals(0, direct.ephemeralCopyCount(), "Direct clean wire write must not trigger ephemeral copy");
+        assertFalse(direct.hasMaterializedBaseFrame(), "Direct wire write must not materialize baseFrame");
+
+        // Mutate section (overwrite singleton 10 -> 55 and add new state 77 at (1,0,0)) and verify direct mutated wire sizing/write
+        direct.setStateId(0, 0, 0, 55, 10L);
+        direct.setStateId(1, 0, 0, 77, 11L);
+        int expectedMutatedSize = 1
+                + LcaSectionBacking.varIntByteSize(5)
+                + LcaSectionBacking.varIntByteSize(1)
+                + LcaSectionBacking.varIntByteSize(20)
+                + LcaSectionBacking.varIntByteSize(30)
+                + LcaSectionBacking.varIntByteSize(55)
+                + LcaSectionBacking.varIntByteSize(77)
+                + (256 * 8);
+        assertEquals(expectedMutatedSize, direct.computeVanillaSerializedSize(15));
+        java.io.ByteArrayOutputStream mutOut = new java.io.ByteArrayOutputStream();
+        direct.writeVanillaPalettedContainer(15, new LcaSectionBacking.VanillaWireSink() {
+            @Override
+            public void writeByte(int b) {
+                mutOut.write(b & 0xFF);
+            }
+
+            @Override
+            public void writeVarInt(int v) {
+                int val = v;
+                while ((val & ~0x7F) != 0) {
+                    mutOut.write((val & 0x7F) | 0x80);
+                    val >>>= 7;
+                }
+                mutOut.write(val & 0x7F);
+            }
+
+            @Override
+            public void writeLong(long word) {
+                for (int shift = 56; shift >= 0; shift -= 8) {
+                    mutOut.write((int) (word >>> shift) & 0xFF);
+                }
+            }
+        });
+        assertEquals(expectedMutatedSize, mutOut.size());
+        assertEquals(0, direct.ephemeralCopyCount(), "Direct mutated wire write must not trigger ephemeral copy");
+
+        // Lazy baseFrame materialization on demand must match encodeCompactSectionFrame byte-for-byte
+        LcaSectionBacking.EncodedCompactFrame eager = LcaSectionBacking.encodeCompactSectionFrame(voxels, 15, 0);
+        byte[] lazyBytes = direct.baseFrame();
+        assertTrue(direct.hasMaterializedBaseFrame());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(eager.frameBytes(), lazyBytes);
+    }
+
+    @Test
+    @DisplayName("fromRawBitStorageSnapshot unpacks packed long[] words off-thread, pre-builds cleanVanillaWireSlice + baseFrame, and compactFrozenOverlayOffThread folds frozen overlays without losing concurrent writes")
+    void rawBitStorageSnapshotAndOffThreadFrozenOverlayCompaction() throws Exception {
+        int[] palette = {1, 10, 20, 30, 40}; // 5 states -> 4 bits per entry (16 entries per 64-bit long -> 256 longs)
+        long[] rawWords = new long[256];
+        // Voxel 0 -> palette[1] = 10; Voxel 1 -> palette[2] = 20; Voxel 15 -> palette[3] = 30
+        rawWords[0] = (1L) | (2L << 4) | (3L << 60);
+        // Voxel 4095 (word 255, entry 15) -> palette[4] = 40
+        rawWords[255] = (4L << 60);
+
+        LcaSectionBacking backing = LcaSectionBacking.fromRawBitStorageSnapshot(
+                rawWords,
+                4,
+                palette,
+                15,
+                15,
+                0,
+                id -> id != 0,
+                id -> id == 20,
+                id -> id == 30
+        );
+        assertFalse(backing.isBaseUniform());
+        assertTrue(backing.hasPrebuiltCleanWireSlice(), "Background factory must pre-build cleanVanillaWireSlice");
+        assertTrue(backing.hasMaterializedBaseFrame(), "Background factory must pre-build compact .lca baseFrame");
+        assertEquals(LcaSectionBacking.BULK_4096_CAPACITY, backing.nonEmptyBlockCount());
+        assertEquals(1, backing.tickingBlockCount());
+        assertEquals(1, backing.tickingFluidCount());
+        assertEquals(10, backing.getStateId(0, 0, 0));
+        assertEquals(20, backing.getStateId(1, 0, 0));
+        assertEquals(30, backing.getStateId(15, 0, 0));
+        assertEquals(40, backing.getStateId(15, 15, 15));
+        assertEquals(1, backing.getStateId(8, 8, 8));
+
+        byte[] cleanSliceBefore = backing.cleanVanillaWireSlice(15);
+        assertNotNull(cleanSliceBefore);
+        assertEquals(backing.computeVanillaSerializedSize(15), cleanSliceBefore.length);
+
+        // Mutate section on main thread -> cleanVanillaWireSlice must return null while dirtyCount > 0
+        backing.setStateId(0, 0, 0, 77, 100L);
+        backing.setStateId(2, 0, 0, 88, 101L);
+        assertEquals(2, backing.dirtyCount());
+        assertNull(backing.cleanVanillaWireSlice(15), "Dirty section must not serve stale clean wire slice");
+
+        // Take lock-free CompactionSnapshot on main thread, then write a concurrent mutation to activeOverlay
+        CompactionSnapshot snap = backing.beginCompactionSnapshot();
+        assertEquals(0, backing.dirtyCount(), "activeOverlay must be reset after beginCompactionSnapshot");
+        backing.setStateId(5, 5, 5, 99, 102L);
+        assertEquals(1, backing.dirtyCount(), "Concurrent main-thread write must land in fresh activeOverlay");
+
+        // Fold frozenOverlay off-thread on a background worker
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            boolean compacted = worker.submit(() -> backing.compactFrozenOverlayOffThread(snap, 15)).get(5, TimeUnit.SECONDS);
+            assertTrue(compacted, "Off-thread frozenOverlay compaction must succeed");
+        } finally {
+            worker.shutdownNow();
+        }
+
+        // Verify both compacted frozenOverlay mutations AND concurrent activeOverlay mutation are preserved
+        assertEquals(77, backing.getStateId(0, 0, 0));
+        assertEquals(88, backing.getStateId(2, 0, 0));
+        assertEquals(99, backing.getStateId(5, 5, 5));
+        assertNull(backing.frozenOverlay(), "frozenOverlay must be cleared after completeCompaction");
+
+        // Compact the remaining activeOverlay mutation off-thread so the section becomes 100% clean
+        assertTrue(backing.compactFrozenOverlayOffThread(15));
+        assertEquals(0, backing.dirtyCount());
+        assertNull(backing.frozenOverlay());
+        assertEquals(99, backing.getStateId(5, 5, 5));
+        byte[] cleanSliceAfter = backing.cleanVanillaWireSlice(15);
+        assertNotNull(cleanSliceAfter, "Clean wire slice must be immediately available after off-thread compaction");
+        assertEquals(backing.computeVanillaSerializedSize(15), cleanSliceAfter.length);
+    }
 }

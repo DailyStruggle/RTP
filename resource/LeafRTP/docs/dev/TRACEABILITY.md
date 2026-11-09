@@ -355,6 +355,38 @@ All rows below are **unimplemented**. Subproject ADR `rtp-proxy-ADR-008-bungee-b
 
 ---
 
+## leaf-video Requirements
+
+| Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
+|---|---|---|---|---|
+| REQ-LCV-F-001 | Lossless bit-exact `RGBA` / `YCoCg-R` cube reconstruction (`PSNR = infinity`) | `leaf-video-ADR-001` | `lcv_accel`, `lcv_codec_system_plugins`, `leafvideo` | `lcv_cli_and_test`, `lcv_proof_report` |
+| REQ-LCV-F-002 | Wire-compatible distance-scaled `d_merge` RLE run coalescing | `leaf-video-ADR-001` | `lcv_accel`, `lcv_codec_system_plugins` | `lcv_cli_and_test`, `lcv_proof_report` |
+| REQ-LCV-F-003 | Append-only superblock tail truncation survival, multi-track `LCV_A001` (`.lca`) audio stems & `O(1)` seekability | `leaf-video-ADR-001` | `lcv_accel`, `lcv_codec_system_plugins`, `obs_leafvideo_plugin` | `lcv_cli_and_test` |
+| REQ-LCV-F-004 | Extended Hamming `(72, 64)` `SEC-DED` pointer self-healing & `CBIT` quarantine | `leaf-video-ADR-001` | `lcv_accel`, `lcv_codec_system_plugins` | `lcv_cli_and_test` |
+| REQ-LCV-F-005 | Zero-decode compressed-domain on-disk transforms (`cropSubRegion`, `stripLsbPlanes`, `coalesceRunsByDistance`, `wrapZstdPools`) | `leaf-video-ADR-001` | `lcv_accel`, `lcv_cli_and_test`, `obs_leafvideo_plugin` | `lcv_cli_and_test`, `lcv_proof_report` |
+| REQ-LCV-DB-001 | Content-addressed `DecodeMapPacket` (`LCV_MAP1`) & `O(1)` `extractSingleFrame` pointer-directory hop | `leaf-video-ADR-003` | `lcv_accel`, `lcv_codec_system_plugins` | `lcv_cli_and_test`, `lcv_proof_report` |
+| REQ-LCV-DB-002 | Cross-superblock Zstd dictionary conditioning & `CompactSignatureIndex` deduplication | `leaf-video-ADR-003` | `lcv_accel`, `lcv_proof_report` | `lcv_cli_and_test`, `lcv_proof_report` |
+| REQ-LCV-DB-003 | Unflattened multi-layer `(layer, x, y, t)` `RGBA` recording & `O(1)` `UNIFORM_INLINE` sparse compositing | `leaf-video-ADR-003` | `lcv_accel`, `obs_leafvideo_plugin` | `lcv_cli_and_test`, `lcv_proof_report` |
+| REQ-LCV-DB-004 | Wait-free growing-stream tail reading, `.lcv.branch` sidecar timeline cuts & Hot-NVMe / Cold-HDD tiered split | `leaf-video-ADR-003` | `lcv_accel`, `lcv_codec_system_plugins`, `obs_leafvideo_plugin` | `lcv_cli_and_test` |
+| REQ-LCV-HW-001 | SWAR 64-bit branchless `YCoCg-R` lifting & `8x8` bit-matrix transpose kernels | `leaf-video-ADR-004` | `lcv_accel`, `lcv_cube_kernel` | `lcv_cli_and_test` |
+| REQ-LCV-HW-002 | Compressed-domain hardware DMA scatter-gather & inline recode checkpointing | `leaf-video-ADR-004` | `lcv_accel`, `lcv_cube_kernel`, `obs_leafvideo_plugin` | `lcv_cli_and_test` |
+| REQ-LCV-HW-003 | Rolling strip (`K=1`) zero-lookahead framing & in-flight `UEP` LSB shedding | `leaf-video-ADR-004` | `lcv_accel`, `obs_leafvideo_plugin` | `lcv_cli_and_test` |
+
+---
+
+## LeafMap Remote `.lca` Stream & Bounded LRU Pool Requirements
+
+| Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
+|---|---|---|---|---|
+| REQ-MAP-STREAM-001 | Full `.lca` chunk batch (`LCAB` `0x4C434142`) at `< 1/5` `.mca` byte size and incremental section patch delta (`LCAS` `0x4C434153`) encoding & ingestion | `leafmap-ADR-004`, `leafanvil-ADR-003`, `anvil-api-ADR-003` | `LcaRemoteStreamCodec`, `LcaBoundedSlabPool`, `LcaWireStreamProtocol`, `LeafMapWorldIndexer`, `LeafMapHttpServer` | `LcaBoundedSlabPoolAndCodecTest`, `LeafMapWorld3DAndPacketFeedTest` |
+| REQ-MAP-STREAM-002 | Extended Hamming `(72, 64)` `SEC-DED-64` baseline/payload verification and `HTTP 409` `NEEDS_FULL_CHUNK_REFILL` reporting (`S-004`) | `leafmap-ADR-004`, `leafanvil-ADR-003` | `LcaRemoteStreamCodec`, `LcaBoundedSlabPool`, `LeafMapHttpServer` | `LcaBoundedSlabPoolAndCodecTest`, `LeafMapWorld3DAndPacketFeedTest` |
+| REQ-MAP-LRU-001 | Two-tier byte-budgeted LRU slab pool (`maxMemoryCacheBytes` L1 RAM + optional `maxDiskCacheBytes` L2 `.lca` disk spillover, `0` = pure RAM mode) | `leafmap-ADR-004`, `anvil-api-ADR-003` | `LcaBoundedSlabPool`, `LeafMapConfig`, `LeafMapRuntime` | `LcaBoundedSlabPoolAndCodecTest`, `LeafMapWorld3DAndPacketFeedTest` |
+| REQ-MAP-LRU-002 | Pinned spawn regions and `LOD-3` (`10,990 B`) surface horizon headers per `(serverId, world)` | `leafmap-ADR-004`, `leafmap-ADR-003` | `LcaBoundedSlabPool`, `LeafMapSubChunkPacketCodec` | `LcaBoundedSlabPoolAndCodecTest`, `LeafMapWorld3DAndPacketFeedTest` |
+| REQ-MAP-MULTI-001 | Multi-server `serverId:world` composite namespace, per-server `BlockState` dictionary isolation, and `/api/servers` + `/api/server/{serverId}/world/{world}/...` routes | `leafmap-ADR-004`, `maps-api-ADR-003` | `WorldBlockFeed`, `LcaBoundedSlabPool`, `LeafMapWorldIndexer`, `LeafMapHttpServer`, `LeafMapRuntime`, `LeafMapWorld3DEngine` | `LcaBoundedSlabPoolAndCodecTest`, `WorldBlockFeedRegistryTest`, `LeafMapWorld3DAndPacketFeedTest` |
+| REQ-MAP-EMBED-001 | Nested multi-server webpage (`?embed=1&server=<serverId>&world=<world>`), Multi-Server Selector UI, and `window.postMessage` bridge | `leafmap-ADR-004` | `LeafMapSubChunkPacketCodec`, `LeafMapRuntime`, `LeafMapHttpServer` | `LeafMapWorld3DAndPacketFeedTest` |
+
+---
+
 ## Coverage Summary
 
 | Module | Total Reqs | Automated Test Coverage |

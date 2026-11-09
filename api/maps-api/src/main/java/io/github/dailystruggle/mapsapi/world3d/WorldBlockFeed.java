@@ -494,6 +494,106 @@ public interface WorldBlockFeed {
                 throw new IllegalArgumentException("world must not be blank");
             }
         }
+
+        /**
+         * Creates a multi-server world descriptor whose {@link #world()} is prefixed with
+         * {@code serverId + ":"} when {@code serverId} is non-blank and not {@code "local"}.
+         */
+        public static WorldMapDescriptor ofServer(
+                String serverId,
+                String world,
+                String displayName,
+                String dimension,
+                int minY,
+                int maxY,
+                int spawnX,
+                int spawnY,
+                int spawnZ,
+                double borderCenterX,
+                double borderCenterZ,
+                double borderSize,
+                long timeOfDayTicks,
+                boolean storming,
+                int indexedRegions,
+                int indexedChunks
+        ) {
+            String srv = (serverId == null || serverId.isBlank()) ? "local" : serverId.trim();
+            String rawWorld = Objects.requireNonNull(world, "world").trim();
+            String composite = ("local".equalsIgnoreCase(srv) || rawWorld.contains(":"))
+                    ? rawWorld
+                    : srv + ":" + rawWorld;
+            return new WorldMapDescriptor(
+                    composite, displayName, dimension,
+                    minY, maxY, spawnX, spawnY, spawnZ,
+                    borderCenterX, borderCenterZ, borderSize,
+                    timeOfDayTicks, storming, indexedRegions, indexedChunks
+            );
+        }
+
+        /**
+         * Returns the upstream server identifier extracted from {@code serverId:world}, or
+         * {@code "local"} when unprefixed.
+         */
+        public String serverId() {
+            int colon = world.indexOf(':');
+            if (colon > 0 && colon + 1 < world.length()) {
+                String prefix = world.substring(0, colon).trim();
+                if (!"minecraft".equalsIgnoreCase(prefix)) {
+                    return prefix;
+                }
+            }
+            return "local";
+        }
+
+        /**
+         * Returns the bare world name without any {@code serverId:} prefix.
+         */
+        public String localWorldName() {
+            int colon = world.indexOf(':');
+            if (colon > 0 && colon + 1 < world.length()) {
+                String prefix = world.substring(0, colon).trim();
+                if (!"minecraft".equalsIgnoreCase(prefix)) {
+                    return world.substring(colon + 1).trim();
+                }
+            }
+            return world;
+        }
+
+        /**
+         * Returns the canonical {@code serverId:world} composite key (or bare {@code world} for
+         * {@code "local"}).
+         */
+        public String compositeWorldKey() {
+            String srv = serverId();
+            String bare = localWorldName();
+            return "local".equalsIgnoreCase(srv) ? bare : srv + ":" + bare;
+        }
+    }
+
+    /**
+     * Descriptor for an upstream server aggregated into a multi-server {@code LeafMap} hub
+     * ({@code leafmap-ADR-004}, {@code REQ-MAP-MULTI-001}).
+     *
+     * @param serverId        unique server identifier (e.g. {@code "survival-east"}, {@code "local"})
+     * @param displayName     human-readable server label
+     * @param worlds          worlds exposed by this server
+     * @param pooledChunks    number of chunks currently held in the bounded `.lca` LRU pool
+     * @param memoryBytesUsed L1 in-memory slab bytes attributed to this server
+     * @param diskBytesUsed   L2 disk `.lca` archive bytes attributed to this server
+     */
+    record ServerMapDescriptor(
+            String serverId,
+            String displayName,
+            List<String> worlds,
+            int pooledChunks,
+            long memoryBytesUsed,
+            long diskBytesUsed
+    ) {
+        public ServerMapDescriptor {
+            serverId = (serverId == null || serverId.isBlank()) ? "local" : serverId.trim();
+            displayName = (displayName == null || displayName.isBlank()) ? serverId : displayName.trim();
+            worlds = worlds == null ? List.of() : List.copyOf(worlds);
+        }
     }
 
     /**
@@ -657,6 +757,17 @@ public interface WorldBlockFeed {
                 "world", "Overworld", "overworld",
                 -64, 319, 144, 68, -96, 0.0, 0.0, 16384.0, 6000L, false, 1, 1024
         ));
+    }
+
+    /**
+     * Returns all servers aggregated into this map hub ({@code leafmap-ADR-004}, {@code REQ-MAP-MULTI-001}).
+     */
+    default List<ServerMapDescriptor> servers() {
+        List<String> worldNames = worlds().stream()
+                .map(WorldMapDescriptor::localWorldName)
+                .distinct()
+                .toList();
+        return List.of(new ServerMapDescriptor("local", "Local Server", worldNames, 0, 0L, 0L));
     }
 
     /**
