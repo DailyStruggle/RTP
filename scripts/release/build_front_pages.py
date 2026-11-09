@@ -563,6 +563,20 @@ def _match_product_for_rel(rel):
         res_root = res_dir.relative_to(ROOT).as_posix().lower()
         if rel_lower == res_root or rel_lower.startswith(res_root + "/"):
             return spec
+    parts = rel.replace("\\", "/").lstrip("/").split("/")
+    if len(parts) >= 2 and parts[0].lower() in ("resource", "plugins") and parts[1].lower().startswith("leaf"):
+        res_name = parts[1]
+        pid = res_name.lower()
+        return ProductSpec(
+            pid,
+            res_name,
+            res_name,
+            f"{res_name}-x.y.z.jar",
+            f"{res_name}-x.y.z.jar",
+            ROOT / "resource" / res_name / "docs" / "publishing" / "FRONT_PAGE.md",
+            repo_base=f"https://docs.leafcraft.net/mc/{pid}",
+            repo_branch="main",
+        )
     return None
 
 
@@ -1289,8 +1303,17 @@ def main(argv=None):
         available = [pid for pid, spec in PRODUCTS.items() if spec.source.is_file()]
         if len(available) == 1:
             selected_product = available[0]
+        elif len(available) > 1:
+            selected_product = "all"
+        elif args.check:
+            print("front pages valid (0 storefront products present in standalone repository)")
+            return 0
     if selected_product is not None and args.source is None:
-        product_ids = list(PRODUCTS.keys()) if selected_product == "all" else [selected_product]
+        product_ids = (
+            [pid for pid, spec in PRODUCTS.items() if spec.source.is_file()]
+            if selected_product == "all"
+            else [selected_product]
+        )
         for pid in product_ids:
             spec = PRODUCTS[pid]
             prod_targets = targets_for_product(pid)

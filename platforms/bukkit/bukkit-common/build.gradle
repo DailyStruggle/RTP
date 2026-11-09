@@ -12,6 +12,7 @@ if (!hasRtpCore) {
                 include 'io/github/dailystruggle/rtp/bukkitplatform/server/BukkitPluginServerAccessor.java'
                 include 'io/github/dailystruggle/rtp/bukkitplatform/server/BukkitWorldEventHook.java'
                 include 'io/github/dailystruggle/rtp/bukkitplatform/tools/MiniMessageRenderer.java'
+                include 'io/github/dailystruggle/rtp/bukkitplatform/world/BukkitBlockWriter.java'
                 include 'io/github/dailystruggle/rtp/bukkitplatform/world/BukkitRegionPaths.java'
             }
         }
@@ -33,6 +34,9 @@ dependencies {
     }
     if (findProject(':anvil-api') != null) {
         api project(':anvil-api')
+    }
+    if (findProject(':schematics-api') != null) {
+        api project(':schematics-api')
     }
     if (findProject(':metrics-api') != null) {
         compileOnly project(':metrics-api')
