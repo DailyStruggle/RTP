@@ -543,4 +543,100 @@ class BukkitServerAccessorTest {
         assertFalse(offThreadReplaceable,
                 "Foreign-region / off-thread call to isReplaceable must fail closed (return false)");
     }
+
+    @Test
+    @DisplayName("attachBrigadierSubcommands attaches argsChild when subcommand has nested subcommands and empty parameters")
+    void testAttachBrigadierSubcommandsAttachesArgsNodeForNestedSubcommands() throws Exception {
+        com.mojang.brigadier.CommandDispatcher<Object> dispatcher = new com.mojang.brigadier.CommandDispatcher<>();
+        com.mojang.brigadier.builder.LiteralArgumentBuilder<Object> rootBuilder =
+                com.mojang.brigadier.builder.LiteralArgumentBuilder.literal("sleuth")
+                        .executes(ctx -> 1)
+                        .then(com.mojang.brigadier.builder.RequiredArgumentBuilder
+                                .argument("args", com.mojang.brigadier.arguments.StringArgumentType.greedyString())
+                                .executes(ctx -> 1));
+        dispatcher.register(rootBuilder);
+
+        Object mcServer = new Object() {
+            @SuppressWarnings("unused")
+            public com.mojang.brigadier.CommandDispatcher<Object> getCommandsDispatcher() {
+                return dispatcher;
+            }
+        };
+        org.bukkit.Server brigadierServer = org.mockito.Mockito.mock(
+                org.bukkit.Server.class,
+                org.mockito.Mockito.withSettings().extraInterfaces(BrigadierCraftServerBridge.class)
+        );
+        org.mockito.Mockito.when(((BrigadierCraftServerBridge) brigadierServer).getServer()).thenReturn(mcServer);
+
+        StubTreeCommand rootCmd = new StubTreeCommand("sleuth");
+        StubTreeCommand altsSub = new StubTreeCommand("alts");
+        StubTreeCommand profileSub = new StubTreeCommand("profile");
+        altsSub.addSubCommand(profileSub);
+        rootCmd.addSubCommand(altsSub);
+
+        StubTreeCommand leafNoChildren = new StubTreeCommand("status");
+        rootCmd.addSubCommand(leafNoChildren);
+
+        java.lang.reflect.Field serverField = Bukkit.class.getDeclaredField("server");
+        serverField.setAccessible(true);
+        Object previousServer = serverField.get(null);
+        try {
+            serverField.set(null, brigadierServer);
+            java.lang.reflect.Method attachMethod = BukkitPluginServerAccessor.class.getDeclaredMethod(
+                    "attachBrigadierSubcommands",
+                    io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand.class,
+                    String.class
+            );
+            attachMethod.setAccessible(true);
+            attachMethod.invoke(null, rootCmd, "leafsleuth");
+        } finally {
+            serverField.set(null, previousServer);
+        }
+
+        com.mojang.brigadier.tree.CommandNode<Object> sleuthNode = dispatcher.getRoot().getChild("sleuth");
+        assertNotNull(sleuthNode);
+        com.mojang.brigadier.tree.CommandNode<Object> altsNode = sleuthNode.getChild("alts");
+        assertNotNull(altsNode, "Expected 'alts' literal subcommand node on '/sleuth'");
+        assertNotNull(altsNode.getChild("args"),
+                "Expected 'args' child on '/sleuth alts' when getParameterLookup() is empty but getCommandLookup() is non-empty");
+        assertEquals(1, dispatcher.execute("sleuth alts profile BotAlpha", new Object()));
+
+        com.mojang.brigadier.tree.CommandNode<Object> statusNode = sleuthNode.getChild("status");
+        assertNotNull(statusNode, "Expected 'status' literal subcommand node on '/sleuth'");
+        assertNull(statusNode.getChild("args"),
+                "Subcommand with empty parameters and empty nested subcommands should remain a pure literal");
+    }
+
+    public interface BrigadierCraftServerBridge {
+        Object getServer();
+    }
+
+    private static final class StubTreeCommand implements io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand {
+        private final String name;
+        private final Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> parameters =
+                new java.util.concurrent.ConcurrentHashMap<>();
+        private final Map<String, io.github.dailystruggle.commandsapi.common.CommandsAPICommand> subCommands =
+                new java.util.concurrent.ConcurrentHashMap<>();
+
+        StubTreeCommand(String name) {
+            this.name = name;
+        }
+
+        @Override public String name() { return name; }
+        @Override public String permission() { return ""; }
+        @Override public String description() { return ""; }
+        @Override public io.github.dailystruggle.commandsapi.common.CommandsAPICommand parent() { return null; }
+        @Override public void msgBadParameter(UUID callerId, String parameterName, String parameterValue) {}
+        @Override public long avgTime() { return 0L; }
+        @Override public Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> getParameterLookup() { return parameters; }
+        @Override public Map<String, io.github.dailystruggle.commandsapi.common.CommandsAPICommand> getCommandLookup() { return subCommands; }
+
+        @Override
+        public boolean onCommand(
+                UUID callerId,
+                Map<String, List<String>> parameterValues,
+                io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
+            return true;
+        }
+    }
 }

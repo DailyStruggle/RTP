@@ -387,6 +387,19 @@ All rows below are **unimplemented**. Subproject ADR `rtp-proxy-ADR-008-bungee-b
 
 ---
 
+## LeafShard Distributed `.lca` World-Sharding Mesh Requirements
+
+| Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
+|---|---|---|---|---|
+| REQ-SHARD-011 | Unified Zstd player state & per-UUID file bundle codec (`PSBD` `0x50534244`) and `PlayerStateContributor` SPI inside `PlayerBorderHandoffEnvelope#compressedPlayerStatePayload` | `leafshard-ADR-003`, `leafshard-ADR-004` | `PlayerStateBundleCodec`, `PlayerStateContributor`, `PlayerUuidFileBundler`, `LeafShardRuntime`, `PaperLeafShardPlugin`, `FabricLeafShardMod`, `NeoForgeLeafShardMod` | `LeafShardCoordinatorAndMeshTest`, `PaperLeafShardPluginTest`, `VelocityLeafShardPluginTest` |
+| REQ-SHARD-012 | Lazy `Supplier<byte[]>` border handoff state evaluation and pre-switch `player.saveData()` flush | `leafshard-ADR-003` | `LeafShardCoordinator`, `LeafShardRuntime`, `PaperLeafShardPlugin`, `FabricLeafShardMod`, `NeoForgeLeafShardMod` | `LeafShardCoordinatorAndMeshTest`, `PaperLeafShardPluginTest` |
+| REQ-SHARD-013 | Immediate UDP `FRAME_PLAYER_HANDOFF (0x04)` pre-join disk staging of bundled `<uuid>` files with strict path-traversal rejection | `leafshard-ADR-003`, `leafshard-ADR-004` | `PlayerUuidFileBundler`, `LeafShardRuntime` | `LeafShardCoordinatorAndMeshTest`, `PaperLeafShardPluginTest`, `VelocityLeafShardPluginTest` |
+| REQ-SHARD-014 | Arbitrary cross-server & cross-world handoff routing (`/leafshard send`, `LeafShardRuntime#initiateCrossServerTransfer`, `VelocityLeafShardPlugin#onServerPreConnect`, and `PlayerBorderHandoffEnvelope#keepDestinationLocation`) | `leafshard-ADR-003`, `leafshard-ADR-004` | `PlayerBorderHandoffEnvelope`, `LeafShardRuntime`, `LeafShardCommand`, `VelocityLeafShardPlugin`, `PaperLeafShardPlugin`, `FabricLeafShardMod`, `NeoForgeLeafShardMod` | `LeafShardCoordinatorAndMeshTest`, `VelocityLeafShardPluginTest`, `PaperLeafShardPluginTest` |
+| REQ-SHARD-015 | Multi-world `<uuid>` discovery and primary world folder remapping (`PlayerUuidFileBundler#primaryWorldFolder`, `server.properties` `level-name=`) | `leafshard-ADR-003`, `leafshard-ADR-004` | `PlayerUuidFileBundler` | `LeafShardCoordinatorAndMeshTest`, `VelocityLeafShardPluginTest`, `PaperLeafShardPluginTest` |
+| REQ-SHARD-016 | Automatic `DEATH` and `QUIT` lifecycle `.psbd` snapshots and all-platform staged offline restore on join (`consumeStagedRestorePayload`) | `leafshard-ADR-003`, `leafshard-ADR-004` | `PlayerSnapshotStore`, `LeafShardRuntime`, `PaperLeafShardPlugin`, `FabricLeafShardMod`, `NeoForgeLeafShardMod` | `LeafShardCoordinatorAndMeshTest`, `VelocityLeafShardPluginTest`, `PaperLeafShardPluginTest` |
+
+---
+
 ## Coverage Summary
 
 | Module | Total Reqs | Automated Test Coverage |

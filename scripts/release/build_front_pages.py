@@ -115,11 +115,12 @@ PRODUCTS = {
     "leafconfig": ProductSpec(
         "leafconfig",
         "LeafConfig",
-        "LeafConfig-Pro",
-        "LeafConfig-x.y.z.jar",
-        "LeafConfig-Pro-x.y.z.jar",
+        None,
+        "LeafConfig-0.1.0.jar",
+        None,
         ROOT / "resource" / "LeafConfig" / "docs" / "publishing" / "FRONT_PAGE.md",
         repo_base="https://docs.leafcraft.net/mc/leafconfig",
+        repo_branch="main",
     ),
     "leafsleuth": ProductSpec(
         "leafsleuth",

@@ -1258,7 +1258,8 @@ public class BukkitPluginServerAccessor implements ServerAccessor {
               litCtor.newInstance(sub.name(), brigCmd, requirement, null, null, false);
           if (argsChild != null
               && sub instanceof TreeCommand subTree
-              && !subTree.getParameterLookup().isEmpty()) {
+              && (!subTree.getParameterLookup().isEmpty()
+                  || !subTree.getCommandLookup().isEmpty())) {
             addChild.invoke(subNode, argsChild);
           }
           addChild.invoke(cmdNode, subNode);
