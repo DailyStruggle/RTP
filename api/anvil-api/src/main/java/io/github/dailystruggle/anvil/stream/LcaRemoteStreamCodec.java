@@ -191,6 +191,31 @@ public final class LcaRemoteStreamCodec {
         public boolean isUniform() {
             return isUniformDirectoryWord(directoryWord16);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof SectionWireSlice that)) {
+                return false;
+            }
+            return Arrays.equals(baseFrameSlice, that.baseFrameSlice)
+                    && Arrays.equals(dirtyOverlayEntries, that.dirtyOverlayEntries)
+                    && Objects.equals(List.of(sectionIndex, directoryWord16), List.of(that.sectionIndex, that.directoryWord16));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 31 * Integer.hashCode(sectionIndex) + Short.hashCode(directoryWord16);
+            result = 31 * result + Arrays.hashCode(baseFrameSlice);
+            return 31 * result + Arrays.hashCode(dirtyOverlayEntries);
+        }
+
+        @Override
+        public String toString() {
+            return "SectionWireSlice[sectionIndex=" + sectionIndex
+                    + ", directoryWord16=" + directoryWord16
+                    + ", baseFrameSlice=" + Arrays.toString(baseFrameSlice)
+                    + ", dirtyOverlayEntries=" + Arrays.toString(dirtyOverlayEntries) + "]";
+        }
     }
 
     /**
@@ -316,6 +341,33 @@ public final class LcaRemoteStreamCodec {
         public byte[] toCanonicalSlabBytes() {
             return serializeCanonicalChunkSlab(chunkX, chunkZ, sections, heightmapDeltaBytes);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof EntryFullChunk that)) {
+                return false;
+            }
+            return Arrays.equals(heightmapDeltaBytes, that.heightmapDeltaBytes)
+                    && Objects.equals(
+                            List.of(chunkX, chunkZ, lastUpdateTick, secDedSyndrome64, sections),
+                            List.of(that.chunkX, that.chunkZ, that.lastUpdateTick, that.secDedSyndrome64, that.sections));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(chunkX, chunkZ, lastUpdateTick, secDedSyndrome64, sections);
+            return 31 * result + Arrays.hashCode(heightmapDeltaBytes);
+        }
+
+        @Override
+        public String toString() {
+            return "EntryFullChunk[chunkX=" + chunkX
+                    + ", chunkZ=" + chunkZ
+                    + ", lastUpdateTick=" + lastUpdateTick
+                    + ", secDedSyndrome64=" + secDedSyndrome64
+                    + ", sections=" + sections
+                    + ", heightmapDeltaBytes=" + Arrays.toString(heightmapDeltaBytes) + "]";
+        }
     }
 
     /**
@@ -411,6 +463,37 @@ public final class LcaRemoteStreamCodec {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof LcaRegionDictSyncFrame that)) {
+                return false;
+            }
+            return Arrays.equals(dictIdToBlockStateRegistryId, that.dictIdToBlockStateRegistryId)
+                    && Arrays.equals(dictIdToBiomeRegistryId, that.dictIdToBiomeRegistryId)
+                    && Objects.equals(
+                            List.of(serverId, world, regionX, regionZ, dictIdToBlockStateName, dictIdToBiomeName),
+                            List.of(that.serverId, that.world, that.regionX, that.regionZ, that.dictIdToBlockStateName, that.dictIdToBiomeName));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(serverId, world, regionX, regionZ, dictIdToBlockStateName, dictIdToBiomeName);
+            result = 31 * result + Arrays.hashCode(dictIdToBlockStateRegistryId);
+            return 31 * result + Arrays.hashCode(dictIdToBiomeRegistryId);
+        }
+
+        @Override
+        public String toString() {
+            return "LcaRegionDictSyncFrame[serverId=" + serverId
+                    + ", world=" + world
+                    + ", regionX=" + regionX
+                    + ", regionZ=" + regionZ
+                    + ", dictIdToBlockStateRegistryId=" + Arrays.toString(dictIdToBlockStateRegistryId)
+                    + ", dictIdToBiomeRegistryId=" + Arrays.toString(dictIdToBiomeRegistryId)
+                    + ", dictIdToBlockStateName=" + dictIdToBlockStateName
+                    + ", dictIdToBiomeName=" + dictIdToBiomeName + "]";
         }
     }
 

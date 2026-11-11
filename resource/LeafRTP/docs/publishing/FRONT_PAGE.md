@@ -115,6 +115,7 @@ Zone 3: Architectural Proof & Technical Transparency (Deep Foundation)
     Head-to-head competitor comparisons live strictly in the Performance section.
 
 Listing metadata (for the marketplace form fields, not emitted):
+  BuiltByBit Carousel Slides: docs/assets/img/leafrtp-action-showcase.webp, docs/assets/img/web_editor_region_map.png, docs/assets/img/cross_plugin_destinations_scatter_chart.png
   Paid BuiltByBit title:  "LeafRTP-Pro"   tagline: "Fast Minecraft random teleport (/rtp & /wild) plugin and mod for Paper, Folia, Fabric, NeoForge & Velocity"
   Free title:             "LeafRTP"       tagline: "Fast Minecraft random teleport (/rtp & /wild) plugin and mod for Paper, Folia, Fabric, NeoForge & Velocity"
   (Modrinth's short description still reads "Fast Random Teleportation for everyone,
@@ -160,15 +161,12 @@ I've worked on it in my own time since 2021. The benchmarks and the test harness
 
 One jar for Paper and Spigot (1.18+), Folia (1.21.11+), Fabric (1.20.1 and 1.21+, needs Fabric API) and NeoForge (1.21.1+), up to 26.3. It also loads on Velocity for `/rtp` across a network.
 
+<!-- not: bbb -->
 ![Web editor: a circular region with an inner exclusion zone drawn over the world map](../assets/img/web_editor_region_map.png)
 
 *Drawing where players land, in the browser editor (`/rtp editor`).*
+<!-- /not -->
 
-<!-- only: bbb-pro -->
-<!-- kind: promo -->
-This listing is how you pay for support. The code is the same as the [free download](https://modrinth.com/plugin/leafrtp) and all of it is MIT licensed. Paying doesn't unlock anything in the plugin; details are in [What paying gets you](#what-paying-gets-you) below.
-<!-- /kind -->
-<!-- /only -->
 <!-- only: bbb-lite -->
 <!-- kind: promo -->
 There is also a paid LeafRTP-Pro listing on BuiltByBit. It is the same code, and nothing in the plugin is locked. Paying gets you priority support, and a patch release when a bug you report needs one.
@@ -273,7 +271,9 @@ On the same NVMe rig (`1,024` to `4,096` region files across the `16k` radius), 
 
 **Where each plugin lands players (Paper 26.2, 4,096 teleports):**
 
+<!-- not: bbb -->
 ![Cross-plugin destination scatter comparison](../assets/img/cross_plugin_destinations_scatter_chart.png)
+<!-- /not -->
 
 *Where each plugin landed 4,096 players in the Paper 26.2 run (`20261008-003310`), every one set to the same 1,024 to 16,384 block circle around 0,0. Out of the box, LeafRTP uses a standard `CIRCLE` or `SQUARE` with an even spread across the region (you only configure a block radius like `radius: 5000b`), so players don't cluster near the center or the outer border.*
 
@@ -481,7 +481,10 @@ Support comes from me, the person who wrote the code.
 - [**Admin and configuration guide**](https://docs.leafcraft.net/mc/FOR_SERVER_ADMINS/): install, configure, command reference
 - [**Addon / API developer guide**](https://docs.leafcraft.net/mc/FOR_ADDON_DEVELOPERS/): `rtp-api` and examples
 - [**Changelog**](../../CHANGELOG.md)
+- [**LeafAnvil & Open `.lca` Codec (`anvil-api`, MIT)**](../../../LeafAnvil/docs/publishing/FRONT_PAGE.md): `50%` smaller worlds, `15.5x` faster shutdown saves, and `8.55 us` `.lca` RTP terrain probes
+- [**LeafSleuth**](../../../LeafSleuth/docs/publishing/FRONT_PAGE.md): catches walk-away lag-machine builders (`CoreProtect`), item dupes, stash rings, and VPN ban-evader alts while cutting hotspot load by `-68.6%`
 - [**LeafTreeGen**](../../../LeafTreeGen/docs/publishing/FRONT_PAGE.md): procedural custom biome trees baked into native vanilla jigsaw worldgen datapacks
+- [**LeafSleep (`OnePlayerSleep`)**](../../../LeafSleep/docs/publishing/FRONT_PAGE.md): population-scaled sleep voting, anti-troll `[Cancel]`, and cross-server dawn sync
 - [**Source on GitHub**](https://github.com/dailystruggle/RTP): issues, contributions, the benchmark harness
 <!-- only: bbb-pro -->
 - [**Free download**](https://modrinth.com/plugin/leafrtp)

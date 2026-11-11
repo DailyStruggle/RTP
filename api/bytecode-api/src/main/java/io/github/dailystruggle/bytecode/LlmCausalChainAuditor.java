@@ -64,10 +64,10 @@ public final class LlmCausalChainAuditor {
             "\\b([A-Z][A-Za-z0-9_$]{1,64})#([a-zA-Z0-9_$<>]{1,64})\\b"
     );
     private static final Pattern JSON_STRING_FIELD_RE = Pattern.compile(
-            "\"([A-Za-z0-9_]+)\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\""
+            "\"([A-Za-z0-9_]+)\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
     );
     private static final Pattern REFUSAL_OR_INJECTION_RE = Pattern.compile(
-            "(?i)(?:ignore\\s+(?:all\\s+)?(?:previous|prior)\\s+instructions|<\\s*\\/?\\s*script|javascript:|as\\s+an\\s+ai\\s+language\\s+model)"
+            "(?i)(?:ignore\\s++(?:all\\s++)?(?:previous|prior)\\s++instructions|<\\s*+(?:/\\s*+)?script|javascript:|as\\s++an\\s++ai\\s++language\\s++model)"
     );
 
     private static final Set<String> ALLOWED_JDK_OR_BUKKIT_SYMBOLS = Set.of(

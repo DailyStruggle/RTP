@@ -95,9 +95,9 @@ PRODUCTS = {
     "leafsleep": ProductSpec(
         "leafsleep",
         "LeafSleep",
-        "LeafSleep-Pro",
+        None,
         "LeafSleep-x.y.z.jar",
-        "LeafSleep-Pro-x.y.z.jar",
+        None,
         ROOT / "resource" / "LeafSleep" / "docs" / "publishing" / "FRONT_PAGE.md",
         repo_base="https://github.com/LeafCraftDev/LeafSleep",
         repo_branch="main",
@@ -105,9 +105,9 @@ PRODUCTS = {
     "leaftreegen": ProductSpec(
         "leaftreegen",
         "LeafTreeGen",
-        "LeafTreeGen-Pro",
+        None,
         "LeafTreeGen-x.y.z.jar",
-        "LeafTreeGen-Pro-x.y.z.jar",
+        None,
         ROOT / "resource" / "LeafTreeGen" / "docs" / "publishing" / "FRONT_PAGE.md",
         repo_base="https://docs.leafcraft.net/mc/leaftreegen",
         repo_branch="main",
@@ -885,6 +885,24 @@ def check_denylist(target, text):
     return problems
 
 
+def check_bbb_gallery_only_images(target, kept):
+    """Ensures BuiltByBit targets keep content images/videos in the gallery carousel (<!-- not: bbb -->)."""
+    if target.name not in ("bbb-pro", "bbb-lite"):
+        return []
+    if not any(line.strip() in ZONE1_START_HEADINGS for _, line in kept):
+        return []
+    problems = []
+    for n, line in kept:
+        for m in _IMAGE.finditer(line):
+            src = m.group("src")
+            if not _is_svg_badge(src):
+                problems.append(
+                    f"line {n}: inline image '{src}' on {target.name}; wrap in '<!-- not: bbb -->' "
+                    "and list in 'BuiltByBit Carousel Slides:' for gallery upload"
+                )
+    return problems
+
+
 def check_zone1_jargon(kept):
     """Returns problems for jargon in Zone 1; empty when the page has no Zone 1 heading."""
     if not any(line.strip() in ZONE1_START_HEADINGS for _, line in kept):
@@ -1228,6 +1246,7 @@ def render(
     _lint(kept)
     jargon = (
         check_listing_metadata(source_text)
+        + check_bbb_gallery_only_images(target, kept)
         + check_zone1_jargon(kept)
         + check_short_version_labels(kept)
         + check_zone2_onramp(kept)

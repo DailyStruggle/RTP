@@ -66,6 +66,23 @@ public final class LcaSectionBacking {
      * Result of encoding a 4,096-voxel section into a compact `.lca` `baseFrame`.
      */
     public record EncodedCompactFrame(int majorityStateId, byte[] frameBytes) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof EncodedCompactFrame that)) return false;
+            return majorityStateId == that.majorityStateId && Arrays.equals(frameBytes, that.frameBytes);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Integer.hashCode(majorityStateId) + Arrays.hashCode(frameBytes);
+        }
+
+        @Override
+        public String toString() {
+            return "EncodedCompactFrame[majorityStateId=" + majorityStateId
+                    + ", frameBytes=" + Arrays.toString(frameBytes) + "]";
+        }
     }
 
     private static final class CompactEncodeScratch {
@@ -2675,6 +2692,29 @@ public final class LcaSectionBacking {
             int uniformStateId,
             OverlayTable frozenOverlay,
             long epoch) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof CompactionSnapshot that)) return false;
+            return uniformStateId == that.uniformStateId
+                    && epoch == that.epoch
+                    && Objects.equals(frozenOverlay, that.frozenOverlay)
+                    && Arrays.equals(baseFrame, that.baseFrame);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(uniformStateId, frozenOverlay, epoch);
+            return 31 * result + Arrays.hashCode(baseFrame);
+        }
+
+        @Override
+        public String toString() {
+            return "CompactionSnapshot[baseFrame=" + Arrays.toString(baseFrame)
+                    + ", uniformStateId=" + uniformStateId
+                    + ", frozenOverlay=" + frozenOverlay
+                    + ", epoch=" + epoch + "]";
+        }
     }
 
     /**

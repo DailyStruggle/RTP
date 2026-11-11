@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -152,6 +153,35 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
 
         public int byteSize() {
             return slabBytes.length;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof PooledChunkSlab that)) {
+                return false;
+            }
+            return Arrays.equals(slabBytes, that.slabBytes)
+                    && Objects.equals(
+                            List.of(serverId, world, chunkX, chunkZ, lastUpdateTick, secDedSyndrome64, pinned),
+                            List.of(that.serverId, that.world, that.chunkX, that.chunkZ, that.lastUpdateTick, that.secDedSyndrome64, that.pinned));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(serverId, world, chunkX, chunkZ, lastUpdateTick, secDedSyndrome64, pinned);
+            return 31 * result + Arrays.hashCode(slabBytes);
+        }
+
+        @Override
+        public String toString() {
+            return "PooledChunkSlab[serverId=" + serverId
+                    + ", world=" + world
+                    + ", chunkX=" + chunkX
+                    + ", chunkZ=" + chunkZ
+                    + ", lastUpdateTick=" + lastUpdateTick
+                    + ", secDedSyndrome64=" + secDedSyndrome64
+                    + ", slabBytes=" + Arrays.toString(slabBytes)
+                    + ", pinned=" + pinned + "]";
         }
     }
 

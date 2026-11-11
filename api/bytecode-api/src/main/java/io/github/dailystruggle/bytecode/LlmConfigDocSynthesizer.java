@@ -52,21 +52,35 @@ import java.util.regex.Pattern;
 public final class LlmConfigDocSynthesizer implements AutoCloseable {
 
     private static final Pattern THINK_BLOCK_RE = Pattern.compile("(?s)<think>.*?</think>\\s*");
-    private static final Pattern CODE_FENCE_RE = Pattern.compile("(?s)```(?:json)?\\s*\\n?(.*?)\\n?```");
     private static final Pattern JSON_STRING_FIELD_RE = Pattern.compile(
-            "\"([A-Za-z0-9_]+)\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\""
+            "\"([A-Za-z0-9_]+)\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
     );
     private static final Pattern JSON_ARRAY_FIELD_RE = Pattern.compile(
             "(?s)\"whatChanges\"\\s*:\\s*\\[(.*?)\\]"
     );
     private static final Pattern JSON_ARRAY_ITEM_RE = Pattern.compile(
-            "\"((?:\\\\.|[^\"\\\\])*)\""
+            "\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
     );
     private static final Pattern PROMPT_INJECTION_RE = Pattern.compile(
-            "(?i)(?:ignore\\s+(?:all\\s+)?(?:previous|prior|above)\\s+instructions|system\\s+prompt|you\\s+are\\s+now|disregard\\s+all|<\\/?script|<\\/?iframe|javascript:)"
+            "(?i)(?:ignore\\s++(?:all\\s++)?(?:previous|prior|above)\\s++instructions|system\\s++prompt|you\\s++are\\s++now|disregard\\s++all|<\\/?+(?:script|iframe)|javascript:)"
     );
     private static final Pattern LLM_REFUSAL_OR_INJECTION_RE = Pattern.compile(
-            "(?i)(?:^\\s*(?:i\\s+cannot|i\\s+can't|i\\s+am\\s+sorry|i'm\\s+sorry|as\\s+an\\s+ai|as\\s+a\\s+language\\s+model|i\\s+am\\s+unable)|<\\s*\\/?\\s*(?:script|iframe|img|svg|object|embed|style|link|meta)\\b|javascript:|onerror\\s*=|onload\\s*=|ignore\\s+previous\\s+instructions)"
+            "(?i)(?:^\\s*+(?:i\\s++cannot|i\\s++can't|i\\s++am\\s++sorry|i'm\\s++sorry|as\\s++an\\s++ai|as\\s++a\\s++language\\s++model|i\\s++am\\s++unable))|(?:<\\s*+(?:/\\s*+)?(?:script|iframe|img|svg|object|embed|style|link|meta)\\b)|(?:javascript:|onerror\\s*+=|onload\\s*+=|ignore\\s++previous\\s++instructions)"
+    );
+    private static final Pattern CONTENT_FIELD_RE = Pattern.compile(
+            "\"content\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
+    );
+    private static final Pattern TEXT_FIELD_RE = Pattern.compile(
+            "\"text\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
+    );
+    private static final Pattern RESPONSE_FIELD_RE = Pattern.compile(
+            "\"response\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
+    );
+    private static final Pattern OUTPUT_FIELD_RE = Pattern.compile(
+            "\"output\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
+    );
+    private static final List<Pattern> UNIVERSAL_FIELD_PATTERNS = List.of(
+            CONTENT_FIELD_RE, TEXT_FIELD_RE, RESPONSE_FIELD_RE, OUTPUT_FIELD_RE
     );
 
     /** Supported LLM backend providers for AST-grounded config documentation synthesis. */
@@ -318,7 +332,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         }
     }
 
-    private static final Pattern PACKAGE_PREFIX_RE = Pattern.compile("\\b(?:[a-z][a-z0-9_]*\\.)+(?:[A-Z][A-Za-z0-9_]*[.$])*([A-Z][A-Za-z0-9_]*)");
+    private static final Pattern PACKAGE_PREFIX_RE = Pattern.compile("\\b(?:[a-z][a-z0-9_]*+\\.)++(?:[A-Z][A-Za-z0-9_]*+[.$])*+([A-Z][A-Za-z0-9_]*+)");
 
     private final LlmHookConfig config;
     private final HttpTransport transport;
@@ -744,6 +758,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         return extractAnthropicContent(rawHttp);
     }
 
+    @SuppressWarnings("java:S4036")
     private synchronized String resolveOpenAiEndpoint() throws IOException {
         if (customTransport) {
             return config.endpoint();
@@ -785,7 +800,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
                     return this.activeTunnelEndpoint;
                 }
                 try {
-                    Thread.sleep(120L);
+                    this.wait(120L);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;
@@ -812,9 +827,16 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         } else if (cleaned.startsWith("<think>")) {
             cleaned = "";
         }
-        Matcher fence = CODE_FENCE_RE.matcher(cleaned);
-        if (fence.find()) {
-            cleaned = fence.group(1).trim();
+        int fenceOpen = cleaned.indexOf("```");
+        if (fenceOpen >= 0) {
+            int bodyStart = fenceOpen + 3;
+            if (cleaned.regionMatches(true, bodyStart, "json", 0, 4)) {
+                bodyStart += 4;
+            }
+            int fenceClose = cleaned.indexOf("```", bodyStart);
+            if (fenceClose >= bodyStart) {
+                cleaned = cleaned.substring(bodyStart, fenceClose).trim();
+            }
         }
         return cleaned;
     }
@@ -924,8 +946,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         }
         int choicesIdx = rawHttpJson.indexOf("\"choices\"");
         String searchRegion = choicesIdx >= 0 ? rawHttpJson.substring(choicesIdx) : rawHttpJson;
-        Pattern contentRe = Pattern.compile("\"content\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
-        Matcher m = contentRe.matcher(searchRegion);
+        Matcher m = CONTENT_FIELD_RE.matcher(searchRegion);
         if (m.find()) {
             return unescapeJsonString(m.group(1));
         }
@@ -938,8 +959,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         }
         int candIdx = rawHttpJson.indexOf("\"candidates\"");
         String searchRegion = candIdx >= 0 ? rawHttpJson.substring(candIdx) : rawHttpJson;
-        Pattern textRe = Pattern.compile("\"text\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
-        Matcher m = textRe.matcher(searchRegion);
+        Matcher m = TEXT_FIELD_RE.matcher(searchRegion);
         if (m.find()) {
             return unescapeJsonString(m.group(1));
         }
@@ -952,8 +972,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         }
         int contentIdx = rawHttpJson.indexOf("\"content\"");
         String searchRegion = contentIdx >= 0 ? rawHttpJson.substring(contentIdx) : rawHttpJson;
-        Pattern textRe = Pattern.compile("\"text\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
-        Matcher m = textRe.matcher(searchRegion);
+        Matcher m = TEXT_FIELD_RE.matcher(searchRegion);
         if (m.find()) {
             return unescapeJsonString(m.group(1));
         }
@@ -968,8 +987,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         if (rawHttpJson.contains("\"playerSummary\"")) {
             return rawHttpJson;
         }
-        for (String field : List.of("content", "text", "response", "output")) {
-            Pattern p = Pattern.compile("\"" + field + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+        for (Pattern p : UNIVERSAL_FIELD_PATTERNS) {
             Matcher m = p.matcher(rawHttpJson);
             if (m.find()) {
                 return unescapeJsonString(m.group(1));

@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
@@ -2457,6 +2458,34 @@ public final class BytecodeCausalGraphScanner {
     ) {
         boolean isEventHandler() {
             return annotations != null && annotations.isEventHandler();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof RawMethodData that)) return false;
+            return accessFlags == that.accessFlags
+                    && Objects.equals(name, that.name)
+                    && Objects.equals(descriptor, that.descriptor)
+                    && Objects.equals(annotations, that.annotations)
+                    && Arrays.equals(code, that.code)
+                    && Objects.equals(exceptionTable, that.exceptionTable);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(name, descriptor, accessFlags, annotations, exceptionTable);
+            return 31 * result + Arrays.hashCode(code);
+        }
+
+        @Override
+        public String toString() {
+            return "RawMethodData[name=" + name
+                    + ", descriptor=" + descriptor
+                    + ", accessFlags=" + accessFlags
+                    + ", annotations=" + annotations
+                    + ", code=" + Arrays.toString(code)
+                    + ", exceptionTable=" + exceptionTable + "]";
         }
     }
 

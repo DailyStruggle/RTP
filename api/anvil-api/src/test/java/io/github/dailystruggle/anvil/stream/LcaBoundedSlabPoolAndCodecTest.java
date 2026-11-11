@@ -565,7 +565,7 @@ class LcaBoundedSlabPoolAndCodecTest {
         assertTrue(LcaRemoteStreamCodec.isUniformDirectoryWord(uWord0));
         short uWordMid = LcaRemoteStreamCodec.encodeUniformDirectoryWord(7, 4, 5);
         assertTrue(LcaRemoteStreamCodec.isUniformDirectoryWord(uWordMid));
-        assertEquals(0, LcaRemoteStreamCodec.unpackEntryFlags4(uWordMid) & 0);
+        assertTrue(LcaRemoteStreamCodec.unpackEntryFlags4(uWordMid) >= 0);
         assertEquals(1, LcaRemoteStreamCodec.varIntByteLength(0));
         assertEquals(3, LcaRemoteStreamCodec.varIntByteLength(30000));
         assertThrows(IllegalArgumentException.class,
@@ -612,5 +612,63 @@ class LcaBoundedSlabPoolAndCodecTest {
             Files.write(slabFile, new byte[]{0, 1, 2, 3});
             assertTrue(cPool.getFullChunk("srv1", "world", 1, 1).isEmpty());
         }
+
+        // 5. Value equality, hashCode, and toString for array-backed stream records (java:S6218)
+        SectionWireSlice s1 = SectionWireSlice.nonUniform(1, new byte[]{1, 2, 3}, new int[]{10, 20});
+        SectionWireSlice s2 = SectionWireSlice.nonUniform(1, new byte[]{1, 2, 3}, new int[]{10, 20});
+        SectionWireSlice s3 = SectionWireSlice.nonUniform(1, new byte[]{1, 2, 4}, new int[]{10, 20});
+        SectionWireSlice s4 = SectionWireSlice.nonUniform(1, new byte[]{1, 2, 3}, new int[]{10, 99});
+        SectionWireSlice s5 = SectionWireSlice.nonUniform(2, new byte[]{1, 2, 3}, new int[]{10, 20});
+        assertEquals(s1, s2);
+        assertEquals(s1.hashCode(), s2.hashCode());
+        assertFalse(s1.equals(s3));
+        assertFalse(s1.equals(s4));
+        assertFalse(s1.equals(s5));
+        assertFalse(s1.equals("not-a-slice"));
+        assertTrue(s1.toString().contains("SectionWireSlice["));
+
+        EntryFullChunk fc1 = EntryFullChunk.createWithComputedSyndrome(2, 3, 100L, List.of(s1), new byte[]{9, 8});
+        EntryFullChunk fc2 = EntryFullChunk.createWithComputedSyndrome(2, 3, 100L, List.of(s2), new byte[]{9, 8});
+        EntryFullChunk fc3 = EntryFullChunk.createWithComputedSyndrome(2, 3, 100L, List.of(s1), new byte[]{9, 7});
+        EntryFullChunk fc4 = EntryFullChunk.createWithComputedSyndrome(5, 3, 100L, List.of(s1), new byte[]{9, 8});
+        assertEquals(fc1, fc2);
+        assertEquals(fc1.hashCode(), fc2.hashCode());
+        assertFalse(fc1.equals(fc3));
+        assertFalse(fc1.equals(fc4));
+        assertFalse(fc1.equals("not-a-chunk"));
+        assertTrue(fc1.toString().contains("EntryFullChunk["));
+
+        LcaRegionDictSyncFrame d1 = new LcaRegionDictSyncFrame(
+                "srv1", "world", 0, 0, new int[]{1, 2}, new int[]{3, 4}, List.of("minecraft:stone"), List.of("minecraft:plains"));
+        LcaRegionDictSyncFrame d2 = new LcaRegionDictSyncFrame(
+                "srv1", "world", 0, 0, new int[]{1, 2}, new int[]{3, 4}, List.of("minecraft:stone"), List.of("minecraft:plains"));
+        LcaRegionDictSyncFrame d3 = new LcaRegionDictSyncFrame(
+                "srv1", "world", 0, 0, new int[]{1, 9}, new int[]{3, 4}, List.of("minecraft:stone"), List.of("minecraft:plains"));
+        LcaRegionDictSyncFrame d4 = new LcaRegionDictSyncFrame(
+                "srv1", "world", 0, 0, new int[]{1, 2}, new int[]{3, 9}, List.of("minecraft:stone"), List.of("minecraft:plains"));
+        LcaRegionDictSyncFrame d5 = new LcaRegionDictSyncFrame(
+                "srv2", "world", 0, 0, new int[]{1, 2}, new int[]{3, 4}, List.of("minecraft:stone"), List.of("minecraft:plains"));
+        assertEquals(d1, d2);
+        assertEquals(d1.hashCode(), d2.hashCode());
+        assertFalse(d1.equals(d3));
+        assertFalse(d1.equals(d4));
+        assertFalse(d1.equals(d5));
+        assertFalse(d1.equals("not-a-dict"));
+        assertTrue(d1.toString().contains("LcaRegionDictSyncFrame["));
+
+        LcaBoundedSlabPool.PooledChunkSlab ps1 = new LcaBoundedSlabPool.PooledChunkSlab(
+                "srv1", "world", 1, 2, 100L, 55L, new byte[]{1, 2, 3}, true);
+        LcaBoundedSlabPool.PooledChunkSlab ps2 = new LcaBoundedSlabPool.PooledChunkSlab(
+                "srv1", "world", 1, 2, 100L, 55L, new byte[]{1, 2, 3}, true);
+        LcaBoundedSlabPool.PooledChunkSlab ps3 = new LcaBoundedSlabPool.PooledChunkSlab(
+                "srv1", "world", 1, 2, 100L, 55L, new byte[]{1, 2, 9}, false);
+        LcaBoundedSlabPool.PooledChunkSlab ps4 = new LcaBoundedSlabPool.PooledChunkSlab(
+                "srv1", "world", 1, 2, 100L, 55L, new byte[]{1, 2, 3}, false);
+        assertEquals(ps1, ps2);
+        assertEquals(ps1.hashCode(), ps2.hashCode());
+        assertFalse(ps1.equals(ps3));
+        assertFalse(ps1.equals(ps4));
+        assertFalse(ps1.equals("not-a-slab"));
+        assertTrue(ps1.toString().contains("PooledChunkSlab["));
     }
 }

@@ -619,5 +619,23 @@ class LcaSectionBackingAndCompactionTest {
         byte[] cleanSliceAfter = backing.cleanVanillaWireSlice(15);
         assertNotNull(cleanSliceAfter, "Clean wire slice must be immediately available after off-thread compaction");
         assertEquals(backing.computeVanillaSerializedSize(15), cleanSliceAfter.length);
+
+        LcaSectionBacking.EncodedCompactFrame f1 = new LcaSectionBacking.EncodedCompactFrame(1, new byte[]{10, 20});
+        LcaSectionBacking.EncodedCompactFrame f2 = new LcaSectionBacking.EncodedCompactFrame(1, new byte[]{10, 20});
+        LcaSectionBacking.EncodedCompactFrame f3 = new LcaSectionBacking.EncodedCompactFrame(2, new byte[]{10, 21});
+        assertEquals(f1, f2);
+        assertEquals(f1.hashCode(), f2.hashCode());
+        assertNotEquals(f1, f3);
+        assertFalse(f1.equals("other"));
+        assertTrue(f1.toString().contains("EncodedCompactFrame["));
+
+        CompactionSnapshot cs1 = new CompactionSnapshot(new byte[]{1, 2}, 0, snap.frozenOverlay(), snap.epoch());
+        CompactionSnapshot cs2 = new CompactionSnapshot(new byte[]{1, 2}, 0, snap.frozenOverlay(), snap.epoch());
+        CompactionSnapshot cs3 = new CompactionSnapshot(new byte[]{1, 3}, 0, snap.frozenOverlay(), snap.epoch());
+        assertEquals(cs1, cs2);
+        assertEquals(cs1.hashCode(), cs2.hashCode());
+        assertNotEquals(cs1, cs3);
+        assertFalse(cs1.equals("other"));
+        assertTrue(cs1.toString().contains("CompactionSnapshot["));
     }
 }

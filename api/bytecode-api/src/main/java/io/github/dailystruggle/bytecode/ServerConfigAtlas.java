@@ -568,8 +568,7 @@ public final class ServerConfigAtlas {
         String displayNorm = art.displayName().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
         String idStem = art.artifactId().replaceFirst("^plugin:", "").toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
         String jarFileName = jarPath.getFileName().toString();
-        String jarStem = jarFileName.replaceFirst("(?i)\\.jar$", "")
-                .replaceFirst("[-_vV]+\\d.*$", "")
+        String jarStem = stripVersionSuffix(jarFileName.replaceFirst("(?i)\\.jar$", ""))
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]", "");
         try (Stream<Path> s = Files.list(pluginsDir)) {
@@ -1012,7 +1011,7 @@ public final class ServerConfigAtlas {
             }
             if (trimmed.startsWith("[") && trimmed.contains("]")) {
                 int close = trimmed.lastIndexOf(']');
-                String header = trimmed.substring(0, close + 1).replaceAll("^\\[+|\\]+$", "").trim();
+                String header = stripBrackets(trimmed.substring(0, close + 1)).trim();
                 currentSection = header.replace("\"", "").replace("'", "");
                 pendingComments.clear();
                 continue;
@@ -1920,7 +1919,7 @@ public final class ServerConfigAtlas {
         List<String> notes = new ArrayList<>();
         String cleaned = rawInput.trim();
         // Strip surrounding smart quotes or standard quotes and trailing semicolons/commas
-        cleaned = cleaned.replaceAll("^[“”‘’'\"]+|[“”‘’'\"]+$", "").trim();
+        cleaned = stripSurroundingQuotes(cleaned).trim();
         if (cleaned.length() > 1 && (cleaned.endsWith(";") || cleaned.endsWith(","))) {
             cleaned = cleaned.substring(0, cleaned.length() - 1).trim();
         }
@@ -2064,6 +2063,10 @@ public final class ServerConfigAtlas {
         return new CoercedConfigInput(rawInput, cleaned, !cleaned.equals(rawInput.trim()), true, notes);
     }
 
+    private static final java.util.regex.Pattern KV_LINE_RE = java.util.regex.Pattern.compile(
+            "^(\\s*+)([A-Za-z0-9_.-]++)\\s*+(:|=)\\s*+([^#\\r\\n]*+)(#[^\\r\\n]*+)?$"
+    );
+
     /**
      * Sanitizes and auto-coerces a raw YAML configuration text for a given artifact and file path:
      * replaces leading tab indentation with 2 spaces, converts {@code key = value} lines into
@@ -2095,10 +2098,6 @@ public final class ServerConfigAtlas {
         boolean modified = false;
         boolean notedTabs = false;
 
-        java.util.regex.Pattern kvPattern = java.util.regex.Pattern.compile(
-                "^(\\s*)([A-Za-z0-9_.-]+)\\s*(:|=)\\s*([^#\\r\\n]*?)(\\s*#.*)?$"
-        );
-
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
             if (line.contains("\t") && !isProps) {
@@ -2115,7 +2114,7 @@ public final class ServerConfigAtlas {
             String trimmed = line.trim();
             if (isToml && trimmed.startsWith("[") && trimmed.contains("]")) {
                 int close = trimmed.lastIndexOf(']');
-                currentTomlSection = trimmed.substring(0, close + 1).replaceAll("^\\[+|\\]+$", "").trim()
+                currentTomlSection = stripBrackets(trimmed.substring(0, close + 1)).trim()
                         .replace("\"", "").replace("'", "");
                 out.append(line);
                 if (i < lines.length - 1) out.append('\n');
@@ -2126,7 +2125,7 @@ public final class ServerConfigAtlas {
                 if (i < lines.length - 1) out.append('\n');
                 continue;
             }
-            java.util.regex.Matcher m = kvPattern.matcher(line);
+            java.util.regex.Matcher m = KV_LINE_RE.matcher(line);
             if (!m.matches()) {
                 out.append(line);
                 if (i < lines.length - 1) out.append('\n');
@@ -2136,8 +2135,13 @@ public final class ServerConfigAtlas {
             int indent = indentStr.length();
             String key = m.group(2);
             String sep = m.group(3);
-            String valPart = m.group(4).trim();
-            String commentPart = m.group(5) != null ? m.group(5) : "";
+            String rawVal = m.group(4);
+            String valPart = rawVal.trim();
+            int trailingWsStart = rawVal.length();
+            while (trailingWsStart > 0 && Character.isWhitespace(rawVal.charAt(trailingWsStart - 1))) {
+                trailingWsStart--;
+            }
+            String commentPart = m.group(5) != null ? (rawVal.substring(trailingWsStart) + m.group(5)) : "";
 
             if (!isToml && !isProps) {
                 while (!indentStack.isEmpty() && indentStack.peekLast()[0] >= indent) {
@@ -2439,13 +2443,65 @@ public final class ServerConfigAtlas {
         }
     }
 
+    private static String stripVersionSuffix(String stem) {
+        for (int i = 0; i < stem.length(); i++) {
+            char c = stem.charAt(i);
+            if (c == '-' || c == '_' || c == 'v' || c == 'V') {
+                int j = i + 1;
+                while (j < stem.length() && (stem.charAt(j) == '-' || stem.charAt(j) == '_' || stem.charAt(j) == 'v' || stem.charAt(j) == 'V')) {
+                    j++;
+                }
+                if (j < stem.length() && Character.isDigit(stem.charAt(j))) {
+                    return stem.substring(0, i);
+                }
+            }
+        }
+        return stem;
+    }
+
+    private static String stripBrackets(String raw) {
+        int start = 0;
+        int end = raw.length();
+        while (start < end && raw.charAt(start) == '[') {
+            start++;
+        }
+        while (end > start && raw.charAt(end - 1) == ']') {
+            end--;
+        }
+        return raw.substring(start, end);
+    }
+
+    private static String stripSurroundingQuotes(String raw) {
+        int start = 0;
+        int end = raw.length();
+        while (start < end && isQuoteChar(raw.charAt(start))) {
+            start++;
+        }
+        while (end > start && isQuoteChar(raw.charAt(end - 1))) {
+            end--;
+        }
+        return raw.substring(start, end);
+    }
+
+    private static boolean isQuoteChar(char c) {
+        return c == '\'' || c == '"' || c == '“' || c == '”' || c == '‘' || c == '’';
+    }
+
     private static String formatNumber(double val, boolean asInt) {
         if (asInt || (val == Math.rint(val) && Math.abs(val) < 1e12 && String.valueOf(val).endsWith(".0"))) {
             if (asInt) {
                 return String.valueOf(Math.round(val));
             }
         }
-        String s = String.format(Locale.ROOT, "%.4f", val).replaceAll("0+$", "").replaceAll("\\.$", "");
+        String s = String.format(Locale.ROOT, "%.4f", val);
+        int end = s.length();
+        while (end > 0 && s.charAt(end - 1) == '0') {
+            end--;
+        }
+        if (end > 0 && s.charAt(end - 1) == '.') {
+            end--;
+        }
+        s = s.substring(0, end);
         if (!asInt && !s.contains(".")) {
             s = s + ".0";
         }

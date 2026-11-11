@@ -34,7 +34,7 @@ public final class SchemaInferrer {
             "(?i)(?:between|range(?:\\s+of)?|from)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(?:and|to|\\.\\.|-)\\s+(-?\\d+(?:\\.\\d+)?)"
     );
     private static final Pattern COMMENT_PAREN_RANGE_RE = Pattern.compile(
-            "\\(\\s*(-?\\d+(?:\\.\\d+)?)\\s*(?:\\.\\.|\\s+-\\s+)\\s*(-?\\d+(?:\\.\\d+)?)\\s*\\)"
+            "\\(\\s*+(-?\\d++(?:\\.\\d++)?)\\s*+(?:\\.\\.|-)\\s*+(-?\\d++(?:\\.\\d++)?)\\s*+\\)"
     );
     private static final Pattern INTEGER_LITERAL_RE = Pattern.compile("^-?\\d+$");
     private static final Pattern FLOAT_LITERAL_RE = Pattern.compile("^-?\\d+\\.\\d+$");
@@ -1494,11 +1494,24 @@ public final class SchemaInferrer {
     static String normalizeCamelToHyphen(String s) {
         if (s == null || s.isEmpty()) return "";
         String pre = s.replace("PvP", "Pvp").replace("PVP", "Pvp");
-        String split = pre
-                .replaceAll("([a-z0-9])([A-Z])", "$1-$2")
-                .replaceAll("([A-Z]+)([A-Z][a-z])", "$1-$2")
-                .replace('_', '-');
-        return split.toLowerCase(Locale.ROOT);
+        StringBuilder out = new StringBuilder(pre.length() + 8);
+        for (int i = 0; i < pre.length(); i++) {
+            char c = pre.charAt(i);
+            if (c == '_') {
+                out.append('-');
+                continue;
+            }
+            if (Character.isUpperCase(c) && i > 0) {
+                char prev = pre.charAt(i - 1);
+                boolean prevLowerOrDigit = Character.isLowerCase(prev) || Character.isDigit(prev);
+                boolean nextLower = (i + 1 < pre.length()) && Character.isLowerCase(pre.charAt(i + 1));
+                if (prevLowerOrDigit || (Character.isUpperCase(prev) && nextLower)) {
+                    out.append('-');
+                }
+            }
+            out.append(Character.toLowerCase(c));
+        }
+        return out.toString();
     }
 
     private static String humanizeConceptPhrase(String kLow, String leaf, String... stripTokens) {
@@ -1708,21 +1721,36 @@ public final class SchemaInferrer {
         return ReloadTier.PLUGIN_RELOAD;
     }
 
+    private static final Pattern OPTION_SPLIT_RE = Pattern.compile("[,|/]");
+    private static final Pattern OPTION_TOKEN_RE = Pattern.compile("^[A-Za-z0-9_.-]+$");
+
     private static List<String> extractCommentOptions(String comment) {
         Matcher m = COMMENT_OPTIONS_RE.matcher(comment);
         if (!m.find()) {
             return List.of();
         }
-        String rawGroup = m.group(1);
-        String[] parts = rawGroup.split("[,|/]|\\s+or\\s+");
+        String rawGroup = m.group(1).replace(" or ", ",");
+        String[] parts = OPTION_SPLIT_RE.split(rawGroup);
         List<String> out = new ArrayList<>();
         for (String p : parts) {
-            String cleaned = p.trim().replaceAll("^['\"`]+|['\"`.]+$", "").trim();
-            if (cleaned.length() >= 2 && cleaned.length() <= 40 && cleaned.matches("^[A-Za-z0-9_.-]+$")) {
+            String cleaned = stripOptionDelimiters(p.trim());
+            if (cleaned.length() >= 2 && cleaned.length() <= 40 && OPTION_TOKEN_RE.matcher(cleaned).matches()) {
                 out.add(cleaned);
             }
         }
         return out.size() >= 2 ? out : List.of();
+    }
+
+    private static String stripOptionDelimiters(String s) {
+        int start = 0;
+        int end = s.length();
+        while (start < end && (s.charAt(start) == '\'' || s.charAt(start) == '"' || s.charAt(start) == '`')) {
+            start++;
+        }
+        while (end > start && (s.charAt(end - 1) == '\'' || s.charAt(end - 1) == '"' || s.charAt(end - 1) == '`' || s.charAt(end - 1) == '.')) {
+            end--;
+        }
+        return s.substring(start, end).trim();
     }
 
     private static double[] extractCommentRange(String comment) {
@@ -1949,7 +1977,7 @@ public final class SchemaInferrer {
     }
 
     private static final Pattern UNSAFE_DISPLAY_LITERAL_RE = Pattern.compile(
-            "(?i)(?:ignore\\s+(?:all\\s+)?(?:previous|prior|above)\\s+instructions|system\\s+prompt|you\\s+are\\s+now|<\\s*\\/?\\s*(?:script|iframe|img|svg|object|embed|style)\\b[^>]*>|javascript:|onerror\\s*=)"
+            "(?i)(?:ignore\\s++(?:all\\s++)?(?:previous|prior|above)\\s++instructions|system\\s++prompt|you\\s++are\\s++now|<\\s*+(?:/\\s*+)?(?:script|iframe|img|svg|object|embed|style)\\b[^>]*+>|javascript:|onerror\\s*+=)"
     );
 
     static String sanitizeDisplayLiteral(String raw) {

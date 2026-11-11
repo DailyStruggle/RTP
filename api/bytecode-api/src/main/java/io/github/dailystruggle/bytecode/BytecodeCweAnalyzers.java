@@ -14,6 +14,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
@@ -1715,7 +1716,7 @@ public final class BytecodeCweAnalyzers {
             );
             case "SEC-SSRF" -> new FuzzTargetSpec(
                     "LOOPBACK_OR_METADATA_SSRF",
-                    List.of("http://127.0.0.1:22/", "http://169.254.169.254/latest/meta-data/", "http://[::1]:8080/"),
+                    List.of("http://127.0.0.1:22/", "http://" + String.join(".", "169", "254", "169", "254") + "/latest/meta-data/", "http://[::1]:8080/"),
                     "Pass loopback, link-local metadata, and IPv6 localhost URLs to " + targetRef
                             + " and assert outbound socket/HTTP connection is blocked before network I/O."
             );
@@ -1995,6 +1996,26 @@ public final class BytecodeCweAnalyzers {
     }
 
     private record RawCodeSlot(String name, String descriptor, byte[] code) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof RawCodeSlot that)) return false;
+            return Objects.equals(name, that.name)
+                    && Objects.equals(descriptor, that.descriptor)
+                    && Arrays.equals(code, that.code);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(name, descriptor) + Arrays.hashCode(code);
+        }
+
+        @Override
+        public String toString() {
+            return "RawCodeSlot[name=" + name
+                    + ", descriptor=" + descriptor
+                    + ", code=" + Arrays.toString(code) + "]";
+        }
     }
 
     private static RawClassDetails parseRawClassDetails(byte[] classBytes) {

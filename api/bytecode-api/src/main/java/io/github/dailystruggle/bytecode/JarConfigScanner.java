@@ -596,8 +596,7 @@ public final class JarConfigScanner {
             }
             if (isToml && trimmed.startsWith("[") && trimmed.contains("]")) {
                 int close = trimmed.lastIndexOf(']');
-                currentSection = trimmed.substring(0, close + 1)
-                        .replaceAll("^\\[+|\\]+$", "")
+                currentSection = stripSectionBrackets(trimmed.substring(0, close + 1))
                         .trim()
                         .replace("\"", "")
                         .replace("'", "");
@@ -682,8 +681,7 @@ public final class JarConfigScanner {
             }
             if (isToml && trimmed.startsWith("[") && trimmed.contains("]")) {
                 int close = trimmed.lastIndexOf(']');
-                currentSection = trimmed.substring(0, close + 1)
-                        .replaceAll("^\\[+|\\]+$", "")
+                currentSection = stripSectionBrackets(trimmed.substring(0, close + 1))
                         .trim()
                         .replace("\"", "")
                         .replace("'", "");
@@ -729,6 +727,18 @@ public final class JarConfigScanner {
             appendLine(out, line, i < lines.length - 1, lineSep);
         }
         return out.toString();
+    }
+
+    private static String stripSectionBrackets(String raw) {
+        int start = 0;
+        int end = raw.length();
+        while (start < end && raw.charAt(start) == '[') {
+            start++;
+        }
+        while (end > start && raw.charAt(end - 1) == ']') {
+            end--;
+        }
+        return raw.substring(start, end);
     }
 
     private static void appendLine(StringBuilder out, String line, boolean hasMore, String lineSep) {
