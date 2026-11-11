@@ -643,7 +643,11 @@ final class QueueTask {
         if (unqueuedFast) {
             RTPRuntime.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator taking UNQUEUED fast-path playerId=" + playerId);
-            LocationGenerator.getLocationFuture(region, biomeNames).whenComplete((res, ex) -> {
+            boolean hasPipelineOwner = playerId != null
+                    && TeleportSessions.current().latestTeleportData.containsKey(playerId);
+            LocationGenerator.getLocationFuture(
+                    region, biomeNames, LoadPurpose.IMMEDIATE, null, null, hasPipelineOwner)
+                    .whenComplete((res, ex) -> {
                 RTPRuntime.log(Level.FINE,
                         "[ENQUEUE_TRACE] LocationGenerator UNQUEUED fast-path result playerId="
                                 + playerId + " resNull=" + (res == null));
@@ -661,7 +665,8 @@ final class QueueTask {
                 if (data != null && !data.completed) {
                     data.attempts = attempts;
                 }
-                result.complete(new GenerationResult(res.coords(), attempts, res.verifiedChunks()));
+                result.complete(new GenerationResult(
+                        res.coords(), attempts, res.verifiedChunks(), res.reservation()));
             });
             return;
         }

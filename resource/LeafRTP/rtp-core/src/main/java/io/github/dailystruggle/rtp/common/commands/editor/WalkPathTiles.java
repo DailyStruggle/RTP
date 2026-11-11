@@ -52,7 +52,7 @@ public final class WalkPathTiles {
     private final Deque<int[]> pending;
     private final int tilesTotal;
     private final boolean truncated;
-    private int tilesDone;
+    private volatile int tilesDone;
 
     WalkPathTiles(String region, MemoryShape<?> shape, int maxTiles) {
         this.region = Objects.requireNonNull(region, "region");

@@ -159,6 +159,18 @@ public class RegionConfigLoader {
                 3,
                 io.github.dailystruggle.rtp.common.selection.region.util.CacheMemoryCost.HOT_CACHE_BYTES_PER_ENTRY);
         double price = getNumber(resolveScalar(regionParser, RegionKeys.price, 0.0)).doubleValue();
+
+        // Auto-interpret dimensionless shape parameters vs world border BEFORE resolveSpatialResolution
+        // calls shape.getNumber(radius) and caches a raw Number over an explicit-unit string (e.g. "16384b").
+        if (!worldBorderOverride) {
+            io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.autoInterpretShape(
+                name, world, shape);
+        }
+
+        // Audit world border vs configured shape bounds
+        io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.checkRegionWorldBorder(
+            name, world, shape, worldBorderOverride);
+
         long spatialResolution = resolveSpatialResolution(resolveScalar(regionParser, RegionKeys.spatialResolution, "auto"), shape);
 
         if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.setSpatialResolution(spatialResolution);
@@ -171,16 +183,6 @@ public class RegionConfigLoader {
         }
         // If world is null here, the region is dormant; the MemoryShape (if any) is loaded
         // later via OnWorldLoadUnload -> RegionConfigLoader.load(...) at rebind time.
-
-        // Auto-interpret dimensionless shape parameters vs world border
-        if (!worldBorderOverride) {
-            io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.autoInterpretShape(
-                name, world, shape);
-        }
-
-        // Audit world border vs configured shape bounds
-        io.github.dailystruggle.rtp.common.selection.region.util.WorldBorderAuditor.checkRegionWorldBorder(
-            name, world, shape, worldBorderOverride);
 
         Object rawCooldown = resolveScalar(regionParser, RegionKeys.cooldown, null);
         Long cooldownMillis = parseDurationSetting(rawCooldown);

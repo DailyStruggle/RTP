@@ -67,6 +67,9 @@ if (!hasRtpCore) {
                 include 'io/github/dailystruggle/rtp/neoforge/tools/NeoForgeLegacyText.java'
                 include 'io/github/dailystruggle/rtp/neoforge/tools/NeoForgeResourceIds.java'
             }
+            resources {
+                exclude 'META-INF/services/io.github.dailystruggle.rtp.**'
+            }
         }
         test {
             java {

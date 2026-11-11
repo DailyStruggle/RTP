@@ -190,7 +190,8 @@ public final class RTPFabricMod implements ModInitializer {
             try {
                 io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
                         io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStatsCatalogue.Host.of("fabric"),
-                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full",
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveServiceId(RTPFabricMod.class),
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.resolveAssemblyVariant(RTPFabricMod.class),
                         accessor.getPluginDirectory());
             } catch (Throwable t) {
                 RTP.log(Level.FINE, "[RTP][fabric] bStats setup skipped or failed: " + t.getMessage());

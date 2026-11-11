@@ -739,10 +739,14 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
     if (!forceLoad) {
       deferredTicketAdds.remove(key);
-      return applyTicketOnOwner(plugin, cx, cz, false, null);
+      return applyTicketOnOwner(plugin, cx, cz, false, null, null);
     }
-    final Object token = new Object();
-    deferredTicketAdds.put(key, token);
+    final Object token = deferredTicketAdds.computeIfAbsent(key, k -> new Object());
+    WeakReference<Chunk> cachedRef = chunkCache.get(key);
+    Chunk cachedChunk = (cachedRef != null) ? cachedRef.get() : null;
+    if (cachedChunk != null && cachedChunk.isLoaded()) {
+      return applyTicketOnOwner(plugin, cx, cz, true, token, cachedChunk);
+    }
     CompletableFuture<Chunk> load;
     try {
       load = world.getChunkAtAsync(cx, cz, true);
@@ -757,7 +761,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       return chunk == null ? new IllegalStateException("getChunkAtAsync returned null") : null;
     }).thenCompose(failure -> {
       if (failure == null) {
-        return applyTicketOnOwner(plugin, cx, cz, true, token);
+        return applyTicketOnOwner(plugin, cx, cz, true, token, null);
       }
       if (!deferredTicketAdds.remove(key, token)) {
         return CompletableFuture.completedFuture(null); // released or superseded meanwhile
@@ -776,11 +780,23 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    *
    * @param deferredToken non-null for a deferred add; the add is skipped unless the token is
    *     still registered, so a release that ran first cannot leave an orphaned ticket (S-002)
+   * @param residentChunk non-null when the caller skipped {@code getChunkAtAsync} because the
+   *     chunk was already present in {@link #chunkCache}; verified on the region thread
    */
   @AnyThread
   private CompletableFuture<Void> applyTicketOnOwner(
-      org.bukkit.plugin.Plugin plugin, int cx, int cz, boolean forceLoad, Object deferredToken) {
+      org.bukkit.plugin.Plugin plugin,
+      int cx,
+      int cz,
+      boolean forceLoad,
+      Object deferredToken,
+      Chunk residentChunk) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    if (!forceLoad && world != null && org.bukkit.Bukkit.getServer() != null
+        && org.bukkit.Bukkit.isOwnedByCurrentRegion(world, cx, cz)) {
+      world.removePluginChunkTicket(cx, cz, plugin);
+      return CompletableFuture.completedFuture(null);
+    }
     io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
         RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getScheduler();
     if (scheduler == null || !plugin.isEnabled()) {
@@ -794,6 +810,15 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
         if (forceLoad) {
           if (deferredToken != null && !deferredTicketAdds.remove(key, deferredToken)) {
             future.complete(null);
+            return;
+          }
+          if (residentChunk != null && !residentChunk.isLoaded()) {
+            chunkCache.remove(key);
+            setForceLoadedImpl(cx, cz, true)
+                .whenComplete((v, ex) -> {
+                  if (ex != null) future.completeExceptionally(ex);
+                  else future.complete(null);
+                });
             return;
           }
           if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {

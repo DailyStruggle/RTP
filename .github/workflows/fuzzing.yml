@@ -30,6 +30,9 @@ jobs:
           - name: anvil-column-probe
             project: ':anvil-api:test'
             test: 'io.github.dailystruggle.anvil.AnvilRegionFuzzTest.fuzzReadColumnProbe'
+          - name: anvil-prefilter
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.anvil.AnvilRegionFuzzTest.fuzzPrefilterNeverAcceptsMalformed'
           - name: anvil-lz4
             project: ':anvil-api:test'
             test: 'io.github.dailystruggle.anvil.AnvilRegionFuzzTest.fuzzLz4BlockDecoder'
@@ -39,6 +42,36 @@ jobs:
           - name: resp-protocol
             project: ':proxy:proxy-common:test'
             test: 'io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocolFuzzTest.fuzzReadReply'
+          - name: proxy-direct-wire
+            project: ':proxy:proxy-common:test'
+            test: 'io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWireFuzzTest.fuzzWireDecoders'
+          - name: rtp-yaml-reader
+            project: ':yaml-api:test'
+            test: 'io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlReaderFuzzTest.fuzzParse'
+          - name: tiny-json-reader
+            project: ':tags-api:test'
+            test: 'io.github.dailystruggle.rtp.tags.TagsParserFuzzTest.fuzzTinyJsonReader'
+          - name: safety-token-parser
+            project: ':tags-api:test'
+            test: 'io.github.dailystruggle.rtp.tags.TagsParserFuzzTest.fuzzSafetyTokenParser'
+          - name: editor-loopback-json
+            project: ':rtp-core:test'
+            test: 'io.github.dailystruggle.rtp.common.commands.editor.EditorParserFuzzTest.fuzzEditorLoopbackJson'
+          - name: editor-payload
+            project: ':rtp-core:test'
+            test: 'io.github.dailystruggle.rtp.common.commands.editor.EditorParserFuzzTest.fuzzEditorPayload'
+          - name: biome-bin-codec
+            project: ':rtp-core:test'
+            test: 'io.github.dailystruggle.rtp.common.commands.editor.EditorParserFuzzTest.fuzzBiomeBinCodec'
+          - name: world-biome-store
+            project: ':rtp-core:test'
+            test: 'io.github.dailystruggle.rtp.common.commands.editor.EditorParserFuzzTest.fuzzWorldBiomeStoreLoad'
+          - name: plugin-message-envelope
+            project: ':rtp-core:test'
+            test: 'io.github.dailystruggle.rtp.common.network.pluginmessage.PluginMessageEnvelopeFuzzTest.fuzzOpen'
+          - name: bukkit-plugin-message
+            project: ':bukkit:bukkit-common:test'
+            test: 'io.github.dailystruggle.rtp.bukkitplatform.network.BukkitPluginMessageFuzzTest.fuzzPluginMessageLengthReader'
 
     steps:
       - name: Check out repository

@@ -4,7 +4,7 @@
 **Formerly:** ADR-077
 **Date:** 2026-08-26
 **Extends:** [anvil-api-ADR-001](anvil-api-ADR-001-anvil-subsystem.md) (Anvil Read-Only Subsystem)
-**Related:** [leafrtp-ADR-018](../../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-018-l3-backlog-cache.md) (L3 Backlog Cache), [leafrtp-ADR-049](../../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-049-adaptive-scan-rate-and-mca-header-generation-check.md) (Adaptive Scan Rate and Header Generation Check)
+**Related:** [leafrtp-ADR-018](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-018-l3-backlog-cache.md) (L3 Backlog Cache), [leafrtp-ADR-049](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-049-adaptive-scan-rate-and-mca-header-generation-check.md) (Adaptive Scan Rate and Header Generation Check)
 
 ## Revision (2026-10-31) - Linear v2 Bucketed (`version 3`) & BufferedLinear (`.b_linear` v2/v3) Support
 
@@ -147,6 +147,6 @@ registers a reader.
 ## References
 
 - [anvil-api-ADR-001](anvil-api-ADR-001-anvil-subsystem.md) - Anvil Read-Only Subsystem
-- [leafrtp-ADR-049](../../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-049-adaptive-scan-rate-and-mca-header-generation-check.md) - Adaptive Scan Rate and Generation Checks
+- [leafrtp-ADR-049](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-049-adaptive-scan-rate-and-mca-header-generation-check.md) - Adaptive Scan Rate and Generation Checks
 - REQ-RTP-S-004 (No silently discarded failures)
 - REQ-RTP-S-005 (No chunk loading on main thread)

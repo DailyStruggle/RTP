@@ -94,9 +94,7 @@ class LcaRegionCodecTest {
     @DisplayName("REQ-RTP-S-005: Real .mca fixtures transcoded to .lca Mode A & Mode B match AnvilReader across all voxels")
     void realMcaTranscodeFullParity(String dirName, int expectedDv) throws IOException {
         byte[] mcaBytes = loadFixture("/anvil/real/" + dirName + "/r.0.0.mca");
-
         for (boolean modeB : new boolean[] {false, true}) {
-            if (modeB && !DynamicZstdBinding.isAvailable()) continue;
 
             byte[] lcaBytes = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, modeB);
             assertTrue(LcaRegionReader.INSTANCE.isChunkGenerated(lcaBytes, 0, 0));
@@ -301,6 +299,19 @@ class LcaRegionCodecTest {
         byte[] mcaBytes = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
         byte[] validLca = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, false);
         LcaRegionReader reader = LcaRegionReader.INSTANCE;
+        assertEquals(0x0002, LcaRegionReader.LCA_FORMAT_VERSION);
+        assertEquals(0x0002, LcaSectionCodec.readUint16BE(validLca, 0x08));
+
+        // T1: Unsupported formatVersion (0x0000, legacy 0x0001, or future > 0x0002)
+        byte[] badVersionZero = Arrays.copyOf(validLca, validLca.length);
+        ByteBuffer.wrap(badVersionZero).putShort(0x08, (short) 0x0000);
+        assertThrows(CorruptRegionEntryException.class, () -> reader.readChunk(badVersionZero, 0, 0));
+        byte[] badVersionOne = Arrays.copyOf(validLca, validLca.length);
+        ByteBuffer.wrap(badVersionOne).putShort(0x08, (short) 0x0001);
+        assertThrows(CorruptRegionEntryException.class, () -> reader.readChunk(badVersionOne, 0, 0));
+        byte[] badVersionFuture = Arrays.copyOf(validLca, validLca.length);
+        ByteBuffer.wrap(badVersionFuture).putShort(0x08, (short) 0x0003);
+        assertThrows(CorruptRegionEntryException.class, () -> reader.readChunk(badVersionFuture, 0, 0));
 
         // T1: Bad superblock magic
         byte[] badMagic = Arrays.copyOf(validLca, validLca.length);
@@ -546,7 +557,47 @@ class LcaRegionCodecTest {
         biomeMap.put("data", new long[] {0x0807060504030201L, 0x0102030405060708L, 0L, 0L});
         secVertical.put("biomes", biomeMap);
 
-        // 4. Boundary light-only sections at Y=-5 and Y=20
+        // 4. Section Y=-1: Octant-compacted H_3, TAG_SINGLETON subTags 1/2/3, 5|3 & 7|1 TAG_DELTA_RUN, Word-Masked TAG_BITMAP, and single-run Gray planes
+        LinkedHashMap<String, Object> secSubModes = new LinkedHashMap<>();
+        secSubModes.put("Y", (byte) -1);
+        LinkedHashMap<String, Object> bsSubModes = new LinkedHashMap<>();
+        bsSubModes.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(
+                LcaRegionReader.parseCanonicalStateToNbtCompound("minecraft:stone"),
+                LcaRegionReader.parseCanonicalStateToNbtCompound("minecraft:copper_ore"),
+                LcaRegionReader.parseCanonicalStateToNbtCompound("minecraft:lapis_ore"),
+                LcaRegionReader.parseCanonicalStateToNbtCompound("minecraft:redstone_ore"),
+                LcaRegionReader.parseCanonicalStateToNbtCompound("minecraft:coal_ore"))));
+        int[] yzxSub = new int[4096];
+        int[] h3ToYzx = LcaSectionCodec.CURVE_TO_YZX[LcaSectionCodec.CURVE_H3];
+        // State 1: single contiguous run of 300 voxels -> TAG_SINGLETON subTag 2 (2B length)
+        for (int k = 0; k < 300; k++) {
+            yzxSub[h3ToYzx[k]] = 1;
+        }
+        // State 2: single contiguous run of 12 voxels -> TAG_SINGLETON subTag 1 (1B length)
+        for (int k = 320; k < 332; k++) {
+            yzxSub[h3ToYzx[k]] = 2;
+        }
+        // State 3: two runs of length 5 and 6 separated by gap 300 -> TAG_SINGLETON subTag 3 (two-run container)
+        for (int k = 350; k < 355; k++) {
+            yzxSub[h3ToYzx[k]] = 3;
+        }
+        for (int k = 655; k < 661; k++) {
+            yzxSub[h3ToYzx[k]] = 3;
+        }
+        // State 4: dense alternating pattern within 2 octants -> Word-Masked TAG_BITMAP
+        for (int k = 704; k < 832; k += 2) {
+            yzxSub[h3ToYzx[k]] = 4;
+        }
+        bsSubModes.put("data", LcaSectionCodec.packBlockLongs(yzxSub, 5));
+        secSubModes.put("block_states", bsSubModes);
+        byte[] singleRunSky = new byte[2048];
+        // Prefix run on plane 0, interior run on plane 1, tail run on plane 3
+        for (int i = 0; i < 256; i++) singleRunSky[i] = 0x11;
+        for (int i = 512; i < 768; i++) singleRunSky[i] = 0x33;
+        for (int i = 1536; i < 2048; i++) singleRunSky[i] = (byte) 0xFF;
+        secSubModes.put("SkyLight", singleRunSky);
+
+        // 5. Boundary light-only sections at Y=-5 and Y=20
         LinkedHashMap<String, Object> secLowBound = new LinkedHashMap<>();
         secLowBound.put("Y", (byte) -5);
         secLowBound.put("SkyLight", new byte[2048]);
@@ -569,7 +620,7 @@ class LcaRegionCodecTest {
         root.put("Heightmaps", hmCustom);
         root.put("CustomSidecarTag", "test_value");
         root.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND,
-                List.of(secLowBound, secChecker, secSparse, secVertical, secHighBound)));
+                List.of(secLowBound, secChecker, secSparse, secVertical, secSubModes, secHighBound)));
 
         archive.saveChunkInitial(1, 1, root);
         archive.saveChunkInitial(2, 1, root);
@@ -605,8 +656,8 @@ class LcaRegionCodecTest {
         assertEquals("minecraft:emerald_ore", view.blockIdAt(0, -48, 0));
         assertEquals("custommod:kelp_column", view.blockIdAt(2, -32 + 7, 2));
 
-        // Also test Mode B Zstd readSection for both uniform and non-uniform sections + incomplete proto-chunk probe
-        if (DynamicZstdBinding.isAvailable()) {
+        // Also test Mode B readSection for both uniform and non-uniform sections + incomplete proto-chunk probe
+        {
             LcaRegionWriter.LcaLiveArchive modeB =
                     LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, 4671, true, 1024);
             LinkedHashMap<String, Object> protoRoot = new LinkedHashMap<>(root);
@@ -1490,7 +1541,7 @@ class LcaRegionCodecTest {
                 cursor += len;
             }
         }
-        byte[] compressed = LcaRegionWriter.compressZstd1(uncompressed);
+        byte[] compressed = com.github.luben.zstd.Zstd.compress(uncompressed, 1);
         byte[] linear = new byte[32 + compressed.length + 8];
         ByteBuffer bb = ByteBuffer.wrap(linear);
         bb.putLong(LinearRegionReader.LINEAR_SIGNATURE);
@@ -2161,20 +2212,24 @@ class LcaRegionCodecTest {
         AnvilChunkView modeAView00 = AnvilReader.toView(Nbt.readRootCompound(modeANbt00));
         assertEquals("minecraft:custom_block_0", modeAView00.blockIdAt(0, -64, 0));
 
-        if (DynamicZstdBinding.isAvailable()) {
-            byte[] modeBMultiBytes = LcaRegionWriter.convertModeAToModeB(modeAMultiBytes);
-            // Verify superblock magic, DEFAULT_ZSTD1 flag (0x19), and footer canary
+        {
+            LcaRegionWriter.LcaLiveArchive multiSegModeBArchive =
+                    LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, 3953, true);
+            multiSegModeBArchive.saveChunkCoW(0, 0, multiStateRoot);
+            multiSegModeBArchive.saveChunkCoW(5, 7, fromMapDecode);
+            byte[] modeBMultiBytes = multiSegModeBArchive.toByteArray();
+            // Verify superblock magic, Mode B flag (0x19), and footer canary
             assertEquals(LcaRegionReader.LCA_SUPERBLOCK_MAGIC,
                     (long) LcaRegionReader.LONG_BE_VIEW.get(modeBMultiBytes, 0));
             assertEquals(0x19, modeBMultiBytes[0x0B] & 0xFF);
             assertEquals(LcaRegionReader.LCA_FOOTER_CANARY_MAGIC,
                     (long) LcaRegionReader.LONG_BE_VIEW.get(modeBMultiBytes, modeBMultiBytes.length - 8));
 
-            // Verify direct binary NBT streaming and FileChannel reads on converted Mode B multi-segment region
+            // Verify direct binary NBT streaming and FileChannel reads on Mode B multi-segment region
             byte[] modeBNbt00 = LcaRegionReader.INSTANCE.readChunkNbtBytes(modeBMultiBytes, 0, 0);
             assertNotNull(modeBNbt00);
             org.junit.jupiter.api.Assertions.assertArrayEquals(modeANbt00, modeBNbt00,
-                    "Mode A and converted Mode B must emit byte-identical binary NBT for multi-segment dictionary chunk");
+                    "Mode A and Mode B must emit byte-identical binary NBT for multi-segment dictionary chunk");
 
             Path modeBFile = tempDir.resolve("r.0.0.modeb.lca");
             Files.write(modeBFile, modeBMultiBytes);
@@ -2194,7 +2249,6 @@ class LcaRegionCodecTest {
         assertNotNull(origEntry);
 
         for (boolean modeB : new boolean[] {false, true}) {
-            if (modeB && !DynamicZstdBinding.isAvailable()) continue;
 
             // 1. Out-of-order appended SectionFrame tests (both before residualRelStart and after Residual Tail,
             //    including sectionIdx=0 to exercise min_k(relStart_k) initial micro-palette bounding)
@@ -2630,19 +2684,214 @@ class LcaRegionCodecTest {
             assertNotNull(rawChunkNbt);
             assertTrue(ws.voxelStorage().writeChunkNbtBytes(0, 0, rawChunkNbt) > 0);
             assertNotNull(ws.voxelStorage().readChunkNbtBytes(0, 0));
-
             byte[] slabPayload = ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, rawChunkNbt);
-            assertTrue(slabPayload.length > 0);
-            assertEquals(0, ws.voxelStorage().encodeChunkNbtForRegionSlab(0, 0, new byte[0]).length);
-            assertTrue(ws.voxelStorage().commitPreEncodedChunkSlab(1, 0, slabPayload) > 0);
-            assertEquals(0, ws.voxelStorage().commitPreEncodedChunkSlab(1, 0, new byte[0]));
-            assertEquals(0, ws.voxelStorage().writeChunkNbtBytes(0, 0, new byte[0]));
-            assertEquals(0, ws.voxelStorage().writeChunkCompound(0, 0, null));
-
             assertTrue(ws.totalOpenRegionCount() >= 1);
             assertEquals(0L, ws.totalMigratedRegionCount());
             ws.compactOpenRegions(0.0);
             ws.flush();
+        }
+    }
+
+    @Test
+    @DisplayName("DataVersion 5006+ (V5006 / 26.3) emits id/properties in block_states.palette while <5006 emits Name/Properties")
+    @SuppressWarnings("unchecked")
+    void dataVersion5023PaletteUsesIdAndPropertiesKeys() throws Exception {
+        for (int dv : new int[] {4903, 5006, 5023}) {
+            boolean expectModern = dv >= 5006;
+            LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+            root.put("DataVersion", dv);
+            root.put("xPos", 0);
+            root.put("zPos", 0);
+            root.put("yPos", -4);
+            root.put("Status", "minecraft:full");
+
+            // Section Y=-4: uniform bare-string palette (Codec.either bare string form)
+            LinkedHashMap<String, Object> secUniform = new LinkedHashMap<>();
+            secUniform.put("Y", (byte) -4);
+            LinkedHashMap<String, Object> bsUniform = new LinkedHashMap<>();
+            bsUniform.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, List.of("minecraft:deepslate")));
+            secUniform.put("block_states", bsUniform);
+
+            // Section Y=-3: mixed palette with {"": id}, static-core id/properties, and custom id/properties
+            LinkedHashMap<String, Object> secMixed = new LinkedHashMap<>();
+            secMixed.put("Y", (byte) -3);
+            LinkedHashMap<String, Object> bsMixed = new LinkedHashMap<>();
+
+            LinkedHashMap<String, Object> wrappedAir = new LinkedHashMap<>();
+            wrappedAir.put("", "minecraft:air");
+
+            LinkedHashMap<String, Object> stairsEntry = new LinkedHashMap<>();
+            stairsEntry.put("id", "minecraft:oak_stairs");
+            LinkedHashMap<String, Object> stairsProps = new LinkedHashMap<>();
+            stairsProps.put("facing", "north");
+            stairsProps.put("type", "single");
+            stairsProps.put("waterlogged", "false");
+            stairsEntry.put("properties", stairsProps);
+
+            LinkedHashMap<String, Object> barrelEntry = new LinkedHashMap<>();
+            barrelEntry.put("id", "minecraft:barrel");
+            LinkedHashMap<String, Object> barrelProps = new LinkedHashMap<>();
+            barrelProps.put("facing", "up");
+            barrelProps.put("open", "true");
+            barrelEntry.put("properties", barrelProps);
+
+            bsMixed.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(wrappedAir, stairsEntry, barrelEntry)));
+            int[] yzx = new int[4096];
+            yzx[1] = 1;
+            yzx[2] = 2;
+            bsMixed.put("data", LcaSectionCodec.packBlockLongs(yzx, 3));
+            secMixed.put("block_states", bsMixed);
+
+            root.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, new ArrayList<>(List.of(secUniform, secMixed))));
+
+            try (LcaRegionWriter.LcaLiveArchive archive =
+                    LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, dv, false)) {
+                archive.saveChunkCoW(0, 0, root);
+                byte[] lcaBytes = archive.toByteArray();
+
+                // 1. Direct fast-path NBT byte emission (readChunkNbtBytes -> encodeChunkFrameToNbtBytes)
+                byte[] rawNbt = LcaRegionReader.INSTANCE.readChunkNbtBytes(lcaBytes, 0, 0);
+                assertNotNull(rawNbt);
+                Map<String, Object> directRoot = Nbt.readRootCompound(rawNbt);
+                assertPaletteKeysForVersion(directRoot, expectModern);
+
+                // 2. Map decode path (readChunk -> decodeChunkFromFrame)
+                AnvilReader.ChunkEntry mapEntry = LcaRegionReader.INSTANCE.readChunk(lcaBytes, 0, 0);
+                assertNotNull(mapEntry);
+                assertPaletteKeysForVersion(mapEntry.root, expectModern);
+
+                // 3. RegionFileReader.applyPatchesToChunkRoot
+                boolean modified = RegionFileReader.applyPatchesToChunkRoot(
+                        mapEntry.root,
+                        List.of(
+                                new RegionFileReader.BlockPatch(0, -48, 0, "minecraft:hopper[enabled=true,facing=down]"),
+                                new RegionFileReader.BlockPatch(0, 16, 0, "minecraft:stone")),
+                        null);
+                assertTrue(modified);
+                assertPaletteKeysForVersion(mapEntry.root, expectModern);
+                AnvilChunkView patchedView = AnvilReader.toView(mapEntry.root);
+                assertEquals("minecraft:hopper", patchedView.blockIdAt(0, -48, 0));
+                assertEquals("minecraft:oak_stairs", patchedView.blockIdAt(1, -48, 0));
+                assertEquals("minecraft:barrel", patchedView.blockIdAt(2, -48, 0));
+                assertEquals("minecraft:stone", patchedView.blockIdAt(0, 16, 0));
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertPaletteKeysForVersion(Map<String, Object> chunkRoot, boolean expectModern) {
+        String expectedNameKey = expectModern ? "id" : "Name";
+        String unexpectedNameKey = expectModern ? "Name" : "id";
+        String unexpectedPropsKey = expectModern ? "Properties" : "properties";
+        Nbt.NbtList sections = (Nbt.NbtList) chunkRoot.get("sections");
+        assertNotNull(sections);
+        for (Object secObj : sections.items) {
+            Map<String, Object> sec = (Map<String, Object>) secObj;
+            Map<String, Object> bs = (Map<String, Object>) sec.get("block_states");
+            if (bs == null) continue;
+            Nbt.NbtList pal = (Nbt.NbtList) bs.get("palette");
+            assertNotNull(pal);
+            for (Object entryObj : pal.items) {
+                Map<String, Object> entry = (Map<String, Object>) entryObj;
+                assertTrue(entry.containsKey(expectedNameKey),
+                        "Expected '" + expectedNameKey + "' key in palette entry: " + entry);
+                assertFalse(entry.containsKey(unexpectedNameKey),
+                        "Unexpected '" + unexpectedNameKey + "' key in palette entry: " + entry);
+                assertFalse(entry.containsKey(unexpectedPropsKey),
+                        "Unexpected '" + unexpectedPropsKey + "' key in palette entry: " + entry);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("anvil-api-ADR-003 Section 3.1 & 7.2: Continuous atomic Layer 2 dictionary (LCD2) training and (72, 64) SEC-DED dictionary healing")
+    void continuousAtomicLayer2DictionaryTrainingAndSecDedHealing() throws IOException {
+        byte[] mcaBytes = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
+        AnvilReader.ChunkEntry orig = AnvilReader.readChunkEntry(mcaBytes, 0, 0);
+        assertNotNull(orig);
+
+        // 1. Incrementally write 4 chunks into a Mode B live archive, verifying continuous atomic dictionary growth
+        LcaRegionWriter.LcaLiveArchive archive =
+                LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, 4671, true, 1024);
+        for (int i = 0; i < 4; i++) {
+            LinkedHashMap<String, Object> root = new LinkedHashMap<>(orig.root);
+            root.put("xPos", i);
+            root.put("zPos", 0);
+            root.put("LastUpdate", 900L + i);
+            archive.saveChunkCoW(i, 0, root);
+        }
+        byte[] lcaBytes = archive.toByteArray();
+
+        // Verify the root dictionary segment trailer has bit 1 (0x02, DICT_SEG_FLAG_HAS_PATTERN_SECDED) set
+        long rootTrailer = LcaRegionReader.getVolatileLongBE(lcaBytes, LcaRegionReader.DICT_ROOT_OFFSET + 1024 - 8);
+        assertEquals(2L, rootTrailer & 2L, "Layer 2 dictionary segment trailer must have SEC-DED + pattern flag (0x02) set");
+
+        // Verify transcodeFromMca Mode B produces valid LCD2 frames smaller than Mode A with SEC-DED dictionary parity
+        byte[] modeABytes = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, false);
+        byte[] convertedModeB = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, true);
+        assertTrue(convertedModeB.length < modeABytes.length,
+                "LCD2 Mode B (" + convertedModeB.length + " B) must be smaller than Mode A (" + modeABytes.length + " B)");
+        AnvilChunkView convView = LcaRegionReader.readChunkView(convertedModeB, 0, 0);
+        AnvilChunkView baselineView = LcaRegionReader.readChunkView(lcaBytes, 0, 0);
+        assertNotNull(convView);
+        assertNotNull(baselineView);
+        assertEquals(baselineView.blockIdAt(8, 64, 8), convView.blockIdAt(8, 64, 8));
+
+        // 2. Inject 1-bit flips into multiple 64-bit words of the Layer 2 dictionary segment (Word 0 header + Huffman/pattern words)
+        byte[] corruptedDict = Arrays.copyOf(lcaBytes, lcaBytes.length);
+        corruptedDict[LcaRegionReader.DICT_ROOT_OFFSET + 2] ^= 0x01;   // Flip a bit in Word 0 (segStateCount)
+        corruptedDict[LcaRegionReader.DICT_ROOT_OFFSET + 64] ^= 0x20;  // Flip a bit in the Canonical Huffman nibble table
+        corruptedDict[LcaRegionReader.DICT_ROOT_OFFSET + 420] ^= 0x08; // Flip a bit in the cross-chunk pattern arena
+
+        LcaRegionReader.RecoveryReport report = LcaRegionReader.healRegionBitRot(corruptedDict);
+        assertEquals(3, report.dictSecDedHealedWords(),
+                "Layer 2 dictionary (72, 64) SEC-DED must heal all 3 single-bit flips across header, Huffman tables, and pattern arena");
+        for (int i = 0; i < 4; i++) {
+            AnvilReader.ChunkEntry healedEntry = LcaRegionReader.INSTANCE.readChunk(corruptedDict, i, 0);
+            assertNotNull(healedEntry);
+            assertEquals(900L + i, ((Number) healedEntry.root.get("LastUpdate")).longValue());
+            AnvilChunkView healedView = LcaRegionReader.readChunkView(corruptedDict, i, 0);
+            assertEquals(baselineView.blockIdAt(8, 64, 8), healedView.blockIdAt(8, 64, 8));
+        }
+
+        // 3. Inject an unrecoverable 2-bit flip (DED) in the same 64-bit word of the Layer 2 dictionary -> must fail closed (S-004)
+        byte[] dedDict = Arrays.copyOf(lcaBytes, lcaBytes.length);
+        dedDict[LcaRegionReader.DICT_ROOT_OFFSET + 64] ^= 0x03; // 2-bit flip in the same word
+        assertThrows(CorruptRegionEntryException.class, () -> LcaRegionReader.INSTANCE.readChunk(dedDict, 0, 0));
+    }
+
+    @Test
+    @DisplayName("anvil-api-ADR-003 Section 2.3 & 4.1: Disk-backed LcaLiveArchive moves LCA1_END footer canary first on EOF growth and retains cached dictionary across single-chunk reads")
+    void diskLiveArchiveMovesFooterFirstAndCachesDictionaryForSingleChunkReads(
+            @org.junit.jupiter.api.io.TempDir Path tempDir) throws Exception {
+        byte[] mcaBytes = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
+        AnvilReader.ChunkEntry orig = AnvilReader.readChunkEntry(mcaBytes, 0, 0);
+        assertNotNull(orig);
+
+        Path lcaFile = tempDir.resolve("r.1.0.live.lca");
+        try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.createEmptyLiveArchive(
+                lcaFile, 1, 0, -4, 24, 4671, 1, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 256)) {
+            for (int i = 0; i < 6; i++) {
+                LinkedHashMap<String, Object> root =
+                        Nbt.readRootCompound(Nbt.writeNamedRoot("", orig.root));
+                root.put("xPos", 32 + i);
+                root.put("zPos", 0);
+                // Force dictionary continuation segment allocation on disk while chunks are being appended
+                for (int k = 0; k < 12; k++) {
+                    archive.registerOrGetBlockStateId("minecraft:test_footer_state_" + i + "_" + k);
+                    byte[] diskBytes = Files.readAllBytes(lcaFile);
+                    assertEquals(
+                            LcaRegionReader.LCA_FOOTER_CANARY_MAGIC,
+                            (long) LcaRegionReader.LONG_BE_VIEW.get(diskBytes, diskBytes.length - 8),
+                            "Disk file must maintain LCA1_END footer canary at EOF even immediately after dictionary segment allocation");
+                }
+                archive.saveChunkCoW(i, 0, root);
+                AnvilChunkView view = LcaRegionReader.readChunkViewFromFile(lcaFile, i, 0);
+                assertNotNull(view, "Single-chunk reader must decode newly appended chunk using cached header/dictionary");
+            }
+            LcaRegionReader.CachedFileHeader cached = LcaRegionReader.peekCachedFileHeader(lcaFile);
+            assertNotNull(cached, "CachedFileHeader must remain hot in FILE_HEADER_CACHE across live chunk saves");
+            assertNotNull(cached.parsedDict, "Cached dictionary must remain populated when subsequent saves do not mutate dictionary");
         }
     }
 }

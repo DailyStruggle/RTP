@@ -81,71 +81,78 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
         // Enumerate the file ids the prefab touches: perf overlay + region overlays.
         Set<String> fileIds = PrefabDiskIO.enumeratePrefabFileIds(prefab);
 
-        List<String> restored = new ArrayList<>();
-        List<String> empty = new ArrayList<>();
-        List<String> failed = new ArrayList<>();
-        for (String fileId : fileIds) {
-            try {
-                Path used = PrefabDiskIO.restoreLatest(pluginDir, fileId);
-                if (used == null) {
-                    empty.add(fileId);
-                } else {
-                    restored.add(fileId + " <- " + used.getFileName().toString());
+        Runnable rollbackTask = () -> {
+            List<String> restored = new ArrayList<>();
+            List<String> empty = new ArrayList<>();
+            List<String> failed = new ArrayList<>();
+            for (String fileId : fileIds) {
+                try {
+                    Path used = PrefabDiskIO.restoreLatest(pluginDir, fileId);
+                    if (used == null) {
+                        empty.add(fileId);
+                    } else {
+                        restored.add(fileId + " <- " + used.getFileName().toString());
+                    }
+                } catch (IOException ioe) {
+                    failed.add(fileId + ": " + ioe.getMessage());
+                    RTPRuntime.log(Level.WARNING,
+                            "[prefab] rollback restore FAILED: caller=" + callerId
+                                    + " prefab=" + prefabId
+                                    + " file=" + fileId + " - " + ioe.getMessage(), ioe);
                 }
-            } catch (IOException ioe) {
-                failed.add(fileId + ": " + ioe.getMessage());
-                RTPRuntime.log(Level.WARNING,
-                        "[prefab] rollback restore FAILED: caller=" + callerId
-                                + " prefab=" + prefabId
-                                + " file=" + fileId + " - " + ioe.getMessage(), ioe);
             }
-        }
 
-        if (restored.isEmpty() && failed.isEmpty()) {
+            if (restored.isEmpty() && failed.isEmpty()) {
+                RTPRuntime.log(Level.INFO,
+                        "[prefab] rollback no-op (no backups present): caller=" + callerId
+                                + " prefab=" + prefabId
+                                + " filesChecked=" + fileIds.size());
+                send(callerId, "&eNo &f.bak&e siblings found for prefab &f" + prefabId
+                        + "&e (nothing to restore).");
+                return;
+            }
+
+            boolean reloaded = false;
+            Throwable reloadFailure = null;
+            try {
+                if (ActiveConfigs.get() != null) reloaded = ActiveConfigs.get().reload();
+            } catch (RuntimeException re) {
+                reloadFailure = re;
+            }
+
             RTPRuntime.log(Level.INFO,
-                    "[prefab] rollback no-op (no backups present): caller=" + callerId
+                    "[prefab] rollback OK: caller=" + callerId
                             + " prefab=" + prefabId
-                            + " filesChecked=" + fileIds.size());
-            send(callerId, "&eNo &f.bak&e siblings found for prefab &f" + prefabId
-                    + "&e (nothing to restore).");
-            return false;
-        }
-
-        boolean reloaded = false;
-        Throwable reloadFailure = null;
-        try {
-            if (ActiveConfigs.get() != null) reloaded = ActiveConfigs.get().reload();
-        } catch (RuntimeException re) {
-            reloadFailure = re;
-        }
-
-        RTPRuntime.log(Level.INFO,
-                "[prefab] rollback OK: caller=" + callerId
-                        + " prefab=" + prefabId
-                        + " restored=" + restored.size()
-                        + " empty=" + empty.size()
-                        + " failed=" + failed.size()
-                        + " reload=" + reloaded);
-        if (!restored.isEmpty()) {
-            send(callerId, "&aRestored " + restored.size() + " file(s) for prefab &f"
-                    + prefabId + "&a:");
-            for (String r : restored) send(callerId, "  &7- &f" + r);
-        }
-        if (!empty.isEmpty()) {
-            send(callerId, "&7No backup found for: &f" + String.join(", ", empty));
-        }
-        if (!failed.isEmpty()) {
-            for (String f : failed) send(callerId, "&cRestore failed: &f" + f);
-        }
-        if (reloaded) {
-            send(callerId, "&7Config reload completed.");
-        } else if (reloadFailure != null) {
-            send(callerId, "&eConfig reload failed: " + reloadFailure.getMessage()
-                    + " - try &f/rtp reload&e.");
+                            + " restored=" + restored.size()
+                            + " empty=" + empty.size()
+                            + " failed=" + failed.size()
+                            + " reload=" + reloaded);
+            if (!restored.isEmpty()) {
+                send(callerId, "&aRestored " + restored.size() + " file(s) for prefab &f"
+                        + prefabId + "&a:");
+                for (String r : restored) send(callerId, "  &7- &f" + r);
+            }
+            if (!empty.isEmpty()) {
+                send(callerId, "&7No backup found for: &f" + String.join(", ", empty));
+            }
+            if (!failed.isEmpty()) {
+                for (String f : failed) send(callerId, "&cRestore failed: &f" + f);
+            }
+            if (reloaded) {
+                send(callerId, "&7Config reload completed.");
+            } else if (reloadFailure != null) {
+                send(callerId, "&eConfig reload failed: " + reloadFailure.getMessage()
+                        + " - try &f/rtp reload&e.");
+            } else {
+                send(callerId, "&7Run &f/rtp reload&7 to pick up the restored files.");
+            }
+        };
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(rollbackTask);
         } else {
-            send(callerId, "&7Run &f/rtp reload&7 to pick up the restored files.");
+            rollbackTask.run();
         }
-        return failed.isEmpty();
+        return true;
     }
 
     private static void send(UUID callerId, String msg) {

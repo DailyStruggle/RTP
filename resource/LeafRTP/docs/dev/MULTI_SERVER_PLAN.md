@@ -180,9 +180,9 @@ Additional locked-in decisions:
 
 Approved from `docs/dev/scratch/PROPOSAL-plugin-message-network-default.md` (D-005 gate cleared). This amends the D2 framing above and the "dev-only" markers elsewhere in this document.
 
-- The `plugin-message` transport is promoted from **dev-only** to the **tier-1 default, non-durable** transport, shipped in both the lite and Pro editions. It carries the richer `BackendHeartbeat` (region availability, warm-cache counts, load) over the proxy's built-in plugin-messaging vocabulary (`Connect` for the move, `Forward` for heartbeat gossip), so a database is **not required** for cross-server RTP on most networks.
-- Transport tiers (one `NetworkTransport` SPI, four implementations): `inMemory` (dev/test) -> **`plugin-message` (tier-1 default, non-durable, lite + Pro)** -> `sql` (tier 2, durable, Pro; MySQL free, Postgres `LISTEN/NOTIFY` faster) -> `redis` (tier 3, durable, atomic Lua claim, Pro).
-- A new `transport.type: auto` mode (the lite default) auto-detects the proxy: a passive `spigot.yml` / `paper-global.yml` probe arms network mode, then an active `GetServer` / `GetServers` handshake on first player join confirms the proxy and learns the topology, so no hand-typed `servers:` list is required. Re-probe on first join and on proxy reconnect.
+- The `plugin-message` transport is promoted from **dev-only** to the **tier-1 default, non-durable** transport, shipped in both the free default and Pro downloads. It carries the richer `BackendHeartbeat` (region availability, warm-cache counts, load) over the proxy's built-in plugin-messaging vocabulary (`Connect` for the move, `Forward` for heartbeat gossip), so a database is **not required** for cross-server RTP on most networks.
+- Transport tiers (one `NetworkTransport` SPI, four implementations): `inMemory` (dev/test) -> **`plugin-message` (tier-1 default, non-durable)** -> `sql` (tier 2, durable; MySQL free, Postgres `LISTEN/NOTIFY` faster) -> `redis` (tier 3, durable, atomic Lua claim). All four ship in both the free default and Pro jars ([ADR-108](../../../../docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)).
+- A new `transport.type: auto` mode (the shipped default) auto-detects the proxy: a passive `spigot.yml` / `paper-global.yml` probe arms network mode, then an active `GetServer` / `GetServers` handshake on first player join confirms the proxy and learns the topology, so no hand-typed `servers:` list is required. Re-probe on first join and on proxy reconnect.
 - **Honest limits** (these define the durable-tier upgrade boundary): everything rides an online player's connection (a player-empty or idle-self-paused Fabric/NeoForge backend cannot broadcast, so its availability goes stale -> treat unknown as accept); single-proxy `Forward` fan-out only; no durable reservation across a proxy restart. Multi-proxy / always-fresh / atomic-claim deployments move to the SQL/Redis tiers.
 - Reuses the existing `NetworkTransport`, `BackendHeartbeat`, `NetworkSnapshot`, and `BackendSelector` surfaces unchanged; no `rtp-proxy-common` SPI change. The dispatcher, selector, and command/tab-complete layer remain transport-agnostic. Contract detail: [`rtp-proxy-ADR-016`](../../../../platforms/proxy/docs/adr/rtp-proxy-ADR-016-plugin-message-default-transport.md).
 
@@ -913,6 +913,23 @@ Tracked here (moved 2026-05-29 from the now-completed metrics-api extraction pro
 - **Keep** in `rtp-proxy-common`: `RtpDispatcher`, `RtpRequest`, `ReservationClient`, `ReservationToken` (RTP-teleport-specific reservation semantics, REQ-RTP-NET-011/012/014).
 - **Timing**: after `metrics-api` lands and ships at least one full build green. Not in the same session.
 - **Scope discipline**: *simple transfer* - no reshaping of types, no extension model, no static registry. The reservation slot stays where it is; if a sibling plugin later needs a non-teleport reservation primitive, that is a separate proposal.
+
+---
+
+## Inter-Server `.lca` Chunk Updates & Cross-Server `/rtp` Pre-Warming (`LCAS`, `leafanvil-ADR-002`, `leafanvil-ADR-003`)
+
+Because `LeafAnvil` (`LcaSectionBacking` + `LcaInMemoryChunkCoordinator` + `LcaWireStreamProtocol`) maintains a zero-translation in-memory section representation (`baseFrame` + `dirtyOverlay` `int[]` entries + `dirtySectionBitmask32` + `SECDED-64` syndrome), backend servers in a multi-server `LeafRTP` cluster can stream **sub-kilobyte section deltas (`EntryPatchDelta`)** and **pre-warmed `.lca` chunks (`EntryFullChunk`)** directly between server JVMs without `.mca` NBT serialization or main-thread voxel scans:
+
+1. **Dual-Mode Shadow Tracking on Each Backend Server (`evictToZeroBitShell`):**
+   - Chunks within `HOT_NATIVE_READ_CHUNK_RADIUS` of active players attach `LcaSectionBacking` in **Shadow-Tracked Native-Read Mode (`evictToZeroBitShell = false`)**: main-thread `getBlockState` reads execute directly against Mojang's native `SimpleBitStorage` (`0 ns` interception overhead), while `setBlockState` mirrors $O(1)$ mutations into `LcaSectionBacking`'s L1 `dirtyOverlay` and marks `TrackedChunkColumn#dirtySectionBitmask32`.
+   - Chunks outside the hot player radius (the non-ticked view-only / cold ring) are promoted to **Cold Evicted Mode (`evictToZeroBitShell = true`)**, evicting `SimpleBitStorage` `long[]` to the shared `0-bit` `ZeroBitStorage` shell and storing 4-bit nibble-packed minority ordinals (`CompactBaseIndex`) in RAM.
+2. **Zero-Translation Inter-Server Delta Export (`LcaInMemoryChunkCoordinator#exportDirtyChunkDeltasForInterServerSync`):**
+   - When a backend node modifies blocks in a shared border zone, replica shard, or hub region, `exportDirtyChunkDeltasForInterServerSync` extracts an `InterServerChunkUpdatePayload` (`INTER_SERVER_UPDATE_MAGIC = 0x4C434153`, `"LCAS"`) containing `sourceServerId`, `dimension`, `regionX`, `regionZ`, `epochSequence`, `previousBaselineSecDed64`, and an `EntryPatchDelta` carrying only the `1..24` mutated `SectionWireSlice`s (`~20–300 bytes` per chunk, compressed in a single `Zstd` frame via `LcaWireStreamProtocol#encodeInterServerUpdatePayload`).
+   - For cross-server `/rtp` destination pre-warming, `exportChunkForInterServerTransfer` exports an `EntryFullChunk` (`~3–8 KB` vs. `64+ KB` uncompressed NBT) over the active multi-server transport tier (Redis / Postgres / Plugin-Message).
+3. **Self-Healing Off-Thread Ingestion & Epoch Fencing (`applyInterServerChunkDeltaEntry`):**
+   - A receiving backend node verifies `EpochCommitFence` (`!fence.isUnloadedTombstoneCommitted(localIdx10)`) and checks `previousBaselineSecDed64 == localColumn.baselineSecDed64()` before folding incoming `SectionWireSlice` updates into `LcaSectionBacking` on `LcaCompactionExecutor` (`REQ-RTP-S-005`).
+   - Post-patch `SECDED-64` syndrome verification (`postPatchFull.secDedSyndrome64() == patchDelta.newSecDedSyndrome64()`) guarantees that missed pub/sub messages or bit flips return `InterServerApplyStatus.NEEDS_FULL_CHUNK_REFILL` / `SYNDROME_MISMATCH` (`REQ-RTP-S-004`) rather than silently corrupting peer chunk state.
+   - Live section coordinate updates (`InterServerSectionBlockCommit`) drain strictly on the owning server tick thread or Folia region thread (`drainPendingInterServerBlockCommits`, `Bukkit.isOwnedByCurrentRegion`).
 
 ---
 

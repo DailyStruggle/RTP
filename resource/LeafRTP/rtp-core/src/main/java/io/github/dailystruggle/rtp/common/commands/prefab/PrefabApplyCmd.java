@@ -79,9 +79,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             return false;
         }
         Prefab prefab = opt.get();
-        // Snapshot the live trees so the diff describes the true delta from the on-disk state.
         File pluginDir = (RTPRuntime.serverAccessor() == null) ? null : RTPRuntime.serverAccessor().getPluginDirectory();
-        Map<String, Map<String, Object>> baseline = PrefabDiskIO.snapshotLiveBaseline(pluginDir, prefab);
         // Collect live world names so MultiWorldExpander can synthesise a
         // definitions/regions/<world>.yml per loaded world. Ignored when the prefab has
         // expandPerWorld=false (2-arg semantics via the 3-arg overload).
@@ -108,6 +106,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         // the file. That makes the diff describe the true delta from the live
         // region binding (e.g. "default" -> "<world>") instead of an absent
         // value when the physical file is missing.
+        Map<String, Map<String, Object>> inMemoryWorldBaseline = new LinkedHashMap<>();
         if (prefab.expandPerWorld() && ActiveConfigs.get() != null) {
             for (String world : worldNames) {
                 String fileId = "definitions/worlds/" + world;
@@ -125,7 +124,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                             "[prefab] apply: world region lookup failed for " + fileId
                                     + " - falling back to empty baseline: " + re.getMessage());
                 }
-                baseline.put(fileId, worldTree);
+                inMemoryWorldBaseline.put(fileId, worldTree);
             }
         }
         // For expandPerWorld prefabs, repair each synthesised per-world region
@@ -136,41 +135,51 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         // regions/default vert as the template and the real world height
         // bounds.
         MultiWorldExpander.RegionOverlayAmender vertAmender = buildDimensionVertAmender(prefab);
-        PrefabApplier.Result result = PrefabApplier.apply(baseline, prefab, worldNames, vertAmender);
-        Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
-        nonceStore.mint(callerId, prefab.id(), diff, result.newTrees());
+        Runnable applyTask = () -> {
+            // Snapshot the live trees so the diff describes the true delta from the on-disk state.
+            Map<String, Map<String, Object>> baseline = PrefabDiskIO.snapshotLiveBaseline(pluginDir, prefab);
+            baseline.putAll(inMemoryWorldBaseline);
+            PrefabApplier.Result result = PrefabApplier.apply(baseline, prefab, worldNames, vertAmender);
+            Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
+            nonceStore.mint(callerId, prefab.id(), diff, result.newTrees());
 
-        int changeCount = 0;
-        for (List<PrefabApplier.Change> changes : diff.values()) {
-            changeCount += changes.size();
-        }
+            int changeCount = 0;
+            for (List<PrefabApplier.Change> changes : diff.values()) {
+                changeCount += changes.size();
+            }
 
-        RTPRuntime.log(Level.INFO,
-                "[prefab] apply requested: caller=" + callerId
-                        + " prefab=" + prefab.id()
-                        + " files=" + diff.size()
-                        + " changes=" + changeCount);
+            RTPRuntime.log(Level.INFO,
+                    "[prefab] apply requested: caller=" + callerId
+                            + " prefab=" + prefab.id()
+                            + " files=" + diff.size()
+                            + " changes=" + changeCount);
 
-        send(callerId, "&7Prefab &a" + prefab.id() + "&7: " + prefab.description());
-        if (diff.isEmpty()) {
-            send(callerId, "&7  (no changes - identity overlay)");
-        } else {
-            for (Map.Entry<String, List<PrefabApplier.Change>> e : diff.entrySet()) {
-                send(callerId, "&f  " + e.getKey() + ".yml &7(" + e.getValue().size() + " changes):");
-                int shown = 0;
-                for (PrefabApplier.Change c : e.getValue()) {
-                    if (shown++ >= 8) {
-                        send(callerId, "&7    ... and " + (e.getValue().size() - 8) + " more");
-                        break;
+            send(callerId, "&7Prefab &a" + prefab.id() + "&7: " + prefab.description());
+            if (diff.isEmpty()) {
+                send(callerId, "&7  (no changes - identity overlay)");
+            } else {
+                for (Map.Entry<String, List<PrefabApplier.Change>> e : diff.entrySet()) {
+                    send(callerId, "&f  " + e.getKey() + ".yml &7(" + e.getValue().size() + " changes):");
+                    int shown = 0;
+                    for (PrefabApplier.Change c : e.getValue()) {
+                        if (shown++ >= 8) {
+                            send(callerId, "&7    ... and " + (e.getValue().size() - 8) + " more");
+                            break;
+                        }
+                        String oldStr = c.oldValue() == null ? "&8(absent)" : "&7" + c.oldValue();
+                        send(callerId, "&7    &f" + c.keyPath() + " &7= &a" + c.newValue() + " &8(was " + oldStr + "&8)");
                     }
-                    String oldStr = c.oldValue() == null ? "&8(absent)" : "&7" + c.oldValue();
-                    send(callerId, "&7    &f" + c.keyPath() + " &7= &a" + c.newValue() + " &8(was " + oldStr + "&8)");
                 }
             }
+            // Token-removal (2026-05-24, mirrors ADR-050): the pending diff is
+            // keyed solely on (callerId, prefabId); no opaque token surfaces.
+            send(callerId, "&7Confirm with: &f/rtp admin prefab confirm id=" + prefab.id());
+        };
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(applyTask);
+        } else {
+            applyTask.run();
         }
-        // Token-removal (2026-05-24, mirrors ADR-050): the pending diff is
-        // keyed solely on (callerId, prefabId); no opaque token surfaces.
-        send(callerId, "&7Confirm with: &f/rtp admin prefab confirm id=" + prefab.id());
         return true;
     }
 

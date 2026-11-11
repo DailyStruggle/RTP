@@ -112,7 +112,7 @@ subprojects {
     def java17Modules = [
             ':rtp-api', ':server-api', ':rtp-core', ':anvil-api', ':bit-api', ':yaml-api', ':units-api', ':commands-api',
             ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
-            ':predict-api', ':config-bit-api', ':menu-api', ':tags-api', ':database-api', ':schematics-api',
+            ':predict-api', ':config-bit-api', ':bytecode-api', ':menu-api', ':tags-api', ':database-api', ':schematics-api',
             ':proxy:proxy-common',
             ':bukkit:bukkit-common', ':bukkit:bukkit-v1_20_R1',
             ':paper:paper-common', ':paper:paper-v1_20_R1',
@@ -288,6 +288,11 @@ subprojects {
         inputs.property 'jazzerMaxDuration', System.getenv('JAZZER_MAX_DURATION') ?: ''
         if (System.getenv('JAZZER_FUZZ')) {
             outputs.upToDateWhen { false }
+            // Jazzer's native agent permits only one active fuzz target per JVM process;
+            // isolate each test class into its own fork so multi-class runs do not fail
+            // and dump hundreds of kilobytes of libFuzzer heartbeat stderr.
+            forkEvery = 1
+            maxParallelForks = 1
         }
         testLogging {
             events = (verboseTests ? ['started', 'passed', 'skipped', 'failed'] : ['skipped', 'failed'])
@@ -371,8 +376,7 @@ subprojects {
             // 81.2% branch.
             ':config-bit-api': [
                     instruction: 0.90,
-                    branch: 0.78,
-                    excludes: ['io/github/dailystruggle/rtp/common/bit/config/atlas/**']
+                    branch: 0.78
             ],
             // predict-api measured via jacocoTestReport (2026-10-24): 94.3% instruction /
             // 79.5% branch.
@@ -587,6 +591,7 @@ def publishedModulePaths = [
         ':maps-api',
         ':predict-api',
         ':config-bit-api',
+        ':bytecode-api',
         ':menu-api',
         ':tags-api',
         ':database-api',
@@ -865,21 +870,6 @@ configure(publishedModulePaths.findAll { findProject(it) != null }.collect { pro
     // Publish after evaluation so each module's `java`/`java-library` component
     // (and any withSourcesJar/withJavadocJar wiring) is fully registered first.
     afterEvaluate {
-        if (project.path == ':config-bit-api' && project.hasProperty('publicSdkOnly')) {
-            sourceSets {
-                main {
-                    java {
-                        exclude 'io/github/dailystruggle/rtp/common/bit/config/atlas/**'
-                    }
-                }
-                test {
-                    java {
-                        exclude 'io/github/dailystruggle/rtp/common/bit/config/atlas/**'
-                    }
-                }
-            }
-        }
-
         // Maven Central rejects a publication that lacks `-sources` and
         // `-javadoc` jars, so the published closure produces both (the rest of
         // the build still ships thin executable jars only - see the `java {}`

@@ -167,10 +167,11 @@ include 'metrics-api'
 // Java, no RTP-module or platform dependency, so sibling plugins (backend or
 // proxy) can reuse it; hosts supply scheduler + logger through its SPI.
 include 'bstats-api'
-// anvil-api -- platform-neutral vanilla Anvil region-file decode / NBT
-// pre-filter (ADR-016). No RTP-module or platform dependency, so it groups
-// under api/ with the other non-rtp-exclusive modules. Renamed from the
-// former ':rtp-anvil' coordinate; on-disk at api/anvil-api.
+// anvil-api -- platform-neutral Anvil (.mca) and Linear (.linear / .b_linear)
+// region-file decode / NBT pre-filter (ADR-016, anvil-api-ADR-002). No
+// RTP-module or platform dependency, so it groups under api/ with the other
+// non-rtp-exclusive modules. Renamed from the former ':rtp-anvil' coordinate;
+// on-disk at api/anvil-api.
 include 'anvil-api'
 // tags-api -- platform-neutral Minecraft block-tag JSON resolver (ADR-017).
 // No RTP-module or platform dependency (hand-rolled JSON reader, no third-party
@@ -181,6 +182,8 @@ include 'tags-api'
 include 'predict-api'
 // config-bit-api -- declarative YAML directive and constraint PBIT library (ADR-064, ADR-121).
 include 'config-bit-api'
+// bytecode-api -- zero-classloading JVM .class constant-pool, config-key, and causal-graph bytecode scanner (leafconfig-ADR-001, leaffuzz-ADR-001, ADR-125).
+include 'bytecode-api'
 // menu-api -- cross-platform declarative menu, session, token, and prompt SPI (ADR-035, ADR-044, ADR-048).
 include 'menu-api'
 // database-api -- zero-dependency SQL connection pooling, dialect abstraction, and Redis RESP2 client (leafrtp-ADR-079).
@@ -208,6 +211,7 @@ project(':anvil-api').projectDir      = file('api/anvil-api')
 project(':tags-api').projectDir       = file('api/tags-api')
 project(':predict-api').projectDir    = file('api/predict-api')
 project(':config-bit-api').projectDir = file('api/config-bit-api')
+project(':bytecode-api').projectDir   = file('api/bytecode-api')
 project(':menu-api').projectDir       = file('api/menu-api')
 project(':database-api').projectDir   = file('api/database-api')
 project(':schematics-api').projectDir = file('api/schematics-api')
@@ -414,9 +418,6 @@ if (!excludeNeoforge) {
 }
 
 include 'addons:LeafRTPCountdownAddon'
-// Linear (.linear) region support is not built into anvil-api (ADR-077): a future
-// guarded reader ships as an addon registering a RegionFileReader with
-// RegionFormatRegistry.
 // LeafRTPRiftAddon - reference demo of effect registration. Registers a single
 // new effects-api prototype ("RIFT", a client-side "world deconstruction" warmup
 // animation) so it joins the built-in effects by name. Fully platform-neutral: the

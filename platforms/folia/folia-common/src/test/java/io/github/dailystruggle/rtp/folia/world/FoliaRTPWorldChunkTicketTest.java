@@ -218,4 +218,110 @@ class FoliaRTPWorldChunkTicketTest {
     verify(bukkitWorld, never()).getChunkAt(anyInt(), anyInt());
     verify(bukkitWorld, never()).addPluginChunkTicket(anyInt(), anyInt(), any(Plugin.class));
   }
+
+  @Test
+  @DisplayName("ADR-015/S-005: setForceLoaded reuses already-cached resident chunk without a duplicate getChunkAtAsync")
+  void cachedResidentChunkAvoidsDuplicatePreload() {
+    Chunk resident = Mockito.mock(Chunk.class);
+    when(resident.isLoaded()).thenReturn(true);
+    rtpWorld.cacheChunk(3, 4, resident);
+
+    CompletableFuture<Void> apply = rtpWorld.setForceLoaded(3, 4, true);
+    verify(bukkitWorld, never()).getChunkAtAsync(anyInt(), anyInt(), Mockito.anyBoolean());
+    assertEquals(1, regionScheduler.pendingCount(), "ticket add must be dispatched to the owning region");
+
+    regionScheduler.executeAll();
+
+    verify(bukkitWorld, never()).getChunkAtAsync(anyInt(), anyInt(), Mockito.anyBoolean());
+    verify(bukkitWorld).addPluginChunkTicket(3, 4, plugin);
+    assertTrue(apply.isDone());
+    assertFalse(apply.isCompletedExceptionally());
+  }
+
+  @Test
+  @DisplayName("ADR-015/S-005: if an unticketed cached chunk unloads while regional ticket task is queued, applyTicketOnOwner reloads before completing readyFuture")
+  void cachedChunkUnloadedWhileQueuedReloadsBeforeCompletingTicketFuture() {
+    Chunk transientChunk = Mockito.mock(Chunk.class);
+    java.util.concurrent.atomic.AtomicBoolean stillLoaded =
+        new java.util.concurrent.atomic.AtomicBoolean(true);
+    when(transientChunk.isLoaded()).thenAnswer(inv -> stillLoaded.get());
+    when(bukkitWorld.isChunkLoaded(3, 4)).thenAnswer(inv -> stillLoaded.get());
+    rtpWorld.cacheChunk(3, 4, transientChunk);
+
+    CompletableFuture<Void> apply = rtpWorld.setForceLoaded(3, 4, true);
+    verify(bukkitWorld, never()).getChunkAtAsync(anyInt(), anyInt(), Mockito.anyBoolean());
+
+    // Simulate Folia unloading the unticketed chunk while the regional task is queued
+    stillLoaded.set(false);
+    regionScheduler.executeAll();
+
+    assertFalse(apply.isDone(),
+        "readyFuture must NOT complete while the chunk is unloaded (would trip staleChunkBeforeVert)");
+    verify(bukkitWorld, never()).addPluginChunkTicket(anyInt(), anyInt(), any(Plugin.class));
+    verify(bukkitWorld).getChunkAtAsync(3, 4, true);
+
+    Chunk reloaded = Mockito.mock(Chunk.class);
+    when(reloaded.isLoaded()).thenReturn(true);
+    stillLoaded.set(true);
+    preload.complete(reloaded);
+    regionScheduler.executeAll();
+
+    verify(bukkitWorld).addPluginChunkTicket(3, 4, plugin);
+    assertTrue(apply.isDone());
+    assertFalse(apply.isCompletedExceptionally());
+    assertTrue(rtpWorld.isChunkLoaded(3, 4));
+  }
+
+  @Test
+  @DisplayName("S-002: release before regional ticket task runs cancels cached-chunk ticket add")
+  void cachedResidentChunkReleaseBeforeRegionalTaskCancelsTicketAdd() {
+    Chunk resident = Mockito.mock(Chunk.class);
+    when(resident.isLoaded()).thenReturn(true);
+    rtpWorld.cacheChunk(3, 4, resident);
+
+    CompletableFuture<Void> apply = rtpWorld.setForceLoaded(3, 4, true);
+    rtpWorld.setForceLoaded(3, 4, false);
+    drainSchedulers();
+
+    verify(bukkitWorld, never()).addPluginChunkTicket(anyInt(), anyInt(), any(Plugin.class));
+    verify(bukkitWorld).removePluginChunkTicket(3, 4, plugin);
+    assertTrue(apply.isDone());
+    assertFalse(apply.isCompletedExceptionally());
+  }
+
+  @Test
+  @DisplayName("ADR-015/S-002: refreshForceLoaded while initial setForceLoaded is queued does not cancel initial ticket add")
+  void refreshForceLoadedWhileQueuedDoesNotCancelInitialTicketAdd() {
+    Chunk resident = Mockito.mock(Chunk.class);
+    when(resident.isLoaded()).thenReturn(true);
+    rtpWorld.cacheChunk(3, 4, resident);
+
+    CompletableFuture<Void> apply = rtpWorld.setForceLoaded(3, 4, true);
+    rtpWorld.refreshForceLoaded(3, 4);
+    assertFalse(apply.isDone(), "initial apply future must stay pending until regional task executes");
+
+    regionScheduler.executeAll();
+
+    verify(bukkitWorld, Mockito.atLeastOnce()).addPluginChunkTicket(3, 4, plugin);
+    assertTrue(apply.isDone());
+    assertFalse(apply.isCompletedExceptionally());
+  }
+
+  @Test
+  @DisplayName("S-002: ticket release on owning region thread removes ticket inline without queueing regional task")
+  void releaseOnOwningRegionThreadRemovesTicketInline() {
+    Chunk resident = Mockito.mock(Chunk.class);
+    when(resident.isLoaded()).thenReturn(true);
+    rtpWorld.cacheChunk(3, 4, resident);
+    rtpWorld.setForceLoaded(3, 4, true);
+    regionScheduler.executeAll();
+
+    when(org.bukkit.Bukkit.getServer().isOwnedByCurrentRegion(bukkitWorld, 3, 4)).thenReturn(true);
+
+    CompletableFuture<Void> release = rtpWorld.setForceLoaded(3, 4, false);
+
+    assertTrue(release.isDone(), "inline release on owning region must complete immediately");
+    assertEquals(0, regionScheduler.pendingCount(), "inline release must not enqueue a regional task");
+    verify(bukkitWorld).removePluginChunkTicket(3, 4, plugin);
+  }
 }

@@ -54,7 +54,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Enterprise readiness (gates, evidence, compatibility matrix) | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) |
 | Platform support matrix (Spigot/Paper/Folia/Fabric/NeoForge/Velocity) | [`SUPPORT_MATRIX.md`](../../resource/LeafRTP/docs/dev/SUPPORT_MATRIX.md) |
 | Semantic Versioning (SemVer) contract (public vs internal API) | [`SEMVER.md`](SEMVER.md) |
-| Licensing clarity & Pro/Lite edition split | [`LICENSING.md`](LICENSING.md) |
+| Licensing clarity & Free/Pro support tiers | [`LICENSING.md`](LICENSING.md) |
 | Deprecation and API evolution policy | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) |
 | Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../../resource/LeafRTP/docs/FOR_SERVER_ADMINS.md) → [`../admin/`](../../resource/LeafRTP/docs/admin/) ([CONFIGURATION.md](../../resource/LeafRTP/docs/admin/configuration/CONFIGURATION.md), [REGIONS.md](../../resource/LeafRTP/docs/admin/configuration/REGIONS.md), [CORE_CONFIG.md](../../resource/LeafRTP/docs/admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../../resource/LeafRTP/docs/admin/configuration/PERFORMANCE.md), [ECONOMY.md](../../resource/LeafRTP/docs/admin/configuration/ECONOMY.md), [SAFETY.md](../../resource/LeafRTP/docs/admin/configuration/SAFETY.md), [ACTIONS.md](../../resource/LeafRTP/docs/admin/ACTIONS.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../../resource/LeafRTP/docs/FOR_ADDON_DEVELOPERS.md) |
@@ -93,7 +93,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`SUPPORT_MATRIX.md`](../../resource/LeafRTP/docs/dev/SUPPORT_MATRIX.md) | Platform family x Minecraft version x Java version support matrix. |
 | [`SERVER_ADAPTER_GUIDE.md`](../../resource/LeafRTP/docs/dev/SERVER_ADAPTER_GUIDE.md) | Server adapter requirements specification, SPI function catalog, threading, and checklist. |
 | [`SEMVER.md`](SEMVER.md) | Semantic versioning contract: public API vs internal boundaries, deprecation rules. |
-| [`LICENSING.md`](LICENSING.md) | All-MIT licensing (ADR-108), per-module licence matrix, Pro (support tier) vs Lite editions. |
+| [`LICENSING.md`](LICENSING.md) | All-MIT licensing (ADR-108), per-module licence matrix, Free (default) vs Pro (priority support tier). |
 | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) | Deprecation lifecycle, notice window, and compiler annotation policy. |
 | [`PUBLISHING.md`](PUBLISHING.md) | Addon artifact publishing guide (JitPack, GitHub Packages, Maven Central). |
 | [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) | Pull request workflow: branching, local pre-PR verification gates, CI pipeline anatomy, and merge criteria. |

@@ -51,9 +51,8 @@ public class BukkitServerProvider {
     }
 
     /**
-     * Basic Folia-aware scheduler shipped in the Paper adapter (and therefore in the free / lite
-     * jar). Used on Folia only when the tuned {@code rtp-folia} adapter is absent from the
-     * classpath - i.e. the free build, which excludes {@code io/.../folia/**} (ADR-024 / ADR-061).
+     * Basic Folia-aware scheduler shipped in the Paper adapter. Used on Folia only when the
+     * tuned {@code rtp-folia} adapter is absent from the classpath (ADR-024 / ADR-061).
      */
     private static final String BASIC_FOLIA_SCHEDULER =
             "io.github.dailystruggle.rtp.paper.scheduling.FoliaAwareScheduler";
@@ -69,8 +68,8 @@ public class BukkitServerProvider {
 
     /**
      * Resolve the accessor/scheduler pair for a Folia host. Prefer the tuned {@code rtp-folia}
-     * adapter (LeafRTP-Pro); when it is not bundled (free build), fall back to the Paper accessor
-     * driven by the basic {@link #BASIC_FOLIA_SCHEDULER} so the free build still runs on Folia.
+     * adapter; when it is not bundled on the classpath, fall back to the Paper accessor
+     * paired with {@link #BASIC_FOLIA_SCHEDULER} so region-thread scheduling still works.
      */
     private static ServerModel foliaModel(String tunedAccessor, String tunedScheduler, String paperAccessor) {
         if (classExists(tunedScheduler)) {
@@ -80,11 +79,8 @@ public class BukkitServerProvider {
     }
 
     /**
-     * Backwards-compatible overload. The full bootstrap ({@code RTPBukkitPlugin})
-     * passes its plugin instance for parameter-symmetry with prior versions; the
-     * lite bootstrap ({@code RTPBukkitLitePlugin}) calls the {@link JavaPlugin}
-     * variant. Both delegate to the same probe-based resolution -- ADR-024 section "three
-     * layers": the plugin instance carries no detection state.
+     * Backwards-compatible overload accepting a {@link JavaPlugin} instance.
+     * Delegates to probe-based resolution (the plugin instance carries no detection state).
      */
     public static ServerModel resolveServerModel(JavaPlugin plugin) {
         return resolveServerModel(Bukkit.getBukkitVersion());

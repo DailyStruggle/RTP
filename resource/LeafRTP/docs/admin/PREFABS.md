@@ -32,7 +32,7 @@ The exact set of knobs each prefab sets lives in `rtp-core` Java code under `io/
 
 ### What prefabs do **not** touch
 
-- `backlogCacheCap` (L3 backlog cache). Both the full and lite assemblies ship it at `1000` (enabled); set it to `0` in `regions/default.yml` to disable L3. Runtime prefabs do not change it on either side.
+- `backlogCacheCap` (L3 backlog cache). Shipped at `1000` (enabled) by default; set it to `0` in `regions/default.yml` to disable L3. Runtime prefabs do not change it.
 - `config.yml`, `safety.yml`, `worlds/<world>.yml`, `economy.yml`, `effects.yml`, `logging.yml`. Prefabs are scoped to `performance.yml` + `regions/<id>.yml` by design. Hand-edit the rest.
 - Comments. The on-disk YAML loader does not round-trip comments, so a confirmed apply writes a fresh file using the prefab's overlay merged onto the loaded keys. **The `.bak.<timestamp>` sibling preserves your original file byte-for-byte**, including comments; copy it back or use `/rtp admin prefab rollback` if you want them.
 
@@ -126,4 +126,4 @@ If you have players mid-teleport when the confirm runs, their in-flight pipeline
 - [PERFORMANCE.md](configuration/PERFORMANCE.md) - reference for every knob a prefab might set in `performance.yml`.
 - [REGIONS.md](configuration/REGIONS.md) - reference for every knob a prefab might set in `regions/<id>.yml`.
 - [RUNBOOK.md](RUNBOOK.md) - what to run when things go wrong after an apply (`/rtp info`, `/rtp test`, `/rtp scan reset`).
-- The `lightweight` prefab is a trimmed subset of the shipped `regions/default.yml`; both the full and lite editions ship `backlogCacheCap: 1000` (enabled) by default.
+- The `lightweight` prefab is a trimmed subset of the shipped `regions/default.yml`; `backlogCacheCap: 1000` (enabled) is the shipped default.

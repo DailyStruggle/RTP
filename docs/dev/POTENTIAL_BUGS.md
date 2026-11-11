@@ -42,6 +42,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
+### 2026-11-08 — `lcv_vlc_demux_open` calls `lcv_sys_index_file_superblocks` with stale 10-argument signature
+
+- **Severity:** High
+- **Status:** Open
+- **Discovered during:** `:leaf-video` ADR/LICENSE/build portability cleanup (`:leaf-video:compileAndRunNativeGate1`)
+- **Location:** `resource/LeafVideo/native/lcv_codec_system_plugins.c` `lcv_vlc_demux_open` (line 1781) vs. `lcv_sys_index_file_superblocks` (line 235)
+- **Symptom / hypothesis:** `lcv_sys_index_file_superblocks` was refactored to take 7 arguments `(FILE *fp, uint64_t file_size, uint64_t *out_offsets, size_t *out_lengths, uint8_t *out_k_vals, uint8_t *out_first_hdr64, size_t max_sbs)` (as used by `lcv_probe_stream_file` and `lcv_decode_file_frame_rgba8`), but `lcv_vlc_demux_open` still passes 10 arguments `(psz_file, &sb_offs, &sb_lens, &sb_ks, &sb_count, &w, &h, &fps, &fps_num, &fps_den)`.
+- **Impact:** Native compilation of `resource/LeafVideo/native/lcv_codec_system_plugins.c` fails in `:leaf-video:compileAndRunNativeGate1` and `:resource:LeafVideo:compileNativeAccel`.
+- **Suggested next step:** In `lcv_vlc_demux_open`, open `psz_file` with `fopen(psz_file, "rb")`, determine `file_size` via `fseeko`/`ftello`, allocate `sb_offs`/`sb_lens`/`sb_ks` up to `LCV_MAX_SCAN_SUPERBLOCKS`, call the 7-argument `lcv_sys_index_file_superblocks(fp, (uint64_t)fsz, sb_offs, sb_lens, sb_ks, hdr0, LCV_MAX_SCAN_SUPERBLOCKS)`, and parse `w`, `h`, `fps_num`, `fps_den` from `hdr0` + `lcv_sys_resolve_tracks_or_obs_fps`.
+
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium
@@ -111,16 +121,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
 - **Linear:** RTP-93
 
-### 2026-10-30 - Untracked BytecodeCausalGraphScanner calls stale ParsedClass and MethodNode constructors
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** LeafRTP 3.3.2 version bump and changelog verification (`:config-bit-api:compileJava`)
-- **Location:** `api/config-bit-api/src/main/java/io/github/dailystruggle/rtp/common/bit/config/atlas/BytecodeCausalGraphScanner.java` lines 1877 (`new ParsedClass(...)`), 1933 and 2209 (`new MethodNode(...)`)
-- **Symptom / hypothesis:** `BytecodeCausalGraphScanner` passes the 8-argument `ParsedClass` constructor and the 25-argument `MethodNode` constructor, whereas `BytecodeConfigScanner.ParsedClass` now takes 9 arguments (adding `ParsedAnnotations`) and `MethodNode` takes 33 arguments.
-- **Impact:** `:config-bit-api:compileJava` and downstream modules that depend on `:config-bit-api` fail to compile while the untracked file is present in the source set.
-- **Suggested next step:** Update the `ParsedClass` and `MethodNode` constructor calls in `BytecodeCausalGraphScanner` to pass the new annotation and call-graph parameters from `BytecodeConfigScanner`.
-
 ### 2026-10-14 - LocationGenerator.joinSafely waits on work queued to the same pool
 
 - **Severity:** Low
@@ -131,19 +131,25 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** None in production; a future production caller could stall a bounded pool until the timeout.
 - **Suggested next step:** Remove it or make callers compose the future instead of joining.
 
-### 2026-10-06 — Fuzz targets: unreachable paths, exception-only oracles, missing parsers
+### 2026-11-04 - LeafFuzz: Detect rebranded/stolen JARs and ZIP-path vs bytecode this_class mismatches in batch triage
 
 - **Severity:** Low
 - **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (Jazzer fuzz targets)
-- **Location:** `AnvilRegionFuzzTest.java`; `rtp-proxy-common/src/test/.../RespProtocolFuzzTest.java`
-- **Symptom / hypothesis:**
-  - The Anvil targets always read chunk `(0, 0)`, so other location-table slots are never exercised. `readChunkView` is only constructed, never queried, so lazy palette decoding is not exercised.
-  - Oracles only check which exception escapes. The open `palette[0]` fail-open returns normally and cannot be detected; no target asserts "malformed input never yields ACCEPT" through `AnvilPrefilter`.
-  - `RespProtocolFuzzTest` tolerates `NumberFormatException` and the Anvil targets tolerate `IllegalArgumentException`, although the parsers convert or never throw these; a regression that leaks them would go unnoticed.
-  - Parsers of untrusted or semi-trusted input with no target: `RtpYamlReader` (imported configs; would find the open depth issue at once), `EditorLoopbackJson`, `EditorSessionManager.parseJsonStringMap`, `PluginMessageEnvelope.open`, `ProxyDirectWire`, `BiomeBinCodec`/`WorldBiomeStore.load`, `TinyJsonReader`, `SafetyTokenParser`, and the Bukkit plugin-message length reader.
-- **Impact:** Coverage gap only; no production defect.
-- **Suggested next step:** Let the fuzzer pick the chunk coordinates (`FuzzedDataProvider`); add a prefilter target asserting the verdict is never ACCEPT on malformed data; narrow the tolerated exceptions; add targets for YAML, editor JSON and the network envelope first.
-- **Linear:** RTP-28
+- **Discovered during:** empirical 453-JAR Modrinth batch triage validation (`Dynamics GUI-1.0.jar`, `ItemTeleporter (1).jar`)
+- **Location:** `api/bytecode-api/src/main/java/io/github/dailystruggle/bytecode/JarConfigScanner.java`; `api/bytecode-api/src/main/java/io/github/dailystruggle/bytecode/BytecodeCausalGraphScanner.java`; `resource/LeafFuzz/leaffuzz-common/src/main/java/net/leaf/fuzz/common/cli/LeafFuzzBatchTriageRunner.java`
+- **Symptom / hypothesis:** `JarConfigScanner` only checks whether the ZIP entry path for a declared `main:` class exists (`mainClassPresent`) and does not verify whether `.class` entries' compiled `this_class` constant-pool headers match their ZIP entry paths or whether embedded `META-INF/maven/<groupId>/<artifactId>/pom.properties` metadata conflicts with `plugin.yml` / `paper-plugin.yml` / `fabric.mod.json` identity.
+- **Impact:** If an uploader renames a package directory inside a `.jar` and updates `plugin.yml` `main:` to match the renamed folder without recompiling the `.class` files, `mainClassPresent` passes even though the JVM throws `NoClassDefFoundError: ... (wrong name: ...)` on startup; uncompiled YAML rebrands over another author's build are also not surfaced as a dedicated triage finding.
+- **Suggested next step:** Investigate three static signals in `:bytecode-api` and `LeafFuzzBatchTriageRunner`: (1) deterministic ZIP entry path vs. `ParsedClass#binaryClassName()` (`this_class`) mismatch check (`0%` false-positive rate, catches `wrong name` `NoClassDefFoundError`), (2) `META-INF/maven/.../pom.properties` (`groupId`/`artifactId`) vs. descriptor `name`/`author`/`main` package mismatch, and (3) normalized structural bytecode fingerprinting (`class hierarchy + field descriptor multiset + method opcode skeletons`) for recompiled clones.
+- **Linear:** RTP-104
+
+### 2026-11-07 - evaluate_causal_rules_on_sources omits bodyless SPI interface methods from causal chains
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** running `scripts/tests/test_repo_ast.py` (`test_causal_chaining_scanner_and_declarative_rules`)
+- **Location:** `scripts/repo_ast.py` `evaluate_causal_rules_on_sources` (~12924-13015); `corpus-atlas/build_doc_index.py` `extract_java_method_shorthand_cards`
+- **Symptom / hypothesis:** `extract_java_method_shorthand_cards` only extracts method scopes with `{ ... }` bodies, so abstract SPI interface declarations (`byte[] loadSector(String path);` in `SectorLoaderSPI`) are not added to `method_nodes` in `evaluate_causal_rules_on_sources`. As a result, `CAUSAL-MAIN-IO` resolves the 2-hop chain `['TeleportController#onCommand', 'DiskSectorLoader#loadSector']` via `short_method_lookup` instead of the 3-hop SPI bridge chain `['TeleportController#onCommand', 'SectorLoaderSPI#loadSector', 'DiskSectorLoader#loadSector']`.
+- **Impact:** Causal chains across pure interfaces omit the intermediate `SPI#method` hop in `test_causal_chaining_scanner_and_declarative_rules`.
+- **Suggested next step:** Synthesize stub `method_nodes` entries for bodyless `interface` method declarations in `evaluate_causal_rules_on_sources` (or `_extract_java_method_scopes`) so the `Closed-World SPI Dynamic Dispatch Bridge` connects `Caller -> SPI#method -> Impl#method`.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

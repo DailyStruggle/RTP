@@ -181,13 +181,26 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
   @Override
   public void scheduleRepeatingTask(Runnable task, long delayTicks, long periodTicks) {
     if (task == null) return;
-    scheduledTasks.add(new ScheduledTask(task, delayTicks, periodTicks));
+    scheduledTasks.add(new ScheduledTask(task, delayTicks, Math.max(1L, periodTicks)));
   }
 
-  /** Advances all registered repeating tasks by one server tick. */
+  @Override
+  public void scheduleDelayedTask(
+      String worldName, int chunkX, int chunkZ, Runnable task, long delayTicks) {
+    if (task == null) return;
+    if (delayTicks <= 0L) {
+      task.run();
+    } else {
+      scheduledTasks.add(new ScheduledTask(task, delayTicks, 0L));
+    }
+  }
+
+  /** Advances all registered repeating and one-shot tasks by one server tick. */
   protected final void tickScheduledTasks() {
     for (ScheduledTask t : scheduledTasks) {
-      t.tick();
+      if (t.tick()) {
+        scheduledTasks.remove(t);
+      }
     }
   }
 
@@ -519,17 +532,21 @@ public abstract class AbstractModServerAccessor implements ServerAccessor {
 
     ScheduledTask(Runnable task, long delayTicks, long periodTicks) {
       this.task = task;
-      this.period = Math.max(1L, periodTicks);
+      this.period = periodTicks;
       this.remaining = Math.max(0L, delayTicks);
     }
 
-    void tick() {
+    boolean tick() {
       if (remaining > 0) {
         remaining--;
-        return;
+        return false;
       }
       task.run();
+      if (period <= 0L) {
+        return true;
+      }
       remaining = period - 1;
+      return false;
     }
   }
 }

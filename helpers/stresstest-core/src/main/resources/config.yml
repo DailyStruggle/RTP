@@ -61,8 +61,8 @@ target-commands:
 
 # Legacy single-target command template.
 # @type: string
-# @default: "rtp player:{player}"
-# target-command: "rtp player:{player}"
+# @default: "rtp player={player}"
+# target-command: "rtp player={player}"
 
 # Online players targeted by the benchmark harness.
 # Accepts "all", "permission:<node>", or "names: [name1, name2]".

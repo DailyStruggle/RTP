@@ -29,18 +29,18 @@ public class RtpYamlSection {
     /** Dotted path from root; empty string for the document root. */
     final String path;
 
-    RtpYamlSection(RtpYamlMapping node) {
+    protected RtpYamlSection(RtpYamlMapping node) {
         this(node, "", "");
     }
 
-    RtpYamlSection(RtpYamlMapping node, String name, String path) {
+    protected RtpYamlSection(RtpYamlMapping node, String name, String path) {
         this.node = node != null ? node : new RtpYamlMapping();
         this.name = name == null ? "" : name;
         this.path = path == null ? "" : path;
     }
 
-    /** The underlying AST mapping (package-private accessor for testing). */
-    RtpYamlMapping mapping() { return node; }
+    /** The underlying AST mapping (package-private/protected accessor). */
+    protected RtpYamlMapping mapping() { return node; }
 
     /** Own key name (mirrors {@code simpleyaml}'s {@code ConfigurationSection.getName()}). */
     public String getName() { return name; }
@@ -65,13 +65,13 @@ public class RtpYamlSection {
         return v == null ? fallback : v;
     }
 
-    public RtpYamlSection getConfigurationSection(String key) {
+    public io.github.dailystruggle.yaml.YamlSection getConfigurationSection(String key) {
         RtpYamlNode n = resolve(key, false);
         if (n instanceof RtpYamlMapping) {
             String[] parts = key.split("\\.");
             String leaf = parts[parts.length - 1];
             String childPath = path.isEmpty() ? key : path + "." + key;
-            return new RtpYamlSection((RtpYamlMapping) n, leaf, childPath);
+            return new io.github.dailystruggle.yaml.YamlSection((RtpYamlMapping) n, leaf, childPath);
         }
         return null;
     }
@@ -184,7 +184,7 @@ public class RtpYamlSection {
      * creates (or replaces) an empty section at {@code key} and returns a
      * handle to it.
      */
-    public RtpYamlSection createSection(String key) {
+    public io.github.dailystruggle.yaml.YamlSection createSection(String key) {
         return createSection(key, java.util.Collections.emptyMap());
     }
 
@@ -193,13 +193,13 @@ public class RtpYamlSection {
      * creates (or replaces) a section at {@code key} populated with the entries
      * of {@code values} and returns a handle to it.
      */
-    public RtpYamlSection createSection(String key, Map<?, ?> values) {
+    public io.github.dailystruggle.yaml.YamlSection createSection(String key, Map<?, ?> values) {
         RtpYamlMapping fresh = new RtpYamlMapping();
         for (var e : values.entrySet()) {
             fresh.put(String.valueOf(e.getKey()), toNode(e.getValue()));
         }
         set(key, fresh);
-        return new RtpYamlSection(fresh);
+        return new io.github.dailystruggle.yaml.YamlSection(fresh);
     }
 
     /**
@@ -351,7 +351,7 @@ public class RtpYamlSection {
     private static Object coerce(RtpYamlNode n) {
         if (n == null) return null;
         if (n instanceof RtpYamlScalar) return ((RtpYamlScalar) n).value();
-        if (n instanceof RtpYamlMapping) return new RtpYamlSection((RtpYamlMapping) n);
+        if (n instanceof RtpYamlMapping) return new io.github.dailystruggle.yaml.YamlSection((RtpYamlMapping) n);
         if (n instanceof RtpYamlSequence) {
             List<Object> out = new ArrayList<>();
             for (RtpYamlNode item : ((RtpYamlSequence) n).items()) out.add(coerce(item));

@@ -98,9 +98,13 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       held.close();
       return;
     }
+    io.github.dailystruggle.rtp.api.server.RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    long holdTicks = (accessor != null && "Folia".equals(accessor.getPlatform()))
+        ? 2L
+        : ARRIVAL_HOLD_TICKS;
     pendingArrivalReleases.put(held, world);
     try {
-      RTPRuntime.scheduler().runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), ARRIVAL_HOLD_TICKS);
+      RTPRuntime.scheduler().runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), holdTicks);
     } catch (Throwable t) {
       RTPRuntime.log(Level.WARNING, "[RTP] arrival chunk hold could not be scheduled; releasing now", t);
       releaseArrivalReservation(held);
@@ -246,21 +250,20 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     teleportPostActions.add(task -> task.isRunning.set(false));
     cleanupPostActions.add(task -> task.isRunning.set(false));
   }
-
   private Phase currentPhase = Phase.SETUP;
   private final GenerationContext context;
   private final ConfigCache.Snapshot configSnapshot = ConfigCache.snapshot();
 
-  private Region region;
-  private RTPCoords coords;
-  private TeleportData teleportData;
-  private ChunkReservation reservation;
-  private ChunkSet chunkSet;
+  private volatile Region region;
+  private volatile RTPCoords coords;
+  private volatile TeleportData teleportData;
+  private volatile ChunkReservation reservation;
+  private volatile ChunkSet chunkSet;
 
   public final Map<String, String> placeholderMap = new ConcurrentHashMap<>();
-  private double distance = 0.0;
-  private double distanceFromCenter = 0.0;
-  private RTPLocation destination = null;
+  private volatile double distance = 0.0;
+  private volatile double distanceFromCenter = 0.0;
+  private volatile RTPLocation destination = null;
   // First pre-teleport player location; the post-teleport recompute would otherwise read the
   // player at the destination and report 0 when teleportData.originalCoords is absent.
   private RTPLocation originSnapshot = null;

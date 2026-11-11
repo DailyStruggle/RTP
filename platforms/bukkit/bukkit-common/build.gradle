@@ -12,6 +12,7 @@ if (!hasRtpCore) {
                 include 'io/github/dailystruggle/rtp/bukkitplatform/server/BukkitPluginServerAccessor.java'
                 include 'io/github/dailystruggle/rtp/bukkitplatform/server/BukkitWorldEventHook.java'
                 include 'io/github/dailystruggle/rtp/bukkitplatform/tools/MiniMessageRenderer.java'
+                include 'io/github/dailystruggle/rtp/bukkitplatform/world/BukkitBlockWriter.java'
                 include 'io/github/dailystruggle/rtp/bukkitplatform/world/BukkitRegionPaths.java'
             }
         }
@@ -33,6 +34,9 @@ dependencies {
     }
     if (findProject(':anvil-api') != null) {
         api project(':anvil-api')
+    }
+    if (findProject(':schematics-api') != null) {
+        api project(':schematics-api')
     }
     if (findProject(':metrics-api') != null) {
         compileOnly project(':metrics-api')
@@ -65,4 +69,6 @@ dependencies {
     // boundary rules that lock the Spigot-exclusive Anvil read-only pre-filter
     // package in place (see ADR-016 / ADR-016 section 6).
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+    testImplementation 'com.mojang:brigadier:1.2.9'
+    testImplementation rootProject.libs.jazzer.junit
 }

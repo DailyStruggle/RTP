@@ -72,12 +72,11 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
   public final AtomicLong scanIncrement = new AtomicLong(0L);
   private final AtomicLong cps = new AtomicLong(128);
   private static final BigInteger increment_big = BigInteger.ONE;
-
   // Instance trackers to natively isolate data per ScanTask
-  public long latestAbsolutePos = 0;
-  public long latestAbsoluteTotal = 0;
-  public long latestCps = 0;
-  public long latestEtaSeconds = 0;
+  public volatile long latestAbsolutePos = 0;
+  public volatile long latestAbsoluteTotal = 0;
+  public volatile long latestCps = 0;
+  public volatile long latestEtaSeconds = 0;
 
   public final Region region;
   private final AtomicLong scanIter;

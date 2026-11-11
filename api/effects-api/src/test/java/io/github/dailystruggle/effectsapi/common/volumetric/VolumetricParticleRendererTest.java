@@ -122,8 +122,6 @@ class VolumetricParticleRendererTest {
         // Surface viewer far above in the same X/Z column -> zero aperture points
         List<Vector3d> farSurface = GeometryPointGenerator.generatePlaneProjectedAperture(
                 farmHull, new Vector3d(106, 70, 206), 8.0, 4.0, 1.0);
-        assertTrue(farSurface.isEmpty());
-
         // Viewer 2 blocks outside -X plane near bottom-front edge -> localized aperture points <= 32
         Vector3d nearWest = new Vector3d(98.0, -49.0, 202.0);
         List<Vector3d> aperture = GeometryPointGenerator.generatePlaneProjectedAperture(
@@ -136,8 +134,28 @@ class VolumetricParticleRendererTest {
             assertEquals(100.0, pt.x(), 1.0e-6);
             assertTrue(pt.distance(projectedOnWest) <= 4.0 + 1.0e-6);
         }
-    }
 
+        // Viewer in the center of a broad 20x20 face (10 blocks from all 4 outer perimeter edges)
+        // still receives 2D planar surface points around their orthogonal projection
+        SpatialBounds wideHull = SpatialBounds.of(100, -50, 200, 120, -30, 220);
+        Vector3d centerWest = new Vector3d(98.0, -40.0, 210.0);
+        List<Vector3d> centerAperture = GeometryPointGenerator.generatePlaneProjectedAperture(
+                wideHull, centerWest, 8.0, 3.5, 1.0);
+        assertFalse(centerAperture.isEmpty());
+        for (Vector3d pt : centerAperture) {
+            assertEquals(100.0, pt.x(), 1.0e-6);
+            assertTrue(pt.distance(new Vector3d(100.0, -40.0, 210.0)) <= 3.5 + 1.0e-6);
+        }
+
+        // 2D planar face surface with a 3.5-block pass-through hole around viewer
+        List<Vector3d> planarWithHole = GeometryPointGenerator.generatePlanarSurfaceWithPassThrough(
+                farmHull, new Vector3d(99.0, -46.0, 206.0), 8.0, 3.5, 1.0);
+        assertFalse(planarWithHole.isEmpty());
+        for (Vector3d pt : planarWithHole) {
+            assertTrue(farmHull.contains(pt));
+            assertTrue(pt.distance(new Vector3d(99.0, -46.0, 206.0)) > 3.5 - 1.0e-6);
+        }
+    }
     @Test
     @DisplayName("VolumetricParticleRenderer distance culling respects 48 block radius")
     void testDistanceCulling() {

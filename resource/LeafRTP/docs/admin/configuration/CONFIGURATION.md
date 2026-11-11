@@ -62,7 +62,7 @@ Each file in the `definitions/regions/` folder defines one teleport region. The 
 | `requirePermission` | Boolean | `false` | If `true`, players need `rtp.regions.<regionName>` to use this region. |
 | `override` | String | `"default"` | Region to redirect to if a player lacks permission for this region. |
 | `cacheCap` | Integer | `50` | Maximum pre-generated safe locations to hold in the queue. Set to `0` to disable background caching. |
-| `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum **unverified** candidates staged upstream of `cacheCap`. Spiral picks land here without chunk I/O, then a per-region pulse verifies one `.mca` bin at a time and promotes in insertion order. Set to `0` to disable. See [REGIONS.md → Backlog Cache (L3)](REGIONS.md#backlog-cache-l3). |
+| `backlogCacheCap` | Integer | `1000` | Maximum **unverified** candidates staged upstream of `cacheCap`. Spiral picks land here without chunk I/O, then a per-region pulse verifies one `.mca` bin at a time and promotes in insertion order. Set to `0` to disable. See [REGIONS.md → Backlog Cache (L3)](REGIONS.md#backlog-cache-l3). |
 | `activeChunkCap` | Integer | `10` | Maximum chunks kept loaded simultaneously for zero-latency teleportation. |
 | `price` | Double | `0.0` | Economy cost override for this region (overrides the global `economy.yml` price). |
 | `cooldown` | Integer / Duration / String | (global fallback) | Per-region cooldown duration between successful teleports. Accepts seconds, duration strings (`5m`), or `"@config"`. Negative values / sentinels (`-1`, `infinite`, `permanent`) are not supported per region: they are ignored and the region falls back to the global `teleportCooldown` and shared timer. Defaults to global `teleportCooldown`. |

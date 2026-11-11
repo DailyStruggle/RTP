@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * Thread-safe service registry for {@link WorldBlockFeed} providers ({@code maps-api-ADR-003},
  * {@code anvil-api-ADR-003}, {@code ADR-115}).
  *
- * <p>Allows {@code LeafMap} to register its {@code .hca v2} / {@code .dlsh} 3D block and
+ * <p>Allows {@code LeafMap} to register its {@code .lca} / {@code .dlsh} 3D block and
  * client-renderer feed at runtime so {@code LeafConfig} (and other sibling tools) can consume
  * live 3D sub-chunk slices and drawing code without a compile-time dependency on {@code LeafMap}.
  *
