@@ -167,10 +167,11 @@ include 'metrics-api'
 // Java, no RTP-module or platform dependency, so sibling plugins (backend or
 // proxy) can reuse it; hosts supply scheduler + logger through its SPI.
 include 'bstats-api'
-// anvil-api -- platform-neutral vanilla Anvil region-file decode / NBT
-// pre-filter (ADR-016). No RTP-module or platform dependency, so it groups
-// under api/ with the other non-rtp-exclusive modules. Renamed from the
-// former ':rtp-anvil' coordinate; on-disk at api/anvil-api.
+// anvil-api -- platform-neutral Anvil (.mca) and Linear (.linear / .b_linear)
+// region-file decode / NBT pre-filter (ADR-016, anvil-api-ADR-002). No
+// RTP-module or platform dependency, so it groups under api/ with the other
+// non-rtp-exclusive modules. Renamed from the former ':rtp-anvil' coordinate;
+// on-disk at api/anvil-api.
 include 'anvil-api'
 // tags-api -- platform-neutral Minecraft block-tag JSON resolver (ADR-017).
 // No RTP-module or platform dependency (hand-rolled JSON reader, no third-party
@@ -417,9 +418,6 @@ if (!excludeNeoforge) {
 }
 
 include 'addons:LeafRTPCountdownAddon'
-// Linear (.linear) region support is not built into anvil-api (ADR-077): a future
-// guarded reader ships as an addon registering a RegionFileReader with
-// RegionFormatRegistry.
 // LeafRTPRiftAddon - reference demo of effect registration. Registers a single
 // new effects-api prototype ("RIFT", a client-side "world deconstruction" warmup
 // animation) so it joins the built-in effects by name. Fully platform-neutral: the

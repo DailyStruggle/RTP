@@ -88,7 +88,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [Unreleased]
 
-## [3.3.3] - 2026-11-02
+## [3.3.3] - Unreleased
 
 ### Fixed
 
@@ -97,6 +97,8 @@ One changelog covers both the free and Pro jars, which ship the same code.
 - **`.lca` region files could be treated as ungenerated chunks during random teleports, and evicting open `.lca` regions on large world borders could stall chunk reads.** Chunk-existence checks read the first `4 KiB` of `.lca` files as a legacy `.mca` header, and opening a clean 1,024-chunk `.lca` region read every chunk header individually and ran unpromoted FIFO cache eviction. `.lca` existence checks now read the `.lca` pointer directory, clean region opens verify the header parity table without per-chunk reads, and region caches use Second-Chance Clock promotion with coalesced compaction before cache removal.
 
 - **On-demand random teleports (`rtp.unqueued` or empty cache queues) could decode candidate chunks twice when `anvilPrefilterEnabled` was active.** When the on-demand load governor selected a direct chunk load (or after an offline region prefilter check passed), the live chunk loader re-entered the offline region-file prefilter before loading the chunk on the server. Direct and post-prefilter chunk loads now load the live server chunk once without re-reading the region file.
+
+- **Chunk-load listeners on Fabric could stall the server thread when reading neighboring chunks, and Paper `26.x+` time-skip events and subcommand tab completion could miss lookups.** Fabric `CHUNK_LOAD` callbacks now run on the next server tick instead of inside `ServerChunkCache` chunk promotion, Bukkit `TimeSkipEvent` skip-reason lookups resolve across Paper's relocated `SkipReason` enum without throwing `IncompatibleClassChangeError`, and Bukkit tab completion checks both subcommand maps when suggesting `parameter=value` arguments.
 
 ## [3.3.2] - 2026-10-30
 

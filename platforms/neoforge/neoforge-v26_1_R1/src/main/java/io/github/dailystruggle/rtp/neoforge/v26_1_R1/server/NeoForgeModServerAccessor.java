@@ -964,23 +964,28 @@ public class NeoForgeModServerAccessor extends AbstractModServerAccessor {
                     return new RawPluginPayload(type, bytes);
                   });
           try {
-            new PayloadRegistrar("1")
-                .optional()
-                .playBidirectional(
-                    type,
-                    codec,
-                    (msg, context) -> {
-                      if (msg == null || msg.data() == null) return;
-                      UUID senderId =
-                          context.player() != null ? context.player().getUUID() : null;
-                      String chKey = channelId.toString();
-                      for (NeoForgeModServerAccessor acc : ACTIVE_ACCESSORS) {
-                        acc.dispatchLocalMessagingChannel(chKey, senderId, msg.data());
-                        if (!chKey.equals(channel)) {
-                          acc.dispatchLocalMessagingChannel(channel, senderId, msg.data());
+            // Synchronize on shared NeoForge PayloadRegistrar.class so parallel @Mod
+            // constructors (modloading-worker-*) do not race on NetworkRegistry's
+            // unsynchronized PAYLOAD_REGISTRATIONS HashMap.
+            synchronized (PayloadRegistrar.class) {
+              new PayloadRegistrar("1")
+                  .optional()
+                  .playBidirectional(
+                      type,
+                      codec,
+                      (msg, context) -> {
+                        if (msg == null || msg.data() == null) return;
+                        UUID senderId =
+                            context.player() != null ? context.player().getUUID() : null;
+                        String chKey = channelId.toString();
+                        for (NeoForgeModServerAccessor acc : ACTIVE_ACCESSORS) {
+                          acc.dispatchLocalMessagingChannel(chKey, senderId, msg.data());
+                          if (!chKey.equals(channel)) {
+                            acc.dispatchLocalMessagingChannel(channel, senderId, msg.data());
+                          }
                         }
-                      }
-                    });
+                      });
+            }
           } catch (RuntimeException | LinkageError ex) {
             logger()
                 .log(

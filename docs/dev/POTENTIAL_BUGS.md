@@ -42,16 +42,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
-### 2026-11-09 — `LeafFuzzConfig.validateDirectory` rejects valid partial `config.yml` files that omit `defaultPlayers`
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** `LeafSleuth` / `LeafFuzz` `:helpers:stresstest-core` boundary cleanup (`:resource:LeafFuzz:leaffuzz-common:test`)
-- **Location:** `resource/LeafFuzz/leaffuzz-common/src/main/java/net/leaf/fuzz/common/LeafFuzzConfig.java` `validateDirectory` (lines 274–281)
-- **Symptom / hypothesis:** `LeafFuzzConfig.validateDirectory` checks `defaultEpisodes` with fallback `250`, but checks `defaultPlayers` with `parseIntScalar(text, "defaultPlayers", -999)` after `parseStringScalar(text, "defaultPlayers", "1")` returns `"1"`. When a partial `config.yml` omits `defaultPlayers` (such as in `LeafFuzzCrossPlatformQcTest.runtimeEnforcesDispatchDenylistAndDisposableGuard` line 2209), `parseIntScalar` returns `-999` and `validateDirectory` reports `config.yml:defaultPlayers must be in [1, 500] or 'auto'/'ramp'`.
-- **Impact:** `LeafFuzzRuntime#reloadAndValidate()` fails when `config.yml` omits `defaultPlayers` instead of falling back to the default `1` (as `LeafFuzzConfig.parse` does).
-- **Suggested next step:** Use `1` (matching `LeafFuzzConfig.parse`) or parse `trimmedPlayers` directly when `rawPlayers` is present in `LeafFuzzConfig.validateDirectory`.
-
 ### 2026-11-08 — `lcv_vlc_demux_open` calls `lcv_sys_index_file_superblocks` with stale 10-argument signature
 
 - **Severity:** High
