@@ -838,7 +838,8 @@ class WeightedParityEvaluatorTest {
         WeightedParityEvaluator.ChunkParityInput equalCopy =
                 new WeightedParityEvaluator.ChunkParityInput(1, 2, sectionsSame, Map.of("xPos", 1, "zPos", 2));
 
-        assertEquals(base, base);
+        Object selfRef = base;
+        assertEquals(base, selfRef);
         assertEquals(base, equalCopy);
         assertEquals(base.hashCode(), equalCopy.hashCode());
         assertTrue(base.toString().contains("minecraft:stone"));

@@ -239,22 +239,24 @@ class LcaStructureStampTest {
         // Invalid dimensions, empty palette, missing Name, and out-of-bounds state index
         LinkedHashMap<String, Object> badDim = new LinkedHashMap<>();
         badDim.put("size", new Nbt.NbtList(Nbt.TAG_INT, List.of(600, 1, 1)));
+        byte[] badDimBytes = Nbt.writeNamedRoot("", badDim);
         assertThrows(
                 IOException.class,
                 () -> StructureTemplateNbtLoader.loadFromBytes(
                         "minecraft:bad_dim",
-                        Nbt.writeNamedRoot("", badDim),
+                        badDimBytes,
                         LcaStructureStamp.TerrainProjection.RIGID,
                         List.of()));
 
         LinkedHashMap<String, Object> emptyPal = new LinkedHashMap<>();
         emptyPal.put("size", new Nbt.NbtList(Nbt.TAG_INT, List.of(1, 1, 1)));
         emptyPal.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of()));
+        byte[] emptyPalBytes = Nbt.writeNamedRoot("", emptyPal);
         assertThrows(
                 IOException.class,
                 () -> StructureTemplateNbtLoader.loadFromBytes(
                         "minecraft:empty_pal",
-                        Nbt.writeNamedRoot("", emptyPal),
+                        emptyPalBytes,
                         LcaStructureStamp.TerrainProjection.RIGID,
                         List.of()));
 
@@ -263,11 +265,12 @@ class LcaStructureStampTest {
         LinkedHashMap<String, Object> blankPalEntry = new LinkedHashMap<>();
         blankPalEntry.put("Name", "  ");
         blankName.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(blankPalEntry)));
+        byte[] blankNameBytes = Nbt.writeNamedRoot("", blankName);
         assertThrows(
                 IOException.class,
                 () -> StructureTemplateNbtLoader.loadFromBytes(
                         "minecraft:blank_name",
-                        Nbt.writeNamedRoot("", blankName),
+                        blankNameBytes,
                         LcaStructureStamp.TerrainProjection.RIGID,
                         List.of()));
 
@@ -278,11 +281,12 @@ class LcaStructureStampTest {
         badBlk.put("pos", new Nbt.NbtList(Nbt.TAG_INT, List.of(0, 0, 0)));
         badBlk.put("state", 5);
         oobState.put("blocks", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(badBlk)));
+        byte[] oobStateBytes = Nbt.writeNamedRoot("", oobState);
         assertThrows(
                 IOException.class,
                 () -> StructureTemplateNbtLoader.loadFromBytes(
                         "minecraft:oob_state",
-                        Nbt.writeNamedRoot("", oobState),
+                        oobStateBytes,
                         LcaStructureStamp.TerrainProjection.RIGID,
                         List.of()));
 
