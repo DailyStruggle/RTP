@@ -2133,19 +2133,19 @@ class WorldgenKernelSwapperTest {
                         false,
                         false)
                 .materializeSections();
-        for (int wy = 6; wy <= 20; wy++) {
+        for (int wy = 6; wy <= 19; wy++) {
             int vox = tallCaveSecs[(wy + 64) >> 4][((wy & 15) << 8) | (8 << 4) | 8];
             assertEquals(
                     2,
                     vox,
-                    "Flooded cavern must fill water (never lava or floating stone floor) from wy=6..20, got "
+                    "Flooded cavern must fill water (never lava or floating stone floor) for Mojang exclusive fluidLevel=20 (wy=6..19), got "
                             + vox
                             + " at wy="
                             + wy);
         }
-        for (int wy = 21; wy <= 28; wy++) {
+        for (int wy = 20; wy <= 28; wy++) {
             int vox = tallCaveSecs[(wy + 64) >> 4][((wy & 15) << 8) | (8 << 4) | 8];
-            assertEquals(0, vox, "Cavern headspace above 40-block bucket level 20 must remain air (zero stone floors) at wy=" + wy);
+            assertEquals(0, vox, "Cavern headspace at/above Mojang exclusive 40-block bucket level 20 must remain air (zero stone floors) at wy=" + wy);
         }
         assertEquals(
                 6,

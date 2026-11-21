@@ -661,4 +661,425 @@ class LcaRegionFileStorageTest {
             LcaV3Codec.resetThreadFeatureMask();
         }
     }
+
+    @Test
+    @DisplayName("Concurrent compaction and lock-free ENTITY_DATA reads must never throw CBIT T3b offset variation")
+    void concurrentCompactionAndEntityDataReadsNeverThrowCbitT3b(@TempDir Path tempDir) throws Exception {
+        Path entitiesDir = tempDir.resolve("entities");
+        Files.createDirectories(entitiesDir);
+        Path lcaFile = entitiesDir.resolve("r.1.1.lca");
+
+        // Create an entities archive in headerOnlyChannelMode with 32 chunks (including idx=4 and idx=25)
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(entitiesDir, false)) {
+            for (int rx = 0; rx < 32; rx++) {
+                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                root.put("DataVersion", 5023);
+                root.put("Position", new int[] {32 + rx, 32});
+                List<Object> entities = new ArrayList<>();
+                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                ent.put("id", "minecraft:cow");
+                ent.put("CustomName", "\"cow-" + rx + "\"");
+                entities.add(ent);
+                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, entities));
+                storage.writeChunkCompound(32 + rx, 32, root);
+            }
+            storage.flush();
+        }
+
+        try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.openLiveArchive(lcaFile)) {
+            // Re-save several chunks to create fragmentation so compact() relocates slabs
+            for (int round = 0; round < 6; round++) {
+                for (int rx = 0; rx < 32; rx += 2) {
+                    LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                    root.put("DataVersion", 5023);
+                    root.put("Position", new int[] {32 + rx, 32});
+                    List<Object> entities = new ArrayList<>();
+                    LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                    ent.put("id", "minecraft:sheep");
+                    ent.put("CustomName", "\"sheep-" + rx + "-r" + round + "\"");
+                    entities.add(ent);
+                    root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, entities));
+                    archive.saveChunkCoW(rx, 0, root);
+                }
+            }
+
+            java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(true);
+            java.util.concurrent.atomic.AtomicReference<Throwable> readerError = new java.util.concurrent.atomic.AtomicReference<>();
+            Thread[] readers = new Thread[4];
+            for (int t = 0; t < readers.length; t++) {
+                final int tid = t;
+                readers[t] = new Thread(() -> {
+                    int iter = 0;
+                    while (running.get() && readerError.get() == null) {
+                        int rx = (iter + tid * 7) & 31;
+                        try {
+                            byte[] nbt = archive.readChunkNbtBytes(rx, 0);
+                            if (nbt == null) {
+                                readerError.compareAndSet(null, new AssertionError("Missing chunk (" + rx + ",0)"));
+                                break;
+                            }
+                        } catch (Throwable ex) {
+                            readerError.compareAndSet(null, ex);
+                            break;
+                        }
+                        iter++;
+                    }
+                }, "lca-reader-" + t);
+                readers[t].start();
+            }
+
+            try {
+                for (int c = 0; c < 40 && readerError.get() == null; c++) {
+                    // Dirty one chunk to shift slabs, then compact
+                    int rx = c & 31;
+                    LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                    root.put("DataVersion", 5023);
+                    root.put("Position", new int[] {32 + rx, 32});
+                    List<Object> entities = new ArrayList<>();
+                    LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                    ent.put("id", "minecraft:pig");
+                    ent.put("CustomName", "\"pig-" + rx + "-c" + c + "\"");
+                    entities.add(ent);
+                    root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, entities));
+                    archive.saveChunkCoW(rx, 0, root);
+                    archive.compact();
+                }
+            } finally {
+                running.set(false);
+                for (Thread r : readers) {
+                    r.join(5000);
+                }
+            }
+
+            if (readerError.get() != null) {
+                throw new AssertionError("Concurrent reader failed during compaction", readerError.get());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Chest block_entities and ENTITY_DATA roundtrip via stream API in Mode A and Mode B across CoW updates and reopen")
+    void chestBlockEntitiesAndEntityDataRoundtripAcrossModeAAndModeB(@TempDir Path tempDir) throws Exception {
+        for (boolean modeB : new boolean[] {false, true}) {
+            Path regionDir = tempDir.resolve("region_modeB_" + modeB);
+            Path entitiesDir = tempDir.resolve("entities_modeB_" + modeB);
+            Files.createDirectories(regionDir);
+            Files.createDirectories(entitiesDir);
+
+            // 1. Write a chunk with a chest containing items via getChunkDataOutputStream
+            LinkedHashMap<String, Object> chunkWithChest = build24SectionNonUniformChunkNbt(4, 0);
+            LinkedHashMap<String, Object> chest = new LinkedHashMap<>();
+            chest.put("id", "minecraft:chest");
+            chest.put("x", 4 * 16 + 3);
+            chest.put("y", 64);
+            chest.put("z", 5);
+            chest.put("keepPacked", (byte) 0);
+            LinkedHashMap<String, Object> item = new LinkedHashMap<>();
+            item.put("Slot", (byte) 0);
+            item.put("id", "minecraft:diamond");
+            item.put("count", 16);
+            chest.put("Items", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(item)));
+            chunkWithChest.put("block_entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(chest)));
+
+            byte[] chestChunkNbt = Nbt.writeNamedRoot("", chunkWithChest);
+
+            try (LcaRegionFileStorage regionStorage = new LcaRegionFileStorage(regionDir, modeB);
+                 LcaRegionFileStorage entityStorage = new LcaRegionFileStorage(entitiesDir, modeB)) {
+                try (java.io.DataOutputStream dos = regionStorage.getChunkDataOutputStream(4, 0)) {
+                    dos.write(chestChunkNbt);
+                }
+
+                // Write 32 entity chunks, update them, remove some, and re-write
+                for (int rx = 0; rx < 32; rx++) {
+                    LinkedHashMap<String, Object> entRoot = new LinkedHashMap<>();
+                    entRoot.put("DataVersion", 5023);
+                    entRoot.put("Position", new int[] {32 + rx, 32});
+                    LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                    ent.put("id", "minecraft:villager");
+                    ent.put("CustomName", "\"villager-" + rx + "\"");
+                    entRoot.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                    try (java.io.DataOutputStream dos = entityStorage.getChunkDataOutputStream(32 + rx, 32)) {
+                        dos.write(Nbt.writeNamedRoot("", entRoot));
+                    }
+                }
+                entityStorage.removeChunk(32 + 4, 32);
+                for (int rx = 0; rx < 32; rx++) {
+                    LinkedHashMap<String, Object> entRoot = new LinkedHashMap<>();
+                    entRoot.put("DataVersion", 5023);
+                    entRoot.put("Position", new int[] {32 + rx, 32});
+                    LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                    ent.put("id", "minecraft:cow");
+                    ent.put("CustomName", "\"cow-v2-" + rx + "\"");
+                    entRoot.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                    try (java.io.DataOutputStream dos = entityStorage.getChunkDataOutputStream(32 + rx, 32)) {
+                        dos.write(Nbt.writeNamedRoot("", entRoot));
+                    }
+                }
+                regionStorage.flush();
+                entityStorage.flush();
+            }
+
+            // Reopen and verify both chest block_entities and all 32 entity chunks
+            try (LcaRegionFileStorage regionStorage = new LcaRegionFileStorage(regionDir, modeB);
+                 LcaRegionFileStorage entityStorage = new LcaRegionFileStorage(entitiesDir, modeB)) {
+                try (java.io.DataInputStream dis = regionStorage.getChunkDataInputStream(4, 0)) {
+                    assertNotNull(dis);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> decoded = (Map<String, Object>) Nbt.readNamedRoot(dis.readAllBytes()).value;
+                    Nbt.NbtList besList = (Nbt.NbtList) decoded.get("block_entities");
+                    assertNotNull(besList, "block_entities missing in modeB=" + modeB);
+                    assertEquals(1, besList.items.size());
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> decChest = (Map<String, Object>) besList.items.get(0);
+                    assertEquals("minecraft:chest", decChest.get("id"));
+                    Nbt.NbtList itemsList = (Nbt.NbtList) decChest.get("Items");
+                    assertNotNull(itemsList, "Chest Items missing in modeB=" + modeB);
+                    assertEquals(1, itemsList.items.size());
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> decItem = (Map<String, Object>) itemsList.items.get(0);
+                    assertEquals("minecraft:diamond", decItem.get("id"));
+                    assertEquals(16, ((Number) decItem.get("count")).intValue());
+                }
+
+                for (int rx = 0; rx < 32; rx++) {
+                    try (java.io.DataInputStream dis = entityStorage.getChunkDataInputStream(32 + rx, 32)) {
+                        assertNotNull(dis, "Missing entity chunk (" + (32 + rx) + ",32) in modeB=" + modeB);
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> decoded = (Map<String, Object>) Nbt.readNamedRoot(dis.readAllBytes()).value;
+                        Nbt.NbtList entsList = (Nbt.NbtList) decoded.get("Entities");
+                        assertNotNull(entsList);
+                        assertEquals(1, entsList.items.size());
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> decEnt = (Map<String, Object>) entsList.items.get(0);
+                        assertEquals("minecraft:cow", decEnt.get("id"));
+                        assertEquals("\"cow-v2-" + rx + "\"", decEnt.get("CustomName"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Pending getChunkDataOutputStream closed after storage.close() must not silently drop chest data")
+    void pendingOutputStreamClosedAfterStorageCloseMustNotSilentlyDropChestData(@TempDir Path tempDir) throws Exception {
+        Path regionDir = tempDir.resolve("region_close_drop");
+        Files.createDirectories(regionDir);
+
+        LinkedHashMap<String, Object> chunkWithChest = build24SectionNonUniformChunkNbt(4, 0);
+        LinkedHashMap<String, Object> chest = new LinkedHashMap<>();
+        chest.put("id", "minecraft:chest");
+        chest.put("x", 4 * 16 + 3);
+        chest.put("y", 64);
+        chest.put("z", 5);
+        LinkedHashMap<String, Object> item = new LinkedHashMap<>();
+        item.put("Slot", (byte) 0);
+        item.put("id", "minecraft:diamond");
+        item.put("count", 32);
+        chest.put("Items", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(item)));
+        chunkWithChest.put("block_entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(chest)));
+        byte[] chestChunkNbt = Nbt.writeNamedRoot("", chunkWithChest);
+
+        LcaRegionFileStorage storage = new LcaRegionFileStorage(regionDir, true);
+        // Prime archive with an initial chunk
+        storage.writeChunkCompound(0, 0, build24SectionNonUniformChunkNbt(0, 0));
+        // Paper opens output stream for chest chunk, then LeafAnvil.onDisable() calls storage.close() before stream closes
+        java.io.DataOutputStream dos = storage.getChunkDataOutputStream(4, 0);
+        storage.close();
+        dos.write(chestChunkNbt);
+        dos.close();
+        storage.close();
+
+        // Reopen and verify chest chunk was NOT silently dropped
+        try (LcaRegionFileStorage reopened = new LcaRegionFileStorage(regionDir, true)) {
+            try (java.io.DataInputStream dis = reopened.getChunkDataInputStream(4, 0)) {
+                assertNotNull(dis, "Chest chunk (4,0) was silently dropped when output stream closed after storage.close()");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> decoded = (Map<String, Object>) Nbt.readNamedRoot(dis.readAllBytes()).value;
+                Nbt.NbtList besList = (Nbt.NbtList) decoded.get("block_entities");
+                assertNotNull(besList, "block_entities missing after reopen");
+                assertEquals(1, besList.items.size());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Concurrent storage.close() and ENTITY_DATA writes must never produce overlapping slabs (CBIT T3b)")
+    void concurrentStorageCloseAndEntityWritesNeverProduceOverlappingSlabs(@TempDir Path tempDir) throws Exception {
+        Path entitiesDir = tempDir.resolve("entities_close_race");
+        Files.createDirectories(entitiesDir);
+
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(entitiesDir, true)) {
+            for (int rx = 0; rx < 32; rx++) {
+                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                root.put("DataVersion", 5023);
+                root.put("Position", new int[] {32 + rx, 32});
+                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                ent.put("id", "minecraft:cow");
+                ent.put("CustomName", "\"cow-init-" + rx + "\"");
+                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                storage.writeChunkCompound(32 + rx, 32, root);
+            }
+            storage.flush();
+
+            java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(true);
+            java.util.concurrent.atomic.AtomicReference<Throwable> error = new java.util.concurrent.atomic.AtomicReference<>();
+            Thread closer = new Thread(() -> {
+                while (running.get() && error.get() == null) {
+                    try {
+                        storage.close();
+                        Thread.yield();
+                    } catch (Throwable t) {
+                        error.compareAndSet(null, t);
+                    }
+                }
+            }, "lca-closer");
+            closer.start();
+
+            Thread[] writers = new Thread[4];
+            for (int t = 0; t < writers.length; t++) {
+                final int tid = t;
+                writers[t] = new Thread(() -> {
+                    for (int round = 0; round < 20 && error.get() == null; round++) {
+                        for (int rx = tid; rx < 32 && error.get() == null; rx += writers.length) {
+                            try {
+                                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                                root.put("DataVersion", 5023);
+                                root.put("Position", new int[] {32 + rx, 32});
+                                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                                ent.put("id", "minecraft:sheep");
+                                ent.put("CustomName", "\"sheep-r" + round + "-" + rx + "\"");
+                                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                                byte[] nbt = Nbt.writeNamedRoot("", root);
+                                try (java.io.DataOutputStream dos = storage.getChunkDataOutputStream(32 + rx, 32)) {
+                                    dos.write(nbt);
+                                }
+                            } catch (Throwable ex) {
+                                error.compareAndSet(null, ex);
+                                break;
+                            }
+                        }
+                    }
+                }, "lca-writer-" + t);
+                writers[t].start();
+            }
+
+            try {
+                for (Thread w : writers) {
+                    w.join(15000);
+                }
+            } finally {
+                running.set(false);
+                closer.join(5000);
+            }
+            if (error.get() != null) {
+                throw new AssertionError("Concurrent close/write threw error", error.get());
+            }
+        }
+
+        // Reopen and read all 32 chunks — any overlapping slab allocation throws CBIT T3b
+        try (LcaRegionFileStorage verify = new LcaRegionFileStorage(entitiesDir, true)) {
+            for (int rx = 0; rx < 32; rx++) {
+                try (java.io.DataInputStream dis = verify.getChunkDataInputStream(32 + rx, 32)) {
+                    assertNotNull(dis, "Entity chunk (" + (32 + rx) + ",32) missing");
+                    byte[] bytes = dis.readAllBytes();
+                    assertTrue(bytes.length > 0);
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Overlapping pointer alias on open is scrubbed and never double-frees slabs into live allocations")
+    void overlappingPointerAliasOnOpenIsScrubbedAndNeverDoubleFrees(@TempDir Path tempDir) throws Exception {
+        Path entitiesDir = tempDir.resolve("entities_overlap_scrub");
+        Files.createDirectories(entitiesDir);
+        Path lcaFile = entitiesDir.resolve("r.1.0.lca");
+
+        // 1. Create a valid entity archive with chunkIdx=707 (rx=3, rz=22) and chunkIdx=900 (rx=4, rz=28)
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(entitiesDir, true)) {
+            for (int i = 0; i < 4; i++) {
+                int rx = (i == 0) ? 3 : (i == 1) ? 4 : 10 + i;
+                int rz = (i == 0) ? 22 : (i == 1) ? 28 : 5;
+                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                root.put("DataVersion", 5023);
+                root.put("Position", new int[] {32 + rx, rz});
+                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                ent.put("id", "minecraft:villager");
+                ent.put("CustomName", "\"entity-" + rx + "-" + rz + "\"");
+                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                storage.writeChunkCompound(32 + rx, rz, root);
+            }
+            storage.flush();
+        }
+
+        // 2. Inject both overlap variants with valid SEC-DED bytes:
+        //    - idx=900 (4,28) aliases idx=707 (3,22), while its original intact slab still exists on disk -> must recover
+        //    - idx=901 (5,28) aliases idx=707 (3,22) with no backing slab on disk -> must be cleared on open
+        byte[] raw = Files.readAllBytes(lcaFile);
+        int idxOwner = (3 & 31) | ((22 & 31) << 5); // 707
+        int idxRecoverableAlias = (4 & 31) | ((28 & 31) << 5); // 900
+        int idxDanglingAlias = (5 & 31) | ((28 & 31) << 5); // 901
+        long ownerPtr = LcaRegionReader.getVolatileLongBE(
+                raw, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (idxOwner << 3));
+        assertTrue(ownerPtr != 0L, "Owner pointer 707 must be present");
+        int secDedTableOffset = LcaRegionReader.SUPERBLOCK_SIZE + LcaRegionReader.POINTER_DIRECTORY_SIZE;
+        byte ownerSyn = (byte) LcaSectionCodec.computeHammingSecDed8(ownerPtr);
+        LcaRegionReader.setVolatileLongBE(
+                raw, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (idxRecoverableAlias << 3), ownerPtr);
+        raw[secDedTableOffset + idxRecoverableAlias] = ownerSyn;
+        LcaRegionReader.setVolatileLongBE(
+                raw, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (idxDanglingAlias << 3), ownerPtr);
+        raw[secDedTableOffset + idxDanglingAlias] = ownerSyn;
+        Files.write(lcaFile, raw);
+        LcaRegionReader.invalidateFileCache(lcaFile);
+
+        // 3. Reopen via LcaLiveArchive: overlapping aliases must be detected and healed/scrubbed on open
+        try (LcaRegionWriter.LcaLiveArchive live = LcaRegionWriter.openLiveArchive(lcaFile)) {
+            assertTrue(live.hasChunk(3, 22), "True slab owner (idx=707) must be preserved on open");
+            assertTrue(live.hasChunk(4, 28), "Recoverable overlapping alias (idx=900) must be recovered to its own slab");
+            assertNotNull(live.readChunkNbtBytes(4, 28), "Recovered chunk (4,28) must decode cleanly without CBIT T3b");
+            assertFalse(live.hasChunk(5, 28), "Dangling overlapping alias (idx=901) with no backing slab must be cleared on open");
+
+            // 4. Exercise returnFreeSlabs double-free guard directly on a live slab and an already-free slab
+            java.lang.reflect.Method returnFree = LcaRegionWriter.LcaLiveArchive.class
+                    .getDeclaredMethod("returnFreeSlabs", int.class, int.class);
+            returnFree.setAccessible(true);
+            int ownerSlabStart = (int) (ownerPtr >>> 29);
+            int ownerSlabs = (((int) ((ownerPtr >>> 8) & 0xFFFFFL)) + 255) >>> LcaRegionReader.SLAB_SHIFT;
+            // Attempt to double-free the live owner's slab — must be rejected
+            returnFree.invoke(live, ownerSlabStart, ownerSlabs);
+
+            // 5. Overwrite owner + write 40 more chunks to rotate the CoW grace ring and force slab reuse
+            for (int k = 0; k < 40; k++) {
+                int rx = (k == 0) ? 3 : (k & 31);
+                int rz = (k == 0) ? 22 : (1 + (k >>> 5));
+                LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+                root.put("DataVersion", 5023);
+                root.put("Position", new int[] {32 + rx, rz});
+                LinkedHashMap<String, Object> ent = new LinkedHashMap<>();
+                ent.put("id", "minecraft:sheep");
+                ent.put("CustomName", "\"after-scrub-" + k + "\"");
+                root.put("Entities", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(ent)));
+                live.saveChunkCoW(rx, rz, root);
+            }
+            live.flush();
+        }
+
+        // 6. Verify every live chunk in the file decodes cleanly via read-only LcaRegionReader (zero CBIT T3b)
+        LcaRegionReader.invalidateFileCache(lcaFile);
+        try (LcaRegionFileStorage verify = new LcaRegionFileStorage(entitiesDir, true)) {
+            try (java.io.DataInputStream dis = verify.getChunkDataInputStream(32 + 3, 22)) {
+                assertNotNull(dis, "Owner chunk (35,22) must remain readable");
+                assertTrue(dis.readAllBytes().length > 0);
+            }
+            for (int k = 1; k < 40; k++) {
+                int rx = k & 31;
+                int rz = 1 + (k >>> 5);
+                try (java.io.DataInputStream dis = verify.getChunkDataInputStream(32 + rx, rz)) {
+                    assertNotNull(dis, "Chunk (" + (32 + rx) + "," + rz + ") missing");
+                    assertTrue(dis.readAllBytes().length > 0);
+                }
+            }
+        }
+    }
 }

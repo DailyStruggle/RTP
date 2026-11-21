@@ -1346,6 +1346,9 @@ public final class LcaRegionWriter {
             boolean hasSecDed = (flags & 16) != 0;
             boolean verifySlabHeadersOnOpen = !hasSecDed || crashFooterRecovered;
             boolean[] needsOpenScan = null;
+            long[] openIntervals = new long[1024];
+            int[] openSlabEnds = new int[1024];
+            int openIntervalCount = 0;
             for (int i = 0; i < 1024; i++) {
                 int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
                 long ptr = (long) LcaRegionReader.LONG_BE_VIEW.get(this.buffer, ptrByteOffset);
@@ -1390,9 +1393,54 @@ public final class LcaRegionWriter {
                         needsOpenScan[i] = true;
                         continue;
                     }
-                    int slabEnd = (int) slabStartLong + ((byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                    int slabStart = (int) slabStartLong;
+                    int slabEnd = slabStart + ((byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
                     if (slabEnd > maxCursorSlab) {
                         maxCursorSlab = slabEnd;
+                    }
+                    openIntervals[openIntervalCount++] = ((long) slabStart << 32) | (i & 0xFFFF_FFFFL);
+                    openSlabEnds[i] = slabEnd;
+                }
+            }
+
+            if (openIntervalCount > 1) {
+                Arrays.sort(openIntervals, 0, openIntervalCount);
+                int prevIdx = (int) openIntervals[0];
+                int prevEnd = openSlabEnds[prevIdx];
+                for (int k = 1; k < openIntervalCount; k++) {
+                    int curStart = (int) (openIntervals[k] >>> 32);
+                    int curIdx = (int) openIntervals[k];
+                    int curEnd = openSlabEnds[curIdx];
+                    if (curStart < prevEnd) {
+                        long prevPtr = (long) LcaRegionReader.LONG_BE_VIEW.get(
+                                this.buffer, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (prevIdx << 3));
+                        long curPtr = (long) LcaRegionReader.LONG_BE_VIEW.get(
+                                this.buffer, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (curIdx << 3));
+                        boolean prevValid = (needsOpenScan == null || !needsOpenScan[prevIdx])
+                                && isSlabValidForChunkOnChannel(ch, prevPtr, prevIdx, effectivePayloadLimit);
+                        boolean curValid = (needsOpenScan == null || !needsOpenScan[curIdx])
+                                && isSlabValidForChunkOnChannel(ch, curPtr, curIdx, effectivePayloadLimit);
+                        if (!prevValid) {
+                            if (needsOpenScan == null) needsOpenScan = new boolean[1024];
+                            needsOpenScan[prevIdx] = true;
+                        }
+                        if (!curValid) {
+                            if (needsOpenScan == null) needsOpenScan = new boolean[1024];
+                            needsOpenScan[curIdx] = true;
+                        }
+                        if (prevValid && curValid) {
+                            if (needsOpenScan == null) needsOpenScan = new boolean[1024];
+                            needsOpenScan[prevIdx] = true;
+                        }
+                    }
+                    boolean prevFlagged = needsOpenScan != null && needsOpenScan[prevIdx];
+                    boolean curFlagged = needsOpenScan != null && needsOpenScan[curIdx];
+                    if (prevFlagged && !curFlagged) {
+                        prevIdx = curIdx;
+                        prevEnd = curEnd;
+                    } else if (!curFlagged && curEnd > prevEnd) {
+                        prevIdx = curIdx;
+                        prevEnd = curEnd;
                     }
                 }
             }
@@ -1401,6 +1449,9 @@ public final class LcaRegionWriter {
                 int recoveredMaxSlab = reconstructCorruptPointersOnOpen(ch, needsOpenScan, effectivePayloadLimit, null);
                 if (recoveredMaxSlab > maxCursorSlab) {
                     maxCursorSlab = recoveredMaxSlab;
+                }
+                if (lcaFile != null) {
+                    LcaRegionReader.invalidateFileCache(lcaFile);
                 }
             }
 
@@ -1828,7 +1879,13 @@ public final class LcaRegionWriter {
          * Off-thread positional region channel writer (`REQ-RTP-S-005`, `@scheduler_dispatch`).
          */
         private void writeChannelRange(long fileOffset, byte[] src, int srcOffset, int length) throws IOException {
-            if (channel == null || !channel.isOpen() || length <= 0) {
+            if (length <= 0) {
+                return;
+            }
+            if (channel == null || !channel.isOpen()) {
+                if (headerOnlyChannelMode) {
+                    throw new java.nio.channels.ClosedChannelException();
+                }
                 return;
             }
             ByteBuffer bb = ByteBuffer.wrap(src, srcOffset, length);
@@ -1860,6 +1917,9 @@ public final class LcaRegionWriter {
          */
         private synchronized void persistPointerAndSecDed(int chunkIdx) {
             if (channel == null || !channel.isOpen()) {
+                if (headerOnlyChannelMode) {
+                    throw new UncheckedIOException(new java.nio.channels.ClosedChannelException());
+                }
                 return;
             }
             writeFooterCanary();
@@ -3234,12 +3294,11 @@ public final class LcaRegionWriter {
                 int chunkStartByteOff = chunkStartSlab << LcaRegionReader.SLAB_SHIFT;
                 int totalChunkPoolBytes = (totalLiveSlabCount << LcaRegionReader.SLAB_SHIFT) + LcaRegionReader.FOOTER_SIZE;
                 byte[] packedChunkPool = new byte[totalChunkPoolBytes];
+                long[] newPtrs = new long[1024];
                 for (int i = 0; i < 1024; i++) {
                     byte[] payload = liveChunkPayloads[i];
-                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
                     if (payload == null) {
-                        buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(0L);
-                        LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, 0L);
+                        newPtrs[i] = 0L;
                         continue;
                     }
                     int slabs = (payload.length + 255) >>> LcaRegionReader.SLAB_SHIFT;
@@ -3247,14 +3306,22 @@ public final class LcaRegionWriter {
                     cursorSlab += slabs;
                     int relDst = (targetSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
                     System.arraycopy(payload, 0, packedChunkPool, relDst, payload.length);
-                    long newPtr = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
+                    newPtrs[i] = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
+                }
+                int newEndSlab = cursorSlab;
+                int footerRelOff = (newEndSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
+                LcaRegionReader.setVolatileLongBE(packedChunkPool, footerRelOff, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
+                // Write compacted slabs to disk BEFORE publishing new pointers to lock-free readers
+                writeChannelRange(chunkStartByteOff, packedChunkPool, 0, packedChunkPool.length);
+                VarHandle.releaseFence();
+                Arrays.fill(prevChunkPointers, 0L);
+                for (int i = 0; i < 1024; i++) {
+                    int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
+                    long newPtr = newPtrs[i];
                     buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
                     LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
                 }
-                activeEndSlab = cursorSlab;
-                int footerRelOff = (activeEndSlab - chunkStartSlab) << LcaRegionReader.SLAB_SHIFT;
-                LcaRegionReader.setVolatileLongBE(packedChunkPool, footerRelOff, LcaRegionReader.LCA_FOOTER_CANARY_MAGIC);
-                writeChannelRange(chunkStartByteOff, packedChunkPool, 0, packedChunkPool.length);
+                activeEndSlab = newEndSlab;
                 lastSyncedFooterOffset = activeEndSlab << LcaRegionReader.SLAB_SHIFT;
                 writeChannelRange(
                         LcaRegionReader.POINTER_DIRECTORY_OFFSET,
@@ -3277,6 +3344,7 @@ public final class LcaRegionWriter {
             for (int s = 0; s < dictSegments.size(); s++) {
                 flushDictSegment(dictSegments.get(s));
             }
+            Arrays.fill(prevChunkPointers, 0L);
             for (int i = 0; i < 1024; i++) {
                 byte[] payload = liveChunkPayloads[i];
                 int ptrByteOffset = LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3);
@@ -3294,6 +3362,7 @@ public final class LcaRegionWriter {
                 if (padded > payload.length) {
                     Arrays.fill(buffer, dstOff + payload.length, dstOff + padded, (byte) 0);
                 }
+                VarHandle.releaseFence();
                 long newPtr = packChunkPointer64(targetSlab, liveChunkModeB[i], payload.length, liveChunkGens[i]);
                 buffer[secDedTableOffset + i] = (byte) LcaSectionCodec.computeHammingSecDed8(newPtr);
                 LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, newPtr);
@@ -5469,14 +5538,14 @@ public final class LcaRegionWriter {
                 int start = (int) (iv >>> 32);
                 int end = (int) iv;
                 if (start > cursorSlab) {
-                    returnFreeSlabs(cursorSlab, start - cursorSlab);
+                    insertFreeInterval(cursorSlab, start - cursorSlab);
                 }
                 if (end > cursorSlab) {
                     cursorSlab = end;
                 }
             }
             if (this.activeEndSlab > cursorSlab) {
-                returnFreeSlabs(cursorSlab, this.activeEndSlab - cursorSlab);
+                insertFreeInterval(cursorSlab, this.activeEndSlab - cursorSlab);
             }
         }
 
@@ -5566,19 +5635,72 @@ public final class LcaRegionWriter {
         }
 
         private synchronized void returnFreeSlabs(int slabStart, int slabCount) {
-            if (slabCount <= 0) return;
+            if (slabCount <= 0 || slabStart < this.slabPoolBaseSlab) return;
             ensureFreeSlabPoolInitialized();
+            int slabEnd = slabStart + slabCount;
+
+            for (int s = 0; s < dictSegments.size(); s++) {
+                DictSegmentMeta seg = dictSegments.get(s);
+                int segStart = seg.byteOffset >>> LcaRegionReader.SLAB_SHIFT;
+                if (segStart >= this.slabPoolBaseSlab) {
+                    int segEnd = segStart + ((seg.capacityBytes + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                    if (segStart < slabEnd && segEnd > slabStart) {
+                        java.util.logging.Logger.getLogger(LcaRegionWriter.class.getName())
+                                .log(java.util.logging.Level.WARNING,
+                                        "[LcaRegionWriter] Refused to free slab range [" + slabStart + ".." + slabEnd
+                                                + ") overlapping live dict segment [" + segStart + ".." + segEnd + ")");
+                        return;
+                    }
+                }
+            }
+            for (int i = 0; i < 1024; i++) {
+                long ptr = (long) LcaRegionReader.LONG_BE_VIEW.get(
+                        this.buffer, LcaRegionReader.POINTER_DIRECTORY_OFFSET + (i << 3));
+                if (ptr != 0L) {
+                    int ptrStart = (int) (ptr >>> 29);
+                    int byteLen = (int) ((ptr >>> 8) & 0xFFFFFL);
+                    if (ptrStart >= this.slabPoolBaseSlab && byteLen > 0) {
+                        int ptrEnd = ptrStart + ((byteLen + 255) >>> LcaRegionReader.SLAB_SHIFT);
+                        if (ptrStart < slabEnd && ptrEnd > slabStart) {
+                            java.util.logging.Logger.getLogger(LcaRegionWriter.class.getName())
+                                    .log(java.util.logging.Level.WARNING,
+                                            "[LcaRegionWriter] Refused to free slab range [" + slabStart + ".." + slabEnd
+                                                    + ") still referenced by live chunkIdx=" + i
+                                                    + " [" + ptrStart + ".." + ptrEnd + ")");
+                            return;
+                        }
+                    }
+                }
+            }
+
+            Map.Entry<Integer, Integer> prev = freeByStart.floorEntry(slabStart);
+            if (prev != null && prev.getKey() + prev.getValue() > slabStart) {
+                java.util.logging.Logger.getLogger(LcaRegionWriter.class.getName())
+                        .log(java.util.logging.Level.WARNING,
+                                "[LcaRegionWriter] Refused duplicate free of slab range [" + slabStart + ".." + slabEnd
+                                        + ") overlapping free interval [" + prev.getKey() + ".."
+                                        + (prev.getKey() + prev.getValue()) + ")");
+                return;
+            }
+            Map.Entry<Integer, Integer> next = freeByStart.ceilingEntry(slabStart);
+            if (next != null && next.getKey() < slabEnd) {
+                java.util.logging.Logger.getLogger(LcaRegionWriter.class.getName())
+                        .log(java.util.logging.Level.WARNING,
+                                "[LcaRegionWriter] Refused duplicate free of slab range [" + slabStart + ".." + slabEnd
+                                        + ") overlapping free interval [" + next.getKey() + ".."
+                                        + (next.getKey() + next.getValue()) + ")");
+                return;
+            }
+
             int mergedStart = slabStart;
             int mergedCount = slabCount;
 
-            Map.Entry<Integer, Integer> prev = freeByStart.floorEntry(slabStart);
             if (prev != null && prev.getKey() + prev.getValue() == slabStart) {
                 removeFreeInterval(prev.getKey(), prev.getValue());
                 mergedStart = prev.getKey();
                 mergedCount += prev.getValue();
             }
 
-            Map.Entry<Integer, Integer> next = freeByStart.ceilingEntry(slabStart + slabCount);
             if (next != null && mergedStart + mergedCount == next.getKey()) {
                 removeFreeInterval(next.getKey(), next.getValue());
                 mergedCount += next.getValue();

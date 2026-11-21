@@ -5150,6 +5150,7 @@ public final class WorldgenKernelSwapper {
     public static final int BEARD_THIN = 2;
     public static final int BEARD_BOX = 3;
     public static final int BEARD_ENCAPSULATE = 4;
+    public static final int BEARD_JUNCTION = 5;
     public static final int STRUCTURE_GRID_QUERY_BYTES = 32;
     public static final int STRUCTURE_CANDIDATE_BYTES = 32;
     public static final int SPREAD_LINEAR = 0;
@@ -5171,7 +5172,7 @@ public final class WorldgenKernelSwapper {
             int junctionCount) {
 
         public GpuBeardPiece {
-            if (terrainAdjustment < BEARD_NONE || terrainAdjustment > BEARD_ENCAPSULATE) {
+            if (terrainAdjustment < BEARD_NONE || terrainAdjustment > BEARD_JUNCTION) {
                 throw new IllegalArgumentException("Invalid terrainAdjustment: " + terrainAdjustment);
             }
             if (groundLevelDelta < -128 || groundLevelDelta > 127) {
@@ -5365,12 +5366,48 @@ public final class WorldgenKernelSwapper {
         return java.util.Collections.unmodifiableList(out);
     }
 
+    private static final float[] MOJANG_BEARD_KERNEL = buildMojangBeardKernel();
+
+    private static float[] buildMojangBeardKernel() {
+        float[] kernel = new float[24 * 24 * 24];
+        for (int z = 0; z < 24; z++) {
+            int dz = z - 12;
+            for (int x = 0; x < 24; x++) {
+                int dx = x - 12;
+                for (int y = 0; y < 24; y++) {
+                    double dy = (double) (y - 12) + 0.5;
+                    double d2 = (double) (dx * dx + dz * dz) + dy * dy;
+                    kernel[(z * 24 + x) * 24 + y] = (float) Math.exp(-d2 / 16.0);
+                }
+            }
+        }
+        return kernel;
+    }
+
+    private static double mojangBeardContribution(int dx, int dy, int dz, int dyGround) {
+        int ix = dx + 12;
+        int iy = dy + 12;
+        int iz = dz + 12;
+        if (ix < 0 || ix >= 24 || iy < 0 || iy >= 24 || iz < 0 || iz >= 24) {
+            return 0.0;
+        }
+        double y = (double) dyGround + 0.5;
+        double d2 = (double) dx * (double) dx + y * y + (double) dz * (double) dz;
+        double scale = -y / Math.sqrt(2.0 * d2);
+        return scale * (double) MOJANG_BEARD_KERNEL[(iz * 24 + ix) * 24 + iy];
+    }
+
+    private static double mojangBuryContribution(double dx, double dy, double dz) {
+        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        return Math.max(0.0, Math.min(1.0, 1.0 - len / 6.0));
+    }
+
     public static float computeBeardContribution(
             int bx, int by, int bz, int[] beardPiecesI32, int beardStartIdx, int beardCount) {
         if (beardPiecesI32 == null || beardCount <= 0) {
             return 0.0f;
         }
-        float sum = 0.0f;
+        double sum = 0.0;
         for (int i = 0; i < beardCount; i++) {
             int p = (beardStartIdx + i) * 8;
             int w6 = beardPiecesI32[p + 6];
@@ -5380,47 +5417,33 @@ public final class WorldgenKernelSwapper {
             }
             int gDelta = (w6 << 16) >> 24;
             int minX = beardPiecesI32[p];
-            int minY = beardPiecesI32[p + 1] + gDelta;
+            int rawMinY = beardPiecesI32[p + 1];
             int minZ = beardPiecesI32[p + 2];
             int maxX = beardPiecesI32[p + 3];
             int maxY = beardPiecesI32[p + 4];
             int maxZ = beardPiecesI32[p + 5];
             int dx = Math.max(0, Math.max(minX - bx, bx - maxX));
             int dz = Math.max(0, Math.max(minZ - bz, bz - maxZ));
-            int dy = Math.max(0, Math.max(minY - by, by - maxY));
-            if (dx > 12 || dz > 12 || dy > 12) {
-                continue;
-            }
-            int d2 = dx * dx + dy * dy + dz * dz;
-            if (d2 >= 144) {
-                continue;
-            }
-            float t = 1.0f - (float) d2 * 0x1.c71c72p-8f;
-            float w = (t * t) * t;
+            int groundY = rawMinY + gDelta;
+            int dyGround = by - groundY;
             if (tAdj == BEARD_BURY) {
-                int midY = (minY + maxY) >> 1;
-                sum += (by <= midY ? 0.85f : -0.45f) * w;
+                sum += mojangBuryContribution(dx, (double) dyGround * 0.5, dz);
             } else if (tAdj == BEARD_THIN) {
-                if (by <= minY) {
-                    sum += 1.35f * w;
-                } else if (dx <= 2 && dz <= 2 && by <= maxY) {
-                    sum -= 0.90f * w;
-                }
+                sum += mojangBeardContribution(dx, dyGround, dz, dyGround) * 0.8;
             } else if (tAdj == BEARD_BOX) {
-                if (dx == 0 && dz == 0 && by >= minY && by <= maxY) {
-                    sum -= 2.25f;
-                } else {
-                    sum += (by < minY ? 1.10f : -0.65f) * w;
-                }
+                int dyBox = Math.max(0, Math.max(groundY - by, by - maxY));
+                sum += mojangBeardContribution(dx, dyBox, dz, dyGround) * 0.8;
             } else if (tAdj == BEARD_ENCAPSULATE) {
-                if (dx == 0 && dz == 0 && by >= minY && by <= maxY) {
-                    sum += 1.60f;
-                } else {
-                    sum += 0.95f * w;
-                }
+                int dyEnc = Math.max(0, Math.max(rawMinY - by, by - maxY));
+                sum += mojangBuryContribution((double) dx * 0.5, (double) dyEnc * 0.5, (double) dz * 0.5) * 0.8;
+            } else if (tAdj == BEARD_JUNCTION) {
+                int jdx = bx - minX;
+                int jdy = by - rawMinY;
+                int jdz = bz - minZ;
+                sum += mojangBeardContribution(jdx, jdy, jdz, jdy) * 0.4;
             }
         }
-        return sum;
+        return (float) sum;
     }
 
     private static int adjustSurfYForBeard(

@@ -167,6 +167,8 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
 
     private final ConcurrentHashMap<Long, LcaRegionWriter.LcaLiveArchive> regionCache =
             new ConcurrentHashMap<>(64);
+    private final ConcurrentHashMap<Long, Object> regionLocks =
+            new ConcurrentHashMap<>(64);
     private final Set<Long> recentRegionKeys = ConcurrentHashMap.newKeySet();
     private final ConcurrentLinkedQueue<Long> regionEvictionQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Long, FileChannel> readChannelCache =
@@ -465,10 +467,46 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
      * commits it to the backing `.lca` region file via Copy-on-Write (`CoW`) `256B` slab rotation.
      */
     public DataOutputStream getChunkDataOutputStream(int chunkX, int chunkZ) throws IOException {
-        int regionX = chunkX >> 5;
-        int regionZ = chunkZ >> 5;
-        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
-        return archive.getChunkDataOutputStream(chunkX & 31, chunkZ & 31);
+        java.io.OutputStream commitOut = new java.io.OutputStream() {
+            private byte[] buf = new byte[65536];
+            private int count;
+            private boolean streamClosed;
+
+            private void ensureCap(int needed) {
+                if (needed > buf.length) {
+                    int next = Math.max(needed, buf.length << 1);
+                    buf = java.util.Arrays.copyOf(buf, next);
+                }
+            }
+
+            @Override
+            public void write(int b) {
+                ensureCap(count + 1);
+                buf[count++] = (byte) b;
+            }
+
+            @Override
+            public void write(byte[] src, int off, int len) {
+                java.util.Objects.checkFromIndexSize(off, len, src.length);
+                if (len > 0) {
+                    ensureCap(count + len);
+                    System.arraycopy(src, off, buf, count, len);
+                    count += len;
+                }
+            }
+
+            @Override
+            public void close() throws IOException {
+                if (streamClosed) {
+                    return;
+                }
+                streamClosed = true;
+                if (count > 0) {
+                    writeChunkNbtBytes(chunkX, chunkZ, buf, 0, count);
+                }
+            }
+        };
+        return new DataOutputStream(new java.io.BufferedOutputStream(commitOut, 8192));
     }
 
     /**
@@ -693,6 +731,10 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         return archive.readChunkNbtBytes(rx, rz);
     }
 
+    private Object regionLock(long key) {
+        return regionLocks.computeIfAbsent(key, k -> new Object());
+    }
+
     /**
      * Writes a decoded chunk NBT compound map at world chunk coordinates `(chunkX, chunkZ)` using
      * Copy-on-Write (`CoW`) `256B` sub-slab persistence.
@@ -704,8 +746,14 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         }
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
-        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
-        return archive.saveChunkCoW(chunkX & 31, chunkZ & 31, chunkRoot);
+        long key = packRegionKey(regionX, regionZ);
+        int written;
+        synchronized (regionLock(key)) {
+            LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegionLocked(regionX, regionZ, true);
+            written = archive.saveChunkCoW(chunkX & 31, chunkZ & 31, chunkRoot);
+        }
+        evictExcessRegions(key);
+        return written;
     }
 
     /**
@@ -716,13 +764,32 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             removeChunk(chunkX, chunkZ);
             return 0;
         }
-        if (containsDirectCoWCommittedMarker(uncompressedNbtBytes, 0, uncompressedNbtBytes.length)) {
+        return writeChunkNbtBytes(chunkX, chunkZ, uncompressedNbtBytes, 0, uncompressedNbtBytes.length);
+    }
+
+    /**
+     * Writes an uncompressed Mojang binary NBT root `TAG_Compound` byte slice at world chunk coordinates `(chunkX, chunkZ)`.
+     */
+    public int writeChunkNbtBytes(
+            int chunkX, int chunkZ, byte[] uncompressedNbtBytes, int offset, int length
+    ) throws IOException {
+        if (uncompressedNbtBytes == null || length <= 0) {
+            removeChunk(chunkX, chunkZ);
+            return 0;
+        }
+        if (containsDirectCoWCommittedMarker(uncompressedNbtBytes, offset, length)) {
             return 0;
         }
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
-        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
-        return archive.saveChunkNbtBytes(chunkX & 31, chunkZ & 31, uncompressedNbtBytes);
+        long key = packRegionKey(regionX, regionZ);
+        int written;
+        synchronized (regionLock(key)) {
+            LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegionLocked(regionX, regionZ, true);
+            written = archive.saveChunkNbtBytes(chunkX & 31, chunkZ & 31, uncompressedNbtBytes, offset, length);
+        }
+        evictExcessRegions(key);
+        return written;
     }
 
     /**
@@ -740,8 +807,14 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         }
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
-        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
-        return archive.saveChunkNbtBuffer(chunkX & 31, chunkZ & 31, uncompressedNbt);
+        long key = packRegionKey(regionX, regionZ);
+        int written;
+        synchronized (regionLock(key)) {
+            LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegionLocked(regionX, regionZ, true);
+            written = archive.saveChunkNbtBuffer(chunkX & 31, chunkZ & 31, uncompressedNbt.duplicate());
+        }
+        evictExcessRegions(key);
+        return written;
     }
 
     /**
@@ -801,8 +874,14 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         }
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
-        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
-        return archive.commitPreEncodedChunkCoW(chunkX & 31, chunkZ & 31, preEncodedSlabBytes);
+        long key = packRegionKey(regionX, regionZ);
+        int written;
+        synchronized (regionLock(key)) {
+            LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegionLocked(regionX, regionZ, true);
+            written = archive.commitPreEncodedChunkCoW(chunkX & 31, chunkZ & 31, preEncodedSlabBytes);
+        }
+        evictExcessRegions(key);
+        return written;
     }
 
     /**
@@ -834,11 +913,17 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     public boolean removeChunk(int chunkX, int chunkZ) throws IOException {
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
-        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, false);
-        if (archive == null) {
-            return false;
+        long key = packRegionKey(regionX, regionZ);
+        boolean removed;
+        synchronized (regionLock(key)) {
+            LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegionLocked(regionX, regionZ, false);
+            if (archive == null) {
+                return false;
+            }
+            removed = archive.removeChunk(chunkX & 31, chunkZ & 31);
         }
-        return archive.removeChunk(chunkX & 31, chunkZ & 31);
+        evictExcessRegions(key);
+        return removed;
     }
 
     /**
@@ -853,7 +938,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         closed.set(false);
         while (true) {
             LcaRegionWriter.LcaLiveArchive cached = regionCache.get(key);
-            if (cached != null) {
+            if (cached != null && cached.isChannelOpen()) {
                 recentRegionKeys.add(key);
                 return cached;
             }
@@ -863,11 +948,11 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             if (existingFuture != null) {
                 try {
                     LcaRegionWriter.LcaLiveArchive joined = existingFuture.join();
-                    if (joined != null) {
+                    if (joined != null && joined.isChannelOpen()) {
                         recentRegionKeys.add(key);
                         return joined;
                     }
-                    if (!createIfAbsent) {
+                    if (!createIfAbsent && joined == null) {
                         return null;
                     }
                     continue;
@@ -879,85 +964,103 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 }
             }
 
+            LcaRegionWriter.LcaLiveArchive result;
             try {
-                LcaRegionWriter.LcaLiveArchive recheck = regionCache.get(key);
-                if (recheck != null) {
-                    recentRegionKeys.add(key);
-                    openingRegions.remove(key, inflight);
-                    inflight.complete(recheck);
-                    return recheck;
-                }
-
-                closeReadChannel(key);
-                LcaRegionWriter.LcaLiveArchive result = null;
-                Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
-                if (Files.exists(lcaFile) && Files.size(lcaFile) >= LcaRegionReader.SUPERBLOCK_SIZE
-                        + LcaRegionReader.POINTER_DIRECTORY_SIZE + LcaRegionReader.FOOTER_SIZE) {
-                    boolean upgraded = LcaRegionWriter.upgradeLegacyArchiveAtomically(lcaFile, lcd2Level);
-                    if (upgraded) {
-                        invalidateRegionCacheState(regionX, regionZ);
-                    }
-                    result = LcaRegionWriter.openLiveArchive(lcaFile, lcd2Level);
-                } else if (autoMigrateLegacy) {
-                    LcaRegionWriter.LcaLiveArchive migrated = tryMigrateLegacyRegion(regionX, regionZ, lcaFile);
-                    if (migrated != null) {
-                        migratedRegionCount.incrementAndGet();
-                        result = migrated;
-                    }
-                }
-
-                if (result == null) {
-                    if (!createIfAbsent) {
-                        knownMissingRegions.add(key);
-                        openingRegions.remove(key, inflight);
-                        inflight.complete(null);
-                        return null;
-                    }
-                    result = LcaRegionWriter.createEmptyLiveArchive(
-                            lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
-                            lcd2Level, storageKind, LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES);
-                }
-                knownMissingRegions.remove(key);
-
-                closed.set(false);
-                regionCache.put(key, result);
-                regionEvictionQueue.offer(key);
-                int maxScans = (maxOpenWriteArchives << 1) + 8;
-                int scans = 0;
-                while (regionCache.size() > maxOpenWriteArchives && scans++ < maxScans) {
-                    Long eldestKey = regionEvictionQueue.poll();
-                    if (eldestKey == null || eldestKey.longValue() == key) {
-                        if (eldestKey != null) {
-                            regionEvictionQueue.offer(eldestKey);
-                        }
-                        break;
-                    }
-                    if (!regionCache.containsKey(eldestKey)) {
-                        recentRegionKeys.remove(eldestKey);
-                        continue;
-                    }
-                    if (recentRegionKeys.remove(eldestKey)) {
-                        regionEvictionQueue.offer(eldestKey);
-                        continue;
-                    }
-                    LcaRegionWriter.LcaLiveArchive evicted = regionCache.get(eldestKey);
-                    if (evicted != null) {
-                        try {
-                            closeArchiveQuietlyWithCompaction(evicted);
-                        } finally {
-                            regionCache.remove(eldestKey, evicted);
-                        }
-                    }
+                synchronized (regionLock(key)) {
+                    result = getOrOpenRegionLocked(regionX, regionZ, createIfAbsent);
                 }
                 openingRegions.remove(key, inflight);
                 inflight.complete(result);
-                return result;
             } catch (IOException | RuntimeException | Error e) {
                 openingRegions.remove(key, inflight);
                 inflight.completeExceptionally(e);
                 throw e;
             } finally {
                 openingRegions.remove(key, inflight);
+            }
+            if (result != null) {
+                evictExcessRegions(key);
+            }
+            return result;
+        }
+    }
+
+    @SuppressWarnings({"java:S2095", "resource"})
+    private LcaRegionWriter.LcaLiveArchive getOrOpenRegionLocked(
+            int regionX, int regionZ, boolean createIfAbsent
+    ) throws IOException {
+        long key = packRegionKey(regionX, regionZ);
+        LcaRegionWriter.LcaLiveArchive recheck = regionCache.get(key);
+        if (recheck != null) {
+            if (recheck.isChannelOpen()) {
+                recentRegionKeys.add(key);
+                return recheck;
+            }
+            regionCache.remove(key, recheck);
+        }
+
+        closeReadChannel(key);
+        LcaRegionWriter.LcaLiveArchive result = null;
+        Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
+        if (Files.exists(lcaFile) && Files.size(lcaFile) >= LcaRegionReader.SUPERBLOCK_SIZE
+                + LcaRegionReader.POINTER_DIRECTORY_SIZE + LcaRegionReader.FOOTER_SIZE) {
+            boolean upgraded = LcaRegionWriter.upgradeLegacyArchiveAtomically(lcaFile, lcd2Level);
+            if (upgraded) {
+                invalidateRegionCacheState(regionX, regionZ);
+            }
+            result = LcaRegionWriter.openLiveArchive(lcaFile, lcd2Level);
+        } else if (autoMigrateLegacy) {
+            LcaRegionWriter.LcaLiveArchive migrated = tryMigrateLegacyRegion(regionX, regionZ, lcaFile);
+            if (migrated != null) {
+                migratedRegionCount.incrementAndGet();
+                result = migrated;
+            }
+        }
+
+        if (result == null) {
+            if (!createIfAbsent) {
+                knownMissingRegions.add(key);
+                return null;
+            }
+            result = LcaRegionWriter.createEmptyLiveArchive(
+                    lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                    lcd2Level, storageKind, LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES);
+        }
+        knownMissingRegions.remove(key);
+        closed.set(false);
+        regionCache.put(key, result);
+        regionEvictionQueue.offer(key);
+        return result;
+    }
+
+    private void evictExcessRegions(long keepKey) throws IOException {
+        int maxScans = (maxOpenWriteArchives << 1) + 8;
+        int scans = 0;
+        while (regionCache.size() > maxOpenWriteArchives && scans++ < maxScans) {
+            Long eldestKey = regionEvictionQueue.poll();
+            if (eldestKey == null || eldestKey.longValue() == keepKey) {
+                if (eldestKey != null) {
+                    regionEvictionQueue.offer(eldestKey);
+                }
+                break;
+            }
+            if (!regionCache.containsKey(eldestKey)) {
+                recentRegionKeys.remove(eldestKey);
+                continue;
+            }
+            if (recentRegionKeys.remove(eldestKey)) {
+                regionEvictionQueue.offer(eldestKey);
+                continue;
+            }
+            synchronized (regionLock(eldestKey)) {
+                LcaRegionWriter.LcaLiveArchive evicted = regionCache.get(eldestKey);
+                if (evicted != null) {
+                    try {
+                        closeArchiveQuietlyWithCompaction(evicted);
+                    } finally {
+                        regionCache.remove(eldestKey, evicted);
+                    }
+                }
             }
         }
     }
@@ -1064,14 +1167,16 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
      */
     public void closeRegion(int regionX, int regionZ) throws IOException {
         long key = packRegionKey(regionX, regionZ);
-        closeReadChannel(key);
-        recentRegionKeys.remove(key);
-        LcaRegionWriter.LcaLiveArchive archive = regionCache.get(key);
-        if (archive != null) {
-            try {
-                closeArchiveWithCompaction(archive, true);
-            } finally {
-                regionCache.remove(key, archive);
+        synchronized (regionLock(key)) {
+            closeReadChannel(key);
+            recentRegionKeys.remove(key);
+            LcaRegionWriter.LcaLiveArchive archive = regionCache.get(key);
+            if (archive != null) {
+                try {
+                    closeArchiveWithCompaction(archive, true);
+                } finally {
+                    regionCache.remove(key, archive);
+                }
             }
         }
     }
@@ -1119,10 +1224,6 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        List<LcaRegionWriter.LcaLiveArchive> archives = new ArrayList<>(regionCache.values());
-        regionCache.clear();
-        recentRegionKeys.clear();
-        regionEvictionQueue.clear();
         List<FileChannel> readChannels = new ArrayList<>(readChannelCache.values());
         readChannelCache.clear();
         recentReadChannelKeys.clear();
@@ -1137,13 +1238,23 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 }
             }
         }
-        for (LcaRegionWriter.LcaLiveArchive archive : archives) {
-            try {
-                closeArchiveWithCompaction(archive, true);
-            } catch (IOException e) {
-                if (firstEx == null) firstEx = e;
+        List<Long> keys = new ArrayList<>(regionCache.keySet());
+        for (Long key : keys) {
+            synchronized (regionLock(key)) {
+                recentRegionKeys.remove(key);
+                LcaRegionWriter.LcaLiveArchive archive = regionCache.get(key);
+                if (archive != null) {
+                    try {
+                        closeArchiveWithCompaction(archive, true);
+                    } catch (IOException e) {
+                        if (firstEx == null) firstEx = e;
+                    } finally {
+                        regionCache.remove(key, archive);
+                    }
+                }
             }
         }
+        regionEvictionQueue.clear();
         if (firstEx != null) {
             throw firstEx;
         }

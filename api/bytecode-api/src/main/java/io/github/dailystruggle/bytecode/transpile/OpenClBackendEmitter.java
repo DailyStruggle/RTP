@@ -3664,7 +3664,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                       }
                       int diff = abs(lvl_a - lvl_b);
                       if (diff == 0) return 0.0f;
-                      float avg = 0.5f * (float)(lvl_a + lvl_b);
+                      float avg = 0.5f * (float)(lvl_a + lvl_b) + 1.0f;
                       float rel_y = (float)wy + 0.5f - avg;
                       float half_diff = (float)diff * 0.5f;
                       float dist_edge = half_diff - fabs(rel_y);
@@ -3717,7 +3717,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                       int f1_wy = (slot1 > 0 && wy <= lvl1) ? slot1 : 0;
                       float sim12 = 1.0f - ((float)(d2 - d1) / sim_scale);
                       if (sim12 <= 0.0f) return f1_wy;
-                      if (f1_wy == default_fluid && default_fluid > 0 && lava_slot > 0 && (wy - 1) <= deep_lava_y) return lava_slot;
+                      if (f1_wy == default_fluid && default_fluid > 0 && lava_slot > 0 && (wy - 1) <= deep_lava_y) return f1_wy;
                       int cb2 = i2 * 5;
                       int lvl2 = (int)cells[cb2 + 3];
                       int slot2 = (int)cells[cb2 + 4];
@@ -4970,7 +4970,60 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
         DiamondMemoPlan memoPlan;
         if (multiInterpGpuSupported) {
             StringBuilder multiFdSb = new StringBuilder(4096);
-            multiFdSb.append("inline float leaf_squeeze_f32(float v) { float c = clamp(v, -1.0f, 1.0f); return c * 0.5f - (c * c * c) / 24.0f; }\n");
+            multiFdSb.append("inline float leaf_squeeze_f32(float v) { float c = clamp(v, -1.0f, 1.0f); return c * 0.5f - (c * c * c) / 24.0f; }\n")
+                    .append("inline float leaf_mojang_beard_kernel(int dx, int dy, int dz, int dy_ground) {\n")
+                    .append("    if (dx < -12 || dx >= 12 || dy < -12 || dy >= 12 || dz < -12 || dz >= 12) return 0.0f;\n")
+                    .append("    float y = (float)dy_ground + 0.5f;\n")
+                    .append("    float d2 = (float)(dx * dx + dz * dz) + y * y;\n")
+                    .append("    float dyk = (float)dy + 0.5f;\n")
+                    .append("    float kd2 = (float)(dx * dx + dz * dz) + dyk * dyk;\n")
+                    .append("    return (-y * rsqrt(2.0f * d2)) * exp(-kd2 * 0.0625f);\n")
+                    .append("}\n")
+                    .append("inline float leaf_mojang_bury(float dx, float dy, float dz) {\n")
+                    .append("    float len = sqrt(dx * dx + dy * dy + dz * dz);\n")
+                    .append("    return clamp(1.0f - len * (1.0f / 6.0f), 0.0f, 1.0f);\n")
+                    .append("}\n")
+                    .append("inline float eval_mojang_beard_voxel(")
+                    .append(openClGlobalPtrParam("float", true, "packed_f"))
+                    .append(", int bx, int by, int bz) {\n")
+                    .append("    int count = (int)packed_f[0];\n")
+                    .append("    float sum = 0.0f;\n")
+                    .append("    for (int i = 0; i < count; i++) {\n")
+                    .append("        int p = 1 + (i << 3);\n")
+                    .append("        int t_adj = (int)packed_f[p + 6];\n")
+                    .append("        if (t_adj == 0) continue;\n")
+                    .append("        int min_x = (int)packed_f[p];\n")
+                    .append("        int raw_min_y = (int)packed_f[p + 1];\n")
+                    .append("        int min_z = (int)packed_f[p + 2];\n")
+                    .append("        int max_x = (int)packed_f[p + 3];\n")
+                    .append("        int max_y = (int)packed_f[p + 4];\n")
+                    .append("        int max_z = (int)packed_f[p + 5];\n")
+                    .append("        int g_delta = (int)packed_f[p + 7];\n")
+                    .append("        if (t_adj == 5) {\n")
+                    .append("            int jdx = bx - min_x;\n")
+                    .append("            int jdy = by - raw_min_y;\n")
+                    .append("            int jdz = bz - min_z;\n")
+                    .append("            sum += leaf_mojang_beard_kernel(jdx, jdy, jdz, jdy) * 0.4f;\n")
+                    .append("            continue;\n")
+                    .append("        }\n")
+                    .append("        int dx = max(0, max(min_x - bx, bx - max_x));\n")
+                    .append("        int dz = max(0, max(min_z - bz, bz - max_z));\n")
+                    .append("        int ground_y = raw_min_y + g_delta;\n")
+                    .append("        int dy_ground = by - ground_y;\n")
+                    .append("        if (t_adj == 1) {\n")
+                    .append("            sum += leaf_mojang_bury((float)dx, (float)dy_ground * 0.5f, (float)dz);\n")
+                    .append("        } else if (t_adj == 2) {\n")
+                    .append("            sum += leaf_mojang_beard_kernel(dx, dy_ground, dz, dy_ground) * 0.8f;\n")
+                    .append("        } else if (t_adj == 3) {\n")
+                    .append("            int dy_box = max(0, max(ground_y - by, by - max_y));\n")
+                    .append("            sum += leaf_mojang_beard_kernel(dx, dy_box, dz, dy_ground) * 0.8f;\n")
+                    .append("        } else if (t_adj == 4) {\n")
+                    .append("            int dy_enc = max(0, max(raw_min_y - by, by - max_y));\n")
+                    .append("            sum += leaf_mojang_bury((float)dx * 0.5f, (float)dy_enc * 0.5f, (float)dz * 0.5f) * 0.8f;\n")
+                    .append("        }\n")
+                    .append("    }\n")
+                    .append("    return sum;\n")
+                    .append("}\n");
             if (useNativeFp64) {
                 multiFdSb.append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
                         .append("inline double leaf_squeeze_f64(double v) { double c = clamp(v, -1.0, 1.0); return c * 0.5 - (c * c * c) / 24.0; }\n")
@@ -6050,13 +6103,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                     .append("                }\n")
                     .append("                dens64 = (").append(combinerF64).append(");\n")
                     .append("                if (add_beard_delta != 0) {\n")
-                    .append("                    double bx00 = (double)c_corners[c00] + ((double)c_corners[c00 + 1] - (double)c_corners[c00]) * fy64;\n")
-                    .append("                    double bx10 = (double)c_corners[c10] + ((double)c_corners[c10 + 1] - (double)c_corners[c10]) * fy64;\n")
-                    .append("                    double bx01 = (double)c_corners[c01] + ((double)c_corners[c01 + 1] - (double)c_corners[c01]) * fy64;\n")
-                    .append("                    double bx11 = (double)c_corners[c11] + ((double)c_corners[c11 + 1] - (double)c_corners[c11]) * fy64;\n")
-                    .append("                    double bz0 = bx00 + (bx10 - bx00) * fx64;\n")
-                    .append("                    double bz1 = bx01 + (bx11 - bx01) * fx64;\n")
-                    .append("                    dens64 += bz0 + (bz1 - bz0) * fz64;\n")
+                    .append("                    dens64 += (double)eval_mojang_beard_voxel(c_corners, bx, wy, bz);\n")
                     .append("                }\n")
                     .append("            } else {\n")
                     .append("                double x00 = s_interp_ch[c00] + (s_interp_ch[c00 + 1] - s_interp_ch[c00]) * fy64;\n")
@@ -6087,13 +6134,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 .append("                }\n")
                 .append("                dens = (").append(combinerF32).append(");\n")
                 .append("                if (add_beard_delta != 0) {\n")
-                .append("                    float bx00 = c_corners[c00] + (c_corners[c00 + 1] - c_corners[c00]) * fy;\n")
-                .append("                    float bx10 = c_corners[c10] + (c_corners[c10 + 1] - c_corners[c10]) * fy;\n")
-                .append("                    float bx01 = c_corners[c01] + (c_corners[c01 + 1] - c_corners[c01]) * fy;\n")
-                .append("                    float bx11 = c_corners[c11] + (c_corners[c11 + 1] - c_corners[c11]) * fy;\n")
-                .append("                    float bz0 = bx00 + (bx10 - bx00) * fx;\n")
-                .append("                    float bz1 = bx01 + (bx11 - bx01) * fx;\n")
-                .append("                    dens += bz0 + (bz1 - bz0) * fz;\n")
+                .append("                    dens += eval_mojang_beard_voxel(c_corners, bx, wy, bz);\n")
                 .append("                }\n")
                 .append("            } else {\n")
                 .append("                float x00 = (float)s_interp_ch[c00] + ((float)s_interp_ch[c00 + 1] - (float)s_interp_ch[c00]) * fy;\n")
@@ -6105,7 +6146,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 .append("                dens = z0 + (z1 - z0) * fz;\n")
                 .append("            }\n");
         if (exactMode && (fp64Local || useHybridSignBand)) {
-            sb.append("            if (fabs(dens) <= CAP_EXACT_SIGN_UNCERTAINTY_EPS) {\n")
+            sb.append("            if (fabs(dens) <= 5.0e-4f) {\n")
                     .append("                uncertain_sign_flag = CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG;\n")
                     .append("            }\n");
         }
