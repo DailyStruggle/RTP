@@ -823,4 +823,37 @@ class WeightedParityEvaluatorTest {
         System.arraycopy(payload, 0, region, 8192, payload.length);
         return region;
     }
+
+    @Test
+    @DisplayName("ChunkParityInput value semantics and Accumulator empty-input guards behave consistently")
+    void chunkParityInputValueSemanticsAndEmptyGuards() throws IOException {
+        String[][] sectionsA = new String[][] {{"minecraft:stone"}, {"minecraft:air"}};
+        String[][] sectionsSame = new String[][] {{"minecraft:stone"}, {"minecraft:air"}};
+        String[][] sectionsDiff = new String[][] {{"minecraft:dirt"}, {"minecraft:air"}};
+        Map<String, Object> rootA = Map.of("xPos", 1, "zPos", 2);
+        Map<String, Object> rootDiff = Map.of("xPos", 9, "zPos", 2);
+
+        WeightedParityEvaluator.ChunkParityInput base =
+                new WeightedParityEvaluator.ChunkParityInput(1, 2, sectionsA, rootA);
+        WeightedParityEvaluator.ChunkParityInput equalCopy =
+                new WeightedParityEvaluator.ChunkParityInput(1, 2, sectionsSame, Map.of("xPos", 1, "zPos", 2));
+
+        assertEquals(base, base);
+        assertEquals(base, equalCopy);
+        assertEquals(base.hashCode(), equalCopy.hashCode());
+        assertTrue(base.toString().contains("minecraft:stone"));
+        assertFalse(base.equals(null));
+        assertFalse(base.equals("not-a-chunk"));
+        assertFalse(base.equals(new WeightedParityEvaluator.ChunkParityInput(9, 2, sectionsA, rootA)));
+        assertFalse(base.equals(new WeightedParityEvaluator.ChunkParityInput(1, 9, sectionsA, rootA)));
+        assertFalse(base.equals(new WeightedParityEvaluator.ChunkParityInput(1, 2, sectionsDiff, rootA)));
+        assertFalse(base.equals(new WeightedParityEvaluator.ChunkParityInput(1, 2, sectionsA, rootDiff)));
+
+        WeightedParityEvaluator.Accumulator acc =
+                new WeightedParityEvaluator.Accumulator(TemplateConformityLibrary.fromSources(null));
+        acc.evaluateRegionPair(0, 0, List.of(), List.of(base));
+        acc.evaluateRegionPair(0, 0, List.of(base), List.of());
+        WeightedParityReport report = acc.finish(100.0, Map.of(), Map.of());
+        assertEquals(0L, report.criticalFunctionalLossCount());
+    }
 }

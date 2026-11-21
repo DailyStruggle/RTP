@@ -3863,7 +3863,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
         }
         sb.append("#define CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG 0x40000000\n");
         sb.append("#define CAP_CARVER_OVERFLOW_FALLBACK_FLAG 0x20000000\n");
-        sb.append("#define CAP_EXACT_SIGN_UNCERTAINTY_EPS 2.0e-5f\n");
+        sb.append("#define CAP_EXACT_SIGN_UNCERTAINTY_EPS 5.0e-6f\n");
         sb.append('\n').append(openClConstantArrayPrefix("float", "CAP_GRAD_X", 16))
                 .append("{1.0f,-1.0f,1.0f,-1.0f,1.0f,-1.0f,1.0f,-1.0f,0.0f,0.0f,0.0f,0.0f,1.0f,0.0f,-1.0f,0.0f};\n");
         sb.append(openClConstantArrayPrefix("float", "CAP_GRAD_Y", 16))
@@ -5277,7 +5277,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                                 + "            float z1 = x01 + (x11 - x01) * fx;\n"
                                 + "            dens = z0 + (z1 - z0) * fz;\n"
                                 + "            float corner_mag = fabs(v000) + fabs(v001) + fabs(v100) + fabs(v101) + fabs(v010) + fabs(v011) + fabs(v110) + fabs(v111);\n"
-                                + "            if (fabs(dens) <= fmax(CAP_EXACT_SIGN_UNCERTAINTY_EPS, corner_mag * CAP_EXACT_SIGN_UNCERTAINTY_EPS)) {\n"
+                                + "            if (corner_mag > 1.0e-6f && fabs(dens) <= fmax(CAP_EXACT_SIGN_UNCERTAINTY_EPS, corner_mag * CAP_EXACT_SIGN_UNCERTAINTY_EPS)) {\n"
                                 + "                uncertain_sign_flag = CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG;\n"
                                 + "            }\n"
                                 + "            solid_sign = (dens > 0.0f) ? 1 : 0;\n"
@@ -5295,7 +5295,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                                         + "            float z1 = x01 + (x11 - x01) * fx;\n"
                                         + "            float dens = z0 + (z1 - z0) * fz;\n"
                                         + "            float corner_mag = fabs(v000) + fabs(v001) + fabs(v100) + fabs(v101) + fabs(v010) + fabs(v011) + fabs(v110) + fabs(v111);\n"
-                                        + "            if (fabs(dens) <= fmax(CAP_EXACT_SIGN_UNCERTAINTY_EPS, corner_mag * CAP_EXACT_SIGN_UNCERTAINTY_EPS)) {\n"
+                                        + "            if (corner_mag > 1.0e-6f && fabs(dens) <= fmax(CAP_EXACT_SIGN_UNCERTAINTY_EPS, corner_mag * CAP_EXACT_SIGN_UNCERTAINTY_EPS)) {\n"
                                         + "                uncertain_sign_flag = CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG;\n"
                                         + "            }\n"
                                         + "            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n"

@@ -2828,7 +2828,8 @@ public final class LiftedWorldgenCapabilityTables {
                             int colPrelimY = newTop;
                             if (rc.initialDensityWithoutJaggedness() != null) {
                                 int pStep = Math.max(1, cellH);
-                                for (int py = maxBoundY; py >= minBoundY; py -= pStep) {
+                                int pStart = Math.min(maxBoundY, Math.max(seaLevel, newTop) + 16);
+                                for (int py = pStart; py >= minBoundY; py -= pStep) {
                                     if (rc.initialDensityWithoutJaggedness().sampleFp64(bx, py, bz) > 0.390625) {
                                         colPrelimY = py;
                                         break;
@@ -7731,7 +7732,7 @@ public final class LiftedWorldgenCapabilityTables {
 
         if (applySurfaceRules && spec.hasSurfaceRuleModule()) {
             JavaConceptBackendEmitter.SurfaceRuleEvaluator surfaceEvaluator =
-                    JavaConceptBackendEmitter.compileSurfaceRuleEvaluator(spec.surfaceRuleModule());
+                    LcaCapabilityChunkFrame.cachedSurfaceRuleEvaluator(spec.surfaceRuleModule());
             long biomeZoomSeed = obfuscateBiomeZoomSeed(worldSeed);
             int chunkBaseQx = chunkX << 2;
             int chunkBaseQy = spec.chunkMinY() >> 2;
@@ -9381,6 +9382,15 @@ public final class LiftedWorldgenCapabilityTables {
                     int estTopY = topSurfaceY != null && topSurfaceY.length >= 256
                             ? topSurfaceY[(nearLz << 4) | nearLx]
                             : spec.seaLevel();
+                    if (pf.allowedBiomeMask() != null) {
+                        int approxWy = Math.max(minBoundY + 1, Math.min(maxBoundY - 1, estTopY + 1));
+                        int bOrdApprox = borderBiomeSampler != null
+                                ? borderBiomeSampler.resolveBiomeOrdinal(worldX >> 2, approxWy >> 2, worldZ >> 2)
+                                : lookupPerimeterHaloBiome(quartBiomes, spec, scratch, relLx, approxWy, relLz);
+                        if (!bitMaskContains(pf.allowedBiomeMask(), bOrdApprox)) {
+                            continue;
+                        }
+                    }
                     int resolvedGroundY = resolveExternalGroundY(
                             spec,
                             borderDensityEval,
@@ -9397,7 +9407,7 @@ public final class LiftedWorldgenCapabilityTables {
                     if (wy <= minBoundY || wy >= maxBoundY) {
                         continue;
                     }
-                    if (pf.allowedBiomeMask() != null) {
+                    if (pf.allowedBiomeMask() != null && Math.abs(wy - (estTopY + 1)) >= 8) {
                         int bOrd = borderBiomeSampler != null
                                 ? borderBiomeSampler.resolveBiomeOrdinal(worldX >> 2, wy >> 2, worldZ >> 2)
                                 : lookupPerimeterHaloBiome(quartBiomes, spec, scratch, relLx, wy, relLz);
@@ -9405,19 +9415,25 @@ public final class LiftedWorldgenCapabilityTables {
                             continue;
                         }
                     }
-                    scratch.externalRootTopSurfaceSlot = evaluateExternalTopSurfaceSlot(
-                            spec,
-                            rc,
-                            borderBiomeSampler,
-                            quartBiomes,
-                            worldSeed,
-                            scratch.voronoiZoomSeed,
-                            worldX,
-                            resolvedGroundY,
-                            worldZ,
-                            minBoundY,
-                            maxBoundY,
-                            scratch);
+                    scratch.externalRootTopSurfaceSlot = (borderDensityEval == null)
+                            ? ((estTopY >= minBoundY && estTopY <= maxBoundY)
+                                    ? frame.getVoxel(
+                                            (estTopY - spec.chunkMinY()) >> 4,
+                                            ((estTopY & 15) << 8) | (nearLz << 4) | nearLx)
+                                    : spec.defaultBlockSlot())
+                            : evaluateExternalTopSurfaceSlot(
+                                    spec,
+                                    rc,
+                                    borderBiomeSampler,
+                                    quartBiomes,
+                                    worldSeed,
+                                    scratch.voronoiZoomSeed,
+                                    worldX,
+                                    resolvedGroundY,
+                                    worldZ,
+                                    minBoundY,
+                                    maxBoundY,
+                                    scratch);
                     if (relLx < -treeReach
                             || relLx > 15 + treeReach
                             || relLz < -treeReach
@@ -9618,9 +9634,20 @@ public final class LiftedWorldgenCapabilityTables {
         if (maxCellIdx < minCellIdx) {
             return Integer.MIN_VALUE;
         }
-        int topCornerY = noiseMinY + (maxCellIdx + 1) * cellH;
+        // Start scanning near the adjacent chunk's surface height (estTopY + 16) rather than Y=319;
+        // if that window ceiling is still solid (steep cliff), widen cleanly up to maxCellIdx.
+        int startCellIdx = maxCellIdx;
+        if (estTopY >= minBoundY && estTopY < maxBoundY - 16) {
+            int probeCell = Math.min(maxCellIdx, Math.max(minCellIdx, ((estTopY + 16) - noiseMinY) / cellH));
+            float probeTop = sampleHorizontalCellCornersBilinear(
+                    densityEval, gx0, gz0, cellW, fx, fz, noiseMinY + (probeCell + 1) * cellH);
+            if (probeTop <= 0.0f) {
+                startCellIdx = probeCell;
+            }
+        }
+        int topCornerY = noiseMinY + (startCellIdx + 1) * cellH;
         float topBilinear = sampleHorizontalCellCornersBilinear(densityEval, gx0, gz0, cellW, fx, fz, topCornerY);
-        for (int cy = maxCellIdx; cy >= minCellIdx; cy--) {
+        for (int cy = startCellIdx; cy >= minCellIdx; cy--) {
             int botCornerY = noiseMinY + cy * cellH;
             float botBilinear = sampleHorizontalCellCornersBilinear(densityEval, gx0, gz0, cellW, fx, fz, botCornerY);
             if (topBilinear > 0.0f || botBilinear > 0.0f) {
@@ -9698,7 +9725,7 @@ public final class LiftedWorldgenCapabilityTables {
             return defaultBlock;
         }
         JavaConceptBackendEmitter.SurfaceRuleEvaluator surfaceEvaluator =
-                JavaConceptBackendEmitter.compileSurfaceRuleEvaluator(spec.surfaceRuleModule());
+                LcaCapabilityChunkFrame.cachedSurfaceRuleEvaluator(spec.surfaceRuleModule());
         int extChunkX = worldX >> 4;
         int extChunkZ = worldZ >> 4;
         int quartsY = Math.max(1, spec.chunkSections() << 2);

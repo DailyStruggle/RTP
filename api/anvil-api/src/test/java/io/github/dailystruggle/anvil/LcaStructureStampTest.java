@@ -178,4 +178,166 @@ class LcaStructureStampTest {
         assertFalse(StructureTemplateNbtLoader.synthesizeBuiltinVanillaTemplate("village_plains")
                 .connectors(0, false).isEmpty());
     }
+
+    @Test
+    void validatesMalformedInputsSupportsRawAndMultiPaletteNbtAndTransformsAllBlockStates() throws IOException {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> StructureTemplateNbtLoader.loadFromBytes(
+                        "   ",
+                        new byte[] {1, 2, 3, 4},
+                        LcaStructureStamp.TerrainProjection.RIGID,
+                        List.of()));
+        assertThrows(
+                IOException.class,
+                () -> StructureTemplateNbtLoader.loadFromBytes(
+                        "minecraft:null_bytes",
+                        null,
+                        LcaStructureStamp.TerrainProjection.RIGID,
+                        null));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> StructureTemplateNbtLoader.writeStructureNbtBytes(
+                        0, 1, 1, List.of("minecraft:stone"), new int[][] {{0, 0, 0, 0}}, Map.of(), false));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> StructureTemplateNbtLoader.writeStructureNbtBytes(
+                        1, 0, 1, List.of("minecraft:stone"), new int[][] {{0, 0, 0, 0}}, Map.of(), false));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> StructureTemplateNbtLoader.writeStructureNbtBytes(
+                        1, 1, 0, List.of("minecraft:stone"), new int[][] {{0, 0, 0, 0}}, Map.of(), false));
+
+        // Raw (uncompressed) NBT roundtrip with null rules list
+        byte[] rawBytes = StructureTemplateNbtLoader.writeStructureNbtBytes(
+                2, 2, 2, List.of("minecraft:stone"), new int[][] {{0, 0, 0, 0}}, null, false);
+        StructureTemplateNbtLoader.TemplateVariantSet rawSet = StructureTemplateNbtLoader.loadFromBytes(
+                "minecraft:raw_box", rawBytes, LcaStructureStamp.TerrainProjection.RIGID, null);
+        assertEquals(1, rawSet.variant(0, false).totalVoxelCount());
+
+        // Multi-palette ('palettes') fallback compound
+        LinkedHashMap<String, Object> multiRoot = new LinkedHashMap<>();
+        multiRoot.put("size", new Nbt.NbtList(Nbt.TAG_INT, List.of(1, 1, 1)));
+        LinkedHashMap<String, Object> palItem = new LinkedHashMap<>();
+        palItem.put("Name", "minecraft:cobblestone");
+        multiRoot.put(
+                "palettes",
+                new Nbt.NbtList(
+                        Nbt.TAG_LIST,
+                        List.of(new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(palItem)))));
+        LinkedHashMap<String, Object> blkItem = new LinkedHashMap<>();
+        blkItem.put("pos", new Nbt.NbtList(Nbt.TAG_INT, List.of(0, 0, 0)));
+        blkItem.put("state", 0);
+        multiRoot.put("blocks", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(blkItem)));
+        StructureTemplateNbtLoader.TemplateVariantSet multiSet = StructureTemplateNbtLoader.loadFromBytes(
+                "minecraft:multi_pal",
+                Nbt.writeNamedRoot("", multiRoot),
+                LcaStructureStamp.TerrainProjection.RIGID,
+                List.of());
+        assertEquals(1, multiSet.variant(0, false).totalVoxelCount());
+
+        // Invalid dimensions, empty palette, missing Name, and out-of-bounds state index
+        LinkedHashMap<String, Object> badDim = new LinkedHashMap<>();
+        badDim.put("size", new Nbt.NbtList(Nbt.TAG_INT, List.of(600, 1, 1)));
+        assertThrows(
+                IOException.class,
+                () -> StructureTemplateNbtLoader.loadFromBytes(
+                        "minecraft:bad_dim",
+                        Nbt.writeNamedRoot("", badDim),
+                        LcaStructureStamp.TerrainProjection.RIGID,
+                        List.of()));
+
+        LinkedHashMap<String, Object> emptyPal = new LinkedHashMap<>();
+        emptyPal.put("size", new Nbt.NbtList(Nbt.TAG_INT, List.of(1, 1, 1)));
+        emptyPal.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of()));
+        assertThrows(
+                IOException.class,
+                () -> StructureTemplateNbtLoader.loadFromBytes(
+                        "minecraft:empty_pal",
+                        Nbt.writeNamedRoot("", emptyPal),
+                        LcaStructureStamp.TerrainProjection.RIGID,
+                        List.of()));
+
+        LinkedHashMap<String, Object> blankName = new LinkedHashMap<>();
+        blankName.put("size", new Nbt.NbtList(Nbt.TAG_INT, List.of(1, 1, 1)));
+        LinkedHashMap<String, Object> blankPalEntry = new LinkedHashMap<>();
+        blankPalEntry.put("Name", "  ");
+        blankName.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(blankPalEntry)));
+        assertThrows(
+                IOException.class,
+                () -> StructureTemplateNbtLoader.loadFromBytes(
+                        "minecraft:blank_name",
+                        Nbt.writeNamedRoot("", blankName),
+                        LcaStructureStamp.TerrainProjection.RIGID,
+                        List.of()));
+
+        LinkedHashMap<String, Object> oobState = new LinkedHashMap<>();
+        oobState.put("size", new Nbt.NbtList(Nbt.TAG_INT, List.of(1, 1, 1)));
+        oobState.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(palItem)));
+        LinkedHashMap<String, Object> badBlk = new LinkedHashMap<>();
+        badBlk.put("pos", new Nbt.NbtList(Nbt.TAG_INT, List.of(0, 0, 0)));
+        badBlk.put("state", 5);
+        oobState.put("blocks", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(badBlk)));
+        assertThrows(
+                IOException.class,
+                () -> StructureTemplateNbtLoader.loadFromBytes(
+                        "minecraft:oob_state",
+                        Nbt.writeNamedRoot("", oobState),
+                        LcaStructureStamp.TerrainProjection.RIGID,
+                        List.of()));
+
+        // transformState coverage across mirror + quarter-turn rotations + edge formats
+        assertEquals("minecraft:stone", StructureTemplateNbtLoader.transformState("minecraft:stone", true, 1));
+        assertEquals("minecraft:stone[broken", StructureTemplateNbtLoader.transformState("minecraft:stone[broken", true, 1));
+        assertEquals("minecraft:stone", StructureTemplateNbtLoader.transformState("minecraft:stone[]", false, 0));
+        assertEquals(
+                "minecraft:oak_sign[rotation=14]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_sign[rotation=2,badtok]", true, 0));
+        assertEquals(
+                "minecraft:oak_sign[rotation=bad]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_sign[rotation=bad]", true, 1));
+        assertEquals(
+                "minecraft:oak_sign[rotation=1234]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_sign[rotation=1234]", false, 1));
+        assertEquals(
+                "minecraft:oak_sign[rotation=6]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_sign[rotation=2]", false, 1));
+        assertEquals(
+                "minecraft:oak_fence[west=true]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_fence[east=true]", true, 0));
+        assertEquals(
+                "minecraft:oak_fence[east=true]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_fence[west=true]", true, 0));
+        assertEquals(
+                "minecraft:jigsaw[orientation=west_up]",
+                StructureTemplateNbtLoader.transformState("minecraft:jigsaw[orientation=east_up]", true, 0));
+        assertEquals(
+                "minecraft:jigsaw[orientation=single]",
+                StructureTemplateNbtLoader.transformState("minecraft:jigsaw[orientation=single]", true, 1));
+        assertEquals(
+                "minecraft:oak_log[axis=x]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_log[axis=z]", false, 1));
+        assertEquals(
+                "minecraft:oak_log[axis=y]",
+                StructureTemplateNbtLoader.transformState("minecraft:oak_log[axis=y]", false, 1));
+        for (String railShape : List.of(
+                "north_south",
+                "east_west",
+                "ascending_east",
+                "ascending_west",
+                "ascending_north",
+                "ascending_south",
+                "south_east",
+                "south_west",
+                "north_west",
+                "north_east",
+                "outer_left",
+                "outer_right",
+                "straight")) {
+            assertNotNull(StructureTemplateNbtLoader.transformState(
+                    "minecraft:rail[shape=" + railShape + "]", true, 1));
+            assertNotNull(StructureTemplateNbtLoader.transformState(
+                    "minecraft:rail[shape=" + railShape + "]", false, 3));
+        }
+    }
 }

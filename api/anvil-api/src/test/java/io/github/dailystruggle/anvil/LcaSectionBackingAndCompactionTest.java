@@ -1176,6 +1176,38 @@ class LcaSectionBackingAndCompactionTest {
             assertEquals(0, noResSnap.sliceSectionFrame(0).length);
             assertEquals(0, noResSnap.sliceSectionFrameWithRuntimePalette(0, null).length);
             assertTrue(new RawChunkFrameSnapshot(noResFrame, 4671, -4, 24, 0, new int[]{1}).toString().contains("dictEntries=1"));
+            assertTrue(noResSnap.toString().contains("dictEntries=0"));
+
+            // Exercise inline-uniform resolution, palette-header rewrite edge cases, and equals field mismatches
+            byte[] inlineFrame = new byte[24 + (24 << 1)];
+            inlineFrame[24] = (byte) 0x80; // section 0 entry = 0x8001 (big-endian)
+            inlineFrame[25] = 1;
+            inlineFrame[26] = (byte) 0x80; // section 1 entry = 0x8005
+            inlineFrame[27] = 5;
+            RawChunkFrameSnapshot inlineSnap = new RawChunkFrameSnapshot(inlineFrame, 4671, -4, 24, 0, new int[]{10, 42});
+            assertEquals(42, inlineSnap.resolveInlineUniformRuntimeStateId(0, null));
+            assertEquals(5, inlineSnap.resolveInlineUniformRuntimeStateId(1, null));
+            assertEquals(0, inlineSnap.sliceSectionFrame(0).length);
+            RawChunkFrameSnapshot inlineNoDict = new RawChunkFrameSnapshot(inlineFrame, 4671, -4, 24, 0, null);
+            assertEquals(1, inlineNoDict.resolveInlineUniformRuntimeStateId(0, null));
+            assertFalse(inlineSnap.equals(new RawChunkFrameSnapshot(inlineFrame, 4672, -4, 24, 0, new int[]{10, 42})));
+            assertFalse(inlineSnap.equals(new RawChunkFrameSnapshot(inlineFrame, 4671, -3, 24, 0, new int[]{10, 42})));
+            assertFalse(inlineSnap.equals(new RawChunkFrameSnapshot(inlineFrame, 4671, -4, 20, 0, new int[]{10, 42})));
+            assertFalse(inlineSnap.equals(new RawChunkFrameSnapshot(inlineFrame, 4671, -4, 24, 1, new int[]{10, 42})));
+            assertFalse(inlineSnap.equals(new RawChunkFrameSnapshot(noResFrame, 4671, -4, 24, 0, new int[]{10, 42})));
+            assertFalse(inlineSnap.equals(inlineNoDict));
+            // rewriteSectionFramePaletteHeaderBytes: blockMode=0, k=0, k=4097, k=1 with out-of-range diskId & bodyLen=0
+            assertEquals(2, RawChunkFrameSnapshot.rewriteSectionFramePaletteHeaderBytes(new byte[]{0x00, 0x00}, new int[]{1}).length);
+            assertEquals(3, RawChunkFrameSnapshot.rewriteSectionFramePaletteHeaderBytes(new byte[]{0x00, (byte) 0x81, 0x20}, new int[]{1}).length);
+            byte[] rewrittenEmptyBody = RawChunkFrameSnapshot.rewriteSectionFramePaletteHeaderBytes(
+                    new byte[]{0x00, 0x01, 0x05}, new int[]{99});
+            assertEquals(3, rewrittenEmptyBody.length);
+            assertEquals(5, rewrittenEmptyBody[2]);
+            // sliceResidualTailBytes when residualNbtRelOffset points past frame length
+            byte[] pastResFrame = new byte[24 + (24 << 1)];
+            pastResFrame[21] = 1;
+            RawChunkFrameSnapshot pastResSnap = new RawChunkFrameSnapshot(pastResFrame, 4671, -4, 24, 9999, null);
+            assertEquals(0, pastResSnap.sliceResidualTailBytes().length);
 
             // Exercise >256-state short-ordinal CompactBaseIndex branch on .lca SectionFrame
             int[] pal300 = new int[300];
