@@ -3610,16 +3610,16 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                           return (default_fluid > 0 && wy <= sea_level) ? default_fluid : 0;
                       }
                       if (lava_slot > 0 && wy <= deep_lava_y) return lava_slot;
-                      int base_gx = floor_div_pos_i32(bx - 5, x_sp) - 1;
+                      int base_gx = floor_div_pos_i32(bx - 5, x_sp);
                       int base_gy = floor_div_pos_i32(wy + 1, y_sp) - 1;
-                      int base_gz = floor_div_pos_i32(bz - 5, z_sp) - 1;
+                      int base_gz = floor_div_pos_i32(bz - 5, z_sp);
                       int i1 = 0, i2 = 0, i3 = 0;
                       int d1 = 2147483647, d2 = 2147483647, d3 = 2147483647;
-                      for (int ox = 0; ox <= 2; ox++) {
+                      for (int ox = 0; ox <= 1; ox++) {
                           int rx = clamp((base_gx + ox) - min_gx, 0, size_x - 1);
-                          for (int oy = 0; oy <= 1; oy++) {
+                          for (int oy = 0; oy <= 2; oy++) {
                               int ry = clamp((base_gy + oy) - min_gy, 0, size_y - 1);
-                              for (int oz = 0; oz <= 2; oz++) {
+                              for (int oz = 0; oz <= 1; oz++) {
                                   int rz = clamp((base_gz + oz) - min_gz, 0, size_z - 1);
                                   int idx = (ry * size_z + rz) * size_x + rx;
                                   int cb = idx * 5;
@@ -3638,7 +3638,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                       int slot1 = (int)cells[cb1 + 4];
                       int f1_wy = (slot1 > 0 && wy <= lvl1) ? slot1 : 0;
                       float sim12 = 1.0f - ((float)(d2 - d1) / sim_scale);
-                      if (f1_wy == 0 && sim12 <= 0.0f) return 0;
+                      if (sim12 <= 0.0f) return f1_wy;
                       if (f1_wy == default_fluid && default_fluid > 0 && lava_slot > 0 && (wy - 1) <= deep_lava_y) return lava_slot;
                       int cb2 = i2 * 5;
                       int lvl2 = (int)cells[cb2 + 3];
@@ -5027,8 +5027,8 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 + "    const int sub_min_gx = cparams[24];\n"
                 + "    const int sub_min_gz = cparams[25];\n"
                 + "    const int sub_packed_dims = cparams[26];\n"
-                + "    const int sub_grid_size_x = (sub_packed_dims & 255) > 0 ? (sub_packed_dims & 255) : 4;\n"
-                + "    const int sub_grid_size_z = ((sub_packed_dims >> 8) & 255) > 0 ? ((sub_packed_dims >> 8) & 255) : 4;\n"
+                + "    const int sub_grid_size_x = (sub_packed_dims & 255) > 0 ? (sub_packed_dims & 255) : 3;\n"
+                + "    const int sub_grid_size_z = ((sub_packed_dims >> 8) & 255) > 0 ? ((sub_packed_dims >> 8) & 255) : 3;\n"
                 + "    const int sub_x_sp = ((sub_packed_dims >> 16) & 255) > 0 ? ((sub_packed_dims >> 16) & 255) : 16;\n"
                 + "    const int sub_y_sp = ((sub_packed_dims >> 24) & 255) > 0 ? ((sub_packed_dims >> 24) & 255) : 12;\n"
                 + "    const float sub_sim_scale = (cparams[27] != 0) ? as_float(cparams[27]) : 25.0f;\n"
@@ -5399,7 +5399,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 + "            }\n"
                 + "        }\n"
                 + "        barrier(CLK_GLOBAL_MEM_FENCE);\n"
-                + "        if (" + (exactMode ? "(has_sub_aquifer != 2)" : "1") + ") {\n"
+                + "        if (has_sub_aquifer != 2) {\n"
                 + "        if (has_sub_aquifer == 1 && (default_fluid > 0 || lava_slot > 0)) {\n"
                 + "            int roof_cap_y = raw_top_y - 6;\n"
                 + "            if (sea_level < roof_cap_y) roof_cap_y = sea_level;\n"

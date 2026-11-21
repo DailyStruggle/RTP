@@ -1233,8 +1233,8 @@ public final class LiftedWorldgenCapabilityTables {
         private final int zSpacing;
         private final float similarityScale;
         private final int[] packedCells;
-        final short[] uniform18Slot;
-        final int[] uniform18Lvl;
+        final short[] uniform12Slot;
+        final int[] uniform12Lvl;
 
         public AquiferCellSnapshot(
                 int minGridX,
@@ -1263,17 +1263,16 @@ public final class LiftedWorldgenCapabilityTables {
             this.similarityScale = similarityScale > 0.0f ? similarityScale : 25.0f;
             this.packedCells = packedCells != null ? packedCells.clone() : new int[0];
             int total = this.packedCells.length / 5;
-            this.uniform18Slot = new short[total];
-            this.uniform18Lvl = new int[total];
+            this.uniform12Slot = new short[total];
+            this.uniform12Lvl = new int[total];
             if (total > 0 && gridSizeX > 0 && gridSizeY > 0 && gridSizeZ > 0) {
                 for (int ry0 = 0; ry0 < gridSizeY; ry0++) {
                     int ry1 = Math.min(gridSizeY - 1, ry0 + 1);
+                    int ry2 = Math.min(gridSizeY - 1, ry0 + 2);
                     for (int rz0 = 0; rz0 < gridSizeZ; rz0++) {
                         int rz1 = Math.min(gridSizeZ - 1, rz0 + 1);
-                        int rz2 = Math.min(gridSizeZ - 1, rz0 + 2);
                         for (int rx0 = 0; rx0 < gridSizeX; rx0++) {
                             int rx1 = Math.min(gridSizeX - 1, rx0 + 1);
-                            int rx2 = Math.min(gridSizeX - 1, rx0 + 2);
                             int baseIdx = (ry0 * gridSizeZ + rz0) * gridSizeX + rx0;
                             if (baseIdx >= total) {
                                 continue;
@@ -1281,13 +1280,13 @@ public final class LiftedWorldgenCapabilityTables {
                             int fLvl = this.packedCells[baseIdx * 5 + 3];
                             int fSlot = this.packedCells[baseIdx * 5 + 4];
                             boolean uni = true;
-                            for (int oy = 0; oy <= 1 && uni; oy++) {
-                                int yB = (oy == 0 ? ry0 : ry1) * gridSizeZ;
-                                for (int oz = 0; oz <= 2 && uni; oz++) {
-                                    int rz = oz == 0 ? rz0 : (oz == 1 ? rz1 : rz2);
+                            for (int oy = 0; oy <= 2 && uni; oy++) {
+                                int yB = (oy == 0 ? ry0 : (oy == 1 ? ry1 : ry2)) * gridSizeZ;
+                                for (int oz = 0; oz <= 1 && uni; oz++) {
+                                    int rz = oz == 0 ? rz0 : rz1;
                                     int zB = (yB + rz) * gridSizeX;
-                                    for (int ox = 0; ox <= 2; ox++) {
-                                        int rx = ox == 0 ? rx0 : (ox == 1 ? rx1 : rx2);
+                                    for (int ox = 0; ox <= 1; ox++) {
+                                        int rx = ox == 0 ? rx0 : rx1;
                                         int idx = zB + rx;
                                         if (idx < total) {
                                             int cb = idx * 5;
@@ -1300,10 +1299,10 @@ public final class LiftedWorldgenCapabilityTables {
                                 }
                             }
                             if (uni) {
-                                this.uniform18Slot[baseIdx] = (short) fSlot;
-                                this.uniform18Lvl[baseIdx] = fLvl;
+                                this.uniform12Slot[baseIdx] = (short) fSlot;
+                                this.uniform12Lvl[baseIdx] = fLvl;
                             } else {
-                                this.uniform18Slot[baseIdx] = -1;
+                                this.uniform12Slot[baseIdx] = -1;
                             }
                         }
                     }
@@ -1413,8 +1412,8 @@ public final class LiftedWorldgenCapabilityTables {
         final int deepLavaY = spec.deepLavaFloorY();
         final int defaultFluid = spec.defaultFluidSlot();
         final int lavaSlot = spec.lavaFluidSlot();
-        final int minGridY = Math.floorDiv(spec.noiseMinY(), ySp) - 1;
-        final int maxGridY = Math.floorDiv(spec.noiseMinY() + spec.noiseHeight(), ySp) + 1;
+        final int minGridY = Math.floorDiv(spec.noiseMinY() + 1, ySp) - 1;
+        final int maxGridY = Math.floorDiv(spec.noiseMinY() + spec.noiseHeight() + 1, ySp) + 1;
         final int gridSizeY = Math.max(1, maxGridY - minGridY + 1);
         final long aqSeed = worldSeed ^ 0x6A09E667F3BCC908L;
 
@@ -1427,10 +1426,10 @@ public final class LiftedWorldgenCapabilityTables {
         return (chunkX, chunkZ) -> {
             int chunkBaseBx = chunkX << 4;
             int chunkBaseBz = chunkZ << 4;
-            int minGridX = Math.floorDiv(chunkBaseBx - 5, xSp) - 1;
+            int minGridX = Math.floorDiv(chunkBaseBx - 5, xSp);
             int maxGridX = Math.floorDiv(chunkBaseBx + 10, xSp) + 1;
             int gridSizeX = Math.max(1, maxGridX - minGridX + 1);
-            int minGridZ = Math.floorDiv(chunkBaseBz - 5, zSp) - 1;
+            int minGridZ = Math.floorDiv(chunkBaseBz - 5, zSp);
             int maxGridZ = Math.floorDiv(chunkBaseBz + 10, zSp) + 1;
             int gridSizeZ = Math.max(1, maxGridZ - minGridZ + 1);
 
@@ -1458,7 +1457,7 @@ public final class LiftedWorldgenCapabilityTables {
                 for (int gx = minGridX; gx <= maxGridX; gx++) {
                     int xIdx = gx - minGridX;
                     int cacheSlot = ((gx * 0x9E37) ^ (gz * 0x85EB)) & aquiferColCacheMask;
-                    AquiferColumnCacheEntry cached = sharedColCache.getOpaque(cacheSlot);
+                    AquiferColumnCacheEntry cached = sharedColCache.getAcquire(cacheSlot);
                     int[] colPacked;
                     if (cached != null && cached.gx == gx && cached.gz == gz) {
                         colPacked = cached.packed5;
@@ -1592,7 +1591,7 @@ public final class LiftedWorldgenCapabilityTables {
                             colPacked[colBase + 3] = finalLvl;
                             colPacked[colBase + 4] = finalSlot;
                         }
-                        sharedColCache.setOpaque(cacheSlot, new AquiferColumnCacheEntry(gx, gz, colPacked));
+                        sharedColCache.setRelease(cacheSlot, new AquiferColumnCacheEntry(gx, gz, colPacked));
                     }
                     for (int yIdx = 0; yIdx < gridSizeY; yIdx++) {
                         int colBase = yIdx * 5;
@@ -1845,9 +1844,9 @@ public final class LiftedWorldgenCapabilityTables {
         int xSp = snap.xSpacing();
         int ySp = snap.ySpacing();
         int zSp = snap.zSpacing();
-        int baseGx = Math.floorDiv(bx - 5, xSp) - 1;
+        int baseGx = Math.floorDiv(bx - 5, xSp);
         int baseGy = Math.floorDiv(wy + 1, ySp) - 1;
-        int baseGz = Math.floorDiv(bz - 5, zSp) - 1;
+        int baseGz = Math.floorDiv(bz - 5, zSp);
 
         int i1 = 0;
         int i2 = 0;
@@ -1866,22 +1865,18 @@ public final class LiftedWorldgenCapabilityTables {
 
         int rx0 = Math.max(0, Math.min(sizeX - 1, baseGx - minGx));
         int rx1 = Math.max(0, Math.min(sizeX - 1, (baseGx + 1) - minGx));
-        int rx2 = Math.max(0, Math.min(sizeX - 1, (baseGx + 2) - minGx));
         int ry0 = Math.max(0, Math.min(sizeY - 1, baseGy - minGy));
         int ry1 = Math.max(0, Math.min(sizeY - 1, (baseGy + 1) - minGy));
+        int ry2 = Math.max(0, Math.min(sizeY - 1, (baseGy + 2) - minGy));
         int rz0 = Math.max(0, Math.min(sizeZ - 1, baseGz - minGz));
         int rz1 = Math.max(0, Math.min(sizeZ - 1, (baseGz + 1) - minGz));
-        int rz2 = Math.max(0, Math.min(sizeZ - 1, (baseGz + 2) - minGz));
 
-        int[] rxs = {rx0, rx1, rx2};
-        int[] rys = {ry0, ry1};
-        int[] rzs = {rz0, rz1, rz2};
-        for (int oy = 0; oy <= 1; oy++) {
-            int yBase = rys[oy] * sizeZ;
-            for (int oz = 0; oz <= 2; oz++) {
-                int zBase = (yBase + rzs[oz]) * sizeX;
-                for (int ox = 0; ox <= 2; ox++) {
-                    int idx = zBase + rxs[ox];
+        for (int ox = 0; ox <= 1; ox++) {
+            int rx = ox == 0 ? rx0 : rx1;
+            for (int oy = 0; oy <= 2; oy++) {
+                int yBase = (oy == 0 ? ry0 : (oy == 1 ? ry1 : ry2)) * sizeZ;
+                for (int oz = 0; oz <= 1; oz++) {
+                    int idx = (yBase + (oz == 0 ? rz0 : rz1)) * sizeX + rx;
                     int cb = idx * 5;
                     int dx = cells[cb] - bx;
                     int dy = cells[cb + 1] - wy;
@@ -1913,8 +1908,8 @@ public final class LiftedWorldgenCapabilityTables {
         int f1AtWy = (slot1 > 0 && wy <= lvl1) ? slot1 : 0;
         double simScale = snap.similarityScale();
         double sim12 = 1.0 - ((double) (d2 - d1) / simScale);
-        if (f1AtWy == 0 && sim12 <= 0.0) {
-            return 0;
+        if (sim12 <= 0.0) {
+            return f1AtWy;
         }
         if (f1AtWy == defaultFluidSlot && defaultFluidSlot > 0 && lavaFluidSlot > 0 && (wy - 1) <= deepLavaFloorY) {
             return lavaFluidSlot;
@@ -1981,9 +1976,9 @@ public final class LiftedWorldgenCapabilityTables {
         int xSp = snap.xSpacing();
         int ySp = snap.ySpacing();
         int zSp = snap.zSpacing();
-        int baseGx = Math.floorDiv(bx - 5, xSp) - 1;
+        int baseGx = Math.floorDiv(bx - 5, xSp);
         int baseGy = Math.floorDiv(wy + 1, ySp) - 1;
-        int baseGz = Math.floorDiv(bz - 5, zSp) - 1;
+        int baseGz = Math.floorDiv(bz - 5, zSp);
 
         int i1 = 0;
         int i2 = 0;
@@ -2004,10 +1999,10 @@ public final class LiftedWorldgenCapabilityTables {
         int ry0 = Math.max(0, Math.min(sizeY - 1, baseGy - minGy));
         int rz0 = Math.max(0, Math.min(sizeZ - 1, baseGz - minGz));
         int firstIdx = (ry0 * sizeZ + rz0) * sizeX + rx0;
-        if (firstIdx >= 0 && firstIdx < snap.uniform18Slot.length) {
-            int uSlot = snap.uniform18Slot[firstIdx];
+        if (firstIdx >= 0 && firstIdx < snap.uniform12Slot.length) {
+            int uSlot = snap.uniform12Slot[firstIdx];
             if (uSlot >= 0) {
-                int uLvl = snap.uniform18Lvl[firstIdx];
+                int uLvl = snap.uniform12Lvl[firstIdx];
                 int fUni = (uSlot > 0 && wy <= uLvl) ? uSlot : 0;
                 if (fUni == defaultFluidSlot
                         && defaultFluidSlot > 0
@@ -2019,20 +2014,16 @@ public final class LiftedWorldgenCapabilityTables {
             }
         }
         int rx1 = Math.max(0, Math.min(sizeX - 1, (baseGx + 1) - minGx));
-        int rx2 = Math.max(0, Math.min(sizeX - 1, (baseGx + 2) - minGx));
         int ry1 = Math.max(0, Math.min(sizeY - 1, (baseGy + 1) - minGy));
+        int ry2 = Math.max(0, Math.min(sizeY - 1, (baseGy + 2) - minGy));
         int rz1 = Math.max(0, Math.min(sizeZ - 1, (baseGz + 1) - minGz));
-        int rz2 = Math.max(0, Math.min(sizeZ - 1, (baseGz + 2) - minGz));
 
-        int[] rxs = {rx0, rx1, rx2};
-        int[] rys = {ry0, ry1};
-        int[] rzs = {rz0, rz1, rz2};
-        for (int oy = 0; oy <= 1; oy++) {
-            int yBase = rys[oy] * sizeZ;
-            for (int oz = 0; oz <= 2; oz++) {
-                int zBase = (yBase + rzs[oz]) * sizeX;
-                for (int ox = 0; ox <= 2; ox++) {
-                    int idx = zBase + rxs[ox];
+        for (int ox = 0; ox <= 1; ox++) {
+            int rx = ox == 0 ? rx0 : rx1;
+            for (int oy = 0; oy <= 2; oy++) {
+                int yBase = (oy == 0 ? ry0 : (oy == 1 ? ry1 : ry2)) * sizeZ;
+                for (int oz = 0; oz <= 1; oz++) {
+                    int idx = (yBase + (oz == 0 ? rz0 : rz1)) * sizeX + rx;
                     int cb = idx * 5;
                     int dx = cells[cb] - bx;
                     int dy = cells[cb + 1] - wy;
@@ -2064,8 +2055,8 @@ public final class LiftedWorldgenCapabilityTables {
         int f1AtWy = (slot1 > 0 && wy <= lvl1) ? slot1 : 0;
         float simScale = snap.similarityScale();
         float sim12 = 1.0f - ((float) (d2 - d1) / simScale);
-        if (f1AtWy == 0 && sim12 <= 0.0f) {
-            return 0;
+        if (sim12 <= 0.0f) {
+            return f1AtWy;
         }
         if (f1AtWy == defaultFluidSlot && defaultFluidSlot > 0 && lavaFluidSlot > 0 && (wy - 1) <= deepLavaFloorY) {
             return lavaFluidSlot;
@@ -2573,22 +2564,36 @@ public final class LiftedWorldgenCapabilityTables {
             return frame;
         }
 
-        private static final java.util.Map<BytecodeConceptIr.ConceptModule, JavaConceptBackendEmitter.SurfaceRuleEvaluator>
-                CACHED_SIGNBAND_SURFACE_EVALUATORS =
-                        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+        private static final int SURFACE_EVAL_CACHE_SLOTS = 32;
+        private static final java.util.concurrent.atomic.AtomicReferenceArray<SurfaceEvalCacheEntry>
+                CACHED_SURFACE_EVALUATORS =
+                        new java.util.concurrent.atomic.AtomicReferenceArray<>(SURFACE_EVAL_CACHE_SLOTS);
+
+        private static final class SurfaceEvalCacheEntry {
+            final BytecodeConceptIr.ConceptModule module;
+            final JavaConceptBackendEmitter.SurfaceRuleEvaluator evaluator;
+
+            SurfaceEvalCacheEntry(
+                    BytecodeConceptIr.ConceptModule module,
+                    JavaConceptBackendEmitter.SurfaceRuleEvaluator evaluator) {
+                this.module = module;
+                this.evaluator = evaluator;
+            }
+        }
 
         private static JavaConceptBackendEmitter.SurfaceRuleEvaluator cachedSurfaceRuleEvaluator(
                 BytecodeConceptIr.ConceptModule module) {
             if (module == null) {
                 return null;
             }
-            JavaConceptBackendEmitter.SurfaceRuleEvaluator cached = CACHED_SIGNBAND_SURFACE_EVALUATORS.get(module);
-            if (cached != null) {
-                return cached;
+            int slot = System.identityHashCode(module) & (SURFACE_EVAL_CACHE_SLOTS - 1);
+            SurfaceEvalCacheEntry entry = CACHED_SURFACE_EVALUATORS.getAcquire(slot);
+            if (entry != null && entry.module == module) {
+                return entry.evaluator;
             }
             JavaConceptBackendEmitter.SurfaceRuleEvaluator compiled =
                     JavaConceptBackendEmitter.compileSurfaceRuleEvaluator(module);
-            CACHED_SIGNBAND_SURFACE_EVALUATORS.put(module, compiled);
+            CACHED_SURFACE_EVALUATORS.setRelease(slot, new SurfaceEvalCacheEntry(module, compiled));
             return compiled;
         }
 
@@ -7487,7 +7492,7 @@ public final class LiftedWorldgenCapabilityTables {
         int estimatedBasinFloorY = minBoundY;
         if (rc.initialDensityWithoutJaggedness() != null) {
             DensityFieldEvaluator prelimEval = rc.initialDensityWithoutJaggedness();
-            if (!exactMode && prelimEval.isQuartAlignedXZ()) {
+            if (!exactMode || prelimEval.isQuartAlignedXZ()) {
                 for (int qz = 0; qz < 4; qz++) {
                     int baseLz = qz << 2;
                     int bz = chunkBaseBz + baseLz;
@@ -7572,7 +7577,9 @@ public final class LiftedWorldgenCapabilityTables {
                 }
             }
 
-            if (!exactMode || aquiferSnap == null) {
+            // Legacy heuristic waterfall/sealing applies strictly when lifted NoiseBasedAquifer is absent;
+            // running chunk-local seal_bits on top of NoiseBasedAquifer creates vertical chunk-border walls.
+            if (aquiferSnap == null) {
             if (aquiferSnap == null && rc.fluidLevelFloodednessNoise() != null && (defaultFluid > 0 || lavaSlot > 0)) {
                 for (int lz = 0; lz < 16; lz++) {
                     int bz = chunkBaseBz + lz;
@@ -7746,33 +7753,14 @@ public final class LiftedWorldgenCapabilityTables {
             int activeHaloQuartsY = Math.min(
                     quartsY,
                     Math.max(1, ((Math.max(seaLevel, maxColTopSurf) + 4) - spec.chunkMinY()) >> 2) + 1);
-            int[] haloBiomes6x6 = new int[quartsY * 36];
-            Arrays.fill(haloBiomes6x6, -1);
-            for (int qyRel = 0; qyRel < quartsY; qyRel++) {
-                int dstLayer = qyRel * 36;
-                int srcLayer = qyRel << 4;
-                for (int qz = 0; qz < 4; qz++) {
-                    int dstRow = dstLayer + (qz + 1) * 6 + 1;
-                    int srcRow = srcLayer + (qz << 2);
-                    for (int dx = 0; dx < 4; dx++) {
-                        haloBiomes6x6[dstRow + dx] = Math.max(0, quartBiomes[srcRow + dx]);
-                    }
-                }
-            }
-            for (int hz = 0; hz < 6; hz++) {
-                int wQz = chunkBaseQz - 1 + hz;
-                for (int hx = 0; hx < 6; hx++) {
-                    if (hx >= 1 && hx <= 4 && hz >= 1 && hz <= 4) {
-                        continue;
-                    }
-                    int colQi = hz * 6 + hx;
-                    if (biomeResolver != null) {
-                        int wQx = chunkBaseQx - 1 + hx;
-                        for (int qyRel = 0; qyRel < activeHaloQuartsY; qyRel++) {
-                            int ord = Math.max(0, biomeResolver.resolveBiomeOrdinal(wQx, chunkBaseQy + qyRel, wQz));
-                            haloBiomes6x6[qyRel * 36 + colQi] = ord;
+            int[] haloBiomes6x6 = DECOR_SCRATCH.get().ensureSurfaceQuartHalo(quartsY, quartBiomes);
+            if (biomeResolver == null) {
+                for (int hz = 0; hz < 6; hz++) {
+                    for (int hx = 0; hx < 6; hx++) {
+                        if (hx >= 1 && hx <= 4 && hz >= 1 && hz <= 4) {
+                            continue;
                         }
-                    } else {
+                        int colQi = hz * 6 + hx;
                         int srcColQi = Math.max(1, Math.min(4, hz)) * 6 + Math.max(1, Math.min(4, hx));
                         for (int qyRel = 0; qyRel < activeHaloQuartsY; qyRel++) {
                             haloBiomes6x6[qyRel * 36 + colQi] = haloBiomes6x6[qyRel * 36 + srcColQi];
@@ -7781,7 +7769,16 @@ public final class LiftedWorldgenCapabilityTables {
                 }
             }
             int ceilProbeMax = exactMode ? Math.max(1, maxBoundY - minBoundY + 1) : 24;
-            boolean tempColConst = rc.temperatureChannel() != null && rc.temperatureChannel().isColumnConstantY();
+            boolean surfaceRuleNeedsTemp = spec.surfaceRuleModule().entryFunction() != null
+                    && spec.surfaceRuleModule().entryFunction().parameters().stream()
+                            .anyMatch(p -> "temperature".equals(p.name()));
+            boolean useTempChannel = surfaceRuleNeedsTemp && rc.temperatureChannel() != null;
+            boolean tempColConst = useTempChannel
+                    && (rc.temperatureChannel().isColumnConstantY()
+                            || (rc.temperatureChannel().sample(chunkBaseBx, 0, chunkBaseBz)
+                                            == rc.temperatureChannel().sample(chunkBaseBx, 64, chunkBaseBz)
+                                    && rc.temperatureChannel().sample(chunkBaseBx + 8, -32, chunkBaseBz + 8)
+                                            == rc.temperatureChannel().sample(chunkBaseBx + 8, 96, chunkBaseBz + 8)));
             for (int lz = 0; lz < 16; lz++) {
                 int bz = chunkBaseBz + lz;
                 for (int lx = 0; lx < 16; lx++) {
@@ -7870,13 +7867,13 @@ public final class LiftedWorldgenCapabilityTables {
                                 quartsY,
                                 haloBiomes6x6,
                                 biomeResolver);
-                        float tempVal = tempColConst
-                                ? colTempVal
-                                : (rc.temperatureChannel() != null
-                                        ? (exactMode
+                        float tempVal = !useTempChannel
+                                ? 0.5f
+                                : (tempColConst
+                                        ? colTempVal
+                                        : (exactMode
                                                 ? (float) rc.temperatureChannel().sampleFp64(bx, wy, bz)
-                                                : rc.temperatureChannel().sample(bx, wy, bz))
-                                        : 0.5f);
+                                                : rc.temperatureChannel().sample(bx, wy, bz)));
                         int nextSlot = evaluateSurfaceRuleModule(
                                 surfaceEvaluator,
                                 cur,
@@ -8147,6 +8144,9 @@ public final class LiftedWorldgenCapabilityTables {
         }
 
         if (applyFeatures) {
+            if (!borderTreeOverhangsOnly && topSurfaceY != null && topSurfaceY.length >= 256) {
+                recordChunkBorderSurface(frame, quartBiomes, topSurfaceY, spec, chunkX, chunkZ, worldSeed, minBoundY, maxBoundY);
+            }
             long[] presentBiomes = buildPresentBiomeBitMask(quartBiomes);
             if (spec.placedFeatureSpecs() != null && spec.placedFeatureSpecs().length > 0) {
                 executePlacedFeatureSpecs(
@@ -9345,6 +9345,10 @@ public final class LiftedWorldgenCapabilityTables {
                 }
                 int nCx = chunkX + dCx;
                 int nCz = chunkZ + dCz;
+                ChunkBorderSurfaceEntry cachedNeighbor = lookupChunkBorderSurface(spec, worldSeed, nCx, nCz);
+                int minAllowedGround = spec.defaultFluidSlot() > 0
+                        ? Math.max(minBoundY, spec.seaLevel() - 1 - Math.max(0, maxWaterDepth))
+                        : minBoundY;
                 scratch.acceptedTreeTrunkCount = 0;
                 rng.reseed(worldSeed, nCx, nCz, pf.stepIndex(), pf.featureSalt() + specIndex);
                 scratch.posA[0] = 0;
@@ -9377,63 +9381,84 @@ public final class LiftedWorldgenCapabilityTables {
                     }
                     int worldX = targetChunkBx + relLx;
                     int worldZ = targetChunkBz + relLz;
-                    int nearLx = Math.max(0, Math.min(15, relLx));
-                    int nearLz = Math.max(0, Math.min(15, relLz));
-                    int estTopY = topSurfaceY != null && topSurfaceY.length >= 256
-                            ? topSurfaceY[(nearLz << 4) | nearLx]
-                            : spec.seaLevel();
-                    if (pf.allowedBiomeMask() != null) {
-                        int approxWy = Math.max(minBoundY + 1, Math.min(maxBoundY - 1, estTopY + 1));
-                        int bOrdApprox = borderBiomeSampler != null
-                                ? borderBiomeSampler.resolveBiomeOrdinal(worldX >> 2, approxWy >> 2, worldZ >> 2)
-                                : lookupPerimeterHaloBiome(quartBiomes, spec, scratch, relLx, approxWy, relLz);
-                        if (!bitMaskContains(pf.allowedBiomeMask(), bOrdApprox)) {
+                    int resolvedGroundY;
+                    if (cachedNeighbor != null) {
+                        int nCol = (nLz << 4) | nLx;
+                        int nTopY = cachedNeighbor.topY256[nCol];
+                        if (nTopY < minAllowedGround || nTopY < minBoundY || nTopY >= maxBoundY) {
                             continue;
                         }
-                    }
-                    int resolvedGroundY = resolveExternalGroundY(
-                            spec,
-                            borderDensityEval,
-                            worldX,
-                            worldZ,
-                            estTopY,
-                            maxWaterDepth,
-                            minBoundY,
-                            maxBoundY);
-                    if (resolvedGroundY == Integer.MIN_VALUE) {
-                        continue;
+                        if (pf.allowedBiomeMask() != null) {
+                            int bOrd = cachedNeighbor.topBiome16[((nLz >> 2) << 2) | (nLx >> 2)];
+                            if (!bitMaskContains(pf.allowedBiomeMask(), bOrd)) {
+                                continue;
+                            }
+                        }
+                        resolvedGroundY = nTopY;
+                        scratch.externalRootTopSurfaceSlot = cachedNeighbor.topSlot256[nCol];
+                    } else {
+                        int nearLx = Math.max(0, Math.min(15, relLx));
+                        int nearLz = Math.max(0, Math.min(15, relLz));
+                        int estTopY = topSurfaceY != null && topSurfaceY.length >= 256
+                                ? topSurfaceY[(nearLz << 4) | nearLx]
+                                : spec.seaLevel();
+                        if (pf.allowedBiomeMask() != null) {
+                            int approxWy = Math.max(minBoundY + 1, Math.min(maxBoundY - 1, estTopY + 1));
+                            int bOrdApprox = borderBiomeSampler != null
+                                    ? borderBiomeSampler.resolveBiomeOrdinal(worldX >> 2, approxWy >> 2, worldZ >> 2)
+                                    : lookupPerimeterHaloBiome(quartBiomes, spec, scratch, relLx, approxWy, relLz);
+                            if (!bitMaskContains(pf.allowedBiomeMask(), bOrdApprox)) {
+                                continue;
+                            }
+                        }
+                        resolvedGroundY = resolveExternalGroundY(
+                                spec,
+                                borderDensityEval,
+                                worldX,
+                                worldZ,
+                                estTopY,
+                                maxWaterDepth,
+                                minBoundY,
+                                maxBoundY);
+                        if (resolvedGroundY == Integer.MIN_VALUE) {
+                            continue;
+                        }
+                        int wyChk = resolvedGroundY + 1;
+                        if (wyChk <= minBoundY || wyChk >= maxBoundY) {
+                            continue;
+                        }
+                        if (pf.allowedBiomeMask() != null && Math.abs(wyChk - (estTopY + 1)) >= 8) {
+                            int bOrd = borderBiomeSampler != null
+                                    ? borderBiomeSampler.resolveBiomeOrdinal(worldX >> 2, wyChk >> 2, worldZ >> 2)
+                                    : lookupPerimeterHaloBiome(quartBiomes, spec, scratch, relLx, wyChk, relLz);
+                            if (!bitMaskContains(pf.allowedBiomeMask(), bOrd)) {
+                                continue;
+                            }
+                        }
+                        scratch.externalRootTopSurfaceSlot = (borderDensityEval == null)
+                                ? ((estTopY >= minBoundY && estTopY <= maxBoundY)
+                                        ? frame.getVoxel(
+                                                (estTopY - spec.chunkMinY()) >> 4,
+                                                ((estTopY & 15) << 8) | (nearLz << 4) | nearLx)
+                                        : spec.defaultBlockSlot())
+                                : evaluateExternalTopSurfaceSlot(
+                                        spec,
+                                        rc,
+                                        borderBiomeSampler,
+                                        quartBiomes,
+                                        worldSeed,
+                                        scratch.voronoiZoomSeed,
+                                        worldX,
+                                        resolvedGroundY,
+                                        worldZ,
+                                        minBoundY,
+                                        maxBoundY,
+                                        scratch);
                     }
                     int wy = resolvedGroundY + 1;
                     if (wy <= minBoundY || wy >= maxBoundY) {
                         continue;
                     }
-                    if (pf.allowedBiomeMask() != null && Math.abs(wy - (estTopY + 1)) >= 8) {
-                        int bOrd = borderBiomeSampler != null
-                                ? borderBiomeSampler.resolveBiomeOrdinal(worldX >> 2, wy >> 2, worldZ >> 2)
-                                : lookupPerimeterHaloBiome(quartBiomes, spec, scratch, relLx, wy, relLz);
-                        if (!bitMaskContains(pf.allowedBiomeMask(), bOrd)) {
-                            continue;
-                        }
-                    }
-                    scratch.externalRootTopSurfaceSlot = (borderDensityEval == null)
-                            ? ((estTopY >= minBoundY && estTopY <= maxBoundY)
-                                    ? frame.getVoxel(
-                                            (estTopY - spec.chunkMinY()) >> 4,
-                                            ((estTopY & 15) << 8) | (nearLz << 4) | nearLx)
-                                    : spec.defaultBlockSlot())
-                            : evaluateExternalTopSurfaceSlot(
-                                    spec,
-                                    rc,
-                                    borderBiomeSampler,
-                                    quartBiomes,
-                                    worldSeed,
-                                    scratch.voronoiZoomSeed,
-                                    worldX,
-                                    resolvedGroundY,
-                                    worldZ,
-                                    minBoundY,
-                                    maxBoundY,
-                                    scratch);
                     if (relLx < -treeReach
                             || relLx > 15 + treeReach
                             || relLz < -treeReach
@@ -9622,62 +9647,43 @@ public final class LiftedWorldgenCapabilityTables {
                     : Integer.MIN_VALUE;
         }
         int noiseMinY = spec.noiseMinY();
-        int cellW = Math.max(1, spec.cellWidth());
         int cellH = Math.max(1, spec.cellHeight());
-        int gx0 = Math.floorDiv(worldX, cellW) * cellW;
-        int gz0 = Math.floorDiv(worldZ, cellW) * cellW;
-        float fx = (worldX - gx0) / (float) cellW;
-        float fz = (worldZ - gz0) / (float) cellW;
-
         int maxCellIdx = Math.max(0, (maxBoundY - 1 - noiseMinY) / cellH);
         int minCellIdx = Math.max(0, (minAllowedGround - noiseMinY) / cellH);
         if (maxCellIdx < minCellIdx) {
             return Integer.MIN_VALUE;
         }
-        // Start scanning near the adjacent chunk's surface height (estTopY + 16) rather than Y=319;
-        // if that window ceiling is still solid (steep cliff), widen cleanly up to maxCellIdx.
+        // Sample the single (worldX, worldZ) vertical column in one batch via sampleColumnY (reusing 2D memoization)
+        // around estTopY first, widening only on steep cliffs/overhangs where the top of the window is still solid.
         int startCellIdx = maxCellIdx;
         if (estTopY >= minBoundY && estTopY < maxBoundY - 16) {
             int probeCell = Math.min(maxCellIdx, Math.max(minCellIdx, ((estTopY + 16) - noiseMinY) / cellH));
-            float probeTop = sampleHorizontalCellCornersBilinear(
-                    densityEval, gx0, gz0, cellW, fx, fz, noiseMinY + (probeCell + 1) * cellH);
-            if (probeTop <= 0.0f) {
+            if (densityEval.sample(worldX, noiseMinY + (probeCell + 1) * cellH, worldZ) <= 0.0f) {
                 startCellIdx = probeCell;
             }
         }
-        int topCornerY = noiseMinY + (startCellIdx + 1) * cellH;
-        float topBilinear = sampleHorizontalCellCornersBilinear(densityEval, gx0, gz0, cellW, fx, fz, topCornerY);
-        for (int cy = startCellIdx; cy >= minCellIdx; cy--) {
-            int botCornerY = noiseMinY + cy * cellH;
-            float botBilinear = sampleHorizontalCellCornersBilinear(densityEval, gx0, gz0, cellW, fx, fz, botCornerY);
-            if (topBilinear > 0.0f || botBilinear > 0.0f) {
+        int cellSpan = (startCellIdx - minCellIdx) + 2;
+        float[] colSamples = new float[cellSpan];
+        int baseCornerY = noiseMinY + minCellIdx * cellH;
+        densityEval.sampleColumnY(worldX, baseCornerY, cellH, cellSpan, worldZ, colSamples, 0);
+        float topVal = colSamples[cellSpan - 1];
+        for (int idx = cellSpan - 2; idx >= 0; idx--) {
+            float botVal = colSamples[idx];
+            if (topVal > 0.0f || botVal > 0.0f) {
+                int botCornerY = baseCornerY + idx * cellH;
                 int cellHiLy = Math.min(cellH - 1, (maxBoundY - 1) - botCornerY);
                 int cellLoLy = Math.max(0, minAllowedGround - botCornerY);
                 for (int ly = cellHiLy; ly >= cellLoLy; ly--) {
                     float fy = ly / (float) cellH;
-                    float dens = botBilinear + fy * (topBilinear - botBilinear);
+                    float dens = botVal + fy * (topVal - botVal);
                     if (dens > 0.0f) {
                         return botCornerY + ly;
                     }
                 }
             }
-            topBilinear = botBilinear;
+            topVal = botVal;
         }
         return Integer.MIN_VALUE;
-    }
-
-    private static float sampleHorizontalCellCornersBilinear(
-            DensityFieldEvaluator densityEval, int gx0, int gz0, int cellW, float fx, float fz, int cornerY) {
-        float c00 = densityEval.sample(gx0, cornerY, gz0);
-        if (fx == 0.0f && fz == 0.0f) {
-            return c00;
-        }
-        float c01 = fz == 0.0f ? c00 : densityEval.sample(gx0, cornerY, gz0 + cellW);
-        float c10 = fx == 0.0f ? c00 : densityEval.sample(gx0 + cellW, cornerY, gz0);
-        float c11 = (fx == 0.0f) ? c01 : ((fz == 0.0f) ? c10 : densityEval.sample(gx0 + cellW, cornerY, gz0 + cellW));
-        float x0 = c00 + fz * (c01 - c00);
-        float x1 = c10 + fz * (c11 - c10);
-        return x0 + fx * (x1 - x0);
     }
 
     private static boolean isExternalSoilCompatibleWithAnyTreeBranch(
@@ -9706,6 +9712,99 @@ public final class LiftedWorldgenCapabilityTables {
         return false;
     }
 
+    private static final int CHUNK_BORDER_SURFACE_CACHE_MASK = 4095;
+    private static final java.util.concurrent.atomic.AtomicReferenceArray<ChunkBorderSurfaceEntry>
+            CHUNK_BORDER_SURFACE_CACHE =
+                    new java.util.concurrent.atomic.AtomicReferenceArray<>(CHUNK_BORDER_SURFACE_CACHE_MASK + 1);
+
+    private static final class ChunkBorderSurfaceEntry {
+        final int specId;
+        final long worldSeed;
+        final int chunkX;
+        final int chunkZ;
+        final short[] topY256;
+        final short[] topSlot256;
+        final short[] topBiome16;
+
+        ChunkBorderSurfaceEntry(
+                int specId,
+                long worldSeed,
+                int chunkX,
+                int chunkZ,
+                short[] topY256,
+                short[] topSlot256,
+                short[] topBiome16
+        ) {
+            this.specId = specId;
+            this.worldSeed = worldSeed;
+            this.chunkX = chunkX;
+            this.chunkZ = chunkZ;
+            this.topY256 = topY256;
+            this.topSlot256 = topSlot256;
+            this.topBiome16 = topBiome16;
+        }
+    }
+
+    private static int chunkBorderSurfaceCacheSlot(int specId, long worldSeed, int chunkX, int chunkZ) {
+        long h = worldSeed ^ ((long) specId * 0x9E3779B97F4A7C15L);
+        h ^= (long) chunkX * 0xBF58476D1CE4E5B9L;
+        h ^= (long) chunkZ * 0x94D049BB133111EBL;
+        return (int) ((h ^ (h >>> 32)) & CHUNK_BORDER_SURFACE_CACHE_MASK);
+    }
+
+    private static void recordChunkBorderSurface(
+            LcaCapabilityChunkFrame frame,
+            int[] quartBiomes,
+            int[] topSurfaceY,
+            DimensionCapabilitySpec spec,
+            int chunkX,
+            int chunkZ,
+            long worldSeed,
+            int minBoundY,
+            int maxBoundY
+    ) {
+        short[] topY256 = new short[256];
+        short[] topSlot256 = new short[256];
+        short[] topBiome16 = new short[16];
+        int chunkMinY = spec.chunkMinY();
+        int defSlot = spec.defaultBlockSlot();
+        for (int col = 0; col < 256; col++) {
+            int ty = topSurfaceY[col];
+            topY256[col] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, ty));
+            if (ty >= minBoundY && ty <= maxBoundY) {
+                int sIdx = (ty - chunkMinY) >> 4;
+                topSlot256[col] = (short) frame.getVoxel(sIdx, ((ty & 15) << 8) | col);
+            } else {
+                topSlot256[col] = (short) defSlot;
+            }
+        }
+        for (int qz = 0; qz < 4; qz++) {
+            int lz = (qz << 2) + 2;
+            for (int qx = 0; qx < 4; qx++) {
+                int lx = (qx << 2) + 2;
+                int ty = topSurfaceY[(lz << 4) | lx];
+                int sampleY = Math.max(minBoundY, Math.min(maxBoundY, ty + 1));
+                int bOrd = sampleQuartBiomeAt(quartBiomes, spec, lx, sampleY, lz);
+                topBiome16[(qz << 2) | qx] = (short) Math.max(0, bOrd);
+            }
+        }
+        int specId = System.identityHashCode(spec);
+        int slot = chunkBorderSurfaceCacheSlot(specId, worldSeed, chunkX, chunkZ);
+        CHUNK_BORDER_SURFACE_CACHE.setRelease(
+                slot, new ChunkBorderSurfaceEntry(specId, worldSeed, chunkX, chunkZ, topY256, topSlot256, topBiome16));
+    }
+
+    private static ChunkBorderSurfaceEntry lookupChunkBorderSurface(
+            DimensionCapabilitySpec spec, long worldSeed, int chunkX, int chunkZ) {
+        int specId = System.identityHashCode(spec);
+        int slot = chunkBorderSurfaceCacheSlot(specId, worldSeed, chunkX, chunkZ);
+        ChunkBorderSurfaceEntry e = CHUNK_BORDER_SURFACE_CACHE.getAcquire(slot);
+        if (e != null && e.specId == specId && e.worldSeed == worldSeed && e.chunkX == chunkX && e.chunkZ == chunkZ) {
+            return e;
+        }
+        return null;
+    }
+
     private static int evaluateExternalTopSurfaceSlot(
             DimensionCapabilitySpec spec,
             RouterCapabilityChannels rc,
@@ -9726,51 +9825,25 @@ public final class LiftedWorldgenCapabilityTables {
         }
         JavaConceptBackendEmitter.SurfaceRuleEvaluator surfaceEvaluator =
                 LcaCapabilityChunkFrame.cachedSurfaceRuleEvaluator(spec.surfaceRuleModule());
-        int extChunkX = worldX >> 4;
-        int extChunkZ = worldZ >> 4;
-        int quartsY = Math.max(1, spec.chunkSections() << 2);
-        int chunkBaseQx = extChunkX << 2;
-        int chunkBaseQy = spec.chunkMinY() >> 2;
-        int chunkBaseQz = extChunkZ << 2;
-        QuartBiomeOrdinalResolver effResolver = borderBiomeSampler != null
-                ? borderBiomeSampler
-                : (qx, qy, qz) -> sampleQuartBiomeAt(
+        int biomeId = borderBiomeSampler != null
+                ? Math.max(0, borderBiomeSampler.resolveBiomeOrdinal(worldX >> 2, groundY >> 2, worldZ >> 2))
+                : sampleQuartBiomeAt(
                         fallbackQuartBiomes,
                         spec,
-                        Math.max(0, Math.min(15, (qx << 2) - (scratch.voronoiChunkX << 4))),
-                        qy << 2,
-                        Math.max(0, Math.min(15, (qz << 2) - (scratch.voronoiChunkZ << 4))));
-        int[] extHalo = new int[quartsY * 36];
-        Arrays.fill(extHalo, -1);
-
+                        Math.max(0, Math.min(15, worldX - (scratch.voronoiChunkX << 4))),
+                        groundY,
+                        Math.max(0, Math.min(15, worldZ - (scratch.voronoiChunkZ << 4))));
         int posHash = mixColumnSeed(worldSeed, worldX, worldZ);
         int surfaceDepth = computeSmoothSurfaceDepth(worldSeed, worldX, worldZ, posHash);
         boolean fluidAbove = spec.defaultFluidSlot() > 0 && groundY < spec.seaLevel();
         int waterHeight = fluidAbove ? spec.seaLevel() : Integer.MIN_VALUE;
         int colPrelimY = groundY - 2;
-        if (rc.initialDensityWithoutJaggedness() != null) {
-            for (int py = Math.min(maxBoundY, groundY + 4); py >= Math.max(minBoundY, groundY - 12); py--) {
-                if (rc.initialDensityWithoutJaggedness().sample(worldX, py, worldZ) > 0.390625f) {
-                    colPrelimY = py;
-                    break;
-                }
-            }
-        }
-        boolean tempColConst = rc.temperatureChannel() != null && rc.temperatureChannel().isColumnConstantY();
-        float tempVal = rc.temperatureChannel() != null
-                ? rc.temperatureChannel().sample(worldX, tempColConst ? 0 : groundY, worldZ)
+        boolean surfaceRuleNeedsTemp = spec.surfaceRuleModule().entryFunction() != null
+                && spec.surfaceRuleModule().entryFunction().parameters().stream()
+                        .anyMatch(p -> "temperature".equals(p.name()));
+        float tempVal = (surfaceRuleNeedsTemp && rc.temperatureChannel() != null)
+                ? rc.temperatureChannel().sample(worldX, rc.temperatureChannel().isColumnConstantY() ? 0 : groundY, worldZ)
                 : 0.5f;
-        int biomeId = resolveVoronoiZoomedBiomeOrdinal(
-                biomeZoomSeed,
-                worldX,
-                groundY,
-                worldZ,
-                chunkBaseQx,
-                chunkBaseQy,
-                chunkBaseQz,
-                quartsY,
-                extHalo,
-                effResolver);
         return evaluateSurfaceRuleModule(
                 surfaceEvaluator,
                 defaultBlock,
