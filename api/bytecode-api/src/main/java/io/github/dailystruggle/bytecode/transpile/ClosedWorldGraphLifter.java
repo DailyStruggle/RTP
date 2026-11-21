@@ -1204,6 +1204,52 @@ final class ClosedWorldGraphLifter {
             return -2;
         }
 
+        int resolveCollectionElementId(SymVal.CollectionRef coll, int elemIdx) {
+            if (elemIdx < 0 || elemIdx >= coll.elementIds().size()) {
+                return -1;
+            }
+            int elemId = coll.elementIds().get(elemIdx);
+            if (elemId != -2 || dynamicCollector == null) {
+                return elemId;
+            }
+            Object liveColl = dynamicCollector.liveObjectsById.get(coll.instanceId());
+            if (liveColl == null) {
+                return -2;
+            }
+            try {
+                Object elemObj;
+                if (liveColl.getClass().isArray()) {
+                    elemObj = java.lang.reflect.Array.get(liveColl, elemIdx);
+                } else if (liveColl instanceof List<?> liveList) {
+                    elemObj = liveList.get(elemIdx);
+                } else {
+                    return -2;
+                }
+                return captureLiveObjectOnDemand(elemObj);
+            } catch (RuntimeException ignored) {
+                return -2;
+            }
+        }
+
+        List<Integer> resolveAllCollectionElementIds(SymVal.CollectionRef coll) {
+            List<Integer> raw = coll.elementIds();
+            boolean hasTruncated = false;
+            for (int id : raw) {
+                if (id == -2) {
+                    hasTruncated = true;
+                    break;
+                }
+            }
+            if (!hasTruncated || dynamicCollector == null) {
+                return raw;
+            }
+            List<Integer> expanded = new ArrayList<>(raw.size());
+            for (int i = 0; i < raw.size(); i++) {
+                expanded.add(resolveCollectionElementId(coll, i));
+            }
+            return expanded;
+        }
+
         private SymVal tryCaptureStaticFieldLive(FieldRef fRef) {
             String key = fRef.owner() + "#" + fRef.name();
             if (onDemandStaticCache.containsKey(key)) {
@@ -2255,6 +2301,7 @@ final class ClosedWorldGraphLifter {
         final List<IndexedContextBinding> usedContextBindings;
         final Set<Integer> activeStructuredWhileHeaders = new HashSet<>();
         ReturnInterceptor activeReturnInterceptor;
+        int controlFlowDepth = 0;
         boolean pure = true;
         final String varPrefix;
 
@@ -2415,17 +2462,40 @@ final class ClosedWorldGraphLifter {
                     SymFrame elseFrame = frame.copy();
                     List<ConceptStmt> thenStmts = new ArrayList<>();
                     List<ConceptStmt> elseStmts = new ArrayList<>();
-
-                    if (block.branchTargetPc != joinPc) {
-                        Map<Integer, Integer> thenLoops = copyLoopsForForwardEdge(activeLoops, pc, block.branchTargetPc);
-                        liftRegion(block.branchTargetPc, joinPc, thenFrame, thenLoops, thenStmts);
+                    java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> preBranchFields =
+                            snapshotReachableLocalObjectFields(frame);
+                    java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> thenBranchFields;
+                    java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> elseBranchFields;
+                    controlFlowDepth++;
+                    try {
+                        if (block.branchTargetPc != joinPc) {
+                            Map<Integer, Integer> thenLoops = copyLoopsForForwardEdge(activeLoops, pc, block.branchTargetPc);
+                            liftRegion(block.branchTargetPc, joinPc, thenFrame, thenLoops, thenStmts);
+                        }
+                        thenBranchFields = captureCurrentLocalObjectFields(preBranchFields.keySet());
+                        restoreLocalObjectFields(preBranchFields);
+                        if (block.fallthroughPc != joinPc) {
+                            Map<Integer, Integer> elseLoops = copyLoopsForForwardEdge(activeLoops, pc, block.fallthroughPc);
+                            liftRegion(block.fallthroughPc, joinPc, elseFrame, elseLoops, elseStmts);
+                        }
+                        elseBranchFields = captureCurrentLocalObjectFields(preBranchFields.keySet());
+                    } finally {
+                        controlFlowDepth--;
                     }
-                    if (block.fallthroughPc != joinPc) {
-                        Map<Integer, Integer> elseLoops = copyLoopsForForwardEdge(activeLoops, pc, block.fallthroughPc);
-                        liftRegion(block.fallthroughPc, joinPc, elseFrame, elseLoops, elseStmts);
-                    }
 
-                    mergeConditionalArms(cond, lastPc, joinPc, frame, thenFrame, elseFrame, thenStmts, elseStmts, out);
+                    mergeConditionalArms(
+                            cond,
+                            lastPc,
+                            joinPc,
+                            frame,
+                            thenFrame,
+                            elseFrame,
+                            thenStmts,
+                            elseStmts,
+                            preBranchFields,
+                            thenBranchFields,
+                            elseBranchFields,
+                            out);
                     if (frame.terminated) {
                         return;
                     }
@@ -2689,9 +2759,11 @@ final class ClosedWorldGraphLifter {
 
             SymFrame bodyFrame = headerFrame.copy();
             List<ConceptStmt> bodyStmts = new ArrayList<>();
+            controlFlowDepth++;
             try {
                 liftRegion(bodyEntryPc, headerPc, bodyFrame, new HashMap<>(activeLoops), bodyStmts);
             } finally {
+                controlFlowDepth--;
                 activeStructuredWhileHeaders.remove(headerPc);
                 this.activeReturnInterceptor = prevInterceptor;
             }
@@ -2841,24 +2913,50 @@ final class ClosedWorldGraphLifter {
                 List<ConceptStmt> thenStmts,
                 List<ConceptStmt> elseStmts,
                 List<ConceptStmt> out) {
+            mergeConditionalArms(
+                    cond, branchPc, joinPc, parentFrame, thenFrame, elseFrame, thenStmts, elseStmts, null, null, null, out);
+        }
+
+        private void mergeConditionalArms(
+                ConceptExpr cond,
+                int branchPc,
+                int joinPc,
+                SymFrame parentFrame,
+                SymFrame thenFrame,
+                SymFrame elseFrame,
+                List<ConceptStmt> thenStmts,
+                List<ConceptStmt> elseStmts,
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> preFields,
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> thenFields,
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> elseFields,
+                List<ConceptStmt> out) {
             if (thenFrame.terminated && elseFrame.terminated) {
                 out.add(new ConceptStmt.If(cond, thenStmts, elseStmts));
                 parentFrame.terminated = true;
                 return;
             }
             if (thenFrame.terminated) {
+                if (elseFields != null) {
+                    restoreLocalObjectFields(elseFields);
+                }
                 out.add(new ConceptStmt.If(cond, thenStmts, List.of()));
                 adoptFrame(parentFrame, elseFrame);
                 out.addAll(elseStmts);
                 return;
             }
             if (elseFrame.terminated) {
+                if (thenFields != null) {
+                    restoreLocalObjectFields(thenFields);
+                }
                 out.add(new ConceptStmt.If(BytecodeSsaLifter.negateBooleanExpr(cond), elseStmts, List.of()));
                 adoptFrame(parentFrame, thenFrame);
                 out.addAll(thenStmts);
                 return;
             }
 
+            if (preFields != null && thenFields != null && elseFields != null && !preFields.isEmpty()) {
+                mergeLocalObjectFields(branchPc, joinPc, preFields, thenFields, elseFields, thenStmts, elseStmts);
+            }
             SymFrame merged = mergeLiveFrames(branchPc, joinPc, thenFrame, elseFrame, thenStmts, elseStmts);
             if (!thenStmts.isEmpty() || !elseStmts.isEmpty()) {
                 if (thenStmts.isEmpty()) {
@@ -2868,6 +2966,132 @@ final class ClosedWorldGraphLifter {
                 }
             }
             adoptFrame(parentFrame, merged);
+        }
+
+        private java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> snapshotReachableLocalObjectFields(
+                SymFrame frame) {
+            java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> snap =
+                    new java.util.IdentityHashMap<>();
+            java.util.IdentityHashMap<Object, Boolean> seen = new java.util.IdentityHashMap<>();
+            for (SymVal v : frame.locals.values()) {
+                collectReachableLocalObjects(v, snap, seen);
+            }
+            for (SymVal v : frame.stack) {
+                collectReachableLocalObjects(v, snap, seen);
+            }
+            return snap;
+        }
+
+        private static void collectReachableLocalObjects(
+                SymVal val,
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> snap,
+                java.util.IdentityHashMap<Object, Boolean> seen) {
+            if (val == null || seen.put(val, Boolean.TRUE) != null) {
+                return;
+            }
+            if (val instanceof SymVal.LocalObjectRef lor) {
+                snap.put(lor, new LinkedHashMap<>(lor.fields()));
+                for (SymVal fv : lor.fields().values()) {
+                    collectReachableLocalObjects(fv, snap, seen);
+                }
+            } else if (val instanceof SymVal.LocalObjectArrayRef loar) {
+                for (SymVal ev : loar.elements()) {
+                    collectReachableLocalObjects(ev, snap, seen);
+                }
+            } else if (val instanceof SymVal.LocalListRef llr) {
+                for (SymVal ev : llr.elements()) {
+                    collectReachableLocalObjects(ev, snap, seen);
+                }
+            } else if (val instanceof SymVal.LambdaClosure lc) {
+                for (SymVal cv : lc.capturedArgs()) {
+                    collectReachableLocalObjects(cv, snap, seen);
+                }
+            }
+        }
+
+        private static java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> captureCurrentLocalObjectFields(
+                Set<SymVal.LocalObjectRef> targets) {
+            java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> out =
+                    new java.util.IdentityHashMap<>();
+            for (SymVal.LocalObjectRef lor : targets) {
+                out.put(lor, new LinkedHashMap<>(lor.fields()));
+            }
+            return out;
+        }
+
+        private static void restoreLocalObjectFields(
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> snapshot) {
+            for (Map.Entry<SymVal.LocalObjectRef, Map<String, SymVal>> e : snapshot.entrySet()) {
+                Map<String, SymVal> target = e.getKey().fields();
+                target.clear();
+                target.putAll(e.getValue());
+            }
+        }
+
+        private void mergeLocalObjectFields(
+                int branchPc,
+                int joinPc,
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> preFields,
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> thenFields,
+                java.util.IdentityHashMap<SymVal.LocalObjectRef, Map<String, SymVal>> elseFields,
+                List<ConceptStmt> thenStmts,
+                List<ConceptStmt> elseStmts) {
+            for (SymVal.LocalObjectRef lor : preFields.keySet()) {
+                Map<String, SymVal> tf = thenFields.getOrDefault(lor, Map.of());
+                Map<String, SymVal> ef = elseFields.getOrDefault(lor, Map.of());
+                Map<String, List<String>> keysByShortName = new LinkedHashMap<>();
+                for (String k : tf.keySet()) {
+                    int hash = k.lastIndexOf('#');
+                    String shortName = hash >= 0 ? k.substring(hash + 1) : k;
+                    keysByShortName.computeIfAbsent(shortName, s -> new ArrayList<>()).add(k);
+                }
+                for (String k : ef.keySet()) {
+                    int hash = k.lastIndexOf('#');
+                    String shortName = hash >= 0 ? k.substring(hash + 1) : k;
+                    List<String> ks = keysByShortName.computeIfAbsent(shortName, s -> new ArrayList<>());
+                    if (!ks.contains(k)) {
+                        ks.add(k);
+                    }
+                }
+                Map<String, SymVal> mergedMap = new LinkedHashMap<>();
+                for (Map.Entry<String, List<String>> ge : keysByShortName.entrySet()) {
+                    String shortName = ge.getKey();
+                    List<String> allKeys = ge.getValue();
+                    SymVal fa = tf.get(shortName);
+                    SymVal fb = ef.get(shortName);
+                    for (String k : allKeys) {
+                        if (fa == null) fa = tf.get(k);
+                        if (fb == null) fb = ef.get(k);
+                    }
+                    if (fa == null && fb == null) {
+                        continue;
+                    }
+                    if (fa == null && fb instanceof SymVal.Scalar sb) {
+                        fa = new SymVal.Scalar(BytecodeSsaLifter.defaultConstForType(sb.expr().type()));
+                    } else if (fb == null && fa instanceof SymVal.Scalar sa) {
+                        fb = new SymVal.Scalar(BytecodeSsaLifter.defaultConstForType(sa.expr().type()));
+                    }
+                    SymVal mergedVal;
+                    if (Objects.equals(fa, fb)) {
+                        mergedVal = fa;
+                    } else if (fa != null && fb != null) {
+                        mergedVal = mergeSymVal(
+                                "lof" + lor.allocId() + "_" + BytecodeSsaLifter.sanitizeIdentifier(shortName) + "_" + branchPc,
+                                joinPc,
+                                fa,
+                                fb,
+                                thenStmts,
+                                elseStmts);
+                    } else {
+                        mergedVal = fa != null ? fa : fb;
+                    }
+                    for (String k : allKeys) {
+                        mergedMap.put(k, mergedVal);
+                    }
+                }
+                lor.fields().clear();
+                lor.fields().putAll(mergedMap);
+            }
         }
 
         private SymFrame mergeLiveFrames(
@@ -3493,11 +3717,13 @@ final class ClosedWorldGraphLifter {
                 if (c0 != 'L' && c0 != '[') {
                     ConceptType fType = ConceptType.fromDescriptorPrefix(fRef.descriptor());
                     ConceptExpr expr = asScalarExpr(val, fType, pc, 0xB5);
-                    if (isCompileTimeScalarConst(expr)) {
+                    String varName = "_loc_obj_" + lor.allocId() + "_"
+                            + BytecodeSsaLifter.sanitizeIdentifier(fRef.name());
+                    if (isCompileTimeScalarConst(expr)
+                            && controlFlowDepth == 0
+                            && !localTypes.containsKey(varName)) {
                         stored = new SymVal.Scalar(expr);
                     } else {
-                        String varName = "_loc_obj_" + lor.allocId() + "_"
-                                + BytecodeSsaLifter.sanitizeIdentifier(fRef.name());
                         localTypes.putIfAbsent(varName, fType);
                         out.add(new ConceptStmt.Assign(varName, fType, expr));
                         stored = new SymVal.Scalar(new ConceptExpr.Var(varName, fType));
@@ -3770,7 +3996,7 @@ final class ClosedWorldGraphLifter {
             if (arrVal instanceof SymVal.CollectionRef coll) {
                 Integer constIdx = tryEvalConstInt(idx);
                 if (constIdx != null && constIdx >= 0 && constIdx < coll.elementIds().size()) {
-                    frame.push(ctx.instanceIdToSymVal(coll.elementIds().get(constIdx)));
+                    frame.push(ctx.instanceIdToSymVal(ctx.resolveCollectionElementId(coll, constIdx)));
                     return;
                 }
                 ConceptLut internedLut = ctx.tryBuildInternedElementLut(coll);
@@ -3788,9 +4014,9 @@ final class ClosedWorldGraphLifter {
                 }
                 if (!coll.elementIds().isEmpty() && coll.elementIds().size() <= ctx.options.maxLoopUnrollLength()) {
                     if (coll.elementIds().size() == 1) {
-                        frame.push(ctx.instanceIdToSymVal(coll.elementIds().get(0)));
+                        frame.push(ctx.instanceIdToSymVal(ctx.resolveCollectionElementId(coll, 0)));
                     } else {
-                        frame.push(new SymVal.MuxInstanceRef(idx, coll.elementIds()));
+                        frame.push(new SymVal.MuxInstanceRef(idx, ctx.resolveAllCollectionElementIds(coll)));
                     }
                     return;
                 }
@@ -4990,11 +5216,11 @@ final class ClosedWorldGraphLifter {
                 return;
             }
             if ("getFirst".equals(name) && callArgs.isEmpty() && !coll.elementIds().isEmpty()) {
-                frame.push(ctx.instanceIdToSymVal(coll.elementIds().get(0)));
+                frame.push(ctx.instanceIdToSymVal(ctx.resolveCollectionElementId(coll, 0)));
                 return;
             }
             if ("getLast".equals(name) && callArgs.isEmpty() && !coll.elementIds().isEmpty()) {
-                frame.push(ctx.instanceIdToSymVal(coll.elementIds().get(coll.elementIds().size() - 1)));
+                frame.push(ctx.instanceIdToSymVal(ctx.resolveCollectionElementId(coll, coll.elementIds().size() - 1)));
                 return;
             }
             if (("get".equals(name)
@@ -5044,7 +5270,7 @@ final class ClosedWorldGraphLifter {
                     return;
                 }
                 if (!coll.elementIds().isEmpty() && coll.elementIds().size() <= ctx.options.maxLoopUnrollLength()) {
-                    frame.push(new SymVal.MuxInstanceRef(idx, coll.elementIds()));
+                    frame.push(new SymVal.MuxInstanceRef(idx, ctx.resolveAllCollectionElementIds(coll)));
                     return;
                 }
                 markImpure(pc, opcode, "non-constant List." + name + " index into heterogeneous collection");

@@ -344,7 +344,8 @@ class LcaStreamingNbtEncoderTest {
 
         Path storageDir = tempDir.resolve("starlight-cave-sky");
         try (LcaRegionFileStorage storage = new LcaRegionFileStorage(storageDir, false)) {
-            storage.commitPreEncodedChunkSlab(cx, cz, ByteBuffer.wrap(actualSlab));
+            byte[] storageSlab = storage.encodeChunkNbtForRegionSlab(regionX, regionZ, ByteBuffer.wrap(rawNbt));
+            storage.commitPreEncodedChunkSlab(cx, cz, ByteBuffer.wrap(storageSlab));
             byte[] roundTrip = storage.readChunkNbtBytes(cx, cz);
             LinkedHashMap<String, Object> decoded = Nbt.readRootCompound(roundTrip);
             Nbt.NbtList decodedSecs = (Nbt.NbtList) decoded.get("sections");
@@ -541,7 +542,8 @@ class LcaStreamingNbtEncoderTest {
 
         Path storageDir = tempDir.resolve("starlight-inline-full");
         try (LcaRegionFileStorage storage = new LcaRegionFileStorage(storageDir, false)) {
-            storage.commitPreEncodedChunkSlab(cx, cz, ByteBuffer.wrap(slab));
+            byte[] storageSlab = storage.encodeChunkNbtForRegionSlab(regionX, regionZ, ByteBuffer.wrap(rawNbt));
+            storage.commitPreEncodedChunkSlab(cx, cz, ByteBuffer.wrap(storageSlab));
             byte[] nbtFast = storage.readChunkNbtBytes(cx, cz);
             LinkedHashMap<String, Object> fastDecoded = Nbt.readRootCompound(nbtFast);
             Map<Integer, Map<String, Object>> fastByY = new LinkedHashMap<>();

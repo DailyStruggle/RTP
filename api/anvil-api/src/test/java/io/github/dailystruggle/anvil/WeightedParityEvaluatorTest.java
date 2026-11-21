@@ -857,4 +857,65 @@ class WeightedParityEvaluatorTest {
         WeightedParityReport report = acc.finish(100.0, Map.of(), Map.of());
         assertEquals(0L, report.criticalFunctionalLossCount());
     }
+
+    @Test
+    @DisplayName("Identical vanilla sloped dirt_path cliff, overhanging path block, and non-street back door yield zero path/doorway regressions")
+    void identicalVanillaSlopedPathAndBackDoorProduceZeroTripwires(@TempDir Path tmpDir) throws IOException {
+        Path refDir = tmpDir.resolve("vanilla_sloped_ref");
+        Files.createDirectories(refDir);
+
+        List<String> surfPal = List.of(
+                "minecraft:air",
+                "minecraft:grass_block",
+                "minecraft:dirt_path",
+                "minecraft:oak_fence",
+                "minecraft:oak_door[half=lower,facing=south]",
+                "minecraft:oak_door[half=upper,facing=south]",
+                "minecraft:oak_door[half=lower,facing=north]",
+                "minecraft:oak_door[half=upper,facing=north]");
+        int[] surfIdx = new int[4096];
+        for (int lz = 0; lz < 16; lz++) {
+            for (int lx = 0; lx < 16; lx++) {
+                surfIdx[(0 << 8) | (lz << 4) | lx] = 1;
+            }
+        }
+        // Vanilla sloped village dirt_path with |dY|=2 step and an overhanging fence on one tile
+        surfIdx[(1 << 8) | (8 << 4) | 4] = 2;
+        surfIdx[(3 << 8) | (8 << 4) | 5] = 2; // |dY| = 2 cliff present in vanilla ref
+        surfIdx[(4 << 8) | (8 << 4) | 5] = 3; // non-passable overhang present in vanilla ref
+        // Front door adjacent to dirt_path at (4, 66, 7)
+        surfIdx[(2 << 8) | (7 << 4) | 4] = 4;
+        surfIdx[(3 << 8) | (7 << 4) | 4] = 5;
+        // Back door 5 blocks away at (4, 66, 2) with NO adjacent dirt_path in vanilla ref
+        surfIdx[(2 << 8) | (2 << 4) | 4] = 6;
+        surfIdx[(3 << 8) | (2 << 4) | 4] = 7;
+
+        List<LinkedHashMap<String, Object>> sections = new ArrayList<>();
+        for (int sy = -4; sy <= 3; sy++) {
+            sections.add(AnvilTestFixtures.sectionWithBiomes(
+                    (byte) sy,
+                    List.of(sy < 0 ? "minecraft:deepslate" : "minecraft:stone"),
+                    null,
+                    List.of("minecraft:plains"),
+                    null));
+        }
+        sections.add(AnvilTestFixtures.sectionWithBiomes(
+                (byte) 4, surfPal, AnvilTestFixtures.packIndices(4, surfIdx), List.of("minecraft:plains"), null));
+
+        LinkedHashMap<String, Object> chunk = AnvilTestFixtures.chunkRoot(3953, new long[37], sections);
+        chunk.put("xPos", 0);
+        chunk.put("zPos", 0);
+        chunk.put("yPos", -4);
+        chunk.put("Status", "minecraft:full");
+        Files.write(refDir.resolve("r.0.0.mca"), writeMultiChunkRegion(Map.of(packLocalChunk(0, 0), chunk)));
+
+        RegionSimilarityAuditor.RegionSimilarityScorecard sc =
+                RegionSimilarityAuditor.compareDirectories(refDir, refDir, "vanilla", "identical", 0);
+        assertEquals(ParityGateVerdict.EXACT_MATCH, sc.weightedParity().verdict());
+        assertEquals(0L, sc.weightedParity().pathDiscontinuityCount(),
+                "Identical vanilla sloped path / back door must produce 0 path discontinuities");
+        assertEquals(0L, sc.weightedParity().obstructedDoorwayCount());
+        assertTrue(sc.weightedParity().breakingTripwires().isEmpty(),
+                () -> "Unexpected tripwires: " + sc.weightedParity().breakingTripwires());
+    }
 }

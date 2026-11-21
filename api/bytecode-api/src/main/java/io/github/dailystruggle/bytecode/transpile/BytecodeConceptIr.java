@@ -261,7 +261,12 @@ public final class BytecodeConceptIr {
             ConceptExpr.MathIntrinsic,
             ConceptExpr.LutLoad,
             ConceptExpr.Call,
-            ConceptExpr.CompareTemp {
+            ConceptExpr.CompareTemp,
+            ConceptExpr.VoxelRead,
+            ConceptExpr.HeightRead,
+            ConceptExpr.BiomeRead,
+            ConceptExpr.RngStep,
+            ConceptExpr.BitSetRead {
 
         ConceptType type();
 
@@ -430,6 +435,86 @@ public final class BytecodeConceptIr {
                 return ConceptType.I32;
             }
         }
+
+        record VoxelRead(
+                ConceptExpr x,
+                ConceptExpr y,
+                ConceptExpr z
+        ) implements ConceptExpr {
+            public VoxelRead {
+                Objects.requireNonNull(x, "x");
+                Objects.requireNonNull(y, "y");
+                Objects.requireNonNull(z, "z");
+            }
+
+            @Override
+            public ConceptType type() {
+                return ConceptType.I32;
+            }
+        }
+
+        record HeightRead(
+                int heightKind,
+                ConceptExpr x,
+                ConceptExpr z
+        ) implements ConceptExpr {
+            public HeightRead {
+                Objects.requireNonNull(x, "x");
+                Objects.requireNonNull(z, "z");
+            }
+
+            @Override
+            public ConceptType type() {
+                return ConceptType.I32;
+            }
+        }
+
+        record BiomeRead(
+                ConceptExpr x,
+                ConceptExpr y,
+                ConceptExpr z
+        ) implements ConceptExpr {
+            public BiomeRead {
+                Objects.requireNonNull(x, "x");
+                Objects.requireNonNull(y, "y");
+                Objects.requireNonNull(z, "z");
+            }
+
+            @Override
+            public ConceptType type() {
+                return ConceptType.I32;
+            }
+        }
+
+        record RngStep(
+                String kind,
+                ConceptExpr state0,
+                ConceptExpr state1,
+                ConceptExpr bound,
+                ConceptType type
+        ) implements ConceptExpr {
+            public RngStep {
+                Objects.requireNonNull(kind, "kind");
+                Objects.requireNonNull(state0, "state0");
+                Objects.requireNonNull(state1, "state1");
+                Objects.requireNonNull(type, "type");
+            }
+        }
+
+        record BitSetRead(
+                String setName,
+                ConceptExpr index
+        ) implements ConceptExpr {
+            public BitSetRead {
+                Objects.requireNonNull(setName, "setName");
+                Objects.requireNonNull(index, "index");
+            }
+
+            @Override
+            public ConceptType type() {
+                return ConceptType.BOOL;
+            }
+        }
     }
 
     /**
@@ -441,7 +526,11 @@ public final class BytecodeConceptIr {
             ConceptStmt.If,
             ConceptStmt.While,
             ConceptStmt.Return,
-            ConceptStmt.StoreBuffer3D {
+            ConceptStmt.StoreBuffer3D,
+            ConceptStmt.VoxelWrite,
+            ConceptStmt.MarkPostProcess,
+            ConceptStmt.BitSetWrite,
+            ConceptStmt.PosSetAdd {
 
         record VarDecl(
                 String name,
@@ -502,6 +591,153 @@ public final class BytecodeConceptIr {
                 Objects.requireNonNull(value, "value");
             }
         }
+
+        record VoxelWrite(
+                ConceptExpr x,
+                ConceptExpr y,
+                ConceptExpr z,
+                ConceptExpr slot,
+                int flags
+        ) implements ConceptStmt {
+            public static final int FLAG_NONE = 0;
+            public static final int FLAG_FLUID_MUTATION = 1;
+            public static final int FLAG_POST_PROCESS = 2;
+
+            public VoxelWrite {
+                Objects.requireNonNull(x, "x");
+                Objects.requireNonNull(y, "y");
+                Objects.requireNonNull(z, "z");
+                Objects.requireNonNull(slot, "slot");
+            }
+        }
+
+        record MarkPostProcess(
+                ConceptExpr x,
+                ConceptExpr y,
+                ConceptExpr z
+        ) implements ConceptStmt {
+            public MarkPostProcess {
+                Objects.requireNonNull(x, "x");
+                Objects.requireNonNull(y, "y");
+                Objects.requireNonNull(z, "z");
+            }
+        }
+
+        record BitSetWrite(
+                String setName,
+                ConceptExpr index,
+                ConceptExpr value
+        ) implements ConceptStmt {
+            public BitSetWrite {
+                Objects.requireNonNull(setName, "setName");
+                Objects.requireNonNull(index, "index");
+                Objects.requireNonNull(value, "value");
+            }
+        }
+
+        record PosSetAdd(
+                String setName,
+                ConceptExpr x,
+                ConceptExpr y,
+                ConceptExpr z
+        ) implements ConceptStmt {
+            public PosSetAdd {
+                Objects.requireNonNull(setName, "setName");
+                Objects.requireNonNull(x, "x");
+                Objects.requireNonNull(y, "y");
+                Objects.requireNonNull(z, "z");
+            }
+        }
+    }
+
+    /**
+     * Compiler-inferred spatial effect classification for a {@link ConceptModule}.
+     */
+    public enum EffectKind {
+        PURE_FUNCTION,
+        CHUNK_LOCAL_MUTATOR,
+        HALO_MUTATOR,
+        OPAQUE
+    }
+
+    /**
+     * Compiler-inferred effect profile metadata derived from {@link ConceptStmt.VoxelWrite}
+     * coordinate bounds, fluid flags, and unmapped diagnostics.
+     */
+    public record EffectProfile(
+            EffectKind kind,
+            int maxWriteRadius,
+            boolean readsFluids,
+            boolean writesFluids,
+            boolean marksPostProcess,
+            boolean gpuEligible
+    ) {
+        public static final EffectProfile PURE = new EffectProfile(
+                EffectKind.PURE_FUNCTION, 0, false, false, false, true);
+
+        public EffectProfile {
+            Objects.requireNonNull(kind, "kind");
+        }
+    }
+
+    /**
+     * Host-agnostic execution context for stateful voxel-effect IR evaluation.
+     */
+    public interface VoxelEffectContext {
+        int readVoxel(int x, int y, int z);
+
+        void writeVoxel(int x, int y, int z, int slot, int flags);
+
+        default int readHeight(int heightKind, int x, int z) {
+            return 0;
+        }
+
+        default int readBiome(int x, int y, int z) {
+            return 0;
+        }
+
+        default void markPostProcess(int x, int y, int z) {
+        }
+
+        default boolean readBitSet(String setName, int index) {
+            return false;
+        }
+
+        default void writeBitSet(String setName, int index, boolean value) {
+        }
+
+        default void addPosSet(String setName, int x, int y, int z) {
+        }
+    }
+
+    /**
+     * Builders for live-registry tag, property-transition, and fluid-flag lookup tables
+     * ({@code TAG_MASK_LUT}, {@code PROP_TRANS_LUT}, {@code FLUID_FLAG_LUT}).
+     */
+    public static ConceptLut buildTagMaskLut(String name, int[] tagMasksBySlot) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(tagMasksBySlot, "tagMasksBySlot");
+        return new ConceptLut(name, "VoxelEffectLut", name, ConceptType.I32, intArrayToNumberList(tagMasksBySlot));
+    }
+
+    public static ConceptLut buildPropertyTransitionLut(String name, int[] transitionTable) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(transitionTable, "transitionTable");
+        return new ConceptLut(name, "VoxelEffectLut", name, ConceptType.I32, intArrayToNumberList(transitionTable));
+    }
+
+    public static ConceptLut buildFluidFlagLut(String name, int[] fluidFlagsBySlot) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(fluidFlagsBySlot, "fluidFlagsBySlot");
+        return new ConceptLut(name, "VoxelEffectLut", name, ConceptType.I32, intArrayToNumberList(fluidFlagsBySlot));
+    }
+
+    private static List<Number> intArrayToNumberList(int[] values) {
+        List<Number> list = new ArrayList<>(values.length);
+        for (int v : values) {
+            list.add(v);
+        }
+        return list;
     }
 
     /**
@@ -746,8 +982,28 @@ public final class BytecodeConceptIr {
         private ConceptIrEvaluator() {
         }
 
+        private static final ThreadLocal<VoxelEffectContext> ACTIVE_VOXEL_CTX = new ThreadLocal<>();
+
         public static Object evaluateEntry(ConceptModule module, Object... args) {
             return evaluateFunction(module, module.entryFunction(), args);
+        }
+
+        public static Object executeVoxelEffect(
+                ConceptModule module,
+                VoxelEffectContext ctx,
+                Object... args) {
+            Objects.requireNonNull(ctx, "ctx");
+            VoxelEffectContext prev = ACTIVE_VOXEL_CTX.get();
+            ACTIVE_VOXEL_CTX.set(ctx);
+            try {
+                return evaluateFunction(module, module.entryFunction(), args);
+            } finally {
+                if (prev == null) {
+                    ACTIVE_VOXEL_CTX.remove();
+                } else {
+                    ACTIVE_VOXEL_CTX.set(prev);
+                }
+            }
         }
 
         public static Object evaluateFunction(
@@ -824,6 +1080,47 @@ public final class BytecodeConceptIr {
                 } else if (stmt instanceof ConceptStmt.Return ret) {
                     Object val = ret.value() != null ? evalExpr(ret.value(), env, luts, fnMap) : null;
                     return new ExecSignal(true, val);
+                } else if (stmt instanceof ConceptStmt.VoxelWrite vw) {
+                    VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                    if (ctx == null) {
+                        throw new IllegalStateException("VoxelWrite requires an active VoxelEffectContext");
+                    }
+                    int vx = asInt(evalExpr(vw.x(), env, luts, fnMap));
+                    int vy = asInt(evalExpr(vw.y(), env, luts, fnMap));
+                    int vz = asInt(evalExpr(vw.z(), env, luts, fnMap));
+                    int slot = asInt(evalExpr(vw.slot(), env, luts, fnMap));
+                    ctx.writeVoxel(vx, vy, vz, slot, vw.flags());
+                    if ((vw.flags() & ConceptStmt.VoxelWrite.FLAG_POST_PROCESS) != 0) {
+                        ctx.markPostProcess(vx, vy, vz);
+                    }
+                } else if (stmt instanceof ConceptStmt.MarkPostProcess mp) {
+                    VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                    if (ctx == null) {
+                        throw new IllegalStateException("MarkPostProcess requires an active VoxelEffectContext");
+                    }
+                    ctx.markPostProcess(
+                            asInt(evalExpr(mp.x(), env, luts, fnMap)),
+                            asInt(evalExpr(mp.y(), env, luts, fnMap)),
+                            asInt(evalExpr(mp.z(), env, luts, fnMap)));
+                } else if (stmt instanceof ConceptStmt.BitSetWrite bsw) {
+                    VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                    if (ctx == null) {
+                        throw new IllegalStateException("BitSetWrite requires an active VoxelEffectContext");
+                    }
+                    ctx.writeBitSet(
+                            bsw.setName(),
+                            asInt(evalExpr(bsw.index(), env, luts, fnMap)),
+                            asBoolean(evalExpr(bsw.value(), env, luts, fnMap)));
+                } else if (stmt instanceof ConceptStmt.PosSetAdd psa) {
+                    VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                    if (ctx == null) {
+                        throw new IllegalStateException("PosSetAdd requires an active VoxelEffectContext");
+                    }
+                    ctx.addPosSet(
+                            psa.setName(),
+                            asInt(evalExpr(psa.x(), env, luts, fnMap)),
+                            asInt(evalExpr(psa.y(), env, luts, fnMap)),
+                            asInt(evalExpr(psa.z(), env, luts, fnMap)));
                 }
             }
             return ExecSignal.CONTINUE;
@@ -917,6 +1214,59 @@ public final class BytecodeConceptIr {
                 Object l = evalExpr(bin.left(), env, luts, fnMap);
                 Object r = evalExpr(bin.right(), env, luts, fnMap);
                 return evalBinary(bin.op(), l, r, bin.left().type(), bin.type());
+            }
+            if (expr instanceof ConceptExpr.VoxelRead vr) {
+                VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                if (ctx == null) {
+                    throw new IllegalStateException("VoxelRead requires an active VoxelEffectContext");
+                }
+                return ctx.readVoxel(
+                        asInt(evalExpr(vr.x(), env, luts, fnMap)),
+                        asInt(evalExpr(vr.y(), env, luts, fnMap)),
+                        asInt(evalExpr(vr.z(), env, luts, fnMap)));
+            }
+            if (expr instanceof ConceptExpr.HeightRead hr) {
+                VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                if (ctx == null) {
+                    throw new IllegalStateException("HeightRead requires an active VoxelEffectContext");
+                }
+                return ctx.readHeight(
+                        hr.heightKind(),
+                        asInt(evalExpr(hr.x(), env, luts, fnMap)),
+                        asInt(evalExpr(hr.z(), env, luts, fnMap)));
+            }
+            if (expr instanceof ConceptExpr.BiomeRead br) {
+                VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                if (ctx == null) {
+                    throw new IllegalStateException("BiomeRead requires an active VoxelEffectContext");
+                }
+                return ctx.readBiome(
+                        asInt(evalExpr(br.x(), env, luts, fnMap)),
+                        asInt(evalExpr(br.y(), env, luts, fnMap)),
+                        asInt(evalExpr(br.z(), env, luts, fnMap)));
+            }
+            if (expr instanceof ConceptExpr.BitSetRead bsr) {
+                VoxelEffectContext ctx = ACTIVE_VOXEL_CTX.get();
+                if (ctx == null) {
+                    throw new IllegalStateException("BitSetRead requires an active VoxelEffectContext");
+                }
+                return ctx.readBitSet(bsr.setName(), asInt(evalExpr(bsr.index(), env, luts, fnMap)));
+            }
+            if (expr instanceof ConceptExpr.RngStep rng) {
+                long s0 = asLong(evalExpr(rng.state0(), env, luts, fnMap));
+                long s1 = asLong(evalExpr(rng.state1(), env, luts, fnMap));
+                long raw = switch (rng.kind()) {
+                    case "xoroshiro128pp" -> Long.rotateLeft(s0 + s1, 17) + s0;
+                    case "lcg48" -> (s0 * 0x5DEECE66DL + 0xBL) & ((1L << 48) - 1L);
+                    default -> Long.rotateLeft(s0 + s1, 17) + s0;
+                };
+                if (rng.bound() != null) {
+                    int bound = asInt(evalExpr(rng.bound(), env, luts, fnMap));
+                    if (bound > 0) {
+                        return coerceType((int) Math.floorMod(raw, bound), rng.type());
+                    }
+                }
+                return coerceType(raw, rng.type());
             }
             throw new IllegalStateException("Unsupported ConceptExpr: " + expr);
         }

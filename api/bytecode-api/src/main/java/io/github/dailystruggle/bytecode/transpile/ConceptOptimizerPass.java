@@ -106,6 +106,152 @@ public final class ConceptOptimizerPass {
     }
 
     /**
+     * Mechanically derives a compiler-verified {@link BytecodeConceptIr.EffectProfile} from
+     * a {@link ConceptModule}'s voxel-effect statements, coordinate bounds, fluid flags, and
+     * unmapped diagnostics ({@code leafgen-ADR-009}).
+     */
+    public static BytecodeConceptIr.EffectProfile analyzeEffectProfile(ConceptModule module) {
+        Objects.requireNonNull(module, "module");
+        if (!module.unmappedReasons().isEmpty()) {
+            return new BytecodeConceptIr.EffectProfile(
+                    BytecodeConceptIr.EffectKind.OPAQUE, 0, false, false, false, false);
+        }
+        boolean[] flags = new boolean[5]; // [0]=hasWrite, [1]=hasHalo, [2]=readsFluids, [3]=writesFluids, [4]=marksPostProcess
+        boolean[] hasPosSet = new boolean[1];
+        analyzeStmtsForEffect(module.entryFunction().body(), flags, hasPosSet);
+        for (ConceptFunction helper : module.helperFunctions()) {
+            analyzeStmtsForEffect(helper.body(), flags, hasPosSet);
+        }
+        if (!flags[0] && !flags[4] && !hasPosSet[0]) {
+            return new BytecodeConceptIr.EffectProfile(
+                    BytecodeConceptIr.EffectKind.PURE_FUNCTION,
+                    0,
+                    flags[2],
+                    false,
+                    false,
+                    true);
+        }
+        boolean halo = flags[1] || hasPosSet[0];
+        BytecodeConceptIr.EffectKind kind = halo
+                ? BytecodeConceptIr.EffectKind.HALO_MUTATOR
+                : BytecodeConceptIr.EffectKind.CHUNK_LOCAL_MUTATOR;
+        int maxRadius = halo ? 1 : 0;
+        boolean gpuEligible = !halo && !hasPosSet[0];
+        return new BytecodeConceptIr.EffectProfile(
+                kind, maxRadius, flags[2], flags[3], flags[4], gpuEligible);
+    }
+
+    private static void analyzeStmtsForEffect(
+            List<ConceptStmt> stmts, boolean[] flags, boolean[] hasPosSet) {
+        for (ConceptStmt stmt : stmts) {
+            if (stmt instanceof ConceptStmt.VarDecl decl && decl.initializer() != null) {
+                analyzeExprForEffect(decl.initializer(), flags);
+            } else if (stmt instanceof ConceptStmt.Assign assign) {
+                analyzeExprForEffect(assign.value(), flags);
+            } else if (stmt instanceof ConceptStmt.If ifStmt) {
+                analyzeExprForEffect(ifStmt.condition(), flags);
+                analyzeStmtsForEffect(ifStmt.thenBody(), flags, hasPosSet);
+                analyzeStmtsForEffect(ifStmt.elseBody(), flags, hasPosSet);
+            } else if (stmt instanceof ConceptStmt.While whileStmt) {
+                analyzeExprForEffect(whileStmt.condition(), flags);
+                analyzeStmtsForEffect(whileStmt.body(), flags, hasPosSet);
+            } else if (stmt instanceof ConceptStmt.Return ret && ret.value() != null) {
+                analyzeExprForEffect(ret.value(), flags);
+            } else if (stmt instanceof ConceptStmt.VoxelWrite vw) {
+                flags[0] = true;
+                if (!isChunkLocalCoord(vw.x()) || !isChunkLocalCoord(vw.z())) {
+                    flags[1] = true;
+                }
+                if ((vw.flags() & ConceptStmt.VoxelWrite.FLAG_FLUID_MUTATION) != 0) {
+                    flags[3] = true;
+                }
+                if ((vw.flags() & ConceptStmt.VoxelWrite.FLAG_POST_PROCESS) != 0) {
+                    flags[4] = true;
+                }
+                analyzeExprForEffect(vw.x(), flags);
+                analyzeExprForEffect(vw.y(), flags);
+                analyzeExprForEffect(vw.z(), flags);
+                analyzeExprForEffect(vw.slot(), flags);
+            } else if (stmt instanceof ConceptStmt.MarkPostProcess mp) {
+                flags[4] = true;
+                analyzeExprForEffect(mp.x(), flags);
+                analyzeExprForEffect(mp.y(), flags);
+                analyzeExprForEffect(mp.z(), flags);
+            } else if (stmt instanceof ConceptStmt.BitSetWrite bsw) {
+                analyzeExprForEffect(bsw.index(), flags);
+                analyzeExprForEffect(bsw.value(), flags);
+            } else if (stmt instanceof ConceptStmt.PosSetAdd psa) {
+                hasPosSet[0] = true;
+                analyzeExprForEffect(psa.x(), flags);
+                analyzeExprForEffect(psa.y(), flags);
+                analyzeExprForEffect(psa.z(), flags);
+            }
+        }
+    }
+
+    private static void analyzeExprForEffect(ConceptExpr expr, boolean[] flags) {
+        if (expr instanceof ConceptExpr.LutLoad lut) {
+            if (lut.lutSymbol().contains("FLUID_FLAG")) {
+                flags[2] = true;
+            }
+            analyzeExprForEffect(lut.index(), flags);
+        } else if (expr instanceof ConceptExpr.BinaryOp bin) {
+            analyzeExprForEffect(bin.left(), flags);
+            analyzeExprForEffect(bin.right(), flags);
+        } else if (expr instanceof ConceptExpr.UnaryOp un) {
+            analyzeExprForEffect(un.operand(), flags);
+        } else if (expr instanceof ConceptExpr.Cast cast) {
+            analyzeExprForEffect(cast.operand(), flags);
+        } else if (expr instanceof ConceptExpr.Ternary t) {
+            analyzeExprForEffect(t.condition(), flags);
+            analyzeExprForEffect(t.thenExpr(), flags);
+            analyzeExprForEffect(t.elseExpr(), flags);
+        } else if (expr instanceof ConceptExpr.MathIntrinsic m) {
+            for (ConceptExpr arg : m.arguments()) {
+                analyzeExprForEffect(arg, flags);
+            }
+        } else if (expr instanceof ConceptExpr.Call c) {
+            for (ConceptExpr arg : c.arguments()) {
+                analyzeExprForEffect(arg, flags);
+            }
+        } else if (expr instanceof ConceptExpr.VoxelRead vr) {
+            analyzeExprForEffect(vr.x(), flags);
+            analyzeExprForEffect(vr.y(), flags);
+            analyzeExprForEffect(vr.z(), flags);
+        } else if (expr instanceof ConceptExpr.HeightRead hr) {
+            analyzeExprForEffect(hr.x(), flags);
+            analyzeExprForEffect(hr.z(), flags);
+        } else if (expr instanceof ConceptExpr.BiomeRead br) {
+            analyzeExprForEffect(br.x(), flags);
+            analyzeExprForEffect(br.y(), flags);
+            analyzeExprForEffect(br.z(), flags);
+        } else if (expr instanceof ConceptExpr.BitSetRead bsr) {
+            analyzeExprForEffect(bsr.index(), flags);
+        } else if (expr instanceof ConceptExpr.RngStep rng) {
+            analyzeExprForEffect(rng.state0(), flags);
+            analyzeExprForEffect(rng.state1(), flags);
+            if (rng.bound() != null) {
+                analyzeExprForEffect(rng.bound(), flags);
+            }
+        }
+    }
+
+    private static boolean isChunkLocalCoord(ConceptExpr expr) {
+        if (expr instanceof ConceptExpr.IntConst c) {
+            return c.value() >= 0 && c.value() <= 15;
+        }
+        if (expr instanceof ConceptExpr.BinaryOp bin && bin.op() == BinaryOperator.BIT_AND) {
+            if (bin.right() instanceof ConceptExpr.IntConst mask && mask.value() >= 0 && mask.value() <= 15) {
+                return true;
+            }
+            if (bin.left() instanceof ConceptExpr.IntConst mask && mask.value() >= 0 && mask.value() <= 15) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Runs standard SSA optimization followed by structural idiom pattern-matching and rewriting
      * via {@link IrIdiomRewriteRegistry}, returning both the rewritten {@link ConceptModule} and
      * all emitted {@link IrPatternDiagnostic} records and LUT compaction hints.

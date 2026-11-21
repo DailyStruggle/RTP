@@ -701,9 +701,103 @@ public final class LcaRegionWriter {
         return Boolean.TRUE;
     }
 
+    /**
+     * Reads the 2-byte big-endian {@code formatVersion} from an on-disk `.lca` superblock
+     * without mutating the file, or returns {@code -1} if the file does not exist, is too short,
+     * or does not start with {@link LcaRegionReader#LCA_SUPERBLOCK_MAGIC}.
+     */
+    public static int peekFormatVersion(Path lcaFile) throws IOException {
+        if (lcaFile == null || !Files.exists(lcaFile)) {
+            return -1;
+        }
+        try (FileChannel ch = FileChannel.open(lcaFile, StandardOpenOption.READ)) {
+            if (ch.size() < LcaRegionReader.SUPERBLOCK_SIZE
+                    + LcaRegionReader.POINTER_DIRECTORY_SIZE
+                    + LcaRegionReader.FOOTER_SIZE) {
+                return -1;
+            }
+            byte[] hdr = new byte[10];
+            ByteBuffer bb = ByteBuffer.wrap(hdr);
+            while (bb.hasRemaining()) {
+                int r = ch.read(bb);
+                if (r < 0) {
+                    return -1;
+                }
+            }
+            long magic = (long) LcaRegionReader.LONG_BE_VIEW.get(hdr, 0);
+            if (magic != LcaRegionReader.LCA_SUPERBLOCK_MAGIC) {
+                return -1;
+            }
+            return LcaSectionCodec.readUint16BE(hdr, 0x08);
+        }
+    }
+
+    /**
+     * Atomically upgrades an on-disk legacy {@code 0x0002} `.lca` archive to {@code 0x0003}
+     * ({@code LCA-ICD-3.0} factored Layer 2 dictionary + pure-ID Layer 3 micro-palettes) via
+     * sibling {@code .tmp} + {@code fsync} + {@code ATOMIC_MOVE} ({@code ICD.md} Section 10.3,
+     * {@code REQ-RTP-S-004}).
+     *
+     * <p>Returns {@code true} if the file was upgraded from {@code 0x0002} to {@code 0x0003}, or
+     * {@code false} if the file is already {@code >= 0x0003} or not an `.lca` archive.
+     * Passing {@code preferredLcd2Level < 0} preserves the legacy archive's Mode A / Mode B setting.
+     */
+    public static boolean upgradeLegacyArchiveAtomically(
+            Path lcaFile, int preferredLcd2Level
+    ) throws IOException {
+        int version = peekFormatVersion(lcaFile);
+        if (version < 0 || version >= LcaRegionReader.LCA_FORMAT_VERSION_V3) {
+            return false;
+        }
+        if (!LcaRegionReader.isSupportedFormatVersion(version)) {
+            throw new CorruptRegionEntryException(
+                    "Unsupported legacy .lca formatVersion 0x" + Integer.toHexString(version) + " in " + lcaFile);
+        }
+        byte[] oldBytes = Files.readAllBytes(lcaFile);
+        LcaSectionCodec.ParsedHeaderAndDict parsed =
+                LcaRegionReader.INSTANCE.parseAndValidateSuperblockAndDict(oldBytes, oldBytes.length);
+        int effectiveLcd2 = preferredLcd2Level >= 0
+                ? preferredLcd2Level
+                : ((parsed.flags & 8) != 0 ? 1 : 0);
+
+        LcaLiveArchive upgraded = createEmptyLiveArchiveWithVersion(
+                parsed.regionX,
+                parsed.regionZ,
+                parsed.minSectionY,
+                parsed.sectionCount,
+                parsed.defaultDataVersion,
+                effectiveLcd2,
+                parsed.storageKind,
+                DEFAULT_ROOT_DICT_CAPACITY_BYTES,
+                LcaRegionReader.LCA_FORMAT_VERSION_V3);
+        for (int rz = 0; rz < 32; rz++) {
+            for (int rx = 0; rx < 32; rx++) {
+                if (!LcaRegionReader.INSTANCE.isChunkGenerated(oldBytes, rx, rz)) {
+                    continue;
+                }
+                AnvilReader.ChunkEntry entry = LcaRegionReader.INSTANCE.readChunk(oldBytes, rx, rz);
+                if (entry != null && entry.root != null) {
+                    upgraded.saveChunkInitial(rx, rz, entry.root);
+                }
+            }
+        }
+        if (upgraded.dictionarySegmentCount() > 1) {
+            upgraded.compact();
+        }
+        byte[] upgradedBytes = upgraded.toByteArray();
+        Path tmpFile = lcaFile.resolveSibling(
+                lcaFile.getFileName().toString() + "." + Thread.currentThread().getId() + ".v3upgrade.tmp");
+        writeBytesAtomicallyDurable(lcaFile, tmpFile, upgradedBytes);
+        LcaRegionReader.invalidateFileCache(lcaFile);
+        return true;
+    }
+
     // Factory method: FileChannel ownership transfers to the returned LcaLiveArchive on success
     @SuppressWarnings({"java:S2095", "java:S2093", "resource"})
     public static LcaLiveArchive openLiveArchive(Path lcaFile, int preferredLcd2Level) throws IOException {
+        if (peekFormatVersion(lcaFile) == LcaRegionReader.LCA_FORMAT_VERSION_V2) {
+            upgradeLegacyArchiveAtomically(lcaFile, preferredLcd2Level);
+        }
         FileChannel ch = FileChannel.open(lcaFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
         boolean ok = false;
         try {
@@ -809,6 +903,13 @@ public final class LcaRegionWriter {
 
         private final Map<String, Integer> blockStateToId = new ConcurrentHashMap<>();
         private final List<String> idToBlockState = Collections.synchronizedList(new ArrayList<>());
+        private final Map<String, Integer> baseBlockToId = new ConcurrentHashMap<>();
+        private final List<String> idToBaseBlock = Collections.synchronizedList(new ArrayList<>());
+        private final Map<String, Integer> propTupleToId = new ConcurrentHashMap<>();
+        private final List<String> idToPropTuple = Collections.synchronizedList(new ArrayList<>());
+        private final List<Integer> stateBaseBlockIds = Collections.synchronizedList(new ArrayList<>());
+        private final List<Integer> statePropTupleIds = Collections.synchronizedList(new ArrayList<>());
+        private final List<Integer> stateMaterialPacked = Collections.synchronizedList(new ArrayList<>());
         private final Map<String, Integer> biomeToId = new ConcurrentHashMap<>();
         private final List<String> idToBiome = Collections.synchronizedList(new ArrayList<>());
 
@@ -821,18 +922,23 @@ public final class LcaRegionWriter {
         private static final class DictSegmentMeta {
             int byteOffset;
             final int capacityBytes;
+            final boolean factoredV3;
+            final List<byte[]> baseBlockEntries = new ArrayList<>();
+            final List<byte[]> propTupleEntries = new ArrayList<>();
             final List<byte[]> stateEntries = new ArrayList<>();
             final List<byte[]> biomeEntries = new ArrayList<>();
             byte[] patternBytes = LcaSectionCodec.EMPTY_BYTES;
             int patternLen = 0;
-            int usedPayloadBytes = 0;
+            int usedPayloadBytes;
             long linkTrailer = 0L;
             volatile boolean channelDirty = false;
             byte[] stagedScratch;
 
-            DictSegmentMeta(int byteOffset, int capacityBytes) {
+            DictSegmentMeta(int byteOffset, int capacityBytes, boolean factoredV3) {
                 this.byteOffset = byteOffset;
                 this.capacityBytes = capacityBytes;
+                this.factoredV3 = factoredV3;
+                this.usedPayloadBytes = factoredV3 ? 2 : 0;
             }
 
             int baseSlab() {
@@ -881,6 +987,10 @@ public final class LcaRegionWriter {
 
         int formatVersion() {
             return formatVersion;
+        }
+
+        boolean isFactoredV3Dict() {
+            return formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3;
         }
 
         boolean writeModeBLcd2() {
@@ -989,7 +1099,8 @@ public final class LcaRegionWriter {
             this.buffer = new byte[slabPoolBaseOffset + LcaRegionReader.FOOTER_SIZE + 65536];
             DictSegmentMeta rootSeg = new DictSegmentMeta(
                     LcaRegionReader.DICT_ROOT_OFFSET,
-                    rootDictCapacityBytes);
+                    rootDictCapacityBytes,
+                    isFactoredV3Dict());
             this.dictSegments.add(rootSeg);
 
             registerOrGetBlockStateId("minecraft:air");
@@ -1040,7 +1151,7 @@ public final class LcaRegionWriter {
             while (true) {
                 int startSlab = segOffset >>> LcaRegionReader.SLAB_SHIFT;
                 int capSlabs = (segCap + 255) >>> LcaRegionReader.SLAB_SHIFT;
-                DictSegmentMeta segMeta = new DictSegmentMeta(segOffset, segCap);
+                DictSegmentMeta segMeta = new DictSegmentMeta(segOffset, segCap, isFactoredV3Dict());
                 if (segOffset >= (this.slabPoolBaseSlab << LcaRegionReader.SLAB_SHIFT)) {
                     int segEndSlab = startSlab + capSlabs;
                     if (segEndSlab > maxCursorSlab) {
@@ -1048,44 +1159,10 @@ public final class LcaRegionWriter {
                     }
                 }
 
-                int segStateCount = LcaSectionCodec.readIntBE(existingBytes, segOffset);
-                int segBiomeCount = LcaSectionCodec.readUint16BE(existingBytes, segOffset + 4);
-                int usedPayloadBytes = LcaSectionCodec.readUint16BE(existingBytes, segOffset + 6);
-                int segPayloadLimit = segOffset + segCap - 8;
-                int pos = segOffset + 8;
-
-                for (int i = 0; i < segStateCount; i++) {
-                    int entryStart = pos;
-                    int utfLen = LcaSectionCodec.readVarInt(existingBytes, pos, segPayloadLimit);
-                    pos += LcaSectionCodec.varIntLen(utfLen);
-                    String canonical = new String(existingBytes, pos, utfLen, StandardCharsets.UTF_8);
-                    pos += utfLen + 4;
-                    byte[] rawEntry = Arrays.copyOfRange(existingBytes, entryStart, pos);
-                    segMeta.stateEntries.add(rawEntry);
-                    segMeta.usedPayloadBytes += rawEntry.length;
-                    blockStateToId.put(canonical, idToBlockState.size());
-                    idToBlockState.add(canonical);
-                }
-
-                for (int i = 0; i < segBiomeCount; i++) {
-                    int entryStart = pos;
-                    int utfLen = LcaSectionCodec.readVarInt(existingBytes, pos, segPayloadLimit);
-                    pos += LcaSectionCodec.varIntLen(utfLen);
-                    String biome = new String(existingBytes, pos, utfLen, StandardCharsets.UTF_8);
-                    pos += utfLen + 4;
-                    byte[] rawEntry = Arrays.copyOfRange(existingBytes, entryStart, pos);
-                    segMeta.biomeEntries.add(rawEntry);
-                    segMeta.usedPayloadBytes += rawEntry.length;
-                    biomeToId.put(biome, idToBiome.size());
-                    idToBiome.add(biome);
-                }
-
-                int activeEnd = segOffset + 8 + usedPayloadBytes;
-                if (pos < activeEnd && activeEnd <= segPayloadLimit) {
-                    segMeta.appendPatternSlice(existingBytes, pos, activeEnd - pos);
-                }
+                parseDictSegmentIntoLiveArchive(existingBytes, segOffset, segCap, segMeta);
 
                 this.dictSegments.add(segMeta);
+                int segPayloadLimit = segOffset + segCap - 8;
                 long trailer = (long) LcaRegionReader.LONG_BE_VIEW.get(existingBytes, segPayloadLimit);
                 segMeta.linkTrailer = trailer;
                 int nextRelSlabs32 = (int) (trailer >>> 32);
@@ -1215,7 +1292,7 @@ public final class LcaRegionWriter {
                 }
                 int startSlab = segOffset >>> LcaRegionReader.SLAB_SHIFT;
                 int capSlabs = (segCap + 255) >>> LcaRegionReader.SLAB_SHIFT;
-                DictSegmentMeta segMeta = new DictSegmentMeta(segOffset, segCap);
+                DictSegmentMeta segMeta = new DictSegmentMeta(segOffset, segCap, isFactoredV3Dict());
                 if (segOffset >= headerPrefixBytes) {
                     int segEndSlab = startSlab + capSlabs;
                     if (segEndSlab > maxCursorSlab) {
@@ -1250,41 +1327,7 @@ public final class LcaRegionWriter {
                     }
                 }
 
-                int segStateCount = LcaSectionCodec.readIntBE(segBuf, segBaseOff);
-                int segBiomeCount = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 4);
-                int usedPayloadBytes = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 6);
-                int pos = segBaseOff + 8;
-
-                for (int i = 0; i < segStateCount; i++) {
-                    int entryStart = pos;
-                    int utfLen = LcaSectionCodec.readVarInt(segBuf, pos, segPayloadLimit);
-                    pos += LcaSectionCodec.varIntLen(utfLen);
-                    String canonical = new String(segBuf, pos, utfLen, StandardCharsets.UTF_8);
-                    pos += utfLen + 4;
-                    byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
-                    segMeta.stateEntries.add(rawEntry);
-                    segMeta.usedPayloadBytes += rawEntry.length;
-                    blockStateToId.put(canonical, idToBlockState.size());
-                    idToBlockState.add(canonical);
-                }
-
-                for (int i = 0; i < segBiomeCount; i++) {
-                    int entryStart = pos;
-                    int utfLen = LcaSectionCodec.readVarInt(segBuf, pos, segPayloadLimit);
-                    pos += LcaSectionCodec.varIntLen(utfLen);
-                    String biome = new String(segBuf, pos, utfLen, StandardCharsets.UTF_8);
-                    pos += utfLen + 4;
-                    byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
-                    segMeta.biomeEntries.add(rawEntry);
-                    segMeta.usedPayloadBytes += rawEntry.length;
-                    biomeToId.put(biome, idToBiome.size());
-                    idToBiome.add(biome);
-                }
-
-                int activeEnd = segBaseOff + 8 + usedPayloadBytes;
-                if (pos < activeEnd && activeEnd <= segPayloadLimit) {
-                    segMeta.appendPatternSlice(segBuf, pos, activeEnd - pos);
-                }
+                parseDictSegmentIntoLiveArchive(segBuf, segBaseOff, segCap, segMeta);
 
                 this.dictSegments.add(segMeta);
                 segMeta.linkTrailer = trailer;
@@ -2137,17 +2180,46 @@ public final class LcaRegionWriter {
                 byte[] patternArenaSnap = (atomicDictState != null && atomicDictState.usedBytes > 0)
                         ? Arrays.copyOf(atomicDictState.arena, atomicDictState.usedBytes)
                         : LcaSectionCodec.EMPTY_BYTES;
-                d = new LcaSectionCodec.ParsedHeaderAndDict(
-                        this.formatVersion,
-                        storageKind, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
-                        flags, slabPoolBaseOffset,
-                        Collections.unmodifiableList(canonicalStates),
-                        Collections.unmodifiableList(baseBlockNames),
-                        Collections.unmodifiableList(singletonBasePalettes),
-                        Collections.unmodifiableList(biomes),
-                        Collections.unmodifiableList(singletonBiomePalettes),
-                        patternArenaSnap
-                );
+                if (isFactoredV3Dict()) {
+                    String[] baseArr = this.idToBaseBlock.toArray(new String[0]);
+                    String[] propArr = this.idToPropTuple.toArray(new String[0]);
+                    int[] sBaseIds = new int[stateCount];
+                    int[] sPropIds = new int[stateCount];
+                    int[] sMat = new int[stateCount];
+                    for (int i = 0; i < stateCount; i++) {
+                        sBaseIds[i] = this.stateBaseBlockIds.get(i);
+                        sPropIds[i] = this.statePropTupleIds.get(i);
+                        sMat[i] = this.stateMaterialPacked.get(i);
+                    }
+                    d = new LcaSectionCodec.ParsedHeaderAndDict(
+                            this.formatVersion,
+                            storageKind, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                            flags, slabPoolBaseOffset,
+                            Collections.unmodifiableList(canonicalStates),
+                            Collections.unmodifiableList(baseBlockNames),
+                            Collections.unmodifiableList(singletonBasePalettes),
+                            Collections.unmodifiableList(biomes),
+                            Collections.unmodifiableList(singletonBiomePalettes),
+                            patternArenaSnap,
+                            baseArr,
+                            propArr,
+                            sBaseIds,
+                            sPropIds,
+                            sMat
+                    );
+                } else {
+                    d = new LcaSectionCodec.ParsedHeaderAndDict(
+                            this.formatVersion,
+                            storageKind, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                            flags, slabPoolBaseOffset,
+                            Collections.unmodifiableList(canonicalStates),
+                            Collections.unmodifiableList(baseBlockNames),
+                            Collections.unmodifiableList(singletonBasePalettes),
+                            Collections.unmodifiableList(biomes),
+                            Collections.unmodifiableList(singletonBiomePalettes),
+                            patternArenaSnap
+                    );
+                }
                 this.cachedParsedDict = d;
                 return d;
             }
@@ -2379,7 +2451,8 @@ public final class LcaRegionWriter {
                             int rawDvWord = LcaSectionCodec.readIntBE(rawSlab, 0);
                             int dv = LcaRegionReader.decodeAndVerifySelfDescribingChunkHeader(rawDvWord, rx, rz);
                             int resRel = LcaSectionCodec.readUint16BE(rawSlab, 22);
-                            return new RawChunkFrameSnapshot(rawSlab, dv, minSectionY, sectionCount, resRel, dictIdToRuntime);
+                            return new RawChunkFrameSnapshot(
+                                    rawSlab, dv, minSectionY, sectionCount, resRel, dictIdToRuntime, this.formatVersion);
                         }
                         int headerLen = 24 + (sectionCount << 1);
                         int headerWords = (headerLen + 7) >>> 3;
@@ -2391,7 +2464,8 @@ public final class LcaRegionWriter {
                         int rawDvWord = LcaSectionCodec.readIntBE(fullFrame, 0);
                         int dv = LcaRegionReader.decodeAndVerifySelfDescribingChunkHeader(rawDvWord, rx, rz);
                         int resRel = LcaSectionCodec.readUint16BE(fullFrame, 22);
-                        return new RawChunkFrameSnapshot(fullFrame, dv, minSectionY, sectionCount, resRel, dictIdToRuntime);
+                        return new RawChunkFrameSnapshot(
+                                fullFrame, dv, minSectionY, sectionCount, resRel, dictIdToRuntime, this.formatVersion);
                     } finally {
                         LcaRegionReader.unpinHazardSlab(hazardSlot);
                     }
@@ -2410,7 +2484,8 @@ public final class LcaRegionWriter {
             int dv = LcaRegionReader.decodeAndVerifySelfDescribingChunkHeader(rawDvWord, rx, rz);
             int resRel = LcaSectionCodec.readUint16BE(frame, 22);
             int[] dictIdToRuntime = resolveDictIdToRuntimeId(runtimeStateLookup);
-            return new RawChunkFrameSnapshot(frame, dv, minSectionY, sectionCount, resRel, dictIdToRuntime);
+            return new RawChunkFrameSnapshot(
+                    frame, dv, minSectionY, sectionCount, resRel, dictIdToRuntime, this.formatVersion);
         }
 
         /**
@@ -2487,14 +2562,17 @@ public final class LcaRegionWriter {
             List<String> localStateList = null;
             List<Integer> localStateGlobalIds = null;
             List<String> localBiomeList = null;
+            List<Integer> localBiomeGlobalIds = null;
             List<LcaSectionCodec.BiomeTemplate> biomeTemplates = Collections.emptyList();
             int paletteLimitRel = sectionDirEnd;
             int initialLocalStateCount = 0;
+            int initialLocalBiomeCount = 0;
+            boolean factoredV3 = isFactoredV3Dict();
             if (hasSlabLocalPalette) {
                 paletteLimitRel = LcaSectionCodec.findFirstSectionRelStart(
                         oldRelStarts, sectionCount, oldResidualRelStart);
                 LcaSectionCodec.SlabLocalPalette localPal = LcaSectionCodec.decodeSlabLocalPalette(
-                        coldChunkFrame, 0, sectionDirEnd, paletteLimitRel, true, true, idToBlockState);
+                        coldChunkFrame, 0, sectionDirEnd, paletteLimitRel, true, true, getOrBuildParsedHeaderAndDict());
                 initialLocalStateCount = localPal.canonicalStates.size();
                 localStateMap = new LinkedHashMap<>(initialLocalStateCount + 16);
                 localStateList = new ArrayList<>(initialLocalStateCount + 16);
@@ -2503,14 +2581,31 @@ public final class LcaRegionWriter {
                     String canon = localPal.canonicalStates.get(i);
                     localStateMap.put(canon, i);
                     localStateList.add(canon);
-                    int bracket = canon.indexOf('[');
-                    if (bracket >= 0 && LcaSectionCodec.STATIC_CORE_PROP_TO_ID.get(canon.substring(bracket)) == null) {
-                        localStateGlobalIds.add(registerOrGetBlockStateId(canon));
+                    if (factoredV3) {
+                        int gid = (localPal.localStateGlobalIds != null && i < localPal.localStateGlobalIds.length)
+                                ? localPal.localStateGlobalIds[i]
+                                : registerOrGetBlockStateId(canon);
+                        localStateGlobalIds.add(gid);
                     } else {
-                        localStateGlobalIds.add(-1);
+                        int bracket = canon.indexOf('[');
+                        if (bracket >= 0 && LcaV2LegacyCodec.STATIC_CORE_PROP_TO_ID.get(canon.substring(bracket)) == null) {
+                            localStateGlobalIds.add(registerOrGetBlockStateId(canon));
+                        } else {
+                            localStateGlobalIds.add(-1);
+                        }
                     }
                 }
                 localBiomeList = new ArrayList<>(localPal.biomes);
+                initialLocalBiomeCount = localBiomeList.size();
+                if (factoredV3) {
+                    localBiomeGlobalIds = new ArrayList<>(initialLocalBiomeCount + 4);
+                    for (int i = 0; i < initialLocalBiomeCount; i++) {
+                        int bgid = (localPal.localBiomeGlobalIds != null && i < localPal.localBiomeGlobalIds.length)
+                                ? localPal.localBiomeGlobalIds[i]
+                                : registerOrGetBiomeId(localBiomeList.get(i));
+                        localBiomeGlobalIds.add(bgid);
+                    }
+                }
                 biomeTemplates = localPal.biomeTemplates;
             }
 
@@ -2648,7 +2743,9 @@ public final class LcaRegionWriter {
                                 localStateMap.put(canon, localIdx);
                                 localStateList.add(canon);
                                 int bracket = canon.indexOf('[');
-                                if (bracket >= 0 && LcaSectionCodec.STATIC_CORE_PROP_TO_ID.get(canon.substring(bracket)) == null) {
+                                if (factoredV3) {
+                                    localStateGlobalIds.add(gId);
+                                } else if (bracket >= 0 && LcaV2LegacyCodec.STATIC_CORE_PROP_TO_ID.get(canon.substring(bracket)) == null) {
                                     localStateGlobalIds.add(gId);
                                 } else {
                                     localStateGlobalIds.add(-1);
@@ -2696,6 +2793,9 @@ public final class LcaRegionWriter {
                             if (bIdx < 0) {
                                 bIdx = localBiomeList.size();
                                 localBiomeList.add(bName);
+                                if (localBiomeGlobalIds != null) {
+                                    localBiomeGlobalIds.add(registerOrGetBiomeId(bName));
+                                }
                             }
                             biomeIds[b] = bIdx;
                         } else {
@@ -2753,15 +2853,27 @@ public final class LcaRegionWriter {
 
             byte[] slabLocalPaletteBytes = LcaSectionCodec.EMPTY_BYTES;
             if (hasSlabLocalPalette) {
-                if (localStateList.size() == initialLocalStateCount) {
+                if (localStateList.size() == initialLocalStateCount
+                        && localBiomeList.size() == initialLocalBiomeCount) {
                     slabLocalPaletteBytes = Arrays.copyOfRange(coldChunkFrame, sectionDirEnd, paletteLimitRel);
                 } else {
                     int[] globalIdArr = new int[localStateGlobalIds.size()];
                     for (int i = 0; i < globalIdArr.length; i++) {
                         globalIdArr[i] = localStateGlobalIds.get(i);
                     }
-                    slabLocalPaletteBytes = LcaSectionCodec.encodeSlabLocalPalette(
-                            localStateList, globalIdArr, localBiomeList, biomeTemplates);
+                    if (factoredV3) {
+                        int[] biomeGlobalIdArr = new int[localBiomeGlobalIds.size()];
+                        for (int i = 0; i < biomeGlobalIdArr.length; i++) {
+                            biomeGlobalIdArr[i] = localBiomeGlobalIds.get(i);
+                        }
+                        slabLocalPaletteBytes = LcaSectionCodec.encodePureIdMicroPalette(
+                                globalIdArr, globalIdArr.length,
+                                biomeGlobalIdArr, biomeGlobalIdArr.length,
+                                biomeTemplates);
+                    } else {
+                        slabLocalPaletteBytes = LcaSectionCodec.encodeSlabLocalPalette(
+                                localStateList, globalIdArr, localBiomeList, biomeTemplates);
+                    }
                 }
                 totalBodyBytes += slabLocalPaletteBytes.length;
             }
@@ -2967,6 +3079,8 @@ public final class LcaRegionWriter {
         public synchronized int saveChunkNbtBuffer(
                 int rx, int rz, ByteBuffer uncompressedNbt
         ) throws IOException {
+            int baseBlockBookmark = idToBaseBlock.size();
+            int propTupleBookmark = idToPropTuple.size();
             int stateBookmark = idToBlockState.size();
             int biomeBookmark = idToBiome.size();
             int patternBookmark = syncedPatternBytes;
@@ -2979,7 +3093,8 @@ public final class LcaRegionWriter {
                 cachedResidualBytes[chunkIdx] = null;
                 return written;
             } catch (RuntimeException | Error | IOException e) {
-                rollbackDictionaryToBookmark(stateBookmark, biomeBookmark, patternBookmark, segBookmark);
+                rollbackDictionaryToBookmark(
+                        baseBlockBookmark, propTupleBookmark, stateBookmark, biomeBookmark, patternBookmark, segBookmark);
                 if (e instanceof UncheckedIOException uio) {
                     throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
                 }
@@ -3298,6 +3413,8 @@ public final class LcaRegionWriter {
 
         void saveChunkInitial(int rx, int rz, Map<String, Object> chunkRoot) throws IOException {
             boolean prevDirty = this.dirty;
+            int baseBlockBookmark = idToBaseBlock.size();
+            int propTupleBookmark = idToPropTuple.size();
             int stateBookmark = idToBlockState.size();
             int biomeBookmark = idToBiome.size();
             int patternBookmark = syncedPatternBytes;
@@ -3307,7 +3424,8 @@ public final class LcaRegionWriter {
             try {
                 payload = encodeChunkPayload(rx, rz, chunkRoot);
             } catch (RuntimeException | Error | IOException e) {
-                rollbackDictionaryToBookmark(stateBookmark, biomeBookmark, patternBookmark, segBookmark);
+                rollbackDictionaryToBookmark(
+                        baseBlockBookmark, propTupleBookmark, stateBookmark, biomeBookmark, patternBookmark, segBookmark);
                 this.dirty = prevDirty;
                 if (e instanceof UncheckedIOException uio) {
                     throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
@@ -3333,7 +3451,8 @@ public final class LcaRegionWriter {
                 buffer[secDedTableOffset + chunkIdx] = oldSyn;
                 LcaRegionReader.setVolatileLongBE(buffer, ptrByteOffset, oldPtr);
                 rollbackAllocatedSlabs(targetSlab, slabsNeeded, prevActiveEndSlab, prevLastSyncedFooter, false);
-                rollbackDictionaryToBookmark(stateBookmark, biomeBookmark, patternBookmark, segBookmark);
+                rollbackDictionaryToBookmark(
+                        baseBlockBookmark, propTupleBookmark, stateBookmark, biomeBookmark, patternBookmark, segBookmark);
                 this.dirty = prevDirty;
                 if (e instanceof UncheckedIOException uio) {
                     throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
@@ -3367,6 +3486,8 @@ public final class LcaRegionWriter {
          * rotation (`anvil-api-ADR-003` Section 2.3, `REQ-RTP-S-005`, `@scheduler_dispatch`).
          */
         public synchronized int saveChunkCoW(int rx, int rz, Map<String, Object> chunkRoot) throws IOException {
+            int baseBlockBookmark = idToBaseBlock.size();
+            int propTupleBookmark = idToPropTuple.size();
             int stateBookmark = idToBlockState.size();
             int biomeBookmark = idToBiome.size();
             int patternBookmark = syncedPatternBytes;
@@ -3376,7 +3497,8 @@ public final class LcaRegionWriter {
                 payload = encodeChunkPayload(rx, rz, chunkRoot);
                 return commitPreEncodedChunkCoW(rx, rz, payload);
             } catch (RuntimeException | Error | IOException e) {
-                rollbackDictionaryToBookmark(stateBookmark, biomeBookmark, patternBookmark, segBookmark);
+                rollbackDictionaryToBookmark(
+                        baseBlockBookmark, propTupleBookmark, stateBookmark, biomeBookmark, patternBookmark, segBookmark);
                 if (e instanceof UncheckedIOException uio) {
                     throw uio.getCause() != null ? uio.getCause() : new IOException(uio);
                 }
@@ -3551,11 +3673,12 @@ public final class LcaRegionWriter {
                         ? sectionDirEnd + ((entry16 - 1) << unitShift)
                         : -1;
             }
+            boolean factoredV3 = isFactoredV3Dict();
             int baseLocalStateCount = 0;
             if (hasSlabLocalPalette) {
                 int paletteLimitRel = LcaSectionCodec.findFirstSectionRelStart(relStarts, sectionCount, residualRelStart);
                 LcaSectionCodec.SlabLocalPalette localPal = LcaSectionCodec.decodeSlabLocalPalette(
-                        frame, 0, sectionDirEnd, paletteLimitRel, false, false, idToBlockState);
+                        frame, 0, sectionDirEnd, paletteLimitRel, false, false, getOrBuildParsedHeaderAndDict());
                 baseLocalStateCount = localPal.baseBlockNames.size();
             }
 
@@ -3563,16 +3686,22 @@ public final class LcaRegionWriter {
             int[] appGlobalIds = new int[appStates.size()];
             for (int i = 0; i < appStates.size(); i++) {
                 String st = appStates.get(i);
-                int bracket = st.indexOf('[');
-                if (bracket >= 0 && LcaSectionCodec.STATIC_CORE_PROP_TO_ID.get(st.substring(bracket)) == null) {
+                if (factoredV3) {
                     appGlobalIds[i] = registerOrGetBlockStateId(st);
                 } else {
-                    appGlobalIds[i] = -1;
+                    int bracket = st.indexOf('[');
+                    if (bracket >= 0 && LcaV2LegacyCodec.STATIC_CORE_PROP_TO_ID.get(st.substring(bracket)) == null) {
+                        appGlobalIds[i] = registerOrGetBlockStateId(st);
+                    } else {
+                        appGlobalIds[i] = -1;
+                    }
                 }
             }
 
-            byte[] patchTailBytes = LcaSectionCodec.encodeChunkPatchTailBytes(
-                    baseLocalStateCount, appStates, appGlobalIds, sectionPatches);
+            byte[] patchTailBytes = factoredV3
+                    ? LcaSectionCodec.encodePureIdChunkPatchTailBytes(appGlobalIds, appGlobalIds.length, sectionPatches)
+                    : LcaSectionCodec.encodeChunkPatchTailBytes(
+                            baseLocalStateCount, appStates, appGlobalIds, sectionPatches);
             byte[] patchedFrame = LcaSectionCodec.injectChunkPatchTailIntoUncompressedFrame(
                     frame, sectionCount, patchTailBytes);
 
@@ -3626,28 +3755,37 @@ public final class LcaRegionWriter {
                         : -1;
             }
 
+            boolean factoredV3 = isFactoredV3Dict();
             Map<String, Integer> localStateMap = new LinkedHashMap<>();
             List<String> localStateList = new ArrayList<>();
             List<Integer> localStateGlobalIds = new ArrayList<>();
             Map<String, Integer> localBiomeMap = new LinkedHashMap<>();
             List<String> localBiomeList = new ArrayList<>();
+            List<Integer> localBiomeGlobalIds = factoredV3 ? new ArrayList<>() : null;
             int baseLocalStateCount = 0;
 
             if (hasSlabLocalPalette) {
                 int paletteLimitRel = LcaSectionCodec.findFirstSectionRelStart(relStarts, sectionCount, residualRelStart);
                 LcaSectionCodec.SlabLocalPalette localPal = LcaSectionCodec.decodeSlabLocalPalette(
-                        frame, 0, sectionDirEnd, paletteLimitRel, true, true, idToBlockState);
+                        frame, 0, sectionDirEnd, paletteLimitRel, true, true, getOrBuildParsedHeaderAndDict());
                 baseLocalStateCount = localPal.canonicalStates.size();
                 for (int i = 0; i < baseLocalStateCount; i++) {
                     String s = localPal.canonicalStates.get(i);
                     localStateMap.put(s, i);
                     localStateList.add(s);
-                    localStateGlobalIds.add(-1);
+                    localStateGlobalIds.add((factoredV3 && localPal.localStateGlobalIds != null)
+                            ? localPal.localStateGlobalIds[i]
+                            : -1);
                 }
                 for (int i = 0; i < localPal.biomes.size(); i++) {
                     String b = localPal.biomes.get(i);
                     localBiomeMap.put(b, i);
                     localBiomeList.add(b);
+                    if (localBiomeGlobalIds != null) {
+                        localBiomeGlobalIds.add(localPal.localBiomeGlobalIds != null
+                                ? localPal.localBiomeGlobalIds[i]
+                                : registerOrGetBiomeId(b));
+                    }
                 }
             }
 
@@ -3660,7 +3798,8 @@ public final class LcaRegionWriter {
             int[] biomeDictIds = extractBiomeIds(
                     replacementSectionNbt,
                     hasSlabLocalPalette ? localBiomeMap : null,
-                    hasSlabLocalPalette ? localBiomeList : null);
+                    hasSlabLocalPalette ? localBiomeList : null,
+                    hasSlabLocalPalette ? localBiomeGlobalIds : null);
             long[] biomeData = extractBiomeDataLongs(replacementSectionNbt);
             byte[] skyLight = resolveSectionLightBytes(
                     replacementSectionNbt, "SkyLight", "starlight.skylight_state");
@@ -3699,8 +3838,8 @@ public final class LcaRegionWriter {
             byte[] workingFrame = frame;
             if (placeAfterResidualTail) {
                 if (!appendedStates.isEmpty() && !usePatchTailReplacementOffset) {
-                    byte[] patchPayload = LcaSectionCodec.encodeChunkPatchTailBytes(
-                            baseLocalStateCount, appendedStates, appendedGlobalIds, Collections.emptyList());
+                    byte[] patchPayload = encodeVersionedChunkPatchTail(
+                            factoredV3, baseLocalStateCount, appendedStates, appendedGlobalIds, Collections.emptyList());
                     workingFrame = LcaSectionCodec.injectChunkPatchTailIntoUncompressedFrame(
                             workingFrame, sectionCount, patchPayload);
                 } else if (usePatchTailReplacementOffset) {
@@ -3708,8 +3847,8 @@ public final class LcaRegionWriter {
                     List<LcaSectionCodec.SectionPatch> placeholder = List.of(
                             new LcaSectionCodec.SectionPatch(
                                     secIdx, LcaSectionCodec.PATCH_FLAG_REPLACEMENT_OFFSET, 1, null, null, null, null));
-                    byte[] placeholderBytes = LcaSectionCodec.encodeChunkPatchTailBytes(
-                            baseLocalStateCount, appendedStates, appendedGlobalIds, placeholder);
+                    byte[] placeholderBytes = encodeVersionedChunkPatchTail(
+                            factoredV3, baseLocalStateCount, appendedStates, appendedGlobalIds, placeholder);
                     workingFrame = LcaSectionCodec.injectChunkPatchTailIntoUncompressedFrame(
                             workingFrame, sectionCount, placeholderBytes);
                 }
@@ -3722,8 +3861,8 @@ public final class LcaRegionWriter {
                     List<LcaSectionCodec.SectionPatch> realPatch = List.of(
                             new LcaSectionCodec.SectionPatch(
                                     secIdx, LcaSectionCodec.PATCH_FLAG_REPLACEMENT_OFFSET, newEntry16, null, null, null, null));
-                    byte[] realPatchBytes = LcaSectionCodec.encodeChunkPatchTailBytes(
-                            baseLocalStateCount, appendedStates, appendedGlobalIds, realPatch);
+                    byte[] realPatchBytes = encodeVersionedChunkPatchTail(
+                            factoredV3, baseLocalStateCount, appendedStates, appendedGlobalIds, realPatch);
                     workingFrame = LcaSectionCodec.injectChunkPatchTailIntoUncompressedFrame(
                             withAppendedSec, sectionCount, realPatchBytes);
                 } else {
@@ -3755,8 +3894,8 @@ public final class LcaRegionWriter {
                         spliced[24 + (secIdx << 1)] = (byte) ((newEntry16 >>> 8) & 0xFF);
                         spliced[24 + (secIdx << 1) + 1] = (byte) (newEntry16 & 0xFF);
                     }
-                    byte[] patchPayload = LcaSectionCodec.encodeChunkPatchTailBytes(
-                            baseLocalStateCount, appendedStates, appendedGlobalIds, patches);
+                    byte[] patchPayload = encodeVersionedChunkPatchTail(
+                            factoredV3, baseLocalStateCount, appendedStates, appendedGlobalIds, patches);
                     workingFrame = LcaSectionCodec.injectChunkPatchTailIntoUncompressedFrame(
                             spliced, sectionCount, patchPayload);
                 } else {
@@ -3770,6 +3909,19 @@ public final class LcaRegionWriter {
                     ? encodeModeBWithAtomicDict(workingFrame, sectionDirEnd, Math.max(1, lcd2Level))
                     : workingFrame;
             return commitPreEncodedChunkCoW(rx, rz, finalPayload);
+        }
+
+        private static byte[] encodeVersionedChunkPatchTail(
+                boolean factoredV3,
+                int baseLocalStateCount,
+                List<String> appendedStates,
+                int[] appendedGlobalIds,
+                List<LcaSectionCodec.SectionPatch> patches
+        ) {
+            return factoredV3
+                    ? LcaSectionCodec.encodePureIdChunkPatchTailBytes(appendedGlobalIds, appendedGlobalIds.length, patches)
+                    : LcaSectionCodec.encodeChunkPatchTailBytes(
+                            baseLocalStateCount, appendedStates, appendedGlobalIds, patches);
         }
 
         private void patchChunkFrameSelfTag(byte[] payload, int chunkIdx) {
@@ -3816,18 +3968,23 @@ public final class LcaRegionWriter {
             Map<String, Object>[] sectionByIdx = new Map[sectionCount];
             int[][] sectionBiomeIds = new int[sectionCount][];
             long[][] sectionBiomeData = new long[sectionCount][];
-            boolean useSlabLocalPalette = hasVoxelSections && idToBlockState.size() < 8192;
+            boolean factoredV3 = isFactoredV3Dict();
+            boolean useSlabLocalPalette = hasVoxelSections && (factoredV3 || idToBlockState.size() < 8192);
             Map<String, Integer> localStateMap = useSlabLocalPalette ? new LinkedHashMap<>(32) : null;
             List<String> localStateList = useSlabLocalPalette ? new ArrayList<>(32) : null;
             List<Integer> localStateGlobalIds = useSlabLocalPalette ? new ArrayList<>(32) : null;
             Map<String, Integer> localBiomeMap = useSlabLocalPalette ? new LinkedHashMap<>(8) : null;
             List<String> localBiomeList = useSlabLocalPalette ? new ArrayList<>(8) : null;
+            List<Integer> localBiomeGlobalIds = (useSlabLocalPalette && factoredV3) ? new ArrayList<>(8) : null;
             if (useSlabLocalPalette) {
                 localStateMap.put("minecraft:air", 0);
                 localStateList.add("minecraft:air");
-                localStateGlobalIds.add(-1);
+                localStateGlobalIds.add(factoredV3 ? registerOrGetBlockStateId("minecraft:air") : -1);
                 localBiomeMap.put("minecraft:plains", 0);
                 localBiomeList.add("minecraft:plains");
+                if (factoredV3) {
+                    localBiomeGlobalIds.add(registerOrGetBiomeId("minecraft:plains"));
+                }
             }
             int chunkDefaultBiomeDictId = -1;
             int bestBiomeCount = 0;
@@ -3852,7 +4009,7 @@ public final class LcaRegionWriter {
                     Object bsObj = sec.get("block_states");
                     if (bsObj instanceof Map<?, ?> && idx >= 0 && idx < sectionCount) {
                         sectionByIdx[idx] = sec;
-                        int[] bIds = extractBiomeIds(sec, localBiomeMap, localBiomeList);
+                        int[] bIds = extractBiomeIds(sec, localBiomeMap, localBiomeList, localBiomeGlobalIds);
                         long[] bData = extractBiomeDataLongs(sec);
                         sectionBiomeIds[idx] = bIds;
                         sectionBiomeData[idx] = bData;
@@ -3977,10 +4134,22 @@ public final class LcaRegionWriter {
                     localStateGlobalIdArr[k] = localStateGlobalIds.get(k);
                 }
             }
-            byte[] slabLocalPaletteBytes = useSlabLocalPalette
-                    ? LcaSectionCodec.encodeSlabLocalPalette(
-                            localStateList, localStateGlobalIdArr, localBiomeList, sortedBiomeTemplates)
-                    : new byte[0];
+            byte[] slabLocalPaletteBytes;
+            if (!useSlabLocalPalette) {
+                slabLocalPaletteBytes = new byte[0];
+            } else if (factoredV3) {
+                int[] localBiomeGlobalIdArr = new int[localBiomeGlobalIds.size()];
+                for (int k = 0; k < localBiomeGlobalIdArr.length; k++) {
+                    localBiomeGlobalIdArr[k] = localBiomeGlobalIds.get(k);
+                }
+                slabLocalPaletteBytes = LcaSectionCodec.encodePureIdMicroPalette(
+                        localStateGlobalIdArr, localStateGlobalIdArr.length,
+                        localBiomeGlobalIdArr, localBiomeGlobalIdArr.length,
+                        sortedBiomeTemplates);
+            } else {
+                slabLocalPaletteBytes = LcaSectionCodec.encodeSlabLocalPalette(
+                        localStateList, localStateGlobalIdArr, localBiomeList, sortedBiomeTemplates);
+            }
             totalSectionPayloadBytes += slabLocalPaletteBytes.length;
 
             boolean scale4B = totalSectionPayloadBytes > 0x7FFF;
@@ -4508,6 +4677,7 @@ public final class LcaRegionWriter {
             if (!(bsObj instanceof Map<?, ?> bs)) return null;
             Object palObj = bs.get("palette");
             if (!(palObj instanceof Nbt.NbtList palList) || palList.items.isEmpty()) return null;
+            boolean factoredV3 = isFactoredV3Dict();
             int[] out = new int[palList.items.size()];
             for (int i = 0; i < palList.items.size(); i++) {
                 String canonical = formatCanonicalStateString(palList.items.get(i));
@@ -4517,10 +4687,15 @@ public final class LcaRegionWriter {
                         locId = localStateList.size();
                         localStateMap.put(canonical, locId);
                         localStateList.add(canonical);
-                        int bracket = canonical.indexOf('[');
-                        int globalId = -1;
-                        if (bracket >= 0 && !LcaSectionCodec.STATIC_CORE_PROP_TO_ID.containsKey(canonical.substring(bracket))) {
+                        int globalId;
+                        if (factoredV3) {
                             globalId = registerOrGetBlockStateId(canonical);
+                        } else {
+                            int bracket = canonical.indexOf('[');
+                            globalId = -1;
+                            if (bracket >= 0 && !LcaV2LegacyCodec.STATIC_CORE_PROP_TO_ID.containsKey(canonical.substring(bracket))) {
+                                globalId = registerOrGetBlockStateId(canonical);
+                            }
                         }
                         localStateGlobalIds.add(globalId);
                     }
@@ -4544,7 +4719,8 @@ public final class LcaRegionWriter {
         private int[] extractBiomeIds(
                 Map<String, Object> sec,
                 Map<String, Integer> localBiomeMap,
-                List<String> localBiomeList
+                List<String> localBiomeList,
+                List<Integer> localBiomeGlobalIds
         ) {
             Object bObj = sec.get("biomes");
             if (!(bObj instanceof Map<?, ?> biomes)) return null;
@@ -4555,11 +4731,18 @@ public final class LcaRegionWriter {
                 Object item = palList.items.get(i);
                 String biomeId = (item instanceof String s) ? s : "minecraft:plains";
                 if (localBiomeMap != null) {
-                    out[i] = localBiomeMap.computeIfAbsent(biomeId, k -> {
+                    Integer existing = localBiomeMap.get(biomeId);
+                    if (existing == null) {
                         int id = localBiomeList.size();
-                        localBiomeList.add(k);
-                        return id;
-                    });
+                        localBiomeMap.put(biomeId, id);
+                        localBiomeList.add(biomeId);
+                        if (localBiomeGlobalIds != null) {
+                            localBiomeGlobalIds.add(registerOrGetBiomeId(biomeId));
+                        }
+                        out[i] = id;
+                    } else {
+                        out[i] = existing;
+                    }
                 } else {
                     out[i] = registerOrGetBiomeId(biomeId);
                 }
@@ -4611,11 +4794,247 @@ public final class LcaRegionWriter {
             return registerNewBlockStateId(canonicalState);
         }
 
+        private void parseDictSegmentIntoLiveArchive(
+                byte[] segBuf, int segBaseOff, int segCap, DictSegmentMeta segMeta
+        ) throws CorruptRegionEntryException {
+            int segPayloadLimit = segBaseOff + segCap - 8;
+            if (segMeta.factoredV3) {
+                int segStateCount = LcaSectionCodec.readUint16BE(segBuf, segBaseOff);
+                int segBiomeCount = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 2);
+                int segBaseBlockCount = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 4);
+                int usedPayloadBytes = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 6);
+                if (segBiomeCount > 16384
+                        || (usedPayloadBytes != 0 && usedPayloadBytes < 2)
+                        || segBaseOff + 8 + usedPayloadBytes > segPayloadLimit) {
+                    throw new CorruptRegionEntryException("CBIT T5: Factored v3 dictionary segment header corrupt");
+                }
+                if (usedPayloadBytes == 0) {
+                    if (segStateCount != 0 || segBiomeCount != 0 || segBaseBlockCount != 0) {
+                        throw new CorruptRegionEntryException("CBIT T5: Non-zero counts in zero-payload v3 dict segment");
+                    }
+                    segMeta.usedPayloadBytes = 2;
+                    return;
+                }
+                int segPropTupleCount = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 8);
+                int activeEnd = segBaseOff + 8 + usedPayloadBytes;
+                int pos = segBaseOff + 10;
+                segMeta.usedPayloadBytes = 2;
+
+                for (int i = 0; i < segBaseBlockCount; i++) {
+                    int entryStart = pos;
+                    int utfLen = LcaSectionCodec.readVarInt(segBuf, pos, activeEnd);
+                    pos += LcaSectionCodec.varIntLen(utfLen);
+                    if (utfLen < 0 || pos + utfLen > activeEnd) {
+                        throw new CorruptRegionEntryException("CBIT T5: Truncated v3 BaseBlock entry");
+                    }
+                    String baseName = new String(segBuf, pos, utfLen, StandardCharsets.UTF_8);
+                    pos += utfLen;
+                    byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
+                    segMeta.baseBlockEntries.add(rawEntry);
+                    segMeta.usedPayloadBytes += rawEntry.length;
+                    baseBlockToId.put(baseName, idToBaseBlock.size());
+                    idToBaseBlock.add(baseName);
+                }
+
+                for (int i = 0; i < segPropTupleCount; i++) {
+                    int entryStart = pos;
+                    int utfLen = LcaSectionCodec.readVarInt(segBuf, pos, activeEnd);
+                    pos += LcaSectionCodec.varIntLen(utfLen);
+                    if (utfLen < 2 || pos + utfLen > activeEnd) {
+                        throw new CorruptRegionEntryException("CBIT T5: Truncated or invalid v3 PropTuple entry");
+                    }
+                    String propTuple = new String(segBuf, pos, utfLen, StandardCharsets.UTF_8);
+                    if (propTuple.charAt(0) != '[' || propTuple.charAt(propTuple.length() - 1) != ']') {
+                        throw new CorruptRegionEntryException("CBIT T5: Malformed v3 PropTuple entry: " + propTuple);
+                    }
+                    pos += utfLen;
+                    byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
+                    segMeta.propTupleEntries.add(rawEntry);
+                    segMeta.usedPayloadBytes += rawEntry.length;
+                    propTupleToId.put(propTuple, idToPropTuple.size());
+                    idToPropTuple.add(propTuple);
+                }
+
+                int totalBases = idToBaseBlock.size();
+                int totalProps = idToPropTuple.size();
+                for (int i = 0; i < segStateCount; i++) {
+                    int entryStart = pos;
+                    int baseId = LcaSectionCodec.readVarInt(segBuf, pos, activeEnd);
+                    pos += LcaSectionCodec.varIntLen(baseId);
+                    int propPlusOne = LcaSectionCodec.readVarInt(segBuf, pos, activeEnd);
+                    pos += LcaSectionCodec.varIntLen(propPlusOne);
+                    if (baseId < 0 || baseId >= totalBases || propPlusOne < 0 || propPlusOne > totalProps || pos + 4 > activeEnd) {
+                        throw new CorruptRegionEntryException("CBIT T5: Invalid causal ID or truncated v3 BlockState entry");
+                    }
+                    int mat32 = LcaSectionCodec.readIntBE(segBuf, pos);
+                    pos += 4;
+                    byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
+                    segMeta.stateEntries.add(rawEntry);
+                    segMeta.usedPayloadBytes += rawEntry.length;
+                    String baseName = idToBaseBlock.get(baseId);
+                    String canonical = propPlusOne == 0 ? baseName : (baseName + idToPropTuple.get(propPlusOne - 1));
+                    blockStateToId.put(canonical, idToBlockState.size());
+                    idToBlockState.add(canonical);
+                    stateBaseBlockIds.add(baseId);
+                    statePropTupleIds.add(propPlusOne - 1);
+                    stateMaterialPacked.add(mat32);
+                }
+
+                for (int i = 0; i < segBiomeCount; i++) {
+                    int entryStart = pos;
+                    int utfLen = LcaSectionCodec.readVarInt(segBuf, pos, activeEnd);
+                    pos += LcaSectionCodec.varIntLen(utfLen);
+                    if (utfLen < 0 || pos + utfLen + 4 > activeEnd) {
+                        throw new CorruptRegionEntryException("CBIT T5: Truncated v3 Biome entry");
+                    }
+                    String biome = new String(segBuf, pos, utfLen, StandardCharsets.UTF_8);
+                    pos += utfLen + 4;
+                    byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
+                    segMeta.biomeEntries.add(rawEntry);
+                    segMeta.usedPayloadBytes += rawEntry.length;
+                    biomeToId.put(biome, idToBiome.size());
+                    idToBiome.add(biome);
+                }
+
+                if (pos > activeEnd) {
+                    throw new CorruptRegionEntryException("CBIT T5: Factored v3 dict entries exceed usedPayloadBytes");
+                }
+                if (pos < activeEnd) {
+                    segMeta.appendPatternSlice(segBuf, pos, activeEnd - pos);
+                }
+                return;
+            }
+
+            int segStateCount = LcaSectionCodec.readIntBE(segBuf, segBaseOff);
+            int segBiomeCount = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 4);
+            int usedPayloadBytes = LcaSectionCodec.readUint16BE(segBuf, segBaseOff + 6);
+            int pos = segBaseOff + 8;
+
+            for (int i = 0; i < segStateCount; i++) {
+                int entryStart = pos;
+                int utfLen = LcaSectionCodec.readVarInt(segBuf, pos, segPayloadLimit);
+                pos += LcaSectionCodec.varIntLen(utfLen);
+                String canonical = new String(segBuf, pos, utfLen, StandardCharsets.UTF_8);
+                pos += utfLen + 4;
+                byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
+                segMeta.stateEntries.add(rawEntry);
+                segMeta.usedPayloadBytes += rawEntry.length;
+                blockStateToId.put(canonical, idToBlockState.size());
+                idToBlockState.add(canonical);
+            }
+
+            for (int i = 0; i < segBiomeCount; i++) {
+                int entryStart = pos;
+                int utfLen = LcaSectionCodec.readVarInt(segBuf, pos, segPayloadLimit);
+                pos += LcaSectionCodec.varIntLen(utfLen);
+                String biome = new String(segBuf, pos, utfLen, StandardCharsets.UTF_8);
+                pos += utfLen + 4;
+                byte[] rawEntry = Arrays.copyOfRange(segBuf, entryStart, pos);
+                segMeta.biomeEntries.add(rawEntry);
+                segMeta.usedPayloadBytes += rawEntry.length;
+                biomeToId.put(biome, idToBiome.size());
+                idToBiome.add(biome);
+            }
+
+            int activeEnd = segBaseOff + 8 + usedPayloadBytes;
+            if (pos < activeEnd && activeEnd <= segPayloadLimit) {
+                segMeta.appendPatternSlice(segBuf, pos, activeEnd - pos);
+            }
+        }
+
         private synchronized int registerNewBlockStateId(String canonicalState) {
             Integer existing = blockStateToId.get(canonicalState);
             if (existing != null) {
                 return existing;
             }
+            if (isFactoredV3Dict()) {
+                int bracket = canonicalState.indexOf('[');
+                boolean hasProps = bracket >= 0 && canonicalState.endsWith("]") && canonicalState.length() - bracket >= 2;
+                String baseName = hasProps ? canonicalState.substring(0, bracket) : canonicalState;
+                String propSuffix = hasProps ? canonicalState.substring(bracket) : null;
+
+                Integer existingBaseId = baseBlockToId.get(baseName);
+                boolean needNewBase = existingBaseId == null;
+                int baseId = needNewBase ? idToBaseBlock.size() : existingBaseId;
+                byte[] rawBaseEntry = null;
+                if (needNewBase) {
+                    byte[] baseUtf = baseName.getBytes(StandardCharsets.UTF_8);
+                    rawBaseEntry = new byte[LcaSectionCodec.varIntLen(baseUtf.length) + baseUtf.length];
+                    int bp = LcaSectionCodec.writeVarIntToBuf(rawBaseEntry, 0, baseUtf.length);
+                    System.arraycopy(baseUtf, 0, rawBaseEntry, bp, baseUtf.length);
+                }
+
+                boolean needNewProp = false;
+                int propId = -1;
+                byte[] rawPropEntry = null;
+                if (propSuffix != null) {
+                    Integer existingPropId = propTupleToId.get(propSuffix);
+                    if (existingPropId == null) {
+                        needNewProp = true;
+                        propId = idToPropTuple.size();
+                        byte[] propUtf = propSuffix.getBytes(StandardCharsets.UTF_8);
+                        rawPropEntry = new byte[LcaSectionCodec.varIntLen(propUtf.length) + propUtf.length];
+                        int pp = LcaSectionCodec.writeVarIntToBuf(rawPropEntry, 0, propUtf.length);
+                        System.arraycopy(propUtf, 0, rawPropEntry, pp, propUtf.length);
+                    } else {
+                        propId = existingPropId;
+                    }
+                }
+
+                int propIdPlusOne = propId + 1;
+                int materialPacked = computeLeafMapMaterialPacked(canonicalState);
+                byte[] rawStateEntry = new byte[
+                        LcaSectionCodec.varIntLen(baseId) + LcaSectionCodec.varIntLen(propIdPlusOne) + 4];
+                int sp = LcaSectionCodec.writeVarIntToBuf(rawStateEntry, 0, baseId);
+                sp = LcaSectionCodec.writeVarIntToBuf(rawStateEntry, sp, propIdPlusOne);
+                rawStateEntry[sp] = (byte) ((materialPacked >>> 24) & 0xFF);
+                rawStateEntry[sp + 1] = (byte) ((materialPacked >>> 16) & 0xFF);
+                rawStateEntry[sp + 2] = (byte) ((materialPacked >>> 8) & 0xFF);
+                rawStateEntry[sp + 3] = (byte) (materialPacked & 0xFF);
+
+                int totalNewBytes = rawStateEntry.length
+                        + (needNewBase ? rawBaseEntry.length : 0)
+                        + (needNewProp ? rawPropEntry.length : 0);
+                DictSegmentMeta activeSeg = ensureDictSegmentCapacity(totalNewBytes);
+                if (needNewBase) {
+                    activeSeg.baseBlockEntries.add(rawBaseEntry);
+                }
+                if (needNewProp) {
+                    activeSeg.propTupleEntries.add(rawPropEntry);
+                }
+                activeSeg.stateEntries.add(rawStateEntry);
+                activeSeg.usedPayloadBytes += totalNewBytes;
+                try {
+                    flushDictSegment(activeSeg);
+                } catch (RuntimeException | Error e) {
+                    activeSeg.stateEntries.remove(activeSeg.stateEntries.size() - 1);
+                    if (needNewProp) {
+                        activeSeg.propTupleEntries.remove(activeSeg.propTupleEntries.size() - 1);
+                    }
+                    if (needNewBase) {
+                        activeSeg.baseBlockEntries.remove(activeSeg.baseBlockEntries.size() - 1);
+                    }
+                    activeSeg.usedPayloadBytes -= totalNewBytes;
+                    throw e;
+                }
+                if (needNewBase) {
+                    idToBaseBlock.add(baseName);
+                    baseBlockToId.put(baseName, baseId);
+                }
+                if (needNewProp) {
+                    idToPropTuple.add(propSuffix);
+                    propTupleToId.put(propSuffix, propId);
+                }
+                int newId = idToBlockState.size();
+                idToBlockState.add(canonicalState);
+                stateBaseBlockIds.add(baseId);
+                statePropTupleIds.add(propId);
+                stateMaterialPacked.add(materialPacked);
+                cachedParsedDict = null;
+                blockStateToId.put(canonicalState, newId);
+                return newId;
+            }
+
             byte[] utfBytes = canonicalState.getBytes(StandardCharsets.UTF_8);
             byte[] rawEntry = new byte[LcaSectionCodec.varIntLen(utfBytes.length) + utfBytes.length + 4];
             int pos = LcaSectionCodec.writeVarIntToBuf(rawEntry, 0, utfBytes.length);
@@ -4683,7 +5102,12 @@ public final class LcaRegionWriter {
 
         private synchronized DictSegmentMeta ensureDictSegmentCapacity(int entryBytes) {
             DictSegmentMeta current = dictSegments.get(dictSegments.size() - 1);
-            if (current.availableSlackBytes() >= entryBytes) {
+            boolean countsFit = !current.factoredV3
+                    || (current.stateEntries.size() < 65535
+                            && current.baseBlockEntries.size() < 65535
+                            && current.propTupleEntries.size() < 65535
+                            && current.biomeEntries.size() < 16384);
+            if (countsFit && current.availableSlackBytes() >= entryBytes) {
                 return current;
             }
             // Geometric continuation segment sizing (1 KiB .. 16 KiB) so large dictionaries stay well below 64 segments
@@ -4700,7 +5124,8 @@ public final class LcaRegionWriter {
 
             DictSegmentMeta nextSeg = new DictSegmentMeta(
                     nextSlabStart << LcaRegionReader.SLAB_SHIFT,
-                    contSlabs << LcaRegionReader.SLAB_SHIFT);
+                    contSlabs << LcaRegionReader.SLAB_SHIFT,
+                    isFactoredV3Dict());
             try {
                 flushDictSegment(nextSeg);
                 int relSlabs32 = nextSlabStart - current.baseSlab();
@@ -4790,7 +5215,8 @@ public final class LcaRegionWriter {
                 int avail = tail.availableSlackBytes();
                 if (avail <= 0) {
                     int rem = atomicDictState.usedBytes - syncedPatternBytes;
-                    int minNeededBytes = (((8 + rem + 7) >>> 3) * 9 + 8 + 255) & ~255;
+                    int hdrOverhead = isFactoredV3Dict() ? 10 : 8;
+                    int minNeededBytes = (((hdrOverhead + rem + 7) >>> 3) * 9 + 8 + 255) & ~255;
                     int contBytes = Math.max(512, minNeededBytes);
                     int contSlabs = contBytes >>> LcaRegionReader.SLAB_SHIFT;
                     int nextSlabStart = allocateSlabs(contSlabs, false);
@@ -4799,7 +5225,8 @@ public final class LcaRegionWriter {
                     }
                     DictSegmentMeta nextSeg = new DictSegmentMeta(
                             nextSlabStart << LcaRegionReader.SLAB_SHIFT,
-                            contSlabs << LcaRegionReader.SLAB_SHIFT);
+                            contSlabs << LcaRegionReader.SLAB_SHIFT,
+                            isFactoredV3Dict());
                     int relSlabs32 = nextSlabStart - tail.baseSlab();
                     tail.linkTrailer = ((long) relSlabs32 << 32)
                             | ((contSlabs & 0xFFFFFFL) << 8)
@@ -4819,16 +5246,53 @@ public final class LcaRegionWriter {
         }
 
         private synchronized void rollbackDictionaryToBookmark(
-                int stateBookmark, int biomeBookmark, int patternBookmark, int segBookmark
+                int baseBlockBookmark,
+                int propTupleBookmark,
+                int stateBookmark,
+                int biomeBookmark,
+                int patternBookmark,
+                int segBookmark
         ) {
             boolean modified = false;
             while (idToBlockState.size() > stateBookmark) {
-                String removed = idToBlockState.remove(idToBlockState.size() - 1);
+                int lastIdx = idToBlockState.size() - 1;
+                String removed = idToBlockState.remove(lastIdx);
                 blockStateToId.remove(removed);
+                if (stateBaseBlockIds.size() > lastIdx) {
+                    stateBaseBlockIds.remove(lastIdx);
+                    statePropTupleIds.remove(lastIdx);
+                    stateMaterialPacked.remove(lastIdx);
+                }
                 for (int s = dictSegments.size() - 1; s >= 0; s--) {
                     DictSegmentMeta seg = dictSegments.get(s);
                     if (!seg.stateEntries.isEmpty()) {
                         byte[] entry = seg.stateEntries.remove(seg.stateEntries.size() - 1);
+                        seg.usedPayloadBytes -= entry.length;
+                        modified = true;
+                        break;
+                    }
+                }
+            }
+            while (idToPropTuple.size() > propTupleBookmark) {
+                String removed = idToPropTuple.remove(idToPropTuple.size() - 1);
+                propTupleToId.remove(removed);
+                for (int s = dictSegments.size() - 1; s >= 0; s--) {
+                    DictSegmentMeta seg = dictSegments.get(s);
+                    if (!seg.propTupleEntries.isEmpty()) {
+                        byte[] entry = seg.propTupleEntries.remove(seg.propTupleEntries.size() - 1);
+                        seg.usedPayloadBytes -= entry.length;
+                        modified = true;
+                        break;
+                    }
+                }
+            }
+            while (idToBaseBlock.size() > baseBlockBookmark) {
+                String removed = idToBaseBlock.remove(idToBaseBlock.size() - 1);
+                baseBlockToId.remove(removed);
+                for (int s = dictSegments.size() - 1; s >= 0; s--) {
+                    DictSegmentMeta seg = dictSegments.get(s);
+                    if (!seg.baseBlockEntries.isEmpty()) {
+                        byte[] entry = seg.baseBlockEntries.remove(seg.baseBlockEntries.size() - 1);
                         seg.usedPayloadBytes -= entry.length;
                         modified = true;
                         break;
@@ -4902,18 +5366,43 @@ public final class LcaRegionWriter {
                 Arrays.fill(staged, (byte) 0);
             }
             ByteBuffer bb = ByteBuffer.wrap(staged);
-            bb.putInt(0, seg.stateEntries.size());
-            bb.putShort(4, (short) seg.biomeEntries.size());
-            bb.putShort(6, (short) seg.usedPayloadBytes);
-
-            int pos = 8;
-            for (byte[] sEntry : seg.stateEntries) {
-                System.arraycopy(sEntry, 0, staged, pos, sEntry.length);
-                pos += sEntry.length;
-            }
-            for (byte[] bEntry : seg.biomeEntries) {
-                System.arraycopy(bEntry, 0, staged, pos, bEntry.length);
-                pos += bEntry.length;
+            int pos;
+            if (seg.factoredV3) {
+                bb.putShort(0, (short) seg.stateEntries.size());
+                bb.putShort(2, (short) seg.biomeEntries.size());
+                bb.putShort(4, (short) seg.baseBlockEntries.size());
+                bb.putShort(6, (short) seg.usedPayloadBytes);
+                bb.putShort(8, (short) seg.propTupleEntries.size());
+                pos = 10;
+                for (byte[] bbEntry : seg.baseBlockEntries) {
+                    System.arraycopy(bbEntry, 0, staged, pos, bbEntry.length);
+                    pos += bbEntry.length;
+                }
+                for (byte[] ptEntry : seg.propTupleEntries) {
+                    System.arraycopy(ptEntry, 0, staged, pos, ptEntry.length);
+                    pos += ptEntry.length;
+                }
+                for (byte[] sEntry : seg.stateEntries) {
+                    System.arraycopy(sEntry, 0, staged, pos, sEntry.length);
+                    pos += sEntry.length;
+                }
+                for (byte[] bEntry : seg.biomeEntries) {
+                    System.arraycopy(bEntry, 0, staged, pos, bEntry.length);
+                    pos += bEntry.length;
+                }
+            } else {
+                bb.putInt(0, seg.stateEntries.size());
+                bb.putShort(4, (short) seg.biomeEntries.size());
+                bb.putShort(6, (short) seg.usedPayloadBytes);
+                pos = 8;
+                for (byte[] sEntry : seg.stateEntries) {
+                    System.arraycopy(sEntry, 0, staged, pos, sEntry.length);
+                    pos += sEntry.length;
+                }
+                for (byte[] bEntry : seg.biomeEntries) {
+                    System.arraycopy(bEntry, 0, staged, pos, bEntry.length);
+                    pos += bEntry.length;
+                }
             }
             if (seg.patternLen > 0) {
                 System.arraycopy(seg.patternBytes, 0, staged, pos, seg.patternLen);

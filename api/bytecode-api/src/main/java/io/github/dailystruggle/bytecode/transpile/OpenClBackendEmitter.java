@@ -2789,6 +2789,48 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                         .append("] = ")
                         .append(emitExpr(store.value(), fn, options, q32Plan, fnByKey, fnByName, false))
                         .append(";\n");
+            } else if (stmt instanceof ConceptStmt.VoxelWrite vw) {
+                sb.append(indent)
+                        .append("leaf_voxel_write(")
+                        .append(emitExpr(vw.x(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(vw.y(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(vw.z(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(vw.slot(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(vw.flags())
+                        .append(");\n");
+            } else if (stmt instanceof ConceptStmt.MarkPostProcess mp) {
+                sb.append(indent)
+                        .append("leaf_mark_post_process(")
+                        .append(emitExpr(mp.x(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(mp.y(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(mp.z(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(");\n");
+            } else if (stmt instanceof ConceptStmt.BitSetWrite bsw) {
+                sb.append(indent)
+                        .append("leaf_bitset_write(")
+                        .append(bsw.setName())
+                        .append(", ")
+                        .append(emitExpr(bsw.index(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(bsw.value(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(");\n");
+            } else if (stmt instanceof ConceptStmt.PosSetAdd psa) {
+                sb.append(indent)
+                        .append("leaf_posset_add(")
+                        .append(psa.setName())
+                        .append(", ")
+                        .append(emitExpr(psa.x(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(psa.y(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(", ")
+                        .append(emitExpr(psa.z(), fn, options, q32Plan, fnByKey, fnByName, false))
+                        .append(");\n");
             }
         }
     }
@@ -3068,6 +3110,41 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 emitted = "(" + l + " " + bin.op().symbol() + " " + r + ")";
             }
             return expectQ32 ? convertToQ32(emitted, bin.type()) : emitted;
+        }
+        if (expr instanceof ConceptExpr.VoxelRead vr) {
+            return "leaf_voxel_read("
+                    + emitExpr(vr.x(), fn, options, q32Plan, fnByKey, fnByName, false) + ", "
+                    + emitExpr(vr.y(), fn, options, q32Plan, fnByKey, fnByName, false) + ", "
+                    + emitExpr(vr.z(), fn, options, q32Plan, fnByKey, fnByName, false) + ")";
+        }
+        if (expr instanceof ConceptExpr.HeightRead hr) {
+            return "leaf_height_read("
+                    + hr.heightKind() + ", "
+                    + emitExpr(hr.x(), fn, options, q32Plan, fnByKey, fnByName, false) + ", "
+                    + emitExpr(hr.z(), fn, options, q32Plan, fnByKey, fnByName, false) + ")";
+        }
+        if (expr instanceof ConceptExpr.BiomeRead br) {
+            return "leaf_biome_read("
+                    + emitExpr(br.x(), fn, options, q32Plan, fnByKey, fnByName, false) + ", "
+                    + emitExpr(br.y(), fn, options, q32Plan, fnByKey, fnByName, false) + ", "
+                    + emitExpr(br.z(), fn, options, q32Plan, fnByKey, fnByName, false) + ")";
+        }
+        if (expr instanceof ConceptExpr.BitSetRead bsr) {
+            return "leaf_bitset_read("
+                    + bsr.setName() + ", "
+                    + emitExpr(bsr.index(), fn, options, q32Plan, fnByKey, fnByName, false) + ")";
+        }
+        if (expr instanceof ConceptExpr.RngStep rng) {
+            String s0 = emitExpr(rng.state0(), fn, options, q32Plan, fnByKey, fnByName, false);
+            String s1 = emitExpr(rng.state1(), fn, options, q32Plan, fnByKey, fnByName, false);
+            String raw = "lcg48".equals(rng.kind())
+                    ? "(((" + s0 + ") * 25214903917L + 11L) & 281474976710655L)"
+                    : "((long)(rotate((ulong)((" + s0 + ") + (" + s1 + ")), (ulong)17UL) + (ulong)(" + s0 + ")))";
+            if (rng.bound() != null) {
+                String b = emitExpr(rng.bound(), fn, options, q32Plan, fnByKey, fnByName, false);
+                return "((int)((ulong)(" + raw + ") % (ulong)(" + b + ")))";
+            }
+            return raw;
         }
         throw new IllegalStateException("Unsupported ConceptExpr in OpenCL emitter: " + expr);
     }
@@ -4651,6 +4728,25 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
             ConstantLutAllocator sharedAllocator,
             boolean enableDiamondMemo
     ) {
+        return emitFinalDensityDeviceSectionWithPlan(
+                finalDensityModule,
+                effPolicy,
+                effExactMode,
+                sharedAllocator,
+                enableDiamondMemo,
+                "fd_",
+                "eval_lifted_final_density_ir");
+    }
+
+    private static FinalDensitySectionResult emitFinalDensityDeviceSectionWithPlan(
+            ConceptModule finalDensityModule,
+            WorldgenKernelSwapper.WorldgenFidelityPolicy effPolicy,
+            WorldgenKernelSwapper.GpuExactArithmeticMode effExactMode,
+            ConstantLutAllocator sharedAllocator,
+            boolean enableDiamondMemo,
+            String symbolPrefix,
+            String evalFnBaseName
+    ) {
         StringBuilder sb = new StringBuilder(1024);
         boolean exactMode = effPolicy != null && effPolicy.isExact();
         boolean useNativeFp64 = exactMode
@@ -4664,14 +4760,14 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 || finalDensityModule.entryFunction() == null
                 || !finalDensityModule.isPureCompute()
                 || !finalDensityModule.unmappedReasons().isEmpty()) {
-            sb.append("inline float eval_lifted_final_density_ir(int bx, int by, int bz").append(spillParam).append(") {\n")
+            sb.append("inline float ").append(evalFnBaseName).append("(int bx, int by, int bz").append(spillParam).append(") {\n")
                     .append("    (void)bx; (void)by; (void)bz;")
                     .append(passSpill ? (" (void)" + sharedAllocator.globalSpillBufferName + ";") : "")
                     .append("\n    return 0.0f;\n")
                     .append("}\n");
             if (useNativeFp64) {
                 sb.append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
-                        .append("inline double eval_lifted_final_density_ir_f64(int bx, int by, int bz").append(spillParam).append(") {\n")
+                        .append("inline double ").append(evalFnBaseName).append("_f64(int bx, int by, int bz").append(spillParam).append(") {\n")
                         .append("    (void)bx; (void)by; (void)bz;")
                         .append(passSpill ? (" (void)" + sharedAllocator.globalSpillBufferName + ";") : "")
                         .append("\n    return 0.0;\n")
@@ -4702,7 +4798,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 ? analyzeDiamondMemoPlan(preOptForMemo, arithMode, preQ32Plan)
                 : DiamondMemoPlan.EMPTY;
         TranspiledArtifact artifact = new OpenClBackendEmitter()
-                .emitWithAllocatorAndMemo(preOptForMemo, emitOpts, "fd_", sharedAllocator, false, memoPlan);
+                .emitWithAllocatorAndMemo(preOptForMemo, emitOpts, symbolPrefix, sharedAllocator, false, memoPlan);
         ConceptModule lowered = artifact.optimizedModule();
         Q32LoweringPlan q32Plan = arithMode.usesInt64Q32()
                 ? ConceptOptimizerPass.analyzeQ32Lowering(lowered)
@@ -4758,10 +4854,10 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
             }
             callArgs.append("memo_mask, memo_val");
         }
-        String rawCall = "fd_" + entry.name() + "(" + callArgs + ")";
+        String rawCall = symbolPrefix + entry.name() + "(" + callArgs + ")";
         boolean returnsQ32 = arithMode.usesInt64Q32() && q32Plan.isQ32Return(entry);
         String floatCall = returnsQ32 ? ("q32_to_f32(" + rawCall + ")") : ("(float)(" + rawCall + ")");
-        sb.append("inline float eval_lifted_final_density_ir(int bx, int by, int bz")
+        sb.append("inline float ").append(evalFnBaseName).append("(int bx, int by, int bz")
                 .append(spillParam)
                 .append(memoParams)
                 .append(") {\n")
@@ -4772,7 +4868,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 .append("}\n");
         if (useNativeFp64) {
             sb.append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
-                    .append("inline double eval_lifted_final_density_ir_f64(int bx, int by, int bz")
+                    .append("inline double ").append(evalFnBaseName).append("_f64(int bx, int by, int bz")
                     .append(spillParam)
                     .append(memoParams)
                     .append(") {\n")
@@ -4860,16 +4956,53 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
         int cellsZPre = Math.max(1, (16 + cellWPre - 1) / cellWPre);
         int cellsYPre = Math.max(1, Math.max(1, spec.noiseHeight()) / cellHPre);
         int cols2dPre = (cellsXPre + 1) * (cellsZPre + 1);
-        boolean gpuCornersSupported = spec.hasFinalDensityModule()
-                && (cols2dPre * (cellsYPre + 1)) <= 4096;
-        FinalDensitySectionResult fdRes = emitFinalDensityDeviceSectionWithPlan(
-                spec.finalDensityModule(),
-                effPolicy,
-                effExactMode,
-                sharedLutAllocator,
-                gpuCornersSupported && cols2dPre <= 256);
-        String finalDensityIrSrc = fdRes.sourceCode();
-        DiamondMemoPlan memoPlan = fdRes.memoPlan();
+        int cornersPerChunkPre = cols2dPre * (cellsYPre + 1);
+        LiftedWorldgenCapabilityTables.InterpolatedDensityGpuPlan gpuInterpPlan =
+                spec.hasInterpolatedDensityGpuPlan() ? spec.interpolatedDensityGpuPlan() : null;
+        int interpChCount = gpuInterpPlan != null ? gpuInterpPlan.channelModules().length : 0;
+        boolean multiInterpGpuSupported = gpuInterpPlan != null
+                && interpChCount > 0
+                && cornersPerChunkPre <= 4096
+                && (interpChCount * cornersPerChunkPre * (useNativeFp64 ? 8 : 4)) <= 28672;
+        boolean gpuCornersSupported = multiInterpGpuSupported
+                || (spec.hasFinalDensityModule() && cornersPerChunkPre <= 4096);
+        String finalDensityIrSrc;
+        DiamondMemoPlan memoPlan;
+        if (multiInterpGpuSupported) {
+            StringBuilder multiFdSb = new StringBuilder(4096);
+            multiFdSb.append("inline float leaf_squeeze_f32(float v) { float c = clamp(v, -1.0f, 1.0f); return c * 0.5f - (c * c * c) / 24.0f; }\n");
+            if (useNativeFp64) {
+                multiFdSb.append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
+                        .append("inline double leaf_squeeze_f64(double v) { double c = clamp(v, -1.0, 1.0); return c * 0.5 - (c * c * c) / 24.0; }\n")
+                        .append("#endif\n");
+            }
+            DiamondMemoPlan ch0Memo = DiamondMemoPlan.EMPTY;
+            for (int ch = 0; ch < interpChCount; ch++) {
+                FinalDensitySectionResult chRes = emitFinalDensityDeviceSectionWithPlan(
+                        gpuInterpPlan.channelModules()[ch],
+                        effPolicy,
+                        effExactMode,
+                        sharedLutAllocator,
+                        ch == 0 && cols2dPre <= 256,
+                        "fd_ch" + ch + "_",
+                        "eval_lifted_interp_ch_" + ch);
+                multiFdSb.append(chRes.sourceCode());
+                if (ch == 0) {
+                    ch0Memo = chRes.memoPlan();
+                }
+            }
+            finalDensityIrSrc = multiFdSb.toString();
+            memoPlan = ch0Memo;
+        } else {
+            FinalDensitySectionResult fdRes = emitFinalDensityDeviceSectionWithPlan(
+                    spec.finalDensityModule(),
+                    effPolicy,
+                    effExactMode,
+                    sharedLutAllocator,
+                    gpuCornersSupported && cols2dPre <= 256);
+            finalDensityIrSrc = fdRes.sourceCode();
+            memoPlan = fdRes.memoPlan();
+        }
         String surfaceRuleIrSrc = emitSurfaceRuleDeviceSection(
                 spec.surfaceRuleModule(), effPolicy, effExactMode, sharedLutAllocator);
         int barrierNoiseId = noiseIds6[0];
@@ -4971,15 +5104,23 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 + "    __local int s_raw_top_y[256];\n"
                 + "    __local int s_prelim_y[256];\n"
                 + "    __local int s_layer_vox[256];\n"
-                + (gpuCornersSupported
-                        ? ((useNativeFp64 && cornersPerChunk <= 2048)
+                + (multiInterpGpuSupported
+                        ? ((useNativeFp64 && (interpChCount * cornersPerChunk * 8) <= 28672)
                                 ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
-                                        + "    __local double s_corners[" + cornersPerChunk + "];\n"
+                                        + "    __local double s_interp_ch[" + (interpChCount * cornersPerChunk) + "];\n"
                                         + "#else\n"
-                                        + "    __local float s_corners[" + cornersPerChunk + "];\n"
+                                        + "    __local float s_interp_ch[" + (interpChCount * cornersPerChunk) + "];\n"
                                         + "#endif\n")
-                                : ("    __local float s_corners[" + cornersPerChunk + "];\n"))
-                        : "")
+                                : ("    __local float s_interp_ch[" + (interpChCount * cornersPerChunk) + "];\n"))
+                        : (gpuCornersSupported
+                                ? ((useNativeFp64 && cornersPerChunk <= 2048)
+                                        ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
+                                                + "    __local double s_corners[" + cornersPerChunk + "];\n"
+                                                + "#else\n"
+                                                + "    __local float s_corners[" + cornersPerChunk + "];\n"
+                                                + "#endif\n")
+                                        : ("    __local float s_corners[" + cornersPerChunk + "];\n"))
+                                : ""))
                 + "    __local int s_est_basin_floor;\n"
                 + "    __local int s_chunk_active_top_y;\n"
                 + (carverCount > 0
@@ -5079,82 +5220,85 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 + "    for (int vi = col; vi < total_voxels; vi += 256) {\n"
                 + "        c_out_sections[vi] = 0;\n"
                 + "    }\n"
-                + (gpuCornersSupported
-                        ? ((memoPlan.isActive()
-                                ? ("    if (has_gpu_corners != 0) {\n"
-                                        + "        int bands_per_col = 256 / " + cols2dPre + ";\n"
-                                        + "        if (bands_per_col < 1) bands_per_col = 1;\n"
-                                        + "        int active_threads = " + cols2dPre + " * bands_per_col;\n"
-                                        + "        if (col < active_threads) {\n"
-                                        + "            int col2d = col / bands_per_col;\n"
-                                        + "            int band_y = col - col2d * bands_per_col;\n"
-                                        + "            int gx_c = col2d / " + (cellsZ + 1) + ";\n"
-                                        + "            int gz_c = col2d - gx_c * " + (cellsZ + 1) + ";\n"
-                                        + "            int c_bx = (chunk_x << 4) + gx_c * cell_w;\n"
-                                        + "            int c_bz = (chunk_z << 4) + gz_c * cell_w;\n"
-                                        + "            int y_per_band = (" + strideZ + " + bands_per_col - 1) / bands_per_col;\n"
-                                        + "            int gy_start = band_y * y_per_band;\n"
-                                        + "            int gy_end = gy_start + y_per_band;\n"
-                                        + "            if (gy_end > " + strideZ + ") gy_end = " + strideZ + ";\n"
-                                        + "            uint memo_mask = 0u;\n"
-                                        + "            " + memoPlan.elemType() + " memo_val[" + memoPlan.slotCount() + "];\n"
-                                        + "            int base_ci = gx_c * stride_x + gz_c * stride_z;\n"
-                                        + "            for (int gy_c = gy_start; gy_c < gy_end; gy_c++) {\n"
-                                        + "                memo_mask &= " + Integer.toUnsignedString(memoPlan.keep2dMask()) + "u;\n"
-                                        + "                int c_by = noise_min_y + gy_c * cell_h;\n"
-                                        + "                int ci_pos = base_ci + gy_c;\n"
-                                        + ((useNativeFp64 && cornersPerChunk <= 2048)
-                                                ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
-                                                        + "                double cv = eval_lifted_final_density_ir_f64(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n"
-                                                        + "                if (add_beard_delta != 0) cv += (double)c_corners[ci_pos];\n"
-                                                        + "                s_corners[ci_pos] = cv;\n"
-                                                        + "#else\n"
-                                                        + "                float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n"
-                                                        + "                if (add_beard_delta != 0) cv += c_corners[ci_pos];\n"
-                                                        + "                s_corners[ci_pos] = cv;\n"
-                                                        + "#endif\n")
-                                                : ("                float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n"
-                                                        + "                if (add_beard_delta != 0) cv += c_corners[ci_pos];\n"
-                                                        + "                s_corners[ci_pos] = cv;\n"))
-                                        + "            }\n"
-                                        + "        }\n"
-                                        + "    } else {\n")
-                                : ("    if (has_gpu_corners != 0) {\n"
+                + (multiInterpGpuSupported
+                        ? emitMultiInterpGpuCornerFill(
+                                interpChCount, cornersPerChunk, cols2dPre, cellsZ, strideZ, useNativeFp64, memoPlan)
+                        : (gpuCornersSupported
+                                ? ((memoPlan.isActive()
+                                        ? ("    if (has_gpu_corners != 0) {\n"
+                                                + "        int bands_per_col = 256 / " + cols2dPre + ";\n"
+                                                + "        if (bands_per_col < 1) bands_per_col = 1;\n"
+                                                + "        int active_threads = " + cols2dPre + " * bands_per_col;\n"
+                                                + "        if (col < active_threads) {\n"
+                                                + "            int col2d = col / bands_per_col;\n"
+                                                + "            int band_y = col - col2d * bands_per_col;\n"
+                                                + "            int gx_c = col2d / " + (cellsZ + 1) + ";\n"
+                                                + "            int gz_c = col2d - gx_c * " + (cellsZ + 1) + ";\n"
+                                                + "            int c_bx = (chunk_x << 4) + gx_c * cell_w;\n"
+                                                + "            int c_bz = (chunk_z << 4) + gz_c * cell_w;\n"
+                                                + "            int y_per_band = (" + strideZ + " + bands_per_col - 1) / bands_per_col;\n"
+                                                + "            int gy_start = band_y * y_per_band;\n"
+                                                + "            int gy_end = gy_start + y_per_band;\n"
+                                                + "            if (gy_end > " + strideZ + ") gy_end = " + strideZ + ";\n"
+                                                + "            uint memo_mask = 0u;\n"
+                                                + "            " + memoPlan.elemType() + " memo_val[" + memoPlan.slotCount() + "];\n"
+                                                + "            int base_ci = gx_c * stride_x + gz_c * stride_z;\n"
+                                                + "            for (int gy_c = gy_start; gy_c < gy_end; gy_c++) {\n"
+                                                + "                memo_mask &= " + Integer.toUnsignedString(memoPlan.keep2dMask()) + "u;\n"
+                                                + "                int c_by = noise_min_y + gy_c * cell_h;\n"
+                                                + "                int ci_pos = base_ci + gy_c;\n"
+                                                + ((useNativeFp64 && cornersPerChunk <= 2048)
+                                                        ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
+                                                                + "                double cv = eval_lifted_final_density_ir_f64(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n"
+                                                                + "                if (add_beard_delta != 0) cv += (double)c_corners[ci_pos];\n"
+                                                                + "                s_corners[ci_pos] = cv;\n"
+                                                                + "#else\n"
+                                                                + "                float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n"
+                                                                + "                if (add_beard_delta != 0) cv += c_corners[ci_pos];\n"
+                                                                + "                s_corners[ci_pos] = cv;\n"
+                                                                + "#endif\n")
+                                                        : ("                float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n"
+                                                                + "                if (add_beard_delta != 0) cv += c_corners[ci_pos];\n"
+                                                                + "                s_corners[ci_pos] = cv;\n"))
+                                                + "            }\n"
+                                                + "        }\n"
+                                                + "    } else {\n")
+                                        : ("    if (has_gpu_corners != 0) {\n"
+                                                + "        for (int ci = col; ci < " + cornersPerChunk + "; ci += 256) {\n"
+                                                + "            int gx_c = ci / stride_x;\n"
+                                                + "            int rem_c = ci - gx_c * stride_x;\n"
+                                                + "            int gz_c = rem_c / stride_z;\n"
+                                                + "            int gy_c = rem_c - gz_c * stride_z;\n"
+                                                + "            int c_bx = (chunk_x << 4) + gx_c * cell_w;\n"
+                                                + "            int c_by = noise_min_y + gy_c * cell_h;\n"
+                                                + "            int c_bz = (chunk_z << 4) + gz_c * cell_w;\n"
+                                                + ((useNativeFp64 && cornersPerChunk <= 2048)
+                                                        ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
+                                                                + "            double cv = eval_lifted_final_density_ir_f64(c_bx, c_by, c_bz, rule_ops);\n"
+                                                                + "            if (add_beard_delta != 0) cv += (double)c_corners[ci];\n"
+                                                                + "            s_corners[ci] = cv;\n"
+                                                                + "#else\n"
+                                                                + "            float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops);\n"
+                                                                + "            if (add_beard_delta != 0) cv += c_corners[ci];\n"
+                                                                + "            s_corners[ci] = cv;\n"
+                                                                + "#endif\n")
+                                                        : ("            float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops);\n"
+                                                                + "            if (add_beard_delta != 0) cv += c_corners[ci];\n"
+                                                                + "            s_corners[ci] = cv;\n"))
+                                                + "        }\n"
+                                                + "    } else {\n"))
                                         + "        for (int ci = col; ci < " + cornersPerChunk + "; ci += 256) {\n"
-                                        + "            int gx_c = ci / stride_x;\n"
-                                        + "            int rem_c = ci - gx_c * stride_x;\n"
-                                        + "            int gz_c = rem_c / stride_z;\n"
-                                        + "            int gy_c = rem_c - gz_c * stride_z;\n"
-                                        + "            int c_bx = (chunk_x << 4) + gx_c * cell_w;\n"
-                                        + "            int c_by = noise_min_y + gy_c * cell_h;\n"
-                                        + "            int c_bz = (chunk_z << 4) + gz_c * cell_w;\n"
                                         + ((useNativeFp64 && cornersPerChunk <= 2048)
                                                 ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
-                                                        + "            double cv = eval_lifted_final_density_ir_f64(c_bx, c_by, c_bz, rule_ops);\n"
-                                                        + "            if (add_beard_delta != 0) cv += (double)c_corners[ci];\n"
-                                                        + "            s_corners[ci] = cv;\n"
+                                                        + "            s_corners[ci] = (double)c_corners[ci];\n"
                                                         + "#else\n"
-                                                        + "            float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops);\n"
-                                                        + "            if (add_beard_delta != 0) cv += c_corners[ci];\n"
-                                                        + "            s_corners[ci] = cv;\n"
+                                                        + "            s_corners[ci] = c_corners[ci];\n"
                                                         + "#endif\n")
-                                                : ("            float cv = eval_lifted_final_density_ir(c_bx, c_by, c_bz, rule_ops);\n"
-                                                        + "            if (add_beard_delta != 0) cv += c_corners[ci];\n"
-                                                        + "            s_corners[ci] = cv;\n"))
+                                                : "            s_corners[ci] = c_corners[ci];\n")
                                         + "        }\n"
-                                        + "    } else {\n"))
-                                + "        for (int ci = col; ci < " + cornersPerChunk + "; ci += 256) {\n"
-                                + ((useNativeFp64 && cornersPerChunk <= 2048)
-                                        ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
-                                                + "            s_corners[ci] = (double)c_corners[ci];\n"
-                                                + "#else\n"
-                                                + "            s_corners[ci] = c_corners[ci];\n"
-                                                + "#endif\n")
-                                        : "            s_corners[ci] = c_corners[ci];\n")
-                                + "        }\n"
-                                + "    }\n"
-                                + "    barrier(CLK_LOCAL_MEM_FENCE);\n")
-                        : "    (void)has_gpu_corners; (void)add_beard_delta;\n")
+                                        + "    }\n"
+                                        + "    barrier(CLK_LOCAL_MEM_FENCE);\n")
+                                : "    (void)has_gpu_corners; (void)add_beard_delta;\n"))
                 + (includeGpuRtree
                         ? ("    if (skip_biome_io == 0 && has_quart_climate != 0 && rtree_node_count > 0) {\n"
                                 + "        int q_slice_stride = (has_halo_6x6 != 0) ? 36 : 16;\n"
@@ -5209,110 +5353,119 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 + "        int c10 = (gx + 1) * stride_x + gz * stride_z + cy;\n"
                 + "        int c01 = gx * stride_x + (gz + 1) * stride_z + cy;\n"
                 + "        int c11 = (gx + 1) * stride_x + (gz + 1) * stride_z + cy;\n"
-                + (gpuCornersSupported
-                        ? ((useNativeFp64 && cornersPerChunk <= 2048)
-                                ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
-                                        + "        double v000 = s_corners[c00], v001 = s_corners[c00 + 1];\n"
-                                        + "        double v100 = s_corners[c10], v101 = s_corners[c10 + 1];\n"
-                                        + "        double v010 = s_corners[c01], v011 = s_corners[c01 + 1];\n"
-                                        + "        double v110 = s_corners[c11], v111 = s_corners[c11 + 1];\n"
+                + (multiInterpGpuSupported
+                        ? emitMultiInterpGpuCellEval(
+                                interpChCount,
+                                cornersPerChunk,
+                                gpuInterpPlan.openClCombinerExprF32(),
+                                gpuInterpPlan.openClCombinerExprF64(),
+                                exactMode,
+                                useNativeFp64,
+                                useHybridSignBand)
+                        : ((gpuCornersSupported
+                                ? ((useNativeFp64 && cornersPerChunk <= 2048)
+                                        ? ("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
+                                                + "        double v000 = s_corners[c00], v001 = s_corners[c00 + 1];\n"
+                                                + "        double v100 = s_corners[c10], v101 = s_corners[c10 + 1];\n"
+                                                + "        double v010 = s_corners[c01], v011 = s_corners[c01 + 1];\n"
+                                                + "        double v110 = s_corners[c11], v111 = s_corners[c11 + 1];\n"
+                                                + "#else\n"
+                                                + "        float v000 = s_corners[c00], v001 = s_corners[c00 + 1];\n"
+                                                + "        float v100 = s_corners[c10], v101 = s_corners[c10 + 1];\n"
+                                                + "        float v010 = s_corners[c01], v011 = s_corners[c01 + 1];\n"
+                                                + "        float v110 = s_corners[c11], v111 = s_corners[c11 + 1];\n"
+                                                + "#endif\n")
+                                        : ("        float v000 = s_corners[c00], v001 = s_corners[c00 + 1];\n"
+                                                + "        float v100 = s_corners[c10], v101 = s_corners[c10 + 1];\n"
+                                                + "        float v010 = s_corners[c01], v011 = s_corners[c01 + 1];\n"
+                                                + "        float v110 = s_corners[c11], v111 = s_corners[c11 + 1];\n"))
+                                : ("        float v000 = c_corners[c00], v001 = c_corners[c00 + 1];\n"
+                                        + "        float v100 = c_corners[c10], v101 = c_corners[c10 + 1];\n"
+                                        + "        float v010 = c_corners[c01], v011 = c_corners[c01 + 1];\n"
+                                        + "        float v110 = c_corners[c11], v111 = c_corners[c11 + 1];\n"))
+                        + "        int cell_base_y = noise_min_y + cy * cell_h;\n"
+                        + (!exactMode
+                                ? ("        float min_c = fmin(fmin(fmin(v000, v001), fmin(v100, v101)), fmin(fmin(v010, v011), fmin(v110, v111)));\n"
+                                        + "        float max_c = fmax(fmax(fmax(v000, v001), fmax(v100, v101)), fmax(fmax(v010, v011), fmax(v110, v111)));\n"
+                                        + "        if (min_c > 0.0f && eval_veins == 0) {\n"
+                                        + "            for (int dy = cell_h - 1; dy >= 0; dy--) {\n"
+                                        + "                int wy = cell_base_y + dy;\n"
+                                        + "                int s_idx = (wy - chunk_min_y) >> 4;\n"
+                                        + "                if (s_idx < 0 || s_idx >= sec_count) continue;\n"
+                                        + "                if (wy > raw_top_y) raw_top_y = wy;\n"
+                                        + "                c_out_sections[(s_idx << 12) | ((wy & 15) << 8) | col] = default_block;\n"
+                                        + "            }\n"
+                                        + "            continue;\n"
+                                        + "        }\n"
+                                        + "        if (max_c <= 0.0f && aquifers_enabled == 0 && deep_lava_enabled == 0 && (default_fluid <= 0 || cell_base_y > sea_level)) {\n"
+                                        + "            continue;\n"
+                                        + "        }\n")
+                                : "")
+                        + "        for (int dy = cell_h - 1; dy >= 0; dy--) {\n"
+                        + "            int wy = cell_base_y + dy;\n"
+                        + "            int s_idx = (wy - chunk_min_y) >> 4;\n"
+                        + "            if (s_idx < 0 || s_idx >= sec_count) continue;\n"
+                        + (useNativeFp64
+                                ? ("            float dens;\n"
+                                        + "            int solid_sign;\n"
+                                        + "#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
+                                        + "            double fy64 = (double)dy / (double)cell_h;\n"
+                                        + "            double fx64 = (double)dx / (double)cell_w;\n"
+                                        + "            double fz64 = (double)dz / (double)cell_w;\n"
+                                        + "            double x00_64 = (double)v000 + ((double)v001 - (double)v000) * fy64;\n"
+                                        + "            double x10_64 = (double)v100 + ((double)v101 - (double)v100) * fy64;\n"
+                                        + "            double x01_64 = (double)v010 + ((double)v011 - (double)v010) * fy64;\n"
+                                        + "            double x11_64 = (double)v110 + ((double)v111 - (double)v110) * fy64;\n"
+                                        + "            double z0_64 = x00_64 + (x10_64 - x00_64) * fx64;\n"
+                                        + "            double z1_64 = x01_64 + (x11_64 - x01_64) * fx64;\n"
+                                        + "            double dens64 = z0_64 + (z1_64 - z0_64) * fz64;\n"
+                                        + "            dens = (float)dens64;\n"
+                                        + "            solid_sign = (dens64 > 0.0) ? 1 : 0;\n"
                                         + "#else\n"
-                                        + "        float v000 = s_corners[c00], v001 = s_corners[c00 + 1];\n"
-                                        + "        float v100 = s_corners[c10], v101 = s_corners[c10 + 1];\n"
-                                        + "        float v010 = s_corners[c01], v011 = s_corners[c01 + 1];\n"
-                                        + "        float v110 = s_corners[c11], v111 = s_corners[c11 + 1];\n"
-                                        + "#endif\n")
-                                : ("        float v000 = s_corners[c00], v001 = s_corners[c00 + 1];\n"
-                                        + "        float v100 = s_corners[c10], v101 = s_corners[c10 + 1];\n"
-                                        + "        float v010 = s_corners[c01], v011 = s_corners[c01 + 1];\n"
-                                        + "        float v110 = s_corners[c11], v111 = s_corners[c11 + 1];\n"))
-                        : ("        float v000 = c_corners[c00], v001 = c_corners[c00 + 1];\n"
-                                + "        float v100 = c_corners[c10], v101 = c_corners[c10 + 1];\n"
-                                + "        float v010 = c_corners[c01], v011 = c_corners[c01 + 1];\n"
-                                + "        float v110 = c_corners[c11], v111 = c_corners[c11 + 1];\n"))
-                + "        int cell_base_y = noise_min_y + cy * cell_h;\n"
-                + (!exactMode
-                        ? ("        float min_c = fmin(fmin(fmin(v000, v001), fmin(v100, v101)), fmin(fmin(v010, v011), fmin(v110, v111)));\n"
-                                + "        float max_c = fmax(fmax(fmax(v000, v001), fmax(v100, v101)), fmax(fmax(v010, v011), fmax(v110, v111)));\n"
-                                + "        if (min_c > 0.0f && eval_veins == 0) {\n"
-                                + "            for (int dy = cell_h - 1; dy >= 0; dy--) {\n"
-                                + "                int wy = cell_base_y + dy;\n"
-                                + "                int s_idx = (wy - chunk_min_y) >> 4;\n"
-                                + "                if (s_idx < 0 || s_idx >= sec_count) continue;\n"
-                                + "                if (wy > raw_top_y) raw_top_y = wy;\n"
-                                + "                c_out_sections[(s_idx << 12) | ((wy & 15) << 8) | col] = default_block;\n"
-                                + "            }\n"
-                                + "            continue;\n"
-                                + "        }\n"
-                                + "        if (max_c <= 0.0f && aquifers_enabled == 0 && deep_lava_enabled == 0 && (default_fluid <= 0 || cell_base_y > sea_level)) {\n"
-                                + "            continue;\n"
-                                + "        }\n")
-                        : "")
-                + "        for (int dy = cell_h - 1; dy >= 0; dy--) {\n"
-                + "            int wy = cell_base_y + dy;\n"
-                + "            int s_idx = (wy - chunk_min_y) >> 4;\n"
-                + "            if (s_idx < 0 || s_idx >= sec_count) continue;\n"
-                + (useNativeFp64
-                        ? ("            float dens;\n"
-                                + "            int solid_sign;\n"
-                                + "#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n"
-                                + "            double fy64 = (double)dy / (double)cell_h;\n"
-                                + "            double fx64 = (double)dx / (double)cell_w;\n"
-                                + "            double fz64 = (double)dz / (double)cell_w;\n"
-                                + "            double x00_64 = (double)v000 + ((double)v001 - (double)v000) * fy64;\n"
-                                + "            double x10_64 = (double)v100 + ((double)v101 - (double)v100) * fy64;\n"
-                                + "            double x01_64 = (double)v010 + ((double)v011 - (double)v010) * fy64;\n"
-                                + "            double x11_64 = (double)v110 + ((double)v111 - (double)v110) * fy64;\n"
-                                + "            double z0_64 = x00_64 + (x10_64 - x00_64) * fx64;\n"
-                                + "            double z1_64 = x01_64 + (x11_64 - x01_64) * fx64;\n"
-                                + "            double dens64 = z0_64 + (z1_64 - z0_64) * fz64;\n"
-                                + "            dens = (float)dens64;\n"
-                                + "            solid_sign = (dens64 > 0.0) ? 1 : 0;\n"
-                                + "#else\n"
-                                + "            float fy = (float)dy * inv_cell_h;\n"
-                                + "            float x00 = v000 + (v001 - v000) * fy;\n"
-                                + "            float x10 = v100 + (v101 - v100) * fy;\n"
-                                + "            float x01 = v010 + (v011 - v010) * fy;\n"
-                                + "            float x11 = v110 + (v111 - v110) * fy;\n"
-                                + "            float z0 = x00 + (x10 - x00) * fx;\n"
-                                + "            float z1 = x01 + (x11 - x01) * fx;\n"
-                                + "            dens = z0 + (z1 - z0) * fz;\n"
-                                + "            float corner_mag = fabs(v000) + fabs(v001) + fabs(v100) + fabs(v101) + fabs(v010) + fabs(v011) + fabs(v110) + fabs(v111);\n"
-                                + "            if (corner_mag > 1.0e-6f && fabs(dens) <= fmax(CAP_EXACT_SIGN_UNCERTAINTY_EPS, corner_mag * CAP_EXACT_SIGN_UNCERTAINTY_EPS)) {\n"
-                                + "                uncertain_sign_flag = CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG;\n"
-                                + "            }\n"
-                                + "            solid_sign = (dens > 0.0f) ? 1 : 0;\n"
-                                + "#endif\n"
-                                + "            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n"
-                                + "            int vox = 0;\n"
-                                + "            if (solid_sign != 0) {\n")
-                        : (useHybridSignBand
-                                ? ("            float fy = (float)dy * inv_cell_h;\n"
+                                        + "            float fy = (float)dy * inv_cell_h;\n"
                                         + "            float x00 = v000 + (v001 - v000) * fy;\n"
                                         + "            float x10 = v100 + (v101 - v100) * fy;\n"
                                         + "            float x01 = v010 + (v011 - v010) * fy;\n"
                                         + "            float x11 = v110 + (v111 - v110) * fy;\n"
                                         + "            float z0 = x00 + (x10 - x00) * fx;\n"
                                         + "            float z1 = x01 + (x11 - x01) * fx;\n"
-                                        + "            float dens = z0 + (z1 - z0) * fz;\n"
+                                        + "            dens = z0 + (z1 - z0) * fz;\n"
                                         + "            float corner_mag = fabs(v000) + fabs(v001) + fabs(v100) + fabs(v101) + fabs(v010) + fabs(v011) + fabs(v110) + fabs(v111);\n"
                                         + "            if (corner_mag > 1.0e-6f && fabs(dens) <= fmax(CAP_EXACT_SIGN_UNCERTAINTY_EPS, corner_mag * CAP_EXACT_SIGN_UNCERTAINTY_EPS)) {\n"
                                         + "                uncertain_sign_flag = CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG;\n"
                                         + "            }\n"
+                                        + "            solid_sign = (dens > 0.0f) ? 1 : 0;\n"
+                                        + "#endif\n"
                                         + "            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n"
                                         + "            int vox = 0;\n"
-                                        + "            if (dens > 0.0f) {\n")
-                                : ("            float fy = (float)dy * inv_cell_h;\n"
-                                        + "            float x00 = v000 + (v001 - v000) * fy;\n"
-                                        + "            float x10 = v100 + (v101 - v100) * fy;\n"
-                                        + "            float x01 = v010 + (v011 - v010) * fy;\n"
-                                        + "            float x11 = v110 + (v111 - v110) * fy;\n"
-                                        + "            float z0 = x00 + (x10 - x00) * fx;\n"
-                                        + "            float z1 = x01 + (x11 - x01) * fx;\n"
-                                        + "            float dens = z0 + (z1 - z0) * fz;\n"
-                                        + "            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n"
-                                        + "            int vox = 0;\n"
-                                        + "            if (dens > 0.0f) {\n")))
+                                        + "            if (solid_sign != 0) {\n")
+                                : (useHybridSignBand
+                                        ? ("            float fy = (float)dy * inv_cell_h;\n"
+                                                + "            float x00 = v000 + (v001 - v000) * fy;\n"
+                                                + "            float x10 = v100 + (v101 - v100) * fy;\n"
+                                                + "            float x01 = v010 + (v011 - v010) * fy;\n"
+                                                + "            float x11 = v110 + (v111 - v110) * fy;\n"
+                                                + "            float z0 = x00 + (x10 - x00) * fx;\n"
+                                                + "            float z1 = x01 + (x11 - x01) * fx;\n"
+                                                + "            float dens = z0 + (z1 - z0) * fz;\n"
+                                                + "            float corner_mag = fabs(v000) + fabs(v001) + fabs(v100) + fabs(v101) + fabs(v010) + fabs(v011) + fabs(v110) + fabs(v111);\n"
+                                                + "            if (corner_mag > 1.0e-6f && fabs(dens) <= fmax(CAP_EXACT_SIGN_UNCERTAINTY_EPS, corner_mag * CAP_EXACT_SIGN_UNCERTAINTY_EPS)) {\n"
+                                                + "                uncertain_sign_flag = CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG;\n"
+                                                + "            }\n"
+                                                + "            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n"
+                                                + "            int vox = 0;\n"
+                                                + "            if (dens > 0.0f) {\n")
+                                        : ("            float fy = (float)dy * inv_cell_h;\n"
+                                                + "            float x00 = v000 + (v001 - v000) * fy;\n"
+                                                + "            float x10 = v100 + (v101 - v100) * fy;\n"
+                                                + "            float x01 = v010 + (v011 - v010) * fy;\n"
+                                                + "            float x11 = v110 + (v111 - v110) * fy;\n"
+                                                + "            float z0 = x00 + (x10 - x00) * fx;\n"
+                                                + "            float z1 = x01 + (x11 - x01) * fx;\n"
+                                                + "            float dens = z0 + (z1 - z0) * fz;\n"
+                                                + "            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n"
+                                                + "            int vox = 0;\n"
+                                                + "            if (dens > 0.0f) {\n")))))
                 + "                vox = default_block;\n"
                 + "                if (wy > raw_top_y) raw_top_y = wy;\n"
                 + "                if (eval_veins != 0 && ((wy >= " + rv.upperMinY() + " && wy <= " + rv.upperMaxY()
@@ -5760,5 +5913,213 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 + "        }\n"
                 + "        barrier(CLK_GLOBAL_MEM_FENCE);\n"
                 + "    }\n";
+    }
+
+    private static String emitMultiInterpGpuCornerFill(
+            int interpChCount,
+            int cornersPerChunk,
+            int cols2dPre,
+            int cellsZ,
+            int strideZ,
+            boolean useNativeFp64,
+            DiamondMemoPlan memoPlan
+    ) {
+        boolean fp64Local = useNativeFp64 && (interpChCount * cornersPerChunk * 8) <= 28672;
+        StringBuilder sb = new StringBuilder(2048);
+        sb.append("    if (has_gpu_corners != 0) {\n");
+        if (memoPlan.isActive()) {
+            sb.append("        int bands_per_col = 256 / ").append(cols2dPre).append(";\n")
+                    .append("        if (bands_per_col < 1) bands_per_col = 1;\n")
+                    .append("        int active_threads = ").append(cols2dPre).append(" * bands_per_col;\n")
+                    .append("        if (col < active_threads) {\n")
+                    .append("            int col2d = col / bands_per_col;\n")
+                    .append("            int band_y = col - col2d * bands_per_col;\n")
+                    .append("            int gx_c = col2d / ").append(cellsZ + 1).append(";\n")
+                    .append("            int gz_c = col2d - gx_c * ").append(cellsZ + 1).append(";\n")
+                    .append("            int c_bx = (chunk_x << 4) + gx_c * cell_w;\n")
+                    .append("            int c_bz = (chunk_z << 4) + gz_c * cell_w;\n")
+                    .append("            int y_per_band = (").append(strideZ).append(" + bands_per_col - 1) / bands_per_col;\n")
+                    .append("            int gy_start = band_y * y_per_band;\n")
+                    .append("            int gy_end = gy_start + y_per_band;\n")
+                    .append("            if (gy_end > ").append(strideZ).append(") gy_end = ").append(strideZ).append(";\n")
+                    .append("            uint memo_mask = 0u;\n")
+                    .append("            ").append(memoPlan.elemType()).append(" memo_val[").append(memoPlan.slotCount()).append("];\n")
+                    .append("            int base_ci = gx_c * stride_x + gz_c * stride_z;\n")
+                    .append("            for (int gy_c = gy_start; gy_c < gy_end; gy_c++) {\n")
+                    .append("                memo_mask &= ").append(Integer.toUnsignedString(memoPlan.keep2dMask())).append("u;\n")
+                    .append("                int c_by = noise_min_y + gy_c * cell_h;\n")
+                    .append("                int ci_pos = base_ci + gy_c;\n");
+            if (fp64Local) {
+                sb.append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
+                        .append("                s_interp_ch[ci_pos] = eval_lifted_interp_ch_0_f64(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n")
+                        .append("#else\n")
+                        .append("                s_interp_ch[ci_pos] = eval_lifted_interp_ch_0(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n")
+                        .append("#endif\n");
+            } else {
+                sb.append("                s_interp_ch[ci_pos] = eval_lifted_interp_ch_0(c_bx, c_by, c_bz, rule_ops, &memo_mask, memo_val);\n");
+            }
+            sb.append("            }\n")
+                    .append("        }\n");
+        } else {
+            sb.append("        for (int ci = col; ci < ").append(cornersPerChunk).append("; ci += 256) {\n")
+                    .append("            int gx_c = ci / stride_x;\n")
+                    .append("            int rem_c = ci - gx_c * stride_x;\n")
+                    .append("            int gz_c = rem_c / stride_z;\n")
+                    .append("            int gy_c = rem_c - gz_c * stride_z;\n")
+                    .append("            int c_bx = (chunk_x << 4) + gx_c * cell_w;\n")
+                    .append("            int c_by = noise_min_y + gy_c * cell_h;\n")
+                    .append("            int c_bz = (chunk_z << 4) + gz_c * cell_w;\n");
+            if (fp64Local) {
+                sb.append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
+                        .append("            s_interp_ch[ci] = eval_lifted_interp_ch_0_f64(c_bx, c_by, c_bz, rule_ops);\n")
+                        .append("#else\n")
+                        .append("            s_interp_ch[ci] = eval_lifted_interp_ch_0(c_bx, c_by, c_bz, rule_ops);\n")
+                        .append("#endif\n");
+            } else {
+                sb.append("            s_interp_ch[ci] = eval_lifted_interp_ch_0(c_bx, c_by, c_bz, rule_ops);\n");
+            }
+            sb.append("        }\n");
+        }
+        if (interpChCount > 1) {
+            sb.append("        for (int ci = col; ci < ").append(cornersPerChunk).append("; ci += 256) {\n")
+                    .append("            int gx_c = ci / stride_x;\n")
+                    .append("            int rem_c = ci - gx_c * stride_x;\n")
+                    .append("            int gz_c = rem_c / stride_z;\n")
+                    .append("            int gy_c = rem_c - gz_c * stride_z;\n")
+                    .append("            int c_bx = (chunk_x << 4) + gx_c * cell_w;\n")
+                    .append("            int c_by = noise_min_y + gy_c * cell_h;\n")
+                    .append("            int c_bz = (chunk_z << 4) + gz_c * cell_w;\n");
+            for (int ch = 1; ch < interpChCount; ch++) {
+                int off = ch * cornersPerChunk;
+                if (fp64Local) {
+                    sb.append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
+                            .append("            s_interp_ch[").append(off).append(" + ci] = eval_lifted_interp_ch_").append(ch).append("_f64(c_bx, c_by, c_bz, rule_ops);\n")
+                            .append("#else\n")
+                            .append("            s_interp_ch[").append(off).append(" + ci] = eval_lifted_interp_ch_").append(ch).append("(c_bx, c_by, c_bz, rule_ops);\n")
+                            .append("#endif\n");
+                } else {
+                    sb.append("            s_interp_ch[").append(off).append(" + ci] = eval_lifted_interp_ch_").append(ch).append("(c_bx, c_by, c_bz, rule_ops);\n");
+                }
+            }
+            sb.append("        }\n");
+        }
+        sb.append("    } else {\n")
+                .append("        for (int ci = col; ci < ").append(cornersPerChunk).append("; ci += 256) {\n")
+                .append("            s_interp_ch[ci] = c_corners[ci];\n")
+                .append("        }\n")
+                .append("    }\n")
+                .append("    barrier(CLK_LOCAL_MEM_FENCE);\n");
+        return sb.toString();
+    }
+
+    private static String emitMultiInterpGpuCellEval(
+            int interpChCount,
+            int cornersPerChunk,
+            String combinerF32,
+            String combinerF64,
+            boolean exactMode,
+            boolean useNativeFp64,
+            boolean useHybridSignBand
+    ) {
+        boolean fp64Local = useNativeFp64 && (interpChCount * cornersPerChunk * 8) <= 28672;
+        StringBuilder sb = new StringBuilder(1536);
+        sb.append("        int cell_base_y = noise_min_y + cy * cell_h;\n")
+                .append("        for (int dy = cell_h - 1; dy >= 0; dy--) {\n")
+                .append("            int wy = cell_base_y + dy;\n")
+                .append("            int s_idx = (wy - chunk_min_y) >> 4;\n")
+                .append("            if (s_idx < 0 || s_idx >= sec_count) continue;\n");
+        if (fp64Local) {
+            sb.append("            float dens;\n")
+                    .append("            int solid_sign;\n")
+                    .append("#if defined(LEAFGEN_EXACT_NATIVE_FP64) && defined(cl_khr_fp64)\n")
+                    .append("            double fy64 = (double)dy / (double)cell_h;\n")
+                    .append("            double fx64 = (double)dx / (double)cell_w;\n")
+                    .append("            double fz64 = (double)dz / (double)cell_w;\n")
+                    .append("            double dens64;\n")
+                    .append("            if (has_gpu_corners != 0) {\n")
+                    .append("                double ch[").append(interpChCount).append("];\n")
+                    .append("                for (int k = 0; k < ").append(interpChCount).append("; k++) {\n")
+                    .append("                    int base = k * ").append(cornersPerChunk).append(";\n")
+                    .append("                    double x00 = s_interp_ch[base + c00] + (s_interp_ch[base + c00 + 1] - s_interp_ch[base + c00]) * fy64;\n")
+                    .append("                    double x10 = s_interp_ch[base + c10] + (s_interp_ch[base + c10 + 1] - s_interp_ch[base + c10]) * fy64;\n")
+                    .append("                    double x01 = s_interp_ch[base + c01] + (s_interp_ch[base + c01 + 1] - s_interp_ch[base + c01]) * fy64;\n")
+                    .append("                    double x11 = s_interp_ch[base + c11] + (s_interp_ch[base + c11 + 1] - s_interp_ch[base + c11]) * fy64;\n")
+                    .append("                    double z0 = x00 + (x10 - x00) * fx64;\n")
+                    .append("                    double z1 = x01 + (x11 - x01) * fx64;\n")
+                    .append("                    ch[k] = z0 + (z1 - z0) * fz64;\n")
+                    .append("                }\n")
+                    .append("                dens64 = (").append(combinerF64).append(");\n")
+                    .append("                if (add_beard_delta != 0) {\n")
+                    .append("                    double bx00 = (double)c_corners[c00] + ((double)c_corners[c00 + 1] - (double)c_corners[c00]) * fy64;\n")
+                    .append("                    double bx10 = (double)c_corners[c10] + ((double)c_corners[c10 + 1] - (double)c_corners[c10]) * fy64;\n")
+                    .append("                    double bx01 = (double)c_corners[c01] + ((double)c_corners[c01 + 1] - (double)c_corners[c01]) * fy64;\n")
+                    .append("                    double bx11 = (double)c_corners[c11] + ((double)c_corners[c11 + 1] - (double)c_corners[c11]) * fy64;\n")
+                    .append("                    double bz0 = bx00 + (bx10 - bx00) * fx64;\n")
+                    .append("                    double bz1 = bx01 + (bx11 - bx01) * fx64;\n")
+                    .append("                    dens64 += bz0 + (bz1 - bz0) * fz64;\n")
+                    .append("                }\n")
+                    .append("            } else {\n")
+                    .append("                double x00 = s_interp_ch[c00] + (s_interp_ch[c00 + 1] - s_interp_ch[c00]) * fy64;\n")
+                    .append("                double x10 = s_interp_ch[c10] + (s_interp_ch[c10 + 1] - s_interp_ch[c10]) * fy64;\n")
+                    .append("                double x01 = s_interp_ch[c01] + (s_interp_ch[c01 + 1] - s_interp_ch[c01]) * fy64;\n")
+                    .append("                double x11 = s_interp_ch[c11] + (s_interp_ch[c11 + 1] - s_interp_ch[c11]) * fy64;\n")
+                    .append("                double z0 = x00 + (x10 - x00) * fx64;\n")
+                    .append("                double z1 = x01 + (x11 - x01) * fx64;\n")
+                    .append("                dens64 = z0 + (z1 - z0) * fz64;\n")
+                    .append("            }\n")
+                    .append("            dens = (float)dens64;\n")
+                    .append("            solid_sign = (dens64 > 0.0) ? 1 : 0;\n")
+                    .append("#else\n");
+        }
+        sb.append("            float fy = (float)dy * inv_cell_h;\n")
+                .append(fp64Local ? "" : "            float dens;\n")
+                .append("            if (has_gpu_corners != 0) {\n")
+                .append("                float ch[").append(interpChCount).append("];\n")
+                .append("                for (int k = 0; k < ").append(interpChCount).append("; k++) {\n")
+                .append("                    int base = k * ").append(cornersPerChunk).append(";\n")
+                .append("                    float x00 = (float)s_interp_ch[base + c00] + ((float)s_interp_ch[base + c00 + 1] - (float)s_interp_ch[base + c00]) * fy;\n")
+                .append("                    float x10 = (float)s_interp_ch[base + c10] + ((float)s_interp_ch[base + c10 + 1] - (float)s_interp_ch[base + c10]) * fy;\n")
+                .append("                    float x01 = (float)s_interp_ch[base + c01] + ((float)s_interp_ch[base + c01 + 1] - (float)s_interp_ch[base + c01]) * fy;\n")
+                .append("                    float x11 = (float)s_interp_ch[base + c11] + ((float)s_interp_ch[base + c11 + 1] - (float)s_interp_ch[base + c11]) * fy;\n")
+                .append("                    float z0 = x00 + (x10 - x00) * fx;\n")
+                .append("                    float z1 = x01 + (x11 - x01) * fx;\n")
+                .append("                    ch[k] = z0 + (z1 - z0) * fz;\n")
+                .append("                }\n")
+                .append("                dens = (").append(combinerF32).append(");\n")
+                .append("                if (add_beard_delta != 0) {\n")
+                .append("                    float bx00 = c_corners[c00] + (c_corners[c00 + 1] - c_corners[c00]) * fy;\n")
+                .append("                    float bx10 = c_corners[c10] + (c_corners[c10 + 1] - c_corners[c10]) * fy;\n")
+                .append("                    float bx01 = c_corners[c01] + (c_corners[c01 + 1] - c_corners[c01]) * fy;\n")
+                .append("                    float bx11 = c_corners[c11] + (c_corners[c11 + 1] - c_corners[c11]) * fy;\n")
+                .append("                    float bz0 = bx00 + (bx10 - bx00) * fx;\n")
+                .append("                    float bz1 = bx01 + (bx11 - bx01) * fx;\n")
+                .append("                    dens += bz0 + (bz1 - bz0) * fz;\n")
+                .append("                }\n")
+                .append("            } else {\n")
+                .append("                float x00 = (float)s_interp_ch[c00] + ((float)s_interp_ch[c00 + 1] - (float)s_interp_ch[c00]) * fy;\n")
+                .append("                float x10 = (float)s_interp_ch[c10] + ((float)s_interp_ch[c10 + 1] - (float)s_interp_ch[c10]) * fy;\n")
+                .append("                float x01 = (float)s_interp_ch[c01] + ((float)s_interp_ch[c01 + 1] - (float)s_interp_ch[c01]) * fy;\n")
+                .append("                float x11 = (float)s_interp_ch[c11] + ((float)s_interp_ch[c11 + 1] - (float)s_interp_ch[c11]) * fy;\n")
+                .append("                float z0 = x00 + (x10 - x00) * fx;\n")
+                .append("                float z1 = x01 + (x11 - x01) * fx;\n")
+                .append("                dens = z0 + (z1 - z0) * fz;\n")
+                .append("            }\n");
+        if (exactMode && (fp64Local || useHybridSignBand)) {
+            sb.append("            if (fabs(dens) <= CAP_EXACT_SIGN_UNCERTAINTY_EPS) {\n")
+                    .append("                uncertain_sign_flag = CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG;\n")
+                    .append("            }\n");
+        }
+        if (fp64Local) {
+            sb.append("            solid_sign = (dens > 0.0f) ? 1 : 0;\n")
+                    .append("#endif\n")
+                    .append("            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n")
+                    .append("            int vox = 0;\n")
+                    .append("            if (solid_sign != 0) {\n");
+        } else {
+            sb.append("            int flat_idx = (s_idx << 12) | ((wy & 15) << 8) | col;\n")
+                    .append("            int vox = 0;\n")
+                    .append("            if (dens > 0.0f) {\n");
+        }
+        return sb.toString();
     }
 }

@@ -1179,6 +1179,73 @@ public final class LiftedWorldgenCapabilityTables {
         default BytecodeConceptIr.ConceptModule conceptModule() {
             return null;
         }
+
+        /**
+         * Returns the multi-channel {@link InterpolatedDensityPlan} when this density function
+         * contains one or more {@code INTERPOLATED} subtrees combined by per-voxel operators
+         * (e.g. {@code squeeze}, {@code range_choice}, {@code abs}, {@code min} for noodle caves),
+         * or {@code null} to use single-grid corner interpolation.
+         */
+        default InterpolatedDensityPlan interpolatedPlan() {
+            return null;
+        }
+    }
+
+    /**
+     * Per-voxel combiner evaluated over the trilinearly interpolated values of each
+     * {@code INTERPOLATED} channel in a {@link DensityFieldEvaluator} DAG.
+     */
+    @FunctionalInterface
+    public interface InterpolatedCombiner {
+        double combine(double[] interpolatedValues, int blockX, int blockY, int blockZ);
+    }
+
+    /**
+     * Multi-channel cell-interpolation plan mirroring vanilla {@code NoiseChunk}'s separate
+     * {@code NoiseInterpolator} instances so post-interpolation operators and {@code Beardifier}
+     * execute per voxel instead of being approximated by coarse cell-corner trilinear lerp.
+     */
+    public record InterpolatedDensityPlan(
+            DensityFieldEvaluator[] channels,
+            InterpolatedCombiner combiner,
+            String openClCombinerExprF32,
+            String openClCombinerExprF64
+    ) {
+        public InterpolatedDensityPlan {
+            Objects.requireNonNull(channels, "channels");
+            Objects.requireNonNull(combiner, "combiner");
+        }
+
+        public InterpolatedDensityPlan(DensityFieldEvaluator[] channels, InterpolatedCombiner combiner) {
+            this(channels, combiner, null, null);
+        }
+    }
+
+    /**
+     * Pure-IR multi-channel density interpolation descriptor for OpenCL GPU kernel emission.
+     */
+    public record InterpolatedDensityGpuPlan(
+            BytecodeConceptIr.ConceptModule[] channelModules,
+            String openClCombinerExprF32,
+            String openClCombinerExprF64
+    ) {
+        public InterpolatedDensityGpuPlan {
+            Objects.requireNonNull(channelModules, "channelModules");
+            Objects.requireNonNull(openClCombinerExprF32, "openClCombinerExprF32");
+            Objects.requireNonNull(openClCombinerExprF64, "openClCombinerExprF64");
+        }
+
+        public boolean isValid() {
+            if (channelModules.length == 0 || openClCombinerExprF32.isBlank() || openClCombinerExprF64.isBlank()) {
+                return false;
+            }
+            for (BytecodeConceptIr.ConceptModule m : channelModules) {
+                if (m == null || m.entryFunction() == null || !m.isPureCompute() || !m.unmappedReasons().isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     /** Mojang {@code Aquifer$NoiseBasedAquifer} dry-cell fluid-level sentinel ({@code -32512}). */
@@ -4528,7 +4595,9 @@ public final class LiftedWorldgenCapabilityTables {
             GpuRouterNoiseTable gpuNoiseTable,
             LiftedPlacedFeatureSpec[] placedFeatureSpecs,
             long[] nonMotionBlockingSlotMask,
-            BytecodeConceptIr.ConceptModule finalDensityModule
+            BytecodeConceptIr.ConceptModule finalDensityModule,
+            InterpolatedDensityGpuPlan interpolatedDensityGpuPlan,
+            List<CompiledVoxelEffectStage> compiledVoxelEffectStages
     ) {
         private static final LiftedPlacedFeatureSpec[] EMPTY_PLACED_SPECS = new LiftedPlacedFeatureSpec[0];
         private static final long[] EMPTY_SLOT_MASK = new long[0];
@@ -4546,6 +4615,66 @@ public final class LiftedWorldgenCapabilityTables {
             if (nonMotionBlockingSlotMask == null) {
                 nonMotionBlockingSlotMask = EMPTY_SLOT_MASK;
             }
+            if (compiledVoxelEffectStages == null) {
+                compiledVoxelEffectStages = List.of();
+            } else {
+                compiledVoxelEffectStages = List.copyOf(compiledVoxelEffectStages);
+            }
+        }
+
+        public boolean hasInterpolatedDensityGpuPlan() {
+            return interpolatedDensityGpuPlan != null && interpolatedDensityGpuPlan.isValid();
+        }
+
+        public DimensionCapabilitySpec(
+                int chunkMinY,
+                int chunkSections,
+                int noiseMinY,
+                int noiseHeight,
+                int cellWidth,
+                int cellHeight,
+                int seaLevel,
+                int defaultBlockSlot,
+                int defaultFluidSlot,
+                boolean aquifersEnabled,
+                int lavaFluidSlot,
+                int deepLavaFloorY,
+                int[] flatRTreeNodes,
+                BytecodeConceptIr.ConceptModule surfaceRuleModule,
+                CarverSpec[] carverSpecs,
+                BiomeFeatureSpec[] featureSpecs,
+                OreVeinSpec[] oreSpecs,
+                RouterVeinSpec routerVeinSpec,
+                GpuRouterNoiseTable gpuNoiseTable,
+                LiftedPlacedFeatureSpec[] placedFeatureSpecs,
+                long[] nonMotionBlockingSlotMask,
+                BytecodeConceptIr.ConceptModule finalDensityModule
+        ) {
+            this(
+                    chunkMinY,
+                    chunkSections,
+                    noiseMinY,
+                    noiseHeight,
+                    cellWidth,
+                    cellHeight,
+                    seaLevel,
+                    defaultBlockSlot,
+                    defaultFluidSlot,
+                    aquifersEnabled,
+                    lavaFluidSlot,
+                    deepLavaFloorY,
+                    flatRTreeNodes,
+                    surfaceRuleModule,
+                    carverSpecs,
+                    featureSpecs,
+                    oreSpecs,
+                    routerVeinSpec,
+                    gpuNoiseTable,
+                    placedFeatureSpecs,
+                    nonMotionBlockingSlotMask,
+                    finalDensityModule,
+                    null,
+                    List.of());
         }
 
         public boolean hasSurfaceRuleModule() {
@@ -7060,9 +7189,75 @@ public final class LiftedWorldgenCapabilityTables {
         int cellsY = Math.max(1, spec.noiseHeight() / cellH);
         int strideZ = cellsY + 1;
         int strideX = (cellsZ + 1) * strideZ;
-        float[] corners = exactMode ? null : new float[(cellsX + 1) * strideX];
-        double[] cornersFp64 = exactMode ? new double[(cellsX + 1) * strideX] : null;
-        if (exactMode) {
+        InterpolatedDensityPlan interpPlan = densityEval.interpolatedPlan();
+        boolean useMultiInterp = interpPlan != null && interpPlan.channels().length > 0;
+        int interpChCount = useMultiInterp ? interpPlan.channels().length : 0;
+        double[][] chCornersFp64 = (useMultiInterp && exactMode)
+                ? new double[interpChCount][(cellsX + 1) * strideX]
+                : null;
+        float[][] chCornersFp32 = (useMultiInterp && !exactMode)
+                ? new float[interpChCount][(cellsX + 1) * strideX]
+                : null;
+        float[] corners = (!useMultiInterp && !exactMode) ? new float[(cellsX + 1) * strideX] : null;
+        double[] cornersFp64 = (!useMultiInterp && exactMode) ? new double[(cellsX + 1) * strideX] : null;
+        int[] effectiveBeardPieces = null;
+        int beardPieceCount = 0;
+        int minBeardY = Integer.MAX_VALUE;
+        int maxBeardY = Integer.MIN_VALUE;
+        if (useMultiInterp) {
+            if (exactMode) {
+                for (int ch = 0; ch < interpChCount; ch++) {
+                    DensityFieldEvaluator chEval = interpPlan.channels()[ch];
+                    double[] dst = chCornersFp64[ch];
+                    for (int gx = 0; gx <= cellsX; gx++) {
+                        int bx = chunkBaseBx + gx * cellW;
+                        for (int gz = 0; gz <= cellsZ; gz++) {
+                            int bz = chunkBaseBz + gz * cellW;
+                            int colOff = gx * strideX + gz * strideZ;
+                            chEval.sampleColumnYFp64(bx, noiseMinY, cellH, cellsY + 1, bz, dst, colOff);
+                        }
+                    }
+                }
+            } else {
+                for (int ch = 0; ch < interpChCount; ch++) {
+                    DensityFieldEvaluator chEval = interpPlan.channels()[ch];
+                    float[] dst = chCornersFp32[ch];
+                    for (int gx = 0; gx <= cellsX; gx++) {
+                        int bx = chunkBaseBx + gx * cellW;
+                        for (int gz = 0; gz <= cellsZ; gz++) {
+                            int bz = chunkBaseBz + gz * cellW;
+                            int colOff = gx * strideX + gz * strideZ;
+                            chEval.sampleColumnY(bx, noiseMinY, cellH, cellsY + 1, bz, dst, colOff);
+                        }
+                    }
+                }
+            }
+            if (beardPiecesI32 != null && beardPiecesI32.length >= 8) {
+                beardPieceCount = beardPiecesI32.length >>> 3;
+                effectiveBeardPieces = beardPiecesI32;
+                for (int i = 0; i < beardPieceCount; i++) {
+                    int p = i << 3;
+                    int w6 = beardPiecesI32[p + 6];
+                    int tAdj = w6 & 255;
+                    if (tAdj == WorldgenKernelSwapper.BEARD_NONE) {
+                        continue;
+                    }
+                    if (tAdj == WorldgenKernelSwapper.BEARD_THIN) {
+                        if (effectiveBeardPieces == beardPiecesI32) {
+                            effectiveBeardPieces = beardPiecesI32.clone();
+                        }
+                        effectiveBeardPieces[p + 1] = beardPiecesI32[p + 1] - 1;
+                    }
+                    int gDelta = (w6 << 16) >> 24;
+                    minBeardY = Math.min(minBeardY, effectiveBeardPieces[p + 1] + gDelta - 12);
+                    maxBeardY = Math.max(maxBeardY, effectiveBeardPieces[p + 4] + 12);
+                }
+                if (minBeardY > maxBeardY) {
+                    effectiveBeardPieces = null;
+                    beardPieceCount = 0;
+                }
+            }
+        } else if (exactMode) {
             for (int gx = 0; gx <= cellsX; gx++) {
                 int bx = chunkBaseBx + gx * cellW;
                 for (int gz = 0; gz <= cellsZ; gz++) {
@@ -7113,8 +7308,8 @@ public final class LiftedWorldgenCapabilityTables {
         int minBoundY = Math.max(spec.chunkMinY(), noiseMinY);
         int maxBoundY = Math.min(spec.chunkMinY() + (secCount << 4) - 1, noiseTopY);
 
-        // Pre-classify section uniform descriptors before cell synthesis in VANILLA_LIKE mode
-        if (!exactMode) {
+        // Pre-classify section uniform descriptors before cell synthesis in VANILLA_LIKE single-grid mode
+        if (!exactMode && !useMultiInterp) {
             for (int s = 0; s < secCount; s++) {
                 int secLoY = spec.chunkMinY() + (s << 4);
                 int secHiY = secLoY + 15;
@@ -7174,6 +7369,15 @@ public final class LiftedWorldgenCapabilityTables {
         double invCellWFp64 = 1.0 / (double) cellW;
         double invCellHFp64 = 1.0 / (double) cellH;
 
+        double[] multiChX00 = useMultiInterp ? new double[interpChCount] : null;
+        double[] multiChX10 = useMultiInterp ? new double[interpChCount] : null;
+        double[] multiChX01 = useMultiInterp ? new double[interpChCount] : null;
+        double[] multiChX11 = useMultiInterp ? new double[interpChCount] : null;
+        double[] multiChZ0 = useMultiInterp ? new double[interpChCount] : null;
+        double[] multiChZ1 = useMultiInterp ? new double[interpChCount] : null;
+        double[] multiChVals = useMultiInterp ? new double[interpChCount] : null;
+        boolean hasMultiBeard = useMultiInterp && effectiveBeardPieces != null && beardPieceCount > 0;
+
         // Fill base terrain + router veins + non-aquifer sea inside [noiseMinY..noiseTopY]; sections outside remain AIR (0)
         for (int cy = cellsY - 1; cy >= 0; cy--) {
             int cellBaseY = noiseMinY + cy * cellH;
@@ -7195,6 +7399,107 @@ public final class LiftedWorldgenCapabilityTables {
                     int c10 = (gx + 1) * strideX + gz * strideZ + cy;
                     int c01 = gx * strideX + (gz + 1) * strideZ + cy;
                     int c11 = (gx + 1) * strideX + (gz + 1) * strideZ + cy;
+                    if (useMultiInterp) {
+                        InterpolatedCombiner combiner = interpPlan.combiner();
+                        for (int dy = cellH - 1; dy >= 0; dy--) {
+                            int wy = cellBaseY + dy;
+                            int secIdx = (wy - spec.chunkMinY()) >> 4;
+                            if (secIdx < 0 || secIdx >= secCount) {
+                                continue;
+                            }
+                            int lyShift = (wy & 15) << 8;
+                            double fyLerp = (double) dy * invCellHFp64;
+                            if (exactMode) {
+                                for (int ch = 0; ch < interpChCount; ch++) {
+                                    double[] g = chCornersFp64[ch];
+                                    multiChX00[ch] = g[c00] + fyLerp * (g[c00 + 1] - g[c00]);
+                                    multiChX10[ch] = g[c10] + fyLerp * (g[c10 + 1] - g[c10]);
+                                    multiChX01[ch] = g[c01] + fyLerp * (g[c01 + 1] - g[c01]);
+                                    multiChX11[ch] = g[c11] + fyLerp * (g[c11 + 1] - g[c11]);
+                                }
+                            } else {
+                                float fy32 = dy * invCellH;
+                                for (int ch = 0; ch < interpChCount; ch++) {
+                                    float[] g = chCornersFp32[ch];
+                                    multiChX00[ch] = g[c00] + fy32 * (g[c00 + 1] - g[c00]);
+                                    multiChX10[ch] = g[c10] + fy32 * (g[c10 + 1] - g[c10]);
+                                    multiChX01[ch] = g[c01] + fy32 * (g[c01 + 1] - g[c01]);
+                                    multiChX11[ch] = g[c11] + fy32 * (g[c11 + 1] - g[c11]);
+                                }
+                            }
+                            boolean wyVeins = cellVeinsActive && routerVeinOverlapsRange(routerVeins, wy, wy);
+                            boolean wyBeard = hasMultiBeard && wy >= minBeardY && wy <= maxBeardY;
+                            for (int dx = 0; dx < maxDx; dx++) {
+                                int lx = gx * cellW + dx;
+                                int bx = chunkBaseBx + lx;
+                                double fxLerp = (double) dx * invCellWFp64;
+                                for (int ch = 0; ch < interpChCount; ch++) {
+                                    multiChZ0[ch] = multiChX00[ch] + fxLerp * (multiChX10[ch] - multiChX00[ch]);
+                                    multiChZ1[ch] = multiChX01[ch] + fxLerp * (multiChX11[ch] - multiChX01[ch]);
+                                }
+                                for (int dz = 0; dz < maxDz; dz++) {
+                                    int lz = gz * cellW + dz;
+                                    int bz = chunkBaseBz + lz;
+                                    int col = (lz << 4) | lx;
+                                    double fzLerp = (double) dz * invCellWFp64;
+                                    for (int ch = 0; ch < interpChCount; ch++) {
+                                        multiChVals[ch] = multiChZ0[ch] + fzLerp * (multiChZ1[ch] - multiChZ0[ch]);
+                                    }
+                                    double dens64 = combiner.combine(multiChVals, bx, wy, bz);
+                                    if (wyBeard) {
+                                        dens64 += WorldgenKernelSwapper.computeBeardContribution(
+                                                bx, wy, bz, effectiveBeardPieces, 0, beardPieceCount);
+                                    }
+                                    int vox;
+                                    if (dens64 > 0.0) {
+                                        vox = defaultBlock;
+                                        if (wy > rawTopSolidY[col]) {
+                                            rawTopSolidY[col] = wy;
+                                        }
+                                        if (wyVeins) {
+                                            int ph = mixColumnSeed(worldSeed, bx, bz) ^ (wy * 31);
+                                            vox = evaluateRouterVeinVoxel(
+                                                    routerVeins, rc, bx, wy, bz, vox, defaultBlock, ph);
+                                        }
+                                    } else if (aquiferSnap != null) {
+                                        vox = exactMode
+                                                ? evaluateNoiseBasedAquiferVoxelExactFp64(
+                                                        aquiferSnap,
+                                                        bx,
+                                                        wy,
+                                                        bz,
+                                                        dens64,
+                                                        rc.barrierNoise(),
+                                                        defaultBlock,
+                                                        defaultFluid,
+                                                        lavaSlot,
+                                                        seaLevel,
+                                                        deepLavaFloorY)
+                                                : evaluateNoiseBasedAquiferVoxel(
+                                                        aquiferSnap,
+                                                        bx,
+                                                        wy,
+                                                        bz,
+                                                        (float) dens64,
+                                                        rc.barrierNoise(),
+                                                        defaultBlock,
+                                                        defaultFluid,
+                                                        lavaSlot,
+                                                        seaLevel,
+                                                        deepLavaFloorY);
+                                    } else if (aquifers && wy <= deepLavaFloorY) {
+                                        vox = lavaSlot;
+                                    } else if (!spec.aquifersEnabled() && defaultFluid > 0 && wy <= seaLevel) {
+                                        vox = defaultFluid;
+                                    } else {
+                                        vox = 0;
+                                    }
+                                    frame.setVoxel(secIdx, lyShift | col, vox);
+                                }
+                            }
+                        }
+                        continue;
+                    }
                     if (exactMode) {
                         double dv000 = cornersFp64[c00], dv001 = cornersFp64[c00 + 1];
                         double dv100 = cornersFp64[c10], dv101 = cornersFp64[c10 + 1];
@@ -8142,6 +8447,31 @@ public final class LiftedWorldgenCapabilityTables {
                     maxBoundY,
                     borderBiomeSampler);
         }
+        if (!borderTreeOverhangsOnly
+                && spec.compiledVoxelEffectStages() != null
+                && !spec.compiledVoxelEffectStages().isEmpty()) {
+            List<CompiledVoxelEffectStage> activeStages = new ArrayList<>();
+            for (CompiledVoxelEffectStage st : spec.compiledVoxelEffectStages()) {
+                if (st == null) continue;
+                if (applyCarvers && st.stageKind() == VoxelEffectStageKind.CARVER) {
+                    activeStages.add(st);
+                } else if (applyFeatures
+                        && (st.stageKind() == VoxelEffectStageKind.PLACEMENT
+                                || st.stageKind() == VoxelEffectStageKind.LOCAL_FEATURE
+                                || st.stageKind() == VoxelEffectStageKind.HALO_FEATURE)) {
+                    activeStages.add(st);
+                }
+            }
+            if (!activeStages.isEmpty()) {
+                int[] colBiomes = new int[256];
+                if (quartBiomes != null && quartBiomes.length > 0 && topSurfaceY != null && topSurfaceY.length >= 256) {
+                    for (int col = 0; col < 256; col++) {
+                        colBiomes[col] = sampleQuartBiomeAt(quartBiomes, spec, col & 15, topSurfaceY[col], col >>> 4);
+                    }
+                }
+                executeCompiledVoxelEffectStages(frame, spec, activeStages, chunkX, chunkZ, worldSeed, topSurfaceY, colBiomes);
+            }
+        }
 
         if (applyFeatures) {
             if (!borderTreeOverhangsOnly && topSurfaceY != null && topSurfaceY.length >= 256) {
@@ -8514,10 +8844,11 @@ public final class LiftedWorldgenCapabilityTables {
                                                         || (lavaSlot > 0 && cur == lavaSlot)) {
                                                     continue;
                                                 }
-                                                frame.setVoxel(
-                                                        sIdx,
-                                                        idx,
-                                                        (carveFluid > 0 && vy <= carver.lavaLevelY()) ? carveFluid : 0);
+                                                int carvedSlot = (carveFluid > 0 && vy <= carver.lavaLevelY()) ? carveFluid : 0;
+                                                frame.setVoxel(sIdx, idx, carvedSlot);
+                                                if (carvedSlot > 0) {
+                                                    frame.recordPostProcessVoxel(sIdx, idx);
+                                                }
                                                 if (vy >= topSurfaceY[col] - 1) {
                                                     anySurfaceChanged = true;
                                                 }
@@ -13181,5 +13512,242 @@ public final class LiftedWorldgenCapabilityTables {
         h = (h ^ (h >>> 30)) * 0xBF58476D1CE4E5B9L;
         h = (h ^ (h >>> 27)) * 0x94D049BB133111EBL;
         return (int) (h ^ (h >>> 31));
+    }
+
+    /**
+     * Pipeline stage category for bytecode-lifted stateful voxel-effect modules ({@code leafgen-ADR-009}).
+     */
+    public enum VoxelEffectStageKind {
+        CARVER,
+        PLACEMENT,
+        LOCAL_FEATURE,
+        HALO_FEATURE
+    }
+
+    /**
+     * Host-agnostic voxel-effect operation bound from host platform methods during bytecode lifting.
+     */
+    public enum VoxelEffectHostOp {
+        VOXEL_READ,
+        VOXEL_WRITE,
+        HEIGHT_READ,
+        BIOME_READ,
+        MARK_POST_PROCESS,
+        BITSET_READ,
+        BITSET_WRITE,
+        POSSET_ADD,
+        RNG_NEXT_INT,
+        RNG_NEXT_LONG,
+        RNG_NEXT_FLOAT,
+        TAG_CHECK_LUT,
+        PROPERTY_TRANSITION_LUT,
+        FLUID_CHECK_LUT
+    }
+
+    /**
+     * Host-method binding rule supplied by platform adapters (e.g. {@code leafgen-common}) to map
+     * host worldgen methods onto Tier-1 {@link BytecodeConceptIr} voxel-effect primitives.
+     */
+    public record VoxelEffectBindingRule(
+            String ownerInternalName,
+            String methodName,
+            String methodDescriptor,
+            VoxelEffectHostOp op
+    ) {
+        public VoxelEffectBindingRule {
+            Objects.requireNonNull(ownerInternalName, "ownerInternalName");
+            Objects.requireNonNull(methodName, "methodName");
+            Objects.requireNonNull(methodDescriptor, "methodDescriptor");
+            Objects.requireNonNull(op, "op");
+        }
+    }
+
+    /**
+     * Compiled bytecode-lifted voxel-effect stage carrying its verified {@link BytecodeConceptIr.EffectProfile}
+     * and executable {@link JvmBytecodeConceptEmitter.VoxelEffectKernel}.
+     */
+    public record CompiledVoxelEffectStage(
+            String id,
+            VoxelEffectStageKind stageKind,
+            BytecodeConceptIr.ConceptModule module,
+            BytecodeConceptIr.EffectProfile profile,
+            JvmBytecodeConceptEmitter.VoxelEffectKernel kernel
+    ) {
+        public CompiledVoxelEffectStage {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(stageKind, "stageKind");
+            Objects.requireNonNull(module, "module");
+            Objects.requireNonNull(profile, "profile");
+            Objects.requireNonNull(kernel, "kernel");
+        }
+
+        public static CompiledVoxelEffectStage compile(
+                String id,
+                VoxelEffectStageKind stageKind,
+                BytecodeConceptIr.ConceptModule module
+        ) {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(stageKind, "stageKind");
+            Objects.requireNonNull(module, "module");
+            BytecodeConceptIr.EffectProfile profile = ConceptOptimizerPass.analyzeEffectProfile(module);
+            if (profile.kind() == BytecodeConceptIr.EffectKind.OPAQUE) {
+                throw new IllegalArgumentException(
+                        "Cannot compile OPAQUE voxel-effect stage '" + id + "': " + module.unmappedReasons());
+            }
+            JvmBytecodeConceptEmitter.VoxelEffectKernel kernel =
+                    JvmBytecodeConceptEmitter.assembleToVoxelEffect(module, id);
+            return new CompiledVoxelEffectStage(id, stageKind, module, profile, kernel);
+        }
+    }
+
+    /**
+     * {@link BytecodeConceptIr.VoxelEffectContext} backed directly by an {@link LcaCapabilityChunkFrame}
+     * and {@link DimensionCapabilitySpec}, recording post-process voxels on fluid or explicit post-process writes
+     * and tracking bounded {@link java.util.BitSet} carving masks and {@code PosSet} halo coordinates.
+     */
+    public static final class ChunkFrameVoxelEffectContext implements BytecodeConceptIr.VoxelEffectContext {
+        private final LcaCapabilityChunkFrame frame;
+        private final DimensionCapabilitySpec spec;
+        private final int[] topSurfaceY;
+        private final int[] biomeByCol;
+        private final java.util.Map<String, java.util.BitSet> bitSets = new java.util.HashMap<>();
+        private final java.util.Map<String, List<int[]>> posSets = new java.util.HashMap<>();
+        private int writeCount;
+        private int haloWriteCount;
+
+        public ChunkFrameVoxelEffectContext(
+                LcaCapabilityChunkFrame frame,
+                DimensionCapabilitySpec spec,
+                int[] topSurfaceY,
+                int[] biomeByCol
+        ) {
+            this.frame = Objects.requireNonNull(frame, "frame");
+            this.spec = Objects.requireNonNull(spec, "spec");
+            this.topSurfaceY = topSurfaceY;
+            this.biomeByCol = biomeByCol;
+        }
+
+        @Override
+        public int readVoxel(int x, int y, int z) {
+            if (x < 0 || x > 15 || z < 0 || z > 15) {
+                return 0;
+            }
+            int secIdx = (y - spec.chunkMinY()) >> 4;
+            if (secIdx < 0 || secIdx >= frame.sectionCount()) {
+                return 0;
+            }
+            return frame.getVoxel(secIdx, ((y & 15) << 8) | (z << 4) | x);
+        }
+
+        @Override
+        public void writeVoxel(int x, int y, int z, int slot, int flags) {
+            if (x < 0 || x > 15 || z < 0 || z > 15) {
+                haloWriteCount++;
+                return;
+            }
+            int secIdx = (y - spec.chunkMinY()) >> 4;
+            if (secIdx < 0 || secIdx >= frame.sectionCount()) {
+                return;
+            }
+            int idx = ((y & 15) << 8) | (z << 4) | x;
+            frame.setVoxel(secIdx, idx, slot);
+            writeCount++;
+            if ((flags & (BytecodeConceptIr.ConceptStmt.VoxelWrite.FLAG_FLUID_MUTATION
+                    | BytecodeConceptIr.ConceptStmt.VoxelWrite.FLAG_POST_PROCESS)) != 0) {
+                frame.recordPostProcessVoxel(secIdx, idx);
+            }
+        }
+
+        @Override
+        public int readHeight(int heightKind, int x, int z) {
+            if (topSurfaceY != null && x >= 0 && x <= 15 && z >= 0 && z <= 15) {
+                return topSurfaceY[(z << 4) | x];
+            }
+            return spec.seaLevel();
+        }
+
+        @Override
+        public int readBiome(int x, int y, int z) {
+            if (biomeByCol != null && x >= 0 && x <= 15 && z >= 0 && z <= 15) {
+                return biomeByCol[(z << 4) | x];
+            }
+            return 0;
+        }
+
+        @Override
+        public void markPostProcess(int x, int y, int z) {
+            if (x < 0 || x > 15 || z < 0 || z > 15) {
+                return;
+            }
+            int secIdx = (y - spec.chunkMinY()) >> 4;
+            if (secIdx < 0 || secIdx >= frame.sectionCount()) {
+                return;
+            }
+            frame.recordPostProcessVoxel(secIdx, ((y & 15) << 8) | (z << 4) | x);
+        }
+
+        @Override
+        public boolean readBitSet(String setName, int index) {
+            java.util.BitSet bs = bitSets.get(setName);
+            return bs != null && index >= 0 && bs.get(index);
+        }
+
+        @Override
+        public void writeBitSet(String setName, int index, boolean value) {
+            if (index < 0) {
+                return;
+            }
+            bitSets.computeIfAbsent(setName, k -> new java.util.BitSet()).set(index, value);
+        }
+
+        @Override
+        public void addPosSet(String setName, int x, int y, int z) {
+            posSets.computeIfAbsent(setName, k -> new ArrayList<>()).add(new int[]{x, y, z});
+        }
+
+        public int writeCount() {
+            return writeCount;
+        }
+
+        public int haloWriteCount() {
+            return haloWriteCount;
+        }
+
+        public List<int[]> posSet(String setName) {
+            return posSets.getOrDefault(setName, List.of());
+        }
+    }
+
+    /**
+     * Executes a sequence of compiled bytecode-lifted voxel-effect stages ({@code CARVER},
+     * {@code PLACEMENT}, {@code LOCAL_FEATURE}, {@code HALO_FEATURE}) against {@code frame}.
+     *
+     * @return sum of stage return values (e.g. carved voxels / placed features)
+     */
+    public static int executeCompiledVoxelEffectStages(
+            LcaCapabilityChunkFrame frame,
+            DimensionCapabilitySpec spec,
+            List<CompiledVoxelEffectStage> stages,
+            int chunkX,
+            int chunkZ,
+            long worldSeed,
+            int[] topSurfaceY,
+            int[] biomeByCol
+    ) {
+        Objects.requireNonNull(frame, "frame");
+        Objects.requireNonNull(spec, "spec");
+        if (stages == null || stages.isEmpty()) {
+            return 0;
+        }
+        ChunkFrameVoxelEffectContext ctx =
+                new ChunkFrameVoxelEffectContext(frame, spec, topSurfaceY, biomeByCol);
+        int total = 0;
+        for (CompiledVoxelEffectStage stage : stages) {
+            if (stage == null) {
+                continue;
+            }
+            total += stage.kernel().execute(ctx, chunkX, chunkZ, worldSeed);
+        }
+        return total;
     }
 }

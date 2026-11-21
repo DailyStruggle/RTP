@@ -90,6 +90,60 @@ public final class JvmBytecodeConceptEmitter {
     }
 
     /**
+     * Compiled executable kernel for stateful voxel-effect {@link ConceptModule} stages
+     * (carvers, placements, local features, and halo-mutating features per {@code leafgen-ADR-009}).
+     */
+    @FunctionalInterface
+    public interface VoxelEffectKernel {
+        int execute(BytecodeConceptIr.VoxelEffectContext ctx, int chunkX, int chunkZ, long seed);
+    }
+
+    /**
+     * Validates and binds a stateful voxel-effect {@link ConceptModule} into a reusable
+     * {@link VoxelEffectKernel}, rejecting {@link BytecodeConceptIr.EffectKind#OPAQUE} modules.
+     *
+     * @param module stateful voxel-effect concept module
+     * @param uniqueSuffix deterministic or unique suffix for diagnostics/caching
+     * @return executable voxel-effect kernel
+     */
+    public static VoxelEffectKernel assembleToVoxelEffect(ConceptModule module, String uniqueSuffix) {
+        Objects.requireNonNull(module, "module");
+        BytecodeConceptIr.EffectProfile profile = ConceptOptimizerPass.analyzeEffectProfile(module);
+        if (profile.kind() == BytecodeConceptIr.EffectKind.OPAQUE) {
+            throw new IllegalArgumentException(
+                    "Cannot assemble OPAQUE voxel-effect module " + module.moduleName()
+                            + ": " + module.unmappedReasons());
+        }
+        ConceptFunction entry = module.entryFunction();
+        int paramCount = entry.parameters().size();
+        if (paramCount > 3) {
+            throw new IllegalArgumentException(
+                    "VoxelEffectKernel supports 0..3 entry parameters (chunkX, chunkZ, seed), got " + paramCount);
+        }
+        return (ctx, chunkX, chunkZ, seed) -> {
+            Objects.requireNonNull(ctx, "ctx");
+            Object[] args = new Object[paramCount];
+            if (paramCount >= 1) {
+                args[0] = entry.parameters().get(0).type() == ConceptType.I64 ? (long) chunkX : chunkX;
+            }
+            if (paramCount >= 2) {
+                args[1] = entry.parameters().get(1).type() == ConceptType.I64 ? (long) chunkZ : chunkZ;
+            }
+            if (paramCount >= 3) {
+                args[2] = entry.parameters().get(2).type() == ConceptType.I64 ? seed : (int) seed;
+            }
+            Object result = BytecodeConceptIr.ConceptIrEvaluator.executeVoxelEffect(module, ctx, args);
+            if (result instanceof Number n) {
+                return n.intValue();
+            }
+            if (result instanceof Boolean b) {
+                return b ? 1 : 0;
+            }
+            return 0;
+        };
+    }
+
+    /**
      * Directly assembles a pure {@link ConceptModule} into a JVM {@code .class}, injects all
      * deduplicated {@link ConceptLut} arrays into its static fields, and binds the entry function
      * as a {@link Double3DEvaluator} ready for immediate HotSpot C2 JIT compilation.

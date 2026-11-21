@@ -893,6 +893,10 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
                 if (Files.exists(lcaFile) && Files.size(lcaFile) >= LcaRegionReader.SUPERBLOCK_SIZE
                         + LcaRegionReader.POINTER_DIRECTORY_SIZE + LcaRegionReader.FOOTER_SIZE) {
+                    boolean upgraded = LcaRegionWriter.upgradeLegacyArchiveAtomically(lcaFile, lcd2Level);
+                    if (upgraded) {
+                        invalidateRegionCacheState(regionX, regionZ);
+                    }
                     result = LcaRegionWriter.openLiveArchive(lcaFile, lcd2Level);
                 } else if (autoMigrateLegacy) {
                     LcaRegionWriter.LcaLiveArchive migrated = tryMigrateLegacyRegion(regionX, regionZ, lcaFile);

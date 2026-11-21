@@ -935,4 +935,227 @@ class LcaV3FormatAndBenchmarkTest {
         assertTrue(encUsArr[1] < encUsArr[0], "FastGreedy LCD2 (level=1) must encode faster than Exhaustive LCD2 (level=3)");
         assertTrue(alignedRegionBytes[1] < benchMca.length, "FastGreedy-1 must remain far smaller than .mca");
     }
+
+    @Test
+    @DisplayName("anvil-api-ADR-006: SEC_EXT_GRAY_BITPLANES (0x02) round-trip across all curves & palettes 2..64, O(1) skip, Tier-3 recovery, and CBIT T5/T6/T6b rejection")
+    void grayBitplanesRoundTripSkipRecoveryAndCbitFaults() throws Exception {
+        // 1. Direct codec round-trip across all 4 curve IDs, partial/full octreeMask64, and palette sizes 2..64
+        int[] paletteSizes = {2, 3, 4, 7, 8, 16, 32, 64};
+        List<String> dictCanon = new ArrayList<>(64);
+        List<String> dictBase = new ArrayList<>(64);
+        for (int i = 0; i < 64; i++) {
+            String s = "graymod:stratum_" + i;
+            dictCanon.add(s);
+            dictBase.add(s);
+        }
+        LcaSectionCodec.ScratchArena arena = LcaSectionCodec.scratch();
+        byte[] grayBuf = new byte[16384];
+        int[] remapped = new int[64];
+
+        for (int pLen : paletteSizes) {
+            int[] sortedGlobalIds = new int[pLen];
+            for (int i = 0; i < pLen; i++) sortedGlobalIds[i] = i;
+
+            for (boolean partialMask : new boolean[] {true, false}) {
+                int[] yzxOrd = new int[LcaSectionCodec.SECTION_VOXELS];
+                long octreeMask64 = 0L;
+                for (int y = 0; y < 16; y++) {
+                    for (int z = 0; z < 16; z++) {
+                        for (int x = 0; x < 16; x++) {
+                            if (partialMask && y >= 8) continue; // upper half is dominant 0 -> partial octreeMask64
+                            int yzx = (y << 8) | (z << 4) | x;
+                            int v = ((y * 2 + (z >> 2) + (x >> 3)) % pLen);
+                            yzxOrd[yzx] = v;
+                            if (v != 0) {
+                                octreeMask64 |= (1L << LcaSectionCodec.YZX_TO_OCTANT6[yzx]);
+                            }
+                        }
+                    }
+                }
+                if (octreeMask64 == 0L) {
+                    yzxOrd[1] = 1;
+                    octreeMask64 = 1L;
+                }
+
+                for (int curveId = 0; curveId < 4; curveId++) {
+                    int activeVoxels = LcaSectionCodec.populateCompactedCurvePaletteIdx(
+                            yzxOrd, curveId, octreeMask64, arena.curvePaletteIdx);
+                    int grayLen = LcaV3Codec.tryEncodeAdjacencyGrayBitplanes(
+                            arena.curvePaletteIdx, activeVoxels, pLen, sortedGlobalIds, remapped, arena, grayBuf);
+                    assertTrue(grayLen > 0, "Expected valid Gray bitplane payload for pLen=" + pLen);
+                    assertEquals(sortedGlobalIds[0], remapped[0], "Dominant palette[0] must remain pinned");
+
+                    // Frame as a full SectionFrame with SEC_EXT_GRAY_BITPLANES = 0x02
+                    int blockMode = (octreeMask64 == -1L)
+                            ? LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK
+                            : LcaSectionCodec.BLOCK_MODE_DELTA_ROARING;
+                    byte[] secFrame = new byte[128 + grayLen];
+                    int pos = 0;
+                    secFrame[pos++] = (byte) ((curveId << 6) | (blockMode << 4));
+                    if (blockMode == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING) {
+                        LcaSectionCodec.writeLongBEToBuf(secFrame, pos, octreeMask64);
+                        pos += 8;
+                    }
+                    secFrame[pos++] = 0;
+                    secFrame[pos++] = (byte) LcaV3Codec.SEC_EXT_GRAY_BITPLANES;
+                    pos = LcaSectionCodec.writeVarIntToBuf(secFrame, pos, pLen);
+                    for (int i = 0; i < pLen; i++) {
+                        pos = LcaSectionCodec.writeVarIntToBuf(secFrame, pos, remapped[i]);
+                    }
+                    pos = LcaSectionCodec.writeVarIntToBuf(secFrame, pos, grayLen);
+                    System.arraycopy(grayBuf, 0, secFrame, pos, grayLen);
+                    pos += grayLen;
+                    secFrame[pos++] = 0; // biome bLen=0
+                    byte[] exactFrame = Arrays.copyOf(secFrame, pos);
+
+                    // O(1) skipSectionFrame parity
+                    assertEquals(exactFrame.length,
+                            LcaSectionCodec.skipSectionFrame(exactFrame, 0, exactFrame.length,
+                                    LcaRegionReader.LCA_FORMAT_VERSION_V3));
+
+                    // decodeSectionFrame parity
+                    LcaSectionCodec.DecodedSection dec = LcaSectionCodec.decodeSectionFrame(
+                            exactFrame, 0, exactFrame.length, 0,
+                            dictCanon, dictBase, List.of("minecraft:plains"), List.of(),
+                            true, true, LcaRegionReader.LCA_FORMAT_VERSION_V3);
+                    int bits = Math.max(4, 32 - Integer.numberOfLeadingZeros(pLen - 1));
+                    int entriesPerLong = 64 / bits;
+                    long mask = (1L << bits) - 1L;
+                    for (int yzx = 0; yzx < LcaSectionCodec.SECTION_VOXELS; yzx++) {
+                        int decOrd = (int) ((dec.packedBlockLongs[yzx / entriesPerLong] >>> ((yzx % entriesPerLong) * bits)) & mask);
+                        assertEquals(dictBase.get(yzxOrd[yzx]), dec.blockBaseNamePalette.get(decOrd),
+                                "Mismatch at pLen=" + pLen + " curve=" + curveId + " yzx=" + yzx);
+                    }
+
+                    // decodeSectionFrameBlockOrdinals parity
+                    int[] decOrds = new int[LcaSectionCodec.SECTION_VOXELS];
+                    int[] decPal = LcaSectionCodec.decodeSectionFrameBlockOrdinals(
+                            exactFrame, exactFrame.length, decOrds, null);
+                    assertEquals(pLen, decPal.length);
+                    for (int yzx = 0; yzx < LcaSectionCodec.SECTION_VOXELS; yzx++) {
+                        assertEquals(yzxOrd[yzx], decPal[decOrds[yzx]]);
+                    }
+                }
+            }
+        }
+
+        // 2. End-to-end chunk encode/decode + Tier-3 dominant recovery + CBIT T5/T6/T6b fault injection
+        LinkedHashMap<String, Object> chunkRoot = new LinkedHashMap<>();
+        chunkRoot.put("DataVersion", 4671);
+        chunkRoot.put("xPos", 0);
+        chunkRoot.put("zPos", 0);
+        chunkRoot.put("yPos", -4);
+        chunkRoot.put("Status", "minecraft:full");
+
+        // Build a smoothly stratified 16-state 3D stepped-band section (smooth adjacent transitions -> Gray bitplanes strictly beat Delta-Roaring!)
+        List<Object> pal = new ArrayList<>();
+        for (int i = 0; i < 16; i++) {
+            LinkedHashMap<String, Object> entry = new LinkedHashMap<>();
+            entry.put("Name", "graymod:layer_" + i);
+            pal.add(entry);
+        }
+        long[] packed = new long[256];
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    int yzx = (y << 8) | (z << 4) | x;
+                    int s = (y < 4) ? 0 : (((y - 4) + ((x + z) >>> 3)) % 16);
+                    packed[yzx / 16] |= ((long) s) << ((yzx % 16) * 4);
+                }
+            }
+        }
+        LinkedHashMap<String, Object> sec = new LinkedHashMap<>();
+        sec.put("Y", (byte) 0);
+        LinkedHashMap<String, Object> bs = new LinkedHashMap<>();
+        bs.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, pal));
+        bs.put("data", packed);
+        sec.put("block_states", bs);
+        LinkedHashMap<String, Object> biomes = new LinkedHashMap<>();
+        biomes.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, List.of("minecraft:plains")));
+        sec.put("biomes", biomes);
+        chunkRoot.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(sec)));
+
+        LcaV3Codec.setThreadFeatureMask(LcaV3Codec.DEFAULT_V3_FEATURES | LcaV3Codec.FEATURE_GRAY_BITPLANES);
+        byte[] lcaBytes;
+        byte[] rawFrame;
+        try {
+            LcaRegionWriter.LcaLiveArchive arch =
+                    LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, 4671, false, 1024);
+            arch.saveChunkCoW(0, 0, chunkRoot);
+            lcaBytes = arch.toByteArray();
+            rawFrame = arch.readUncompressedChunkFrame(0, 0);
+        } finally {
+            LcaV3Codec.resetThreadFeatureMask();
+        }
+
+        // Confirm SEC_EXT_GRAY_BITPLANES (0x02) was actually selected for section index 4 (Y = 0)
+        int secDirEnd = 24 + (24 << 1);
+        int entry16 = LcaSectionCodec.readUint16BE(rawFrame, 24 + (4 << 1));
+        assertTrue(entry16 > 0 && (entry16 & 0x8000) == 0);
+        int secRelStart = secDirEnd + (entry16 - 1);
+        int secHdr = rawFrame[secRelStart] & 0xFF;
+        int secBlockMode = (secHdr >>> 4) & 3;
+        int palEscapeOff = secRelStart + 1 + (secBlockMode == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING ? 8 : 0);
+        assertEquals(0, rawFrame[palEscapeOff] & 0xFF, "Expected v3 paletteLen == 0 escape");
+        assertEquals(LcaV3Codec.SEC_EXT_GRAY_BITPLANES, rawFrame[palEscapeOff + 1] & 0xFF,
+                "Expected SEC_EXT_GRAY_BITPLANES (0x02) to win on stratified 16-state section");
+
+        // Verify full round-trip via readChunk, readChunkNbtBytes, and readChunkView
+        AnvilChunkView origView = AnvilReader.toView(chunkRoot);
+        AnvilChunkView decView = LcaRegionReader.readChunkView(lcaBytes, 0, 0);
+        AnvilChunkView decNbtView = AnvilReader.toView(
+                Nbt.readRootCompound(LcaRegionReader.INSTANCE.readChunkNbtBytes(lcaBytes, 0, 0)));
+        AnvilChunkView decChunkView = AnvilReader.toView(
+                LcaRegionReader.INSTANCE.readChunk(lcaBytes, 0, 0).root);
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    String exp = origView.blockIdAt(x, y, z);
+                    assertEquals(exp, decView.blockIdAt(x, y, z));
+                    assertEquals(exp, decNbtView.blockIdAt(x, y, z));
+                    assertEquals(exp, decChunkView.blockIdAt(x, y, z));
+                }
+            }
+        }
+
+        // CBIT T5: reserved secExtFlags (0x04) & mutually exclusive (0x03) must fail closed
+        long ptr = LcaRegionReader.getVolatileLongBE(lcaBytes, LcaRegionReader.POINTER_DIRECTORY_OFFSET);
+        int fStart = (int) ((ptr >>> 29) << LcaRegionReader.SLAB_SHIFT);
+        for (int badFlags : new int[] {0x03, 0x04, 0x80}) {
+            byte[] badFlagsLca = Arrays.copyOf(lcaBytes, lcaBytes.length);
+            badFlagsLca[fStart + palEscapeOff + 1] = (byte) badFlags;
+            assertThrows(CorruptRegionEntryException.class,
+                    () -> LcaRegionReader.readChunkView(badFlagsLca, 0, 0));
+        }
+
+        // CBIT T6b: corrupting octreeOccupancyMask64 fails closed in readChunkView and recovers dominant palette[0] in readChunkViewWithRecovery!
+        if (secBlockMode == LcaSectionCodec.BLOCK_MODE_DELTA_ROARING) {
+            byte[] badMaskLca = Arrays.copyOf(lcaBytes, lcaBytes.length);
+            badMaskLca[fStart + secRelStart + 1] ^= 0x01; // flip bit in octreeMask64
+            assertThrows(CorruptRegionEntryException.class,
+                    () -> LcaRegionReader.readChunkView(badMaskLca, 0, 0));
+            LcaRegionReader.RecoveryReport rep = new LcaRegionReader.RecoveryReport();
+            AnvilChunkView recovered = LcaRegionReader.readChunkViewWithRecovery(badMaskLca, 0, 0, rep);
+            assertNotNull(recovered);
+            assertEquals("graymod:layer_0", recovered.blockIdAt(0, 0, 0),
+                    "Tier-3 recovery on SEC_EXT_GRAY_BITPLANES must quarantine to pinned dominant palette[0]");
+        }
+
+        // CBIT T5/T6 direct unit checks: forbidden planeMode=2, truncated payloadLen, and invGray(g) >= paletteLen
+        byte[] badPlaneMode = new byte[] {
+            1, // payloadByteLen = 1
+            (byte) 0x02 // plane 0 mode = 2 (forbidden)
+        };
+        assertThrows(CorruptRegionEntryException.class, () -> LcaV3Codec.decodeGrayBitplaneBlocks(
+                badPlaneMode, 0, badPlaneMode.length, 3, LcaSectionCodec.CURVE_YZX, -1L, new long[256], 4));
+
+        // paletteLen = 3 (valid ordinals 0,1,2 -> Gray codes 00,01,11); Gray code 10 -> invGray(2) == 3 >= paletteLen (CBIT T6!)
+        byte[] outOfRangeGray = new byte[] {
+            2, // payloadByteLen = 2
+            (byte) 0x04, // plane 0 = Const0 (00), plane 1 = subHdr (01) -> 0b00_00_01_00 = 0x04
+            (byte) 0xFF  // plane 1 = All-1 -> every voxel has g = 0b10 -> invGray = 3 >= 3!
+        };
+        assertThrows(CorruptRegionEntryException.class, () -> LcaV3Codec.decodeGrayBitplaneBlocks(
+                outOfRangeGray, 0, outOfRangeGray.length, 3, LcaSectionCodec.CURVE_YZX, -1L, new long[256], 4));
+    }
 }

@@ -7,7 +7,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Package-private {@code .lca} (LeafCraft Anvil) $16 \times 16 \times 16$ section
@@ -175,142 +174,7 @@ final class LcaSectionCodec {
     static final int[] SECDED_DATA_MASKS = new int[64];
     static final int[] SECDED_SYNDROME_TO_BIT = new int[128];
     static final byte[][] SECDED_BYTE_LUT = new byte[8][256];
-    /**
-     * 160-entry Static Core Base Block Name (`0x80 | coreId` for `0..127`, `0x60 | (coreId - 128)`
-     * for `128..159`) & 60-entry Static Core Biome token tables for Slab-Local Chunk Micro-Palettes
-     * (`anvil-api-ADR-003` Section 4.2). Common vanilla overworld/nether/end blocks encode their
-     * base name as a single byte inside the chunk slab and decode in `< 80 ns` with zero `String`,
-     * `substring`, or `List` heap allocations.
-     */
-    static final String[] STATIC_CORE_STATES = {
-        "minecraft:air", "minecraft:stone", "minecraft:deepslate", "minecraft:dirt",
-        "minecraft:grass_block", "minecraft:podzol", "minecraft:coarse_dirt", "minecraft:rooted_dirt",
-        "minecraft:mycelium", "minecraft:dirt_path", "minecraft:farmland", "minecraft:mud",
-        "minecraft:packed_mud", "minecraft:clay", "minecraft:gravel", "minecraft:sand",
-        "minecraft:red_sand", "minecraft:sandstone", "minecraft:red_sandstone", "minecraft:bedrock",
-        "minecraft:water", "minecraft:lava", "minecraft:granite", "minecraft:diorite",
-        "minecraft:andesite", "minecraft:tuff", "minecraft:calcite", "minecraft:dripstone_block",
-        "minecraft:pointed_dripstone", "minecraft:smooth_basalt", "minecraft:basalt", "minecraft:blackstone",
-        "minecraft:obsidian", "minecraft:crying_obsidian", "minecraft:cobblestone", "minecraft:mossy_cobblestone",
-        "minecraft:coal_ore", "minecraft:deepslate_coal_ore", "minecraft:iron_ore", "minecraft:deepslate_iron_ore",
-        "minecraft:copper_ore", "minecraft:deepslate_copper_ore", "minecraft:gold_ore", "minecraft:deepslate_gold_ore",
-        "minecraft:redstone_ore", "minecraft:deepslate_redstone_ore", "minecraft:diamond_ore", "minecraft:deepslate_diamond_ore",
-        "minecraft:emerald_ore", "minecraft:deepslate_emerald_ore", "minecraft:lapis_ore", "minecraft:deepslate_lapis_ore",
-        "minecraft:raw_iron_block", "minecraft:raw_copper_block", "minecraft:raw_gold_block", "minecraft:amethyst_block",
-        "minecraft:budding_amethyst", "minecraft:amethyst_cluster", "minecraft:snow", "minecraft:snow_block",
-        "minecraft:powder_snow", "minecraft:ice", "minecraft:packed_ice", "minecraft:blue_ice",
-        "minecraft:moss_block", "minecraft:moss_carpet", "minecraft:glow_lichen", "minecraft:vine",
-        "minecraft:cave_vines", "minecraft:cave_vines_plant", "minecraft:spore_blossom", "minecraft:hanging_roots",
-        "minecraft:big_dripleaf", "minecraft:big_dripleaf_stem", "minecraft:small_dripleaf", "minecraft:azalea",
-        "minecraft:flowering_azalea", "minecraft:oak_log", "minecraft:spruce_log", "minecraft:birch_log",
-        "minecraft:jungle_log", "minecraft:acacia_log", "minecraft:dark_oak_log", "minecraft:mangrove_log",
-        "minecraft:cherry_log", "minecraft:oak_leaves", "minecraft:spruce_leaves", "minecraft:birch_leaves",
-        "minecraft:jungle_leaves", "minecraft:acacia_leaves", "minecraft:dark_oak_leaves", "minecraft:mangrove_leaves",
-        "minecraft:cherry_leaves", "minecraft:azalea_leaves", "minecraft:flowering_azalea_leaves", "minecraft:short_grass",
-        "minecraft:grass", "minecraft:tall_grass", "minecraft:fern", "minecraft:large_fern",
-        "minecraft:dandelion", "minecraft:poppy", "minecraft:blue_orchid", "minecraft:allium",
-        "minecraft:azure_bluet", "minecraft:red_tulip", "minecraft:orange_tulip", "minecraft:white_tulip",
-        "minecraft:pink_tulip", "minecraft:oxeye_daisy", "minecraft:cornflower", "minecraft:lily_of_the_valley",
-        "minecraft:sweet_berry_bush", "minecraft:pumpkin", "minecraft:melon", "minecraft:sugar_cane",
-        "minecraft:bamboo", "minecraft:kelp", "minecraft:kelp_plant", "minecraft:seagrass",
-        "minecraft:tall_seagrass", "minecraft:cave_air", "minecraft:void_air", "minecraft:infested_stone",
-        "minecraft:infested_deepslate", "minecraft:sculk", "minecraft:sculk_vein", "minecraft:netherrack",
-        "minecraft:magma_block", "minecraft:bubble_column", "minecraft:firefly_bush", "minecraft:brown_mushroom",
-        "minecraft:small_amethyst_bud", "minecraft:medium_amethyst_bud", "minecraft:large_amethyst_bud", "minecraft:oak_fence",
-        "minecraft:oak_planks", "minecraft:cobweb", "minecraft:chest", "minecraft:spawner",
-        "minecraft:rail", "minecraft:wall_torch", "minecraft:end_stone", "minecraft:soul_sand",
-        "minecraft:soul_soil", "minecraft:glowstone", "minecraft:nether_quartz_ore", "minecraft:nether_gold_ore",
-        "minecraft:crimson_nylium", "minecraft:warped_nylium", "minecraft:nether_wart_block", "minecraft:warped_wart_block",
-        "minecraft:shroomlight", "minecraft:ancient_debris", "minecraft:bone_block", "minecraft:stone_bricks",
-        "minecraft:mossy_stone_bricks", "minecraft:cracked_stone_bricks", "minecraft:torch", "minecraft:lantern"
-    };
-    static final String[] STATIC_CORE_BASE_NAMES = new String[STATIC_CORE_STATES.length];
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    static final List<String>[] STATIC_CORE_SINGLETON_PALETTES = new List[STATIC_CORE_STATES.length];
-    static final Map<String, Integer> STATIC_CORE_STATE_TO_ID = new LinkedHashMap<>(256);
-
-    /**
-     * Static 1-byte property suffix table (`0x80 | propId`, 128 entries `0..127`) for `Part B` of the
-     * Slab-Local Chunk Micro-Palette (`anvil-api-ADR-003` Section 4.2), replacing 40-78 byte ASCII
-     * `[property=value,...]` strings in every chunk frame with a single byte.
-     */
-    static final String[] STATIC_CORE_PROP_SUFFIXES = {
-        "[axis=y]", "[axis=x]", "[axis=z]",
-        "[lit=false]", "[lit=true]",
-        "[snowy=false]", "[snowy=true]",
-        "[waterlogged=false]", "[waterlogged=true]",
-        "[half=lower]", "[half=upper]", "[half=bottom]", "[half=top]",
-        "[drag=true]", "[drag=false]",
-        "[berries=false]", "[berries=true]",
-        "[level=0]", "[level=1]", "[level=2]", "[level=3]", "[level=4]", "[level=5]", "[level=6]", "[level=7]",
-        "[level=8]", "[level=9]", "[level=10]", "[level=11]", "[level=12]", "[level=13]", "[level=14]", "[level=15]",
-        "[layers=1]", "[layers=2]", "[layers=3]", "[layers=4]", "[layers=5]", "[layers=6]", "[layers=7]", "[layers=8]",
-        "[distance=1,persistent=false,waterlogged=false]", "[distance=2,persistent=false,waterlogged=false]",
-        "[distance=3,persistent=false,waterlogged=false]", "[distance=4,persistent=false,waterlogged=false]",
-        "[distance=5,persistent=false,waterlogged=false]", "[distance=6,persistent=false,waterlogged=false]",
-        "[distance=7,persistent=false,waterlogged=false]",
-        "[persistent=false,waterlogged=false,distance=1]", "[persistent=false,waterlogged=false,distance=2]",
-        "[persistent=false,waterlogged=false,distance=3]", "[persistent=false,waterlogged=false,distance=4]",
-        "[persistent=false,waterlogged=false,distance=5]", "[persistent=false,waterlogged=false,distance=6]",
-        "[persistent=false,waterlogged=false,distance=7]",
-        "[facing=up,waterlogged=false]", "[facing=down,waterlogged=false]",
-        "[facing=north,waterlogged=false]", "[facing=south,waterlogged=false]",
-        "[facing=east,waterlogged=false]", "[facing=west,waterlogged=false]",
-        "[facing=north]", "[facing=south]", "[facing=east]", "[facing=west]", "[facing=up]", "[facing=down]",
-        "[age=0]", "[age=1]", "[age=2]", "[age=3]", "[age=4]", "[age=5]", "[age=6]", "[age=7]",
-        "[age=8]", "[age=9]", "[age=10]", "[age=11]", "[age=12]", "[age=13]", "[age=14]", "[age=15]",
-        "[age=16]", "[age=17]", "[age=18]", "[age=19]", "[age=20]", "[age=21]", "[age=22]", "[age=23]",
-        "[age=24]", "[age=25]",
-        "[age=20,berries=false]", "[age=21,berries=false]", "[age=22,berries=false]",
-        "[age=23,berries=false]", "[age=24,berries=false]", "[age=25,berries=false]",
-        "[age=23,berries=true]", "[age=24,berries=true]", "[age=25,berries=true]",
-        "[waterlogged=false,shape=east_west]", "[waterlogged=false,shape=north_south]",
-        "[shape=north_south,waterlogged=false]", "[shape=east_west,waterlogged=false]",
-        "[stage=0]", "[stage=1]",
-        "[hanging=false,waterlogged=false]", "[hanging=true,waterlogged=false]",
-        "[type=bottom,waterlogged=false]", "[type=top,waterlogged=false]", "[type=double,waterlogged=false]",
-        "[east=false,north=false,south=false,up=false,west=false]",
-        "[bites=0]", "[moisture=0]", "[moisture=7]",
-        "[distance=7,persistent=true,waterlogged=false]", "[distance=1,persistent=true,waterlogged=false]",
-        "[eye=false,facing=north]", "[eye=false,facing=south]", "[eye=false,facing=east]", "[eye=false,facing=west]",
-        "[pickles=1,waterlogged=true]", "[candles=1,lit=false,waterlogged=false]",
-        "[facing=north,type=single,waterlogged=false]", "[facing=south,type=single,waterlogged=false]",
-        "[facing=east,type=single,waterlogged=false]"
-    };
-    static final Map<String, Integer> STATIC_CORE_PROP_TO_ID = new LinkedHashMap<>(256);
-
-    static final String[] STATIC_CORE_BIOMES = {
-        "minecraft:plains", "minecraft:sunflower_plains", "minecraft:snowy_plains", "minecraft:ice_spikes",
-        "minecraft:desert", "minecraft:swamp", "minecraft:mangrove_swamp", "minecraft:forest",
-        "minecraft:flower_forest", "minecraft:birch_forest", "minecraft:dark_forest", "minecraft:old_growth_birch_forest",
-        "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga", "minecraft:taiga", "minecraft:snowy_taiga",
-        "minecraft:savanna", "minecraft:savanna_plateau", "minecraft:windswept_hills", "minecraft:windswept_gravelly_hills",
-        "minecraft:windswept_forest", "minecraft:windswept_savanna", "minecraft:jungle", "minecraft:sparse_jungle",
-        "minecraft:bamboo_jungle", "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands",
-        "minecraft:meadow", "minecraft:cherry_grove", "minecraft:grove", "minecraft:snowy_slopes",
-        "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:stony_peaks", "minecraft:river",
-        "minecraft:frozen_river", "minecraft:beach", "minecraft:snowy_beach", "minecraft:stony_shore",
-        "minecraft:warm_ocean", "minecraft:lukewarm_ocean", "minecraft:deep_lukewarm_ocean", "minecraft:ocean",
-        "minecraft:deep_ocean", "minecraft:cold_ocean", "minecraft:deep_cold_ocean", "minecraft:frozen_ocean",
-        "minecraft:deep_frozen_ocean", "minecraft:mushroom_fields", "minecraft:dripstone_caves", "minecraft:lush_caves",
-        "minecraft:deep_dark", "minecraft:nether_wastes", "minecraft:crimson_forest", "minecraft:warped_forest",
-        "minecraft:soul_sand_valley", "minecraft:basalt_deltas", "minecraft:the_end", "minecraft:the_void",
-        "minecraft:small_end_islands", "minecraft:end_midlands", "minecraft:end_highlands", "minecraft:end_barrens",
-        "minecraft:pale_garden"
-    };
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    static final List<String>[] STATIC_CORE_SINGLETON_BIOMES = new List[STATIC_CORE_BIOMES.length];
     static final int MODERN_PALETTE_DATA_VERSION = 5006;
-
-    static final Map<String, Integer> STATIC_CORE_BIOME_TO_ID = new LinkedHashMap<>(128);
-    static final byte[][] STATIC_CORE_STATE_NBT_BYTES = new byte[STATIC_CORE_STATES.length][];
-    static final byte[][] STATIC_CORE_PROP_NBT_BYTES = new byte[STATIC_CORE_PROP_SUFFIXES.length][];
-    static final byte[][] STATIC_CORE_STATE_PROP_NBT_CACHE = new byte[STATIC_CORE_STATES.length * 128][];
-    static final byte[][] STATIC_CORE_STATE_NBT_BYTES_MODERN = new byte[STATIC_CORE_STATES.length][];
-    static final byte[][] STATIC_CORE_PROP_NBT_BYTES_MODERN = new byte[STATIC_CORE_PROP_SUFFIXES.length][];
-    static final byte[][] STATIC_CORE_STATE_PROP_NBT_CACHE_MODERN = new byte[STATIC_CORE_STATES.length * 128][];
-    static final byte[][] STATIC_CORE_BIOME_STRING_NBT_BYTES = new byte[STATIC_CORE_BIOMES.length][];
-    static final byte[][] STATIC_CORE_SINGLE_BIOME_COMPOUND_NBT_BYTES = new byte[STATIC_CORE_BIOMES.length][];
 
     private static final byte[] MINECRAFT_COLON_UTF8 = "minecraft:".getBytes(StandardCharsets.UTF_8);
     private static final byte[] LCA_BOUNDARY_MARKER_UTF8 = "_lca_boundary_".getBytes(StandardCharsets.UTF_8);
@@ -334,30 +198,10 @@ final class LcaSectionCodec {
     private static final byte[] BIOMES_PALETTE_PREFIX_NBT = buildBiomesPalettePrefix();
     private static final byte[] SKY_LIGHT_2048_HEADER_NBT = buildByteArray2048Header("SkyLight");
     private static final byte[] BLOCK_LIGHT_2048_HEADER_NBT = buildByteArray2048Header("BlockLight");
+    static final byte[] AIR_STATE_NBT_BYTES = encodeCanonicalStateToNbtCompoundBytes("minecraft:air", false);
+    static final byte[] AIR_STATE_NBT_BYTES_MODERN = encodeCanonicalStateToNbtCompoundBytes("minecraft:air", true);
 
     static {
-        for (int i = 0; i < STATIC_CORE_PROP_SUFFIXES.length; i++) {
-            STATIC_CORE_PROP_TO_ID.put(STATIC_CORE_PROP_SUFFIXES[i], i);
-            STATIC_CORE_PROP_NBT_BYTES[i] = encodePropSuffixToNbtBytes(STATIC_CORE_PROP_SUFFIXES[i], false);
-            STATIC_CORE_PROP_NBT_BYTES_MODERN[i] = encodePropSuffixToNbtBytes(STATIC_CORE_PROP_SUFFIXES[i], true);
-        }
-        for (int i = 0; i < STATIC_CORE_STATES.length; i++) {
-            String s = STATIC_CORE_STATES[i];
-            String base = stripBlockProperties(s);
-            STATIC_CORE_BASE_NAMES[i] = base;
-            STATIC_CORE_SINGLETON_PALETTES[i] = List.of(base);
-            STATIC_CORE_STATE_TO_ID.put(s, i);
-            STATIC_CORE_STATE_NBT_BYTES[i] = encodeCanonicalStateToNbtCompoundBytes(base, false);
-            STATIC_CORE_STATE_NBT_BYTES_MODERN[i] = encodeCanonicalStateToNbtCompoundBytes(base, true);
-        }
-        for (int i = 0; i < STATIC_CORE_BIOMES.length; i++) {
-            String b = STATIC_CORE_BIOMES[i];
-            STATIC_CORE_SINGLETON_BIOMES[i] = List.of(b);
-            STATIC_CORE_BIOME_TO_ID.put(b, i);
-            byte[] strBytes = encodeNbtStringPayloadBytes(b);
-            STATIC_CORE_BIOME_STRING_NBT_BYTES[i] = strBytes;
-            STATIC_CORE_SINGLE_BIOME_COMPOUND_NBT_BYTES[i] = encodeSingleBiomeCompoundNbtBytes(strBytes);
-        }
         Arrays.fill(SECDED_SYNDROME_TO_BIT, -1);
         int bitIdx = 0;
         for (int code = 3; bitIdx < 64; code++) {
@@ -2224,6 +2068,255 @@ final class LcaSectionCodec {
         return computeHammingSecDed8(h);
     }
 
+    static boolean isV3ExtendedSectionFrame(byte[] buf) {
+        if (buf == null || buf.length < 2) {
+            return false;
+        }
+        try {
+            int limit = buf.length;
+            int pos = 0;
+            int sectionHeader = buf[pos++] & 0xFF;
+            int blockMode = (sectionHeader >>> 4) & 3;
+            int skyMode = (sectionHeader >>> 2) & 3;
+            int blkMode = sectionHeader & 3;
+            if (blockMode == BLOCK_MODE_DELTA_ROARING || blockMode == BLOCK_MODE_FLAT_BITPACK) {
+                if (pos + 8 > limit) return false;
+                pos += 8;
+            }
+            int paletteLen = readVarInt(buf, pos, limit);
+            pos += varIntLen(paletteLen);
+            if (paletteLen == 0) {
+                if ((blockMode != BLOCK_MODE_DELTA_ROARING && blockMode != BLOCK_MODE_DELTA_ROARING_FULL_MASK)
+                        || pos >= limit) {
+                    return false;
+                }
+                int secExtFlags = buf[pos++] & 0xFF;
+                if (secExtFlags == 0 || !LcaV3Codec.isValidSecExtFlags(secExtFlags) || pos >= limit) {
+                    return false;
+                }
+                int actualPalLen = readVarInt(buf, pos, limit);
+                if (actualPalLen < 2 || actualPalLen > SECTION_VOXELS) {
+                    return false;
+                }
+                return skipSectionFrame(buf, 0, limit, LcaRegionReader.LCA_FORMAT_VERSION_V3) == limit;
+            }
+            if (skyMode != LIGHT_MODE_GRAY_PLANES && blkMode != LIGHT_MODE_GRAY_PLANES) {
+                return false;
+            }
+            if (paletteLen < 1 || paletteLen > SECTION_VOXELS) {
+                return false;
+            }
+            for (int i = 0; i < paletteLen; i++) {
+                int d = readVarInt(buf, pos, limit);
+                pos += varIntLen(d);
+            }
+            if (blockMode == BLOCK_MODE_DELTA_ROARING || blockMode == BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+                for (int p = 1; p < paletteLen; p++) {
+                    int word16 = readUint16BE(buf, pos);
+                    pos += 2;
+                    int tag = (word16 >>> 14) & 3;
+                    int countOrIdx = word16 & 0x3FFF;
+                    if (tag == TAG_SINGLETON) {
+                        int subTag = (countOrIdx >>> 12) & 3;
+                        if (subTag == 1) pos += 1;
+                        else if (subTag == 2) pos += 2;
+                        else if (subTag == 3) {
+                            pos++;
+                            if ((buf[pos++] & 0xFF) >= 240) pos++;
+                        }
+                    } else if (tag == TAG_BITMAP) {
+                        if (countOrIdx == 512) pos += 512;
+                        else if ((countOrIdx & 0x1000) != 0) pos += (countOrIdx & 0x0FFF);
+                        else pos += 8 + (countOrIdx << 3);
+                    } else if (tag == TAG_DELTA_ARRAY) {
+                        for (int r = 0; r < countOrIdx; r++) {
+                            if ((buf[pos++] & 0xFF) >= 240) pos++;
+                        }
+                    } else {
+                        int subMode = (countOrIdx >>> 12) & 3;
+                        int runCount = countOrIdx & 0x0FFF;
+                        int lBits = 4 - subMode;
+                        int gMax = (1 << (4 + subMode)) - 1;
+                        int lMax = (1 << lBits) - 1;
+                        for (int r = 0; r < runCount; r++) {
+                            int tok = buf[pos++] & 0xFF;
+                            int adjGap = (tok >>> lBits) & gMax;
+                            int lenM1 = tok & lMax;
+                            if (adjGap == gMax && (buf[pos++] & 0xFF) >= 240) pos++;
+                            if (lenM1 == lMax) {
+                                int extra = readVarInt(buf, pos, limit);
+                                pos += varIntLen(extra);
+                            }
+                        }
+                    }
+                }
+            } else if (blockMode == BLOCK_MODE_FLAT_BITPACK) {
+                int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(paletteLen - 1));
+                pos += (SECTION_VOXELS * flatBits + 7) >>> 3;
+            }
+            if (pos < limit) {
+                int b0 = buf[pos] & 0xFF;
+                if ((b0 & 0x80) != 0) {
+                    pos++;
+                } else {
+                    int bLen = readVarInt(buf, pos, limit);
+                    pos += varIntLen(bLen);
+                    for (int i = 0; i < bLen; i++) {
+                        int bId = readVarInt(buf, pos, limit);
+                        pos += varIntLen(bId);
+                    }
+                    if (bLen > 1) {
+                        int runCount = readVarInt(buf, pos, limit);
+                        pos += varIntLen(runCount);
+                        if (bLen <= 8) {
+                            pos += runCount;
+                        } else {
+                            for (int r = 0; r < runCount; r++) {
+                                int pIdx = readVarInt(buf, pos, limit);
+                                pos += varIntLen(pIdx) + 1;
+                            }
+                        }
+                    }
+                }
+            }
+            if (skyMode == LIGHT_MODE_CONST || blkMode == LIGHT_MODE_CONST) {
+                pos++;
+            }
+            boolean hasEikonal = false;
+            if (skyMode == LIGHT_MODE_GRAY_PLANES && pos < limit) {
+                if ((buf[pos] & LcaV3Codec.SENTINEL_MODE_MASK) == LcaV3Codec.SENTINEL_MODE_EIKONAL) {
+                    hasEikonal = true;
+                }
+                pos = skipLightChannel(buf, pos, limit, skyMode, LcaRegionReader.LCA_FORMAT_VERSION_V3);
+            } else if (skyMode == LIGHT_MODE_RAW) {
+                pos += 2048;
+            }
+            if (blkMode == LIGHT_MODE_GRAY_PLANES && pos < limit) {
+                if ((buf[pos] & LcaV3Codec.SENTINEL_MODE_MASK) == LcaV3Codec.SENTINEL_MODE_EIKONAL) {
+                    hasEikonal = true;
+                }
+                pos = skipLightChannel(buf, pos, limit, blkMode, LcaRegionReader.LCA_FORMAT_VERSION_V3);
+            } else if (blkMode == LIGHT_MODE_RAW) {
+                pos += 2048;
+            }
+            return hasEikonal && pos == limit;
+        } catch (CorruptRegionEntryException | ArrayIndexOutOfBoundsException e) {
+            return false;
+        }
+    }
+
+    static byte[] downgradeV3BlockSectionFrameToV2(byte[] buf) {
+        if (buf == null || buf.length < 4) {
+            return buf;
+        }
+        try {
+            int limit = buf.length;
+            int pos = 0;
+            int sectionHeader = buf[pos++] & 0xFF;
+            int curveId = (sectionHeader >>> 6) & 3;
+            int blockMode = (sectionHeader >>> 4) & 3;
+            int lightModes4 = sectionHeader & 0x0F;
+            if (blockMode != BLOCK_MODE_DELTA_ROARING && blockMode != BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
+                return buf;
+            }
+            long octreeMask64 = (blockMode == BLOCK_MODE_DELTA_ROARING_FULL_MASK) ? -1L : readLongBE(buf, pos);
+            if (blockMode == BLOCK_MODE_DELTA_ROARING) {
+                pos += 8;
+            }
+            int firstPal = readVarInt(buf, pos, limit);
+            if (firstPal != 0) {
+                return buf;
+            }
+            pos += varIntLen(firstPal);
+            if (pos >= limit) return buf;
+            int secExtFlags = buf[pos++] & 0xFF;
+            if (!LcaV3Codec.isValidSecExtFlags(secExtFlags)) return buf;
+            int paletteLen = readVarInt(buf, pos, limit);
+            pos += varIntLen(paletteLen);
+            if (paletteLen < 2 || paletteLen > SECTION_VOXELS) return buf;
+            int[] palIds = new int[paletteLen];
+            for (int i = 0; i < paletteLen; i++) {
+                int id = readVarInt(buf, pos, limit);
+                pos += varIntLen(id);
+                palIds[i] = id;
+            }
+
+            ScratchArena arena = scratch();
+            int bits = Math.max(4, 32 - Integer.numberOfLeadingZeros(paletteLen - 1));
+            int entriesPerLong = 64 / bits;
+            int numLongs = (SECTION_VOXELS + entriesPerLong - 1) / entriesPerLong;
+            long[] packed = arena.packedBlockLongs;
+            Arrays.fill(packed, 0, numLongs, 0L);
+            if ((secExtFlags & LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
+                pos = LcaV3Codec.decodeRankExcludedDeltaRoaringBlocks(
+                        buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
+            } else if ((secExtFlags & LcaV3Codec.SEC_EXT_GRAY_BITPLANES) != 0) {
+                pos = LcaV3Codec.decodeGrayBitplaneBlocks(
+                        buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
+            } else {
+                return buf;
+            }
+            int trailingStart = pos;
+            int trailingLen = limit - trailingStart;
+
+            int[] yzxOrd = arena.yzxPaletteIdx;
+            long mask = (1L << bits) - 1L;
+            int vox = 0;
+            for (int w = 0; w < numLongs && vox < SECTION_VOXELS; w++) {
+                long word = packed[w];
+                int lim = Math.min(SECTION_VOXELS, vox + entriesPerLong);
+                if (word == 0L) {
+                    Arrays.fill(yzxOrd, vox, lim, 0);
+                    vox = lim;
+                } else {
+                    while (vox < lim) {
+                        yzxOrd[vox++] = (int) (word & mask);
+                        word >>>= bits;
+                    }
+                }
+            }
+            int activeVoxels = populateCompactedCurvePaletteIdx(yzxOrd, curveId, octreeMask64, arena.curvePaletteIdx);
+            byte[] blockBuf = arena.byteStaging;
+            int roaringLen = encodeMinorityContainersSinglePass(
+                    arena.curvePaletteIdx, activeVoxels, paletteLen, arena, blockBuf);
+            int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(paletteLen - 1));
+            int flatBytes = (SECTION_VOXELS * flatBits + 7) >>> 3;
+            int outBlockMode;
+            int blockPayloadLen;
+            if (roaringLen <= flatBytes) {
+                outBlockMode = (octreeMask64 == -1L) ? BLOCK_MODE_DELTA_ROARING_FULL_MASK : BLOCK_MODE_DELTA_ROARING;
+                blockPayloadLen = roaringLen;
+            } else {
+                outBlockMode = BLOCK_MODE_FLAT_BITPACK;
+                int[] identityMap = new int[paletteLen];
+                for (int i = 0; i < paletteLen; i++) identityMap[i] = i;
+                encodeFlatBitPackYzx(yzxOrd, identityMap, flatBits, flatBytes, blockBuf);
+                blockPayloadLen = flatBytes;
+            }
+
+            byte[] out = new byte[1 + 8 + 5 + paletteLen * 5 + blockPayloadLen + trailingLen];
+            int wPos = 0;
+            out[wPos++] = (byte) ((curveId << 6) | (outBlockMode << 4) | lightModes4);
+            if (outBlockMode == BLOCK_MODE_DELTA_ROARING || outBlockMode == BLOCK_MODE_FLAT_BITPACK) {
+                writeLongBEToBuf(out, wPos, octreeMask64);
+                wPos += 8;
+            }
+            wPos = writeVarIntToBuf(out, wPos, paletteLen);
+            for (int i = 0; i < paletteLen; i++) {
+                wPos = writeVarIntToBuf(out, wPos, palIds[i]);
+            }
+            System.arraycopy(blockBuf, 0, out, wPos, blockPayloadLen);
+            wPos += blockPayloadLen;
+            if (trailingLen > 0) {
+                System.arraycopy(buf, trailingStart, out, wPos, trailingLen);
+                wPos += trailingLen;
+            }
+            return Arrays.copyOf(out, wPos);
+        } catch (CorruptRegionEntryException e) {
+            return buf;
+        }
+    }
+
     static int skipSectionFrame(byte[] buf, int offset, int limit) throws CorruptRegionEntryException {
         return skipSectionFrame(buf, offset, limit, LcaRegionReader.LCA_FORMAT_VERSION);
     }
@@ -2241,6 +2334,7 @@ final class LcaSectionCodec {
         if (blockMode == BLOCK_MODE_DELTA_ROARING || blockMode == BLOCK_MODE_FLAT_BITPACK) {
             pos += 8;
         }
+        int secExtFlags = 0;
         int paletteLen = readVarInt(buf, pos, limit);
         pos += varIntLen(paletteLen);
         if (paletteLen == 0) {
@@ -2251,9 +2345,9 @@ final class LcaSectionCodec {
             if (pos >= limit) {
                 throw new CorruptRegionEntryException("CBIT T5: Truncated v3 secExtFlags");
             }
-            int secExtFlags = buf[pos++] & 0xFF;
-            if ((secExtFlags & ~LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
-                throw new CorruptRegionEntryException("CBIT T5: Reserved v3 secExtFlags bits set: " + secExtFlags);
+            secExtFlags = buf[pos++] & 0xFF;
+            if (!LcaV3Codec.isValidSecExtFlags(secExtFlags)) {
+                throw new CorruptRegionEntryException("CBIT T5: Reserved or conflicting v3 secExtFlags bits set: " + secExtFlags);
             }
             paletteLen = readVarInt(buf, pos, limit);
             pos += varIntLen(paletteLen);
@@ -2268,52 +2362,61 @@ final class LcaSectionCodec {
         if (blockMode == BLOCK_MODE_UNIFORM || paletteLen == 1) {
             // 0 bytes
         } else if (blockMode == BLOCK_MODE_DELTA_ROARING || blockMode == BLOCK_MODE_DELTA_ROARING_FULL_MASK) {
-            for (int p = 1; p < paletteLen; p++) {
-                int word16 = readUint16BE(buf, pos);
-                pos += 2;
-                int tag = (word16 >>> 14) & 3;
-                int countOrIdx = word16 & 0x3FFF;
-                if (tag == TAG_SINGLETON) {
-                    int subTag = (countOrIdx >>> 12) & 3;
-                    if (subTag == 1) {
-                        pos += 1;
-                    } else if (subTag == 2) {
-                        pos += 2;
-                    } else if (subTag == 3) {
-                        pos++;
-                        int b0 = buf[pos++] & 0xFF;
-                        if (b0 >= 240) pos++;
-                    }
-                } else if (tag == TAG_BITMAP) {
-                    if (countOrIdx == 512) {
-                        pos += 512;
-                    } else if ((countOrIdx & 0x1000) != 0) {
-                        pos += (countOrIdx & 0x0FFF);
-                    } else {
-                        pos += 8 + (countOrIdx << 3);
-                    }
-                } else if (tag == TAG_DELTA_ARRAY) {
-                    for (int r = 0; r < countOrIdx; r++) {
-                        int b0 = buf[pos++] & 0xFF;
-                        if (b0 >= 240) pos++;
-                    }
-                } else {
-                    int subMode = (countOrIdx >>> 12) & 3;
-                    int runCount = countOrIdx & 0x0FFF;
-                    int lBits = 4 - subMode;
-                    int gMax = (1 << (4 + subMode)) - 1;
-                    int lMax = (1 << lBits) - 1;
-                    for (int r = 0; r < runCount; r++) {
-                        int tok = buf[pos++] & 0xFF;
-                        int adjGap = (tok >>> lBits) & gMax;
-                        int lenM1 = tok & lMax;
-                        if (adjGap == gMax) {
+            if ((secExtFlags & LcaV3Codec.SEC_EXT_GRAY_BITPLANES) != 0) {
+                int grayPayloadLen = readVarInt(buf, pos, limit);
+                pos += varIntLen(grayPayloadLen);
+                if (grayPayloadLen < 1 || pos + grayPayloadLen > limit) {
+                    throw new CorruptRegionEntryException("CBIT T5: Truncated v3 Gray bitplane payload");
+                }
+                pos += grayPayloadLen;
+            } else {
+                for (int p = 1; p < paletteLen; p++) {
+                    int word16 = readUint16BE(buf, pos);
+                    pos += 2;
+                    int tag = (word16 >>> 14) & 3;
+                    int countOrIdx = word16 & 0x3FFF;
+                    if (tag == TAG_SINGLETON) {
+                        int subTag = (countOrIdx >>> 12) & 3;
+                        if (subTag == 1) {
+                            pos += 1;
+                        } else if (subTag == 2) {
+                            pos += 2;
+                        } else if (subTag == 3) {
+                            pos++;
                             int b0 = buf[pos++] & 0xFF;
                             if (b0 >= 240) pos++;
                         }
-                        if (lenM1 == lMax) {
-                            int extra = readVarInt(buf, pos, limit);
-                            pos += varIntLen(extra);
+                    } else if (tag == TAG_BITMAP) {
+                        if (countOrIdx == 512) {
+                            pos += 512;
+                        } else if ((countOrIdx & 0x1000) != 0) {
+                            pos += (countOrIdx & 0x0FFF);
+                        } else {
+                            pos += 8 + (countOrIdx << 3);
+                        }
+                    } else if (tag == TAG_DELTA_ARRAY) {
+                        for (int r = 0; r < countOrIdx; r++) {
+                            int b0 = buf[pos++] & 0xFF;
+                            if (b0 >= 240) pos++;
+                        }
+                    } else {
+                        int subMode = (countOrIdx >>> 12) & 3;
+                        int runCount = countOrIdx & 0x0FFF;
+                        int lBits = 4 - subMode;
+                        int gMax = (1 << (4 + subMode)) - 1;
+                        int lMax = (1 << lBits) - 1;
+                        for (int r = 0; r < runCount; r++) {
+                            int tok = buf[pos++] & 0xFF;
+                            int adjGap = (tok >>> lBits) & gMax;
+                            int lenM1 = tok & lMax;
+                            if (adjGap == gMax) {
+                                int b0 = buf[pos++] & 0xFF;
+                                if (b0 >= 240) pos++;
+                            }
+                            if (lenM1 == lMax) {
+                                int extra = readVarInt(buf, pos, limit);
+                                pos += varIntLen(extra);
+                            }
                         }
                     }
                 }
@@ -2364,7 +2467,8 @@ final class LcaSectionCodec {
             int residualStart,
             int patchPayloadStart,
             int patchPayloadLen,
-            int limitBytes
+            int limitBytes,
+            int formatVersion
     ) {
         int maxPostSecStart = -1;
         for (int i = 0; i < sectionCount; i++) {
@@ -2382,23 +2486,30 @@ final class LcaSectionCodec {
                 int pPos = patchPayloadStart;
                 int appCount = readVarInt(buf, pPos, pEnd);
                 pPos += varIntLen(appCount);
-                for (int i = 0; i < appCount; i++) {
-                    int tag = buf[pPos++] & 0xFF;
-                    if ((tag & 0x80) == 0 && (tag < 0x60 || tag >= 0x80)) {
-                        int uLen = readVarInt(buf, pPos, pEnd);
-                        pPos += varIntLen(uLen) + uLen;
+                if (formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3) {
+                    for (int i = 0; i < appCount; i++) {
+                        int gId = readVarInt(buf, pPos, pEnd);
+                        pPos += varIntLen(gId);
                     }
-                }
-                if (appCount > 0) {
-                    int propCount = readVarInt(buf, pPos, pEnd);
-                    pPos += varIntLen(propCount);
-                    for (int k = 0; k < propCount; k++) {
-                        int sIdx = readVarInt(buf, pPos, pEnd);
-                        pPos += varIntLen(sIdx);
-                        int pTag = buf[pPos++] & 0xFF;
-                        if (pTag == 0x40) {
-                            int gId = readVarInt(buf, pPos, pEnd);
-                            pPos += varIntLen(gId);
+                } else {
+                    for (int i = 0; i < appCount; i++) {
+                        int tag = buf[pPos++] & 0xFF;
+                        if ((tag & 0x80) == 0 && (tag < 0x60 || tag >= 0x80)) {
+                            int uLen = readVarInt(buf, pPos, pEnd);
+                            pPos += varIntLen(uLen) + uLen;
+                        }
+                    }
+                    if (appCount > 0) {
+                        int propCount = readVarInt(buf, pPos, pEnd);
+                        pPos += varIntLen(propCount);
+                        for (int k = 0; k < propCount; k++) {
+                            int sIdx = readVarInt(buf, pPos, pEnd);
+                            pPos += varIntLen(sIdx);
+                            int pTag = buf[pPos++] & 0xFF;
+                            if (pTag == 0x40) {
+                                int gId = readVarInt(buf, pPos, pEnd);
+                                pPos += varIntLen(gId);
+                            }
                         }
                     }
                 }
@@ -2798,7 +2909,8 @@ final class LcaSectionCodec {
         int blockEncodingMode;
         int blockPayloadLen = 0;
         byte[] blockStaging = arena.byteStaging;
-        boolean useRankExcl = false;
+        int secExtFlags = 0;
+        int[] emittedGlobalIds = sortedGlobalIds;
 
         if (activePaletteSize == 1) {
             blockEncodingMode = BLOCK_MODE_UNIFORM;
@@ -2883,15 +2995,17 @@ final class LcaSectionCodec {
                 }
             }
 
-            // v3 Layer 3: Adaptive Successive Rank-Exclusion (3 <= |P| <= 64, ADR-005 D litLen[b] gated in Mode B)
+            // v3 Layer 3: Adaptive Successive Rank-Exclusion (3 <= |P| <= 12, ADR-005 D litLen[b] gated in Mode B)
+            boolean curveSyncedForV3 = !(h3OverwroteCurve && curveId != CURVE_H3);
             if (formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3
                     && (LcaV3Codec.currentFeatureMask() & LcaV3Codec.FEATURE_RANK_EXCL) != 0
                     && activePaletteSize >= LcaV3Codec.MIN_RANK_EXCL_PALETTE
                     && activePaletteSize <= LcaV3Codec.MAX_RANK_EXCL_PALETTE) {
-                if (h3OverwroteCurve && curveId != CURVE_H3) {
+                if (!curveSyncedForV3) {
                     bestActiveVoxels = populateCompactedCurvePaletteIdx(
                             remapYzxToSorted(yzxIdx, oldToNew, LcaV3Codec.v3Scratch().unpackedYzx),
                             curveId, octreeMask64, curvePaletteIdx);
+                    curveSyncedForV3 = true;
                 }
                 byte[] rankBuf = LcaV3Codec.v3Scratch().rankStaging;
                 int rankLen = LcaV3Codec.encodeRankExcludedMinorityContainers(
@@ -2906,20 +3020,62 @@ final class LcaSectionCodec {
                     if (acceptRank) {
                         roaringLen = rankLen;
                         blockStaging = rankBuf;
-                        useRankExcl = true;
+                        secExtFlags = LcaV3Codec.SEC_EXT_RANK_EXCLUDED;
+                    }
+                }
+            }
+
+            // v3 Layer 4: Dominant-Pinned Adjacency-Ordered Local Gray Bitplanes (0x02, anvil-api-ADR-006)
+            if (formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3
+                    && (LcaV3Codec.currentFeatureMask() & LcaV3Codec.FEATURE_GRAY_BITPLANES) != 0
+                    && activePaletteSize >= LcaV3Codec.MIN_GRAY_PALETTE
+                    && activePaletteSize <= LcaV3Codec.MAX_GRAY_PALETTE) {
+                if (!curveSyncedForV3) {
+                    bestActiveVoxels = populateCompactedCurvePaletteIdx(
+                            remapYzxToSorted(yzxIdx, oldToNew, LcaV3Codec.v3Scratch().unpackedYzx),
+                            curveId, octreeMask64, curvePaletteIdx);
+                    curveSyncedForV3 = true;
+                }
+                LcaV3Codec.V3Scratch v3sc = LcaV3Codec.v3Scratch();
+                byte[] grayBuf = v3sc.grayStaging;
+                int grayLen = LcaV3Codec.tryEncodeAdjacencyGrayBitplanes(
+                        curvePaletteIdx, bestActiveVoxels, activePaletteSize,
+                        sortedGlobalIds, v3sc.grayRemappedGlobalIds, arena, grayBuf);
+                if (grayLen > 0) {
+                    int currentOverhead = (secExtFlags != 0) ? 2 : 0;
+                    int grayOverhead = 2 + varIntLen(grayLen);
+                    if (grayLen + grayOverhead < roaringLen + currentOverhead) {
+                        boolean acceptGray = true;
+                        if (modeBLitLen != null) {
+                            long grayBits = LcaV3Codec.estimateHuffmanBitCost(grayBuf, 0, grayLen, modeBLitLen)
+                                    + ((long) grayOverhead << 3);
+                            long baseBits = LcaV3Codec.estimateHuffmanBitCost(blockStaging, 0, roaringLen, modeBLitLen)
+                                    + ((long) currentOverhead << 3);
+                            acceptGray = grayBits < baseBits;
+                        }
+                        if (acceptGray) {
+                            roaringLen = grayLen;
+                            blockStaging = grayBuf;
+                            secExtFlags = LcaV3Codec.SEC_EXT_GRAY_BITPLANES;
+                            emittedGlobalIds = v3sc.grayRemappedGlobalIds;
+                        }
                     }
                 }
             }
 
             int flatBits = Math.max(1, 32 - Integer.numberOfLeadingZeros(activePaletteSize - 1));
             int flatByteCount = (SECTION_VOXELS * flatBits + 7) >>> 3;
-            int effectiveRoaringBytes = roaringLen + (useRankExcl ? 2 : 0);
+            int secExtOverhead = (secExtFlags == LcaV3Codec.SEC_EXT_GRAY_BITPLANES)
+                    ? (2 + varIntLen(roaringLen))
+                    : (secExtFlags != 0 ? 2 : 0);
+            int effectiveRoaringBytes = roaringLen + secExtOverhead;
             if (effectiveRoaringBytes <= flatByteCount) {
                 blockEncodingMode = BLOCK_MODE_DELTA_ROARING;
                 blockPayloadLen = roaringLen;
             } else {
                 blockEncodingMode = BLOCK_MODE_FLAT_BITPACK;
-                useRankExcl = false;
+                secExtFlags = 0;
+                emittedGlobalIds = sortedGlobalIds;
                 encodeFlatBitPackYzx(yzxIdx, oldToNew, flatBits, flatByteCount, blockStaging);
                 blockPayloadLen = flatByteCount;
             }
@@ -2936,13 +3092,16 @@ final class LcaSectionCodec {
             pos += 8;
         }
 
-        if (useRankExcl) {
+        if (secExtFlags != 0) {
             secOut[pos++] = 0; // v3 paletteLen == 0 escape
-            secOut[pos++] = (byte) LcaV3Codec.SEC_EXT_RANK_EXCLUDED;
+            secOut[pos++] = (byte) secExtFlags;
         }
         pos = writeVarIntToBuf(secOut, pos, activePaletteSize);
         for (int i = 0; i < activePaletteSize; i++) {
-            pos = writeVarIntToBuf(secOut, pos, sortedGlobalIds[i]);
+            pos = writeVarIntToBuf(secOut, pos, emittedGlobalIds[i]);
+        }
+        if (secExtFlags == LcaV3Codec.SEC_EXT_GRAY_BITPLANES) {
+            pos = writeVarIntToBuf(secOut, pos, blockPayloadLen);
         }
 
         if (blockPayloadLen > 0) {
@@ -3256,7 +3415,7 @@ final class LcaSectionCodec {
                     return EMPTY_INTS;
                 }
                 secExtFlags = buf[pos++] & 0xFF;
-                if ((secExtFlags & ~LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
+                if (!LcaV3Codec.isValidSecExtFlags(secExtFlags)) {
                     return EMPTY_INTS;
                 }
                 paletteLen = readVarInt(buf, pos, limit);
@@ -3288,6 +3447,9 @@ final class LcaSectionCodec {
                 Arrays.fill(packed, 0, numLongs, 0L);
                 if ((secExtFlags & LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
                     pos = LcaV3Codec.decodeRankExcludedDeltaRoaringBlocks(
+                            buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
+                } else if ((secExtFlags & LcaV3Codec.SEC_EXT_GRAY_BITPLANES) != 0) {
+                    pos = LcaV3Codec.decodeGrayBitplaneBlocks(
                             buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
                 } else {
                     pos = decodeDeltaRoaringBlocks(
@@ -3851,7 +4013,7 @@ final class LcaSectionCodec {
         return runCount;
     }
 
-    private static int emitGraySubModeCandidate(
+    static int emitGraySubModeCandidate(
             int[] staging, int runCount, int refCode, boolean split62, byte[] dst, int startPos
     ) {
         int pos = startPos;
@@ -4088,8 +4250,8 @@ final class LcaSectionCodec {
                 throw new CorruptRegionEntryException("CBIT T5: Truncated v3 secExtFlags");
             }
             secExtFlags = buf[pos++] & 0xFF;
-            if ((secExtFlags & ~LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
-                throw new CorruptRegionEntryException("CBIT T5: Reserved v3 secExtFlags bits set: " + secExtFlags);
+            if (!LcaV3Codec.isValidSecExtFlags(secExtFlags)) {
+                throw new CorruptRegionEntryException("CBIT T5: Reserved or conflicting v3 secExtFlags bits set: " + secExtFlags);
             }
             paletteLen = readVarInt(buf, pos, limit);
             pos += varIntLen(paletteLen);
@@ -4134,6 +4296,9 @@ final class LcaSectionCodec {
             packedBlockLongs = new long[numLongs];
             if ((secExtFlags & LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
                 pos = LcaV3Codec.decodeRankExcludedDeltaRoaringBlocks(
+                        buf, pos, limit, paletteLen, curveId, octreeMask64, packedBlockLongs, bits);
+            } else if ((secExtFlags & LcaV3Codec.SEC_EXT_GRAY_BITPLANES) != 0) {
+                pos = LcaV3Codec.decodeGrayBitplaneBlocks(
                         buf, pos, limit, paletteLen, curveId, octreeMask64, packedBlockLongs, bits);
             } else {
                 pos = decodeDeltaRoaringBlocks(
@@ -4963,7 +5128,7 @@ final class LcaSectionCodec {
         return longs;
     }
 
-    private static long[] packBiomeLongs(int[] cells64, int paletteSize) {
+    static long[] packBiomeLongs(int[] cells64, int paletteSize) {
         int bits = BiomePaletteSection.biomeBitsPerEntry(paletteSize);
         int entriesPerLong = 64 / bits;
         int numLongs = (BIOME_CELLS + entriesPerLong - 1) / entriesPerLong;
@@ -5459,9 +5624,19 @@ final class LcaSectionCodec {
         final List<String> biomes;
         final List<List<String>> singletonBiomePalettes;
         final byte[] dictPatternArena;
+        final String[] baseBlockTable;
+        final String[] propTupleTable;
+        final int[] stateBaseBlockIds;
+        final int[] statePropTupleIds;
+        final int[] stateMaterialPacked;
+        final int airStateId;
         private volatile int[] litHuffDecTable;
         private volatile int[] cmdHuffDecTable;
         private volatile int[] offHuffDecTable;
+        private volatile byte[][] baseBlockNameNbtBytes;
+        private volatile byte[][] baseBlockNameNbtBytesModern;
+        private volatile byte[][] propTupleNbtBytes;
+        private volatile byte[][] propTupleNbtBytesModern;
         private volatile byte[][] stateNbtBytes;
         private volatile byte[][] stateNbtBytesModern;
         private volatile byte[][] biomeStringNbtBytes;
@@ -5562,6 +5737,51 @@ final class LcaSectionCodec {
                 List<List<String>> singletonBiomePalettes,
                 byte[] dictPatternArena
         ) {
+            this(
+                    formatVersion,
+                    storageKind,
+                    regionX,
+                    regionZ,
+                    minSectionY,
+                    sectionCount,
+                    defaultDataVersion,
+                    flags,
+                    slabPoolBaseOffset,
+                    canonicalStates,
+                    baseBlockNames,
+                    singletonBasePalettes,
+                    biomes,
+                    singletonBiomePalettes,
+                    dictPatternArena,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        ParsedHeaderAndDict(
+                int formatVersion,
+                int storageKind,
+                int regionX,
+                int regionZ,
+                int minSectionY,
+                int sectionCount,
+                int defaultDataVersion,
+                int flags,
+                long slabPoolBaseOffset,
+                List<String> canonicalStates,
+                List<String> baseBlockNames,
+                List<List<String>> singletonBasePalettes,
+                List<String> biomes,
+                List<List<String>> singletonBiomePalettes,
+                byte[] dictPatternArena,
+                String[] baseBlockTable,
+                String[] propTupleTable,
+                int[] stateBaseBlockIds,
+                int[] statePropTupleIds,
+                int[] stateMaterialPacked
+        ) {
             this.formatVersion = formatVersion;
             this.storageKind = storageKind;
             this.regionX = regionX;
@@ -5577,6 +5797,21 @@ final class LcaSectionCodec {
             this.biomes = biomes;
             this.singletonBiomePalettes = singletonBiomePalettes;
             this.dictPatternArena = dictPatternArena != null ? dictPatternArena : EMPTY_BYTES;
+            this.baseBlockTable = baseBlockTable;
+            this.propTupleTable = propTupleTable;
+            this.stateBaseBlockIds = stateBaseBlockIds;
+            this.statePropTupleIds = statePropTupleIds;
+            this.stateMaterialPacked = stateMaterialPacked;
+            int foundAir = -1;
+            if (canonicalStates != null) {
+                for (int i = 0; i < canonicalStates.size(); i++) {
+                    if ("minecraft:air".equals(canonicalStates.get(i))) {
+                        foundAir = i;
+                        break;
+                    }
+                }
+            }
+            this.airStateId = foundAir;
         }
 
         int[] ensureLitHuffDecTable() {
@@ -5606,6 +5841,54 @@ final class LcaSectionCodec {
             return t;
         }
 
+        byte[][] ensureBaseBlockNameNbtBytes(boolean modernKeys) {
+            byte[][] cur = modernKeys ? this.baseBlockNameNbtBytesModern : this.baseBlockNameNbtBytes;
+            if (cur != null) {
+                return cur;
+            }
+            byte[][] built = new byte[baseBlockTable != null ? baseBlockTable.length : 0][];
+            if (modernKeys) {
+                this.baseBlockNameNbtBytesModern = built;
+            } else {
+                this.baseBlockNameNbtBytes = built;
+            }
+            return built;
+        }
+
+        byte[] baseBlockNameNbtBytesAt(int baseBlockId, boolean modernKeys) {
+            byte[][] arr = ensureBaseBlockNameNbtBytes(modernKeys);
+            byte[] b = arr[baseBlockId];
+            if (b == null) {
+                b = encodeCanonicalStateToNbtCompoundBytes(baseBlockTable[baseBlockId], modernKeys);
+                arr[baseBlockId] = b;
+            }
+            return b;
+        }
+
+        byte[][] ensurePropTupleNbtBytes(boolean modernKeys) {
+            byte[][] cur = modernKeys ? this.propTupleNbtBytesModern : this.propTupleNbtBytes;
+            if (cur != null) {
+                return cur;
+            }
+            byte[][] built = new byte[propTupleTable != null ? propTupleTable.length : 0][];
+            if (modernKeys) {
+                this.propTupleNbtBytesModern = built;
+            } else {
+                this.propTupleNbtBytes = built;
+            }
+            return built;
+        }
+
+        byte[] propTupleNbtBytesAt(int propTupleId, boolean modernKeys) {
+            byte[][] arr = ensurePropTupleNbtBytes(modernKeys);
+            byte[] b = arr[propTupleId];
+            if (b == null) {
+                b = encodePropSuffixToNbtBytes(propTupleTable[propTupleId], modernKeys);
+                arr[propTupleId] = b;
+            }
+            return b;
+        }
+
         byte[][] ensureStateNbtBytes() {
             return ensureStateNbtBytes(false);
         }
@@ -5632,10 +5915,33 @@ final class LcaSectionCodec {
             byte[][] arr = ensureStateNbtBytes(modernKeys);
             byte[] b = arr[globalId];
             if (b == null) {
-                b = encodeCanonicalStateToNbtCompoundBytes(canonicalStates.get(globalId), modernKeys);
+                if (stateBaseBlockIds != null
+                        && baseBlockTable != null
+                        && globalId >= 0
+                        && globalId < stateBaseBlockIds.length) {
+                    int baseId = stateBaseBlockIds[globalId];
+                    int propId = statePropTupleIds[globalId];
+                    byte[] baseNbt = baseBlockNameNbtBytesAt(baseId, modernKeys);
+                    b = propId < 0
+                            ? baseNbt
+                            : combineBaseStateAndPropNbt(baseNbt, propTupleNbtBytesAt(propId, modernKeys));
+                } else {
+                    b = encodeCanonicalStateToNbtCompoundBytes(canonicalStates.get(globalId), modernKeys);
+                }
                 arr[globalId] = b;
             }
             return b;
+        }
+
+        byte[] airStateNbtBytes(boolean modernKeys) {
+            if (airStateId >= 0 && airStateId < canonicalStates.size()) {
+                return stateNbtBytesAt(airStateId, modernKeys);
+            }
+            return modernKeys ? AIR_STATE_NBT_BYTES_MODERN : AIR_STATE_NBT_BYTES;
+        }
+
+        byte[][] getOrBuildStateNbtBytes(boolean modernKeys) {
+            return ensureAllStateNbtBytes(modernKeys);
         }
 
         byte[][] ensureAllStateNbtBytes() {
@@ -5646,10 +5952,18 @@ final class LcaSectionCodec {
             byte[][] arr = ensureStateNbtBytes(modernKeys);
             for (int i = 0; i < arr.length; i++) {
                 if (arr[i] == null) {
-                    arr[i] = encodeCanonicalStateToNbtCompoundBytes(canonicalStates.get(i), modernKeys);
+                    stateNbtBytesAt(i, modernKeys);
                 }
             }
             return arr;
+        }
+
+        byte[][] getOrBuildBiomeStringNbtBytes() {
+            return ensureBiomeStringNbtBytes();
+        }
+
+        byte[][] getOrBuildSingleBiomeCompoundNbtBytes() {
+            return ensureSingleBiomeCompoundNbtBytes();
         }
 
         byte[][] ensureBiomeStringNbtBytes() {
@@ -5698,78 +6012,40 @@ final class LcaSectionCodec {
         }
     }
 
-    /**
-     * Encodes a chunk's Slab-Local Micro-Palette (`anvil-api-ADR-003` Section 4.2):
-     * Part A stores 1-byte static core tokens (`0x80 | coreId`) for base block/biome names plus
-     * chunk-level $4 \times 4 \times 4$ biome grid templates; Part B stores 1-byte static property
-     * suffix tokens (`0x80 | propId`), 1-2 byte region dictionary IDs (`0x40` + VarInt), or raw
-     * UTF-8 fallback (`0x00`).
-     */
-    static byte[] encodeSlabLocalPalette(
-            List<String> localStates,
+    static byte[] encodePureIdMicroPalette(
             int[] localStateGlobalIds,
-            List<String> localBiomes,
+            int localStateCount,
+            int[] localBiomeGlobalIds,
+            int localBiomeCount,
             List<BiomeTemplate> biomeTemplates
     ) {
         ScratchArena arena = scratch();
         byte[] buf = arena.byteStaging;
-        int pos = writeSlabLocalEntryList(buf, 0, localStates, STATIC_CORE_STATE_TO_ID, true);
-        pos = writeSlabLocalEntryList(buf, pos, localBiomes, STATIC_CORE_BIOME_TO_ID, false);
-
+        int pos = writeVarIntToBuf(buf, 0, localStateCount);
+        for (int i = 0; i < localStateCount; i++) {
+            pos = writeVarIntToBuf(buf, pos, localStateGlobalIds[i]);
+        }
+        pos = writeVarIntToBuf(buf, pos, localBiomeCount);
+        for (int i = 0; i < localBiomeCount; i++) {
+            pos = writeVarIntToBuf(buf, pos, localBiomeGlobalIds[i]);
+        }
         int tmplCount = biomeTemplates == null ? 0 : biomeTemplates.size();
         pos = writeVarIntToBuf(buf, pos, tmplCount);
         for (int t = 0; t < tmplCount; t++) {
             BiomeTemplate tmpl = biomeTemplates.get(t);
             pos = encodeBiomesToBuf(buf, pos, tmpl.biomeIds, tmpl.rawBiomeDataLongs, -1, arena);
         }
-
-        int propStateCount = 0;
-        for (int i = 0; i < localStates.size(); i++) {
-            if (localStates.get(i).indexOf('[') >= 0) propStateCount++;
-        }
-        // Part B: property suffixes only for states that actually have '[...]' (skipped in O(1) by readChunkView!)
-        pos = writeVarIntToBuf(buf, pos, propStateCount);
-        for (int i = 0; i < localStates.size(); i++) {
-            String s = localStates.get(i);
-            int bracket = s.indexOf('[');
-            if (bracket >= 0) {
-                pos = writeVarIntToBuf(buf, pos, i);
-                String propSuffix = s.substring(bracket);
-                Integer propId = STATIC_CORE_PROP_TO_ID.get(propSuffix);
-                if (propId != null) {
-                    buf[pos++] = (byte) (0x80 | (propId & 0x7F));
-                } else {
-                    buf[pos++] = 0x40;
-                    pos = writeVarIntToBuf(buf, pos, localStateGlobalIds[i]);
-                }
-            }
-        }
         return Arrays.copyOf(buf, pos);
     }
 
-    private static int writeSlabLocalEntryList(
-            byte[] buf, int pos, List<String> entries, Map<String, Integer> coreMap, boolean stripProps
+    static byte[] encodeSlabLocalPalette(
+            List<String> localStates,
+            int[] localStateGlobalIds,
+            List<String> localBiomes,
+            List<BiomeTemplate> biomeTemplates
     ) {
-        pos = writeVarIntToBuf(buf, pos, entries.size());
-        for (int i = 0; i < entries.size(); i++) {
-            String s = entries.get(i);
-            int bracket = stripProps ? s.indexOf('[') : -1;
-            String base = bracket >= 0 ? s.substring(0, bracket) : s;
-            Integer coreId = coreMap.get(base);
-            if (coreId != null && coreId < 128) {
-                buf[pos++] = (byte) (0x80 | coreId);
-            } else if (coreId != null && coreId < 160) {
-                buf[pos++] = (byte) (0x60 | (coreId - 128));
-            } else {
-                boolean mc = base.startsWith("minecraft:");
-                byte[] utf = (mc ? base.substring(10) : base).getBytes(StandardCharsets.UTF_8);
-                buf[pos++] = (byte) (mc ? 0x40 : 0x00);
-                pos = writeVarIntToBuf(buf, pos, utf.length);
-                System.arraycopy(utf, 0, buf, pos, utf.length);
-                pos += utf.length;
-            }
-        }
-        return pos;
+        return LcaV2LegacyCodec.encodeSlabLocalPaletteV2(
+                localStates, localStateGlobalIds, localBiomes, biomeTemplates);
     }
 
     static final class SlabLocalPalette {
@@ -5779,6 +6055,8 @@ final class LcaSectionCodec {
         final List<String> biomes;
         final List<List<String>> singletonBiomePalettes;
         final List<BiomeTemplate> biomeTemplates;
+        final int[] localStateGlobalIds;
+        final int[] localBiomeGlobalIds;
 
         SlabLocalPalette(
                 List<String> canonicalStates,
@@ -5788,16 +6066,142 @@ final class LcaSectionCodec {
                 List<List<String>> singletonBiomePalettes,
                 List<BiomeTemplate> biomeTemplates
         ) {
+            this(canonicalStates, baseBlockNames, singletonBasePalettes,
+                    biomes, singletonBiomePalettes, biomeTemplates, null, null);
+        }
+
+        SlabLocalPalette(
+                List<String> canonicalStates,
+                List<String> baseBlockNames,
+                List<List<String>> singletonBasePalettes,
+                List<String> biomes,
+                List<List<String>> singletonBiomePalettes,
+                List<BiomeTemplate> biomeTemplates,
+                int[] localStateGlobalIds,
+                int[] localBiomeGlobalIds
+        ) {
             this.canonicalStates = canonicalStates;
             this.baseBlockNames = baseBlockNames;
             this.singletonBasePalettes = singletonBasePalettes;
             this.biomes = biomes;
             this.singletonBiomePalettes = singletonBiomePalettes;
             this.biomeTemplates = biomeTemplates;
+            this.localStateGlobalIds = localStateGlobalIds;
+            this.localBiomeGlobalIds = localBiomeGlobalIds;
         }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    static SlabLocalPalette decodePureIdMicroPalette(
+            byte[] frame,
+            int fOff,
+            int startRel,
+            int limitRel,
+            boolean needCanonicalStates,
+            boolean needBiomes,
+            ParsedHeaderAndDict regionMeta
+    ) throws CorruptRegionEntryException {
+        if (regionMeta == null) {
+            throw new CorruptRegionEntryException("CBIT T5: Pure-ID micro-palette requires parsed Layer 2 dictionary");
+        }
+        int pos = fOff + startRel;
+        int limit = fOff + limitRel;
+        int stateCount = readVarInt(frame, pos, limit);
+        pos += varIntLen(stateCount);
+        if (stateCount < 0 || stateCount > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette stateCount " + stateCount);
+        }
+        int regionStateCount = regionMeta.canonicalStates.size();
+        int[] stateGlobalIds = new int[stateCount];
+        List<String> baseNames = new ArrayList<>(stateCount);
+        List<List<String>> singletons = new ArrayList<>(stateCount);
+        List<String> canonicalStates = needCanonicalStates ? new ArrayList<>(stateCount) : Collections.emptyList();
+        for (int i = 0; i < stateCount; i++) {
+            int gid = readVarInt(frame, pos, limit);
+            pos += varIntLen(gid);
+            if (gid < 0 || gid >= regionStateCount) {
+                throw new CorruptRegionEntryException("CBIT T7: Pure-ID micro-palette stateId " + gid + " out of range");
+            }
+            stateGlobalIds[i] = gid;
+            baseNames.add(regionMeta.baseBlockNames.get(gid));
+            singletons.add(regionMeta.singletonBasePalettes.get(gid));
+            if (needCanonicalStates) {
+                canonicalStates.add(regionMeta.canonicalStates.get(gid));
+            }
+        }
+
+        if (!needBiomes) {
+            return new SlabLocalPalette(
+                    canonicalStates,
+                    baseNames,
+                    singletons,
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    stateGlobalIds,
+                    null);
+        }
+
+        int biomeCount = readVarInt(frame, pos, limit);
+        pos += varIntLen(biomeCount);
+        if (biomeCount < 0 || biomeCount > 1024) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette biomeCount " + biomeCount);
+        }
+        int regionBiomeCount = regionMeta.biomes.size();
+        int[] biomeGlobalIds = new int[biomeCount];
+        String[] biomeArr = new String[biomeCount];
+        List<String>[] singletonBiomeArr = new List[biomeCount];
+        for (int i = 0; i < biomeCount; i++) {
+            int bgid = readVarInt(frame, pos, limit);
+            pos += varIntLen(bgid);
+            if (bgid < 0 || bgid >= regionBiomeCount) {
+                throw new CorruptRegionEntryException("CBIT T7: Pure-ID micro-palette biomeId " + bgid + " out of range");
+            }
+            biomeGlobalIds[i] = bgid;
+            biomeArr[i] = regionMeta.biomes.get(bgid);
+            singletonBiomeArr[i] = regionMeta.singletonBiomePalettes.get(bgid);
+        }
+        List<String> biomes = Arrays.asList(biomeArr);
+        List<List<String>> singletonBiomes = Arrays.asList(singletonBiomeArr);
+
+        int tmplCount = readVarInt(frame, pos, limit);
+        pos += varIntLen(tmplCount);
+        if (tmplCount < 0 || tmplCount > 64) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID biome template count " + tmplCount);
+        }
+        List<BiomeTemplate> biomeTemplates = Collections.emptyList();
+        if (tmplCount > 0) {
+            BiomeTemplate[] tmplArr = new BiomeTemplate[tmplCount];
+            ScratchArena arena = scratch();
+            for (int t = 0; t < tmplCount; t++) {
+                int bLen = readVarInt(frame, pos, limit);
+                pos += varIntLen(bLen);
+                if (bLen == 1) {
+                    int bLocalId = readVarInt(frame, pos, limit);
+                    pos += varIntLen(bLocalId);
+                    if (bLocalId < 0 || bLocalId >= biomeCount) {
+                        throw new CorruptRegionEntryException("CBIT T7: Biome localId " + bLocalId + " out of range");
+                    }
+                    tmplArr[t] = new BiomeTemplate(new int[]{bLocalId}, null, singletonBiomeArr[bLocalId], null);
+                } else {
+                    List<String> tmplPal = new ArrayList<>(bLen);
+                    pos = decodeSectionBiomePayload(frame, pos, limit, bLen, biomes, false, tmplPal, arena);
+                    int[] tmplIds = new int[bLen];
+                    for (int j = 0; j < bLen; j++) {
+                        int idx = biomes.indexOf(tmplPal.get(j));
+                        tmplIds[j] = Math.max(0, idx);
+                    }
+                    long[] packedLongs = bLen > 1 ? packBiomeLongs(arena.biomeCells, bLen) : null;
+                    tmplArr[t] = new BiomeTemplate(tmplIds, packedLongs, tmplPal, packedLongs);
+                }
+            }
+            biomeTemplates = Arrays.asList(tmplArr);
+        }
+        return new SlabLocalPalette(
+                canonicalStates, baseNames, singletons, biomes, singletonBiomes, biomeTemplates,
+                stateGlobalIds, biomeGlobalIds);
+    }
+
     static SlabLocalPalette decodeSlabLocalPalette(
             byte[] frame,
             int fOff,
@@ -5805,96 +6209,42 @@ final class LcaSectionCodec {
             int limitRel,
             boolean needCanonicalStates,
             boolean needBiomes,
-            List<String> regionCanonicalStates
+            ParsedHeaderAndDict regionMeta
+    ) throws CorruptRegionEntryException {
+        if (regionMeta != null && regionMeta.formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3) {
+            return decodePureIdMicroPalette(
+                    frame, fOff, startRel, limitRel, needCanonicalStates, needBiomes, regionMeta);
+        }
+        return LcaV2LegacyCodec.decodeSlabLocalPaletteV2(
+                frame, fOff, startRel, limitRel, needCanonicalStates, needBiomes,
+                regionMeta != null ? regionMeta.canonicalStates : Collections.emptyList());
+    }
+
+    static int[] decodePureIdMicroPaletteRuntimeIds(
+            byte[] frame,
+            int fOff,
+            int startRel,
+            int limitRel,
+            int[] dictIdToRuntimeIdOrNull
     ) throws CorruptRegionEntryException {
         int pos = fOff + startRel;
         int limit = fOff + limitRel;
         int stateCount = readVarInt(frame, pos, limit);
         pos += varIntLen(stateCount);
-        List<String> baseNames = new ArrayList<>(stateCount);
-        List<List<String>> singletons = new ArrayList<>(stateCount);
-        pos = readSlabLocalEntryList(
-                frame, pos, limit, stateCount, STATIC_CORE_BASE_NAMES, STATIC_CORE_SINGLETON_PALETTES, baseNames, singletons);
-
-        if (!needBiomes && !needCanonicalStates) {
-            return new SlabLocalPalette(
-                    Collections.emptyList(),
-                    baseNames,
-                    singletons,
-                    Collections.emptyList(),
-                    Collections.emptyList(),
-                    Collections.emptyList());
+        if (stateCount < 0 || stateCount > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette stateCount " + stateCount);
         }
-
-        int biomeCount = readVarInt(frame, pos, limit);
-        pos += varIntLen(biomeCount);
-        String[] biomeArr = new String[biomeCount];
-        List<String>[] singletonBiomeArr = new List[biomeCount];
-        pos = readSlabLocalEntryArrays(
-                frame, pos, limit, biomeCount, STATIC_CORE_BIOMES, STATIC_CORE_SINGLETON_BIOMES, biomeArr, singletonBiomeArr);
-        List<String> biomes = Arrays.asList(biomeArr);
-        List<List<String>> singletonBiomes = Arrays.asList(singletonBiomeArr);
-
-        int tmplCount = readVarInt(frame, pos, limit);
-        pos += varIntLen(tmplCount);
-        List<BiomeTemplate> biomeTemplates = Collections.emptyList();
-        if (tmplCount > 0) {
-            BiomeTemplate[] tmplArr = needBiomes ? new BiomeTemplate[tmplCount] : null;
-            ScratchArena arena = scratch();
-            for (int t = 0; t < tmplCount; t++) {
-                int bLen = readVarInt(frame, pos, limit);
-                pos += varIntLen(bLen);
-                if (needBiomes && bLen == 1) {
-                    int bDictId = readVarInt(frame, pos, limit);
-                    pos += varIntLen(bDictId);
-                    if (bDictId < 0 || bDictId >= biomeCount) {
-                        throw new CorruptRegionEntryException("CBIT T7: Biome dictId " + bDictId + " out of range");
-                    }
-                    tmplArr[t] = new BiomeTemplate(null, null, singletonBiomeArr[bDictId], null);
-                } else {
-                    List<String> tmplPal = needBiomes ? new ArrayList<>(bLen) : Collections.emptyList();
-                    pos = decodeSectionBiomePayload(frame, pos, limit, bLen, biomes, !needBiomes, tmplPal, arena);
-                    if (needBiomes) {
-                        long[] packedLongs = bLen > 1 ? packBiomeLongs(arena.biomeCells, bLen) : null;
-                        tmplArr[t] = new BiomeTemplate(null, null, tmplPal, packedLongs);
-                    }
-                }
-            }
-            if (needBiomes) {
-                biomeTemplates = Arrays.asList(tmplArr);
-            }
-        }
-
-        if (!needCanonicalStates) {
-            return new SlabLocalPalette(Collections.emptyList(), baseNames, singletons, biomes, singletonBiomes, biomeTemplates);
-        }
-
-        List<String> canonicalStates = new ArrayList<>(baseNames);
-        int propCount = readVarInt(frame, pos, limit);
-        pos += varIntLen(propCount);
-        for (int k = 0; k < propCount; k++) {
-            int stateIdx = readVarInt(frame, pos, limit);
-            pos += varIntLen(stateIdx);
-            if (stateIdx >= stateCount || pos >= limit) {
-                throw new CorruptRegionEntryException("CBIT T5: Invalid slab-local property suffix index");
-            }
-            int tag = frame[pos++] & 0xFF;
-            if ((tag & 0x80) != 0) {
-                int propId = tag & 0x7F;
-                if (propId >= STATIC_CORE_PROP_SUFFIXES.length) {
-                    throw new CorruptRegionEntryException("CBIT T5: Invalid static property suffix token " + propId);
-                }
-                canonicalStates.set(stateIdx, baseNames.get(stateIdx) + STATIC_CORE_PROP_SUFFIXES[propId]);
+        int[] out = new int[stateCount];
+        for (int i = 0; i < stateCount; i++) {
+            int gid = readVarInt(frame, pos, limit);
+            pos += varIntLen(gid);
+            if (dictIdToRuntimeIdOrNull != null && gid >= 0 && gid < dictIdToRuntimeIdOrNull.length) {
+                out[i] = dictIdToRuntimeIdOrNull[gid];
             } else {
-                int globalId = readVarInt(frame, pos, limit);
-                pos += varIntLen(globalId);
-                if (regionCanonicalStates == null || globalId < 0 || globalId >= regionCanonicalStates.size()) {
-                    throw new CorruptRegionEntryException("CBIT T7: Slab-local globalStateId " + globalId + " out of range");
-                }
-                canonicalStates.set(stateIdx, regionCanonicalStates.get(globalId));
+                out[i] = gid;
             }
         }
-        return new SlabLocalPalette(canonicalStates, baseNames, singletons, biomes, singletonBiomes, biomeTemplates);
+        return out;
     }
 
     static int[] decodeSlabLocalPaletteRuntimeIds(
@@ -5902,112 +6252,15 @@ final class LcaSectionCodec {
             int fOff,
             int startRel,
             int limitRel,
+            int formatVersion,
             int[] dictIdToRuntimeIdOrNull,
             java.util.function.Function<String, Integer> fallbackRuntimeLookup
     ) throws CorruptRegionEntryException {
-        final String globalPrefix = "\u0000GID:";
-        List<String> syntheticGlobals = new java.util.AbstractList<>() {
-            @Override
-            public String get(int index) {
-                return globalPrefix + index;
-            }
-
-            @Override
-            public int size() {
-                return dictIdToRuntimeIdOrNull != null
-                        ? Math.max(dictIdToRuntimeIdOrNull.length, LcaSectionBacking.MAX_STATE_ID_19)
-                        : LcaSectionBacking.MAX_STATE_ID_19;
-            }
-        };
-        SlabLocalPalette localPal = decodeSlabLocalPalette(
-                frame, fOff, startRel, limitRel, true, false, syntheticGlobals);
-        int stateCount = localPal.canonicalStates.size();
-        int[] out = new int[stateCount];
-        for (int i = 0; i < stateCount; i++) {
-            String canon = localPal.canonicalStates.get(i);
-            if (canon.startsWith(globalPrefix)) {
-                int gId = Integer.parseInt(canon.substring(globalPrefix.length()));
-                if (dictIdToRuntimeIdOrNull != null && gId >= 0 && gId < dictIdToRuntimeIdOrNull.length) {
-                    out[i] = dictIdToRuntimeIdOrNull[gId];
-                }
-            } else if (fallbackRuntimeLookup != null) {
-                Integer mapped = fallbackRuntimeLookup.apply(canon);
-                out[i] = mapped != null ? mapped.intValue() : 0;
-            }
+        if (formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3) {
+            return decodePureIdMicroPaletteRuntimeIds(frame, fOff, startRel, limitRel, dictIdToRuntimeIdOrNull);
         }
-        return out;
-    }
-
-    private static int readSlabLocalEntryArrays(
-            byte[] frame,
-            int pos,
-            int limit,
-            int count,
-            String[] coreNames,
-            List<String>[] coreSingletons,
-            String[] namesOut,
-            List<String>[] singletonsOut
-    ) throws CorruptRegionEntryException {
-        for (int i = 0; i < count; i++) {
-            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local palette");
-            int tag = frame[pos++] & 0xFF;
-            if ((tag & 0x80) != 0 || (tag >= 0x60 && tag < 0x80)) {
-                int coreId = ((tag & 0x80) != 0) ? (tag & 0x7F) : (128 + (tag & 0x1F));
-                if (coreId >= coreNames.length) {
-                    throw new CorruptRegionEntryException("CBIT T5: Invalid static core token " + coreId);
-                }
-                namesOut[i] = coreNames[coreId];
-                singletonsOut[i] = coreSingletons[coreId];
-            } else {
-                int utfLen = readVarInt(frame, pos, limit);
-                pos += varIntLen(utfLen);
-                if (pos + utfLen > limit) {
-                    throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local string");
-                }
-                String raw = new String(frame, pos, utfLen, StandardCharsets.UTF_8);
-                pos += utfLen;
-                String full = (tag == 0x40) ? ("minecraft:" + raw) : raw;
-                namesOut[i] = full;
-                singletonsOut[i] = List.of(full);
-            }
-        }
-        return pos;
-    }
-
-    private static int readSlabLocalEntryList(
-            byte[] frame,
-            int pos,
-            int limit,
-            int count,
-            String[] coreNames,
-            List<String>[] coreSingletons,
-            List<String> namesOut,
-            List<List<String>> singletonsOut
-    ) throws CorruptRegionEntryException {
-        for (int i = 0; i < count; i++) {
-            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local palette");
-            int tag = frame[pos++] & 0xFF;
-            if ((tag & 0x80) != 0 || (tag >= 0x60 && tag < 0x80)) {
-                int coreId = ((tag & 0x80) != 0) ? (tag & 0x7F) : (128 + (tag & 0x1F));
-                if (coreId >= coreNames.length) {
-                    throw new CorruptRegionEntryException("CBIT T5: Invalid static core token " + coreId);
-                }
-                namesOut.add(coreNames[coreId]);
-                singletonsOut.add(coreSingletons[coreId]);
-            } else {
-                int utfLen = readVarInt(frame, pos, limit);
-                pos += varIntLen(utfLen);
-                if (pos + utfLen > limit) {
-                    throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local string");
-                }
-                String raw = new String(frame, pos, utfLen, StandardCharsets.UTF_8);
-                pos += utfLen;
-                String full = (tag == 0x40) ? ("minecraft:" + raw) : raw;
-                namesOut.add(full);
-                singletonsOut.add(List.of(full));
-            }
-        }
-        return pos;
+        return LcaV2LegacyCodec.decodeSlabLocalPaletteRuntimeIdsV2(
+                frame, fOff, startRel, limitRel, dictIdToRuntimeIdOrNull, fallbackRuntimeLookup);
     }
 
     static final class SectionPatch {
@@ -6056,53 +6309,33 @@ final class LcaSectionCodec {
         }
     }
 
-    /**
-     * Encodes a `ChunkPatchTail` payload (`LCA-ICD-1.0` Section 8.3, `anvil-api-ADR-003` Section 4.3)
-     * including the trailing 1-byte Extended Hamming `(72, 64)` `patchParity8` syndrome.
-     */
+    static byte[] encodePureIdChunkPatchTailBytes(
+            int[] appendedGlobalStateIds,
+            int appendedCount,
+            List<SectionPatch> sectionPatches
+    ) {
+        ScratchArena arena = scratch();
+        byte[] buf = arena.byteStaging;
+        int pos = writeVarIntToBuf(buf, 0, appendedCount);
+        for (int i = 0; i < appendedCount; i++) {
+            pos = writeVarIntToBuf(buf, pos, appendedGlobalStateIds[i]);
+        }
+        return finishChunkPatchTailEncoding(buf, pos, sectionPatches, arena);
+    }
+
     static byte[] encodeChunkPatchTailBytes(
             int baseLocalStateCount,
             List<String> appendedStates,
             int[] appendedGlobalStateIds,
             List<SectionPatch> sectionPatches
     ) {
-        ScratchArena arena = scratch();
-        byte[] buf = arena.byteStaging;
-        int pos = 0;
+        return LcaV2LegacyCodec.encodeChunkPatchTailBytesV2(
+                baseLocalStateCount, appendedStates, appendedGlobalStateIds, sectionPatches);
+    }
 
-        List<String> appStates = appendedStates == null ? Collections.emptyList() : appendedStates;
-        int appCount = appStates.size();
-        if (appCount == 0) {
-            pos = writeVarIntToBuf(buf, pos, 0);
-        } else {
-            pos = writeSlabLocalEntryList(buf, pos, appStates, STATIC_CORE_STATE_TO_ID, true);
-            int propCount = 0;
-            for (int i = 0; i < appCount; i++) {
-                if (appStates.get(i).indexOf('[') >= 0) {
-                    propCount++;
-                }
-            }
-            pos = writeVarIntToBuf(buf, pos, propCount);
-            for (int i = 0; i < appCount; i++) {
-                String s = appStates.get(i);
-                int bracket = s.indexOf('[');
-                if (bracket >= 0) {
-                    pos = writeVarIntToBuf(buf, pos, baseLocalStateCount + i);
-                    String propSuffix = s.substring(bracket);
-                    Integer propId = STATIC_CORE_PROP_TO_ID.get(propSuffix);
-                    if (propId != null) {
-                        buf[pos++] = (byte) (0x80 | (propId & 0x7F));
-                    } else {
-                        buf[pos++] = 0x40;
-                        int gid = (appendedGlobalStateIds != null && i < appendedGlobalStateIds.length)
-                                ? appendedGlobalStateIds[i]
-                                : 0;
-                        pos = writeVarIntToBuf(buf, pos, gid);
-                    }
-                }
-            }
-        }
-
+    static byte[] finishChunkPatchTailEncoding(
+            byte[] buf, int pos, List<SectionPatch> sectionPatches, ScratchArena arena
+    ) {
         List<SectionPatch> patches = sectionPatches == null ? Collections.emptyList() : sectionPatches;
         pos = writeVarIntToBuf(buf, pos, patches.size());
         for (int s = 0; s < patches.size(); s++) {
@@ -6210,7 +6443,7 @@ final class LcaSectionCodec {
             boolean scale4B,
             boolean hasSlabLocalPalette,
             SlabLocalPalette localPal,
-            List<String> regionCanonicalStates,
+            ParsedHeaderAndDict regionMeta,
             boolean needCanonicalStates,
             boolean skipLighting,
             int[] sectionEntries,
@@ -6287,54 +6520,31 @@ final class LcaSectionCodec {
         if (appendedStateCount < 0 || appendedStateCount > SECTION_VOXELS) {
             throw new CorruptRegionEntryException("CBIT T5: Invalid appendedStateCount " + appendedStateCount);
         }
-        if (appendedStateCount > 0) {
-            if (!hasSlabLocalPalette || localPal == null) {
-                throw new CorruptRegionEntryException("CBIT T5: Appended micro-palette entries require hasSlabLocalPalette");
-            }
-            int baseCount = localPal.baseBlockNames.size();
-            pPos = readSlabLocalEntryList(
-                    frame, pPos, payloadEnd, appendedStateCount,
-                    STATIC_CORE_BASE_NAMES, STATIC_CORE_SINGLETON_PALETTES,
-                    localPal.baseBlockNames, localPal.singletonBasePalettes);
-            if (needCanonicalStates) {
+        if (regionMeta != null && regionMeta.formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3) {
+            if (appendedStateCount > 0) {
+                if (!hasSlabLocalPalette || localPal == null) {
+                    throw new CorruptRegionEntryException("CBIT T5: Appended micro-palette entries require hasSlabLocalPalette");
+                }
+                int regionStateCount = regionMeta.canonicalStates.size();
                 for (int i = 0; i < appendedStateCount; i++) {
-                    localPal.canonicalStates.add(localPal.baseBlockNames.get(baseCount + i));
-                }
-            }
-            int appendedPropCount = readVarInt(frame, pPos, payloadEnd);
-            pPos += varIntLen(appendedPropCount);
-            if (appendedPropCount < 0 || appendedPropCount > appendedStateCount) {
-                throw new CorruptRegionEntryException("CBIT T5: Invalid appendedPropCount " + appendedPropCount);
-            }
-            for (int k = 0; k < appendedPropCount; k++) {
-                int stateIdx = readVarInt(frame, pPos, payloadEnd);
-                pPos += varIntLen(stateIdx);
-                if (stateIdx < baseCount || stateIdx >= baseCount + appendedStateCount || pPos >= payloadEnd) {
-                    throw new CorruptRegionEntryException("CBIT T5: Appended property suffix index out of range: " + stateIdx);
-                }
-                int propTag = frame[pPos++] & 0xFF;
-                if ((propTag & 0x80) != 0) {
-                    int propId = propTag & 0x7F;
-                    if (propId >= STATIC_CORE_PROP_SUFFIXES.length) {
-                        throw new CorruptRegionEntryException("CBIT T5: Invalid appended static property suffix " + propId);
+                    int gid = readVarInt(frame, pPos, payloadEnd);
+                    pPos += varIntLen(gid);
+                    if (gid < 0 || gid >= regionStateCount) {
+                        throw new CorruptRegionEntryException("CBIT T7: Appended pure-ID globalStateId " + gid + " out of range");
                     }
+                    localPal.baseBlockNames.add(regionMeta.baseBlockNames.get(gid));
+                    localPal.singletonBasePalettes.add(regionMeta.singletonBasePalettes.get(gid));
                     if (needCanonicalStates) {
-                        localPal.canonicalStates.set(
-                                stateIdx, localPal.baseBlockNames.get(stateIdx) + STATIC_CORE_PROP_SUFFIXES[propId]);
+                        localPal.canonicalStates.add(regionMeta.canonicalStates.get(gid));
                     }
-                } else if (propTag == 0x40) {
-                    int globalId = readVarInt(frame, pPos, payloadEnd);
-                    pPos += varIntLen(globalId);
-                    if (needCanonicalStates) {
-                        if (regionCanonicalStates == null || globalId < 0 || globalId >= regionCanonicalStates.size()) {
-                            throw new CorruptRegionEntryException("CBIT T7: Appended globalStateId " + globalId + " out of range");
-                        }
-                        localPal.canonicalStates.set(stateIdx, regionCanonicalStates.get(globalId));
-                    }
-                } else {
-                    throw new CorruptRegionEntryException("CBIT T5: Invalid appended property tag 0x" + Integer.toHexString(propTag));
                 }
             }
+        } else {
+            pPos = LcaV2LegacyCodec.decodeChunkPatchTailAppendedStatesV2(
+                    frame, pPos, payloadEnd, appendedStateCount,
+                    hasSlabLocalPalette, localPal,
+                    regionMeta != null ? regionMeta.canonicalStates : Collections.emptyList(),
+                    needCanonicalStates);
         }
 
         int patchedSecCount = readVarInt(frame, pPos, payloadEnd);
@@ -6739,7 +6949,7 @@ final class LcaSectionCodec {
         return out;
     }
 
-    private static byte[] encodeNbtStringPayloadBytesFromFrame(byte[] frame, int pos, int utfLen, boolean mcPrefix) {
+    static byte[] encodeNbtStringPayloadBytesFromFrame(byte[] frame, int pos, int utfLen, boolean mcPrefix) {
         int totalUtf = (mcPrefix ? 10 : 0) + utfLen;
         byte[] out = new byte[2 + totalUtf];
         out[0] = (byte) ((totalUtf >>> 8) & 0xFF);
@@ -6770,7 +6980,7 @@ final class LcaSectionCodec {
         return encodeBaseStateBytesFromFrame(frame, pos, utfLen, mcPrefix, false);
     }
 
-    private static byte[] encodeBaseStateBytesFromFrame(
+    static byte[] encodeBaseStateBytesFromFrame(
             byte[] frame, int pos, int utfLen, boolean mcPrefix, boolean modernKeys) {
         int totalUtf = (mcPrefix ? 10 : 0) + utfLen;
         if (modernKeys) {
@@ -6899,27 +7109,8 @@ final class LcaSectionCodec {
         }
         byte[] baseNbt = encodeCanonicalStateToNbtCompoundBytes(canonicalState.substring(0, bracket), modernKeys);
         String suffix = canonicalState.substring(bracket);
-        Integer propId = STATIC_CORE_PROP_TO_ID.get(suffix);
-        byte[][] propTable = modernKeys ? STATIC_CORE_PROP_NBT_BYTES_MODERN : STATIC_CORE_PROP_NBT_BYTES;
-        byte[] propNbt = (propId != null && propTable[propId] != null)
-                ? propTable[propId]
-                : encodePropSuffixToNbtBytes(suffix, modernKeys);
+        byte[] propNbt = encodePropSuffixToNbtBytes(suffix, modernKeys);
         return combineBaseStateAndPropNbt(baseNbt, propNbt);
-    }
-
-    private static volatile byte[] STATIC_CORE_LIGHT_V1_CACHE;
-
-    private static byte[] staticCoreLightV1Table() {
-        byte[] cached = STATIC_CORE_LIGHT_V1_CACHE;
-        if (cached != null) {
-            return cached;
-        }
-        byte[] tbl = new byte[STATIC_CORE_STATES.length];
-        for (int i = 0; i < STATIC_CORE_STATES.length; i++) {
-            tbl[i] = LcaV3Codec.classifyLightV1(STATIC_CORE_STATES[i]);
-        }
-        STATIC_CORE_LIGHT_V1_CACHE = tbl;
-        return tbl;
     }
 
     static final class SlabLocalPaletteNbt {
@@ -6955,6 +7146,73 @@ final class LcaSectionCodec {
         return decodeSlabLocalPaletteForNbt(frame, fOff, startRel, limitRel, regionMeta, arena, false);
     }
 
+    static SlabLocalPaletteNbt decodePureIdMicroPaletteForNbt(
+            byte[] frame,
+            int fOff,
+            int startRel,
+            int limitRel,
+            ParsedHeaderAndDict regionMeta,
+            ScratchArena arena,
+            boolean modernKeys
+    ) throws CorruptRegionEntryException {
+        if (regionMeta == null) {
+            throw new CorruptRegionEntryException("CBIT T5: Pure-ID micro-palette NBT decode requires Layer 2 dictionary");
+        }
+        int pos = fOff + startRel;
+        int limit = fOff + limitRel;
+        int stateCount = readVarInt(frame, pos, limit);
+        pos += varIntLen(stateCount);
+        if (stateCount < 0 || stateCount > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette stateCount " + stateCount);
+        }
+        int regionStateCount = regionMeta.canonicalStates.size();
+        byte[][] stateNbt = new byte[stateCount][];
+        byte[] regionLightV1 = regionMeta.getOrBuildStatePackedLightV1();
+        byte[] stateLightV1 = new byte[stateCount];
+        for (int i = 0; i < stateCount; i++) {
+            int gid = readVarInt(frame, pos, limit);
+            pos += varIntLen(gid);
+            if (gid < 0 || gid >= regionStateCount) {
+                throw new CorruptRegionEntryException("CBIT T7: Pure-ID micro-palette stateId " + gid + " out of range");
+            }
+            stateNbt[i] = regionMeta.stateNbtBytesAt(gid, modernKeys);
+            stateLightV1[i] = regionLightV1[gid];
+        }
+
+        int biomeCount = readVarInt(frame, pos, limit);
+        pos += varIntLen(biomeCount);
+        if (biomeCount < 0 || biomeCount > 1024) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID micro-palette biomeCount " + biomeCount);
+        }
+        byte[][] regionBiomeStr = regionMeta.ensureBiomeStringNbtBytes();
+        byte[][] regionSingleBiome = regionMeta.ensureSingleBiomeCompoundNbtBytes();
+        byte[][] biomeStrNbt = new byte[biomeCount][];
+        byte[][] singleBiomeNbt = new byte[biomeCount][];
+        for (int i = 0; i < biomeCount; i++) {
+            int bgid = readVarInt(frame, pos, limit);
+            pos += varIntLen(bgid);
+            if (bgid < 0 || bgid >= regionBiomeStr.length) {
+                throw new CorruptRegionEntryException("CBIT T7: Pure-ID micro-palette biomeId " + bgid + " out of range");
+            }
+            biomeStrNbt[i] = regionBiomeStr[bgid];
+            singleBiomeNbt[i] = regionSingleBiome[bgid];
+        }
+
+        int tmplCount = readVarInt(frame, pos, limit);
+        pos += varIntLen(tmplCount);
+        if (tmplCount < 0 || tmplCount > 64) {
+            throw new CorruptRegionEntryException("CBIT T5: Invalid pure-ID biome template count " + tmplCount);
+        }
+        byte[][] tmplNbt = tmplCount > 0 ? new byte[tmplCount][] : new byte[0][];
+        for (int t = 0; t < tmplCount; t++) {
+            int bLen = readVarInt(frame, pos, limit);
+            pos += varIntLen(bLen);
+            pos = decodeBiomePayloadToCompoundNbt(
+                    frame, pos, limit, bLen, biomeStrNbt, singleBiomeNbt, arena, tmplNbt, t);
+        }
+        return new SlabLocalPaletteNbt(stateNbt, biomeStrNbt, singleBiomeNbt, tmplNbt, stateLightV1);
+    }
+
     static SlabLocalPaletteNbt decodeSlabLocalPaletteForNbt(
             byte[] frame,
             int fOff,
@@ -6964,142 +7222,15 @@ final class LcaSectionCodec {
             ScratchArena arena,
             boolean modernKeys
     ) throws CorruptRegionEntryException {
-        int pos = fOff + startRel;
-        int limit = fOff + limitRel;
-        int stateCount = readVarInt(frame, pos, limit);
-        pos += varIntLen(stateCount);
-        if (stateCount < 0 || stateCount > SECTION_VOXELS) {
-            throw new CorruptRegionEntryException("CBIT T5: Invalid slab-local stateCount " + stateCount);
+        if (regionMeta != null && regionMeta.formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3) {
+            return decodePureIdMicroPaletteForNbt(
+                    frame, fOff, startRel, limitRel, regionMeta, arena, modernKeys);
         }
-        byte[][] stateNbt = new byte[stateCount][];
-        boolean buildV3Light = regionMeta != null && regionMeta.formatVersion >= LcaRegionReader.LCA_FORMAT_VERSION_V3;
-        byte[] stateLightV1 = buildV3Light ? new byte[stateCount] : null;
-        byte[] coreLightTbl = buildV3Light ? staticCoreLightV1Table() : null;
-        String[] stateBaseNamesForLight = buildV3Light ? new String[stateCount] : null;
-        int[] stateCoreIds = arena.sectionPaletteDictIds;
-        byte[][] coreStateTable = modernKeys ? STATIC_CORE_STATE_NBT_BYTES_MODERN : STATIC_CORE_STATE_NBT_BYTES;
-        for (int i = 0; i < stateCount; i++) {
-            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local palette");
-            int tag = frame[pos++] & 0xFF;
-            if ((tag & 0x80) != 0 || (tag >= 0x60 && tag < 0x80)) {
-                int coreId = ((tag & 0x80) != 0) ? (tag & 0x7F) : (128 + (tag & 0x1F));
-                if (coreId >= coreStateTable.length) {
-                    throw new CorruptRegionEntryException("CBIT T5: Invalid static core token " + coreId);
-                }
-                stateNbt[i] = coreStateTable[coreId];
-                stateCoreIds[i] = coreId;
-                if (buildV3Light) {
-                    stateLightV1[i] = coreLightTbl[coreId];
-                    stateBaseNamesForLight[i] = STATIC_CORE_STATES[coreId];
-                }
-            } else {
-                int utfLen = readVarInt(frame, pos, limit);
-                pos += varIntLen(utfLen);
-                if (utfLen < 0 || pos + utfLen > limit) {
-                    throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local string");
-                }
-                stateNbt[i] = encodeBaseStateBytesFromFrame(frame, pos, utfLen, tag == 0x40, modernKeys);
-                stateCoreIds[i] = -1;
-                if (buildV3Light) {
-                    String baseName = (tag == 0x40 ? "minecraft:" : "")
-                            + new String(frame, pos, utfLen, StandardCharsets.UTF_8);
-                    stateLightV1[i] = LcaV3Codec.classifyLightV1(baseName);
-                    stateBaseNamesForLight[i] = baseName;
-                }
-                pos += utfLen;
-            }
-        }
-
-        int biomeCount = readVarInt(frame, pos, limit);
-        pos += varIntLen(biomeCount);
-        if (biomeCount < 0 || biomeCount > 1024) {
-            throw new CorruptRegionEntryException("CBIT T5: Invalid slab-local biomeCount " + biomeCount);
-        }
-        byte[][] biomeStrNbt = new byte[biomeCount][];
-        byte[][] singleBiomeNbt = new byte[biomeCount][];
-        for (int i = 0; i < biomeCount; i++) {
-            if (pos >= limit) throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local biome palette");
-            int tag = frame[pos++] & 0xFF;
-            if ((tag & 0x80) != 0 || (tag >= 0x60 && tag < 0x80)) {
-                int coreId = ((tag & 0x80) != 0) ? (tag & 0x7F) : (128 + (tag & 0x1F));
-                if (coreId >= STATIC_CORE_BIOME_STRING_NBT_BYTES.length) {
-                    throw new CorruptRegionEntryException("CBIT T5: Invalid static biome token " + coreId);
-                }
-                biomeStrNbt[i] = STATIC_CORE_BIOME_STRING_NBT_BYTES[coreId];
-                singleBiomeNbt[i] = STATIC_CORE_SINGLE_BIOME_COMPOUND_NBT_BYTES[coreId];
-            } else {
-                int utfLen = readVarInt(frame, pos, limit);
-                pos += varIntLen(utfLen);
-                if (utfLen < 0 || pos + utfLen > limit) {
-                    throw new CorruptRegionEntryException("CBIT T5: Truncated slab-local biome string");
-                }
-                byte[] strBytes = encodeNbtStringPayloadBytesFromFrame(frame, pos, utfLen, tag == 0x40);
-                biomeStrNbt[i] = strBytes;
-                singleBiomeNbt[i] = encodeSingleBiomeCompoundNbtBytes(strBytes);
-                pos += utfLen;
-            }
-        }
-
-        int tmplCount = readVarInt(frame, pos, limit);
-        pos += varIntLen(tmplCount);
-        if (tmplCount < 0 || tmplCount > 64) {
-            throw new CorruptRegionEntryException("CBIT T5: Invalid slab-local biome template count " + tmplCount);
-        }
-        byte[][] tmplNbt = tmplCount > 0 ? new byte[tmplCount][] : new byte[0][];
-        for (int t = 0; t < tmplCount; t++) {
-            int bLen = readVarInt(frame, pos, limit);
-            pos += varIntLen(bLen);
-            pos = decodeBiomePayloadToCompoundNbt(frame, pos, limit, bLen, biomeStrNbt, singleBiomeNbt, arena, tmplNbt, t);
-        }
-
-        int propCount = readVarInt(frame, pos, limit);
-        pos += varIntLen(propCount);
-        byte[][] corePropTable = modernKeys ? STATIC_CORE_PROP_NBT_BYTES_MODERN : STATIC_CORE_PROP_NBT_BYTES;
-        byte[][] coreStatePropCache = modernKeys ? STATIC_CORE_STATE_PROP_NBT_CACHE_MODERN : STATIC_CORE_STATE_PROP_NBT_CACHE;
-        for (int k = 0; k < propCount; k++) {
-            int stateIdx = readVarInt(frame, pos, limit);
-            pos += varIntLen(stateIdx);
-            if (stateIdx < 0 || stateIdx >= stateCount || pos >= limit) {
-                throw new CorruptRegionEntryException("CBIT T5: Invalid slab-local property suffix index");
-            }
-            int tag = frame[pos++] & 0xFF;
-            if ((tag & 0x80) != 0) {
-                int propId = tag & 0x7F;
-                if (propId >= corePropTable.length) {
-                    throw new CorruptRegionEntryException("CBIT T5: Invalid static property suffix token " + propId);
-                }
-                int coreId = stateCoreIds[stateIdx];
-                if (coreId >= 0) {
-                    int cacheIdx = (coreId << 7) | propId;
-                    byte[] cached = coreStatePropCache[cacheIdx];
-                    if (cached == null) {
-                        cached = combineBaseStateAndPropNbt(stateNbt[stateIdx], corePropTable[propId]);
-                        coreStatePropCache[cacheIdx] = cached;
-                    }
-                    stateNbt[stateIdx] = cached;
-                } else {
-                    stateNbt[stateIdx] = combineBaseStateAndPropNbt(stateNbt[stateIdx], corePropTable[propId]);
-                }
-                if (buildV3Light) {
-                    stateLightV1[stateIdx] = LcaV3Codec.classifyLightV1(
-                            stateBaseNamesForLight[stateIdx] + STATIC_CORE_PROP_SUFFIXES[propId]);
-                }
-            } else {
-                int globalId = readVarInt(frame, pos, limit);
-                pos += varIntLen(globalId);
-                if (regionMeta == null || globalId < 0 || globalId >= regionMeta.canonicalStates.size()) {
-                    throw new CorruptRegionEntryException("CBIT T7: Slab-local globalStateId " + globalId + " out of range");
-                }
-                stateNbt[stateIdx] = regionMeta.stateNbtBytesAt(globalId, modernKeys);
-                if (buildV3Light) {
-                    stateLightV1[stateIdx] = regionMeta.getOrBuildStatePackedLightV1()[globalId];
-                }
-            }
-        }
-        return new SlabLocalPaletteNbt(stateNbt, biomeStrNbt, singleBiomeNbt, tmplNbt, stateLightV1);
+        return LcaV2LegacyCodec.decodeSlabLocalPaletteForNbtV2(
+                frame, fOff, startRel, limitRel, regionMeta, arena, modernKeys);
     }
 
-    private static int decodeBiomePayloadToCompoundNbt(
+    static int decodeBiomePayloadToCompoundNbt(
             byte[] buf,
             int pos,
             int limit,
@@ -7683,8 +7814,9 @@ final class LcaSectionCodec {
                 }
 
                 boolean hasStarlightVersion = (bpFlags & 64) != 0;
+                byte[] airNbtBytes = meta.airStateNbtBytes(modernKeys);
                 boolean starlightZeroEligible = hasStarlightVersion
-                        && !isAirStateNbtBytes(stBytes, modernKeys);
+                        && !isAirStateNbtBytes(stBytes, airNbtBytes);
                 if (skyLight2 == 0b01 || skyLight2 == 0b10) {
                     System.arraycopy(SKY_LIGHT_2048_HEADER_NBT, 0, out, outPos, SKY_LIGHT_2048_HEADER_NBT.length);
                     outPos += SKY_LIGHT_2048_HEADER_NBT.length;
@@ -7719,6 +7851,7 @@ final class LcaSectionCodec {
                         frame, fOff + relStart, fOff + relEnd, sectionY,
                         activeStateNbt, activeBiomeStrNbt, activeSingleBiomeCompoundNbt,
                         activeBiomeTemplateNbt, defaultBiomeCompoundBytes, activeStateLightV1,
+                        meta.airStateNbtBytes(modernKeys),
                         arena, outPos, meta.formatVersion, (bpFlags & 64) != 0, modernKeys);
                 out = arena.nbtOutBuf;
             }
@@ -7734,12 +7867,8 @@ final class LcaSectionCodec {
         return Arrays.copyOf(out, outPos);
     }
 
-    private static boolean isAirStateNbtBytes(byte[] stBytes, boolean modernKeys) {
-        return stBytes == STATIC_CORE_STATE_NBT_BYTES[0]
-                || stBytes == STATIC_CORE_STATE_NBT_BYTES_MODERN[0]
-                || Arrays.equals(
-                        stBytes,
-                        modernKeys ? STATIC_CORE_STATE_NBT_BYTES_MODERN[0] : STATIC_CORE_STATE_NBT_BYTES[0]);
+    private static boolean isAirStateNbtBytes(byte[] stBytes, byte[] expectedAirBytes) {
+        return stBytes == expectedAirBytes || Arrays.equals(stBytes, expectedAirBytes);
     }
 
     private static int writeCompactBoundarySectionToBuf(
@@ -7786,6 +7915,7 @@ final class LcaSectionCodec {
             byte[][] chunkBiomeTemplateNbt,
             byte[] defaultBiomeCompoundBytes,
             byte[] dictStateLightV1,
+            byte[] airNbtBytes,
             ScratchArena arena,
             int outPos,
             int formatVersion,
@@ -7827,8 +7957,8 @@ final class LcaSectionCodec {
                 throw new CorruptRegionEntryException("CBIT T5: Truncated v3 secExtFlags");
             }
             secExtFlags = buf[pos++] & 0xFF;
-            if ((secExtFlags & ~LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
-                throw new CorruptRegionEntryException("CBIT T5: Reserved v3 secExtFlags bits set: " + secExtFlags);
+            if (!LcaV3Codec.isValidSecExtFlags(secExtFlags)) {
+                throw new CorruptRegionEntryException("CBIT T5: Reserved or conflicting v3 secExtFlags bits set: " + secExtFlags);
             }
             paletteLen = readVarInt(buf, pos, limit);
             pos += varIntLen(paletteLen);
@@ -7880,6 +8010,9 @@ final class LcaSectionCodec {
             Arrays.fill(packed, 0, numLongs, 0L);
             if ((secExtFlags & LcaV3Codec.SEC_EXT_RANK_EXCLUDED) != 0) {
                 pos = LcaV3Codec.decodeRankExcludedDeltaRoaringBlocks(
+                        buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
+            } else if ((secExtFlags & LcaV3Codec.SEC_EXT_GRAY_BITPLANES) != 0) {
+                pos = LcaV3Codec.decodeGrayBitplaneBlocks(
                         buf, pos, limit, paletteLen, curveId, octreeMask64, packed, bits);
             } else {
                 pos = decodeDeltaRoaringBlocks(
@@ -7958,7 +8091,7 @@ final class LcaSectionCodec {
         }
 
         boolean sectionOnlyAir = paletteLen == 1
-                && isAirStateNbtBytes(dictStateNbt[secPalIds[0]], modernKeys);
+                && isAirStateNbtBytes(dictStateNbt[secPalIds[0]], airNbtBytes);
         if (skyMode == LIGHT_MODE_ABSENT) {
             if (hasStarlightVersion && !sectionOnlyAir) {
                 System.arraycopy(STARLIGHT_SKY_STATE_ONE_NBT, 0, out, outPos, STARLIGHT_SKY_STATE_ONE_NBT.length);

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -14,12 +15,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -1809,5 +1814,211 @@ class LcaAdr005EntropyPerfTradeoffTest {
 
     private static double pct(long revised, long base) {
         return 100.0 * (revised - base) / Math.max(1, base);
+    }
+
+    @Test
+    @DisplayName("anvil-api-ADR-006: Empirical A/B benchmark of factored Layer 2 + pure-ID palettes and FEATURE_GRAY_BITPLANES (Mode A & Mode B)")
+    void evaluateGrayBitplanesModeAModeBTradeoff() throws Exception {
+        byte[] mcaBytes = loadRealFixture("1_21_R1");
+        List<int[]> coords = new ArrayList<>();
+        List<LinkedHashMap<String, Object>> roots = new ArrayList<>();
+        for (int rz = 0; rz < 32 && coords.size() < 64; rz++) {
+            for (int rx = 0; rx < 32 && coords.size() < 64; rx++) {
+                AnvilReader.ChunkEntry ce = AnvilReader.readChunkEntry(mcaBytes, rx, rz);
+                if (ce != null) {
+                    coords.add(new int[] {rx, rz});
+                    roots.add(ce.root);
+                }
+            }
+        }
+        assertFalse(coords.isEmpty());
+
+        // Also build a 16-chunk synthetic stratified structure/schematic corpus (smooth multi-material builds)
+        List<int[]> structCoords = new ArrayList<>();
+        List<LinkedHashMap<String, Object>> structRoots = new ArrayList<>();
+        for (int i = 0; i < 16; i++) {
+            int rx = i & 3;
+            int rz = i >>> 2;
+            structCoords.add(new int[] {rx, rz});
+            structRoots.add(buildSyntheticStratifiedStructureChunk(rx, rz, 4671));
+        }
+
+        runAdr006AbSuite("Real Overworld 1_21_R1 (64 chunks)", coords, roots, 3953);
+        runAdr006AbSuite("Synthetic Stratified Structure (16 chunks)", structCoords, structRoots, 4671);
+    }
+
+    private static void runAdr006AbSuite(
+            String label,
+            List<int[]> coords,
+            List<LinkedHashMap<String, Object>> roots,
+            int dataVersion
+    ) throws Exception {
+        int n = coords.size();
+        String[] variantNames = {
+            "v2 Mode A (STATIC_CORE)",
+            "v2 Mode B (STATIC_CORE)",
+            "v3 Base Mode A (Factored+PureID)",
+            "v3 Base Mode B (Factored+PureID)",
+            "v3+Gray Mode A (SEC_EXT_0x02)",
+            "v3+Gray Mode B (SEC_EXT_0x02)"
+        };
+        int[] versions = {
+            LcaRegionReader.LCA_FORMAT_VERSION_V2,
+            LcaRegionReader.LCA_FORMAT_VERSION_V2,
+            LcaRegionReader.LCA_FORMAT_VERSION_V3,
+            LcaRegionReader.LCA_FORMAT_VERSION_V3,
+            LcaRegionReader.LCA_FORMAT_VERSION_V3,
+            LcaRegionReader.LCA_FORMAT_VERSION_V3
+        };
+        int[] lcd2Levels = {0, 1, 0, 1, 0, 1};
+        int[] featMasks = {
+            LcaV3Codec.DEFAULT_V3_FEATURES,
+            LcaV3Codec.DEFAULT_V3_FEATURES,
+            LcaV3Codec.DEFAULT_V3_FEATURES,
+            LcaV3Codec.DEFAULT_V3_FEATURES,
+            LcaV3Codec.DEFAULT_V3_FEATURES | LcaV3Codec.FEATURE_GRAY_BITPLANES,
+            LcaV3Codec.DEFAULT_V3_FEATURES | LcaV3Codec.FEATURE_GRAY_BITPLANES
+        };
+
+        byte[][] archives = new byte[variantNames.length][];
+        LcaRegionWriter.LcaLiveArchive[] liveArchs = new LcaRegionWriter.LcaLiveArchive[variantNames.length];
+        for (int v = 0; v < variantNames.length; v++) {
+            LcaV3Codec.setThreadFeatureMask(featMasks[v]);
+            try {
+                LcaRegionWriter.LcaLiveArchive arch = new LcaRegionWriter.LcaLiveArchive(
+                        0, 0, -4, 24, dataVersion, lcd2Levels[v],
+                        LcaRegionReader.STORAGE_KIND_REGION_VOXEL,
+                        LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES,
+                        versions[v]);
+                for (int i = 0; i < n; i++) {
+                    int[] c = coords.get(i);
+                    arch.saveChunkInitial(c[0], c[1], roots.get(i));
+                }
+                liveArchs[v] = arch;
+                archives[v] = arch.toByteArray();
+            } finally {
+                LcaV3Codec.resetThreadFeatureMask();
+            }
+            // Lossless L_inf = 0 verification on every chunk
+            for (int i = 0; i < n; i++) {
+                int[] c = coords.get(i);
+                AnvilChunkView exp = AnvilReader.toView(roots.get(i));
+                AnvilChunkView act = LcaRegionReader.readChunkView(archives[v], c[0], c[1]);
+                assertNotNull(act);
+                for (int y = -64; y < 320; y += 37) {
+                    assertEquals(exp.blockIdAt(5, y, 7), act.blockIdAt(5, y, 7));
+                }
+                byte[] nbt = LcaRegionReader.INSTANCE.readChunkNbtBytes(archives[v], c[0], c[1]);
+                assertNotNull(nbt);
+            }
+        }
+
+        // Warmup + measure encode (saveChunkCoW), direct NBT decode, and readChunkView latencies
+        double[] encUs = new double[variantNames.length];
+        double[] nbtRdUs = new double[variantNames.length];
+        double[] viewRdUs = new double[variantNames.length];
+        for (int v = 0; v < variantNames.length; v++) {
+            final int fv = v;
+            LcaV3Codec.setThreadFeatureMask(featMasks[fv]);
+            try {
+                encUs[fv] = benchUs(1, 2, n, () -> {
+                    long acc = 0;
+                    for (int i = 0; i < n; i++) {
+                        int[] c = coords.get(i);
+                        acc += liveArchs[fv].saveChunkCoW(c[0], c[1], roots.get(i));
+                    }
+                    return acc;
+                });
+            } finally {
+                LcaV3Codec.resetThreadFeatureMask();
+            }
+            nbtRdUs[fv] = benchUs(1, 3, n, () -> {
+                long acc = 0;
+                for (int i = 0; i < n; i++) {
+                    int[] c = coords.get(i);
+                    acc += LcaRegionReader.INSTANCE.readChunkNbtBytes(archives[fv], c[0], c[1]).length;
+                }
+                return acc;
+            });
+            viewRdUs[fv] = benchUs(1, 3, n, () -> {
+                long acc = 0;
+                for (int i = 0; i < n; i++) {
+                    int[] c = coords.get(i);
+                    acc += LcaRegionReader.readChunkView(archives[fv], c[0], c[1]).sections().size();
+                }
+                return acc;
+            });
+        }
+
+        System.out.printf(Locale.ROOT,
+                "%n================ [anvil-api-ADR-006 A/B BENCHMARK: %s] ================%n"
+                        + "  %-34s | %10s | %8s | %10s | %10s | %10s%n",
+                label, "Variant", "Size (B)", "vs v2", "CoW Save", "RawNBT Rd", "View Rd");
+        for (int v = 0; v < variantNames.length; v++) {
+            long refSize = archives[v % 2].length;
+            System.out.printf(Locale.ROOT,
+                    "  %-34s | %,10d | %+7.2f%% | %7.2f us | %7.2f us | %7.2f us%n",
+                    variantNames[v], archives[v].length, pct(archives[v].length, refSize),
+                    encUs[v], nbtRdUs[v], viewRdUs[v]);
+        }
+        System.out.println("==============================================================================================");
+    }
+
+    private static LinkedHashMap<String, Object> buildSyntheticStratifiedStructureChunk(int rx, int rz, int dv) {
+        LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+        root.put("DataVersion", dv);
+        root.put("xPos", rx);
+        root.put("zPos", rz);
+        root.put("yPos", -4);
+        root.put("Status", "minecraft:full");
+        List<Object> sections = new ArrayList<>();
+        String[] mats = {
+            "minecraft:air", "minecraft:stone_bricks", "minecraft:mossy_stone_bricks", "minecraft:cracked_stone_bricks",
+            "minecraft:deepslate_bricks", "minecraft:deepslate_tiles", "minecraft:polished_deepslate", "minecraft:cobbled_deepslate",
+            "minecraft:oak_planks", "minecraft:spruce_planks", "minecraft:dark_oak_planks", "minecraft:stripped_oak_log[axis=y]",
+            "minecraft:glass_pane[east=true,north=false,south=false,waterlogged=false,west=true]",
+            "create:cogwheel[axis=y,waterlogged=false]",
+            "create:large_cogwheel[axis=y,waterlogged=false]",
+            "create:brass_casing"
+        };
+        for (int sy = 0; sy < 8; sy++) {
+            LinkedHashMap<String, Object> sec = new LinkedHashMap<>();
+            sec.put("Y", (byte) sy);
+            List<Object> pal = new ArrayList<>();
+            for (String m : mats) {
+                pal.add(LcaSectionCodec.parseCanonicalStateToNbtCompound(m));
+            }
+            long[] packed = new long[256];
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        int yzx = (y << 8) | (z << 4) | x;
+                        // Stepped 3D wall/floor bands with smooth adjacent transitions across 16 states
+                        int s = ((y < 4) ? 0 : (((y - 4) + ((x + z) >>> 3) + (sy & 3)) % 16));
+                        packed[yzx / 16] |= ((long) s) << ((yzx % 16) * 4);
+                    }
+                }
+            }
+            LinkedHashMap<String, Object> bs = new LinkedHashMap<>();
+            bs.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, pal));
+            bs.put("data", packed);
+            sec.put("block_states", bs);
+            LinkedHashMap<String, Object> biomes = new LinkedHashMap<>();
+            biomes.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, List.of("terralith:volcanic_peaks")));
+            sec.put("biomes", biomes);
+            sections.add(sec);
+        }
+        root.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, sections));
+        return root;
+    }
+
+    private static byte[] loadRealFixture(String dirName) throws IOException {
+        String resource = "/anvil/real/" + dirName + "/r.0.0.mca";
+        try (InputStream in = LcaAdr005EntropyPerfTradeoffTest.class.getResourceAsStream(resource)) {
+            if (in == null) {
+                throw new IOException("Fixture not found on classpath: " + resource);
+            }
+            return in.readAllBytes();
+        }
     }
 }

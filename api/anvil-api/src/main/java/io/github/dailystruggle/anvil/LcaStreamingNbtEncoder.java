@@ -126,19 +126,24 @@ public final class LcaStreamingNbtEncoder {
     ) throws IOException {
         int sectionCount = archive.sectionCount();
         boolean hasVoxelSections = chunk.hasVoxelSections;
-        boolean useSlabLocalPalette = hasVoxelSections && archive.totalDictionaryStates() < 8192;
+        boolean factoredV3 = archive.isFactoredV3Dict();
+        boolean useSlabLocalPalette = hasVoxelSections && (factoredV3 || archive.totalDictionaryStates() < 8192);
 
         Map<String, Integer> localStateMap = useSlabLocalPalette ? new LinkedHashMap<>(32) : null;
         List<String> localStateList = useSlabLocalPalette ? new ArrayList<>(32) : null;
         List<Integer> localStateGlobalIds = useSlabLocalPalette ? new ArrayList<>(32) : null;
         Map<String, Integer> localBiomeMap = useSlabLocalPalette ? new LinkedHashMap<>(8) : null;
         List<String> localBiomeList = useSlabLocalPalette ? new ArrayList<>(8) : null;
+        List<Integer> localBiomeGlobalIds = (useSlabLocalPalette && factoredV3) ? new ArrayList<>(8) : null;
         if (useSlabLocalPalette) {
             localStateMap.put(AIR_STATE, 0);
             localStateList.add(AIR_STATE);
-            localStateGlobalIds.add(-1);
+            localStateGlobalIds.add(factoredV3 ? archive.registerOrGetBlockStateId(AIR_STATE) : -1);
             localBiomeMap.put(PLAINS_BIOME, 0);
             localBiomeList.add(PLAINS_BIOME);
+            if (factoredV3) {
+                localBiomeGlobalIds.add(archive.registerOrGetBiomeId(PLAINS_BIOME));
+            }
         }
 
         int chunkDefaultBiomeDictId = -1;
@@ -161,7 +166,8 @@ public final class LcaStreamingNbtEncoder {
                 if (sec == null) {
                     continue;
                 }
-                int[] bIds = resolveBiomeDictIds(archive, sec.biomePalette, localBiomeMap, localBiomeList);
+                int[] bIds = resolveBiomeDictIds(
+                        archive, sec.biomePalette, localBiomeMap, localBiomeList, localBiomeGlobalIds);
                 long[] bData = sec.biomeData;
                 sectionBiomeIds[idx] = bIds;
                 sectionBiomeData[idx] = bData;
@@ -300,10 +306,22 @@ public final class LcaStreamingNbtEncoder {
                 localStateGlobalIdArr[k] = localStateGlobalIds.get(k);
             }
         }
-        byte[] slabLocalPaletteBytes = useSlabLocalPalette
-                ? LcaSectionCodec.encodeSlabLocalPalette(
-                        localStateList, localStateGlobalIdArr, localBiomeList, sortedBiomeTemplates)
-                : new byte[0];
+        byte[] slabLocalPaletteBytes;
+        if (!useSlabLocalPalette) {
+            slabLocalPaletteBytes = new byte[0];
+        } else if (factoredV3) {
+            int[] localBiomeGlobalIdArr = new int[localBiomeGlobalIds.size()];
+            for (int k = 0; k < localBiomeGlobalIdArr.length; k++) {
+                localBiomeGlobalIdArr[k] = localBiomeGlobalIds.get(k);
+            }
+            slabLocalPaletteBytes = LcaSectionCodec.encodePureIdMicroPalette(
+                    localStateGlobalIdArr, localStateGlobalIdArr.length,
+                    localBiomeGlobalIdArr, localBiomeGlobalIdArr.length,
+                    sortedBiomeTemplates);
+        } else {
+            slabLocalPaletteBytes = LcaSectionCodec.encodeSlabLocalPalette(
+                    localStateList, localStateGlobalIdArr, localBiomeList, sortedBiomeTemplates);
+        }
         totalSectionPayloadBytes += slabLocalPaletteBytes.length;
 
         boolean scale4B = totalSectionPayloadBytes > 0x7FFF;
@@ -396,6 +414,7 @@ public final class LcaStreamingNbtEncoder {
             List<String> localStateList,
             List<Integer> localStateGlobalIds
     ) {
+        boolean factoredV3 = archive.isFactoredV3Dict();
         int[] out = new int[paletteStates.length];
         for (int i = 0; i < paletteStates.length; i++) {
             String canonical = paletteStates[i];
@@ -405,11 +424,16 @@ public final class LcaStreamingNbtEncoder {
                     locId = localStateList.size();
                     localStateMap.put(canonical, locId);
                     localStateList.add(canonical);
-                    int bracket = canonical.indexOf('[');
-                    int globalId = -1;
-                    if (bracket >= 0
-                            && !LcaSectionCodec.STATIC_CORE_PROP_TO_ID.containsKey(canonical.substring(bracket))) {
+                    int globalId;
+                    if (factoredV3) {
                         globalId = archive.registerOrGetBlockStateId(canonical);
+                    } else {
+                        int bracket = canonical.indexOf('[');
+                        globalId = -1;
+                        if (bracket >= 0
+                                && !LcaV2LegacyCodec.STATIC_CORE_PROP_TO_ID.containsKey(canonical.substring(bracket))) {
+                            globalId = archive.registerOrGetBlockStateId(canonical);
+                        }
                     }
                     localStateGlobalIds.add(globalId);
                 }
@@ -425,7 +449,8 @@ public final class LcaStreamingNbtEncoder {
             LcaRegionWriter.LcaLiveArchive archive,
             String[] biomePalette,
             Map<String, Integer> localBiomeMap,
-            List<String> localBiomeList
+            List<String> localBiomeList,
+            List<Integer> localBiomeGlobalIds
     ) {
         if (biomePalette == null || biomePalette.length == 0) {
             return null;
@@ -434,11 +459,18 @@ public final class LcaStreamingNbtEncoder {
         for (int i = 0; i < biomePalette.length; i++) {
             String biomeId = biomePalette[i] != null ? biomePalette[i] : PLAINS_BIOME;
             if (localBiomeMap != null) {
-                out[i] = localBiomeMap.computeIfAbsent(biomeId, k -> {
+                Integer existing = localBiomeMap.get(biomeId);
+                if (existing == null) {
                     int id = localBiomeList.size();
-                    localBiomeList.add(k);
-                    return id;
-                });
+                    localBiomeMap.put(biomeId, id);
+                    localBiomeList.add(biomeId);
+                    if (localBiomeGlobalIds != null) {
+                        localBiomeGlobalIds.add(archive.registerOrGetBiomeId(biomeId));
+                    }
+                    out[i] = id;
+                } else {
+                    out[i] = existing;
+                }
             } else {
                 out[i] = archive.registerOrGetBiomeId(biomeId);
             }

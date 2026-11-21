@@ -32,8 +32,17 @@ final class LcaV3Codec {
 
     // v3 SectionFrame extension flags (paletteLen == 0 escape)
     static final int SEC_EXT_RANK_EXCLUDED = 0x01;
+    static final int SEC_EXT_GRAY_BITPLANES = 0x02;
+    static final int SEC_EXT_VALID_MASK = SEC_EXT_RANK_EXCLUDED | SEC_EXT_GRAY_BITPLANES;
     static final int MIN_RANK_EXCL_PALETTE = 3;
     static final int MAX_RANK_EXCL_PALETTE = 12;
+    static final int MIN_GRAY_PALETTE = 3;
+    static final int MAX_GRAY_PALETTE = 64;
+
+    static boolean isValidSecExtFlags(int secExtFlags) {
+        return (secExtFlags & ~SEC_EXT_VALID_MASK) == 0
+                && (secExtFlags & SEC_EXT_VALID_MASK) != SEC_EXT_VALID_MASK;
+    }
 
     // v3 Eikonal light residual sentinel & sub-modes
     static final int SENTINEL_MODE_MASK = 0x03;
@@ -60,9 +69,13 @@ final class LcaV3Codec {
     static final int FEATURE_COLUMNAR_TAIL = 1 << 1;
     static final int FEATURE_RANK_EXCL = 1 << 2;
     static final int FEATURE_EIKONAL_MODE_A = 1 << 3;
+    static final int FEATURE_GRAY_BITPLANES = 1 << 4;
     static final int DEFAULT_V3_FEATURES = FEATURE_EIKONAL_LIGHT | FEATURE_COLUMNAR_TAIL;
-    static final int ALL_V3_FEATURES =
-            FEATURE_EIKONAL_LIGHT | FEATURE_COLUMNAR_TAIL | FEATURE_RANK_EXCL | FEATURE_EIKONAL_MODE_A;
+    static final int ALL_V3_FEATURES = FEATURE_EIKONAL_LIGHT
+            | FEATURE_COLUMNAR_TAIL
+            | FEATURE_RANK_EXCL
+            | FEATURE_EIKONAL_MODE_A
+            | FEATURE_GRAY_BITPLANES;
 
     @SuppressWarnings("java:S5164")
     private static final ThreadLocal<Integer> THREAD_FEATURE_MASK = ThreadLocal.withInitial(() -> DEFAULT_V3_FEATURES);
@@ -111,6 +124,15 @@ final class LcaV3Codec {
         final byte[] claimed = new byte[SECTION_VOXELS];
         final byte[] rankStaging = new byte[16384];
         final int[] unpackedYzx = new int[SECTION_VOXELS];
+        final int[] grayAdjMatrix = new int[MAX_GRAY_PALETTE * MAX_GRAY_PALETTE];
+        final int[] grayOldToNew = new int[MAX_GRAY_PALETTE];
+        final int[] grayNewToOld = new int[MAX_GRAY_PALETTE];
+        final boolean[] grayUsed = new boolean[MAX_GRAY_PALETTE];
+        final int[] grayRemappedGlobalIds = new int[MAX_GRAY_PALETTE];
+        final int[] grayCurveVals = new int[SECTION_VOXELS];
+        final int[] grayRunStaging = new int[SECTION_VOXELS];
+        final int[] grayRunStagingAlt = new int[SECTION_VOXELS];
+        final byte[] grayStaging = new byte[16384];
     }
 
     // =========================================================================
@@ -2032,6 +2054,458 @@ final class LcaV3Codec {
             outDomain[i] = i;
         }
         return SECTION_VOXELS;
+    }
+
+    // =========================================================================
+    // 5. Layer 4: Dominant-Pinned Adjacency-Ordered Local Gray Bitplanes (0x02)
+    // =========================================================================
+
+    /**
+     * Encodes active-domain voxels in {@code curvePaletteIdx[0..activeVoxels)} using a dominant-pinned,
+     * 3D curve-adjacency-ordered local palette and Reflected Binary Gray bitplanes
+     * ({@code SEC_EXT_GRAY_BITPLANES = 0x02}, {@code anvil-api-ADR-006}).
+     *
+     * <p>Writes {@code planeModes[ceil(b/4)] || planePayloads[0..b-1]} into {@code dst[0..len)} and
+     * writes the reordered local palette global/micro IDs into {@code outRemappedGlobalIds[0..paletteSize)}
+     * with {@code outRemappedGlobalIds[0] == sortedGlobalIds[0]} pinned.
+     */
+    static int tryEncodeAdjacencyGrayBitplanes(
+            int[] curvePaletteIdx,
+            int activeVoxels,
+            int paletteSize,
+            int[] sortedGlobalIds,
+            int[] outRemappedGlobalIds,
+            LcaSectionCodec.ScratchArena arena,
+            byte[] dst
+    ) {
+        if (activeVoxels <= 0 || paletteSize < 2 || paletteSize > MAX_GRAY_PALETTE) {
+            return -1;
+        }
+        V3Scratch sc = v3Scratch();
+        int[] adj = sc.grayAdjMatrix;
+        int pSq = paletteSize * paletteSize;
+        Arrays.fill(adj, 0, pSq, 0);
+
+        int prev = curvePaletteIdx[0];
+        for (int i = 1; i < activeVoxels; i++) {
+            int cur = curvePaletteIdx[i];
+            if (cur != prev) {
+                adj[prev * paletteSize + cur]++;
+                adj[cur * paletteSize + prev]++;
+                prev = cur;
+            }
+        }
+
+        int[] oldToNew = sc.grayOldToNew;
+        int[] newToOld = sc.grayNewToOld;
+        boolean[] used = sc.grayUsed;
+        Arrays.fill(used, 0, paletteSize, false);
+        newToOld[0] = 0;
+        oldToNew[0] = 0;
+        used[0] = true;
+
+        int prevOld = 0;
+        for (int k = 1; k < paletteSize; k++) {
+            int rowBase = prevOld * paletteSize;
+            int bestCand = -1;
+            int bestWeight = -1;
+            for (int cand = 1; cand < paletteSize; cand++) {
+                if (used[cand]) continue;
+                int w = adj[rowBase + cand];
+                if (w > bestWeight) {
+                    bestWeight = w;
+                    bestCand = cand;
+                }
+            }
+            newToOld[k] = bestCand;
+            oldToNew[bestCand] = k;
+            used[bestCand] = true;
+            prevOld = bestCand;
+        }
+
+        for (int k = 0; k < paletteSize; k++) {
+            outRemappedGlobalIds[k] = sortedGlobalIds[newToOld[k]];
+        }
+
+        int[] grayCurve = sc.grayCurveVals;
+        for (int i = 0; i < activeVoxels; i++) {
+            int np = oldToNew[curvePaletteIdx[i]];
+            grayCurve[i] = np ^ (np >>> 1);
+        }
+
+        int b = 32 - Integer.numberOfLeadingZeros(paletteSize - 1);
+        int planeModeBytes = (b + 3) >>> 2;
+        Arrays.fill(dst, 0, planeModeBytes, (byte) 0);
+        int pos = planeModeBytes;
+        int rawPlaneBytes = (activeVoxels + 7) >>> 3;
+        int[] stagingA = sc.grayRunStaging;
+        int[] stagingB = sc.grayRunStagingAlt;
+
+        for (int plane = 0; plane < b; plane++) {
+            int mask = 1 << plane;
+            int prevMask = plane > 0 ? (1 << (plane - 1)) : 0;
+
+            int rawRunCount = 0;
+            int ones = 0;
+            int cursor = 0;
+            int i = 0;
+            while (i < activeVoxels) {
+                if ((grayCurve[i] & mask) == 0) {
+                    i++;
+                    continue;
+                }
+                int start = i++;
+                while (i < activeVoxels && (grayCurve[i] & mask) != 0) {
+                    i++;
+                }
+                int gap = start - cursor;
+                int len = i - start;
+                ones += len;
+                stagingA[rawRunCount++] = (gap << 16) | ((len - 1) & 0xFFFF);
+                cursor = i;
+            }
+
+            int mode;
+            if (ones == 0) {
+                mode = 0;
+            } else if (ones == activeVoxels) {
+                mode = 1;
+                dst[pos++] = (byte) 0xFF;
+            } else {
+                int bestKind = 3; // 0=singleRun, 1=rleA, 2=rleB, 3=rawBits
+                int bestBytes = rawPlaneBytes;
+                int bestRefCode = 0;
+                boolean bestSplit62 = false;
+                int bestRunCount = 0;
+
+                if (rawRunCount == 1) {
+                    int packed = stagingA[0];
+                    int start = packed >>> 16;
+                    int len = (packed & 0xFFFF) + 1;
+                    int singleLen = (start + len == activeVoxels || start == 0)
+                            ? 2
+                            : (2 + LcaSectionCodec.varIntLen(len - 1));
+                    if (singleLen <= bestBytes) {
+                        bestBytes = singleLen;
+                        bestKind = 0;
+                    }
+                } else {
+                    int size44 = measureGrayRleSize(stagingA, rawRunCount, false);
+                    int size62 = measureGrayRleSize(stagingA, rawRunCount, true);
+                    int minRaw = Math.min(size44, size62);
+                    if (minRaw <= bestBytes) {
+                        bestBytes = minRaw;
+                        bestKind = 1;
+                        bestRefCode = 0;
+                        bestSplit62 = size62 < size44;
+                        bestRunCount = rawRunCount;
+                    }
+                }
+
+                if (ones > (activeVoxels >>> 1)) {
+                    int invRuns = extractActiveGrayPlaneRuns(grayCurve, activeVoxels, mask, 0, mask, stagingB);
+                    int s44 = measureGrayRleSize(stagingB, invRuns, false);
+                    int s62 = measureGrayRleSize(stagingB, invRuns, true);
+                    int minInv = Math.min(s44, s62);
+                    if (minInv < bestBytes) {
+                        bestBytes = minInv;
+                        bestKind = 2;
+                        bestRefCode = 2;
+                        bestSplit62 = s62 < s44;
+                        bestRunCount = invRuns;
+                    }
+                }
+
+                if (plane > 0) {
+                    int[] xorTarget = (bestKind == 2) ? stagingA : stagingB;
+                    int xorRuns = extractActiveGrayPlaneRuns(grayCurve, activeVoxels, mask, prevMask, 0, xorTarget);
+                    int s44 = measureGrayRleSize(xorTarget, xorRuns, false);
+                    int s62 = measureGrayRleSize(xorTarget, xorRuns, true);
+                    int minXor = Math.min(s44, s62);
+                    if (minXor < bestBytes) {
+                        bestBytes = minXor;
+                        bestKind = (xorTarget == stagingA) ? 1 : 2;
+                        bestRefCode = 1;
+                        bestSplit62 = s62 < s44;
+                        bestRunCount = xorRuns;
+                    }
+                }
+
+                if (bestKind == 0) {
+                    mode = 1;
+                    int packed = stagingA[0];
+                    int start = packed >>> 16;
+                    int len = (packed & 0xFFFF) + 1;
+                    if (start + len == activeVoxels) {
+                        dst[pos++] = (byte) (0xE0 | ((start >>> 8) & 0x0F));
+                        dst[pos++] = (byte) (start & 0xFF);
+                    } else if (start == 0) {
+                        int end = len - 1;
+                        dst[pos++] = (byte) (0xD0 | ((end >>> 8) & 0x0F));
+                        dst[pos++] = (byte) (end & 0xFF);
+                    } else {
+                        dst[pos++] = (byte) (0xC0 | ((start >>> 8) & 0x0F));
+                        dst[pos++] = (byte) (start & 0xFF);
+                        pos = LcaSectionCodec.writeVarIntToBuf(dst, pos, len - 1);
+                    }
+                } else if (bestKind == 1 || bestKind == 2) {
+                    mode = 1;
+                    int[] srcRuns = (bestKind == 1) ? stagingA : stagingB;
+                    pos += LcaSectionCodec.emitGraySubModeCandidate(
+                            srcRuns, bestRunCount, bestRefCode, bestSplit62, dst, pos);
+                } else {
+                    mode = 3;
+                    Arrays.fill(dst, pos, pos + rawPlaneBytes, (byte) 0);
+                    for (int h = 0; h < activeVoxels; h++) {
+                        if ((grayCurve[h] & mask) != 0) {
+                            dst[pos + (h >>> 3)] |= (byte) (1 << (h & 7));
+                        }
+                    }
+                    pos += rawPlaneBytes;
+                }
+            }
+            dst[plane >>> 2] |= (byte) (mode << ((plane & 3) << 1));
+        }
+        return pos;
+    }
+
+    private static int measureGrayRleSize(int[] staging, int runCount, boolean split62) {
+        int size = 1 + (runCount >= 31 ? LcaSectionCodec.varIntLen(runCount - 31) : 0);
+        int gMax = split62 ? 63 : 15;
+        int lMax = split62 ? 3 : 15;
+        for (int r = 0; r < runCount; r++) {
+            int packed = staging[r];
+            int rawGap = packed >>> 16;
+            int adjGap = (r == 0) ? rawGap : (rawGap - 1);
+            int lm1 = packed & 0xFFFF;
+            size += 1 + (adjGap >= gMax ? LcaSectionCodec.varIntLen(adjGap - gMax) : 0)
+                    + (lm1 >= lMax ? LcaSectionCodec.varIntLen(lm1 - lMax) : 0);
+        }
+        return size;
+    }
+
+    private static int extractActiveGrayPlaneRuns(
+            int[] grayCurve, int activeVoxels, int mask, int refMask, int invertTarget, int[] staging
+    ) {
+        int runCount = 0;
+        int cursor = 0;
+        int i = 0;
+        while (i < activeVoxels) {
+            int bit = (grayCurve[i] & mask) ^ invertTarget;
+            int ref = (refMask != 0 && (grayCurve[i] & refMask) != 0) ? mask : 0;
+            if ((bit ^ ref) == 0) {
+                i++;
+                continue;
+            }
+            int start = i++;
+            while (i < activeVoxels) {
+                int b2 = (grayCurve[i] & mask) ^ invertTarget;
+                int r2 = (refMask != 0 && (grayCurve[i] & refMask) != 0) ? mask : 0;
+                if ((b2 ^ r2) == 0) break;
+                i++;
+            }
+            int gap = start - cursor;
+            int len = i - start;
+            staging[runCount++] = (gap << 16) | ((len - 1) & 0xFFFF);
+            cursor = i;
+        }
+        return runCount;
+    }
+
+    /**
+     * Decodes a {@code SEC_EXT_GRAY_BITPLANES} ({@code 0x02}) section directly into
+     * {@code packedBlockLongs}, enforcing strict bounds ({@code CBIT T5/T6}) and mandatory
+     * {@code CBIT T6b} ({@code decodedOctreeMask64 == expectedOctreeMask64}).
+     */
+    static int decodeGrayBitplaneBlocks(
+            byte[] buf,
+            int pos,
+            int limit,
+            int paletteLen,
+            int curveId,
+            long expectedOctreeMask64,
+            long[] packedBlockLongs,
+            int bits
+    ) throws CorruptRegionEntryException {
+        if (paletteLen < 2 || paletteLen > SECTION_VOXELS) {
+            throw new CorruptRegionEntryException("CBIT T7: Invalid Gray bitplane paletteLen " + paletteLen);
+        }
+        int payloadByteLen = LcaSectionCodec.readVarInt(buf, pos, limit);
+        pos += LcaSectionCodec.varIntLen(payloadByteLen);
+        int b = 32 - Integer.numberOfLeadingZeros(paletteLen - 1);
+        int planeModeBytes = (b + 3) >>> 2;
+        if (payloadByteLen < planeModeBytes || pos + payloadByteLen > limit) {
+            throw new CorruptRegionEntryException(
+                    "CBIT T5: Truncated Gray bitplane payload (len=" + payloadByteLen + ")");
+        }
+        int payloadEnd = pos + payloadByteLen;
+        int modesOff = pos;
+        pos += planeModeBytes;
+
+        int usedTailBits = (b & 3) << 1;
+        if (usedTailBits != 0) {
+            int lastModeByte = buf[modesOff + planeModeBytes - 1] & 0xFF;
+            if ((lastModeByte >>> usedTailBits) != 0) {
+                throw new CorruptRegionEntryException("CBIT T5: Reserved Gray planeMode bits set");
+            }
+        }
+
+        V3Scratch sc = v3Scratch();
+        int[] curDom = sc.domainA;
+        int activeVoxels = buildInitialCurveDomain(curveId, expectedOctreeMask64, curDom);
+        int[] grayCurve = sc.grayCurveVals;
+        Arrays.fill(grayCurve, 0, activeVoxels, 0);
+        int rawPlaneBytes = (activeVoxels + 7) >>> 3;
+
+        for (int plane = 0; plane < b; plane++) {
+            int mode = ((buf[modesOff + (plane >>> 2)] & 0xFF) >>> ((plane & 3) << 1)) & 3;
+            int bit = 1 << plane;
+            int prevBit = plane > 0 ? (1 << (plane - 1)) : 0;
+            if (mode == 0) {
+                // Const0
+            } else if (mode == 2) {
+                throw new CorruptRegionEntryException("CBIT T5: Forbidden Gray voxel planeMode 2 on plane " + plane);
+            } else if (mode == 1) {
+                if (pos >= payloadEnd) {
+                    throw new CorruptRegionEntryException("CBIT T5: Truncated Gray voxel plane subHdr");
+                }
+                int subHdr = buf[pos++] & 0xFF;
+                if (subHdr == 0xFF) {
+                    for (int i = 0; i < activeVoxels; i++) {
+                        grayCurve[i] |= bit;
+                    }
+                } else if ((subHdr & 0xC0) == 0xC0) {
+                    int kind = (subHdr >>> 4) & 3;
+                    if (kind == 3 || pos >= payloadEnd) {
+                        throw new CorruptRegionEntryException("CBIT T5: Invalid or truncated Gray single-run subHdr");
+                    }
+                    int val12 = ((subHdr & 0x0F) << 8) | (buf[pos++] & 0xFF);
+                    int start;
+                    int end;
+                    if (kind == 2) {
+                        start = val12;
+                        end = activeVoxels;
+                    } else if (kind == 1) {
+                        start = 0;
+                        end = val12 + 1;
+                    } else {
+                        int lenM1 = LcaSectionCodec.readVarInt(buf, pos, payloadEnd);
+                        pos += LcaSectionCodec.varIntLen(lenM1);
+                        start = val12;
+                        end = start + lenM1 + 1;
+                    }
+                    if (start < 0 || end > activeVoxels || start > end) {
+                        throw new CorruptRegionEntryException("CBIT T6: Gray voxel single-run overflow");
+                    }
+                    for (int i = start; i < end; i++) {
+                        grayCurve[i] |= bit;
+                    }
+                } else {
+                    int refCode = (subHdr >>> 6) & 3;
+                    if (refCode == 1 && prevBit == 0) {
+                        throw new CorruptRegionEntryException("CBIT T5: Cross-plane XOR forbidden on Gray plane 0");
+                    }
+                    boolean split62 = (subHdr & 0x20) != 0;
+                    int runCount = subHdr & 0x1F;
+                    if (runCount == 31) {
+                        int extra = LcaSectionCodec.readVarInt(buf, pos, payloadEnd);
+                        pos += LcaSectionCodec.varIntLen(extra);
+                        runCount += extra;
+                    }
+                    if (runCount < 0 || runCount > activeVoxels) {
+                        throw new CorruptRegionEntryException("CBIT T5: Invalid Gray voxel runCount " + runCount);
+                    }
+                    if (refCode == 2) {
+                        for (int i = 0; i < activeVoxels; i++) {
+                            grayCurve[i] |= bit;
+                        }
+                    } else if (refCode == 1) {
+                        for (int i = 0; i < activeVoxels; i++) {
+                            if ((grayCurve[i] & prevBit) != 0) {
+                                grayCurve[i] |= bit;
+                            }
+                        }
+                    }
+                    int lBits = split62 ? 2 : 4;
+                    int gMax = split62 ? 63 : 15;
+                    int lMax = split62 ? 3 : 15;
+                    int cursor = 0;
+                    for (int r = 0; r < runCount; r++) {
+                        if (pos >= payloadEnd) {
+                            throw new CorruptRegionEntryException("CBIT T5: Truncated Gray voxel run");
+                        }
+                        int tok = buf[pos++] & 0xFF;
+                        int adjGap = (tok >>> lBits) & gMax;
+                        int lenMinusOne = tok & lMax;
+                        if (adjGap == gMax) {
+                            int extra = LcaSectionCodec.readVarInt(buf, pos, payloadEnd);
+                            pos += LcaSectionCodec.varIntLen(extra);
+                            adjGap += extra;
+                        }
+                        if (lenMinusOne == lMax) {
+                            int extra = LcaSectionCodec.readVarInt(buf, pos, payloadEnd);
+                            pos += LcaSectionCodec.varIntLen(extra);
+                            lenMinusOne += extra;
+                        }
+                        cursor += (r == 0) ? adjGap : (adjGap + 1);
+                        int runLen = lenMinusOne + 1;
+                        if (cursor < 0 || cursor + runLen > activeVoxels) {
+                            throw new CorruptRegionEntryException("CBIT T6: Gray voxel run cursor overflow");
+                        }
+                        for (int k = 0; k < runLen; k++) {
+                            grayCurve[cursor++] ^= bit;
+                        }
+                    }
+                }
+            } else {
+                if (pos + rawPlaneBytes > payloadEnd) {
+                    throw new CorruptRegionEntryException("CBIT T5: Truncated raw Gray voxel bitplane");
+                }
+                for (int bi = 0; bi < rawPlaneBytes; bi++) {
+                    int mask8 = buf[pos + bi] & 0xFF;
+                    if (mask8 == 0) continue;
+                    int base = bi << 3;
+                    int lim = Math.min(8, activeVoxels - base);
+                    for (int k = 0; k < lim; k++) {
+                        if ((mask8 & (1 << k)) != 0) {
+                            grayCurve[base + k] |= bit;
+                        }
+                    }
+                }
+                pos += rawPlaneBytes;
+            }
+        }
+
+        if (pos != payloadEnd) {
+            throw new CorruptRegionEntryException("CBIT T5: Gray bitplane payload trailing bytes");
+        }
+
+        int[] curveToLoc = LcaSectionCodec.CURVE_BITS_TO_PACKED_LOC[curveId][bits];
+        long decodedOctreeMask64 = 0L;
+        for (int i = 0; i < activeVoxels; i++) {
+            int g = grayCurve[i];
+            if (g != 0) {
+                int p = g ^ (g >>> 8);
+                p ^= (p >>> 4);
+                p ^= (p >>> 2);
+                p ^= (p >>> 1);
+                if (p >= paletteLen) {
+                    throw new CorruptRegionEntryException(
+                            "CBIT T6: Gray bitplane decoded ordinal " + p + " >= paletteLen " + paletteLen);
+                }
+                int loc = curveToLoc[curDom[i]];
+                packedBlockLongs[loc >>> 12] |= ((long) p) << loc;
+                decodedOctreeMask64 |= 1L << (loc >>> 6);
+            }
+        }
+
+        if (decodedOctreeMask64 != expectedOctreeMask64) {
+            throw new CorruptRegionEntryException(
+                    "CBIT T6b: GrayBitplane decodedOctreeMask64 mismatch (expected=0x"
+                            + Long.toHexString(expectedOctreeMask64)
+                            + ", decoded=0x" + Long.toHexString(decodedOctreeMask64) + ")");
+        }
+        return pos;
     }
 
     /**

@@ -25,8 +25,21 @@ public record RawChunkFrameSnapshot(
         int minSectionY,
         int sectionCount,
         int residualNbtRelOffset,
-        int[] dictIdToRuntimeId
+        int[] dictIdToRuntimeId,
+        int formatVersion
 ) {
+    public RawChunkFrameSnapshot(
+            byte[] chunkFrame,
+            int dataVersion,
+            int minSectionY,
+            int sectionCount,
+            int residualNbtRelOffset,
+            int[] dictIdToRuntimeId
+    ) {
+        this(chunkFrame, dataVersion, minSectionY, sectionCount, residualNbtRelOffset, dictIdToRuntimeId,
+                LcaRegionReader.LCA_FORMAT_VERSION);
+    }
+
     public RawChunkFrameSnapshot {
         Objects.requireNonNull(chunkFrame, "chunkFrame");
         if (chunkFrame.length < 24 + (Math.max(1, sectionCount) << 1)) {
@@ -196,7 +209,8 @@ public record RawChunkFrameSnapshot(
             int[] relStarts = computeSectionRelStarts();
             int limitRel = LcaSectionCodec.findFirstSectionRelStart(relStarts, sectionCount, residualRelStart());
             return LcaSectionCodec.decodeSlabLocalPaletteRuntimeIds(
-                    chunkFrame, 0, sectionDirectoryEnd(), limitRel, dictIdToRuntimeId, fallbackRuntimeLookup);
+                    chunkFrame, 0, sectionDirectoryEnd(), limitRel,
+                    formatVersion, dictIdToRuntimeId, fallbackRuntimeLookup);
         } catch (CorruptRegionEntryException e) {
             throw new java.io.UncheckedIOException(e);
         }
@@ -220,7 +234,23 @@ public record RawChunkFrameSnapshot(
             int prefixLen = pos;
             int k = LcaSectionCodec.readVarInt(sectionFrame, pos, sectionFrame.length);
             pos += LcaSectionCodec.varIntLen(k);
-            if (k < 1 || k > 4096) {
+            if (k == 0) {
+                if ((blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING
+                        && blockMode != LcaSectionCodec.BLOCK_MODE_DELTA_ROARING_FULL_MASK)
+                        || pos >= sectionFrame.length) {
+                    return sectionFrame;
+                }
+                int secExtFlags = sectionFrame[pos++] & 0xFF;
+                if (!LcaV3Codec.isValidSecExtFlags(secExtFlags) || pos >= sectionFrame.length) {
+                    return sectionFrame;
+                }
+                prefixLen = pos;
+                k = LcaSectionCodec.readVarInt(sectionFrame, pos, sectionFrame.length);
+                pos += LcaSectionCodec.varIntLen(k);
+                if (k < 2 || k > 4096) {
+                    return sectionFrame;
+                }
+            } else if (k < 1 || k > 4096) {
                 return sectionFrame;
             }
             int[] mappedIds = new int[k];
@@ -249,6 +279,25 @@ public record RawChunkFrameSnapshot(
         } catch (CorruptRegionEntryException e) {
             return sectionFrame;
         }
+    }
+
+    /**
+     * Returns {@code true} if the standalone {@code SectionFrame} uses a {@code 0x0003}-only
+     * encoding ({@code secExtFlags} {@code 0x01} Rank-Excluded, {@code 0x02} Gray Bitplanes,
+     * or Eikonal light residuals) requiring {@code CAP_LCA_V3_SECTIONS} on the wire.
+     */
+    public static boolean isV3ExtendedSectionFrame(byte[] sectionFrame) {
+        return LcaSectionCodec.isV3ExtendedSectionFrame(sectionFrame);
+    }
+
+    /**
+     * Re-encodes a {@code 0x0003} {@code secExtFlags} ({@code 0x01} or {@code 0x02}) block payload
+     * into a {@code 0x0002}-compatible {@code SectionFrame} while preserving trailing biome and
+     * light bytes verbatim. Returns {@code sectionFrame} unchanged when no {@code secExtFlags}
+     * block escape is present.
+     */
+    public static byte[] downgradeV3BlockSectionFrameToV2(byte[] sectionFrame) {
+        return LcaSectionCodec.downgradeV3BlockSectionFrameToV2(sectionFrame);
     }
 
     /**

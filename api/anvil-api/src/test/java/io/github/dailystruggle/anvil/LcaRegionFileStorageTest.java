@@ -541,4 +541,124 @@ class LcaRegionFileStorageTest {
                     "Mode B LcaLiveArchive must lazily initialize AtomicDictState on Mode B encode");
         }
     }
+
+    @Test
+    @DisplayName("anvil-api-ADR-006: Atomic 0x0002 -> 0x0003 upgrade on writable open and RawChunkFrameSnapshot O(1) pure-ID + secExtFlags (0x01/0x02) header rewriting")
+    void atomicV2ToV3UpgradeAndRawSnapshotSecExtHeaderRewriting(@TempDir Path tempDir) throws Exception {
+        // 1. Write a legacy 0x0002 archive to disk and verify read-only access does not mutate it
+        Path upgradeDir = tempDir.resolve("region_v2_upgrade");
+        Files.createDirectories(upgradeDir);
+        Path v2File = upgradeDir.resolve("r.0.0.lca");
+        LcaRegionWriter.LcaLiveArchive v2Arch = LcaRegionWriter.createEmptyLiveArchiveWithVersion(
+                0, 0, -4, 24, 4671, 0, LcaRegionReader.STORAGE_KIND_REGION_VOXEL,
+                LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES, LcaRegionReader.LCA_FORMAT_VERSION_V2);
+        v2Arch.saveChunkCoW(2, 3, build24SectionNonUniformChunkNbt(2, 3));
+        byte[] v2Bytes = v2Arch.toByteArray();
+        Files.write(v2File, v2Bytes);
+        assertEquals(LcaRegionReader.LCA_FORMAT_VERSION_V2, LcaRegionWriter.peekFormatVersion(v2File));
+
+        AnvilChunkView roView = LcaRegionReader.readChunkViewFromFile(v2File, 2, 3);
+        assertNotNull(roView);
+        assertEquals("minecraft:iron_ore", roView.blockIdAt(0, 0, 0));
+        assertEquals(LcaRegionReader.LCA_FORMAT_VERSION_V2, LcaRegionWriter.peekFormatVersion(v2File),
+                "Read-only LcaRegionReader must leave 0x0002 archive untouched on disk");
+
+        // Opening via LcaRegionFileStorage for write atomically upgrades 0x0002 -> 0x0003
+        try (LcaRegionFileStorage storage = new LcaRegionFileStorage(upgradeDir, false)) {
+            storage.writeChunkCompound(4, 5, build24SectionNonUniformChunkNbt(4, 5));
+            storage.flush();
+        }
+        assertEquals(LcaRegionReader.LCA_FORMAT_VERSION_V3, LcaRegionWriter.peekFormatVersion(v2File),
+                "Writable open via LcaRegionFileStorage must atomically upgrade 0x0002 -> 0x0003");
+        try (var stream = Files.list(upgradeDir)) {
+            assertTrue(stream.noneMatch(p -> p.getFileName().toString().endsWith(".tmp")),
+                    "No leftover .tmp files may remain after atomic upgrade");
+        }
+        AnvilChunkView afterUpgradeOrig = LcaRegionReader.readChunkViewFromFile(v2File, 2, 3);
+        AnvilChunkView afterUpgradeNew = LcaRegionReader.readChunkViewFromFile(v2File, 4, 5);
+        assertNotNull(afterUpgradeOrig);
+        assertNotNull(afterUpgradeNew);
+        assertEquals("minecraft:iron_ore", afterUpgradeOrig.blockIdAt(0, 0, 0));
+        assertEquals("minecraft:iron_ore", afterUpgradeNew.blockIdAt(0, 0, 0));
+
+        // 2. RawChunkFrameSnapshot O(1) pure-ID micro-palette runtime resolution + secExtFlags (0x01 & 0x02) header rewriting
+        LinkedHashMap<String, Object> v3Chunk = new LinkedHashMap<>();
+        v3Chunk.put("DataVersion", 4671);
+        v3Chunk.put("xPos", 0);
+        v3Chunk.put("zPos", 0);
+        v3Chunk.put("yPos", -4);
+        v3Chunk.put("Status", "minecraft:full");
+
+        List<Object> pal = new ArrayList<>();
+        Map<String, Integer> runtimeMap = new LinkedHashMap<>();
+        runtimeMap.put("minecraft:air", 1000);
+        for (int i = 0; i < 16; i++) {
+            String name = "snapmod:band_" + i;
+            LinkedHashMap<String, Object> e = new LinkedHashMap<>();
+            e.put("Name", name);
+            pal.add(e);
+            runtimeMap.put(name, 2000 + i);
+        }
+        long[] packed = new long[256];
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    int yzx = (y << 8) | (z << 4) | x;
+                    int s = (y < 4) ? 0 : (((y - 4) + ((x + z) >>> 3)) % 16);
+                    packed[yzx / 16] |= ((long) s) << ((yzx % 16) * 4);
+                }
+            }
+        }
+        LinkedHashMap<String, Object> sec = new LinkedHashMap<>();
+        sec.put("Y", (byte) 0);
+        LinkedHashMap<String, Object> bs = new LinkedHashMap<>();
+        bs.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, pal));
+        bs.put("data", packed);
+        sec.put("block_states", bs);
+        LinkedHashMap<String, Object> biomes = new LinkedHashMap<>();
+        biomes.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, List.of("minecraft:plains")));
+        sec.put("biomes", biomes);
+        v3Chunk.put("sections", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(sec)));
+
+        LcaV3Codec.setThreadFeatureMask(LcaV3Codec.DEFAULT_V3_FEATURES | LcaV3Codec.FEATURE_GRAY_BITPLANES);
+        try {
+            LcaRegionWriter.LcaLiveArchive arch =
+                    LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, 4671, false, 1024);
+            arch.saveChunkCoW(0, 0, v3Chunk);
+            RawChunkFrameSnapshot snap = arch.readRawChunkFrame(0, 0, runtimeMap::get);
+            assertNotNull(snap);
+            assertEquals(LcaRegionReader.LCA_FORMAT_VERSION_V3, snap.formatVersion());
+
+            // Pass null fallbackRuntimeLookup to prove 0x0003 pure-ID micro-palette resolves in O(1) with ZERO string lookups
+            byte[] graySlice = snap.sliceSectionFrameWithRuntimePalette(4, null); // Y = 0 -> sectionIdx 4
+            assertTrue(RawChunkFrameSnapshot.isV3ExtendedSectionFrame(graySlice),
+                    "Rewritten runtime slice must preserve SEC_EXT_GRAY_BITPLANES (0x02) header");
+
+            int[] decOrds = new int[LcaSectionCodec.SECTION_VOXELS];
+            int[] runtimePal = LcaSectionCodec.decodeSectionFrameBlockOrdinals(
+                    graySlice, graySlice.length, decOrds, null);
+            assertEquals(15, runtimePal.length);
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        int yzx = (y << 8) | (z << 4) | x;
+                        int expectedStateIdx = (y < 4) ? 0 : (((y - 4) + ((x + z) >>> 3)) % 16);
+                        assertEquals(2000 + expectedStateIdx, runtimePal[decOrds[yzx]],
+                                "Runtime ID mismatch after zero-copy secExtFlags=0x02 header rewrite at yzx=" + yzx);
+                    }
+                }
+            }
+
+            // Downgrade v3 Gray slice to v2-compatible SectionFrame and verify identical voxels & isV3Extended == false
+            byte[] downgraded = RawChunkFrameSnapshot.downgradeV3BlockSectionFrameToV2(graySlice);
+            assertFalse(RawChunkFrameSnapshot.isV3ExtendedSectionFrame(downgraded));
+            int[] dgOrds = new int[LcaSectionCodec.SECTION_VOXELS];
+            int[] dgPal = LcaSectionCodec.decodeSectionFrameBlockOrdinals(downgraded, downgraded.length, dgOrds, null);
+            for (int yzx = 0; yzx < LcaSectionCodec.SECTION_VOXELS; yzx++) {
+                assertEquals(runtimePal[decOrds[yzx]], dgPal[dgOrds[yzx]]);
+            }
+        } finally {
+            LcaV3Codec.resetThreadFeatureMask();
+        }
+    }
 }
