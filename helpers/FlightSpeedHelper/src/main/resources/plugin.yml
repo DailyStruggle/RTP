@@ -1,0 +1,25 @@
+name: FlightSpeedHelper
+version: 1.0-SNAPSHOT
+main: io.github.dailystruggle.helpers.flightspeed.FlightSpeedHelperPlugin
+api-version: "1.20"
+folia-supported: true
+author: dailystruggle
+description: Standalone Paper/Folia helper plugin providing unclamped /flyspeed multipliers beyond Bukkit's 10x cap and /fly toggling for high-speed world/storage demos.
+commands:
+  flyspeed:
+    description: Set or reset flight speed multiplier (1 = vanilla creative, 10 = Bukkit cap, >10 = unclamped NMS Abilities).
+    usage: "/<command> <multiplier|reset> [player]"
+    aliases:
+      - fspeed
+    permission: flightspeedhelper.use
+  fly:
+    description: Toggle flight allowance for yourself or a target player.
+    usage: "/<command> [on|off|toggle] [player]"
+    permission: flightspeedhelper.use
+permissions:
+  flightspeedhelper.use:
+    description: Allows adjusting own flight speed and flight state.
+    default: op
+  flightspeedhelper.others:
+    description: Allows adjusting another player's flight speed and flight state.
+    default: op

@@ -31,12 +31,14 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
  * and `BuiltInTestable` verifier (`anvil-api-ADR-003`, `anvil-api-ADR-002`, `ADR-077`).
  *
  * <p>Implements zero-LZ direct section decoding (`Mode A`, `codec1 = 0`) and optional per-chunk
- * Zstandard frame wrapper decoding (`Mode B`, `codec1 = 1`), $O(1)$ inline uniform-section
- * resolution (`bit 15 == 1` in `uint16 sectionOffsets[i]`), dynamically chained shared dictionary
- * traversal (`nextSegmentLinkTrailer`), and Continuous Built-In Test (`CBIT`) tripwires `T1..T8`.</p>
+ * pure-Java `LCD2` (`0x4C44` `"LD"` Atomic Dictionary + 12-bit Huffman) wrapper decoding (`Mode B`, `codec1 = 1`),
+ * $O(1)$ inline uniform-section resolution (`bit 15 == 1` in `uint16 sectionOffsets[i]`), dynamically chained
+ * shared dictionary traversal (`nextSegmentLinkTrailer`), and Continuous Built-In Test (`CBIT`) tripwires `T1..T8`.</p>
  *
  * @governedBy anvil-api-ADR-003
  * @governedBy anvil-api-ADR-002
+ * @governedBy leafanvil-ADR-005
+ * @governedBy leafanvil-ADR-006
  * @governedBy ADR-016
  * @governedBy ADR-077
  * @governedBy ADR-115
@@ -56,12 +58,18 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
     /** Legacy reference format version `0x0001` (Major 1, Minor 0). */
     public static final int LCA_FORMAT_VERSION_V1 = 0x0001;
 
-    /** Current reference format version `0x0002` (Major 2, Minor 0). */
-    public static final int LCA_FORMAT_VERSION = 0x0002;
+    /** Legacy reference format version `0x0002` (`LCA-ICD-1.0`, Major 2, Minor 0). */
+    public static final int LCA_FORMAT_VERSION_V2 = 0x0002;
 
-    /** Returns `true` if `formatVersion` is a supported `.lca` wire format version (`0x0002`). */
+    /** Current reference format version `0x0003` (`LCA-ICD-3.0`, Major 3, Minor 0). */
+    public static final int LCA_FORMAT_VERSION_V3 = 0x0003;
+
+    /** Current reference format version (`0x0003`). */
+    public static final int LCA_FORMAT_VERSION = LCA_FORMAT_VERSION_V3;
+
+    /** Returns `true` if `formatVersion` is a supported `.lca` wire format version (`0x0002` or `0x0003`). */
     public static boolean isSupportedFormatVersion(int formatVersion) {
-        return formatVersion == LCA_FORMAT_VERSION;
+        return formatVersion == LCA_FORMAT_VERSION_V2 || formatVersion == LCA_FORMAT_VERSION_V3;
     }
 
     /**
@@ -510,14 +518,22 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
 
         LcaSectionCodec.ResidualTailDecoded tail = hasResidualNbt
                 ? LcaSectionCodec.unpackResidualSectionAndNbt(
-                        frame, fOff, residualRelStart, residualRelEnd, meta.minSectionY, sectionCount)
+                        frame, fOff, residualRelStart, residualRelEnd, meta.minSectionY, sectionCount,
+                        (meta.regionX << 5) + rx, (meta.regionZ << 5) + rz, meta.formatVersion)
                 : new LcaSectionCodec.ResidualTailDecoded(
                         new LinkedHashMap<>(), Collections.emptyList(), Collections.emptyList(), false);
 
         LinkedHashMap<String, Object> root = tail.rootMap();
         root.putIfAbsent("DataVersion", chunkDataVersion);
+        if (statusOrdinal == LcaSectionCodec.STATUS_ORDINAL_RESIDUAL
+                && !(root.get("Status") instanceof String)) {
+            throw new CorruptRegionEntryException(
+                    "CBIT T5: chunkStatusOrdinal=0xFD missing residual Status tag");
+        }
         if (tail.nonVoxelRoot()) {
-            if (statusOrdinal != 0xFE && !root.containsKey("Status")) {
+            if (statusOrdinal != LcaSectionCodec.STATUS_ORDINAL_ABSENT
+                    && statusOrdinal != LcaSectionCodec.STATUS_ORDINAL_RESIDUAL
+                    && !root.containsKey("Status")) {
                 root.put("Status", LcaSectionCodec.decodeStatusOrdinal(statusOrdinal));
             }
             return new AnvilReader.ChunkEntry(snap.codec1 == 0 ? 3 : 5, snap.exactByteLen20, root);
@@ -526,7 +542,9 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         root.putIfAbsent("xPos", (meta.regionX << 5) + rx);
         root.putIfAbsent("zPos", (meta.regionZ << 5) + rz);
         root.putIfAbsent("yPos", meta.minSectionY);
-        if (statusOrdinal != 0xFE && !root.containsKey("Status")) {
+        if (statusOrdinal != LcaSectionCodec.STATUS_ORDINAL_ABSENT
+                && statusOrdinal != LcaSectionCodec.STATUS_ORDINAL_RESIDUAL
+                && !root.containsKey("Status")) {
             root.put("Status", LcaSectionCodec.decodeStatusOrdinal(statusOrdinal));
         }
         root.putIfAbsent("LastUpdate", lastUpdateTick);
@@ -576,15 +594,28 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                             List.of(activeBiomes.get(defaultBiomeDictId))));
                     secMap.put("biomes", biomeMap);
                 }
+                boolean hasStarlightVersion = root.containsKey("starlight.light_version");
+                boolean starlightZeroEligible = hasStarlightVersion
+                        && !"minecraft:air".equals(activeCanonicalStates.get(globalDictId));
                 if (skyLight2 == 0b01 || skyLight2 == 0b10) {
                     byte[] sky = new byte[2048];
                     Arrays.fill(sky, (byte) 0xFF);
                     secMap.put("SkyLight", sky);
+                    if (hasStarlightVersion) {
+                        secMap.put("starlight.skylight_state", 2);
+                    }
+                } else if (starlightZeroEligible) {
+                    secMap.put("starlight.skylight_state", 1);
                 }
                 if (skyLight2 == 0b10 || skyLight2 == 0b11) {
                     byte[] blk = new byte[2048];
                     Arrays.fill(blk, (byte) 0xFF);
                     secMap.put("BlockLight", blk);
+                    if (hasStarlightVersion) {
+                        secMap.put("starlight.blocklight_state", 2);
+                    }
+                } else if (starlightZeroEligible) {
+                    secMap.put("starlight.blocklight_state", 1);
                 }
                 sectionCompounds.add(secMap);
             } else {
@@ -634,11 +665,24 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                             List.of(activeBiomes.get(defaultBiomeDictId))));
                     secMap.put("biomes", biomeMap);
                 }
+                boolean hasStarlightVersion = root.containsKey("starlight.light_version");
+                boolean sectionOnlyAir = dec.blockStateCanonicalPalette.size() == 1
+                        && "minecraft:air".equals(dec.blockStateCanonicalPalette.get(0));
                 if (dec.skyLight2048 != null) {
                     secMap.put("SkyLight", dec.skyLight2048);
+                    if (hasStarlightVersion) {
+                        secMap.put("starlight.skylight_state", 2);
+                    }
+                } else if (hasStarlightVersion && !sectionOnlyAir) {
+                    secMap.put("starlight.skylight_state", 1);
                 }
                 if (dec.blockLight2048 != null) {
                     secMap.put("BlockLight", dec.blockLight2048);
+                    if (hasStarlightVersion) {
+                        secMap.put("starlight.blocklight_state", 2);
+                    }
+                } else if (hasStarlightVersion && !sectionOnlyAir) {
+                    secMap.put("starlight.blocklight_state", 1);
                 }
                 sectionCompounds.add(secMap);
             }
@@ -699,6 +743,22 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
     public static AnvilChunkView readChunkView(byte[] regionBytes, int regionLength, int rx, int rz) throws IOException {
         WindowDecodeResult res = decodeWindowWithRetry(
                 regionBytes, regionLength, rx, rz, Integer.MIN_VALUE, Integer.MAX_VALUE, true, true);
+        return res == null ? null : res.toChunkView();
+    }
+
+    /**
+     * Direct `.lca` {@link AnvilChunkView} decoder preserving canonical sorted
+     * {@code minecraft:id[k1=v1,...]} blockstate strings from the archive dictionary
+     * while leaving {@link #readChunkView} bare-name {@code ADR-016} behavior unchanged.
+     */
+    public static AnvilChunkView readChunkStateView(byte[] regionBytes, int rx, int rz) throws IOException {
+        return readChunkStateView(regionBytes, regionBytes.length, rx, rz);
+    }
+
+    public static AnvilChunkView readChunkStateView(byte[] regionBytes, int regionLength, int rx, int rz)
+            throws IOException {
+        WindowDecodeResult res = decodeWindowWithRetry(
+                regionBytes, regionLength, rx, rz, Integer.MIN_VALUE, Integer.MAX_VALUE, true, true, null, false);
         return res == null ? null : res.toChunkView();
     }
 
@@ -826,6 +886,22 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             boolean decodeHeightmap,
             RecoveryReport recoveryReport
     ) throws IOException {
+        return decodeWindowWithRetry(
+                regionBytes, regionLength, rx, rz, minY, maxY, decodeBiomes, decodeHeightmap, recoveryReport, true);
+    }
+
+    private static WindowDecodeResult decodeWindowWithRetry(
+            byte[] regionBytes,
+            int regionLength,
+            int rx,
+            int rz,
+            int minY,
+            int maxY,
+            boolean decodeBiomes,
+            boolean decodeHeightmap,
+            RecoveryReport recoveryReport,
+            boolean stripProperties
+    ) throws IOException {
         validateCoordinates(rx, rz);
         SuperblockFastMeta sb = validateSuperblockFast(regionBytes, regionLength);
         for (int attempt = 0; attempt < 2; attempt++) {
@@ -835,7 +911,8 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             int hazardSlot = pinHazardSlab((int) (snap.ptrBefore >>> 29));
             try {
                 WindowDecodeResult res = decodeWindowToViewOrProbe(
-                        regionBytes, regionLength, sb, null, snap, minY, maxY, decodeBiomes, decodeHeightmap, recoveryReport);
+                        regionBytes, regionLength, sb, null, snap, minY, maxY,
+                        decodeBiomes, decodeHeightmap, recoveryReport, stripProperties);
                 if (snap.verifyTearFree(regionBytes) || attempt == 1) {
                     return res;
                 }
@@ -851,7 +928,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         return null;
     }
 
-    private static int[] computeSectionRelStarts(
+    static int[] computeSectionRelStarts(
             byte[] frame,
             int fOff,
             int frameLen,
@@ -866,7 +943,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 entriesOut, new int[sectionCount]);
     }
 
-    private static int[] computeSectionRelStarts(
+    static int[] computeSectionRelStarts(
             byte[] frame,
             int fOff,
             int frameLen,
@@ -908,7 +985,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         return relStarts;
     }
 
-    private static int findSectionRelEnd(
+    static int findSectionRelEnd(
             int[] relStarts, int idx, int sectionCount, int residualRelStart, int frameLen
     ) {
         return LcaSectionCodec.findSectionRelEnd(relStarts, idx, sectionCount, residualRelStart, frameLen);
@@ -961,6 +1038,24 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             boolean decodeHeightmap,
             RecoveryReport recoveryReport
     ) throws IOException {
+        return decodeWindowToViewOrProbe(
+                regionBytes, regionLength, sb, preParsedMeta, snap,
+                minY, maxY, decodeBiomes, decodeHeightmap, recoveryReport, true);
+    }
+
+    private static WindowDecodeResult decodeWindowToViewOrProbe(
+            byte[] regionBytes,
+            int regionLength,
+            SuperblockFastMeta sb,
+            LcaSectionCodec.ParsedHeaderAndDict preParsedMeta,
+            ChunkSlabView snap,
+            int minY,
+            int maxY,
+            boolean decodeBiomes,
+            boolean decodeHeightmap,
+            RecoveryReport recoveryReport,
+            boolean stripProperties
+    ) throws IOException {
         byte[] frame = snap.frameBytes;
         int fOff = snap.frameOffset;
         int frameLen = snap.frameLength;
@@ -1005,7 +1100,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             }
             if (needsBody) {
                 if (preParsedMeta == null && regionBytes != null) {
-                    preParsedMeta = hasSlabLocalPalette
+                    preParsedMeta = (hasSlabLocalPalette && stripProperties)
                             ? INSTANCE.resolveFastPatternDictOnly(regionBytes, regionLength, sb, recoveryReport)
                             : INSTANCE.parseAndValidateSuperblockAndDict(regionBytes, regionLength, recoveryReport);
                 }
@@ -1041,11 +1136,18 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         List<LcaSectionCodec.BiomeTemplate> biomeTemplates = Collections.emptyList();
         LcaSectionCodec.SlabLocalPalette localPal = null;
 
+        List<String> regionCanonicalForSlab = Collections.emptyList();
         if (hasSlabLocalPalette) {
+            if (!stripProperties) {
+                LcaSectionCodec.ParsedHeaderAndDict regionMeta = (preParsedMeta != null && !preParsedMeta.canonicalStates.isEmpty())
+                        ? preParsedMeta
+                        : INSTANCE.parseAndValidateSuperblockAndDict(regionBytes, regionLength, recoveryReport);
+                regionCanonicalForSlab = regionMeta.canonicalStates;
+            }
             int paletteLimitRel = LcaSectionCodec.findFirstSectionRelStart(
                     relStarts, sectionCount, residualRelStart);
             localPal = LcaSectionCodec.decodeSlabLocalPalette(
-                    frame, fOff, sectionDirEnd, paletteLimitRel, false, decodeBiomes, Collections.emptyList());
+                    frame, fOff, sectionDirEnd, paletteLimitRel, !stripProperties, decodeBiomes, regionCanonicalForSlab);
             canonicalStates = localPal.canonicalStates;
             baseBlockNames = localPal.baseBlockNames;
             singletonBasePalettes = localPal.singletonBasePalettes;
@@ -1055,7 +1157,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         } else {
             LcaSectionCodec.ParsedHeaderAndDict regionMeta = preParsedMeta != null
                     ? preParsedMeta
-                    : INSTANCE.parseAndValidateSuperblockAndDict(regionBytes, regionLength);
+                    : INSTANCE.parseAndValidateSuperblockAndDict(regionBytes, regionLength, recoveryReport);
             canonicalStates = regionMeta.canonicalStates;
             baseBlockNames = regionMeta.baseBlockNames;
             singletonBasePalettes = regionMeta.singletonBasePalettes;
@@ -1063,12 +1165,14 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             singletonBiomePalettes = regionMeta.singletonBiomePalettes;
         }
 
+        List<String> targetStateDict = stripProperties ? baseBlockNames : canonicalStates;
+
         int residualRelEnd = LcaSectionCodec.findResidualRelEnd(relStarts, sectionCount, residualRelStart, frameLen);
         LcaSectionCodec.ChunkPatchTail patchTail = (!snap.modeBBodyDeferred && hasResidualNbt)
                 ? LcaSectionCodec.locateAndDecodeChunkPatchTail(
                         frame, fOff, frameLen, residualRelStart, residualRelEnd,
                         sectionCount, sectionDirEnd, scale4B, hasSlabLocalPalette,
-                        localPal, Collections.emptyList(), false, true,
+                        localPal, regionCanonicalForSlab, !stripProperties, true,
                         entries, relStarts)
                 : null;
         if (patchTail != null) {
@@ -1095,10 +1199,15 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
 
             if ((entry16 & 0x8000) != 0 && secPatch == null) {
                 int globalDictId = hasSlabLocalPalette ? (entry16 & 0x07FF) : (entry16 & 0x1FFF);
-                if (globalDictId >= singletonBasePalettes.size()) {
+                if (globalDictId < 0
+                        || globalDictId >= singletonBasePalettes.size()
+                        || (!stripProperties && (targetStateDict == null || globalDictId >= targetStateDict.size()))) {
                     throw new CorruptRegionEntryException("CBIT T7: Inline globalDictId out of bounds: " + globalDictId);
                 }
-                sectionsOut.add(new PaletteSection(sectionY, singletonBasePalettes.get(globalDictId), null));
+                List<String> inlinePalette = stripProperties
+                        ? singletonBasePalettes.get(globalDictId)
+                        : List.of(targetStateDict.get(globalDictId));
+                sectionsOut.add(new PaletteSection(sectionY, inlinePalette, null));
                 if (decodeBiomes) {
                     if (hasSlabLocalPalette && !biomeTemplates.isEmpty()) {
                         int biomeTmplIdx = (entry16 >>> 11) & 3;
@@ -1113,9 +1222,9 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             } else if (entry16 == 0 || (entry16 & 0x8000) != 0) {
                 LcaSectionCodec.DecodedSection dec = LcaSectionCodec.createUniformDecodedSection(
                         sectionY, entry16, hasSlabLocalPalette,
-                        canonicalStates, baseBlockNames, biomes,
+                        canonicalStates, targetStateDict, biomes,
                         biomeTemplates, defaultBiomeDictId, true, !decodeBiomes);
-                dec = LcaSectionCodec.applySectionPatch(dec, secPatch, canonicalStates, baseBlockNames, true);
+                dec = LcaSectionCodec.applySectionPatch(dec, secPatch, canonicalStates, targetStateDict, true);
                 sectionsOut.add(dec.toPaletteSection());
                 if (decodeBiomes) {
                     BiomePaletteSection bps = dec.toBiomePaletteSection();
@@ -1131,10 +1240,10 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 try {
                     LcaSectionCodec.DecodedSection dec = LcaSectionCodec.decodeSectionFrame(
                             frame, fOff + relStart, fOff + relEnd, sectionY,
-                            canonicalStates, baseBlockNames, biomes,
+                            canonicalStates, targetStateDict, biomes,
                             biomeTemplates, true, !decodeBiomes, sb.formatVersion);
                     if (secPatch != null) {
-                        dec = LcaSectionCodec.applySectionPatch(dec, secPatch, canonicalStates, baseBlockNames, true);
+                        dec = LcaSectionCodec.applySectionPatch(dec, secPatch, canonicalStates, targetStateDict, true);
                     }
                     sectionsOut.add(dec.toPaletteSection());
                     if (decodeBiomes) {
@@ -1150,7 +1259,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                         throw ex;
                     }
                     String fallbackDominantBlock = recoverDominantPaletteZeroState(
-                            frame, fOff + relStart, fOff + relEnd, baseBlockNames);
+                            frame, fOff + relStart, fOff + relEnd, targetStateDict);
                     sectionsOut.add(new PaletteSection(sectionY, List.of(fallbackDominantBlock), null));
                     if (decodeBiomes && defaultBiomeDictId >= 0 && defaultBiomeDictId < singletonBiomePalettes.size()) {
                         biomesOut.add(new BiomePaletteSection(sectionY, singletonBiomePalettes.get(defaultBiomeDictId), null));
@@ -1400,7 +1509,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         throw new CorruptRegionEntryException("CBIT T8: Concurrent chunk pointer mutation did not stabilize after retry");
     }
 
-    private static int decodeAndVerifySelfDescribingChunkHeader(int rawDvWord, int rx, int rz)
+    static int decodeAndVerifySelfDescribingChunkHeader(int rawDvWord, int rx, int rz)
             throws CorruptRegionEntryException {
         if ((rawDvWord & CHUNK_FRAME_SELF_TAG_MASK) == CHUNK_FRAME_SELF_TAG_MAGIC) {
             int expectedChunkIdx = (rx & 31) | ((rz & 31) << 5);
@@ -1648,10 +1757,10 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
     }
 
     static int estimateSelfDescribingChunkLengthStatic(
-            byte[] buf, int frameStart, int sectionCount, boolean modeBZstd, int limitBytes
+            byte[] buf, int frameStart, int sectionCount, boolean modeBLcd2, int limitBytes
     ) {
         int sectionDirEnd = 24 + (sectionCount << 1);
-        if (modeBZstd) {
+        if (modeBLcd2) {
             int headerWords = (sectionDirEnd + 7) >>> 3;
             int compStart = frameStart + sectionDirEnd + headerWords;
             if (compStart + 9 <= limitBytes
@@ -2096,7 +2205,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         return LcaSectionCodec.parseCanonicalStateToNbtCompound(canonicalState, dataVersion);
     }
 
-    static String decodeStatusOrdinal(int ordinal) {
+    static String decodeStatusOrdinal(int ordinal) throws CorruptRegionEntryException {
         return LcaSectionCodec.decodeStatusOrdinal(ordinal);
     }
 
@@ -2114,7 +2223,9 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
     // Positional Single-Chunk FileChannel Reader & Header Cache (ADR-016 / anvil-api-ADR-003)
     // -------------------------------------------------------------------------
 
-    private static final int FILE_HEADER_CACHE_CAPACITY = 4096;
+    static final int DEFAULT_FILE_HEADER_CACHE_CAPACITY = 256;
+    private static final int FILE_HEADER_CACHE_CAPACITY =
+            Math.max(16, Integer.getInteger("leafanvil.reader.headerCacheCapacity", DEFAULT_FILE_HEADER_CACHE_CAPACITY));
     private static final int INITIAL_FILE_SCRATCH_BYTES = 64 * 1024;
     @SuppressWarnings("java:S5164")
     private static final ThreadLocal<byte[]> FILE_SCRATCH =
@@ -2126,11 +2237,17 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
     }
 
     private static final ConcurrentHashMap<Path, CachedFileHeader> FILE_HEADER_CACHE =
-            new ConcurrentHashMap<>(1024);
+            new ConcurrentHashMap<>(Math.min(256, FILE_HEADER_CACHE_CAPACITY));
     private static final java.util.concurrent.ConcurrentLinkedQueue<Path> FILE_HEADER_CLOCK_QUEUE =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     static final class CachedFileHeader {
+        private record CachedRuntimeDictMapping(
+                java.util.function.Function<String, Integer> lookupRef,
+                int dictSize,
+                int[] mapping
+        ) {}
+
         final byte[] headerBytes;
         final byte[] secDedBytes;
         final SuperblockFastMeta sb;
@@ -2139,6 +2256,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
         volatile long checkedNanos;
         volatile boolean clockBit = false;
         volatile LcaSectionCodec.ParsedHeaderAndDict parsedDict;
+        volatile CachedRuntimeDictMapping cachedRuntimeMapping;
 
         CachedFileHeader(
                 byte[] headerBytes, byte[] secDedBytes, SuperblockFastMeta sb, long mtime, long fileSize, long checkedNanos
@@ -2186,6 +2304,23 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             this.parsedDict = d;
             return d;
         }
+
+        int[] resolveDictIdToRuntimeId(
+                LcaSectionCodec.ParsedHeaderAndDict dict,
+                java.util.function.Function<String, Integer> runtimeStateLookup
+        ) {
+            if (runtimeStateLookup == null || dict == null || dict.canonicalStates == null) {
+                return null;
+            }
+            int dictSize = dict.canonicalStates.size();
+            CachedRuntimeDictMapping cur = this.cachedRuntimeMapping;
+            if (cur != null && cur.lookupRef == runtimeStateLookup && cur.dictSize == dictSize) {
+                return cur.mapping;
+            }
+            int[] built = buildDictIdToRuntimeIdArray(dict.canonicalStates, runtimeStateLookup);
+            this.cachedRuntimeMapping = new CachedRuntimeDictMapping(runtimeStateLookup, dictSize, built);
+            return built;
+        }
     }
 
     private static Path normalizeCacheKey(Path regionFile) {
@@ -2218,6 +2353,7 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
             h.clockBit = true;
             if (dictModified) {
                 h.parsedDict = null;
+                h.cachedRuntimeMapping = null;
             }
         }
         AnvilRegionHeaderCache.invalidate(regionFile);
@@ -2353,6 +2489,130 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 if (snap == null) return null;
                 LcaSectionCodec.ParsedHeaderAndDict dict = header.ensureParsedDict(channel);
                 return encodeChunkNbtBytesFromFrame(dict, snap, rx, rz);
+            } catch (CorruptRegionEntryException e) {
+                if (cachedHeader) {
+                    cachedHeader = false;
+                    long mtime = fileMtimeOrMinusOne(regionFile);
+                    if (mtime < 0L) {
+                        invalidateFileCache(regionFile);
+                        return null;
+                    }
+                    header = loadFileHeader(regionFile, channel, mtime);
+                    if (header == null) return null;
+                    continue;
+                }
+                throw e;
+            }
+        }
+    }
+
+    static RawChunkFrameSnapshot buildRawChunkFrameSnapshot(
+            LcaSectionCodec.ParsedHeaderAndDict meta,
+            ChunkSlabView snap,
+            int rx,
+            int rz,
+            int[] dictIdToRuntimeId
+    ) throws IOException {
+        snap.ensureBodyDecompressed(meta.sectionCount, meta);
+        byte[] frame = snap.frameBytes;
+        int fOff = snap.frameOffset;
+        int frameLen = snap.frameLength;
+        if (frameLen < 24 + (meta.sectionCount << 1)) {
+            throw new CorruptRegionEntryException("CBIT T5: ChunkFrame too short (" + frameLen + ")");
+        }
+        int rawDvWord = LcaSectionCodec.readIntBE(frame, fOff);
+        int chunkDataVersion = decodeAndVerifySelfDescribingChunkHeader(rawDvWord, rx, rz);
+        int residualNbtRelOffset = LcaSectionCodec.readUint16BE(frame, fOff + 22);
+        byte[] ownedFrame = (fOff == 0 && frameLen == frame.length)
+                ? frame
+                : Arrays.copyOfRange(frame, fOff, fOff + frameLen);
+        return new RawChunkFrameSnapshot(
+                ownedFrame,
+                chunkDataVersion,
+                meta.minSectionY,
+                meta.sectionCount,
+                residualNbtRelOffset,
+                dictIdToRuntimeId
+        );
+    }
+
+    static int[] buildDictIdToRuntimeIdArray(
+            List<String> canonicalStates,
+            java.util.function.Function<String, Integer> runtimeStateLookup
+    ) {
+        if (runtimeStateLookup == null || canonicalStates == null) {
+            return null;
+        }
+        int len = canonicalStates.size();
+        int[] out = new int[len];
+        for (int i = 0; i < len; i++) {
+            Integer mapped = runtimeStateLookup.apply(canonicalStates.get(i));
+            out[i] = mapped != null ? mapped.intValue() : 0;
+        }
+        return out;
+    }
+
+    /**
+     * Off-thread raw `.lca` `ChunkFrame` file reader (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    @SuppressWarnings("java:S1168")
+    public static RawChunkFrameSnapshot readRawChunkFrameFromFile(
+            Path regionFile,
+            int rx,
+            int rz,
+            java.util.function.Function<String, Integer> runtimeStateLookup
+    ) throws IOException {
+        if (regionFile == null) return null;
+        try (FileChannel ch = FileChannel.open(regionFile, StandardOpenOption.READ)) {
+            return readRawChunkFrameFromChannel(regionFile, ch, rx, rz, runtimeStateLookup);
+        } catch (NoSuchFileException e) {
+            invalidateFileCache(regionFile);
+            return null;
+        }
+    }
+
+    /**
+     * Off-thread positional `FileChannel` `.lca` `ChunkFrame` reader (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    @SuppressWarnings("java:S1168")
+    public static RawChunkFrameSnapshot readRawChunkFrameFromChannel(
+            Path regionFile,
+            FileChannel channel,
+            int rx,
+            int rz,
+            java.util.function.Function<String, Integer> runtimeStateLookup
+    ) throws IOException {
+        validateCoordinates(rx, rz);
+        if (regionFile == null) return null;
+        if (channel == null || !channel.isOpen()) {
+            return readRawChunkFrameFromFile(regionFile, rx, rz, runtimeStateLookup);
+        }
+        CachedFileHeader header = freshFileHeader(regionFile);
+        boolean cachedHeader = header != null;
+        if (header == null) {
+            long mtime = fileMtimeOrMinusOne(regionFile);
+            if (mtime < 0L) {
+                invalidateFileCache(regionFile);
+                return null;
+            }
+            header = revalidateFileHeader(regionFile, mtime);
+            if (header != null) {
+                cachedHeader = true;
+            } else {
+                header = loadFileHeader(regionFile, channel, mtime);
+                if (header == null) return null;
+            }
+        }
+        while (true) {
+            try {
+                if (!header.isOccupied(rx, rz)) {
+                    return null;
+                }
+                ChunkSlabView snap = readSlabFromChannel(channel, header, rx, rz);
+                if (snap == null) return null;
+                LcaSectionCodec.ParsedHeaderAndDict dict = header.ensureParsedDict(channel);
+                int[] dictIdToRuntimeId = header.resolveDictIdToRuntimeId(dict, runtimeStateLookup);
+                return buildRawChunkFrameSnapshot(dict, snap, rx, rz, dictIdToRuntimeId);
             } catch (CorruptRegionEntryException e) {
                 if (cachedHeader) {
                     cachedHeader = false;

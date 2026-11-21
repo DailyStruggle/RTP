@@ -147,7 +147,7 @@ public final class AnvilReader implements RegionFileReader {
         return writeCompressedChunkToMcaBytes(regionBytes, cx, cz, updatedNbt);
     }
 
-    private static byte[] writeCompressedChunkToMcaBytes(
+    static byte[] writeCompressedChunkToMcaBytes(
             byte[] regionBytes, int cx, int cz, byte[] uncompressedNbt) throws IOException {
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream(uncompressedNbt.length);
         try (java.util.zip.DeflaterOutputStream dos = new java.util.zip.DeflaterOutputStream(baos)) {
@@ -325,6 +325,19 @@ public final class AnvilReader implements RegionFileReader {
     }
 
     /**
+     * As {@link #readChunkViewFromSectors(byte[], int, int)}, preserving canonical sorted
+     * {@code minecraft:id[k1=v1,...]} blockstate properties for 3D map/rendering consumers while
+     * leaving {@link #readChunkViewFromSectors} bare-name behavior unchanged ({@code ADR-016}).
+     */
+    public static AnvilChunkView readChunkStateViewFromSectors(byte[] sectorBytes, int cx, int cz) throws IOException {
+        if (sectorBytes == null) {
+            throw new CorruptRegionEntryException("Null sector buffer for chunk (" + cx + "," + cz + ")");
+        }
+        RawChunk raw = decodeSectorPayload(sectorBytes, sectorBytes.length, 0, sectorBytes.length, cx, cz);
+        return toStateView(Nbt.readRootCompound(raw.nbtBytes));
+    }
+
+    /**
      * Decodes absolute chunk {@code (chunkX, chunkZ)} from {@code sectorBytes[0, length)}, its own
      * sector run (see {@link #readChunkViewFromSectors}). The buffer may be a reused, longer scratch
      * array; bytes past {@code length} are never read and the entry holds no reference to it.
@@ -485,6 +498,22 @@ public final class AnvilReader implements RegionFileReader {
         ChunkEntry entry = readChunkEntry(regionBytes, regionLength, cx, cz);
         if (entry == null) return null;
         return toView(entry.root);
+    }
+
+    /**
+     * Reads chunk {@code (cx, cz)} into an {@link AnvilChunkView} whose section palettes preserve
+     * canonical sorted {@code minecraft:id[k1=v1,...]} blockstate strings.
+     */
+    public static AnvilChunkView readChunkStateView(byte[] regionBytes, int cx, int cz) throws IOException {
+        return readChunkStateView(regionBytes, regionBytes == null ? 0 : regionBytes.length, cx, cz);
+    }
+
+    /** As {@link #readChunkStateView(byte[], int, int)} over {@code regionBytes[0, regionLength)}. */
+    public static AnvilChunkView readChunkStateView(byte[] regionBytes, int regionLength, int cx, int cz)
+            throws IOException {
+        ChunkEntry entry = readChunkEntry(regionBytes, regionLength, cx, cz);
+        if (entry == null) return null;
+        return toStateView(entry.root);
     }
 
     // ----------------------------------------------------------- column probe (ADR-016)
@@ -712,6 +741,18 @@ public final class AnvilReader implements RegionFileReader {
      * "malformed → UNKNOWN, never crash" posture.
      */
     public static AnvilChunkView toView(LinkedHashMap<String, Object> root) {
+        return toViewInternal(root, false);
+    }
+
+    /**
+     * Lifts an already-parsed chunk root compound into an {@link AnvilChunkView} preserving
+     * canonical sorted {@code Name[k1=v1,...]} blockstate strings from {@code Properties}.
+     */
+    public static AnvilChunkView toStateView(LinkedHashMap<String, Object> root) {
+        return toViewInternal(root, true);
+    }
+
+    private static AnvilChunkView toViewInternal(LinkedHashMap<String, Object> root, boolean preserveProperties) {
         int dataVersion = getDataVersion(root);
         long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
@@ -724,7 +765,7 @@ public final class AnvilReader implements RegionFileReader {
             out = new ArrayList<>(sections.items.size());
             biomeOut = new ArrayList<>(sections.items.size());
             for (Object raw : sections.items) {
-                PaletteSection ps = sectionFromCompound(raw);
+                PaletteSection ps = sectionFromCompound(raw, preserveProperties);
                 if (ps != null) out.add(ps);
                 // Biome container is decoded independently: a section may carry a
                 // valid biome palette even if its block_states is missing, and vice
@@ -740,8 +781,12 @@ public final class AnvilReader implements RegionFileReader {
                 Collections.unmodifiableList(biomeOut));
     }
 
-    @SuppressWarnings("unchecked")
     private static PaletteSection sectionFromCompound(Object raw) {
+        return sectionFromCompound(raw, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static PaletteSection sectionFromCompound(Object raw, boolean preserveProperties) {
         if (!(raw instanceof Map)) return null;
         Map<String, Object> sec = (Map<String, Object>) raw;
 
@@ -760,7 +805,7 @@ public final class AnvilReader implements RegionFileReader {
 
         List<String> paletteNames = new ArrayList<>(palList.items.size());
         for (Object entry : palList.items) {
-            String name = blockStateName(entry);
+            String name = preserveProperties ? formatCanonicalBlockState(entry) : blockStateName(entry);
             if (name == null) return null;
             paletteNames.add(name);
         }
@@ -769,6 +814,99 @@ public final class AnvilReader implements RegionFileReader {
         long[] data = (dataObj instanceof long[]) ? (long[]) dataObj : null;
 
         return new PaletteSection(sectionY, Collections.unmodifiableList(paletteNames), data);
+    }
+
+    /**
+     * Formats a raw NBT {@code block_states.palette} entry (or structure-template {@code palette}
+     * compound) into canonical sorted {@code namespace:id[k1=v1,k2=v2]} form. Returns {@code null}
+     * when the entry has no valid block identifier.
+     */
+    @SuppressWarnings("unchecked")
+    public static String formatCanonicalBlockState(Object entry) {
+        String baseName = blockStateName(entry);
+        if (baseName == null || !(entry instanceof Map)) {
+            return baseName;
+        }
+        Map<String, Object> m = (Map<String, Object>) entry;
+        Object propsObj = m.get("Properties");
+        if (propsObj == null) {
+            propsObj = m.get("properties");
+        }
+        if (!(propsObj instanceof Map<?, ?> rawProps) || rawProps.isEmpty()) {
+            return baseName;
+        }
+        java.util.TreeMap<String, String> sorted = new java.util.TreeMap<>();
+        for (Map.Entry<?, ?> pe : rawProps.entrySet()) {
+            if (pe.getKey() != null && pe.getValue() != null) {
+                sorted.put(String.valueOf(pe.getKey()), String.valueOf(pe.getValue()));
+            }
+        }
+        if (sorted.isEmpty()) {
+            return baseName;
+        }
+        StringBuilder sb = new StringBuilder(baseName.length() + sorted.size() * 14);
+        sb.append(baseName).append('[');
+        boolean first = true;
+        for (Map.Entry<String, String> se : sorted.entrySet()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(se.getKey()).append('=').append(se.getValue());
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+
+    /**
+     * Normalizes any raw blockstate string (e.g. {@code oak_stairs[half=top,facing=west]}) into
+     * canonical sorted {@code namespace:id[facing=west,half=top]} form so property-order differences
+     * across {@code .mca}, {@code .lca}, and {@code .nbt} sources hash identically.
+     */
+    public static String normalizeCanonicalBlockState(String rawState) {
+        if (rawState == null || rawState.isBlank()) {
+            return "minecraft:air";
+        }
+        String trimmed = rawState.trim();
+        int bracket = trimmed.indexOf('[');
+        String base = (bracket >= 0 ? trimmed.substring(0, bracket) : trimmed).toLowerCase(java.util.Locale.ROOT);
+        if (!base.contains(":")) {
+            base = "minecraft:" + base;
+        }
+        if (bracket < 0 || !trimmed.endsWith("]")) {
+            return base;
+        }
+        String propsRaw = trimmed.substring(bracket + 1, trimmed.length() - 1);
+        if (propsRaw.isEmpty()) {
+            return base;
+        }
+        java.util.TreeMap<String, String> sorted = new java.util.TreeMap<>();
+        int start = 0;
+        while (start < propsRaw.length()) {
+            int comma = propsRaw.indexOf(',', start);
+            String pair = comma < 0 ? propsRaw.substring(start) : propsRaw.substring(start, comma);
+            int eq = pair.indexOf('=');
+            if (eq > 0) {
+                String k = pair.substring(0, eq).trim().toLowerCase(java.util.Locale.ROOT);
+                String v = pair.substring(eq + 1).trim().toLowerCase(java.util.Locale.ROOT);
+                if (!k.isEmpty() && !v.isEmpty()) {
+                    sorted.put(k, v);
+                }
+            }
+            if (comma < 0) break;
+            start = comma + 1;
+        }
+        if (sorted.isEmpty()) {
+            return base;
+        }
+        StringBuilder sb = new StringBuilder(base.length() + sorted.size() * 14);
+        sb.append(base).append('[');
+        boolean first = true;
+        for (Map.Entry<String, String> e : sorted.entrySet()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(e.getKey()).append('=').append(e.getValue());
+        }
+        sb.append(']');
+        return sb.toString();
     }
 
     /**

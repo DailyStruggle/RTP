@@ -42,6 +42,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
+### 2026-11-19 — `lcv_native_encode_superblock_rgba` / `lcv_layered_variance_proof.c` glibc heap corruption on scaled inputs
+
+- **Severity:** High
+- **Status:** Open
+- **Discovered during:** `leaf-video-ADR-005` blind-wire evaluation (`2026-11-15 03-20-47.mp4 @60s`)
+- **Location:** `resource/LeafVideo/native/lcv_accel.c` (`lcv_native_encode_superblock_rgba`) and `resource/LeafVideo/native/lcv_layered_variance_proof.c`
+- **Symptom / hypothesis:** Probing scaled inputs via `lcv_native_encode_superblock_rgba` (and `lcv_layered_variance_proof.c`) triggers glibc heap corruption (`free(): invalid next size` / `corrupted size vs. prev_size`) on `2026-11-15 03-20-47.mp4 @60s`, whereas `lcv_native_encode_superblock_rgba16` succeeds cleanly on the same input.
+- **Impact:** Native crash / memory corruption on affected 8-bit `RGBA` superblock encodes; prerequisite blocker before promoting `leaf-video-ADR-005` native encoder paths into production.
+- **Suggested next step:** Reproduce under ASan/UBSan (`-fsanitize=address,undefined`) on `2026-11-15 03-20-47.mp4 @60s` to pinpoint the out-of-bounds write or buffer sizing mismatch in `lcv_native_encode_superblock_rgba` vs. `lcv_native_encode_superblock_rgba16`.
+
 ### 2026-11-08 — `lcv_vlc_demux_open` calls `lcv_sys_index_file_superblocks` with stale 10-argument signature
 
 - **Severity:** High
@@ -121,6 +131,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
 - **Linear:** RTP-93
 
+### 2026-11-14 - `MixinSerializableChunkData` skips `ZeroBitShellEvictor` attachment on cold-read chunks
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** live `.mca` vs `.lca` multi-platform server & bot benchmark (`scripts/bench_lca_vs_mca_live.py`)
+- **Location:** `resource/LeafAnvil/leafanvil-{fabric,neoforge}/src/main/java/net/leaf/anvil/{fabric,neoforge}/mixin/MixinSerializableChunkData.java` lines 137–165
+- **Symptom / hypothesis:** `MixinSerializableChunkData#leafanvil$onReadReturn` records chunk-level `beginColdChunkFrame` without attaching `LcaSectionBacking[]`, so `-Dleafanvil.memory.serverEvictZeroBitShell=true` sees `lca_section_backing_count == 0` on cold-read chunks and leaves `SimpleBitStorage` `long[]` arrays resident.
+- **Impact:** Opt-in `serverEvictZeroBitShell=true` on Fabric/NeoForge does not reclaim `SimpleBitStorage` `long[]` on cold-read chunks.
+- **Suggested next step:** Wire cold-shell eviction in `MixinSerializableChunkData` / `FabricLeafAnvilMod` when `serverEvictZeroBitShell` is enabled.
+
 ### 2026-10-14 - LocationGenerator.joinSafely waits on work queued to the same pool
 
 - **Severity:** Low
@@ -151,5 +171,44 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** `extract_java_method_shorthand_cards` only extracts method scopes with `{ ... }` bodies, so abstract SPI interface declarations (`byte[] loadSector(String path);` in `SectorLoaderSPI`) are not added to `method_nodes` in `evaluate_causal_rules_on_sources`. As a result, `CAUSAL-MAIN-IO` resolves the 2-hop chain `['TeleportController#onCommand', 'DiskSectorLoader#loadSector']` via `short_method_lookup` instead of the 3-hop SPI bridge chain `['TeleportController#onCommand', 'SectorLoaderSPI#loadSector', 'DiskSectorLoader#loadSector']`.
 - **Impact:** Causal chains across pure interfaces omit the intermediate `SPI#method` hop in `test_causal_chaining_scanner_and_declarative_rules`.
 - **Suggested next step:** Synthesize stub `method_nodes` entries for bodyless `interface` method declarations in `evaluate_causal_rules_on_sources` (or `_extract_java_method_scopes`) so the `Closed-World SPI Dynamic Dispatch Bridge` connects `Caller -> SPI#method -> Impl#method`.
+
+### 2026-11-14 - Untracked non-`Lca*` classes in `:anvil-api` pull `jacocoTestCoverageVerification` branch ratio to `0.76` (`< 0.77`)
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** `LcaSectionBacking` cold `baseFrame` fast-path verification (`python3 scripts/agent-gate.py --finalize --scoped :anvil-api`)
+- **Location:** `build.gradle` lines 394–398 (`coverageFloors[':anvil-api']`); `api/anvil-api/src/main/java/io/github/dailystruggle/anvil/{RawChunkFrameSnapshot,CompiledGpuStampAtlas,RegionSimilarityAuditor,StructureTemplateNbtLoader}.java`
+- **Symptom / hypothesis:** `coverageFloors[':anvil-api']` excludes `io/github/dailystruggle/anvil/Lca*`, so newly added untracked non-`Lca*` classes in `api/anvil-api` are evaluated against the `0.77` branch floor and currently aggregate to `0.76`, failing `:anvil-api:jacocoTestCoverageVerification` by `0.01`.
+- **Impact:** `:anvil-api:check` fails at `jacocoTestCoverageVerification` even when all `:anvil-api:test` suites pass.
+- **Suggested next step:** Add branch-covering unit assertions for `RawChunkFrameSnapshot` (`equals`/`hashCode`/guard branches) and the new stamp/auditor helpers in `:anvil-api` tests so non-`Lca*` branch coverage clears `>= 0.77`.
+
+### 2026-11-14 - Concurrent `recordDirtyVoxel` burst during victim write-back leaves `DirtyChunkLruCache` above `maxDirtyChunks` in `LcaAimd3dSlabCacheTest`
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** `:resource:LeafAnvil:leafanvil-common:test` verification for `LeafAnvilWorldConverter` pacing
+- **Location:** `resource/LeafAnvil/leafanvil-common/src/main/java/net/leaf/anvil/common/LcaInMemoryChunkCoordinator.java`; `resource/LeafAnvil/leafanvil-common/src/test/java/net/leaf/anvil/common/LcaAimd3dSlabCacheTest.java` line 326
+- **Symptom / hypothesis:** Under the 4-thread `64`-iteration `recordDirtyVoxel` + `touchDirtyChunkLru` burst in untracked `LcaAimd3dSlabCacheTest#dirtyLruAimdVictimEvictionConcurrentThreadSafetyAndUnloadPurge`, chunks re-dirtied while an asynchronous victim flush is already in flight remain in `DirtyChunkLruCache` after `awaitPendingBackgroundCompactions(5_000L)` without scheduling a follow-up eviction pass, leaving `dirtyChunkCount() > maxDirtyChunks` (`2`).
+- **Impact:** `:resource:LeafAnvil:leafanvil-common:test` fails on `LcaAimd3dSlabCacheTest` line 326 when all 4 columns stay hot concurrently.
+- **Suggested next step:** Re-check `dirtyChunkCount() > maxDirtyChunks` when an async victim compaction finishes in `LcaInMemoryChunkCoordinator` and schedule the next lowest-AIMD/LRU victim if capacity is still exceeded.
+
+### 2026-11-15 - Pre-staged `PSI-INCOMPATIBLE-COLLECTION-KEY`, `S-002-DOUBLE-RELEASE`, and `PROCESS_NOTE` lint hits block `pre_commit.py`
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** `LeafGen` / `LeafAnvil` cave sky-light and `PlacedFeature` parity verification (`python3 scripts/agent-gate.py --finalize`)
+- **Location:** `api/anvil-api/src/main/java/io/github/dailystruggle/anvil/CompiledGpuStampAtlas.java` line 120; `resource/LeafAnvil/leafanvil-common/src/main/java/net/leaf/anvil/common/LeafAnvilWorldConverter.java` line 997; `resource/LeafGen/leafgen-common/src/main/java/net/leaf/gen/common/LeafGenChunkStatusInterceptor.java` line 10559; `resource/LeafGen/leafgen-common/src/main/java/net/leaf/gen/common/LeafGenBenchmarkHarness.java` lines 25 and 571
+- **Symptom / hypothesis:** Pre-staged code from earlier sessions triggers `PSI-INCOMPATIBLE-COLLECTION-KEY` (`decMap.containsKey(stamp)` with `LcaStructureStamp` on `IdentityHashMap<LcaDecoratorStamp, ...>` and `LIVE_TREE_ANCHOR_CACHE.containsKey(k)` with `SwappedWorldgenKernel` on `ConcurrentHashMap<Long, Integer>`), `S-002-DOUBLE-RELEASE` (`inFlightGate.release()` inside `dispatchBoundedWave()`), and two `"Step 1"` Javadoc `PROCESS_NOTE` strings in `LeafGenBenchmarkHarness`.
+- **Impact:** `scripts/pre_commit.py --check` exits `1` on those pre-staged files even when newly edited methods have zero violations.
+- **Suggested next step:** Key `LIVE_TREE_ANCHOR_CACHE` / `decMap` with matching types, remove the duplicate `inFlightGate.release()` path in `LeafAnvilWorldConverter#dispatchBoundedWave`, and replace `"Step 1"` with `"Stage 1"` in `LeafGenBenchmarkHarness`.
+
+### 2026-11-16 - `test_adr126_release_workflows_and_support_bot_manifest` still asserts `leafsleuth:` is absent from `discord-support-bot` manifest
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** `FRONT_PAGE.md` DRY cleanup (`python3 -m unittest discover -s scripts/tests -p "test_build_front_pages.py"`)
+- **Location:** `scripts/tests/test_build_front_pages.py` line 569 (`test_adr126_release_workflows_and_support_bot_manifest`)
+- **Symptom / hypothesis:** After `leafsleuth` was promoted to a published product in `discord-support-bot` and `.github/workflows/release-sleuth.yml`, `test_adr126_release_workflows_and_support_bot_manifest` still asserts `assertNotIn("  leafsleuth:", manifest)`.
+- **Impact:** Running `scripts/tests/test_build_front_pages.py` fails 1 of 57 tests on that outdated negative assertion while `build_front_pages.py --all` passes cleanly.
+- **Suggested next step:** Update `test_adr126_release_workflows_and_support_bot_manifest` in `scripts/tests/test_build_front_pages.py` to expect `leafsleuth:` alongside the other published products.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

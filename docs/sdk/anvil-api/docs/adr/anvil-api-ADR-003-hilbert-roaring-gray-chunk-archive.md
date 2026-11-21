@@ -100,14 +100,16 @@ BiomeEntry[segmentBiomeCount]:
   VarInt  utf8ByteLen
   byte[]  biomeIdString            // e.g. "minecraft:lush_caves"
   uint32  foliageAndWaterTint      // Biome tint colors for map rendering
-byte[]  slackPadding               // Zero-filled slack up to (segmentCapacityBytes - 8)
+byte[]  patternArenaSlice          // Optional forward-indexed 384B Canonical Huffman + cross-chunk LZ arena
+byte[]  slackPadding               // Zero-filled slack between active payload and downward-growing SEC-DED
+uint8   secDedSyndromes[W]         // Downward-growing (72, 64) SEC-DED syndromes at (cap - 8 - 1 - w)
 uint64  nextSegmentLinkTrailer     // ALWAYS at the last 8 bytes of the segment (offset + segmentCapacityBytes - 8)
 ```
 - **Pre-Allocated Slack and Tail Relative Continuation Pointer (`nextSegmentLinkTrailer`):**
   - The root dictionary at `0x2040` is pre-allocated with `256B`-aligned slack capacity (default `1,024 B` = 4 sub-slabs of `256 B`, configurable up to `4,096 B+`) so newly encountered `BlockState` or `Biome` strings append into `slackPadding` in $O(1)$ without shifting `lodHeaderOffset` or `slabPoolBaseOffset`.
   - The final 8 bytes (`uint64`) of every dictionary segment store a relative continuation link trailer:
     $$\underbrace{\mathtt{nextSegmentRelSlabs32}}_{\text{bits } 63..32\text{ (int32)}} \;\big|\; \underbrace{\mathtt{nextSegmentCapacitySlabs24}}_{\text{bits } 31..8\text{ (uint24)}} \;\big|\; \underbrace{\mathtt{segmentFlags8}}_{\text{bits } 7..0}$$
-    where `nextSegmentRelSlabs32` is a relative offset in `256-byte` sub-slabs from the start of the current segment to the next dictionary segment (`0` = terminal segment), and `nextSegmentCapacitySlabs24` is the capacity of that next segment in `256B` sub-slabs.
+    where `nextSegmentRelSlabs32` is a relative offset in `256-byte` sub-slabs from the start of the current segment to the next dictionary segment (`0` = terminal segment), `nextSegmentCapacitySlabs24` is the capacity of that next segment in `256B` sub-slabs, `segmentFlags8` bit `0` (`0x01`) marks an active continuation link, and `segmentFlags8` bit `1` (`0x02`) enables downward-growing Extended Hamming `(72, 64)` `SEC-DED` dictionary syndromes (`segCap - 8 - 1 - w`) and the forward-addressed Mode B `dictPatternArena` (`384 B` packed 4-bit `lit`/`cmd`/`off` Canonical Huffman lengths + up to `16 KiB` of cross-chunk LZ byte patterns; normative bit layout in [`LCA-ICD-1.0` Sections 5.3-5.4](../ICD.md#53-mode-b-pattern-arena-dictpatternarena--384-byte-canonical-huffman-tables)).
   - When a segment's slack is exhausted (`usedPayloadBytes + newEntryBytes > segmentCapacityBytes - 8`), the writer allocates a free slab range from the `TreeMap` (e.g., `256 B .. 4 KiB`), formats it as a continuation segment (with `nextSegmentLinkTrailer = 0`), and atomically writes the relative pointer into the current segment's trailer. This allows the shared dictionary to grow across chained segments while preserving monotonic global dictionary IDs (`0 .. totalStateCount - 1`); offline compaction can flatten chained segments into a single contiguous root arena.
 - **Material Metadata (`materialPacked`):** Embedding the 32-bit `materialPacked` word (`RGBA8` albedo + translucency/emissive/water flags) in the region dictionary once per state allows map renderers to shade voxel or octree LOD cells in $O(1)$ from the `VarInt` state ID without parsing blockstate JSONs or textures during LOD streaming.
 
@@ -208,6 +210,12 @@ byte[]  residualNbtPayload         // Optional Mojang TAG_Compound up to residua
   - `Bit 13` (`0x2000`): `MOTION_BLOCKING_NO_LEAVES` binary heightmap stream present (`VarInt mbnlByteLen` + `byte[mbnlByteLen] mbnlDeltaStream`).
   - `Bit 14` (`0x4000`, `HAS_CHUNK_PATCH_TAIL`): Length-prefixed `ChunkPatchTail` (`VarInt patchTailByteLen` + `byte[patchTailByteLen]`) placed immediately before `Bit 10` (`residualNbtPayload`), containing appended Slab-Local Micro-Palette entries (`Part A` + `Part B` for `localIdx >= K`), per-section voxel delta lists (`(uint16 yzx12, VarInt dictId)`), optional replacement section offset overrides, optional `SkyLight`/`BlockLight` section patches, and a 1-byte Extended Hamming `(72, 64)` `patchParity8` syndrome trailer.
 - Decoded in `LcaSectionCodec.unpackResidualSectionAndNbt` and `LcaSectionCodec.locateAndDecodeChunkPatchTail` without injecting synthetic marker keys into the returned NBT map.
+
+#### 4.4 Mode B (`codec1 = 1`): Inline Header `SEC-DED` & Continuous Atomic Region Dictionary (`LCD2` `0x4C44`)
+While **Mode A (`codec1 = 0`)** writes the post-header chunk body uncompressed (`0-LZ`) for sub-microsecond section slicing, **Mode B (`codec1 = 1`, default when `lcd2-level >= 1`)** achieves whole-region dictionary compression ratios without `.linear`'s whole-region read/write amplification or native JNI dependencies (`LcaSectionCodec.encodeModeBChunkFrameWithAtomicDict` / `decodeAtomicDictBody`):
+1. **Uncompressed Header + Inline `(72, 64)` `SEC-DED` Syndromes (`CBIT T3c`):** Bytes `[0 .. headerLen)` remain uncompressed so `selfTagAndDataVersion`, timestamps, `chunkStatusOrdinal`, and `uint16[sectionCount]` `sectionOffsets` can be inspected or probed without decompressing the body (`0`-body uniform chunks omit the `LCD2` frame altogether when `exactByteLen20 == headerLen + headerWords`). Immediately following the header, `headerWords = (headerLen + 7) >>> 3` bytes store Extended Hamming `(72, 64)` syndromes over each big-endian 64-bit header word (right-padded with `0x00` on trailing partial words).
+2. **`LCD2` (`0x4C44` `"LD"`) 3-Stream Body Frame (`CBIT T8`):** Non-empty chunk bodies (`[headerLen .. chunkFrame.length)`) are encoded behind a `9-byte` header (`uint16 magic = 0x4C44`, `uint8 frameFlags8`, `uint24BE compFrameLen` inclusive of the `9 B` header, `uint24BE uncompBodyLen`). Incompressible payloads set `RAW_PASSTHROUGH` (`0x04`); otherwise the payload splits into `litStream`, `cmdStream`, and `offStream`, each independently entropy-coded with MSB-first 12-bit length-limited Canonical Huffman tables (`frameFlags8` bits `0`, `1`, `3`) stored once per region at `dictPatternArena[0 .. 383]`.
+3. **4-Mode Intra-Chunk & Forward Region-Arena Matching:** Each `1-byte` command token `(litCode3 << 5) | (matchMode2 << 3) | lenCode3` places any `litCode3 == 7` or `lenCode3 == 7` overflow `VarInt`s into `offStream` ahead of the match offset and selects among `0: SHORT_INTRA` (`1 B` offset `1 .. 256`, `minMatch = 3`), `1: FAR_INTRA` (`2 B` offset `257 .. 65,792`, `minMatch = 4`), `2: DICT_ARENA` (`2 B` forward offset into immutable `dictPatternArena[384 .. 65,919]`, `minMatch = 4`), and `3: REPEAT_OFFSET` (`0 B`, `minMatch = 3`). Because `dictPatternArena` grows monotonically across chained Layer 2 segments, `CoW` single-chunk saves remain $O(1)$ (`~554 us`) without invalidating previously written Mode B slabs. Complete byte tables and reference Java decoder pseudocode are specified in [`LCA-ICD-1.0` (`ICD.md` Section 6.2)](../ICD.md#62-mode-b-codec1--1-header-sec-ded-syndromes--continuous-atomic-region-dictionary-lcd2-body-decompression).
 
 ### 5. Layer 4: $16 \times 16 \times 16$ Section Frame Layout (`BlockStates`, `Biomes`, `Light`)
 
@@ -381,6 +389,7 @@ Measured in `LcaRegionCodecTest` with bit-exact voxel, biome, heightmap, and lig
 
 ## References
 
+- [`LCA-ICD-1.0` (`api/anvil-api/docs/ICD.md`)](../ICD.md) - Normative `.lca` Binary Format Interface Control Document
 - [anvil-api-ADR-001](anvil-api-ADR-001-anvil-subsystem.md) - Anvil Read-Only Subsystem
 - [anvil-api-ADR-002](anvil-api-ADR-002-multi-format-region-support.md) - Multi-Format Region Support (`.mca` & `.linear`)
 - [leafrtp-ADR-065](../../../../resource/LeafRTP/docs/adr/leafrtp-ADR-065-layered-spiral-hilbert-rle-index.md) - Layered Spiral-Hilbert RLE Index

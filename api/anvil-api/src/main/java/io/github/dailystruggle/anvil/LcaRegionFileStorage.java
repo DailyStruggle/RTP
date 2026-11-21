@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,17 +39,116 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @governedBy anvil-api-ADR-003
  * @governedBy anvil-api-ADR-002
+ * @governedBy leafanvil-ADR-005
+ * @governedBy leafanvil-ADR-006
  * @governedBy ADR-115
  * @trace REQ-RTP-S-004
  * @trace REQ-RTP-S-005
  */
 public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
 
-    /** Default maximum open `.lca` region handles per storage folder (512, `~12.8 MiB` header-only heap). */
-    public static final int DEFAULT_MAX_OPEN_REGIONS = 512;
+    /** Default maximum open `.lca` region handles per storage folder (128, `~3.2 MiB` header-only heap). */
+    public static final int DEFAULT_MAX_OPEN_REGIONS =
+            Math.max(16, Integer.getInteger("leafanvil.storage.maxOpenRegions", 128));
+
+    /** Upper bound (`16 MiB`) on decompressed chunk NBT bytes accepted by {@link #decodeAnvilChunkPayload}. */
+    public static final int MAX_DECODED_CHUNK_NBT_BYTES = 16 * 1024 * 1024;
+
+    /**
+     * Sentinel root byte-tag name emitted by `MixinSerializableChunkData` / `-javaagent` direct CoW
+     * chunk save hooks after committing the spliced `.lca` `ChunkFrame` directly so downstream
+     * `RegionFileStorage` stream wrappers treat the metadata envelope as an already-persisted no-op.
+     */
+    public static final String DIRECT_COW_COMMITTED_TAG = "__leafanvil_cow_committed";
+    private static final byte[] DIRECT_COW_MARKER_UTF8 =
+            DIRECT_COW_COMMITTED_TAG.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+    public static boolean containsDirectCoWCommittedMarker(byte[] bytes, int offset, int length) {
+        if (bytes == null || length <= DIRECT_COW_MARKER_UTF8.length || length > 512) {
+            return false;
+        }
+        int end = offset + length - DIRECT_COW_MARKER_UTF8.length;
+        outer:
+        for (int i = offset; i <= end; i++) {
+            for (int j = 0; j < DIRECT_COW_MARKER_UTF8.length; j++) {
+                if (bytes[i + j] != DIRECT_COW_MARKER_UTF8[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean containsDirectCoWCommittedMarker(ByteBuffer buf) {
+        if (buf == null) {
+            return false;
+        }
+        int rem = buf.remaining();
+        if (rem <= DIRECT_COW_MARKER_UTF8.length || rem > 512) {
+            return false;
+        }
+        if (buf.hasArray()) {
+            return containsDirectCoWCommittedMarker(buf.array(), buf.arrayOffset() + buf.position(), rem);
+        }
+        byte[] tmp = new byte[rem];
+        buf.duplicate().get(tmp);
+        return containsDirectCoWCommittedMarker(tmp, 0, rem);
+    }
+
+    /**
+     * Decodes a compressed Anvil region stream payload (`1` = GZIP, `2` = Zlib/Deflate,
+     * `3` = Uncompressed, `4` = Mojang `LZ4Block`) into uncompressed Mojang binary NBT bytes,
+     * failing closed with {@link IOException} on unknown compression IDs or oversized streams
+     * (`anvil-api-ADR-001` Section 15, `REQ-RTP-S-004`).
+     */
+    public static byte[] decodeAnvilChunkPayload(
+            int compressionId, byte[] payload, int offset, int length
+    ) throws IOException {
+        if (payload == null || offset < 0 || length < 0 || offset > payload.length - length) {
+            throw new IOException("Invalid Anvil chunk payload slice (offset=" + offset + ", length=" + length + ")");
+        }
+        if (compressionId == 3) {
+            if (length > MAX_DECODED_CHUNK_NBT_BYTES) {
+                throw new IOException("Uncompressed chunk payload exceeds " + MAX_DECODED_CHUNK_NBT_BYTES + " bytes");
+            }
+            return java.util.Arrays.copyOfRange(payload, offset, offset + length);
+        }
+        if (compressionId == 4) {
+            return Lz4BlockDecoder.decode(payload, offset, length, MAX_DECODED_CHUNK_NBT_BYTES);
+        }
+        if (compressionId == 2) {
+            try (java.io.InputStream in = new java.util.zip.InflaterInputStream(
+                    new java.io.ByteArrayInputStream(payload, offset, length))) {
+                return readBoundedStreamBytes(in, MAX_DECODED_CHUNK_NBT_BYTES);
+            }
+        }
+        if (compressionId == 1) {
+            try (java.io.InputStream in = new java.util.zip.GZIPInputStream(
+                    new java.io.ByteArrayInputStream(payload, offset, length))) {
+                return readBoundedStreamBytes(in, MAX_DECODED_CHUNK_NBT_BYTES);
+            }
+        }
+        throw new IOException("Unsupported Anvil chunk compression ID: " + compressionId);
+    }
+
+    private static byte[] readBoundedStreamBytes(java.io.InputStream in, int maxBytes) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(8192);
+        byte[] buf = new byte[8192];
+        int total = 0;
+        int n;
+        while ((n = in.read(buf)) >= 0) {
+            total += n;
+            if (total > maxBytes) {
+                throw new IOException("Decompressed chunk stream exceeds " + maxBytes + " bytes");
+            }
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
+    }
 
     /** Maximum mutable `LcaLiveArchive` header-only handles (`~25.6 KiB` each) retained in heap per storage folder. */
-    private static final int DEFAULT_MAX_OPEN_WRITE_ARCHIVES = 512;
+    private static final int DEFAULT_MAX_OPEN_WRITE_ARCHIVES = DEFAULT_MAX_OPEN_REGIONS;
 
     /** Default free-slab fragmentation ratio threshold (`35%`) triggering compaction on region eviction/close. */
     public static final double DEFAULT_COMPACT_FRAGMENTATION_THRESHOLD = 0.35;
@@ -58,7 +158,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     private final int minSectionY;
     private final int sectionCount;
     private final int defaultDataVersion;
-    private final int zstdLevel;
+    private final int lcd2Level;
     private final boolean autoMigrateLegacy;
     private final boolean backupMigratedLegacyFiles;
     private final int maxOpenRegions;
@@ -80,13 +180,17 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public LcaRegionFileStorage(Path storageDirectory) {
+        this(storageDirectory, true);
+    }
+
+    public LcaRegionFileStorage(Path storageDirectory, boolean modeBLcd2) {
         this(
                 storageDirectory,
                 inferStorageKindFromPath(storageDirectory),
                 -4,
                 24,
                 4671,
-                1,
+                modeBLcd2 ? 1 : 0,
                 true,
                 true,
                 DEFAULT_MAX_OPEN_REGIONS,
@@ -99,7 +203,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             int minSectionY,
             int sectionCount,
             int defaultDataVersion,
-            boolean modeBZstd,
+            boolean modeBLcd2,
             boolean autoMigrateLegacy,
             boolean backupMigratedLegacyFiles,
             int maxOpenRegions,
@@ -111,7 +215,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 minSectionY,
                 sectionCount,
                 defaultDataVersion,
-                modeBZstd ? 1 : 0,
+                modeBLcd2 ? 1 : 0,
                 autoMigrateLegacy,
                 backupMigratedLegacyFiles,
                 maxOpenRegions,
@@ -124,7 +228,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             int minSectionY,
             int sectionCount,
             int defaultDataVersion,
-            int zstdLevel,
+            int lcd2Level,
             boolean autoMigrateLegacy,
             boolean backupMigratedLegacyFiles,
             int maxOpenRegions,
@@ -138,7 +242,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         this.minSectionY = minSectionY;
         this.sectionCount = Math.max(1, sectionCount);
         this.defaultDataVersion = defaultDataVersion;
-        this.zstdLevel = LcaRegionWriter.normalizeZstdLevel(zstdLevel);
+        this.lcd2Level = LcaRegionWriter.normalizeLcd2Level(lcd2Level);
         this.autoMigrateLegacy = autoMigrateLegacy;
         this.backupMigratedLegacyFiles = backupMigratedLegacyFiles;
         this.maxOpenRegions = Math.max(1, maxOpenRegions);
@@ -174,6 +278,14 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
 
     public int storageKind() {
         return storageKind;
+    }
+
+    public int lcd2Level() {
+        return lcd2Level;
+    }
+
+    public boolean modeBLcd2() {
+        return lcd2Level > 0;
     }
 
     public int openRegionCount() {
@@ -325,14 +437,16 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             if (!header.isOccupied(rx, rz)) {
                 return null;
             }
-            return new DataInputStream(new LcaRegionWriter.LazyChunkNbtInputStream(() -> {
-                LcaRegionWriter.LcaLiveArchive live = getOpenRegionIfCached(regionX, regionZ);
-                if (live != null) {
-                    return live.readChunkNbtBytes(rx, rz);
-                }
-                FileChannel ch = getOrOpenReadChannel(regionX, regionZ, lcaFile);
-                return LcaRegionReader.readChunkNbtBytesFromChannel(lcaFile, ch, rx, rz);
-            }));
+            return new DataInputStream(new java.io.BufferedInputStream(
+                    new LcaRegionWriter.LazyChunkNbtInputStream(() -> {
+                        LcaRegionWriter.LcaLiveArchive live = getOpenRegionIfCached(regionX, regionZ);
+                        if (live != null) {
+                            return live.readChunkNbtBytes(rx, rz);
+                        }
+                        FileChannel ch = getOrOpenReadChannel(regionX, regionZ, lcaFile);
+                        return LcaRegionReader.readChunkNbtBytesFromChannel(lcaFile, ch, rx, rz);
+                    }),
+                    8192));
         }
         if (!autoMigrateLegacy) {
             knownMissingRegions.add(key);
@@ -398,6 +512,150 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     }
 
     /**
+     * Reads the canonical uncompressed `.lca` `ChunkFrame` at world chunk coordinates `(chunkX, chunkZ)`
+     * using positional `FileChannel` reads + `pinHazardSlab` (Mode A zero-copy read, Mode B pure-Java
+     * `LCD2` `0x4C44` unpack) without synthesizing Mojang NBT (`leafanvil-ADR-005`, `leafanvil-ADR-006`,
+     * `REQ-RTP-S-002`, `REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    @SuppressWarnings("java:S1168")
+    public RawChunkFrameSnapshot readRawChunkFrame(
+            int chunkX,
+            int chunkZ,
+            java.util.function.Function<String, Integer> runtimeStateLookup
+    ) throws IOException {
+        int regionX = chunkX >> 5;
+        int regionZ = chunkZ >> 5;
+        long key = packRegionKey(regionX, regionZ);
+        if (knownMissingRegions.contains(key)) {
+            return null;
+        }
+        int rx = chunkX & 31;
+        int rz = chunkZ & 31;
+        LcaRegionWriter.LcaLiveArchive cached = getOpenRegionIfCached(regionX, regionZ);
+        if (cached != null) {
+            return cached.readRawChunkFrame(rx, rz, runtimeStateLookup);
+        }
+        Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
+        LcaRegionReader.CachedFileHeader header = resolveReadHeader(regionX, regionZ, lcaFile);
+        if (header != null) {
+            if (!header.isOccupied(rx, rz)) {
+                return null;
+            }
+            FileChannel ch = getOrOpenReadChannel(regionX, regionZ, lcaFile);
+            return LcaRegionReader.readRawChunkFrameFromChannel(lcaFile, ch, rx, rz, runtimeStateLookup);
+        }
+        if (!autoMigrateLegacy) {
+            knownMissingRegions.add(key);
+            return null;
+        }
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, false);
+        if (archive == null) {
+            return null;
+        }
+        return archive.readRawChunkFrame(rx, rz, runtimeStateLookup);
+    }
+
+    /**
+     * Translates a host {@code runtimeStateId} into the open archive's {@code globalDictId} for
+     * region `(regionX, regionZ)`, caching the mapping in $O(1)$ (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public int resolveRuntimeIdToDictId(
+            int regionX,
+            int regionZ,
+            int runtimeStateId,
+            java.util.function.IntFunction<String> runtimeIdToCanonicalState
+    ) throws IOException {
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
+        return archive.resolveRuntimeIdToDictId(runtimeStateId, runtimeIdToCanonicalState);
+    }
+
+    /**
+     * Registers or looks up a canonical `BlockState` string in region `(regionX, regionZ)`'s dictionary
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public int registerBlockStateInRegion(int regionX, int regionZ, String canonicalBlockState) throws IOException {
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
+        return archive.registerOrGetBlockStateId(canonicalBlockState);
+    }
+
+    /**
+     * Registers or looks up a canonical `Biome` identifier in region `(regionX, regionZ)`'s dictionary
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public int registerBiomeInRegion(int regionX, int regionZ, String canonicalBiome) throws IOException {
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
+        return archive.registerOrGetBiomeId(canonicalBiome);
+    }
+
+    /**
+     * Splices re-encoded dirty sections (`dirtySectionMask`) with verbatim byte copies of untouched
+     * `SectionFrame`s from `coldChunkFrame` and commits the new slab via `.lca` `256B` Copy-on-Write
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public void commitSplicedChunkFrameCoW(
+            int chunkX,
+            int chunkZ,
+            byte[] coldChunkFrame,
+            int dirtySectionMask,
+            java.util.function.IntFunction<int[]> dirtySectionVoxels,
+            byte[] updatedResidualNbtOrNull
+    ) throws IOException {
+        commitAndGetSplicedChunkFrameCoW(
+                chunkX, chunkZ, coldChunkFrame, dirtySectionMask, dirtySectionVoxels, updatedResidualNbtOrNull);
+    }
+
+    /**
+     * Splices re-encoded dirty sections (`dirtySectionMask`) with verbatim byte copies of untouched
+     * `SectionFrame`s from `coldChunkFrame`, commits via `.lca` `256B` Copy-on-Write, and returns
+     * the newly committed uncompressed `ChunkFrame` buffer for atomic in-memory baseline swap
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public byte[] commitAndGetSplicedChunkFrameCoW(
+            int chunkX,
+            int chunkZ,
+            byte[] coldChunkFrame,
+            int dirtySectionMask,
+            java.util.function.IntFunction<int[]> dirtySectionVoxels,
+            byte[] updatedResidualNbtOrNull
+    ) throws IOException {
+        return commitAndGetSplicedChunkFrameCoW(
+                chunkX,
+                chunkZ,
+                coldChunkFrame,
+                dirtySectionMask,
+                dirtySectionVoxels,
+                null,
+                null,
+                updatedResidualNbtOrNull
+        );
+    }
+
+    public byte[] commitAndGetSplicedChunkFrameCoW(
+            int chunkX,
+            int chunkZ,
+            byte[] coldChunkFrame,
+            int dirtySectionMask,
+            java.util.function.IntFunction<int[]> dirtySectionVoxels,
+            java.util.function.IntFunction<byte[]> updatedSectionSkyLight,
+            java.util.function.IntFunction<byte[]> updatedSectionBlockLight,
+            byte[] updatedResidualNbtOrNull
+    ) throws IOException {
+        int regionX = chunkX >> 5;
+        int regionZ = chunkZ >> 5;
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
+        return archive.spliceAndCommitChunkFrameCoW(
+                chunkX & 31,
+                chunkZ & 31,
+                coldChunkFrame,
+                dirtySectionMask,
+                dirtySectionVoxels,
+                updatedSectionSkyLight,
+                updatedSectionBlockLight,
+                updatedResidualNbtOrNull
+        );
+    }
+
+    /**
      * Reads and serializes the chunk at world chunk coordinates `(chunkX, chunkZ)` into uncompressed
      * Mojang binary NBT bytes, or returns `null` if absent.
      */
@@ -458,6 +716,9 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
             removeChunk(chunkX, chunkZ);
             return 0;
         }
+        if (containsDirectCoWCommittedMarker(uncompressedNbtBytes, 0, uncompressedNbtBytes.length)) {
+            return 0;
+        }
         int regionX = chunkX >> 5;
         int regionZ = chunkZ >> 5;
         LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
@@ -465,9 +726,29 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     }
 
     /**
-     * Parses `uncompressedNbtBytes` and encodes the `.lca` `ChunkFrame` slab for region `(regionX, regionZ)`
-     * without mutating the region pointer directory or slab allocator. Designed to run inside
-     * `RegionFileVersion$StreamWrapper` on `C2ME`'s `GlobalExecutors.prioritizedScheduler` worker pool.
+     * Writes an uncompressed Mojang binary NBT root `TAG_Compound` {@link ByteBuffer} slice at world
+     * chunk coordinates `(chunkX, chunkZ)` without mutating the caller's buffer position/limit
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public int writeChunkNbtBuffer(int chunkX, int chunkZ, ByteBuffer uncompressedNbt) throws IOException {
+        if (uncompressedNbt == null || !uncompressedNbt.hasRemaining()) {
+            removeChunk(chunkX, chunkZ);
+            return 0;
+        }
+        if (containsDirectCoWCommittedMarker(uncompressedNbt)) {
+            return 0;
+        }
+        int regionX = chunkX >> 5;
+        int regionZ = chunkZ >> 5;
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
+        return archive.saveChunkNbtBuffer(chunkX & 31, chunkZ & 31, uncompressedNbt);
+    }
+
+    /**
+     * Parses `uncompressedNbtBytes` in a single streaming pass ({@link LcaStreamingNbtEncoder}) and
+     * encodes the `.lca` `ChunkFrame` slab for region `(regionX, regionZ)` without mutating the
+     * region pointer directory or slab allocator. Designed to run inside `RegionFileVersion$StreamWrapper`
+     * on `C2ME`'s `GlobalExecutors.prioritizedScheduler` worker pool.
      */
     public byte[] encodeChunkNbtForRegionSlab(
             int regionX, int regionZ, byte[] uncompressedNbtBytes
@@ -475,32 +756,36 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         if (uncompressedNbtBytes == null || uncompressedNbtBytes.length == 0) {
             return new byte[0];
         }
-        LinkedHashMap<String, Object> root = Nbt.readRootCompound(uncompressedNbtBytes);
-        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
-        int rx = extractLocalChunkCoord(root, true, regionX);
-        int rz = extractLocalChunkCoord(root, false, regionZ);
-        return archive.encodeChunkPayloadForSlab(rx, rz, root);
+        return encodeChunkNbtForRegionSlab(regionX, regionZ, uncompressedNbtBytes, 0, uncompressedNbtBytes.length);
     }
 
-    private static int extractLocalChunkCoord(Map<String, Object> root, boolean isX, int fallbackRegionCoord) {
-        if (root != null) {
-            Object direct = root.get(isX ? "xPos" : "zPos");
-            if (direct instanceof Number n) {
-                return n.intValue() & 31;
-            }
-            Object posObj = root.get("Position");
-            if (posObj instanceof int[] posArr && posArr.length >= 2) {
-                return posArr[isX ? 0 : 1] & 31;
-            }
-            Object levelObj = root.get("Level");
-            if (levelObj instanceof Map<?, ?> levelMap) {
-                Object nested = levelMap.get(isX ? "xPos" : "zPos");
-                if (nested instanceof Number n) {
-                    return n.intValue() & 31;
-                }
-            }
+    /**
+     * Slice overload of {@link #encodeChunkNbtForRegionSlab(int, int, byte[])} avoiding buffer copies
+     * and intermediate {@code Map<String, Object>} trees via {@link LcaStreamingNbtEncoder}.
+     */
+    public byte[] encodeChunkNbtForRegionSlab(
+            int regionX, int regionZ, byte[] uncompressedNbtBytes, int offset, int length
+    ) throws IOException {
+        if (uncompressedNbtBytes == null || length <= 0) {
+            return new byte[0];
         }
-        return (fallbackRegionCoord << 5) & 31;
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
+        return LcaStreamingNbtEncoder.encodeChunkSlab(archive, regionX, regionZ, uncompressedNbtBytes, offset, length);
+    }
+
+    /**
+     * Zero-copy {@link ByteBuffer} overload of {@link #encodeChunkNbtForRegionSlab(int, int, byte[])}
+     * visiting uncompressed Mojang binary NBT directly via {@link LcaStreamingNbtEncoder}
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public byte[] encodeChunkNbtForRegionSlab(
+            int regionX, int regionZ, ByteBuffer uncompressedNbt
+    ) throws IOException {
+        if (uncompressedNbt == null || !uncompressedNbt.hasRemaining()) {
+            return new byte[0];
+        }
+        LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
+        return LcaStreamingNbtEncoder.encodeChunkSlab(archive, regionX, regionZ, uncompressedNbt);
     }
 
     /**
@@ -518,6 +803,29 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         int regionZ = chunkZ >> 5;
         LcaRegionWriter.LcaLiveArchive archive = getOrOpenRegion(regionX, regionZ, true);
         return archive.commitPreEncodedChunkCoW(chunkX & 31, chunkZ & 31, preEncodedSlabBytes);
+    }
+
+    /**
+     * {@link ByteBuffer} overload of {@link #commitPreEncodedChunkSlab(int, int, byte[])} that reads
+     * without mutating the caller's buffer position/limit (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public int commitPreEncodedChunkSlab(
+            int chunkX, int chunkZ, ByteBuffer preEncodedSlab
+    ) throws IOException {
+        if (preEncodedSlab == null || !preEncodedSlab.hasRemaining()) {
+            removeChunk(chunkX, chunkZ);
+            return 0;
+        }
+        if (preEncodedSlab.hasArray()
+                && preEncodedSlab.arrayOffset() == 0
+                && preEncodedSlab.position() == 0
+                && preEncodedSlab.remaining() == preEncodedSlab.array().length) {
+            return commitPreEncodedChunkSlab(chunkX, chunkZ, preEncodedSlab.array());
+        }
+        ByteBuffer dup = preEncodedSlab.duplicate();
+        byte[] bytes = new byte[dup.remaining()];
+        dup.get(bytes);
+        return commitPreEncodedChunkSlab(chunkX, chunkZ, bytes);
     }
 
     /**
@@ -543,103 +851,110 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
     ) throws IOException {
         long key = packRegionKey(regionX, regionZ);
         closed.set(false);
-        LcaRegionWriter.LcaLiveArchive cached = regionCache.get(key);
-        if (cached != null) {
-            recentRegionKeys.add(key);
-            return cached;
-        }
-
-        CompletableFuture<LcaRegionWriter.LcaLiveArchive> inflight = new CompletableFuture<>();
-        CompletableFuture<LcaRegionWriter.LcaLiveArchive> existingFuture = openingRegions.putIfAbsent(key, inflight);
-        if (existingFuture != null) {
-            try {
-                LcaRegionWriter.LcaLiveArchive joined = existingFuture.join();
-                if (joined != null) {
-                    recentRegionKeys.add(key);
-                    return joined;
-                }
-                if (!createIfAbsent) {
-                    return null;
-                }
-            } catch (CompletionException e) {
-                if (e.getCause() instanceof IOException ioe) {
-                    throw ioe;
-                }
-                throw e;
-            }
-        }
-
-        try {
-            LcaRegionWriter.LcaLiveArchive recheck = regionCache.get(key);
-            if (recheck != null) {
+        while (true) {
+            LcaRegionWriter.LcaLiveArchive cached = regionCache.get(key);
+            if (cached != null) {
                 recentRegionKeys.add(key);
-                inflight.complete(recheck);
-                return recheck;
+                return cached;
             }
 
-            closeReadChannel(key);
-            LcaRegionWriter.LcaLiveArchive result = null;
-            Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
-            if (Files.exists(lcaFile) && Files.size(lcaFile) >= LcaRegionReader.SUPERBLOCK_SIZE
-                    + LcaRegionReader.POINTER_DIRECTORY_SIZE + LcaRegionReader.FOOTER_SIZE) {
-                result = LcaRegionWriter.openLiveArchive(lcaFile, zstdLevel);
-            } else if (autoMigrateLegacy) {
-                LcaRegionWriter.LcaLiveArchive migrated = tryMigrateLegacyRegion(regionX, regionZ, lcaFile);
-                if (migrated != null) {
-                    migratedRegionCount.incrementAndGet();
-                    result = migrated;
+            CompletableFuture<LcaRegionWriter.LcaLiveArchive> inflight = new CompletableFuture<>();
+            CompletableFuture<LcaRegionWriter.LcaLiveArchive> existingFuture = openingRegions.putIfAbsent(key, inflight);
+            if (existingFuture != null) {
+                try {
+                    LcaRegionWriter.LcaLiveArchive joined = existingFuture.join();
+                    if (joined != null) {
+                        recentRegionKeys.add(key);
+                        return joined;
+                    }
+                    if (!createIfAbsent) {
+                        return null;
+                    }
+                    continue;
+                } catch (CompletionException e) {
+                    if (e.getCause() instanceof IOException ioe) {
+                        throw ioe;
+                    }
+                    throw e;
                 }
             }
 
-            if (result == null) {
-                if (!createIfAbsent) {
-                    knownMissingRegions.add(key);
-                    inflight.complete(null);
-                    return null;
+            try {
+                LcaRegionWriter.LcaLiveArchive recheck = regionCache.get(key);
+                if (recheck != null) {
+                    recentRegionKeys.add(key);
+                    openingRegions.remove(key, inflight);
+                    inflight.complete(recheck);
+                    return recheck;
                 }
-                result = LcaRegionWriter.createEmptyLiveArchive(
-                        lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
-                        zstdLevel, storageKind, LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES);
-            }
-            knownMissingRegions.remove(key);
 
-            closed.set(false);
-            regionCache.put(key, result);
-            regionEvictionQueue.offer(key);
-            int maxScans = (maxOpenWriteArchives << 1) + 8;
-            int scans = 0;
-            while (regionCache.size() > maxOpenWriteArchives && scans++ < maxScans) {
-                Long eldestKey = regionEvictionQueue.poll();
-                if (eldestKey == null || eldestKey.longValue() == key) {
-                    if (eldestKey != null) {
+                closeReadChannel(key);
+                LcaRegionWriter.LcaLiveArchive result = null;
+                Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
+                if (Files.exists(lcaFile) && Files.size(lcaFile) >= LcaRegionReader.SUPERBLOCK_SIZE
+                        + LcaRegionReader.POINTER_DIRECTORY_SIZE + LcaRegionReader.FOOTER_SIZE) {
+                    result = LcaRegionWriter.openLiveArchive(lcaFile, lcd2Level);
+                } else if (autoMigrateLegacy) {
+                    LcaRegionWriter.LcaLiveArchive migrated = tryMigrateLegacyRegion(regionX, regionZ, lcaFile);
+                    if (migrated != null) {
+                        migratedRegionCount.incrementAndGet();
+                        result = migrated;
+                    }
+                }
+
+                if (result == null) {
+                    if (!createIfAbsent) {
+                        knownMissingRegions.add(key);
+                        openingRegions.remove(key, inflight);
+                        inflight.complete(null);
+                        return null;
+                    }
+                    result = LcaRegionWriter.createEmptyLiveArchive(
+                            lcaFile, regionX, regionZ, minSectionY, sectionCount, defaultDataVersion,
+                            lcd2Level, storageKind, LcaRegionWriter.DEFAULT_ROOT_DICT_CAPACITY_BYTES);
+                }
+                knownMissingRegions.remove(key);
+
+                closed.set(false);
+                regionCache.put(key, result);
+                regionEvictionQueue.offer(key);
+                int maxScans = (maxOpenWriteArchives << 1) + 8;
+                int scans = 0;
+                while (regionCache.size() > maxOpenWriteArchives && scans++ < maxScans) {
+                    Long eldestKey = regionEvictionQueue.poll();
+                    if (eldestKey == null || eldestKey.longValue() == key) {
+                        if (eldestKey != null) {
+                            regionEvictionQueue.offer(eldestKey);
+                        }
+                        break;
+                    }
+                    if (!regionCache.containsKey(eldestKey)) {
+                        recentRegionKeys.remove(eldestKey);
+                        continue;
+                    }
+                    if (recentRegionKeys.remove(eldestKey)) {
                         regionEvictionQueue.offer(eldestKey);
+                        continue;
                     }
-                    break;
-                }
-                if (!regionCache.containsKey(eldestKey)) {
-                    recentRegionKeys.remove(eldestKey);
-                    continue;
-                }
-                if (recentRegionKeys.remove(eldestKey)) {
-                    regionEvictionQueue.offer(eldestKey);
-                    continue;
-                }
-                LcaRegionWriter.LcaLiveArchive evicted = regionCache.get(eldestKey);
-                if (evicted != null) {
-                    try {
-                        closeArchiveQuietlyWithCompaction(evicted);
-                    } finally {
-                        regionCache.remove(eldestKey, evicted);
+                    LcaRegionWriter.LcaLiveArchive evicted = regionCache.get(eldestKey);
+                    if (evicted != null) {
+                        try {
+                            closeArchiveQuietlyWithCompaction(evicted);
+                        } finally {
+                            regionCache.remove(eldestKey, evicted);
+                        }
                     }
                 }
+                openingRegions.remove(key, inflight);
+                inflight.complete(result);
+                return result;
+            } catch (IOException | RuntimeException | Error e) {
+                openingRegions.remove(key, inflight);
+                inflight.completeExceptionally(e);
+                throw e;
+            } finally {
+                openingRegions.remove(key, inflight);
             }
-            inflight.complete(result);
-            return result;
-        } catch (IOException | RuntimeException | Error e) {
-            inflight.completeExceptionally(e);
-            throw e;
-        } finally {
-            openingRegions.remove(key, inflight);
         }
     }
 
@@ -671,19 +986,11 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
 
         byte[] srcBytes = Files.readAllBytes(legacyFile);
         byte[] lcaBytes = LcaRegionWriter.transcodeFromReader(
-                legacyReader, srcBytes, regionX, regionZ, zstdLevel, storageKind);
+                legacyReader, srcBytes, regionX, regionZ, lcd2Level, storageKind);
 
         Files.createDirectories(storageDirectory);
         Path tmpFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca.tmp");
-        try {
-            Files.write(tmpFile, lcaBytes);
-            Files.move(tmpFile, targetLcaFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } finally {
-            try {
-                Files.deleteIfExists(tmpFile);
-            } catch (IOException ignored) {
-            }
-        }
+        LcaRegionWriter.writeBytesAtomicallyDurable(targetLcaFile, tmpFile, lcaBytes);
 
         if (backupMigratedLegacyFiles) {
             Path bakFile = storageDirectory.resolve(legacyFile.getFileName().toString() + ".bak");
@@ -691,10 +998,16 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 Files.move(legacyFile, bakFile, StandardCopyOption.REPLACE_EXISTING);
             }
         }
-        return LcaRegionWriter.openLiveArchive(targetLcaFile, zstdLevel);
+        return LcaRegionWriter.openLiveArchive(targetLcaFile, lcd2Level);
     }
 
     private void closeArchiveQuietlyWithCompaction(LcaRegionWriter.LcaLiveArchive archive) throws IOException {
+        closeArchiveWithCompaction(archive, false);
+    }
+
+    private void closeArchiveWithCompaction(
+            LcaRegionWriter.LcaLiveArchive archive, boolean forceDiskSync
+    ) throws IOException {
         if (archive == null) {
             return;
         }
@@ -705,19 +1018,30 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 archive.compactIfFragmented(compactFragmentationThreshold);
             }
         } finally {
-            archive.closeWithoutForce();
+            if (forceDiskSync) {
+                archive.close();
+            } else {
+                archive.closeWithoutForce();
+            }
         }
     }
 
     /**
-     * Clears any negative missing-region cache entry for `(regionX, regionZ)` after external file creation.
+     * Clears any negative missing-region cache entry and cached header state for `(regionX, regionZ)`
+     * after external file creation or replacement.
      */
     public void invalidateRegionCacheState(int regionX, int regionZ) {
         long key = packRegionKey(regionX, regionZ);
         knownMissingRegions.remove(key);
+        Path lcaFile = storageDirectory.resolve("r." + regionX + "." + regionZ + ".lca");
+        LcaRegionReader.invalidateFileCache(lcaFile);
         try {
             closeReadChannel(key);
-        } catch (IOException ignored) {
+        } catch (IOException closeEx) {
+            java.util.logging.Logger.getLogger(LcaRegionFileStorage.class.getName()).log(
+                    java.util.logging.Level.FINE,
+                    "Failed to close cached read channel during region invalidation (" + regionX + "," + regionZ + ")",
+                    closeEx);
         }
     }
 
@@ -741,7 +1065,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         LcaRegionWriter.LcaLiveArchive archive = regionCache.get(key);
         if (archive != null) {
             try {
-                closeArchiveQuietlyWithCompaction(archive);
+                closeArchiveWithCompaction(archive, true);
             } finally {
                 regionCache.remove(key, archive);
             }
@@ -811,7 +1135,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
         }
         for (LcaRegionWriter.LcaLiveArchive archive : archives) {
             try {
-                closeArchiveQuietlyWithCompaction(archive);
+                closeArchiveWithCompaction(archive, true);
             } catch (IOException e) {
                 if (firstEx == null) firstEx = e;
             }
@@ -967,7 +1291,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 int minSectionY,
                 int sectionCount,
                 int defaultDataVersion,
-                boolean modeBZstd,
+                boolean modeBLcd2,
                 boolean autoMigrateLegacy
         ) {
             this(
@@ -975,7 +1299,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    modeBZstd ? 1 : 0,
+                    modeBLcd2 ? 1 : 0,
                     autoMigrateLegacy);
         }
 
@@ -984,7 +1308,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                 int minSectionY,
                 int sectionCount,
                 int defaultDataVersion,
-                int zstdLevel,
+                int lcd2Level,
                 boolean autoMigrateLegacy
         ) {
             this.dimensionDirectory = dimensionDirectory;
@@ -994,7 +1318,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    zstdLevel,
+                    lcd2Level,
                     autoMigrateLegacy,
                     true,
                     DEFAULT_MAX_OPEN_REGIONS,
@@ -1005,7 +1329,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    zstdLevel,
+                    lcd2Level,
                     autoMigrateLegacy,
                     true,
                     DEFAULT_MAX_OPEN_REGIONS,
@@ -1016,7 +1340,7 @@ public final class LcaRegionFileStorage implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    zstdLevel,
+                    lcd2Level,
                     autoMigrateLegacy,
                     true,
                     DEFAULT_MAX_OPEN_REGIONS,

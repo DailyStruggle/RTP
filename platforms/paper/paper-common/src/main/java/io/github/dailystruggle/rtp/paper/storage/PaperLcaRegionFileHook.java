@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PaperLcaRegionFileHook implements Closeable, AutoCloseable {
 
     private final Map<UUID, LcaRegionFileStorage.LcaWorldStorageSession> worldSessions = new ConcurrentHashMap<>();
-    private final boolean modeBZstd;
+    private final boolean modeBLcd2;
     private final boolean autoMigrateLegacy;
     private final int defaultDataVersion;
 
@@ -42,8 +42,8 @@ public final class PaperLcaRegionFileHook implements Closeable, AutoCloseable {
         this(true, true, 4671);
     }
 
-    public PaperLcaRegionFileHook(boolean modeBZstd, boolean autoMigrateLegacy, int defaultDataVersion) {
-        this.modeBZstd = modeBZstd;
+    public PaperLcaRegionFileHook(boolean modeBLcd2, boolean autoMigrateLegacy, int defaultDataVersion) {
+        this.modeBLcd2 = modeBLcd2;
         this.autoMigrateLegacy = autoMigrateLegacy;
         this.defaultDataVersion = defaultDataVersion;
         LcaRegionReader.register();
@@ -68,7 +68,7 @@ public final class PaperLcaRegionFileHook implements Closeable, AutoCloseable {
                     minSectionY,
                     sectionCount,
                     defaultDataVersion,
-                    modeBZstd,
+                    modeBLcd2,
                     autoMigrateLegacy);
         });
     }

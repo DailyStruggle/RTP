@@ -2093,6 +2093,8 @@ class BytecodeCausalGraphScannerTest {
               assertEquals(SchemaInferrer.DocProvenance.LLM_SYNTHESIZED, upgraded.schema().provenance());
               int batchCount = atlas.synthesizeUndocumentedNodesWithLlm(openAiSynth, 5);
               assertTrue(batchCount >= 0);
+              assertTrue(openAiSynth.cachedEntryCount() >= 1);
+              openAiSynth.clearSynthesisCache();
               assertTrue(openAiSynth.synthesizeForNodeCached("sha512-test", pass3Node).succeeded());
               assertTrue(openAiSynth.synthesizeForNodeCached("sha512-test", pass3Node).succeeded());
               assertEquals(1L, openAiSynth.synthesisCacheHits());

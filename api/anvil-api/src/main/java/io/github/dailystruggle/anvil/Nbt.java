@@ -96,7 +96,17 @@ public final class Nbt {
     // ------------------------------------------------------------------------------------------ read
 
     public static NamedTag readNamedRoot(byte[] rawUncompressedNbt) throws IOException {
-        try (DataInputStream in = new DataInputStream(new java.io.ByteArrayInputStream(rawUncompressedNbt))) {
+        if (rawUncompressedNbt == null) {
+            throw new IOException("NBT payload array is null");
+        }
+        return readNamedRoot(rawUncompressedNbt, 0, rawUncompressedNbt.length);
+    }
+
+    public static NamedTag readNamedRoot(byte[] rawUncompressedNbt, int offset, int length) throws IOException {
+        if (rawUncompressedNbt == null || offset < 0 || length < 0 || offset > rawUncompressedNbt.length - length) {
+            throw new IOException("Invalid NBT slice bounds (offset=" + offset + ", length=" + length + ")");
+        }
+        try (DataInputStream in = new DataInputStream(new java.io.ByteArrayInputStream(rawUncompressedNbt, offset, length))) {
             byte type = in.readByte();
             if (type == TAG_END) return new NamedTag("", null);
             String name = in.readUTF();
@@ -107,7 +117,17 @@ public final class Nbt {
 
     @SuppressWarnings("unchecked")
     public static LinkedHashMap<String, Object> readRootCompound(byte[] rawUncompressedNbt) throws IOException {
-        NamedTag root = readNamedRoot(rawUncompressedNbt);
+        if (rawUncompressedNbt == null) {
+            throw new IOException("NBT payload array is null");
+        }
+        return readRootCompound(rawUncompressedNbt, 0, rawUncompressedNbt.length);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static LinkedHashMap<String, Object> readRootCompound(
+            byte[] rawUncompressedNbt, int offset, int length
+    ) throws IOException {
+        NamedTag root = readNamedRoot(rawUncompressedNbt, offset, length);
         if (!(root.value instanceof LinkedHashMap)) {
             throw new IOException("NBT root is not a TAG_Compound (got " + (root.value == null ? "null" : root.value.getClass().getSimpleName()) + ")");
         }

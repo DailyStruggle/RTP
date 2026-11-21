@@ -341,4 +341,91 @@ class ConfigBitApiExtendedCoverageTest {
         assertEquals(1, refFindings.size());
         assertEquals("missingInDefaults", refFindings.get(0).path());
     }
+
+    @Test
+    @DisplayName("SleuthDiagnosticSnapshotSource records, backward-compatible constructors, null normalization, and default methods")
+    void sleuthDiagnosticSnapshotSourceRecordsAndDefaultContracts() {
+        var nullRem = new SleuthDiagnosticSnapshotSource.ConfigRemediationRecord(null, null, null, null, null);
+        assertEquals("", nullRem.filePath());
+        assertEquals("", nullRem.keyPath());
+        assertEquals("", nullRem.suggestedValue());
+        assertEquals("NONE_HOLD", nullRem.lever());
+        assertEquals("", nullRem.rationale());
+
+        var rem = new SleuthDiagnosticSnapshotSource.ConfigRemediationRecord(
+                "spigot.yml",
+                "world-settings.default.ticks-per.hopper-transfer",
+                "16",
+                "PACE_CHUNK_HOPPER_TRANSFERS",
+                "Calibrated 4t hopper surge"
+        );
+        assertEquals("spigot.yml", rem.filePath());
+        assertEquals("16", rem.suggestedValue());
+
+        var nullHook = new SleuthDiagnosticSnapshotSource.PluginHookCulpritRecord(
+                null, null, null, null, 0.5, 0.1, null, null
+        );
+        assertEquals("", nullHook.pluginName());
+        assertEquals("OTHER_MECHANISM", nullHook.triggerArchetype());
+        assertTrue(nullHook.remediations().isEmpty());
+
+        var hook = new SleuthDiagnosticSnapshotSource.PluginHookCulpritRecord(
+                "SlowShopPlugin",
+                "ShopListener#onMove",
+                "InventoryMoveItemEvent",
+                "HOPPER_OPEN_TOP_UNCAPPED",
+                1.8,
+                0.2,
+                "Unfiltered listener",
+                List.of(rem)
+        );
+        assertEquals(1, hook.remediations().size());
+
+        var legacyHotspot = new SleuthDiagnosticSnapshotSource.ChunkHotspotRecord(
+                null, 4, -2, 3.5, 0.4, null, 4
+        );
+        assertEquals("world", legacyHotspot.worldName());
+        assertEquals("STEADY_LOAD", legacyHotspot.dominantPattern());
+        assertEquals("", legacyHotspot.subsystem());
+        assertEquals("", legacyHotspot.archetypeLabel());
+        assertEquals("", legacyHotspot.culpritPlugin());
+        assertTrue(legacyHotspot.remediations().isEmpty());
+
+        var fullHotspot = new SleuthDiagnosticSnapshotSource.ChunkHotspotRecord(
+                "world_nether", 8, 9, 5.2, 0.3, "PERIODIC_CLOCK", 2,
+                "REDSTONE_AND_HOPPERS", "HOPPER_OPEN_TOP_UNCAPPED", "SlowShopPlugin", List.of(rem)
+        );
+        assertEquals("REDSTONE_AND_HOPPERS", fullHotspot.subsystem());
+        assertEquals("HOPPER_OPEN_TOP_UNCAPPED", fullHotspot.archetypeLabel());
+        assertEquals("SlowShopPlugin", fullHotspot.culpritPlugin());
+        assertEquals(1, fullHotspot.remediations().size());
+
+        var legacyCase = new SleuthDiagnosticSnapshotSource.ForensicCaseRecord(
+                null, null, null, null, 1, 2, 3, 0.9, 0.8, 0.95, null, null, null
+        );
+        assertEquals("", legacyCase.playerName());
+        assertEquals("world", legacyCase.worldName());
+        assertTrue(legacyCase.supportingTells().isEmpty());
+        assertTrue(legacyCase.exoneratingTells().isEmpty());
+        assertTrue(legacyCase.remediations().isEmpty());
+
+        var fullCase = new SleuthDiagnosticSnapshotSource.ForensicCaseRecord(
+                "Suspect", "ECONOMY_MASS_CONSERVATION_DUPE", "HIGH", "world", 10, 64, -10,
+                0.95, 0.88, 0.99, "Summary", List.of("tell1"), List.of("exon1"), List.of(rem)
+        );
+        assertEquals(1, fullCase.remediations().size());
+
+        SleuthDiagnosticSnapshotSource baseDefault = new SleuthDiagnosticSnapshotSource() {};
+        assertTrue(baseDefault.diagnosticHotspots().isEmpty());
+        assertTrue(baseDefault.diagnosticPluginHooks().isEmpty());
+        assertTrue(baseDefault.diagnosticIdentityComparisons().isEmpty());
+        assertTrue(baseDefault.diagnosticForensicCases().isEmpty());
+
+        io.github.dailystruggle.bit.config.SleuthDiagnosticSnapshotSource canonicalDefault =
+                new io.github.dailystruggle.bit.config.SleuthDiagnosticSnapshotSource() {};
+        assertTrue(canonicalDefault.diagnosticHotspots().isEmpty());
+        assertTrue(canonicalDefault.diagnosticPluginHooks().isEmpty());
+        assertTrue(canonicalDefault.diagnosticIdentityComparisons().isEmpty());
+        assertTrue(canonicalDefault.diagnosticForensicCases().isEmpty());
+    }
 }

@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.regex.Matcher;
@@ -214,9 +215,15 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
             if (yaml == null) {
                 return disabled();
             }
+            boolean enabledSet = yaml.isSet("llm-synthesis.enabled");
             boolean enabled = yaml.getBoolean("llm-synthesis.enabled", false);
-            String provRaw = yaml.getString("llm-synthesis.provider", enabled ? "GEMINI" : "OFF");
-            Provider prov = parseProvider(provRaw, enabled);
+            Provider prov;
+            if (enabledSet && !enabled) {
+                prov = Provider.OFF;
+            } else {
+                String provRaw = yaml.getString("llm-synthesis.provider", enabled ? "GEMINI" : "OFF");
+                prov = parseProvider(provRaw, enabled);
+            }
             String model = yaml.getString("llm-synthesis.model", defaultModelFor(prov));
             String endpoint = yaml.getString("llm-synthesis.endpoint", defaultEndpointFor(prov));
             String sshHost = yaml.getString("llm-synthesis.ssh-host", "");
@@ -338,10 +345,12 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
     private final HttpTransport transport;
     private final boolean customTransport;
     private final Map<String, SynthesisOutcome> contentAddressedCache = new ConcurrentHashMap<>();
+    private final Object cacheIoLock = new Object();
     private final LongAdder cacheHits = new LongAdder();
     private final LongAdder cacheMisses = new LongAdder();
     private Process sshTunnelProcess;
     private String activeTunnelEndpoint;
+    private volatile String lastFailureDiagnostic = "";
     private volatile boolean closed;
 
     public LlmConfigDocSynthesizer(LlmHookConfig config) {
@@ -356,6 +365,111 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
 
     public LlmHookConfig config() {
         return config;
+    }
+
+    public boolean isClosed() {
+        return closed;
+    }
+
+    /** Returns the most recent synthesis or preflight failure message ({@code S-004}), or empty when healthy. */
+    public String lastFailureDiagnostic() {
+        return lastFailureDiagnostic;
+    }
+
+    /**
+     * Validates that the configured provider has required credentials before scanning undocumented
+     * keys so missing API keys fail fast in zero network calls and surface an actionable
+     * {@code S-004} diagnostic.
+     */
+    public boolean preflightCheck() {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        String diag = preflightDiagnosticForConfig(config);
+        if (diag == null) {
+            return true;
+        }
+        this.lastFailureDiagnostic = diag;
+        return false;
+    }
+
+    /** Pure in-memory credential check ({@code S-004}, zero I/O); returns empty when disabled, {@code null} when valid, or diagnostic when missing credentials. */
+    public static String preflightDiagnosticForConfig(LlmHookConfig cfg) {
+        if (cfg == null || cfg.provider() == Provider.OFF) {
+            return "";
+        }
+        if (cfg.provider() == Provider.GEMINI && cfg.resolveApiKey().isEmpty()) {
+            return "Missing Gemini API key (set llm-synthesis.api-key in plugins/LeafConfig/config.yml, export env "
+                    + cfg.apiKeyEnv() + ", or switch llm-synthesis.provider to OLLAMA)";
+        }
+        if (cfg.provider() == Provider.ANTHROPIC && cfg.resolveApiKey().isEmpty()) {
+            return "Missing Anthropic API key (set llm-synthesis.api-key in plugins/LeafConfig/config.yml, export env "
+                    + cfg.apiKeyEnv() + ", or switch llm-synthesis.provider to OLLAMA)";
+        }
+        if (cfg.provider() == Provider.OPENAI_COMPATIBLE && cfg.resolveApiKey().isEmpty()) {
+            String ep = cfg.endpoint().toLowerCase(Locale.ROOT);
+            boolean loopback = ep.contains("127.0.0.1") || ep.contains("localhost") || !configOrEmpty(cfg.sshHost()).isEmpty();
+            if (!loopback) {
+                return "Missing OpenAI-compatible API key (set llm-synthesis.api-key in plugins/LeafConfig/config.yml, export env "
+                        + cfg.apiKeyEnv() + ", or switch llm-synthesis.provider to OLLAMA)";
+            }
+        }
+        return null;
+    }
+
+    private static String configOrEmpty(String s) {
+        return s == null ? "" : s;
+    }
+
+    /** Returns the number of cached `(provider, model, jarSha512, filePath#keyPath)` entries. */
+    public int cachedEntryCount() {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        return contentAddressedCache.size();
+    }
+
+    /** Exports an immutable snapshot of all cached synthesis entries. */
+    public Map<String, SynthesisOutcome> exportCachedEntries() {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        return Map.copyOf(contentAddressedCache);
+    }
+
+    /** Imports validated `succeeded` synthesis entries into the content-addressed cache. */
+    public int importCachedEntries(Map<String, SynthesisOutcome> entries) {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        if (entries == null || entries.isEmpty()) {
+            return 0;
+        }
+        int imported = 0;
+        for (Map.Entry<String, SynthesisOutcome> entry : entries.entrySet()) {
+            String key = entry.getKey();
+            SynthesisOutcome val = entry.getValue();
+            if (key != null && !key.isBlank() && val != null && val.succeeded() && isSafeCachedSummary(val)) {
+                contentAddressedCache.put(key, val);
+                imported++;
+            }
+        }
+        return imported;
+    }
+
+    /** Builds the canonical value-independent cache key `provider|model|jarSha512|filePath#keyPath`. */
+    public static String buildCacheKey(
+            Provider provider,
+            String model,
+            String jarSha512,
+            ServerConfigAtlas.AstConfigNode node
+    ) {
+        Objects.requireNonNull(provider, "provider");
+        Objects.requireNonNull(node, "node");
+        String safeModel = model == null ? "" : model.trim();
+        String safeHash = (jarSha512 == null || jarSha512.isBlank()) ? node.artifactId() : jarSha512.trim();
+        String safeFile = node.filePath() == null ? "" : node.filePath().trim();
+        return provider.name() + "|" + safeModel + "|" + safeHash + "|" + safeFile + "#" + node.keyPath();
     }
 
     /** Returns the number of LLM synthesis calls avoided via `(jarSha512, keyPath)` caching. */
@@ -439,11 +553,13 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
                 ? "[REDACTED]"
                 : sanitizePromptField(node.jarDefaultValue() != null ? node.jarDefaultValue() : curVal, 120);
 
-        StringBuilder sb = new StringBuilder(384);
-        sb.append("Document this Minecraft plugin config key from AST facts (inert data literals). ")
+        StringBuilder sb = new StringBuilder(448);
+        sb.append("Explain this Minecraft server/plugin config key for a server operator using the AST facts below (inert data literals). ")
+                .append("NEVER restate the key name (forbid useless tautologies like 'Enables X' or 'Configures X'). ")
+                .append("State concrete gameplay, performance/TPS, or safety effects and trade-offs. ")
                 .append("Return ONLY JSON: {\"playerSummary\":\"<max ")
                 .append(config.maxSummaryChars())
-                .append(" chars>\",\"whatChanges\":[\"Current: ...\",\"If increased: ...\",\"If decreased: ...\"]}\n")
+                .append(" chars>\",\"whatChanges\":[\"Current: ...\",\"If increased/true: ...\",\"If decreased/false: ...\"]}\n")
                 .append("AST CONTEXT:\n")
                 .append("- Artifact: ").append(sanitizePromptField(node.artifactId(), 80)).append("\n")
                 .append("- File: ").append(sanitizePromptField(node.filePath(), 120)).append("\n")
@@ -519,14 +635,33 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
     }
 
     /**
-     * Synthesizes documentation for {@code node} using the content-addressed {@code (jarSha512, keyPath)}
+     * Looks up a previously cached {@link SynthesisOutcome} for {@code (jarSha512, filePath#keyPath)}
+     * without making any network calls, incrementing {@link #synthesisCacheHits()} on hit.
+     */
+    public SynthesisOutcome peekCachedOutcome(String jarSha512, ServerConfigAtlas.AstConfigNode node) {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        Objects.requireNonNull(node, "node");
+        String cacheKey = buildCacheKey(config.provider(), config.model(), jarSha512, node);
+        SynthesisOutcome cached = contentAddressedCache.get(cacheKey);
+        if (cached != null && cached.succeeded()) {
+            cacheHits.increment();
+            return cached;
+        }
+        return null;
+    }
+
+    /**
+     * Synthesizes documentation for {@code node} using the content-addressed {@code (jarSha512, filePath#keyPath)}
      * cache so unchanged plugin JARs are never sent to the LLM a second time.
      */
     public SynthesisOutcome synthesizeForNodeCached(String jarSha512, ServerConfigAtlas.AstConfigNode node) {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
         Objects.requireNonNull(node, "node");
-        String safeHash = (jarSha512 == null || jarSha512.isBlank()) ? node.artifactId() : jarSha512.trim();
-        String val = node.liveDiskValue() != null ? node.liveDiskValue() : "";
-        String cacheKey = config.provider().name() + "|" + config.model() + "|" + safeHash + "|" + node.keyPath() + "|" + val;
+        String cacheKey = buildCacheKey(config.provider(), config.model(), jarSha512, node);
         SynthesisOutcome cached = contentAddressedCache.get(cacheKey);
         if (cached != null) {
             cacheHits.increment();
@@ -596,6 +731,17 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
             );
         }
 
+        if (!preflightCheck()) {
+            return new SynthesisOutcome(
+                    false,
+                    config.provider().name(),
+                    config.model(),
+                    composeDeterministicSummary(node),
+                    node.investigatoryDoc().whatChanges(),
+                    this.lastFailureDiagnostic
+            );
+        }
+
         String prompt = buildAstContextPrompt(node);
         try {
             String rawResponse = switch (config.provider()) {
@@ -604,15 +750,23 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
                 case OPENAI_COMPATIBLE, OLLAMA -> invokeOpenAiCompatible(prompt);
                 case OFF -> "";
             };
-            return parseAndValidateResponse(rawResponse, node);
+            SynthesisOutcome parsed = parseAndValidateResponse(rawResponse, node);
+            if (parsed.succeeded()) {
+                this.lastFailureDiagnostic = "";
+            } else {
+                this.lastFailureDiagnostic = parsed.diagnostic();
+            }
+            return parsed;
         } catch (Exception e) {
+            String diag = "LLM hook fallback (" + config.provider() + "/" + config.model() + "): " + e.getMessage();
+            this.lastFailureDiagnostic = diag;
             return new SynthesisOutcome(
                     false,
                     config.provider().name(),
                     config.model(),
                     composeDeterministicSummary(node),
                     node.investigatoryDoc().whatChanges(),
-                    "LLM hook fallback (" + config.provider() + "/" + config.model() + "): " + e.getMessage()
+                    diag
             );
         }
     }
@@ -623,24 +777,63 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
      */
     public ServerConfigAtlas.AstConfigNode upgradeNodeWithLlm(ServerConfigAtlas.AstConfigNode node) {
         Objects.requireNonNull(node, "node");
+        return upgradeNodeWithLlm(node.artifactId(), node);
+    }
+
+    /**
+     * Upgrades an undocumented {@link ServerConfigAtlas.AstConfigNode} using the content-addressed
+     * {@code (provider, model, jarSha512, filePath#keyPath)} cache when available, falling back to
+     * live provider synthesis on cache miss.
+     */
+    public ServerConfigAtlas.AstConfigNode upgradeNodeWithLlm(String jarSha512, ServerConfigAtlas.AstConfigNode node) {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        Objects.requireNonNull(node, "node");
         if (config.provider() == Provider.OFF || node.secret()) {
             return node;
         }
         SchemaInferrer.DocProvenance curProv = node.schema().provenance();
         if (curProv == SchemaInferrer.DocProvenance.OFFICIAL_DOCS
                 || curProv == SchemaInferrer.DocProvenance.AUTHOR_COMMENT
+                || curProv == SchemaInferrer.DocProvenance.LLM_SYNTHESIZED
                 || node.commentRestored()) {
             return node;
         }
-        SynthesisOutcome outcome = synthesizeForNode(node);
+        SynthesisOutcome cached = peekCachedOutcome(jarSha512, node);
+        if (cached != null) {
+            return applySynthesisOutcome(node, cached);
+        }
+        if (shouldSkipLlmSynthesis(node)) {
+            return node;
+        }
+        SynthesisOutcome outcome = synthesizeForNodeCached(jarSha512, node);
         if (!outcome.succeeded()) {
             return node;
         }
+        return applySynthesisOutcome(node, outcome);
+    }
 
+    /**
+     * Applies a validated {@link SynthesisOutcome} onto {@code node} and stamps
+     * {@link SchemaInferrer.DocProvenance#LLM_SYNTHESIZED} without performing network I/O.
+     */
+    public ServerConfigAtlas.AstConfigNode applySynthesisOutcome(
+            ServerConfigAtlas.AstConfigNode node,
+            SynthesisOutcome outcome
+    ) {
+        Objects.requireNonNull(node, "node");
+        Objects.requireNonNull(outcome, "outcome");
+        if (!outcome.succeeded() || node.secret()) {
+            return node;
+        }
         SchemaInferrer.InvestigatoryDocResult prev = node.investigatoryDoc();
+        String hookLine = "+6% [LLM Hook] Concise AST-grounded synthesis via `"
+                + outcome.providerUsed() + "/" + outcome.modelUsed() + "`";
         List<String> updatedEvidence = new ArrayList<>(prev.evidenceChain());
-        updatedEvidence.add("+6% [LLM Hook] Concise AST-grounded synthesis via `"
-                + outcome.providerUsed() + "/" + outcome.modelUsed() + "`");
+        if (!updatedEvidence.contains(hookLine)) {
+            updatedEvidence.add(hookLine);
+        }
 
         double newScore = Math.min(0.96, Math.round((prev.confidenceScore() + 0.05) * 100.0) / 100.0);
         List<Double> updatedHistory = new ArrayList<>(prev.confidenceHistory());
@@ -695,13 +888,206 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         );
     }
 
+    /**
+     * Serializes all validated {@code contentAddressedCache} entries in memory to deterministic
+     * UTF-8 JSON (`{"version":1,"entries":[...]}`) with zero filesystem I/O.
+     *
+     * @return formatted JSON payload
+     */
+    public String serializeCacheToJson() {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        synchronized (cacheIoLock) {
+            Map<String, SynthesisOutcome> sorted = new TreeMap<>(contentAddressedCache);
+            StringBuilder sb = new StringBuilder(Math.max(256, sorted.size() * 256));
+            sb.append("{\n  \"version\": 1,\n  \"entries\": [\n");
+            int written = 0;
+            for (Map.Entry<String, SynthesisOutcome> entry : sorted.entrySet()) {
+                SynthesisOutcome out = entry.getValue();
+                if (out == null || !out.succeeded() || !isSafeCachedSummary(out)) {
+                    continue;
+                }
+                if (written > 0) {
+                    sb.append(",\n");
+                }
+                sb.append("    {\"cacheKey\":\"")
+                        .append(SchemaInferrer.escapeJson(entry.getKey()))
+                        .append("\",\"providerUsed\":\"")
+                        .append(SchemaInferrer.escapeJson(out.providerUsed()))
+                        .append("\",\"modelUsed\":\"")
+                        .append(SchemaInferrer.escapeJson(out.modelUsed()))
+                        .append("\",\"playerSummary\":\"")
+                        .append(SchemaInferrer.escapeJson(out.playerSummary()))
+                        .append("\",\"whatChanges\":[");
+                List<String> changes = out.whatChanges();
+                for (int i = 0; i < changes.size(); i++) {
+                    if (i > 0) {
+                        sb.append(',');
+                    }
+                    sb.append('"').append(SchemaInferrer.escapeJson(changes.get(i))).append('"');
+                }
+                sb.append("],\"diagnostic\":\"")
+                        .append(SchemaInferrer.escapeJson(out.diagnostic()))
+                        .append("\"}");
+                written++;
+            }
+            sb.append("\n  ]\n}\n");
+            return sb.toString();
+        }
+    }
+
+    /**
+     * Parses cached {@link SynthesisOutcome} entries from a JSON string into the in-memory
+     * content-addressed cache with zero filesystem I/O, rejecting malformed JSON or unsafe entries (`S-004`).
+     *
+     * @param rawJson JSON cache payload
+     * @return number of valid entries loaded
+     * @throws IOException if {@code rawJson} contains malformed or truncated JSON
+     */
+    public int loadCacheFromJson(String rawJson) throws IOException {
+        if (closed) {
+            throw new IllegalStateException("LlmConfigDocSynthesizer is closed (S-006)");
+        }
+        synchronized (cacheIoLock) {
+            if (rawJson == null || rawJson.isBlank()) {
+                return 0;
+            }
+            int entriesKeyIdx = rawJson.indexOf("\"entries\"");
+            int bracketStart = entriesKeyIdx >= 0 ? rawJson.indexOf('[', entriesKeyIdx) : -1;
+            if (bracketStart < 0) {
+                throw new IOException("Malformed LLM doc cache JSON (missing entries array)");
+            }
+            int loaded = 0;
+            int depth = 0;
+            int objStart = -1;
+            boolean inString = false;
+            boolean escaped = false;
+            boolean closedArray = false;
+            for (int i = bracketStart + 1; i < rawJson.length(); i++) {
+                char c = rawJson.charAt(i);
+                if (inString) {
+                    if (escaped) {
+                        escaped = false;
+                    } else if (c == '\\') {
+                        escaped = true;
+                    } else if (c == '"') {
+                        inString = false;
+                    }
+                    continue;
+                }
+                if (c == '"') {
+                    inString = true;
+                } else if (c == '{') {
+                    if (depth == 0) {
+                        objStart = i;
+                    }
+                    depth++;
+                } else if (c == '}') {
+                    depth--;
+                    if (depth < 0) {
+                        throw new IOException("Malformed LLM doc cache JSON (unbalanced brace)");
+                    }
+                    if (depth == 0 && objStart >= 0) {
+                        String entryJson = rawJson.substring(objStart, i + 1);
+                        if (parseAndStoreCachedEntryJson(entryJson)) {
+                            loaded++;
+                        }
+                        objStart = -1;
+                    }
+                } else if (c == ']' && depth == 0) {
+                    closedArray = true;
+                    break;
+                }
+            }
+            if (!closedArray) {
+                throw new IOException("Truncated LLM doc cache JSON (unclosed entries array)");
+            }
+            return loaded;
+        }
+    }
+
+    private boolean parseAndStoreCachedEntryJson(String entryJson) {
+        String cacheKey = "";
+        String providerUsed = "";
+        String modelUsed = "";
+        String playerSummary = "";
+        String diagnostic = "";
+        Matcher fieldMatcher = JSON_STRING_FIELD_RE.matcher(entryJson);
+        while (fieldMatcher.find()) {
+            String field = fieldMatcher.group(1);
+            String val = unescapeJsonString(fieldMatcher.group(2)).trim();
+            switch (field) {
+                case "cacheKey" -> cacheKey = val;
+                case "providerUsed" -> providerUsed = val;
+                case "modelUsed" -> modelUsed = val;
+                case "playerSummary" -> playerSummary = val;
+                case "diagnostic" -> diagnostic = val;
+                default -> {
+                }
+            }
+        }
+        if (cacheKey.isBlank() || playerSummary.isBlank()) {
+            return false;
+        }
+        List<String> whatChanges = new ArrayList<>();
+        Matcher arrMatcher = JSON_ARRAY_FIELD_RE.matcher(entryJson);
+        if (arrMatcher.find()) {
+            Matcher itemMatcher = JSON_ARRAY_ITEM_RE.matcher(arrMatcher.group(1));
+            while (itemMatcher.find()) {
+                String item = unescapeJsonString(itemMatcher.group(1)).trim();
+                if (!item.isEmpty() && !LLM_REFUSAL_OR_INJECTION_RE.matcher(item).find()) {
+                    whatChanges.add(item);
+                }
+            }
+        }
+        SynthesisOutcome outcome = new SynthesisOutcome(
+                true,
+                providerUsed.isEmpty() ? config.provider().name() : providerUsed,
+                modelUsed.isEmpty() ? config.model() : modelUsed,
+                playerSummary,
+                whatChanges,
+                diagnostic
+        );
+        if (!isSafeCachedSummary(outcome)) {
+            return false;
+        }
+        contentAddressedCache.put(cacheKey, outcome);
+        return true;
+    }
+
+    private static boolean isSafeCachedSummary(SynthesisOutcome outcome) {
+        String summary = outcome.playerSummary();
+        return summary != null
+                && summary.length() >= 15
+                && !LLM_REFUSAL_OR_INJECTION_RE.matcher(summary).find();
+    }
+
     private String invokeOpenAiCompatible(String prompt) throws IOException {
         String targetUrl = resolveOpenAiEndpoint();
-        String systemMsg = "You are a concise Minecraft configuration documentation synthesizer. "
-                + "Use only the provided AST facts. Keep any <think> block under 30 words, then output compact JSON with keys playerSummary and whatChanges.";
+        String systemMsg = "You are a concise Minecraft server configuration documentation synthesizer. "
+                + "Use the provided bytecode AST facts to explain concrete gameplay, TPS/MSPT, or safety behavior for a new server operator. "
+                + "Never merely restate the key name. Output compact JSON with keys playerSummary and whatChanges.";
+        boolean isOllama = config.provider() == Provider.OLLAMA;
+        if (isOllama && targetUrl.endsWith("/api/chat")) {
+            String ollamaNativeBody = "{\"model\":\"" + SchemaInferrer.escapeJson(config.model()) + "\","
+                    + "\"stream\":false,"
+                    + "\"think\":false,"
+                    + "\"format\":\"json\","
+                    + "\"options\":{\"temperature\":0.1,\"num_predict\":500},"
+                    + "\"messages\":["
+                    + "{\"role\":\"system\",\"content\":\"" + SchemaInferrer.escapeJson(systemMsg) + "\"},"
+                    + "{\"role\":\"user\",\"content\":\"" + SchemaInferrer.escapeJson(prompt) + "\"}"
+                    + "]}";
+            Map<String, String> headers = Map.of("Content-Type", "application/json", "Accept", "application/json");
+            String rawHttp = transport.postJson(targetUrl, headers, ollamaNativeBody, config.timeoutMs());
+            return extractOpenAiContent(rawHttp);
+        }
+        String extraThinkControl = isOllama ? "\"think\":false,\"reasoning_effort\":\"none\"," : "";
         String body = "{\"model\":\"" + SchemaInferrer.escapeJson(config.model()) + "\","
                 + "\"temperature\":0.1,"
-                + "\"max_tokens\":1500,"
+                + "\"max_tokens\":900,"
+                + extraThinkControl
                 + "\"response_format\":{\"type\":\"json_object\"},"
                 + "\"messages\":["
                 + "{\"role\":\"system\",\"content\":\"" + SchemaInferrer.escapeJson(systemMsg) + "\"},"

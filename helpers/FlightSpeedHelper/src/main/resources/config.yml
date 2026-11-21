@@ -1,0 +1,15 @@
+# FlightSpeedHelper configurable settings and user feedback messages (REQ-RTP-S-007)
+max-multiplier: 100.0
+suppress-moved-too-quickly: true
+
+messages:
+  no-permission: "&c[FlightSpeed] You do not have permission to execute this command."
+  player-only: "&c[FlightSpeed] Specify a target player when running from console."
+  player-not-found: "&c[FlightSpeed] Player not found: %player%"
+  invalid-command: "&c[FlightSpeed] Usage: %usage%"
+  bad-parameter: "&c[FlightSpeed] Invalid parameter '%arg%'. Expected a multiplier between 0.1 and %max%, or 'reset'."
+  speed-set: "&a[FlightSpeed] Set flight speed for &f%player%&a to &e%multiplier%x&a (abilities.flyingSpeed=%raw%)."
+  speed-reset: "&a[FlightSpeed] Reset flight speed for &f%player%&a to &e1.0x&a (abilities.flyingSpeed=0.05)."
+  fly-enabled: "&a[FlightSpeed] Enabled flight for &f%player%&a."
+  fly-disabled: "&e[FlightSpeed] Disabled flight for &f%player%&e."
+  unclamped-unsupported: "&c[FlightSpeed] Unclamped flight (>10x) failed on this server runtime; clamped to 10.0x. Check server logs."

@@ -12,16 +12,16 @@ import java.util.function.IntPredicate;
 import java.util.function.IntUnaryOperator;
 
 /**
- * Lock-free L1-resident section dirty overlay and double-buffered compaction state machine for LCA chunks.
+ * Lock-free L1-resident sparse dirty cell map and double-buffered compaction state machine for `.lca` sections.
  *
- * <p>Implements 32-bit packed voxel overlay entries ({@code entry32 == 0} empty sentinel with {@code (pos12 + 1) << 19}),
- * staged progression ({@code int[16]} linear scan to {@code int[64]} Fibonacci hash at {@code <= 75%} load factor to
- * {@code int[4096]} direct table), 64-bit octant fast-path read filtering, authoritative {@code overlayB} revert
- * tombstones during compaction, release-ordered scalar counter publication after {@code dirtyOverlay} updates,
- * non-pinning ephemeral {@code Copy-on-Read} snapshots for client meshing, Paper/Folia {@code Moonrise}
- * ticking-list delta callbacks, and {@code UNLOADED} bit-63 epoch fencing.
+ * <p>Implements 32-bit packed voxel modifier entries ({@code entry32 == 0} empty sentinel with {@code (pos12 + 1) << 19}),
+ * flat resizable power-of-two open-addressed sparse tables ({@code int[16]} -> {@code int[64]} -> {@code int[256]} ->
+ * {@code int[1024]} -> {@code int[8192]} at {@code <= 75%} load factor with zero {@code CompactBaseIndex} hydration on write
+ * and zero {@code 16 KiB} {@code int[4096]} slab inflation), 64-bit read fast-path filtering, authoritative {@code overlayB}
+ * revert tombstones during compaction, release-ordered scalar counter publication, non-pinning ephemeral {@code Copy-on-Read}
+ * snapshots, Paper/Folia {@code Moonrise} ticking-list delta callbacks, and {@code UNLOADED} bit-63 epoch fencing.
  *
- * @governedBy leafanvil-ADR-002, leafanvil-ADR-003, anvil-api-ADR-003, leafrtp-ADR-072, ADR-115
+ * @governedBy leafanvil-ADR-002, leafanvil-ADR-003, leafanvil-ADR-005, leafanvil-ADR-006, anvil-api-ADR-003, leafrtp-ADR-072, ADR-115
  * @trace REQ-RTP-S-004, REQ-RTP-S-005
  */
 public final class LcaSectionBacking {
@@ -29,7 +29,9 @@ public final class LcaSectionBacking {
     public static final int STAGE_EMPTY = 0;
     public static final int STAGE_LINEAR_16 = 1;
     public static final int STAGE_HASH_64 = 2;
-    public static final int STAGE_BULK_4096 = 3;
+    public static final int STAGE_SPARSE_HASH_EXT = 3;
+    @Deprecated
+    public static final int STAGE_BULK_4096 = STAGE_SPARSE_HASH_EXT;
 
     public static final int LINEAR_16_CAPACITY = 16;
     public static final int HASH_64_CAPACITY = 64;
@@ -44,6 +46,9 @@ public final class LcaSectionBacking {
 
     public static final long UNLOADED_BIT = 1L << 63;
     public static final long EPOCH_MAGNITUDE_MASK = Long.MAX_VALUE;
+
+    public static final int DEFAULT_AIMD_ADDITIVE_INCREMENT = 16;
+    public static final int MAX_AIMD_EDIT_SCORE = 1_048_576;
 
     private static final ThreadLocal<int[]> THREAD_LOCAL_EPHEMERAL_VOXELS =
             ThreadLocal.withInitial(() -> new int[BULK_4096_CAPACITY]);
@@ -498,6 +503,7 @@ public final class LcaSectionBacking {
     private static final VarHandle NON_EMPTY_BLOCK_COUNT;
     private static final VarHandle TICKING_BLOCK_COUNT;
     private static final VarHandle TICKING_FLUID_COUNT;
+    private static final VarHandle AIMD_EDIT_SCORE;
 
     static {
         try {
@@ -512,9 +518,21 @@ public final class LcaSectionBacking {
                     LcaSectionBacking.class, "tickingBlockCount", int.class);
             TICKING_FLUID_COUNT = lookup.findVarHandle(
                     LcaSectionBacking.class, "tickingFluidCount", int.class);
+            AIMD_EDIT_SCORE = lookup.findVarHandle(
+                    LcaSectionBacking.class, "aimdEditScore", int.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
+    }
+
+    /**
+     * Listener invoked outside {@link LcaSectionBacking}'s intrinsic monitor whenever a voxel
+     * mutation commits to {@code activeOverlay}, allowing {@code LcaInMemoryChunkCoordinator}
+     * to admit or refresh this 3D slab in its bounded AIMD LRU cache without lock inversion.
+     */
+    @FunctionalInterface
+    public interface SectionMutationListener {
+        void onSectionMutated(LcaSectionBacking backing, long currentTick);
     }
 
     /**
@@ -538,6 +556,8 @@ public final class LcaSectionBacking {
     private volatile OverlayTable activeOverlay;
     private volatile long lastMutatedTick;
     private volatile TickingCoordinateCallback tickingCoordinateCallback;
+    private volatile SectionMutationListener sectionMutationListener;
+    private volatile int aimdAdditiveIncrement = DEFAULT_AIMD_ADDITIVE_INCREMENT;
 
     @SuppressWarnings("FieldMayBeFinal")
     private volatile int nonEmptyBlockCount;
@@ -545,6 +565,18 @@ public final class LcaSectionBacking {
     private volatile int tickingBlockCount;
     @SuppressWarnings("FieldMayBeFinal")
     private volatile int tickingFluidCount;
+    @SuppressWarnings("FieldMayBeFinal")
+    private volatile int aimdEditScore;
+    private volatile int uniformSkyLight2 = -1;
+
+    public int uniformSkyLight2() {
+        return uniformSkyLight2;
+    }
+
+    public LcaSectionBacking withUniformSkyLight2(int skyLight2) {
+        this.uniformSkyLight2 = (skyLight2 >= 0 && skyLight2 <= 3) ? skyLight2 : -1;
+        return this;
+    }
 
     public LcaSectionBacking() {
         this(null, 0);
@@ -617,6 +649,165 @@ public final class LcaSectionBacking {
         this.tickingFluidCount = tickingFluidCount;
     }
 
+    /**
+     * Constructs an unhydrated cold {@link LcaSectionBacking} (`compactIndex == null`) directly
+     * around a runtime-palette `.lca` `SectionFrame` slice (`leafanvil-ADR-005`, `leafanvil-ADR-006`).
+     *
+     * <p>When {@code initialNonEmptyCount >= 0} is supplied (e.g. from a live NMS
+     * {@code LevelChunkSection}), avoids eagerly unpacking the 4,096-voxel curve body in $O(1)$
+     * while preserving exact {@link #hasOnlyAir()} / {@link #nonEmptyBlockCount()} semantics for
+     * chunk lighting. When {@code initialNonEmptyCount < 0}, transiently parses the `.lca`
+     * `SectionFrame` once to compute exact predicate counts without pinning `CompactBaseIndex` in RAM.</p>
+     */
+    public static LcaSectionBacking fromColdSectionFrame(
+            byte[] coldSectionFrame,
+            int fallbackUniformStateId,
+            int initialNonEmptyCount,
+            int initialTickingBlockCount,
+            int initialTickingFluidCount,
+            IntPredicate nonEmptyPredicate,
+            IntPredicate tickingBlockPredicate,
+            IntPredicate tickingFluidPredicate
+    ) {
+        IntPredicate nonEmptyPred = nonEmptyPredicate != null ? nonEmptyPredicate : (id -> id != 0);
+        IntPredicate tickBlockPred = tickingBlockPredicate != null ? tickingBlockPredicate : (id -> false);
+        IntPredicate tickFluidPred = tickingFluidPredicate != null ? tickingFluidPredicate : (id -> false);
+        byte[] safeFrame = coldSectionFrame != null ? coldSectionFrame : EMPTY_BYTES;
+        int resolvedUniformId = fallbackUniformStateId;
+        int nonEmpty = initialNonEmptyCount;
+        int tickBlocks = Math.max(0, initialTickingBlockCount);
+        int tickFluids = Math.max(0, initialTickingFluidCount);
+
+        if (safeFrame.length == 0) {
+            if (nonEmpty < 0) {
+                nonEmpty = nonEmptyPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+                if (initialTickingBlockCount < 0) {
+                    tickBlocks = tickBlockPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+                }
+                if (initialTickingFluidCount < 0) {
+                    tickFluids = tickFluidPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+                }
+            }
+        } else if (nonEmpty < 0) {
+            CompactBaseIndex parsed = CompactBaseIndex.tryParse(safeFrame);
+            if (parsed != null) {
+                if (resolvedUniformId == 0) {
+                    resolvedUniformId = parsed.majorityStateId;
+                }
+                int ne = 0;
+                int tb = 0;
+                int tf = 0;
+                int[] pal = parsed.paletteStateIds;
+                int[] counts = parsed.paletteCounts;
+                for (int i = 0; i < pal.length; i++) {
+                    int c = counts[i];
+                    if (c > 0) {
+                        int st = pal[i];
+                        if (nonEmptyPred.test(st)) ne += c;
+                        if (tickBlockPred.test(st)) tb += c;
+                        if (tickFluidPred.test(st)) tf += c;
+                    }
+                }
+                nonEmpty = ne;
+                if (initialTickingBlockCount < 0) tickBlocks = tb;
+                if (initialTickingFluidCount < 0) tickFluids = tf;
+            } else {
+                nonEmpty = nonEmptyPred.test(resolvedUniformId) ? BULK_4096_CAPACITY : 0;
+            }
+        } else if (resolvedUniformId == 0) {
+            int peekedMajority = peekSectionFrameDominantStateId(safeFrame);
+            if (peekedMajority >= 0) {
+                resolvedUniformId = peekedMajority;
+            }
+        }
+
+        return new LcaSectionBacking(
+                safeFrame,
+                resolvedUniformId,
+                null,
+                Math.max(0, nonEmpty),
+                tickBlocks,
+                tickFluids,
+                nonEmptyPred,
+                tickBlockPred,
+                tickFluidPred,
+                null
+        );
+    }
+
+    private static int peekSectionFrameDominantStateId(byte[] frame) {
+        if (frame == null || frame.length < 3) {
+            return -1;
+        }
+        int pos = 0;
+        int hdr = frame[pos++] & 0xFF;
+        int blockMode = (hdr >>> 4) & 3;
+        if (blockMode != 0 && blockMode != 3) {
+            if (pos + 8 > frame.length) {
+                return -1;
+            }
+            pos += 8;
+        }
+        int k = readUnsignedVarIntOrNeg1(frame, pos, frame.length);
+        if (k == 0) {
+            // v3 SectionFrame extension escape: 0x00, secExtFlags, actual paletteLen
+            pos++;
+            if (pos >= frame.length) {
+                return -1;
+            }
+            pos++; // secExtFlags
+            k = readUnsignedVarIntOrNeg1(frame, pos, frame.length);
+        }
+        if (k < 1 || k > BULK_4096_CAPACITY) {
+            return -1;
+        }
+        pos += LcaSectionCodec.varIntLen(k);
+        int dom = readUnsignedVarIntOrNeg1(frame, pos, frame.length);
+        return (dom >= 0 && dom <= MAX_STATE_ID_19) ? dom : -1;
+    }
+
+    private static int readUnsignedVarIntOrNeg1(byte[] buf, int pos, int limit) {
+        int val = 0;
+        int shift = 0;
+        while (pos < limit && shift <= 28) {
+            int b = buf[pos++] & 0xFF;
+            val |= (b & 0x7F) << shift;
+            if ((b & 0x80) == 0) {
+                return val >= 0 ? val : -1;
+            }
+            shift += 7;
+        }
+        return -1;
+    }
+
+    private LcaSectionBacking(
+            byte[] baseFrame,
+            int uniformStateId,
+            CompactBaseIndex optionalIndex,
+            int nonEmptyBlockCount,
+            int tickingBlockCount,
+            int tickingFluidCount,
+            IntPredicate nonEmptyPredicate,
+            IntPredicate tickingBlockPredicate,
+            IntPredicate tickingFluidPredicate,
+            IntUnaryOperator defaultBaseFrameDecoder) {
+        this.nonEmptyPredicate = Objects.requireNonNull(nonEmptyPredicate, "nonEmptyPredicate");
+        this.tickingBlockPredicate = Objects.requireNonNull(tickingBlockPredicate, "tickingBlockPredicate");
+        this.tickingFluidPredicate = Objects.requireNonNull(tickingFluidPredicate, "tickingFluidPredicate");
+        this.defaultBaseFrameDecoder = defaultBaseFrameDecoder;
+        this.committedState = new SectionSnapshotState(
+                baseFrame,
+                uniformStateId,
+                optionalIndex,
+                null,
+                0L,
+                1L);
+        this.activeOverlay = EMPTY_OVERLAY;
+        this.nonEmptyBlockCount = nonEmptyBlockCount;
+        this.tickingBlockCount = tickingBlockCount;
+        this.tickingFluidCount = tickingFluidCount;
+    }
+
     private LcaSectionBacking(
             CompactBaseIndex directCompactIndex,
             int uniformStateId,
@@ -653,6 +844,25 @@ public final class LcaSectionBacking {
 
     public TickingCoordinateCallback tickingCoordinateCallback() {
         return this.tickingCoordinateCallback;
+    }
+
+    public void setSectionMutationListener(SectionMutationListener listener) {
+        this.sectionMutationListener = listener;
+    }
+
+    public SectionMutationListener sectionMutationListener() {
+        return this.sectionMutationListener;
+    }
+
+    public void setAimdAdditiveIncrement(int additiveIncrement) {
+        if (additiveIncrement <= 0) {
+            throw new IllegalArgumentException("additiveIncrement must be >= 1: " + additiveIncrement);
+        }
+        this.aimdAdditiveIncrement = additiveIncrement;
+    }
+
+    public int aimdAdditiveIncrement() {
+        return this.aimdAdditiveIncrement;
     }
 
     /**
@@ -740,11 +950,83 @@ public final class LcaSectionBacking {
     }
 
     /**
-     * Atomically masks {@code (x & 15)}, {@code (y & 15)}, {@code (z & 15)} at entry, reads the prior state ID,
-     * updates {@code dirtyOverlay} and {@code dirtyOctantMask64}, and then publishes {@code nonEmptyBlockCount},
-     * {@code tickingBlockCount}, and {@code tickingFluidCount} with release semantics.
+     * Instant $O(1)$ sparse dirty cell write when the caller (e.g. NMS {@code PalettedContainer#getAndSet},
+     * {@code LcaAgentSectionCarrier}, or {@code MixinPalettedContainer}) already knows {@code prevStateId19}.
+     * Never reads {@code baseFrame} and never hydrates {@link CompactBaseIndex}.
      */
-    public synchronized int setAndGetPreviousStateId(
+    public void recordDirtyVoxel(int pos12, int prevStateId19, int newStateId19, long currentTick) {
+        recordDirtyVoxelSynchronized(pos12, prevStateId19, newStateId19, currentTick);
+        SectionMutationListener listener = this.sectionMutationListener;
+        if (listener != null) {
+            listener.onSectionMutated(this, currentTick);
+        }
+    }
+
+    /**
+     * Instant $O(1)$ sparse dirty cell write without hydrating {@link CompactBaseIndex}.
+     */
+    public void recordDirtyVoxel(int pos12, int newStateId19, long currentTick) {
+        int maskedPos = pos12 & MAX_POS_12;
+        setAndGetPreviousStateId(
+                maskedPos & 15,
+                (maskedPos >>> 8) & 15,
+                (maskedPos >>> 4) & 15,
+                newStateId19,
+                currentTick,
+                this.defaultBaseFrameDecoder);
+    }
+
+    private synchronized void recordDirtyVoxelSynchronized(
+            int pos12,
+            int prevStateId19,
+            int newStateId19,
+            long currentTick
+    ) {
+        if (newStateId19 < 0 || newStateId19 > MAX_STATE_ID_19) {
+            throw new IllegalArgumentException("stateId19 out of range [0..524287]: " + newStateId19);
+        }
+        int maskedPos = pos12 & MAX_POS_12;
+        int octant = octantIdxFromPos12(maskedPos);
+        OverlayTable currentOverlay = this.activeOverlay;
+        int priorOverlayState;
+        if (currentOverlay == EMPTY_OVERLAY) {
+            OverlayTable allocated = new OverlayTable();
+            priorOverlayState = allocated.put(maskedPos, octant, newStateId19);
+            ACTIVE_OVERLAY.setRelease(this, allocated);
+        } else {
+            priorOverlayState = currentOverlay.put(maskedPos, octant, newStateId19);
+        }
+        this.lastMutatedTick = currentTick;
+        recordEditScoreIncrement(this.aimdAdditiveIncrement);
+        int effectivePrev = priorOverlayState >= 0 ? priorOverlayState : prevStateId19;
+        if (effectivePrev >= 0 && effectivePrev != newStateId19) {
+            publishScalarCountersRelease(maskedPos, effectivePrev, newStateId19);
+        }
+    }
+
+    /**
+     * Atomically masks {@code (x & 15)}, {@code (y & 15)}, {@code (z & 15)} at entry, updates the
+     * sparse dirty cell map in $O(1)$ without hydrating {@link CompactBaseIndex}, publishes scalar
+     * counters with release semantics, increments the AIMD edit score, and notifies any registered
+     * {@link SectionMutationListener} outside {@code this} monitor.
+     */
+    public int setAndGetPreviousStateId(
+            int x,
+            int y,
+            int z,
+            int stateId19,
+            long currentTick,
+            IntUnaryOperator baseFrameDecoder) {
+        int previousStateId = setAndGetPreviousStateIdSynchronized(
+                x, y, z, stateId19, currentTick, baseFrameDecoder);
+        SectionMutationListener listener = this.sectionMutationListener;
+        if (listener != null) {
+            listener.onSectionMutated(this, currentTick);
+        }
+        return previousStateId;
+    }
+
+    private synchronized int setAndGetPreviousStateIdSynchronized(
             int x,
             int y,
             int z,
@@ -757,24 +1039,38 @@ public final class LcaSectionBacking {
         int mx = x & 15;
         int my = y & 15;
         int mz = z & 15;
-        int previousStateId = getStateId(mx, my, mz, baseFrameDecoder);
         int pos = pos12(mx, my, mz);
         int octant = octantIdx(mx, my, mz);
 
-        // 1. Update dirtyOverlay and dirtyOctantMask64 FIRST (lazy-allocating on first mutation)
+        // 1. Update sparse dirty cell map FIRST (lazy-allocating on first mutation, zero CompactBaseIndex hydration)
         OverlayTable currentOverlay = this.activeOverlay;
+        int priorInActive;
         if (currentOverlay == EMPTY_OVERLAY) {
             OverlayTable allocated = new OverlayTable();
-            allocated.put(pos, octant, stateId19);
+            priorInActive = allocated.put(pos, octant, stateId19);
             ACTIVE_OVERLAY.setRelease(this, allocated);
         } else {
-            currentOverlay.put(pos, octant, stateId19);
+            priorInActive = currentOverlay.put(pos, octant, stateId19);
+        }
+        int previousStateId;
+        if (priorInActive >= 0) {
+            previousStateId = priorInActive;
+        } else {
+            SectionSnapshotState snap = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+            OverlayTable frozen = snap.frozenOverlay;
+            int priorInFrozen = (frozen != null && (snap.frozenOctantMask & (1L << octant)) != 0L)
+                    ? frozen.getStateId(pos)
+                    : -1;
+            previousStateId = priorInFrozen >= 0
+                    ? priorInFrozen
+                    : decodeFromBaseFrame(pos, snap, baseFrameDecoder != null ? baseFrameDecoder : this.defaultBaseFrameDecoder);
         }
         this.lastMutatedTick = currentTick;
+        recordEditScoreIncrement(this.aimdAdditiveIncrement);
 
         // 2. Publish scalar counters (nonEmptyBlockCount, tickingBlockCount, tickingFluidCount) AFTER
-        // dirtyOverlay and dirtyOctantMask64 with release semantics so readers checking hasOnlyAir()
-        // never observe a non-empty count before the overlay slot is visible.
+        // dirtyOverlay with release semantics so readers checking hasOnlyAir() never observe a
+        // non-empty count before the dirty entry is visible.
         if (previousStateId != stateId19) {
             publishScalarCountersRelease(pos, previousStateId, stateId19);
         }
@@ -918,6 +1214,18 @@ public final class LcaSectionBacking {
         return decodeFromBaseFrame(pos, snap, baseFrameDecoder);
     }
 
+    private CompactBaseIndex resolveTransientOrHydratedIndex(SectionSnapshotState snap) {
+        CompactBaseIndex idx = snap.compactIndex;
+        if (idx != null || this.defaultBaseFrameDecoder != null) {
+            return idx;
+        }
+        byte[] base = snap.baseFrame;
+        if (base != null && base.length > 0 && base.length < BULK_4096_CAPACITY) {
+            return CompactBaseIndex.tryParse(base);
+        }
+        return null;
+    }
+
     /**
      * Evaluates {@code stateIdPredicate} against the distinct block state IDs present in this
      * section in $O(|P| + |\text{dirty}|)$ time (`1..20` palette entries) without materializing
@@ -934,7 +1242,6 @@ public final class LcaSectionBacking {
         int activeDirty = active != null ? active.dirtyCount() : 0;
         int frozenDirty = frozen != null ? frozen.dirtyCount() : 0;
 
-        CompactBaseIndex idx = snap.compactIndex;
         if (snap.isUniformBase()) {
             if (activeDirty == 0 && frozenDirty == 0) {
                 return stateIdPredicate.test(snap.uniformStateId);
@@ -965,6 +1272,7 @@ public final class LcaSectionBacking {
             return overwritten < BULK_4096_CAPACITY && stateIdPredicate.test(snap.uniformStateId);
         }
 
+        final CompactBaseIndex idx = resolveTransientOrHydratedIndex(snap);
         if (idx != null) {
             if (activeDirty == 0 && frozenDirty == 0) {
                 int[] pal = idx.paletteStateIds;
@@ -1039,7 +1347,9 @@ public final class LcaSectionBacking {
             return;
         }
 
-        CompactBaseIndex idx = snap.compactIndex;
+        final CompactBaseIndex idx = (activeDirty + frozenDirty) <= HASH_64_MAX_LOAD
+                ? resolveTransientOrHydratedIndex(snap)
+                : snap.compactIndex;
         if (idx != null && activeDirty == 0 && frozenDirty == 0) {
             int[] pal = idx.paletteStateIds;
             int[] counts = idx.paletteCounts;
@@ -1108,7 +1418,7 @@ public final class LcaSectionBacking {
         OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
         SectionSnapshotState snap = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
         byte[] base = snap.baseFrame;
-        CompactBaseIndex idx = snap.compactIndex;
+        CompactBaseIndex idx = resolveTransientOrHydratedIndex(snap);
         if (base != null && base.length > 0 && idx == null) {
             return false;
         }
@@ -1164,6 +1474,8 @@ public final class LcaSectionBacking {
             for (int pos = 0; pos < BULK_4096_CAPACITY; pos++) {
                 out[pos] = base[pos] & 0xFF;
             }
+        } else if (base != null && base.length > 0) {
+            decodeCompactBaseFrameInto(base, uniform, out);
         } else {
             Arrays.fill(out, 0, BULK_4096_CAPACITY, uniform);
         }
@@ -1195,7 +1507,9 @@ public final class LcaSectionBacking {
             return 1 + varIntByteSize(snap.uniformStateId);
         }
 
-        CompactBaseIndex idx = snap.compactIndex;
+        final CompactBaseIndex idx = (activeDirty + frozenDirty) <= HASH_64_MAX_LOAD
+                ? resolveTransientOrHydratedIndex(snap)
+                : snap.compactIndex;
         if (idx != null && activeDirty == 0 && frozenDirty == 0) {
             byte[] prebuilt = idx.cleanVanillaWireSlice;
             if (prebuilt != null && idx.cleanVanillaWireGlobalBits == globalPaletteBits) {
@@ -1328,7 +1642,9 @@ public final class LcaSectionBacking {
             return;
         }
 
-        CompactBaseIndex idx = snap.compactIndex;
+        CompactBaseIndex idx = (activeDirty == 0 && frozenDirty == 0)
+                ? resolveTransientOrHydratedIndex(snap)
+                : snap.compactIndex;
         if (idx != null && activeDirty == 0 && frozenDirty == 0) {
             int[] pal = idx.paletteStateIds;
             int distinctCount = pal.length;
@@ -1443,6 +1759,12 @@ public final class LcaSectionBacking {
         if (snap.isUniformBase()) {
             return snap.getOrBuildUniformWireSlice();
         }
+        if (snap.baseFrame != null && snap.baseFrame.length > 0 && snap.baseFrame.length < BULK_4096_CAPACITY) {
+            CompactBaseIndex transientIdx = CompactBaseIndex.tryParse(snap.baseFrame);
+            if (transientIdx != null) {
+                return transientIdx.getOrBuildCleanVanillaWireSlice(globalPaletteBits);
+            }
+        }
         return null;
     }
 
@@ -1496,25 +1818,20 @@ public final class LcaSectionBacking {
         OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
         SectionSnapshotState snap = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
         OverlayTable frozen = snap.frozenOverlay;
-        if ((frozen == null || frozen.dirtyCount() == 0) && (active == null || active.dirtyCount() == 0)) {
+        int frozenCount = frozen != null ? frozen.dirtyCount() : 0;
+        int activeCount = active != null ? active.dirtyCount() : 0;
+        if (frozenCount == 0 && activeCount == 0) {
             return new int[0];
         }
-        Map<Integer, Integer> merged = new LinkedHashMap<>();
-        if (frozen != null && frozen.dirtyCount() > 0) {
-            frozen.forEachEntry(merged::put);
+        if (frozenCount == 0) {
+            return active.toCompactPackedArray();
         }
-        if (active != null && active.dirtyCount() > 0) {
-            active.forEachEntry(merged::put);
+        if (activeCount == 0) {
+            return frozen.toCompactPackedArray();
         }
-        if (merged.isEmpty()) {
-            return new int[0];
-        }
-        int[] entries = new int[merged.size()];
-        int idx = 0;
-        for (Map.Entry<Integer, Integer> entry : merged.entrySet()) {
-            entries[idx++] = packEntry32(entry.getKey(), entry.getValue());
-        }
-        return entries;
+        SparseDirtyCellMap merged = frozen.copySparseMap();
+        active.forEachEntry(merged::put);
+        return merged.toCompactPackedArray();
     }
 
     private int decodeFromBaseFrame(
@@ -1538,6 +1855,12 @@ public final class LcaSectionBacking {
         }
         if (baseFrame != null && baseFrame.length >= BULK_4096_CAPACITY) {
             return baseFrame[pos12 & MAX_POS_12] & 0xFF;
+        }
+        if (baseFrame != null && baseFrame.length > 0) {
+            CompactBaseIndex parsed = CompactBaseIndex.tryParse(baseFrame);
+            if (parsed != null) {
+                return parsed.lookup(pos12);
+            }
         }
         return uniformStateId;
     }
@@ -1603,7 +1926,8 @@ public final class LcaSectionBacking {
         if ((expectedEpoch & UNLOADED_BIT) != 0L) {
             return false;
         }
-        CompactBaseIndex newIndex = CompactBaseIndex.tryParse(newBaseFrame);
+        SectionSnapshotState initial = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+        CompactBaseIndex newIndex = initial.compactIndex != null ? CompactBaseIndex.tryParse(newBaseFrame) : null;
         return completeCompactionWithIndex(expectedEpoch, newBaseFrame, newUniformStateId, newIndex);
     }
 
@@ -1686,11 +2010,24 @@ public final class LcaSectionBacking {
         }
 
         int[] voxels = THREAD_LOCAL_EPHEMERAL_VOXELS.get();
+        int skyConst4 = 15;
+        int blkConst4 = 0;
         if (current.compactIndex != null) {
             current.compactIndex.scatterInto(voxels);
+            skyConst4 = (current.compactIndex.packedLightByte >>> 4) & 0xF;
+            blkConst4 = current.compactIndex.packedLightByte & 0xF;
         } else if (current.baseFrame != null && current.baseFrame.length >= BULK_4096_CAPACITY) {
             for (int i = 0; i < BULK_4096_CAPACITY; i++) {
                 voxels[i] = current.baseFrame[i] & 0xFF;
+            }
+        } else if (current.baseFrame != null && current.baseFrame.length > 0 && this.defaultBaseFrameDecoder == null) {
+            CompactBaseIndex parsedCold = CompactBaseIndex.tryParse(current.baseFrame);
+            if (parsedCold != null) {
+                parsedCold.scatterInto(voxels);
+                skyConst4 = (parsedCold.packedLightByte >>> 4) & 0xF;
+                blkConst4 = parsedCold.packedLightByte & 0xF;
+            } else {
+                Arrays.fill(voxels, 0, BULK_4096_CAPACITY, current.uniformStateId);
             }
         } else if (this.defaultBaseFrameDecoder != null && !current.isUniformBase()) {
             for (int i = 0; i < BULK_4096_CAPACITY; i++) {
@@ -1702,17 +2039,19 @@ public final class LcaSectionBacking {
 
         frozen.forEachEntry((pos12, stateId) -> voxels[pos12 & MAX_POS_12] = stateId);
 
-        int skyConst4 = current.compactIndex != null ? ((current.compactIndex.packedLightByte >>> 4) & 0xF) : 15;
-        int blkConst4 = current.compactIndex != null ? (current.compactIndex.packedLightByte & 0xF) : 0;
         CompactBaseIndex newIndex = CompactBaseIndex.fromVoxelsSinglePass(voxels, skyConst4, blkConst4);
         if (newIndex == null) {
             int uniformId = Math.max(0, voxels[0]);
             return completeCompactionWithIndex(snap.epoch(), EMPTY_BYTES, uniformId, null);
         }
 
-        newIndex.getOrBuildCleanVanillaWireSlice(globalPaletteBits);
+        boolean keepHydrated = current.compactIndex != null;
+        if (keepHydrated) {
+            newIndex.getOrBuildCleanVanillaWireSlice(globalPaletteBits);
+        }
         byte[] newBaseFrame = newIndex.getOrEncodeBaseFrame();
-        return completeCompactionWithIndex(snap.epoch(), newBaseFrame, newIndex.majorityStateId, newIndex);
+        return completeCompactionWithIndex(
+                snap.epoch(), newBaseFrame, newIndex.majorityStateId, keepHydrated ? newIndex : null);
     }
 
     /**
@@ -1751,6 +2090,14 @@ public final class LcaSectionBacking {
 
     public int overlayStage() {
         return ((OverlayTable) ACTIVE_OVERLAY.getAcquire(this)).stage();
+    }
+
+    public int activeOverlayCapacity() {
+        return ((OverlayTable) ACTIVE_OVERLAY.getAcquire(this)).tableCapacity();
+    }
+
+    public int activeOverlayAllocatedBytes() {
+        return ((OverlayTable) ACTIVE_OVERLAY.getAcquire(this)).allocatedSlotBytes();
     }
 
     public int dirtyCount() {
@@ -1854,6 +2201,148 @@ public final class LcaSectionBacking {
 
     public OverlayTable frozenOverlay() {
         return ((SectionSnapshotState) COMMITTED_STATE.getAcquire(this)).frozenOverlay;
+    }
+
+    /**
+     * Returns {@code true} when an unpacked {@link CompactBaseIndex} is currently resident on this section.
+     */
+    public boolean hasHydratedCompactBaseIndex() {
+        return ((SectionSnapshotState) COMMITTED_STATE.getAcquire(this)).compactIndex != null;
+    }
+
+    /**
+     * Returns {@code true} when this section is a clean non-uniform 3D slab holding only its compact
+     * {@code .lca} {@code baseFrame} ({@code compactIndex == null}).
+     */
+    public boolean isColdBaseFrameOnly() {
+        OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
+        if (active != null && active.dirtyCount() != 0) {
+            return false;
+        }
+        SectionSnapshotState snap = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+        if (snap.frozenOverlay != null && snap.frozenOverlay.dirtyCount() != 0) {
+            return false;
+        }
+        return snap.compactIndex == null && snap.baseFrame != null && snap.baseFrame.length > 0;
+    }
+
+    /**
+     * Hydrates {@link CompactBaseIndex} strictly in-memory from this section's resident compact
+     * {@code .lca} {@code baseFrame} via lock-free CAS when currently cold ({@code REQ-RTP-S-005}).
+     */
+    public boolean hydrateCompactBaseIndexIfNeeded() {
+        SectionSnapshotState initial = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+        if (initial.compactIndex != null) {
+            return true;
+        }
+        if ((initial.chunkEpoch & UNLOADED_BIT) != 0L
+                || initial.baseFrame == null
+                || initial.baseFrame.length == 0
+                || initial.baseFrame.length >= BULK_4096_CAPACITY) {
+            return false;
+        }
+        CompactBaseIndex parsed = CompactBaseIndex.tryParse(initial.baseFrame);
+        if (parsed == null) {
+            return false;
+        }
+        while (true) {
+            SectionSnapshotState current = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+            if (current.compactIndex != null) {
+                return true;
+            }
+            if ((current.chunkEpoch & UNLOADED_BIT) != 0L || current.baseFrame != initial.baseFrame) {
+                return false;
+            }
+            SectionSnapshotState next = new SectionSnapshotState(
+                    current.baseFrame,
+                    current.uniformStateId,
+                    parsed,
+                    current.frozenOverlay,
+                    current.frozenOctantMask,
+                    current.chunkEpoch);
+            if (COMMITTED_STATE.compareAndSet(this, current, next)) {
+                return true;
+            }
+        }
+    }
+
+    /**
+     * Demotes a clean non-uniform section from hydrated {@link CompactBaseIndex} residency to sealed
+     * {@code .lca} {@code baseFrame}-only cold mode ({@code leafanvil-ADR-006}). Refuses demotion
+     * whenever {@code activeOverlay} or {@code frozenOverlay} contains uncompacted edits ({@code REQ-RTP-S-004}).
+     */
+    public boolean evictCompactBaseIndexToColdBaseFrame() {
+        while (true) {
+            OverlayTable active = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
+            if (active != null && active.dirtyCount() != 0) {
+                return false;
+            }
+            SectionSnapshotState current = (SectionSnapshotState) COMMITTED_STATE.getAcquire(this);
+            if ((current.chunkEpoch & UNLOADED_BIT) != 0L || current.compactIndex == null) {
+                return false;
+            }
+            if (current.frozenOverlay != null && current.frozenOverlay.dirtyCount() != 0) {
+                return false;
+            }
+            byte[] encodedBase = current.resolveBaseFrameBytes();
+            if (encodedBase == null || encodedBase.length == 0) {
+                return false;
+            }
+            OverlayTable recheckActive = (OverlayTable) ACTIVE_OVERLAY.getAcquire(this);
+            if (recheckActive != null && recheckActive.dirtyCount() != 0) {
+                return false;
+            }
+            SectionSnapshotState next = new SectionSnapshotState(
+                    encodedBase,
+                    current.uniformStateId,
+                    null,
+                    null,
+                    0L,
+                    current.chunkEpoch);
+            if (COMMITTED_STATE.compareAndSet(this, current, next)) {
+                return true;
+            }
+        }
+    }
+
+    /**
+     * Returns the current AIMD edit-count score for 3D slab cache retention ({@code leafanvil-ADR-006}).
+     */
+    public int editScore() {
+        return (int) AIMD_EDIT_SCORE.getAcquire(this);
+    }
+
+    /**
+     * Additively increments this section's AIMD edit score, clamping at {@link #MAX_AIMD_EDIT_SCORE}.
+     */
+    public int recordEditScoreIncrement(int additiveIncrement) {
+        if (additiveIncrement <= 0) {
+            throw new IllegalArgumentException("additiveIncrement must be >= 1: " + additiveIncrement);
+        }
+        while (true) {
+            int cur = (int) AIMD_EDIT_SCORE.getAcquire(this);
+            int next = Math.min(MAX_AIMD_EDIT_SCORE, cur + additiveIncrement);
+            if (AIMD_EDIT_SCORE.compareAndSet(this, cur, next)) {
+                return next;
+            }
+        }
+    }
+
+    /**
+     * Multiplicatively decays this section's AIMD edit score via {@code (score * numerator) >>> shift}.
+     */
+    public int applyMultiplicativeScoreDecay(int numerator, int shift) {
+        if (numerator < 0 || shift < 0 || shift > 30 || numerator > (1 << shift)) {
+            throw new IllegalArgumentException(
+                    "Invalid multiplicative decay fraction (" + numerator + " / 2^" + shift + ")");
+        }
+        while (true) {
+            int cur = (int) AIMD_EDIT_SCORE.getAcquire(this);
+            int next = (int) (((long) cur * numerator) >>> shift);
+            if (AIMD_EDIT_SCORE.compareAndSet(this, cur, next)) {
+                return next;
+            }
+        }
     }
 
     /**
@@ -2054,6 +2543,17 @@ public final class LcaSectionBacking {
             if (baseFrame == null || baseFrame.length == 0 || baseFrame.length == BULK_4096_CAPACITY) {
                 return null;
             }
+            CompactBaseIndex nativeParsed = tryParseNativeCompactFrame(baseFrame);
+            if (nativeParsed != null) {
+                return nativeParsed;
+            }
+            return tryParseLcaSectionFrame(baseFrame);
+        }
+
+        private static CompactBaseIndex tryParseNativeCompactFrame(byte[] baseFrame) {
+            if (baseFrame == null || baseFrame.length == 0 || baseFrame.length == BULK_4096_CAPACITY) {
+                return null;
+            }
             int len = baseFrame.length;
             int cursor = 0;
             int majorityStateId = 0;
@@ -2073,8 +2573,13 @@ public final class LcaSectionBacking {
                 return null;
             }
             byte packedLight = baseFrame[cursor++];
+            // Packed light byte only uses skyConst4 in high nibble and blkConst4 in low nibble;
+            // V2 native CompactBaseIndex always has 0x00 sentinel next and consumes exact len bytes.
             if (cursor + 1 < len && baseFrame[cursor] == 0x00) {
-                return tryParseV2Containers(baseFrame, cursor + 1, len, majorityStateId, packedLight);
+                CompactBaseIndex v2 = tryParseV2Containers(baseFrame, cursor + 1, len, majorityStateId, packedLight);
+                if (v2 != null) {
+                    return v2;
+                }
             }
             int minorityCount = 0;
             shift = 0;
@@ -2152,13 +2657,20 @@ public final class LcaSectionBacking {
                         }
                         shift += 7;
                     }
+                    if (k > 0 && delta <= 0) {
+                        return null;
+                    }
                     pos += delta;
                     if (pos < 0 || pos >= BULK_4096_CAPACITY) {
                         return null;
                     }
                     int w = pos >>> 6;
+                    long bit = 1L << (pos & 63);
+                    if ((tempWordMasks[w] & bit) != 0L) {
+                        return null;
+                    }
                     wordMask64 |= (1L << w);
-                    tempWordMasks[w] |= (1L << (pos & 63));
+                    tempWordMasks[w] |= bit;
                 }
             }
             if (cursor != len) {
@@ -2270,7 +2782,6 @@ public final class LcaSectionBacking {
             }
             int paletteLen = 1 + minorityCount;
             int[] paletteStateIds = new int[paletteLen];
-            int[] paletteCounts = new int[paletteLen];
             paletteStateIds[0] = majorityStateId;
             for (int m = 1; m <= minorityCount; m++) {
                 int stateId = 0;
@@ -2297,7 +2808,32 @@ public final class LcaSectionBacking {
             if (endCursor != len) {
                 return null;
             }
+            return buildIndexFromDecodedPaletteAndOrdinals(paletteStateIds, yzxOrd, packedLight, baseFrame);
+        }
 
+        private static CompactBaseIndex buildIndexFromDecodedPaletteAndOrdinals(
+                int[] paletteStateIds,
+                int[] yzxOrd,
+                byte packedLight,
+                byte[] lazyFrameOrNull
+        ) {
+            int paletteLen = paletteStateIds.length;
+            int majorityStateId = paletteStateIds[0];
+            if (paletteLen == 1) {
+                return new CompactBaseIndex(
+                        majorityStateId,
+                        paletteStateIds,
+                        new int[]{BULK_4096_CAPACITY},
+                        0L,
+                        new long[0],
+                        new short[0],
+                        new byte[0],
+                        null,
+                        packedLight,
+                        lazyFrameOrNull
+                );
+            }
+            int[] paletteCounts = new int[paletteLen];
             long[] tempWordMasks = THREAD_LOCAL_WORD_MASKS_64.get();
             long wordMask64 = 0L;
             int totalMinority = 0;
@@ -2317,7 +2853,6 @@ public final class LcaSectionBacking {
                     wordMask64 |= (1L << w);
                 }
             }
-
             int nonUniformWords = Long.bitCount(wordMask64);
             long[] minorityBitmasks = new long[nonUniformWords];
             short[] wordRankOffsets = new short[nonUniformWords];
@@ -2357,7 +2892,6 @@ public final class LcaSectionBacking {
                 }
                 slotIdx++;
             }
-
             return new CompactBaseIndex(
                     majorityStateId,
                     paletteStateIds,
@@ -2368,8 +2902,22 @@ public final class LcaSectionBacking {
                     ordinalsByte,
                     ordinalsShort,
                     packedLight,
-                    baseFrame
+                    lazyFrameOrNull
             );
+        }
+
+        private static CompactBaseIndex tryParseLcaSectionFrame(byte[] baseFrame) {
+            if (baseFrame == null || baseFrame.length < 3 || baseFrame.length == BULK_4096_CAPACITY) {
+                return null;
+            }
+            int[] yzxOrd = THREAD_ENCODE_SCRATCH.get().nextPos;
+            byte[] lightBox = new byte[1];
+            int[] paletteStateIds = LcaSectionCodec.decodeSectionFrameBlockOrdinals(
+                    baseFrame, baseFrame.length, yzxOrd, lightBox);
+            if (paletteStateIds == null || paletteStateIds.length == 0) {
+                return null;
+            }
+            return buildIndexFromDecodedPaletteAndOrdinals(paletteStateIds, yzxOrd, lightBox[0], null);
         }
 
         byte[] getOrEncodeBaseFrame() {
@@ -2718,38 +3266,305 @@ public final class LcaSectionBacking {
     }
 
     /**
-     * Staged L1-resident overlay table supporting {@code STAGE_EMPTY (0)}, {@code STAGE_LINEAR_16 (1)},
-     * {@code STAGE_HASH_64 (2)} (Fibonacci hash, capped at 48 entries / 75% load factor), and
-     * {@code STAGE_BULK_4096 (3)}.
+     * Flat resizable power-of-two open-addressed primitive {@code (pos12 -> runtimeStateId19)} table
+     * ({@code 0 -> 16 -> 64 -> 256 -> 1024 -> 8192} slots, never allocating {@code int[4096]} dense slabs).
+     * Packed entry word: {@code ((pos12 + 1) << 19) | (runtimeStateId19 & 0x7FFFF)}, {@code 0 == empty}.
      */
-    public static final class OverlayTable {
-        private static final int[] EMPTY_SLOTS = new int[0];
+    static final class SparseDirtyCellMap {
+        private static final int[] EMPTY_TABLE = new int[0];
 
-        private volatile int stage;
-        private volatile int dirtyCount;
-        private volatile long octantMask;
-        private volatile int[] slots;
+        private volatile int[] table;
+        private volatile int size;
 
-        public OverlayTable() {
-            this.stage = STAGE_EMPTY;
-            this.dirtyCount = 0;
-            this.octantMask = 0L;
-            this.slots = EMPTY_SLOTS;
+        SparseDirtyCellMap() {
+            this.table = EMPTY_TABLE;
+            this.size = 0;
         }
 
-        private OverlayTable(int stage, int dirtyCount, long octantMask, int[] slots) {
-            this.stage = stage;
-            this.dirtyCount = dirtyCount;
+        private SparseDirtyCellMap(int[] table, int size) {
+            this.table = table;
+            this.size = size;
+        }
+
+        int size() {
+            return this.size;
+        }
+
+        int capacity() {
+            return this.table.length;
+        }
+
+        int stageCode() {
+            int cap = this.table.length;
+            if (cap == 0 || this.size == 0) {
+                return STAGE_EMPTY;
+            }
+            if (cap <= LINEAR_16_CAPACITY) {
+                return STAGE_LINEAR_16;
+            }
+            if (cap <= HASH_64_CAPACITY) {
+                return STAGE_HASH_64;
+            }
+            return STAGE_SPARSE_HASH_EXT;
+        }
+
+        private static int initialSlot(int pos12, int cap) {
+            int shift = Integer.numberOfLeadingZeros(cap) + 1;
+            return (((pos12 & MAX_POS_12) * FIBONACCI_HASH_MULTIPLIER) >>> shift) & (cap - 1);
+        }
+
+        private static int maxLoadForCapacity(int cap) {
+            if (cap == LINEAR_16_CAPACITY) {
+                return LINEAR_16_CAPACITY;
+            }
+            if (cap >= 8192) {
+                return BULK_4096_CAPACITY;
+            }
+            return (cap * 3) >>> 2;
+        }
+
+        private static int nextCapacity(int currentCap) {
+            if (currentCap == 0) return 16;
+            if (currentCap == 16) return 64;
+            if (currentCap == 64) return 256;
+            if (currentCap == 256) return 1024;
+            return 8192;
+        }
+
+        int get(int pos12) {
+            int maskedPos = pos12 & MAX_POS_12;
+            int[] tab = this.table;
+            int cap = tab.length;
+            if (cap == 0 || this.size == 0) {
+                return -1;
+            }
+            if (cap == LINEAR_16_CAPACITY) {
+                int limit = Math.min(this.size, LINEAR_16_CAPACITY);
+                for (int i = 0; i < limit; i++) {
+                    int entry = tab[i];
+                    if (entry != 0 && unpackPos12(entry) == maskedPos) {
+                        return unpackStateId19(entry);
+                    }
+                }
+                return -1;
+            }
+            int mask = cap - 1;
+            int slot = initialSlot(maskedPos, cap);
+            for (int probes = 0; probes < cap; probes++) {
+                int entry = tab[slot];
+                if (entry == 0) {
+                    return -1;
+                }
+                if (unpackPos12(entry) == maskedPos) {
+                    return unpackStateId19(entry);
+                }
+                slot = (slot + 1) & mask;
+            }
+            return -1;
+        }
+
+        synchronized int put(int pos12, int runtimeStateId19) {
+            int maskedPos = pos12 & MAX_POS_12;
+            int packed = packEntry32(maskedPos, runtimeStateId19);
+            int[] tab = this.table;
+            int cap = tab.length;
+
+            if (cap == 0) {
+                int[] next = new int[LINEAR_16_CAPACITY];
+                next[0] = packed;
+                this.table = next;
+                this.size = 1;
+                return -1;
+            }
+
+            if (cap == LINEAR_16_CAPACITY) {
+                int count = this.size;
+                for (int i = 0; i < count; i++) {
+                    int existing = tab[i];
+                    if (unpackPos12(existing) == maskedPos) {
+                        int prevState = unpackStateId19(existing);
+                        tab[i] = packed;
+                        return prevState;
+                    }
+                }
+                if (count < LINEAR_16_CAPACITY) {
+                    tab[count] = packed;
+                    this.size = count + 1;
+                    return -1;
+                }
+                rehashTo(nextCapacity(cap), packed);
+                return -1;
+            }
+
+            int mask = cap - 1;
+            int slot = initialSlot(maskedPos, cap);
+            int maxLoad = maxLoadForCapacity(cap);
+            for (int probes = 0; probes < cap; probes++) {
+                int existing = tab[slot];
+                if (existing == 0) {
+                    if (this.size < maxLoad) {
+                        tab[slot] = packed;
+                        this.size++;
+                        return -1;
+                    }
+                    break;
+                }
+                if (unpackPos12(existing) == maskedPos) {
+                    int prevState = unpackStateId19(existing);
+                    tab[slot] = packed;
+                    return prevState;
+                }
+                slot = (slot + 1) & mask;
+            }
+
+            rehashTo(nextCapacity(cap), packed);
+            return -1;
+        }
+
+        private void rehashTo(int newCap, int additionalPackedEntry) {
+            int[] oldTab = this.table;
+            int[] newTab = new int[newCap];
+            int mask = newCap - 1;
+            int newSize = 0;
+            for (int entry : oldTab) {
+                if (entry != 0) {
+                    int pos = unpackPos12(entry);
+                    int s = initialSlot(pos, newCap);
+                    while (newTab[s] != 0) {
+                        s = (s + 1) & mask;
+                    }
+                    newTab[s] = entry;
+                    newSize++;
+                }
+            }
+            int addPos = unpackPos12(additionalPackedEntry);
+            int s = initialSlot(addPos, newCap);
+            while (newTab[s] != 0) {
+                if (unpackPos12(newTab[s]) == addPos) {
+                    newTab[s] = additionalPackedEntry;
+                    this.table = newTab;
+                    this.size = newSize;
+                    return;
+                }
+                s = (s + 1) & mask;
+            }
+            newTab[s] = additionalPackedEntry;
+            this.table = newTab;
+            this.size = newSize + 1;
+        }
+
+        int maxProbeLength() {
+            int[] tab = this.table;
+            int cap = tab.length;
+            int count = this.size;
+            if (cap == 0 || count == 0) {
+                return 0;
+            }
+            if (cap == LINEAR_16_CAPACITY) {
+                return count;
+            }
+            int mask = cap - 1;
+            int maxProbes = 0;
+            for (int slot = 0; slot < cap; slot++) {
+                int entry = tab[slot];
+                if (entry != 0) {
+                    int start = initialSlot(unpackPos12(entry), cap);
+                    int probes = ((slot - start) & mask) + 1;
+                    if (probes > maxProbes) {
+                        maxProbes = probes;
+                    }
+                }
+            }
+            return maxProbes;
+        }
+
+        int[] toCompactPackedArray() {
+            int[] tab = this.table;
+            int cap = tab.length;
+            int count = this.size;
+            if (cap == 0 || count == 0) {
+                return new int[0];
+            }
+            if (cap == LINEAR_16_CAPACITY) {
+                int limit = Math.min(count, LINEAR_16_CAPACITY);
+                return Arrays.copyOf(tab, limit);
+            }
+            int[] dense = new int[count];
+            int idx = 0;
+            for (int entry : tab) {
+                if (entry != 0) {
+                    if (idx == dense.length) {
+                        dense = Arrays.copyOf(dense, dense.length + 8);
+                    }
+                    dense[idx++] = entry;
+                }
+            }
+            return idx == dense.length ? dense : Arrays.copyOf(dense, idx);
+        }
+
+        void forEachEntry(OverlayEntryConsumer consumer) {
+            int[] tab = this.table;
+            int cap = tab.length;
+            if (cap == 0 || this.size == 0) {
+                return;
+            }
+            if (cap == LINEAR_16_CAPACITY) {
+                int limit = Math.min(this.size, LINEAR_16_CAPACITY);
+                for (int i = 0; i < limit; i++) {
+                    int entry = tab[i];
+                    if (entry != 0) {
+                        consumer.accept(unpackPos12(entry), unpackStateId19(entry));
+                    }
+                }
+                return;
+            }
+            for (int entry : tab) {
+                if (entry != 0) {
+                    consumer.accept(unpackPos12(entry), unpackStateId19(entry));
+                }
+            }
+        }
+
+        synchronized SparseDirtyCellMap copy() {
+            if (this.size == 0 || this.table.length == 0) {
+                return new SparseDirtyCellMap();
+            }
+            return new SparseDirtyCellMap(Arrays.copyOf(this.table, this.table.length), this.size);
+        }
+    }
+
+    /**
+     * Sparse dirty cell modifier wrapper backed by {@link SparseDirtyCellMap} (`16 -> 64 -> 256 -> 1024 -> 8192`
+     * open-addressed primitive slots, zero `int[4096]` full-slab inflation).
+     */
+    public static final class OverlayTable {
+        private final SparseDirtyCellMap sparseMap;
+        private volatile long octantMask;
+
+        public OverlayTable() {
+            this.sparseMap = new SparseDirtyCellMap();
+            this.octantMask = 0L;
+        }
+
+        private OverlayTable(SparseDirtyCellMap sparseMap, long octantMask) {
+            this.sparseMap = sparseMap;
             this.octantMask = octantMask;
-            this.slots = slots;
         }
 
         public int stage() {
-            return this.stage;
+            return this.sparseMap.stageCode();
         }
 
         public int dirtyCount() {
-            return this.dirtyCount;
+            return this.sparseMap.size();
+        }
+
+        public int tableCapacity() {
+            return this.sparseMap.capacity();
+        }
+
+        public int allocatedSlotBytes() {
+            return this.sparseMap.capacity() << 2;
         }
 
         public long octantMask() {
@@ -2760,182 +3575,35 @@ public final class LcaSectionBacking {
          * Returns the 19-bit state ID for {@code pos12}, or {@code -1} on miss.
          */
         public int getStateId(int pos12) {
-            int maskedPos = pos12 & MAX_POS_12;
-            int currentStage = this.stage;
-            int[] table = this.slots;
-            if (currentStage == STAGE_EMPTY || table.length == 0) {
-                return -1;
-            }
-            if (currentStage == STAGE_LINEAR_16) {
-                int limit = Math.min(this.dirtyCount, table.length);
-                for (int i = 0; i < limit; i++) {
-                    int entry = table[i];
-                    if (entry != 0 && unpackPos12(entry) == maskedPos) {
-                        return unpackStateId19(entry);
-                    }
-                }
-                return -1;
-            }
-            if (currentStage == STAGE_HASH_64) {
-                int slot = initialSlot64(maskedPos);
-                for (int probes = 0; probes < HASH_64_CAPACITY; probes++) {
-                    int entry = table[slot];
-                    if (entry == 0) {
-                        return -1;
-                    }
-                    if (unpackPos12(entry) == maskedPos) {
-                        return unpackStateId19(entry);
-                    }
-                    slot = (slot + 1) & 63;
-                }
-                return -1;
-            }
-            int entry = table[maskedPos];
-            return entry == 0 ? -1 : unpackStateId19(entry);
+            return this.sparseMap.get(pos12);
         }
 
-        synchronized void put(int pos12, int octantIdx, int stateId19) {
-            int maskedPos = pos12 & MAX_POS_12;
-            int maskedOctant = octantIdx & 63;
-            int packed = packEntry32(maskedPos, stateId19);
-            int currentStage = this.stage;
-
-            if (currentStage == STAGE_EMPTY) {
-                int[] linear = new int[LINEAR_16_CAPACITY];
-                linear[0] = packed;
-                this.slots = linear;
-                this.dirtyCount = 1;
-                this.stage = STAGE_LINEAR_16;
-                this.octantMask |= (1L << maskedOctant);
-                return;
-            }
-
-            if (currentStage == STAGE_LINEAR_16) {
-                int[] linear = this.slots;
-                int count = this.dirtyCount;
-                for (int i = 0; i < count; i++) {
-                    if (unpackPos12(linear[i]) == maskedPos) {
-                        linear[i] = packed;
-                        this.octantMask |= (1L << maskedOctant);
-                        return;
-                    }
-                }
-                if (count < LINEAR_16_CAPACITY) {
-                    linear[count] = packed;
-                    this.dirtyCount = count + 1;
-                    this.octantMask |= (1L << maskedOctant);
-                    return;
-                }
-                int[] hash64 = new int[HASH_64_CAPACITY];
-                for (int i = 0; i < LINEAR_16_CAPACITY; i++) {
-                    insertIntoHash64(hash64, linear[i]);
-                }
-                insertIntoHash64(hash64, packed);
-                this.slots = hash64;
-                this.dirtyCount = LINEAR_16_CAPACITY + 1;
-                this.stage = STAGE_HASH_64;
-                this.octantMask |= (1L << maskedOctant);
-                return;
-            }
-
-            if (currentStage == STAGE_HASH_64) {
-                int[] hash64 = this.slots;
-                int slot = initialSlot64(maskedPos);
-                for (int probes = 0; probes < HASH_64_CAPACITY; probes++) {
-                    int existing = hash64[slot];
-                    if (existing == 0) {
-                        if (this.dirtyCount < HASH_64_MAX_LOAD) {
-                            hash64[slot] = packed;
-                            this.dirtyCount++;
-                            this.octantMask |= (1L << maskedOctant);
-                            return;
-                        }
-                        break;
-                    }
-                    if (unpackPos12(existing) == maskedPos) {
-                        hash64[slot] = packed;
-                        this.octantMask |= (1L << maskedOctant);
-                        return;
-                    }
-                    slot = (slot + 1) & 63;
-                }
-
-                int[] bulk = new int[BULK_4096_CAPACITY];
-                for (int i = 0; i < HASH_64_CAPACITY; i++) {
-                    int entry = hash64[i];
-                    if (entry != 0) {
-                        bulk[unpackPos12(entry)] = entry;
-                    }
-                }
-                bulk[maskedPos] = packed;
-                this.slots = bulk;
-                this.dirtyCount = HASH_64_MAX_LOAD + 1;
-                this.stage = STAGE_BULK_4096;
-                this.octantMask |= (1L << maskedOctant);
-                return;
-            }
-
-            int[] bulk = this.slots;
-            int existing = bulk[maskedPos];
-            bulk[maskedPos] = packed;
-            if (existing == 0) {
-                this.dirtyCount++;
-            }
-            this.octantMask |= (1L << maskedOctant);
+        synchronized int put(int pos12, int octantIdx, int stateId19) {
+            int prev = this.sparseMap.put(pos12, stateId19);
+            this.octantMask |= (1L << (octantIdx & 63));
+            return prev;
         }
 
-        private static void insertIntoHash64(int[] hash64, int packedEntry) {
-            int pos = unpackPos12(packedEntry);
-            int slot = initialSlot64(pos);
-            while (hash64[slot] != 0) {
-                if (unpackPos12(hash64[slot]) == pos) {
-                    hash64[slot] = packedEntry;
-                    return;
-                }
-                slot = (slot + 1) & 63;
-            }
-            hash64[slot] = packedEntry;
+        public int[] toCompactPackedArray() {
+            return this.sparseMap.toCompactPackedArray();
+        }
+
+        SparseDirtyCellMap copySparseMap() {
+            return this.sparseMap.copy();
         }
 
         /**
-         * Computes the worst-case probe length across all currently occupied slots in this overlay.
+         * Computes the worst-case open-addressed probe length across all occupied slots.
          */
         public int maxProbeLength() {
-            int currentStage = this.stage;
-            int[] table = this.slots;
-            if (currentStage == STAGE_EMPTY || this.dirtyCount == 0) {
-                return 0;
-            }
-            if (currentStage == STAGE_LINEAR_16) {
-                return this.dirtyCount;
-            }
-            if (currentStage == STAGE_HASH_64) {
-                int maxProbes = 0;
-                for (int slot = 0; slot < HASH_64_CAPACITY; slot++) {
-                    int entry = table[slot];
-                    if (entry != 0) {
-                        int pos = unpackPos12(entry);
-                        int start = initialSlot64(pos);
-                        int probes = ((slot - start) & 63) + 1;
-                        if (probes > maxProbes) {
-                            maxProbes = probes;
-                        }
-                    }
-                }
-                return maxProbes;
-            }
-            return 1;
+            return this.sparseMap.maxProbeLength();
         }
 
         OverlayTable freezeCopy() {
-            if (this.stage == STAGE_EMPTY) {
+            if (this.sparseMap.size() == 0) {
                 return new OverlayTable();
             }
-            return new OverlayTable(
-                    this.stage,
-                    this.dirtyCount,
-                    this.octantMask,
-                    Arrays.copyOf(this.slots, this.slots.length));
+            return new OverlayTable(this.sparseMap.copy(), this.octantMask);
         }
 
         OverlayTable mergeWithNewer(OverlayTable newer) {
@@ -2946,30 +3614,11 @@ public final class LcaSectionBacking {
         }
 
         /**
-         * Visits all dirty {@code (pos12, stateId19)} pairs stored in this overlay table.
+         * Visits all dirty {@code (pos12, stateId19)} pairs stored in this sparse modifier table.
          */
         public void forEachEntry(OverlayEntryConsumer consumer) {
             Objects.requireNonNull(consumer, "consumer");
-            int currentStage = this.stage;
-            int[] table = this.slots;
-            if (currentStage == STAGE_EMPTY || table.length == 0) {
-                return;
-            }
-            if (currentStage == STAGE_LINEAR_16) {
-                int limit = Math.min(this.dirtyCount, table.length);
-                for (int i = 0; i < limit; i++) {
-                    int entry = table[i];
-                    if (entry != 0) {
-                        consumer.accept(unpackPos12(entry), unpackStateId19(entry));
-                    }
-                }
-                return;
-            }
-            for (int entry : table) {
-                if (entry != 0) {
-                    consumer.accept(unpackPos12(entry), unpackStateId19(entry));
-                }
-            }
+            this.sparseMap.forEachEntry(consumer);
         }
     }
 

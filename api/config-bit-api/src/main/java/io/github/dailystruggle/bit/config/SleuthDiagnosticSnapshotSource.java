@@ -20,6 +20,11 @@ public interface SleuthDiagnosticSnapshotSource
     }
 
     @Override
+    default List<PluginHookCulpritRecord> diagnosticPluginHooks() {
+        return List.of();
+    }
+
+    @Override
     default List<IdentityComparisonRecord> diagnosticIdentityComparisons() {
         return List.of();
     }

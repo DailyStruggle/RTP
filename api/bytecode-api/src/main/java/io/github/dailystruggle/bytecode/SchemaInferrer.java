@@ -40,6 +40,16 @@ public final class SchemaInferrer {
     private static final Pattern FLOAT_LITERAL_RE = Pattern.compile("^-?\\d+\\.\\d+$");
     private static final Pattern DURATION_UNIT_LITERAL_RE = Pattern.compile("^(\\d+(?:\\.\\d+)?)(ms|t|ticks|s|sec|m|min|h|d)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern DISTANCE_UNIT_LITERAL_RE = Pattern.compile("^(\\d+(?:\\.\\d+)?)(b|blocks|c|chunks|r|regions|km|mi)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PROPERTIES_TIMESTAMP_HEADER_RE = Pattern.compile(
+            "^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\s++(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s++\\d{1,2}\\s++\\d{2}:\\d{2}:\\d{2}\\s++\\S++\\s++\\d{4}$"
+    );
+    private static final Pattern ASCII_BOX_BORDER_RE = Pattern.compile("^[+*=\\-_~|:\\s]{4,}$");
+    private static final Pattern COMMENT_BOOL_TRUE_RE = Pattern.compile(
+            "(?i)(?:\\bwhen\\s++(?:this\\s++is\\s++)?set\\s++to\\s++['\"`]?true['\"`]?[,:\\s-]++|\\bif\\s++(?:this\\s++is\\s++)?(?:set\\s++to\\s++)?['\"`]?true['\"`]?[,:\\s-]++|(?:^|[.;\\n-]\\s*+)['\"`]?true['\"`]?\\s*+[=:\\-]\\s*+)([^.\\n]{10,220})"
+    );
+    private static final Pattern COMMENT_BOOL_FALSE_RE = Pattern.compile(
+            "(?i)(?:\\bwhen\\s++(?:this\\s++is\\s++)?set\\s++to\\s++['\"`]?false['\"`]?[,:\\s-]++|\\bif\\s++(?:this\\s++is\\s++)?(?:set\\s++to\\s++)?['\"`]?false['\"`]?[,:\\s-]++|(?:^|[.;\\n-]\\s*+)['\"`]?false['\"`]?\\s*+[=:\\-]\\s*+)([^.\\n]{10,220})"
+    );
 
     /** Provenance tier for documentation and schema metadata ({@code leafconfig-ADR-001} Section 3). */
     public enum DocProvenance {
@@ -258,6 +268,24 @@ public final class SchemaInferrer {
             List<String> bytecodeOptions,
             boolean hasOfficialDocs
     ) {
+        return infer(keyPath, rawValue, commentLines, bytecodeOptions, hasOfficialDocs, false);
+    }
+
+    /**
+     * Synthesizes an {@link InferredSchema} with explicit engine-file lifecycle context so root
+     * engine files ({@code server.properties}, {@code bukkit.yml}, {@code spigot.yml},
+     * {@code config/paper-*.yml}) default to {@link ReloadTier#SERVER_RESTART} rather than
+     * {@link ReloadTier#PLUGIN_RELOAD}, and uncommented keys are never falsely stamped
+     * {@link DocProvenance#OFFICIAL_DOCS} from a bare artifact URL.
+     */
+    public static InferredSchema infer(
+            String keyPath,
+            Object rawValue,
+            List<String> commentLines,
+            List<String> bytecodeOptions,
+            boolean hasOfficialDocs,
+            boolean isEngineFile
+    ) {
         Objects.requireNonNull(keyPath, "keyPath");
         List<String> safeComments = commentLines == null ? List.of() : commentLines;
         DirectiveSchemaParser explicit = DirectiveSchemaParser.parse(safeComments);
@@ -265,14 +293,12 @@ public final class SchemaInferrer {
         String rawLeaf = extractLeaf(keyPath);
         String leaf = normalizeCamelToHyphen(rawLeaf);
         String lowerPath = normalizeCamelToHyphen(keyPath);
-        String joinedComment = String.join("\n", safeComments);
+        String joinedComment = cleanAuthorCommentProse(String.join("\n", safeComments));
 
-        // 1. Provenance classification
+        // 1. Provenance classification: bare hasOfficialDocs without per-key prose/directives stays BYTECODE_INFERRED
         DocProvenance provenance;
         if (hasNonDirectiveProse(safeComments) || explicit.hasChecks()) {
             provenance = hasOfficialDocs ? DocProvenance.OFFICIAL_DOCS : DocProvenance.AUTHOR_COMMENT;
-        } else if (hasOfficialDocs) {
-            provenance = DocProvenance.OFFICIAL_DOCS;
         } else {
             provenance = DocProvenance.BYTECODE_INFERRED;
         }
@@ -327,6 +353,11 @@ public final class SchemaInferrer {
             } else if (matchesMinecraftRegistry(leaf)) {
                 type = "enum";
                 if (source == null) source = "minecraft:" + normalizeRegistryName(leaf);
+            } else if (isRatePerUnitSuffix(leaf)) {
+                type = (rawValue instanceof Double || rawValue instanceof Float || FLOAT_LITERAL_RE.matcher(valStr).matches())
+                        ? "double"
+                        : "integer";
+                if (rangeMin == null) rangeMin = "-1".equals(valStr) || "-1.0".equals(valStr) ? -1.0 : 0.0;
             } else if (isDurationSuffix(leaf)) {
                 type = "integer";
                 if (unit == null) unit = inferDurationUnit(leaf);
@@ -335,6 +366,13 @@ public final class SchemaInferrer {
                 type = "integer";
                 if (unit == null) unit = inferDistanceUnit(leaf);
                 if (rangeMin == null && !isCoordinateAxis(leaf)) rangeMin = "-1".equals(valStr) ? -1.0 : 0.0;
+            } else if (isPercentageScaleSuffix(leaf, rawValue, valStr)) {
+                type = (rawValue instanceof Integer || rawValue instanceof Long || INTEGER_LITERAL_RE.matcher(valStr).matches())
+                        ? "integer"
+                        : "double";
+                if (unit == null) unit = "%";
+                if (rangeMin == null) rangeMin = 0.0;
+                if (rangeMax == null) rangeMax = leaf.contains("range") ? 1000.0 : 100.0;
             } else if (isRatioOrChanceSuffix(leaf)) {
                 type = "double";
                 if (rangeMin == null && (leaf.contains("chance") || leaf.contains("percent") || leaf.contains("probability"))) {
@@ -365,7 +403,7 @@ public final class SchemaInferrer {
         }
 
         // 5. Reload tier heuristic
-        ReloadTier reloadTier = classifyReloadTier(lowerPath, joinedComment);
+        ReloadTier reloadTier = classifyReloadTier(lowerPath, joinedComment, isEngineFile);
 
         // 6. Spatial coordinate gizmo classification for the 2D Map panel
         SpatialGizmoKind gizmoKind = classifySpatialGizmo(leaf, lowerPath, type);
@@ -776,7 +814,14 @@ public final class SchemaInferrer {
                     + whereClause + effectTail + ".";
         }
 
-        // 4. Probability / chance / percentage thresholds
+        // 4. Percentage scales (0..100+%) vs [0.0..1.0] trigger probabilities
+        if (isPercentageScaleKey(leaf, numVal, schema)) {
+            String subject = humanizeConceptPhrase(kLow, leaf, "percentage", "percent");
+            String whereClause = !astTargetRef.isEmpty() ? (" in `" + astTargetRef + "`") : "";
+            String pctDisplay = val.endsWith("%") ? ("`" + val + "`") : ("`" + val + "%`");
+            return "Scales " + subject + " to " + pctDisplay
+                    + " (`100%` = normal baseline)" + astMeta + whereClause + effectTail + ".";
+        }
         if (leaf.contains("chance") || leaf.contains("probability") || leaf.contains("percent")) {
             String subject = humanizeConceptPhrase(kLow, leaf, "chance", "probability", "percent");
             String whereClause = !astTargetRef.isEmpty() ? (" in `" + astTargetRef + "`") : "";
@@ -852,7 +897,13 @@ public final class SchemaInferrer {
                     + (effectTail.isEmpty() ? " before expiring" : effectTail) + ".";
         }
 
-        // 9. Maximum caps / batch limits / quotas / character bounds
+        // 9. Maximum caps / batch limits / per-tick throughput rates / quotas / character bounds
+        if (isRatePerUnitSuffix(leaf)) {
+            String rateUnit = extractRateUnitLabel(leaf);
+            String subject = humanizeConceptPhrase(kLow, leaf, "max", "limit", "cap", "per", "tick", "ticks", "second", "seconds", "chunk");
+            String whereClause = !astTargetRef.isEmpty() ? (" in `" + astTargetRef + "`") : "";
+            return "Caps " + subject + " throughput at `" + val + "` per " + rateUnit + astMeta + whereClause + effectTail + ".";
+        }
         if (leaf.contains("batch") || leaf.contains("amount") || leaf.contains("max")
                 || leaf.contains("limit") || leaf.contains("cap") || leaf.contains("count")
                 || leaf.contains("uses") || leaf.contains("chars") || leaf.contains("size")) {
@@ -938,14 +989,23 @@ public final class SchemaInferrer {
 
         // 2. Category-specific player impact when changed (discrete & spatial types first, then tunable numeric categories)
         if ("boolean".equals(schema.inferredType())) {
-            String subject = humanizeSubject(kLow, leaf, "enable", "enabled", "allow", "deny");
-            if (leaf.startsWith("deny") || leaf.startsWith("cancel") || leaf.startsWith("prevent")) {
-                String action = humanizeSubject(leaf, leaf, "deny", "cancel", "prevent");
-                adjustmentBullets.add("true: Cancels/blocks " + action + " for players in this region or mode.");
-                adjustmentBullets.add("false: Allows players to perform " + action + " normally.");
-            } else {
-                adjustmentBullets.add("true: Turns on " + subject + " in-game.");
-                adjustmentBullets.add("false: Turns off " + subject + " so the feature is skipped.");
+            List<String> extractedBoolBullets = extractBooleanBranchesFromComment(cleanComment);
+            if (!extractedBoolBullets.isEmpty()) {
+                adjustmentBullets.addAll(extractedBoolBullets);
+            } else if (!hasExplicitDocs || cleanComment == null || cleanComment.isBlank()) {
+                String subject = humanizeSubject(kLow, leaf, "enable", "enabled", "allow", "deny");
+                if (leaf.startsWith("deny") || leaf.startsWith("cancel") || leaf.startsWith("prevent")) {
+                    String action = humanizeSubject(leaf, leaf, "deny", "cancel", "prevent");
+                    adjustmentBullets.add("true: Cancels/blocks " + action + " when triggered.");
+                    adjustmentBullets.add("false: Permits " + action + " to proceed without blocking.");
+                } else if (leaf.startsWith("suppress") || leaf.startsWith("hide") || leaf.startsWith("ignore")) {
+                    String target = humanizeSubject(leaf, leaf, "suppress", "hide", "ignore");
+                    adjustmentBullets.add("true: Suppresses/skips " + target + " checks or console notices.");
+                    adjustmentBullets.add("false: Enforces and reports " + target + " normally.");
+                } else {
+                    adjustmentBullets.add("true: Activates " + subject + (triggerPhrase.isEmpty() ? "." : (" (" + triggerPhrase + ").")));
+                    adjustmentBullets.add("false: Disables " + subject + ".");
+                }
             }
         } else if ("enum".equals(schema.inferredType()) || !schema.options().isEmpty()) {
             for (String opt : schema.options()) {
@@ -962,13 +1022,22 @@ public final class SchemaInferrer {
                 adjustmentBullets.add("Changing coordinate: Shifts the center anchor point of this zone on the 2D world map.");
             }
         } else if (numVal != null && !isStructuralNumericIdentifier(leaf)) {
-            if (leaf.contains("chance") || leaf.contains("probability") || leaf.contains("percent")) {
+            if (isPercentageScaleKey(leaf, numVal, schema)) {
+                String subject = humanizeSubject(kLow, leaf, "percentage", "percent");
+                adjustmentBullets.add("If increased (above 100%): Scales " + subject + " farther/higher than the 100% default baseline (increases client/network or CPU work).");
+                adjustmentBullets.add("If decreased (below 100%): Scales " + subject + " down proportionally (e.g. 50 = half of normal baseline, reducing load).");
+            } else if (leaf.contains("chance") || leaf.contains("probability") || leaf.contains("percent")) {
                 String subject = humanizeSubject(kLow, leaf, "chance", "probability", "percent");
                 String maxStr = (schema.rangeMax() != null && schema.rangeMax() > 1.0) ? "100%" : "1.0 (100%)";
                 adjustmentBullets.add("If increased (toward " + maxStr + "): " + capitalize(subject)
                         + " triggers on a higher percentage of hits/actions (at " + maxStr + ", it triggers every single time).");
                 adjustmentBullets.add("If decreased (toward 0.0 / 0%): " + capitalize(subject)
                         + " triggers less often; setting 0.0 disables the effect completely.");
+            } else if (isRatePerUnitSuffix(leaf)) {
+                String rateUnit = extractRateUnitLabel(leaf);
+                String subject = humanizeSubject(kLow, leaf, "max", "limit", "cap", "per", "tick", "ticks", "second", "seconds", "chunk");
+                adjustmentBullets.add("If increased: Processes more " + subject + " work per " + rateUnit + " (finishes queues faster at higher MSPT cost).");
+                adjustmentBullets.add("If decreased: Spreads " + subject + " work across more " + rateUnit + "s to prevent server tick spikes.");
             } else if (isIntervalOrCooldown(leaf)) {
                 if (kLow.contains("hopper") || kLow.contains("transfer")) {
                     adjustmentBullets.add("If increased (e.g. 16-20 ticks / 0.8s-1.0s): Hoppers pause longer between transfers — player sorting systems move items slower, but chunk tick (MSPT) lag drops significantly.");
@@ -995,8 +1064,13 @@ public final class SchemaInferrer {
                 }
             } else if (leaf.contains("multiplier") || leaf.contains("scale") || leaf.contains("factor")) {
                 String subject = humanizeSubject(kLow, leaf, "multiplier", "scale", "factor");
-                adjustmentBullets.add("If increased (higher multiplier): Scales " + subject + " up (e.g. 2.0 = double strength/health per player), making encounters tougher.");
-                adjustmentBullets.add("If decreased (closer to 1.0 or lower): Reduces " + subject + " scaling (1.0 = unscaled base value).");
+                if (kLow.contains("boss") || kLow.contains("mob") || kLow.contains("damage") || kLow.contains("health")) {
+                    adjustmentBullets.add("If increased (higher multiplier): Scales " + subject + " up (e.g. 2.0 = double strength/health per player), making encounters tougher.");
+                    adjustmentBullets.add("If decreased (closer to 1.0 or lower): Reduces " + subject + " scaling (1.0 = unscaled base value).");
+                } else {
+                    adjustmentBullets.add("If increased: Raises the " + subject + " scaling factor (`1.0` = unscaled base rate).");
+                    adjustmentBullets.add("If decreased: Lowers the " + subject + " scaling factor toward or below `1.0`.");
+                }
             } else if (leaf.contains("batch") || leaf.contains("amount") || leaf.contains("max") || leaf.contains("min")
                     || leaf.contains("limit") || leaf.contains("cap") || leaf.contains("count")
                     || leaf.contains("size") || leaf.contains("threads") || leaf.contains("workers")) {
@@ -1305,6 +1379,12 @@ public final class SchemaInferrer {
         if (numVal == null) return "`" + rawVal + "`";
 
         String unit = schema != null && schema.unit() != null ? schema.unit() : "";
+        if (isRatePerUnitSuffix(leaf)) {
+            return "`" + rawVal + "` per " + extractRateUnitLabel(leaf);
+        }
+        if ("%".equals(unit) || isPercentageScaleKey(leaf, numVal, schema)) {
+            return rawVal.endsWith("%") ? ("`" + rawVal + "`") : ("`" + rawVal + "%`");
+        }
         if ("ticks".equalsIgnoreCase(unit) || leaf.contains("ticks") || leaf.endsWith("-tick")) {
             double seconds = numVal / 20.0;
             String secStr = seconds >= 60.0
@@ -1644,13 +1724,84 @@ public final class SchemaInferrer {
         return String.join(", ", out);
     }
 
+    static String cleanAuthorCommentProse(String commentText) {
+        return stripCommentPrefixes(commentText);
+    }
+
+    static String sanitizeBlanketProse(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String cleaned = UNSAFE_DISPLAY_LITERAL_RE.matcher(raw).replaceAll("[redacted]");
+        return cleaned.replace('<', '(').replace('>', ')').replaceAll("[\\r\\n\\t]+", " ").replaceAll("\\s+", " ").trim();
+    }
+
+    private static boolean isNoiseBannerOrHeaderLine(String strippedLine) {
+        if (strippedLine == null || strippedLine.isBlank()) {
+            return true;
+        }
+        String t = strippedLine.trim();
+        if (t.startsWith("@") || t.startsWith("---") || "BLANK".equalsIgnoreCase(t)) {
+            return true;
+        }
+        if ("Minecraft server properties".equalsIgnoreCase(t)
+                || PROPERTIES_TIMESTAMP_HEADER_RE.matcher(t).matches()) {
+            return true;
+        }
+        if (ASCII_BOX_BORDER_RE.matcher(t).matches()) {
+            return true;
+        }
+        if (t.startsWith("|") && t.endsWith("|")) {
+            if (t.length() < 2) {
+                return true;
+            }
+            String inner = t.substring(1, t.length() - 1).trim();
+            if (inner.isEmpty() || inner.equals(inner.toUpperCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<String> extractBooleanBranchesFromComment(String cleanComment) {
+        if (cleanComment == null || cleanComment.isBlank()) {
+            return List.of();
+        }
+        String trueDesc = null;
+        String falseDesc = null;
+        Matcher mt = COMMENT_BOOL_TRUE_RE.matcher(cleanComment);
+        if (mt.find()) {
+            trueDesc = mt.group(1).trim();
+        }
+        Matcher mf = COMMENT_BOOL_FALSE_RE.matcher(cleanComment);
+        if (mf.find()) {
+            falseDesc = mf.group(1).trim();
+        }
+        if (trueDesc == null && falseDesc == null) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>(2);
+        if (trueDesc != null && !trueDesc.isEmpty()) {
+            out.add("true: " + capitalize(trueDesc) + (trueDesc.endsWith(".") ? "" : "."));
+        }
+        if (falseDesc != null && !falseDesc.isEmpty()) {
+            out.add("false: " + capitalize(falseDesc) + (falseDesc.endsWith(".") ? "" : "."));
+        }
+        return out;
+    }
+
     private static String stripCommentPrefixes(String commentText) {
         if (commentText == null || commentText.isBlank()) return "";
         StringBuilder sb = new StringBuilder();
         for (String line : commentText.split("\n")) {
             String t = line.trim();
-            if (t.startsWith("#")) t = t.substring(1).trim();
-            if (t.isEmpty() || t.startsWith("@") || t.startsWith("---")) continue;
+            while (t.startsWith("#") || t.startsWith("!")) {
+                t = t.substring(1).trim();
+            }
+            if (isNoiseBannerOrHeaderLine(t)) continue;
+            if (t.startsWith("|") && t.endsWith("|") && t.length() > 2) {
+                t = t.substring(1, t.length() - 1).trim();
+            }
             if (sb.length() > 0) sb.append(" ");
             sb.append(t);
         }
@@ -1704,8 +1855,16 @@ public final class SchemaInferrer {
     }
 
     private static ReloadTier classifyReloadTier(String lowerPath, String comment) {
+        return classifyReloadTier(lowerPath, comment, false);
+    }
+
+    private static ReloadTier classifyReloadTier(String lowerPath, String comment, boolean isEngineFile) {
         String lowComment = comment.toLowerCase(Locale.ROOT);
-        if (lowComment.contains("requires a server restart")
+        if (lowComment.contains("hot-apply") || lowComment.contains("hot reload")) {
+            return ReloadTier.HOT_RELOAD;
+        }
+        if (isEngineFile
+                || lowComment.contains("requires a server restart")
                 || lowComment.contains("requires restart")
                 || lowComment.contains("restart required")
                 || lowerPath.contains("database.host")
@@ -1714,8 +1873,7 @@ public final class SchemaInferrer {
                 || lowerPath.contains("worker-threads")) {
             return ReloadTier.SERVER_RESTART;
         }
-        if (lowComment.contains("hot-apply") || lowComment.contains("hot reload")
-                || lowerPath.startsWith("regions.") || lowerPath.startsWith("performance.")) {
+        if (lowerPath.startsWith("regions.") || lowerPath.startsWith("performance.")) {
             return ReloadTier.HOT_RELOAD;
         }
         return ReloadTier.PLUGIN_RELOAD;
@@ -1782,8 +1940,10 @@ public final class SchemaInferrer {
         for (String line : comments) {
             if (line == null) continue;
             String t = line.trim();
-            if (t.startsWith("#")) t = t.substring(1).trim();
-            if (!t.isEmpty() && !t.startsWith("@") && !t.startsWith("---")) {
+            while (t.startsWith("#") || t.startsWith("!")) {
+                t = t.substring(1).trim();
+            }
+            if (!isNoiseBannerOrHeaderLine(t)) {
                 return true;
             }
         }
@@ -1915,7 +2075,54 @@ public final class SchemaInferrer {
         return upperOptions;
     }
 
+    private static boolean isRatePerUnitSuffix(String leaf) {
+        return leaf.contains("-per-tick") || leaf.endsWith("per-tick")
+                || leaf.contains("-per-second") || leaf.endsWith("per-second") || leaf.endsWith("-per-sec")
+                || leaf.contains("-per-minute") || leaf.endsWith("per-minute")
+                || leaf.contains("-per-chunk") || leaf.endsWith("per-chunk");
+    }
+
+    private static String extractRateUnitLabel(String leaf) {
+        if (leaf.contains("chunk")) return "chunk";
+        if (leaf.contains("minute")) return "minute";
+        if (leaf.contains("second") || leaf.endsWith("-per-sec")) return "second";
+        return "tick";
+    }
+
+    private static boolean isPercentageScaleSuffix(String leaf, Object rawValue, String valStr) {
+        if (leaf.contains("percentage") || leaf.contains("range-percent")) {
+            return true;
+        }
+        if (leaf.endsWith("-percent") || leaf.endsWith("percent")) {
+            if (rawValue instanceof Integer || rawValue instanceof Long || INTEGER_LITERAL_RE.matcher(valStr).matches()) {
+                return true;
+            }
+            Double d = parseFiniteDouble(valStr);
+            return d != null && d > 1.0;
+        }
+        return false;
+    }
+
+    private static boolean isPercentageScaleKey(String leaf, Double numVal, InferredSchema schema) {
+        if (schema != null && "%".equals(schema.unit())) {
+            return true;
+        }
+        if (leaf.contains("percentage") || leaf.contains("range-percent")) {
+            return true;
+        }
+        if (leaf.contains("percent")) {
+            if (numVal != null && numVal > 1.0) {
+                return true;
+            }
+            return schema != null && "integer".equals(schema.inferredType());
+        }
+        return false;
+    }
+
     private static boolean isDurationSuffix(String leaf) {
+        if (isRatePerUnitSuffix(leaf)) {
+            return false;
+        }
         return leaf.endsWith("-ticks") || leaf.endsWith("ticks") || leaf.contains("-ticks-")
                 || leaf.endsWith("-ms") || leaf.endsWith("millis") || leaf.contains("-ms-")
                 || leaf.endsWith("-seconds") || leaf.endsWith("seconds") || leaf.contains("-seconds-")

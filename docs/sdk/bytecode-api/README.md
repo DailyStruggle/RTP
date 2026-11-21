@@ -21,6 +21,10 @@ Zero-classloading JVM `.class` constant-pool, configuration-key, and causal-grap
 | `ServerConfigAtlas` | Cross-plugin configuration AST, bytecode-only key indexer, entity-binding, conflict detector, and fuzzy search atlas. |
 | `LlmConfigDocSynthesizer` | Configurable AST-grounded LLM documentation synthesizer consuming bytecode call sites and inferred schemas. |
 | `LlmCausalChainAuditor` | Closed-world AST-grounded LLM causal-chain auditor and fault explainer for `BytecodeCausalGraphScanner` findings. |
+| `BytecodeSsaLifter` / `BytecodeConceptIr` | Stackless SSA-like intermediate representation and instance-snapshot lifter (`io.github.dailystruggle.bytecode.transpile`) for numeric/worldgen JVM bytecode graphs. |
+| `WorldgenKernelSwapper` | Runtime worldgen kernel compiler, Stage `K0`/`K2` structure-grid and `Beardifier` evaluator, and hidden-class / GPU backend router (`leafgen-ADR-001`..`leafgen-ADR-004`). |
+| `LiftedWorldgenCapabilityTables` | Pure-primitive multi-dimension worldgen capability tables (`Climate.RTree` 7D BVH, 3D hydrostatic aquifers, router veins, composable stack-VM `SurfaceRules`, carvers, and features; `leafgen-ADR-005`). |
+| `OpenClBackendEmitter` | OpenCL 1.2 C99 SIMT kernel and `16x16` workgroup multi-dimension capability chunk emitter (`evaluate_dimension_capability_chunk`) with `Math.rint`/`rint` cross-lane parity. |
 
 ## Build & Verification
 

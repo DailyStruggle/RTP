@@ -132,6 +132,7 @@ function intArg(flag, envName, def) {
 
 const host = getArg('--host', 'BENCH_HOST', '127.0.0.1');
 const port = intArg('--port', 'BENCH_PORT', 25565);
+const fakeHost = getArg('--fake-host', 'BENCH_FAKE_HOST', '');
 const count = Math.max(1, intArg('--count', 'BENCH_COUNT', 64));
 const prefix = getArg('--prefix', 'BENCH_PREFIX', 'bench_');
 const startIndex = Math.max(0, intArg('--start-index', 'BENCH_START_INDEX', 0));
@@ -142,6 +143,7 @@ const joinDelayMs = Math.max(0, intArg('--join-delay-ms', 'BENCH_JOIN_DELAY_MS',
 const viewDistanceRaw = getArg('--view-distance', 'BENCH_VIEW_DISTANCE', '2');
 const viewDistance = /^\d+$/.test(viewDistanceRaw) ? Math.max(2, parseInt(viewDistanceRaw, 10)) : viewDistanceRaw;
 const physicsEnabled = hasFlag('--physics', 'BENCH_PHYSICS');
+const activeWalk = hasFlag('--active-walk', 'BENCH_ACTIVE_WALK');
 const fullPlugins = hasFlag('--full-plugins', 'BENCH_FULL_PLUGINS');
 const reconnectBaseMs = Math.max(500, intArg('--reconnect-base-ms', null, 5000));
 const reconnectMaxMs = Math.max(reconnectBaseMs, intArg('--reconnect-max-ms', null, 60000));
@@ -371,7 +373,7 @@ function connect(state) {
   state.online = false;
   let bot;
   try {
-    bot = mineflayer.createBot({
+    const botOpts = {
       host,
       port,
       username: state.username,
@@ -383,7 +385,20 @@ function connect(state) {
       hideErrors: true,
       checkTimeoutInterval: 60 * 1000,
       plugins: pluginOverrides
-    });
+    };
+    if (fakeHost) botOpts.fakeHost = fakeHost;
+    bot = mineflayer.createBot(botOpts);
+    const origWrite = bot._client.write.bind(bot._client);
+    const hasTickEnd = !!(activeVersion && minecraftData(activeVersion)?.protocol?.play?.toServer?.types?.packet_tick_end);
+    if (hasTickEnd) {
+      bot._client.write = function (name, params) {
+        const res = origWrite(name, params);
+        if (bot._client.state === 'play' && (name === 'position' || name === 'position_look' || name === 'look' || name === 'flying')) {
+          origWrite('tick_end', {});
+        }
+        return res;
+      };
+    }
   } catch (err) {
     stats.errors++;
     console.error(`[bench] [${state.username}] createBot failed: ${err.message}`);
@@ -403,6 +418,13 @@ function connect(state) {
 
   bot.on('forcedMove', () => {
     const now = Date.now();
+    if (bot.entity && bot.entity.position) {
+      state.walkAnchor = {
+        x: bot.entity.position.x,
+        y: bot.entity.position.y,
+        z: bot.entity.position.z
+      };
+    }
     // Login and respawn positions are not teleports.
     if (!state.online || now - state.spawnAt < 3000) return;
     state.lastTp = now;
@@ -414,7 +436,41 @@ function connect(state) {
     state.online = true;
     state.spawnAt = state.lastTp = Date.now();
     state.failures = 0; // a clean spawn resets backoff
+    if (bot.entity && bot.entity.position) {
+      state.walkAnchor = {
+        x: bot.entity.position.x,
+        y: bot.entity.position.y,
+        z: bot.entity.position.z
+      };
+    }
     console.log(`[bench] [${state.username}] spawned (${onlineCount()}/${count} online)`);
+    if (activeWalk) {
+      let angle = (state.username.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 628) / 100.0;
+      const walkTimer = setInterval(() => {
+        if (!state.online || !bot._client || bot._client.state !== 'play' || !state.walkAnchor) return;
+        angle += 0.15;
+        const nx = state.walkAnchor.x + Math.cos(angle) * 2.0;
+        const ny = state.walkAnchor.y;
+        const nz = state.walkAnchor.z + Math.sin(angle) * 2.0;
+        const yawDeg = ((angle * 180.0 / Math.PI) % 360.0) - 180.0;
+        if (bot.entity && bot.entity.position) {
+          bot.entity.position.set(nx, ny, nz);
+        }
+        try {
+          bot._client.write('position_look', {
+            x: nx,
+            y: ny,
+            z: nz,
+            yaw: yawDeg,
+            pitch: 0,
+            onGround: true,
+            flags: { onGround: true, hasHorizontalCollision: false }
+          });
+        } catch (e) { /* socket closing */ }
+      }, 100);
+      walkTimer.unref();
+      bot.once('end', () => clearInterval(walkTimer));
+    }
     if (autonomousPolicy) {
       startAutonomousPolicyLoop(state, bot);
     }

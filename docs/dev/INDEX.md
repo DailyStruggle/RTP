@@ -69,6 +69,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](../../resource/LeafRTP/docs/dev/EXTERNAL_HOOKS.md) (ADR-026) |
 | Player archetypes, utility functions & valuation weights | [`PLAYER_TAXONOMY_VALUATION.md`](../../resource/LeafRTP/docs/dev/PLAYER_TAXONOMY_VALUATION.md) |
 | How and why AI tooling is used in this repository | [`AI_USAGE.md`](AI_USAGE.md) |
+| Storefront conversion baselines, sample-size power, review cold-start, AI disclosure & hosting buyer tiers | [`MARKETPLACE_CONVERSION_RESEARCH.md`](MARKETPLACE_CONVERSION_RESEARCH.md) ([ADR-130](../adr/ADR-130-shallow-ast-storefront-architecture-and-salience-governance.md)) |
 
 ## Normative (read before writing code)
 
@@ -102,6 +103,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`ROADMAP.md`](ROADMAP.md) | Pointer to the Linear `LeafRTP` team, where forward-looking work is tracked. |
 | [`STAKEHOLDERS.md`](../../resource/LeafRTP/docs/dev/STAKEHOLDERS.md) | Roles and review expectations. |
 | [`PLAYER_TAXONOMY_VALUATION.md`](../../resource/LeafRTP/docs/dev/PLAYER_TAXONOMY_VALUATION.md) | Player taxonomy, utility functions, site valuation weights, and behavioral benchmark models. |
+| [`MARKETPLACE_CONVERSION_RESEARCH.md`](MARKETPLACE_CONVERSION_RESEARCH.md) | Cross-resource marketplace conversion baselines, binomial zero-purchase bounds, cold-start review lift, copy length vs. `ADR-130`, AI disclosure transparency, and 2026 hosting plan incentives. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
 | [`../../helpers/StressTestRTP/LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) | Behaviour leak fuzzer (`scripts/bench_fuzz.py`): goals, methodology, reading a run, findings (BetterRTP, LeafRTP 3.3.0), limitations. |
 | [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md) | Generalising `bench_fuzz.py` to coverage-guided fault finding: what is generic, detector defects, goals, staged plan (finding oracles done; JaCoCo coverage, fault-only mode, new oracles, vocabulary D-005 gated). Governed by [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md). |

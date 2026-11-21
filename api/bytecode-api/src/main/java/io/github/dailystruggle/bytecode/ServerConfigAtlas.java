@@ -442,22 +442,8 @@ public final class ServerConfigAtlas {
             }
         }
         if (!engineFiles.isEmpty()) {
-            JarConfigScanner.HarvestedArtifact engineArtifact = new JarConfigScanner.HarvestedArtifact(
-                    "engine:paper",
-                    "Paper / Spigot Engine",
-                    "latest",
-                    "engine",
-                    "",
-                    "https://docs.papermc.io/",
-                    List.of("paper", "spigot"),
-                    List.of(),
-                    List.of(),
-                    JarConfigScanner.ReloadStrategy.DEFER_UNTIL_SHUTDOWN,
-                    engineFiles,
-                    Map.of(),
-                    Map.of(),
-                    false
-            );
+            JarConfigScanner.HarvestedArtifact engineArtifact =
+                    JarConfigScanner.scanCachedEngineArtifact(serverRoot, engineFiles);
             atlas.registerArtifact(engineArtifact, engineFiles);
         }
 
@@ -589,17 +575,17 @@ public final class ServerConfigAtlas {
         String low = relPath.replace('\\', '/').toLowerCase(Locale.ROOT);
         if (low.startsWith("lang/") || low.startsWith("locale/") || low.startsWith("locales/")
                 || low.startsWith("translations/") || low.startsWith("i18n/")
-                || low.startsWith("editor/") || low.startsWith("workspace/")
+                || low.startsWith("editor/") || low.startsWith("workspace/") || low.startsWith("cache/")
                 || low.contains("/lang/") || low.contains("/locale/") || low.contains("/locales/")
                 || low.contains("/translations/") || low.contains("/i18n/")
-                || low.contains("/editor/") || low.contains("/workspace/")) {
+                || low.contains("/editor/") || low.contains("/workspace/") || low.contains("/cache/")) {
             return false;
         }
         String fileName = low.contains("/") ? low.substring(low.lastIndexOf('/') + 1) : low;
         int dotIdx = fileName.indexOf('.');
         boolean isLocaleStem = (dotIdx == 5 || dotIdx == 6)
                 && (fileName.charAt(2) == '_' || (dotIdx == 6 && fileName.charAt(3) == '_'));
-        if ("editor-data.json".equals(fileName) || "usercache.json".equals(fileName)
+        if ("editor-data.json".equals(fileName) || "llm-docs.json".equals(fileName) || "usercache.json".equals(fileName)
                 || "whitelist.json".equals(fileName) || "ops.json".equals(fileName)
                 || "banned-players.json".equals(fileName) || "banned-ips.json".equals(fileName)
                 || "version_history.json".equals(fileName)
@@ -1141,12 +1127,15 @@ public final class ServerConfigAtlas {
                     !consumers.isEmpty()
             );
 
+            boolean isEngineArtifact = artifact.artifactId().startsWith("engine:")
+                    || "engine".equalsIgnoreCase(artifact.loaderFamily());
             SchemaInferrer.InferredSchema schema = SchemaInferrer.infer(
                     keyPath,
                     effectiveValObj,
                     commentLines,
                     bytecodeOptions,
-                    !artifact.docSourceUrl().isBlank()
+                    !artifact.docSourceUrl().isBlank(),
+                    isEngineArtifact
             );
 
             int dot = keyPath.lastIndexOf('.');
@@ -1271,12 +1260,15 @@ public final class ServerConfigAtlas {
                     ? resolveMatchingEnumConstants(artifact.discoveredEnums(), callSites, keyPath, sampleObj, !consumers.isEmpty())
                     : List.of();
 
+            boolean isEngineArtifact = artifact.artifactId().startsWith("engine:")
+                    || "engine".equalsIgnoreCase(artifact.loaderFamily());
             SchemaInferrer.InferredSchema schema = SchemaInferrer.infer(
                     keyPath,
                     sampleObj,
                     List.of(),
                     bytecodeOptions,
-                    !artifact.docSourceUrl().isBlank()
+                    false,
+                    isEngineArtifact
             );
 
             int dot = keyPath.lastIndexOf('.');
@@ -1584,6 +1576,14 @@ public final class ServerConfigAtlas {
         return upgradedCount;
     }
 
+    private String resolveArtifactSha512(String artifactId) {
+        JarConfigScanner.HarvestedArtifact artifact = artifacts.get(artifactId);
+        if (artifact != null && artifact.jarSha512() != null && !artifact.jarSha512().isBlank()) {
+            return artifact.jarSha512();
+        }
+        return artifactId;
+    }
+
     /**
      * Synthesizes a concise player-terms description for a single undocumented configuration node
      * using the supplied {@link LlmConfigDocSynthesizer} grounded on Pass 3 bytecode AST context.
@@ -1607,10 +1607,129 @@ public final class ServerConfigAtlas {
         if (current.investigatoryDoc().investigationPass() < 3) {
             current = investigateNode(symbolId, 3);
         }
-        AstConfigNode llmUpgraded = synthesizer.upgradeNodeWithLlm(current);
+        String jarSha512 = resolveArtifactSha512(current.artifactId());
+        AstConfigNode llmUpgraded = synthesizer.upgradeNodeWithLlm(jarSha512, current);
         nodesBySymbol.put(symbolId, llmUpgraded);
         investigatoryCache.put(symbolId, llmUpgraded.investigatoryDoc());
         return llmUpgraded;
+    }
+
+    /**
+     * Hydrates scanned undocumented {@link AstConfigNode}s from already-cached entries inside
+     * {@code synthesizer} (`provider|model|jarSha512|filePath#keyPath`) with zero network I/O.
+     *
+     * @param synthesizer synthesizer holding warm or disk-loaded cache entries
+     * @return number of nodes upgraded to {@link SchemaInferrer.DocProvenance#LLM_SYNTHESIZED}
+     */
+    public int hydrateCachedLlmDocs(LlmConfigDocSynthesizer synthesizer) {
+        Objects.requireNonNull(synthesizer, "synthesizer");
+        this.activeLlmHookConfig = synthesizer.config();
+        if (synthesizer.config().provider() == LlmConfigDocSynthesizer.Provider.OFF
+                || synthesizer.cachedEntryCount() == 0) {
+            return 0;
+        }
+        int hydrated = 0;
+        List<String> symbols = new ArrayList<>(nodesBySymbol.keySet());
+        for (String sym : symbols) {
+            AstConfigNode current = nodesBySymbol.get(sym);
+            if (current == null || current.secret()) {
+                continue;
+            }
+            SchemaInferrer.DocProvenance prov = current.schema().provenance();
+            if (prov == SchemaInferrer.DocProvenance.OFFICIAL_DOCS
+                    || prov == SchemaInferrer.DocProvenance.AUTHOR_COMMENT
+                    || prov == SchemaInferrer.DocProvenance.LLM_SYNTHESIZED
+                    || current.commentRestored()) {
+                continue;
+            }
+            String jarSha512 = resolveArtifactSha512(current.artifactId());
+            LlmConfigDocSynthesizer.SynthesisOutcome cached = synthesizer.peekCachedOutcome(jarSha512, current);
+            if (cached == null) {
+                continue;
+            }
+            if (current.investigatoryDoc().investigationPass() < 3) {
+                current = investigateNode(sym, 3);
+            }
+            AstConfigNode upgraded = synthesizer.applySynthesisOutcome(current, cached);
+            nodesBySymbol.put(sym, upgraded);
+            investigatoryCache.put(sym, upgraded.investigatoryDoc());
+            hydrated++;
+        }
+        return hydrated;
+    }
+
+    /**
+     * Applies an upstream {@link OfficialConfigDocHarvester.OfficialKeyDoc} onto {@code symbolId},
+     * upgrading its schema provenance to {@link SchemaInferrer.DocProvenance#OFFICIAL_DOCS} and
+     * re-synthesizing its verified documentation card.
+     */
+    public boolean applyOfficialKeyDoc(String symbolId, OfficialConfigDocHarvester.OfficialKeyDoc keyDoc) {
+        if (symbolId == null || keyDoc == null || keyDoc.description().isBlank()) {
+            return false;
+        }
+        AstConfigNode current = nodesBySymbol.get(symbolId);
+        if (current == null) {
+            return false;
+        }
+        JarConfigScanner.HarvestedArtifact art = artifacts.get(current.artifactId());
+        boolean isEngine = current.artifactId().startsWith("engine:")
+                || (art != null && "engine".equalsIgnoreCase(art.loaderFamily()));
+        List<String> commentLines = List.of("# " + keyDoc.description());
+        Object sampleVal = parseLooseScalarOrList(
+                current.liveDiskValue() != null ? current.liveDiskValue() : current.jarDefaultValue()
+        );
+        SchemaInferrer.InferredSchema enrichedSchema = SchemaInferrer.infer(
+                current.keyPath(),
+                sampleVal,
+                commentLines,
+                current.schema().options(),
+                true,
+                isEngine
+        );
+        String effectiveDefault = current.jarDefaultValue();
+        if (!keyDoc.upstreamDefault().isEmpty()
+                && (effectiveDefault == null || Objects.equals(effectiveDefault, current.liveDiskValue()))) {
+            effectiveDefault = keyDoc.upstreamDefault();
+        }
+        boolean modified = effectiveDefault != null
+                && current.liveDiskValue() != null
+                && !Objects.equals(effectiveDefault, current.liveDiskValue());
+        String displayName = art != null ? art.displayName() : current.artifactId();
+        List<BytecodeConfigScanner.KeyCallSite> sites = art != null
+                ? findCallSitesForKey(art.keyCallSiteIndex(), current.keyPath())
+                : List.of();
+        SchemaInferrer.InvestigatoryDocResult verifiedDoc = SchemaInferrer.synthesizeInvestigatoryDoc(
+                displayName,
+                current.filePath(),
+                current.keyPath(),
+                current.liveDiskValue() != null ? current.liveDiskValue() : effectiveDefault,
+                effectiveDefault,
+                keyDoc.description(),
+                enrichedSchema,
+                current.readByClasses(),
+                sites,
+                3,
+                current.investigatoryDoc()
+        );
+        investigatoryCache.put(symbolId, verifiedDoc);
+        AstConfigNode upgraded = new AstConfigNode(
+                current.symbolId(),
+                current.artifactId(),
+                current.filePath(),
+                current.keyPath(),
+                current.parentPrefix(),
+                current.leafName(),
+                effectiveDefault,
+                current.liveDiskValue(),
+                modified,
+                keyDoc.description(),
+                false,
+                enrichedSchema,
+                current.readByClasses(),
+                verifiedDoc
+        );
+        nodesBySymbol.put(symbolId, upgraded);
+        return true;
     }
 
     /**
@@ -1627,7 +1746,11 @@ public final class ServerConfigAtlas {
         if (synthesizer.config().provider() == LlmConfigDocSynthesizer.Provider.OFF || maxNodes <= 0) {
             return 0;
         }
+        if (!synthesizer.preflightCheck()) {
+            return 0;
+        }
         int count = 0;
+        int consecutiveTransportFailures = 0;
         List<String> symbols = new ArrayList<>(nodesBySymbol.keySet());
         for (String sym : symbols) {
             if (count >= maxNodes) {
@@ -1641,9 +1764,20 @@ public final class ServerConfigAtlas {
                     || node.commentRestored()) {
                 continue;
             }
+            if (LlmConfigDocSynthesizer.shouldSkipLlmSynthesis(node)) {
+                continue;
+            }
+            long missesBefore = synthesizer.synthesisCacheMisses();
             AstConfigNode upgraded = synthesizeNodeWithLlm(sym, synthesizer);
             if (upgraded != null && upgraded.schema().provenance() == SchemaInferrer.DocProvenance.LLM_SYNTHESIZED) {
                 count++;
+                consecutiveTransportFailures = 0;
+            } else if (synthesizer.synthesisCacheMisses() > missesBefore
+                    && !synthesizer.lastFailureDiagnostic().isEmpty()) {
+                consecutiveTransportFailures++;
+                if (consecutiveTransportFailures >= 2) {
+                    break;
+                }
             }
         }
         return count;

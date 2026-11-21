@@ -344,9 +344,25 @@ public final class JarConfigScanner {
                     allClassBinaryNames.add(name.substring(0, name.length() - 6).replace('/', '.'));
                 } else if (name.startsWith("data/") || name.startsWith("assets/") || "pack.mcmeta".equals(name)) {
                     hasDatapackOrAssetPayload = true;
-                } else if (name.endsWith(".jar")
-                        && (name.startsWith("META-INF/jars/") || name.startsWith("META-INF/jarjar/"))) {
-                    scannedClasses += scanNestedJarClassNames(zip, entry, allClassBinaryNames);
+                } else if (name.endsWith(".jarinjar")
+                        || (name.endsWith(".jar")
+                        && (name.startsWith("META-INF/jars/") || name.startsWith("META-INF/jarjar/")))) {
+                    int remainingBudget = Math.max(0, MAX_CLASSES_PER_JAR - scannedClasses);
+                    NestedJarHarvest nested = scanNestedJarArchive(
+                            zip,
+                            entry,
+                            allClassBinaryNames,
+                            embeddedConfigs,
+                            embeddedPlayerDocs,
+                            classResults,
+                            enumMap,
+                            remainingBudget
+                    );
+                    scannedClasses += nested.scannedClasses();
+                    if (nested.savesOnDisable()) {
+                        savesOnDisable = true;
+                    }
+                    continue;
                 }
                 long size = entry.getSize();
                 if (size > MAX_RESOURCE_BYTES) {
@@ -1091,25 +1107,211 @@ public final class JarConfigScanner {
         return cleaned.isEmpty() ? "unknown" : cleaned;
     }
 
-    private static int scanNestedJarClassNames(ZipFile zip, ZipEntry nestedJarEntry, Set<String> outBinaryNames) {
+    private record NestedJarHarvest(int scannedClasses, boolean savesOnDisable) {
+    }
+
+    private static NestedJarHarvest scanNestedJarArchive(
+            ZipFile zip,
+            ZipEntry nestedJarEntry,
+            Set<String> outBinaryNames,
+            Map<String, String> embeddedConfigs,
+            Map<String, String> embeddedPlayerDocs,
+            List<BytecodeConfigScanner.ClassScanResult> classResults,
+            Map<String, List<String>> enumMap,
+            int maxClassesBudget
+    ) {
         int count = 0;
+        boolean savesOnDisable = false;
         try (InputStream rawIn = zip.getInputStream(nestedJarEntry);
              java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(rawIn)) {
             ZipEntry sub;
-            while ((sub = zis.getNextEntry()) != null && count < MAX_CLASSES_PER_JAR) {
-                if (!sub.isDirectory()) {
-                    String subName = sub.getName();
-                    if (subName.endsWith(".class") && subName.length() > 6) {
-                        outBinaryNames.add(subName.substring(0, subName.length() - 6).replace('/', '.'));
-                        if (!isShadedLibraryClass(subName)) {
+            while ((sub = zis.getNextEntry()) != null) {
+                if (sub.isDirectory()) {
+                    continue;
+                }
+                String subName = sub.getName();
+                if (subName.endsWith(".class") && subName.length() > 6) {
+                    outBinaryNames.add(subName.substring(0, subName.length() - 6).replace('/', '.'));
+                    if (count < maxClassesBudget && !isShadedLibraryClass(subName)) {
+                        byte[] bytes = readBoundedStreamBytes(zis);
+                        if (bytes != null) {
                             count++;
+                            BytecodeConfigScanner.ClassScanResult res = BytecodeConfigScanner.scanClassBytes(bytes);
+                            if (res != null) {
+                                classResults.add(res);
+                                if (res.isEnum() && !res.enumConstants().isEmpty()) {
+                                    enumMap.putIfAbsent(res.className(), res.enumConstants());
+                                }
+                                if (res.hasSaveConfigOnDisable()) {
+                                    savesOnDisable = true;
+                                }
+                            }
                         }
+                    }
+                } else if (isCandidatePlayerDocResource(subName) || subName.toLowerCase(Locale.ROOT).endsWith(".md")) {
+                    byte[] bytes = readBoundedStreamBytes(zis);
+                    if (bytes != null) {
+                        String text = new String(bytes, StandardCharsets.UTF_8);
+                        embeddedPlayerDocs.putIfAbsent(subName, text);
+                        if (isCandidateConfigResource(subName)) {
+                            embeddedConfigs.putIfAbsent(subName, text);
+                        }
+                    }
+                } else if (isCandidateConfigResource(subName)) {
+                    byte[] bytes = readBoundedStreamBytes(zis);
+                    if (bytes != null) {
+                        embeddedConfigs.putIfAbsent(subName, new String(bytes, StandardCharsets.UTF_8));
                     }
                 }
             }
         } catch (IOException | RuntimeException ignored) {
         }
-        return count;
+        return new NestedJarHarvest(count, savesOnDisable);
+    }
+
+    private static byte[] readBoundedStreamBytes(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(2048);
+        byte[] buf = new byte[4096];
+        int total = 0;
+        int r;
+        while ((r = in.read(buf)) != -1) {
+            total += r;
+            if (total > MAX_RESOURCE_BYTES) {
+                return null;
+            }
+            out.write(buf, 0, r);
+        }
+        return out.toByteArray();
+    }
+
+    /**
+     * Builds the {@code engine:paper} {@link HarvestedArtifact} by inspecting any Paperclip-patched
+     * server JAR already cached on disk under {@code versions/<mc>/*.jar} (for example,
+     * {@code versions/26.3/paper-26.3.jar}) to extract embedded {@code configurations/*.yml}
+     * defaults, {@code DedicatedServerProperties}, {@code SpigotConfig}, and Paper
+     * {@code GlobalConfiguration}/{@code WorldConfiguration} bytecode consumers and enums.
+     */
+    public static HarvestedArtifact scanCachedEngineArtifact(
+            Path serverRoot,
+            Map<String, String> liveEngineFiles
+    ) {
+        Map<String, String> mergedDefaults = new LinkedHashMap<>(liveEngineFiles);
+        List<BytecodeConfigScanner.ClassScanResult> classResults = new ArrayList<>();
+        Map<String, List<String>> enumMap = new LinkedHashMap<>();
+        String engineVersion = "latest";
+        String sha512 = "";
+
+        Path cachedJar = locateCachedPatchedEngineJar(serverRoot);
+        int scannedClasses = 0;
+        if (cachedJar != null && Files.isRegularFile(cachedJar)) {
+            String fn = cachedJar.getFileName().toString();
+            Matcher vm = Pattern.compile("(?i)(?:paper|purpur|folia|pufferfish|spigot|leaf)-([0-9][A-Za-z0-9._-]*)\\.jar$").matcher(fn);
+            if (vm.find()) {
+                engineVersion = vm.group(1);
+            }
+            try (ZipFile zip = new ZipFile(cachedJar.toFile())) {
+                Enumeration<? extends ZipEntry> entries = zip.entries();
+                while (entries.hasMoreElements()) {
+                    ZipEntry entry = entries.nextElement();
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
+                    String name = entry.getName();
+                    if (name.startsWith("configurations/") && name.endsWith(".yml")) {
+                        byte[] bytes = readBoundedBytes(zip, entry);
+                        if (bytes != null) {
+                            String relName = name.substring("configurations/".length());
+                            mergedDefaults.put(relName, new String(bytes, StandardCharsets.UTF_8));
+                        }
+                    } else if (isEngineConfigurationClassEntry(name) && scannedClasses < 512) {
+                        byte[] bytes = readBoundedBytes(zip, entry);
+                        if (bytes != null) {
+                            scannedClasses++;
+                            BytecodeConfigScanner.ClassScanResult res = BytecodeConfigScanner.scanClassBytes(bytes);
+                            if (res != null) {
+                                classResults.add(res);
+                                if (res.isEnum() && !res.enumConstants().isEmpty()) {
+                                    enumMap.put(res.className(), res.enumConstants());
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (IOException | RuntimeException ignored) {
+            }
+        }
+
+        Map<String, Set<String>> readByClass = BytecodeConfigScanner.buildReadByClassIndex(classResults);
+        Map<String, List<BytecodeConfigScanner.KeyCallSite>> keyCallSites = BytecodeConfigScanner.buildKeyCallSiteIndex(classResults);
+        return new HarvestedArtifact(
+                "engine:paper",
+                "Paper / Spigot Engine",
+                engineVersion,
+                "engine",
+                sha512,
+                "https://docs.papermc.io/",
+                List.of("paper", "spigot"),
+                List.of(),
+                List.of(),
+                ReloadStrategy.DEFER_UNTIL_SHUTDOWN,
+                mergedDefaults,
+                readByClass,
+                enumMap,
+                false,
+                keyCallSites,
+                List.of(),
+                Map.of(),
+                "",
+                true,
+                scannedClasses
+        );
+    }
+
+    private static boolean isEngineConfigurationClassEntry(String entryName) {
+        if (!entryName.endsWith(".class")) {
+            return false;
+        }
+        return entryName.startsWith("net/minecraft/server/dedicated/DedicatedServerProperties")
+                || entryName.startsWith("org/spigotmc/SpigotConfig")
+                || entryName.startsWith("org/spigotmc/SpigotWorldConfig")
+                || entryName.startsWith("io/papermc/paper/configuration/")
+                || entryName.startsWith("org/purpurmc/purpur/PurpurConfig")
+                || entryName.startsWith("org/purpurmc/purpur/PurpurWorldConfig")
+                || entryName.startsWith("com/velocitypowered/proxy/config/");
+    }
+
+    private static Path locateCachedPatchedEngineJar(Path serverRoot) {
+        if (serverRoot == null) {
+            return null;
+        }
+        Path versionsDir = serverRoot.resolve("versions");
+        Path best = null;
+        long bestMtime = Long.MIN_VALUE;
+        if (Files.isDirectory(versionsDir)) {
+            try (var subDirs = Files.list(versionsDir)) {
+                for (Path sub : subDirs.toList()) {
+                    if (!Files.isDirectory(sub)) {
+                        continue;
+                    }
+                    try (var jars = Files.list(sub)) {
+                        for (Path cand : jars.toList()) {
+                            String low = cand.getFileName().toString().toLowerCase(Locale.ROOT);
+                            if (!Files.isRegularFile(cand) || !low.endsWith(".jar") || low.startsWith("mojang_")) {
+                                continue;
+                            }
+                            long score = Files.getLastModifiedTime(cand).toMillis()
+                                    + (low.startsWith("server-") ? 0L : 1_000_000_000_000L);
+                            if (score > bestMtime) {
+                                bestMtime = score;
+                                best = cand;
+                            }
+                        }
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        return best;
     }
 
     private static byte[] readBoundedBytes(ZipFile zip, ZipEntry entry) throws IOException {

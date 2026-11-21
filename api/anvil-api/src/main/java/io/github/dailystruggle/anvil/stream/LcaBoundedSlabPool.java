@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @governedBy leafmap-ADR-004
  * @governedBy leafanvil-ADR-003
+ * @governedBy leafanvil-ADR-005
  * @governedBy anvil-api-ADR-003
  * @governedBy ADR-115
  * @trace REQ-MAP-STREAM-001
@@ -63,6 +64,9 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
     public static final long DEFAULT_MAX_DISK_BYTES = 1024L * 1024L * 1024L;
     public static final int DEFAULT_LOD3_HEADER_BYTES = 10_990;
     private static final int DISK_POOL_MAGIC = 0x4C434150; // "LCAP"
+    private static final int L2_STRIPE_COUNT = 64;
+    private static final java.util.logging.Logger LOG =
+            java.util.logging.Logger.getLogger(LcaBoundedSlabPool.class.getName());
 
     /**
      * Configuration for the two-tier bounded `.lca` LRU slab pool.
@@ -244,10 +248,14 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
     }
 
     private final PoolConfig config;
+    private final Object metadataLock = new Object();
+    private final Object[] l2StripeLocks = new Object[L2_STRIPE_COUNT];
     private final LinkedHashMap<ChunkCoordKey, PooledChunkSlab> l1Map =
             new LinkedHashMap<>(256, 0.75f, true);
     private final LinkedHashMap<ChunkCoordKey, Long> l2IndexBytes =
             new LinkedHashMap<>(256, 0.75f, true);
+    private final Map<ChunkCoordKey, PooledChunkSlab> inflightL2Spills =
+            new ConcurrentHashMap<>();
     private final Map<RegionCoordKey, LcaRegionDictSyncFrame> regionDictionaries =
             new ConcurrentHashMap<>();
     private final Map<RegionCoordKey, byte[]> pinnedLod3Headers =
@@ -266,6 +274,18 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
 
     public LcaBoundedSlabPool(PoolConfig config) {
         this.config = Objects.requireNonNull(config, "config");
+        for (int i = 0; i < L2_STRIPE_COUNT; i++) {
+            this.l2StripeLocks[i] = new Object();
+        }
+    }
+
+    private Object l2StripeLock(int chunkX, int chunkZ) {
+        int rx = chunkX >> 5;
+        int rz = chunkZ >> 5;
+        int h = (rx * 0x9E3779B9) ^ (rz * 0x85EBCA6B);
+        h ^= (h >>> 16);
+        h ^= (h >>> 8);
+        return l2StripeLocks[h & (L2_STRIPE_COUNT - 1)];
     }
 
     public PoolConfig config() {
@@ -329,9 +349,9 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
 
     /**
      * Pins or unpins a region (e.g. spawn region `(0, 0)`) and optionally caches its `LOD-3`
-     * (`10,990 B`) horizon header in memory (`REQ-MAP-LRU-002`).
+     * (`10,990 B`) horizon header in memory (`REQ-MAP-LRU-002`, `REQ-RTP-S-005`, `@scheduler_dispatch`).
      */
-    public synchronized void pinRegion(
+    public void pinRegion(
             String serverId,
             String world,
             int regionX,
@@ -344,12 +364,18 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
             byte[] header = (lod3HeaderBytes != null && lod3HeaderBytes.length > 0)
                     ? lod3HeaderBytes.clone()
                     : buildDeterministicLod3HorizonHeader(regionKey);
-            byte[] prev = pinnedLod3Headers.put(regionKey, header);
-            if (prev != null) {
-                memoryBytesUsed = Math.max(0L, memoryBytesUsed - prev.length);
+            List<PooledChunkSlab> l1Victims = new ArrayList<>();
+            synchronized (metadataLock) {
+                byte[] prev = pinnedLod3Headers.put(regionKey, header);
+                if (prev != null) {
+                    memoryBytesUsed = Math.max(0L, memoryBytesUsed - prev.length);
+                }
+                memoryBytesUsed += header.length;
+                evictL1CollectVictimsLocked(0L, l1Victims);
             }
-            memoryBytesUsed += header.length;
-            evictL1IfNeeded(0L);
+            for (PooledChunkSlab victim : l1Victims) {
+                spillToL2Disk(victim, true);
+            }
         }
     }
 
@@ -361,9 +387,9 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
     }
 
     /**
-     * Ingests a `StreamChunkBatchPayload` (`LCAB`) into the bounded LRU pool.
+     * Ingests a `StreamChunkBatchPayload` (`LCAB`) into the bounded LRU pool (`REQ-RTP-S-005`, `@scheduler_dispatch`).
      */
-    public synchronized IngestBatchResult ingestStreamBatch(
+    public IngestBatchResult ingestStreamBatch(
             String serverId,
             StreamChunkBatchPayload batch,
             boolean pinnedRegion
@@ -390,9 +416,9 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
     /**
      * Ingests a `StreamDeltaUpdatePayload` (`LCAS` or normalized `LCAB`) into the bounded LRU pool,
      * verifying `SEC-DED-64` syndromes and reporting any chunks that require a full-chunk refill
-     * (`REQ-MAP-STREAM-001`, `REQ-MAP-STREAM-002`, `S-004`).
+     * (`REQ-MAP-STREAM-001`, `REQ-MAP-STREAM-002`, `S-004`, `REQ-RTP-S-005`, `@scheduler_dispatch`).
      */
-    public synchronized IngestBatchResult ingestDeltaUpdate(
+    public IngestBatchResult ingestDeltaUpdate(
             StreamDeltaUpdatePayload update,
             boolean pinnedRegion
     ) {
@@ -406,10 +432,14 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         boolean effectivePin = pinnedRegion || autoPinSpawn || pinnedRegions.contains(regionKey);
         if (effectivePin) {
             pinnedRegions.add(regionKey);
-            if (config.pinLod3Headers() && !pinnedLod3Headers.containsKey(regionKey)) {
-                byte[] hdr = buildDeterministicLod3HorizonHeader(regionKey);
-                pinnedLod3Headers.put(regionKey, hdr);
-                memoryBytesUsed += hdr.length;
+            if (config.pinLod3Headers()) {
+                synchronized (metadataLock) {
+                    if (!pinnedLod3Headers.containsKey(regionKey)) {
+                        byte[] hdr = buildDeterministicLod3HorizonHeader(regionKey);
+                        pinnedLod3Headers.put(regionKey, hdr);
+                        memoryBytesUsed += hdr.length;
+                    }
+                }
             }
         }
 
@@ -430,14 +460,20 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
             }
         }
 
+        long memSnap;
+        long diskSnap;
+        synchronized (metadataLock) {
+            memSnap = memoryBytesUsed;
+            diskSnap = diskBytesUsed;
+        }
         return new IngestBatchResult(
                 regionKey,
                 cleanAcks,
                 patchDeltas,
                 fullChunks,
                 refills,
-                memoryBytesUsed,
-                diskBytesUsed
+                memSnap,
+                diskSnap
         );
     }
 
@@ -541,9 +577,9 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
     }
 
     /**
-     * Inserts a `EntryFullChunk` directly into the L1 slab cache.
+     * Inserts a `EntryFullChunk` directly into the L1 slab cache (`REQ-RTP-S-005`, `@scheduler_dispatch`).
      */
-    public synchronized void putFullChunk(
+    public void putFullChunk(
             String serverId,
             String world,
             EntryFullChunk fullChunk,
@@ -558,67 +594,94 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         ));
     }
 
+    /**
+     * Off-thread L1 insertion and deferred L2 spillover helper (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
     private void putSlabInternal(PooledChunkSlab slab) {
         int entryBytes = slab.byteSize();
         if (entryBytes > config.maxMemoryCacheBytes()) {
             if (config.maxDiskCacheBytes() >= entryBytes) {
-                spillToL2Disk(slab);
+                spillToL2Disk(slab, false);
             }
             return;
         }
         ChunkCoordKey key = new ChunkCoordKey(slab.serverId(), slab.world(), slab.chunkX(), slab.chunkZ());
-        PooledChunkSlab prev = l1Map.remove(key);
-        if (prev != null) {
-            memoryBytesUsed = Math.max(0L, memoryBytesUsed - prev.byteSize());
+        List<PooledChunkSlab> l1Victims = new ArrayList<>();
+        boolean hadL2Entry = false;
+        synchronized (metadataLock) {
+            inflightL2Spills.remove(key);
+            PooledChunkSlab prev = l1Map.remove(key);
+            if (prev != null) {
+                memoryBytesUsed = Math.max(0L, memoryBytesUsed - prev.byteSize());
+            }
+            Long prevL2 = l2IndexBytes.remove(key);
+            if (prevL2 != null) {
+                diskBytesUsed = Math.max(0L, diskBytesUsed - prevL2);
+                hadL2Entry = true;
+            }
+            evictL1CollectVictimsLocked(entryBytes, l1Victims);
+            l1Map.put(key, slab);
+            memoryBytesUsed += entryBytes;
         }
-        removeL2DiskEntry(key);
-        evictL1IfNeeded(entryBytes);
-        l1Map.put(key, slab);
-        memoryBytesUsed += entryBytes;
+        if (hadL2Entry) {
+            deleteUnindexedL2File(key);
+        }
+        for (PooledChunkSlab victim : l1Victims) {
+            spillToL2Disk(victim, true);
+        }
     }
 
-    private void evictL1IfNeeded(long incomingBytes) {
-        if (memoryBytesUsed + incomingBytes <= config.maxMemoryCacheBytes()) {
-            return;
-        }
-        Iterator<Map.Entry<ChunkCoordKey, PooledChunkSlab>> it = l1Map.entrySet().iterator();
-        while (memoryBytesUsed + incomingBytes > config.maxMemoryCacheBytes() && it.hasNext()) {
-            Map.Entry<ChunkCoordKey, PooledChunkSlab> eldest = it.next();
-            PooledChunkSlab val = eldest.getValue();
-            if (val.pinned() || pinnedRegions.contains(eldest.getKey().toRegionKey())) {
-                continue;
+    private void evictL1CollectVictimsLocked(long incomingBytes, List<PooledChunkSlab> outVictims) {
+        synchronized (metadataLock) {
+            if (memoryBytesUsed + incomingBytes <= config.maxMemoryCacheBytes()) {
+                return;
             }
-            memoryBytesUsed = Math.max(0L, memoryBytesUsed - val.byteSize());
-            it.remove();
-            l1EvictionCount.incrementAndGet();
-            if (config.maxDiskCacheBytes() > 0 && config.diskCacheRoot() != null) {
-                spillToL2Disk(val);
-            }
-        }
-        // If still over budget because all entries are pinned, evict oldest non-spawn entry as safety valve
-        if (memoryBytesUsed + incomingBytes > config.maxMemoryCacheBytes()) {
-            Iterator<Map.Entry<ChunkCoordKey, PooledChunkSlab>> forceIt = l1Map.entrySet().iterator();
-            while (memoryBytesUsed + incomingBytes > config.maxMemoryCacheBytes() && forceIt.hasNext()) {
-                Map.Entry<ChunkCoordKey, PooledChunkSlab> eldest = forceIt.next();
+            boolean canSpill = config.maxDiskCacheBytes() > 0 && config.diskCacheRoot() != null;
+            Iterator<Map.Entry<ChunkCoordKey, PooledChunkSlab>> it = l1Map.entrySet().iterator();
+            while (memoryBytesUsed + incomingBytes > config.maxMemoryCacheBytes() && it.hasNext()) {
+                Map.Entry<ChunkCoordKey, PooledChunkSlab> eldest = it.next();
+                ChunkCoordKey vKey = eldest.getKey();
                 PooledChunkSlab val = eldest.getValue();
+                if (val.pinned() || pinnedRegions.contains(vKey.toRegionKey())) {
+                    continue;
+                }
                 memoryBytesUsed = Math.max(0L, memoryBytesUsed - val.byteSize());
-                forceIt.remove();
+                it.remove();
                 l1EvictionCount.incrementAndGet();
-                if (config.maxDiskCacheBytes() > 0 && config.diskCacheRoot() != null) {
-                    spillToL2Disk(val);
+                if (canSpill) {
+                    inflightL2Spills.put(vKey, val);
+                    outVictims.add(val);
+                }
+            }
+            // Safety valve when pinned entries exceed L1 budget
+            if (memoryBytesUsed + incomingBytes > config.maxMemoryCacheBytes()) {
+                Iterator<Map.Entry<ChunkCoordKey, PooledChunkSlab>> forceIt = l1Map.entrySet().iterator();
+                while (memoryBytesUsed + incomingBytes > config.maxMemoryCacheBytes() && forceIt.hasNext()) {
+                    Map.Entry<ChunkCoordKey, PooledChunkSlab> eldest = forceIt.next();
+                    ChunkCoordKey vKey = eldest.getKey();
+                    PooledChunkSlab val = eldest.getValue();
+                    memoryBytesUsed = Math.max(0L, memoryBytesUsed - val.byteSize());
+                    forceIt.remove();
+                    l1EvictionCount.incrementAndGet();
+                    if (canSpill) {
+                        inflightL2Spills.put(vKey, val);
+                        outVictims.add(val);
+                    }
                 }
             }
         }
     }
 
-    private void spillToL2Disk(PooledChunkSlab slab) {
+    /**
+     * Off-thread coordinate-striped L2 disk spillover writer (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    private void spillToL2Disk(PooledChunkSlab slab, boolean trackedInflight) {
         if (config.maxDiskCacheBytes() <= 0 || config.diskCacheRoot() == null) {
             return;
         }
         ChunkCoordKey key = new ChunkCoordKey(slab.serverId(), slab.world(), slab.chunkX(), slab.chunkZ());
-        Path file = resolveL2SlabFile(key);
+        byte[] diskBytes;
         try {
-            Files.createDirectories(file.getParent());
             ByteArrayOutputStream baos = new ByteArrayOutputStream(32 + slab.byteSize());
             try (DataOutputStream out = new DataOutputStream(baos)) {
                 out.writeInt(DISK_POOL_MAGIC);
@@ -632,48 +695,113 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
                 out.writeInt(slab.slabBytes().length);
                 out.write(slab.slabBytes());
             }
-            byte[] diskBytes = baos.toByteArray();
-            if (diskBytes.length > config.maxDiskCacheBytes()) {
+            diskBytes = baos.toByteArray();
+        } catch (IOException e) {
+            if (trackedInflight) {
+                inflightL2Spills.remove(key, slab);
+            }
+            LOG.log(java.util.logging.Level.WARNING,
+                    "[LcaBoundedSlabPool] Failed serializing L2 slab for " + key + ": " + e.getMessage(), e);
+            return;
+        }
+        if (diskBytes.length > config.maxDiskCacheBytes()) {
+            if (trackedInflight) {
+                inflightL2Spills.remove(key, slab);
+            }
+            return;
+        }
+
+        Path file = resolveL2SlabFile(key);
+        List<ChunkCoordKey> l2VictimsToDelete = new ArrayList<>();
+        synchronized (l2StripeLock(key.chunkX(), key.chunkZ())) {
+            synchronized (metadataLock) {
+                if (l1Map.containsKey(key) || (trackedInflight && inflightL2Spills.get(key) != slab)) {
+                    if (trackedInflight) {
+                        inflightL2Spills.remove(key, slab);
+                    }
+                    return;
+                }
+            }
+            try {
+                Files.createDirectories(file.getParent());
+                Path tmp = file.resolveSibling(file.getFileName().toString() + ".tmp");
+                Files.write(tmp, diskBytes);
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                if (trackedInflight) {
+                    inflightL2Spills.remove(key, slab);
+                }
+                LOG.log(java.util.logging.Level.WARNING,
+                        "[LcaBoundedSlabPool] Failed writing L2 spill file " + file + ": " + e.getMessage(), e);
                 return;
             }
-            evictL2IfNeeded(diskBytes.length);
-            Path tmp = file.resolveSibling(file.getFileName().toString() + ".tmp");
-            Files.write(tmp, diskBytes);
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-            Long prevLen = l2IndexBytes.remove(key);
-            if (prevLen != null) {
-                diskBytesUsed = Math.max(0L, diskBytesUsed - prevLen);
+            boolean superseded = false;
+            synchronized (metadataLock) {
+                if (l1Map.containsKey(key) || (trackedInflight && inflightL2Spills.get(key) != slab)) {
+                    superseded = true;
+                } else {
+                    Long prevLen = l2IndexBytes.remove(key);
+                    if (prevLen != null) {
+                        diskBytesUsed = Math.max(0L, diskBytesUsed - prevLen);
+                    }
+                    evictL2CollectVictimsLocked(diskBytes.length, l2VictimsToDelete);
+                    l2IndexBytes.put(key, (long) diskBytes.length);
+                    diskBytesUsed += diskBytes.length;
+                }
+                if (trackedInflight) {
+                    inflightL2Spills.remove(key, slab);
+                }
             }
-            l2IndexBytes.put(key, (long) diskBytes.length);
-            diskBytesUsed += diskBytes.length;
-        } catch (IOException ignored) {
+            if (superseded) {
+                deleteQuietly(file);
+                return;
+            }
+        }
+
+        for (ChunkCoordKey evictedL2Key : l2VictimsToDelete) {
+            deleteUnindexedL2File(evictedL2Key);
         }
     }
 
-    private void evictL2IfNeeded(long incomingDiskBytes) {
-        Iterator<Map.Entry<ChunkCoordKey, Long>> it = l2IndexBytes.entrySet().iterator();
-        while (diskBytesUsed + incomingDiskBytes > config.maxDiskCacheBytes() && it.hasNext()) {
-            Map.Entry<ChunkCoordKey, Long> eldest = it.next();
-            ChunkCoordKey key = eldest.getKey();
-            long size = eldest.getValue();
-            it.remove();
-            diskBytesUsed = Math.max(0L, diskBytesUsed - size);
-            l2EvictionCount.incrementAndGet();
-            try {
-                Files.deleteIfExists(resolveL2SlabFile(key));
-            } catch (IOException ignored) {
+    private void evictL2CollectVictimsLocked(long incomingDiskBytes, List<ChunkCoordKey> outEvictedKeys) {
+        synchronized (metadataLock) {
+            Iterator<Map.Entry<ChunkCoordKey, Long>> it = l2IndexBytes.entrySet().iterator();
+            while (diskBytesUsed + incomingDiskBytes > config.maxDiskCacheBytes() && it.hasNext()) {
+                Map.Entry<ChunkCoordKey, Long> eldest = it.next();
+                ChunkCoordKey key = eldest.getKey();
+                long size = eldest.getValue();
+                it.remove();
+                diskBytesUsed = Math.max(0L, diskBytesUsed - size);
+                l2EvictionCount.incrementAndGet();
+                outEvictedKeys.add(key);
             }
         }
     }
 
-    private void removeL2DiskEntry(ChunkCoordKey key) {
-        Long removed = l2IndexBytes.remove(key);
-        if (removed != null) {
-            diskBytesUsed = Math.max(0L, diskBytesUsed - removed);
-            try {
-                Files.deleteIfExists(resolveL2SlabFile(key));
-            } catch (IOException ignored) {
+    /**
+     * Off-thread unindexed L2 spillover file remover (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    private void deleteUnindexedL2File(ChunkCoordKey key) {
+        if (config.diskCacheRoot() == null) {
+            return;
+        }
+        synchronized (l2StripeLock(key.chunkX(), key.chunkZ())) {
+            boolean stillIndexed;
+            synchronized (metadataLock) {
+                stillIndexed = l2IndexBytes.containsKey(key);
             }
+            if (!stillIndexed) {
+                deleteQuietly(resolveL2SlabFile(key));
+            }
+        }
+    }
+
+    private static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            LOG.log(java.util.logging.Level.WARNING,
+                    "[LcaBoundedSlabPool] Failed deleting L2 slab file " + path + ": " + e.getMessage(), e);
         }
     }
 
@@ -698,18 +826,48 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
 
     /**
      * Resolves a pooled chunk slab from L1 RAM or L2 Disk `.lca` spillover, promoting L2 hits
-     * back into L1 RAM.
+     * back into L1 RAM without blocking concurrent L1 readers or disjoint region stripes
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
      */
-    public synchronized Optional<PooledChunkSlab> getChunkSlabEntry(
+    public Optional<PooledChunkSlab> getChunkSlabEntry(
             String serverId, String world, int chunkX, int chunkZ) {
         ChunkCoordKey key = new ChunkCoordKey(serverId, world, chunkX, chunkZ);
-        PooledChunkSlab l1 = l1Map.get(key);
-        if (l1 != null) {
-            l1HitCount.incrementAndGet();
-            return Optional.of(l1);
+        synchronized (metadataLock) {
+            PooledChunkSlab l1 = l1Map.get(key);
+            if (l1 != null) {
+                l1HitCount.incrementAndGet();
+                return Optional.of(l1);
+            }
+            PooledChunkSlab spilling = inflightL2Spills.get(key);
+            if (spilling != null) {
+                l1HitCount.incrementAndGet();
+                return Optional.of(spilling);
+            }
+            if (!l2IndexBytes.containsKey(key) || config.diskCacheRoot() == null) {
+                missCount.incrementAndGet();
+                return Optional.empty();
+            }
         }
-        Long l2Bytes = l2IndexBytes.get(key);
-        if (l2Bytes != null && config.diskCacheRoot() != null) {
+
+        PooledChunkSlab reloaded = null;
+        synchronized (l2StripeLock(key.chunkX(), key.chunkZ())) {
+            synchronized (metadataLock) {
+                PooledChunkSlab l1 = l1Map.get(key);
+                if (l1 != null) {
+                    l1HitCount.incrementAndGet();
+                    return Optional.of(l1);
+                }
+                PooledChunkSlab spilling = inflightL2Spills.get(key);
+                if (spilling != null) {
+                    l1HitCount.incrementAndGet();
+                    return Optional.of(spilling);
+                }
+                if (!l2IndexBytes.containsKey(key)) {
+                    missCount.incrementAndGet();
+                    return Optional.empty();
+                }
+            }
+
             Path file = resolveL2SlabFile(key);
             if (Files.isRegularFile(file)) {
                 try {
@@ -725,27 +883,57 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
                             long syn = in.readLong();
                             boolean pinned = in.readBoolean();
                             int len = in.readInt();
-                            byte[] slab = new byte[len];
-                            in.readFully(slab);
-                            if (LcaRemoteStreamCodec.verifySecDedSyndrome64(tick, slab, syn)) {
-                                PooledChunkSlab reloaded = new PooledChunkSlab(
-                                        srv, w, cx, cz, tick, syn, slab, pinned);
-                                l2HitCount.incrementAndGet();
-                                putSlabInternal(reloaded);
-                                return Optional.of(reloaded);
+                            if (len >= 0 && len <= raw.length) {
+                                byte[] slab = new byte[len];
+                                in.readFully(slab);
+                                if (LcaRemoteStreamCodec.verifySecDedSyndrome64(tick, slab, syn)) {
+                                    reloaded = new PooledChunkSlab(
+                                            srv, w, cx, cz, tick, syn, slab, pinned);
+                                }
                             }
                         }
                     }
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    LOG.log(java.util.logging.Level.WARNING,
+                            "[LcaBoundedSlabPool] Failed reading L2 slab file " + file + ": " + e.getMessage(), e);
                 }
             }
-            removeL2DiskEntry(key);
+
+            if (reloaded == null) {
+                synchronized (metadataLock) {
+                    Long removed = l2IndexBytes.remove(key);
+                    if (removed != null) {
+                        diskBytesUsed = Math.max(0L, diskBytesUsed - removed);
+                    }
+                }
+                deleteQuietly(file);
+                missCount.incrementAndGet();
+                return Optional.empty();
+            }
+
+            boolean stillValidInL2;
+            synchronized (metadataLock) {
+                Long removed = l2IndexBytes.remove(key);
+                if (removed != null) {
+                    diskBytesUsed = Math.max(0L, diskBytesUsed - removed);
+                    stillValidInL2 = true;
+                } else {
+                    stillValidInL2 = false;
+                }
+            }
+            if (!stillValidInL2) {
+                missCount.incrementAndGet();
+                return Optional.empty();
+            }
+            deleteQuietly(file);
         }
-        missCount.incrementAndGet();
-        return Optional.empty();
+
+        l2HitCount.incrementAndGet();
+        putSlabInternal(reloaded);
+        return Optional.of(reloaded);
     }
 
-    public synchronized Optional<byte[]> getChunkSlabBytes(
+    public Optional<byte[]> getChunkSlabBytes(
             String serverId, String world, int chunkX, int chunkZ) {
         return getChunkSlabEntry(serverId, world, chunkX, chunkZ)
                 .map(PooledChunkSlab::slabBytes);
@@ -755,24 +943,17 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
      * Returns a compact binary snapshot of all pooled chunks in `(serverId, world, regionX, regionZ)`
      * or {@link Optional#empty()} if no chunks in that region are pooled.
      */
-    public synchronized Optional<byte[]> getRegionLcaBytes(
+    public Optional<byte[]> getRegionLcaBytes(
             String serverId, String world, int regionX, int regionZ) {
         String srv = normalizeServerId(serverId);
         String w = normalizeWorldName(world);
-        if (!hasAnyChunkInRegion(srv, w, regionX, regionZ)) {
+        List<ChunkCoordKey> candidateKeys = collectRegionCandidateKeys(srv, w, regionX, regionZ);
+        if (candidateKeys.isEmpty()) {
             return Optional.empty();
         }
-        int baseCx = regionX << 5;
-        int baseCz = regionZ << 5;
-        List<BatchChunkEntry> entries = new ArrayList<>();
-        for (int cz = 0; cz < 32; cz++) {
-            for (int cx = 0; cx < 32; cx++) {
-                ChunkCoordKey cKey = new ChunkCoordKey(srv, w, baseCx + cx, baseCz + cz);
-                if (!l1Map.containsKey(cKey) && !l2IndexBytes.containsKey(cKey)) {
-                    continue;
-                }
-                getFullChunk(srv, w, baseCx + cx, baseCz + cz).ifPresent(entries::add);
-            }
+        List<BatchChunkEntry> entries = new ArrayList<>(candidateKeys.size());
+        for (ChunkCoordKey cKey : candidateKeys) {
+            getFullChunk(srv, w, cKey.chunkX(), cKey.chunkZ()).ifPresent(entries::add);
         }
         if (entries.isEmpty()) {
             return Optional.empty();
@@ -783,7 +964,27 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         return Optional.of(LcaRemoteStreamCodec.serializeRawChunkBatch(regionX, regionZ, capped, true));
     }
 
-    public synchronized Optional<EntryFullChunk> getFullChunk(
+    private List<ChunkCoordKey> collectRegionCandidateKeys(
+            String srv, String w, int regionX, int regionZ) {
+        int baseCx = regionX << 5;
+        int baseCz = regionZ << 5;
+        List<ChunkCoordKey> keys = new ArrayList<>();
+        synchronized (metadataLock) {
+            for (int cz = 0; cz < 32; cz++) {
+                for (int cx = 0; cx < 32; cx++) {
+                    ChunkCoordKey cKey = new ChunkCoordKey(srv, w, baseCx + cx, baseCz + cz);
+                    if (l1Map.containsKey(cKey)
+                            || inflightL2Spills.containsKey(cKey)
+                            || l2IndexBytes.containsKey(cKey)) {
+                        keys.add(cKey);
+                    }
+                }
+            }
+        }
+        return keys;
+    }
+
+    public Optional<EntryFullChunk> getFullChunk(
             String serverId, String world, int chunkX, int chunkZ) {
         return getChunkSlabEntry(serverId, world, chunkX, chunkZ)
                 .map(entry -> LcaRemoteStreamCodec.deserializeCanonicalChunkSlab(
@@ -794,7 +995,7 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
      * Resolves a pooled chunk as an {@link AnvilChunkView} using the region's `BlockState` and
      * `Biome` dictionary for `(serverId, world, chunkX >> 5, chunkZ >> 5)`.
      */
-    public synchronized Optional<AnvilChunkView> getChunkView(
+    public Optional<AnvilChunkView> getChunkView(
             String serverId, String world, int chunkX, int chunkZ, int minSectionY) {
         Optional<EntryFullChunk> fullOpt = getFullChunk(serverId, world, chunkX, chunkZ);
         if (fullOpt.isEmpty()) {
@@ -813,7 +1014,7 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
      * Returns all pooled chunks in `(serverId, world, regionX, regionZ)` as a `32x32` grid of
      * {@link AnvilChunkView}s (or `null` entries for unpooled chunks).
      */
-    public synchronized AnvilChunkView[][] getRegionChunkViews(
+    public AnvilChunkView[][] getRegionChunkViews(
             String serverId, String world, int regionX, int regionZ, int minSectionY) {
         String srv = normalizeServerId(serverId);
         String w = normalizeWorldName(world);
@@ -823,38 +1024,40 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         List<String> biomeNames = dict != null ? dict.dictIdToBiomeName() : List.of();
 
         AnvilChunkView[][] grid = new AnvilChunkView[32][32];
-        int baseCx = regionX << 5;
-        int baseCz = regionZ << 5;
-        for (int cz = 0; cz < 32; cz++) {
-            for (int cx = 0; cx < 32; cx++) {
-                ChunkCoordKey cKey = new ChunkCoordKey(srv, w, baseCx + cx, baseCz + cz);
-                if (!l1Map.containsKey(cKey) && !l2IndexBytes.containsKey(cKey)) {
-                    continue;
-                }
-                Optional<EntryFullChunk> fullOpt = getFullChunk(srv, w, baseCx + cx, baseCz + cz);
-                if (fullOpt.isPresent()) {
-                    grid[cz][cx] = LcaRemoteStreamCodec.toAnvilChunkView(
-                            fullOpt.get(), minSectionY, blockNames, biomeNames);
-                }
+        for (ChunkCoordKey cKey : collectRegionCandidateKeys(srv, w, regionX, regionZ)) {
+            Optional<EntryFullChunk> fullOpt = getFullChunk(srv, w, cKey.chunkX(), cKey.chunkZ());
+            if (fullOpt.isPresent()) {
+                int localCx = cKey.chunkX() & 31;
+                int localCz = cKey.chunkZ() & 31;
+                grid[localCz][localCx] = LcaRemoteStreamCodec.toAnvilChunkView(
+                        fullOpt.get(), minSectionY, blockNames, biomeNames);
             }
         }
         return grid;
     }
 
-    public synchronized boolean hasAnyChunkInRegion(
+    public boolean hasAnyChunkInRegion(
             String serverId, String world, int regionX, int regionZ) {
         String srv = normalizeServerId(serverId);
         String w = normalizeWorldName(world);
-        for (ChunkCoordKey k : l1Map.keySet()) {
-            if (k.serverId().equals(srv) && k.world().equals(w)
-                    && (k.chunkX() >> 5) == regionX && (k.chunkZ() >> 5) == regionZ) {
-                return true;
+        synchronized (metadataLock) {
+            for (ChunkCoordKey k : l1Map.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)
+                        && (k.chunkX() >> 5) == regionX && (k.chunkZ() >> 5) == regionZ) {
+                    return true;
+                }
             }
-        }
-        for (ChunkCoordKey k : l2IndexBytes.keySet()) {
-            if (k.serverId().equals(srv) && k.world().equals(w)
-                    && (k.chunkX() >> 5) == regionX && (k.chunkZ() >> 5) == regionZ) {
-                return true;
+            for (ChunkCoordKey k : inflightL2Spills.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)
+                        && (k.chunkX() >> 5) == regionX && (k.chunkZ() >> 5) == regionZ) {
+                    return true;
+                }
+            }
+            for (ChunkCoordKey k : l2IndexBytes.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)
+                        && (k.chunkX() >> 5) == regionX && (k.chunkZ() >> 5) == regionZ) {
+                    return true;
+                }
             }
         }
         return false;
@@ -863,84 +1066,134 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
     /**
      * Builds a `ChunkDigestPayload` (`LCAG`) for reconnect delta synchronization.
      */
-    public synchronized ChunkDigestPayload buildRegionDigest(
+    public ChunkDigestPayload buildRegionDigest(
             String serverId, String world, int regionX, int regionZ) {
         String srv = normalizeServerId(serverId);
         String w = normalizeWorldName(world);
         List<ChunkDigestEntry> entries = new ArrayList<>();
         Set<Integer> seenLocal = new LinkedHashSet<>();
+        List<ChunkCoordKey> l2ReloadKeys = new ArrayList<>();
 
-        for (PooledChunkSlab slab : l1Map.values()) {
-            if (slab.serverId().equals(srv)
-                    && slab.world().equals(w)
-                    && (slab.chunkX() >> 5) == regionX
-                    && (slab.chunkZ() >> 5) == regionZ) {
-                int localIdx = LcaRemoteStreamCodec.toLocalChunkIndex10(slab.chunkX(), slab.chunkZ());
-                seenLocal.add(localIdx);
-                entries.add(new ChunkDigestEntry(
-                        localIdx, slab.lastUpdateTick(), slab.secDedSyndrome64()));
+        synchronized (metadataLock) {
+            for (PooledChunkSlab slab : l1Map.values()) {
+                if (slab.serverId().equals(srv)
+                        && slab.world().equals(w)
+                        && (slab.chunkX() >> 5) == regionX
+                        && (slab.chunkZ() >> 5) == regionZ) {
+                    int localIdx = LcaRemoteStreamCodec.toLocalChunkIndex10(slab.chunkX(), slab.chunkZ());
+                    seenLocal.add(localIdx);
+                    entries.add(new ChunkDigestEntry(
+                            localIdx, slab.lastUpdateTick(), slab.secDedSyndrome64()));
+                }
+            }
+            for (PooledChunkSlab slab : inflightL2Spills.values()) {
+                if (slab.serverId().equals(srv)
+                        && slab.world().equals(w)
+                        && (slab.chunkX() >> 5) == regionX
+                        && (slab.chunkZ() >> 5) == regionZ) {
+                    int localIdx = LcaRemoteStreamCodec.toLocalChunkIndex10(slab.chunkX(), slab.chunkZ());
+                    if (seenLocal.add(localIdx)) {
+                        entries.add(new ChunkDigestEntry(
+                                localIdx, slab.lastUpdateTick(), slab.secDedSyndrome64()));
+                    }
+                }
+            }
+            int baseCx = regionX << 5;
+            int baseCz = regionZ << 5;
+            for (int cz = 0; cz < 32; cz++) {
+                for (int cx = 0; cx < 32; cx++) {
+                    int localIdx = (cz << 5) | cx;
+                    if (seenLocal.contains(localIdx)) {
+                        continue;
+                    }
+                    ChunkCoordKey cKey = new ChunkCoordKey(srv, w, baseCx + cx, baseCz + cz);
+                    if (l2IndexBytes.containsKey(cKey)) {
+                        l2ReloadKeys.add(cKey);
+                    }
+                }
             }
         }
-        int baseCx = regionX << 5;
-        int baseCz = regionZ << 5;
-        for (int cz = 0; cz < 32; cz++) {
-            for (int cx = 0; cx < 32; cx++) {
-                int localIdx = (cz << 5) | cx;
-                if (seenLocal.contains(localIdx)) {
-                    continue;
-                }
-                ChunkCoordKey cKey = new ChunkCoordKey(srv, w, baseCx + cx, baseCz + cz);
-                if (l2IndexBytes.containsKey(cKey)) {
-                    Optional<PooledChunkSlab> reloaded = getChunkSlabEntry(srv, w, baseCx + cx, baseCz + cz);
-                    reloaded.ifPresent(slab -> entries.add(new ChunkDigestEntry(
-                            localIdx, slab.lastUpdateTick(), slab.secDedSyndrome64())));
-                }
-            }
+        for (ChunkCoordKey cKey : l2ReloadKeys) {
+            int localIdx = cKey.localChunkIndex10();
+            Optional<PooledChunkSlab> reloaded = getChunkSlabEntry(srv, w, cKey.chunkX(), cKey.chunkZ());
+            reloaded.ifPresent(slab -> entries.add(new ChunkDigestEntry(
+                    localIdx, slab.lastUpdateTick(), slab.secDedSyndrome64())));
         }
         return new ChunkDigestPayload(w, regionX, regionZ, entries);
     }
 
-    public synchronized boolean evictChunk(String serverId, String world, int chunkX, int chunkZ) {
+    /**
+     * Evicts `(serverId, world, chunkX, chunkZ)` from L1/L2 (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
+    public boolean evictChunk(String serverId, String world, int chunkX, int chunkZ) {
         ChunkCoordKey key = new ChunkCoordKey(serverId, world, chunkX, chunkZ);
         boolean removed = false;
-        PooledChunkSlab l1 = l1Map.remove(key);
-        if (l1 != null) {
-            memoryBytesUsed = Math.max(0L, memoryBytesUsed - l1.byteSize());
-            l1EvictionCount.incrementAndGet();
-            removed = true;
+        boolean deleteL2 = false;
+        synchronized (metadataLock) {
+            if (inflightL2Spills.remove(key) != null) {
+                removed = true;
+            }
+            PooledChunkSlab l1 = l1Map.remove(key);
+            if (l1 != null) {
+                memoryBytesUsed = Math.max(0L, memoryBytesUsed - l1.byteSize());
+                l1EvictionCount.incrementAndGet();
+                removed = true;
+            }
+            Long prevL2 = l2IndexBytes.remove(key);
+            if (prevL2 != null) {
+                diskBytesUsed = Math.max(0L, diskBytesUsed - prevL2);
+                l2EvictionCount.incrementAndGet();
+                removed = true;
+                deleteL2 = true;
+            }
         }
-        if (l2IndexBytes.containsKey(key)) {
-            removeL2DiskEntry(key);
-            l2EvictionCount.incrementAndGet();
-            removed = true;
+        if (deleteL2) {
+            deleteUnindexedL2File(key);
         }
         return removed;
     }
 
     /**
-     * Evicts all unpinned entries across L1 and L2, returning the number of evicted chunks.
+     * Evicts all unpinned entries across L1 and L2, returning the number of evicted chunks
+     * (`REQ-RTP-S-005`, `@scheduler_dispatch`).
      */
-    public synchronized int evictUnpinned() {
+    public int evictUnpinned() {
         int evicted = 0;
-        Iterator<Map.Entry<ChunkCoordKey, PooledChunkSlab>> it = l1Map.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<ChunkCoordKey, PooledChunkSlab> e = it.next();
-            PooledChunkSlab slab = e.getValue();
-            if (slab.pinned() || pinnedRegions.contains(e.getKey().toRegionKey())) {
-                continue;
-            }
-            memoryBytesUsed = Math.max(0L, memoryBytesUsed - slab.byteSize());
-            it.remove();
-            l1EvictionCount.incrementAndGet();
-            evicted++;
-        }
-        List<ChunkCoordKey> l2Keys = new ArrayList<>(l2IndexBytes.keySet());
-        for (ChunkCoordKey k : l2Keys) {
-            if (!pinnedRegions.contains(k.toRegionKey())) {
-                removeL2DiskEntry(k);
-                l2EvictionCount.incrementAndGet();
+        List<ChunkCoordKey> l2ToDelete = new ArrayList<>();
+        synchronized (metadataLock) {
+            Iterator<Map.Entry<ChunkCoordKey, PooledChunkSlab>> it = l1Map.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<ChunkCoordKey, PooledChunkSlab> e = it.next();
+                PooledChunkSlab slab = e.getValue();
+                if (slab.pinned() || pinnedRegions.contains(e.getKey().toRegionKey())) {
+                    continue;
+                }
+                memoryBytesUsed = Math.max(0L, memoryBytesUsed - slab.byteSize());
+                it.remove();
+                l1EvictionCount.incrementAndGet();
                 evicted++;
             }
+            for (ChunkCoordKey k : new ArrayList<>(inflightL2Spills.keySet())) {
+                if (!pinnedRegions.contains(k.toRegionKey()) && inflightL2Spills.remove(k) != null) {
+                    evicted++;
+                }
+            }
+            Iterator<Map.Entry<ChunkCoordKey, Long>> l2It = l2IndexBytes.entrySet().iterator();
+            while (l2It.hasNext()) {
+                Map.Entry<ChunkCoordKey, Long> e = l2It.next();
+                ChunkCoordKey k = e.getKey();
+                if (!pinnedRegions.contains(k.toRegionKey())) {
+                    long sz = e.getValue();
+                    l2It.remove();
+                    diskBytesUsed = Math.max(0L, diskBytesUsed - sz);
+                    l2EvictionCount.incrementAndGet();
+                    l2ToDelete.add(k);
+                    evicted++;
+                }
+            }
+        }
+        for (ChunkCoordKey k : l2ToDelete) {
+            deleteUnindexedL2File(k);
         }
         return evicted;
     }
@@ -948,7 +1201,7 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
     /**
      * Injects a single-bit flip into an L1 cached chunk slab for `SEC-DED-64` fault-injection tests.
      */
-    public synchronized void corruptSingleBitInL1(
+    public void corruptSingleBitInL1(
             String serverId,
             String world,
             int chunkX,
@@ -957,38 +1210,52 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
             int bitIndex
     ) {
         ChunkCoordKey key = new ChunkCoordKey(serverId, world, chunkX, chunkZ);
-        PooledChunkSlab entry = l1Map.get(key);
-        if (entry == null) {
-            throw new IllegalArgumentException("Chunk not present in L1 cache: " + key);
+        synchronized (metadataLock) {
+            PooledChunkSlab entry = l1Map.get(key);
+            if (entry == null) {
+                throw new IllegalArgumentException("Chunk not present in L1 cache: " + key);
+            }
+            byte[] raw = entry.slabBytes();
+            if (byteIndex < 0 || byteIndex >= raw.length) {
+                throw new IllegalArgumentException("byteIndex out of bounds: " + byteIndex);
+            }
+            if (bitIndex < 0 || bitIndex > 7) {
+                throw new IllegalArgumentException("bitIndex out of bounds [0..7]: " + bitIndex);
+            }
+            raw[byteIndex] ^= (byte) (1 << bitIndex);
+            l1Map.put(key, new PooledChunkSlab(
+                    entry.serverId(), entry.world(), entry.chunkX(), entry.chunkZ(),
+                    entry.lastUpdateTick(), entry.secDedSyndrome64(), raw, entry.pinned()));
         }
-        byte[] raw = entry.slabBytes();
-        if (byteIndex < 0 || byteIndex >= raw.length) {
-            throw new IllegalArgumentException("byteIndex out of bounds: " + byteIndex);
-        }
-        if (bitIndex < 0 || bitIndex > 7) {
-            throw new IllegalArgumentException("bitIndex out of bounds [0..7]: " + bitIndex);
-        }
-        raw[byteIndex] ^= (byte) (1 << bitIndex);
-        l1Map.put(key, new PooledChunkSlab(
-                entry.serverId(), entry.world(), entry.chunkX(), entry.chunkZ(),
-                entry.lastUpdateTick(), entry.secDedSyndrome64(), raw, entry.pinned()));
     }
 
-    public synchronized PoolTelemetrySnapshot snapshotTelemetry() {
+    public PoolTelemetrySnapshot snapshotTelemetry() {
         Set<String> servers = new LinkedHashSet<>();
         Set<String> worlds = new LinkedHashSet<>();
         int pinnedChunks = 0;
-        for (Map.Entry<ChunkCoordKey, PooledChunkSlab> e : l1Map.entrySet()) {
-            ChunkCoordKey k = e.getKey();
-            servers.add(k.serverId());
-            worlds.add(k.toRegionKey().compositeWorldKey());
-            if (e.getValue().pinned() || pinnedRegions.contains(k.toRegionKey())) {
-                pinnedChunks++;
+        long memSnap;
+        long diskSnap;
+        int l1Size;
+        int l2Size;
+        int lod3Size;
+        synchronized (metadataLock) {
+            for (Map.Entry<ChunkCoordKey, PooledChunkSlab> e : l1Map.entrySet()) {
+                ChunkCoordKey k = e.getKey();
+                servers.add(k.serverId());
+                worlds.add(k.toRegionKey().compositeWorldKey());
+                if (e.getValue().pinned() || pinnedRegions.contains(k.toRegionKey())) {
+                    pinnedChunks++;
+                }
             }
-        }
-        for (ChunkCoordKey k : l2IndexBytes.keySet()) {
-            servers.add(k.serverId());
-            worlds.add(k.toRegionKey().compositeWorldKey());
+            for (ChunkCoordKey k : l2IndexBytes.keySet()) {
+                servers.add(k.serverId());
+                worlds.add(k.toRegionKey().compositeWorldKey());
+            }
+            memSnap = memoryBytesUsed;
+            diskSnap = diskBytesUsed;
+            l1Size = l1Map.size();
+            l2Size = l2IndexBytes.size();
+            lod3Size = pinnedLod3Headers.size();
         }
         for (RegionCoordKey rk : regionDictionaries.keySet()) {
             servers.add(rk.serverId());
@@ -999,14 +1266,14 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
             worlds.add(rk.compositeWorldKey());
         }
         return new PoolTelemetrySnapshot(
-                memoryBytesUsed,
+                memSnap,
                 config.maxMemoryCacheBytes(),
-                diskBytesUsed,
+                diskSnap,
                 config.maxDiskCacheBytes(),
-                l1Map.size(),
-                l2IndexBytes.size(),
+                l1Size,
+                l2Size,
                 pinnedChunks,
-                pinnedLod3Headers.size(),
+                lod3Size,
                 l1HitCount.get(),
                 l2HitCount.get(),
                 missCount.get(),
@@ -1018,35 +1285,49 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         );
     }
 
-    public synchronized int countChunksForWorld(String serverId, String world) {
+    public int countChunksForWorld(String serverId, String world) {
         String srv = normalizeServerId(serverId);
         String w = normalizeWorldName(world);
         Set<ChunkCoordKey> unique = new LinkedHashSet<>();
-        for (ChunkCoordKey k : l1Map.keySet()) {
-            if (k.serverId().equals(srv) && k.world().equals(w)) {
-                unique.add(k);
+        synchronized (metadataLock) {
+            for (ChunkCoordKey k : l1Map.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)) {
+                    unique.add(k);
+                }
             }
-        }
-        for (ChunkCoordKey k : l2IndexBytes.keySet()) {
-            if (k.serverId().equals(srv) && k.world().equals(w)) {
-                unique.add(k);
+            for (ChunkCoordKey k : inflightL2Spills.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)) {
+                    unique.add(k);
+                }
+            }
+            for (ChunkCoordKey k : l2IndexBytes.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)) {
+                    unique.add(k);
+                }
             }
         }
         return unique.size();
     }
 
-    public synchronized int countRegionsForWorld(String serverId, String world) {
+    public int countRegionsForWorld(String serverId, String world) {
         String srv = normalizeServerId(serverId);
         String w = normalizeWorldName(world);
         Set<RegionCoordKey> unique = new LinkedHashSet<>();
-        for (ChunkCoordKey k : l1Map.keySet()) {
-            if (k.serverId().equals(srv) && k.world().equals(w)) {
-                unique.add(k.toRegionKey());
+        synchronized (metadataLock) {
+            for (ChunkCoordKey k : l1Map.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)) {
+                    unique.add(k.toRegionKey());
+                }
             }
-        }
-        for (ChunkCoordKey k : l2IndexBytes.keySet()) {
-            if (k.serverId().equals(srv) && k.world().equals(w)) {
-                unique.add(k.toRegionKey());
+            for (ChunkCoordKey k : inflightL2Spills.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)) {
+                    unique.add(k.toRegionKey());
+                }
+            }
+            for (ChunkCoordKey k : l2IndexBytes.keySet()) {
+                if (k.serverId().equals(srv) && k.world().equals(w)) {
+                    unique.add(k.toRegionKey());
+                }
             }
         }
         for (RegionCoordKey rk : pinnedRegions) {
@@ -1070,15 +1351,24 @@ public final class LcaBoundedSlabPool implements AutoCloseable {
         return header;
     }
 
+    /**
+     * Closes the pool and purges L1/L2 state (`REQ-RTP-S-005`, `@scheduler_dispatch`).
+     */
     @Override
-    public synchronized void close() {
-        l1Map.clear();
-        for (ChunkCoordKey k : new ArrayList<>(l2IndexBytes.keySet())) {
-            removeL2DiskEntry(k);
+    public void close() {
+        List<ChunkCoordKey> l2Keys;
+        synchronized (metadataLock) {
+            l1Map.clear();
+            inflightL2Spills.clear();
+            l2Keys = new ArrayList<>(l2IndexBytes.keySet());
+            l2IndexBytes.clear();
+            pinnedLod3Headers.clear();
+            pinnedRegions.clear();
+            memoryBytesUsed = 0L;
+            diskBytesUsed = 0L;
         }
-        pinnedLod3Headers.clear();
-        pinnedRegions.clear();
-        memoryBytesUsed = 0L;
-        diskBytesUsed = 0L;
+        for (ChunkCoordKey k : l2Keys) {
+            deleteUnindexedL2File(k);
+        }
     }
 }

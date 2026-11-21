@@ -44,7 +44,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   (cd "$REPO_ROOT" && ./gradlew :resource:LeafAnvil:leafanvil-plugin:assemble :resource:LeafShard:leafshard-plugin:assemble :resource:LeafSleep:leafsleep-plugin:assemble --console=plain -q)
 fi
 
-ANVIL_JAR="$REPO_ROOT/resource/LeafAnvil/leafanvil-plugin/build/libs/LeafAnvil-0.2.0.jar"
+ANVIL_JAR="$REPO_ROOT/resource/LeafAnvil/leafanvil-plugin/build/libs/LeafAnvil-0.2.1.jar"
 SHARD_JAR="$REPO_ROOT/resource/LeafShard/leafshard-plugin/build/libs/LeafShard-0.1.0.jar"
 SLEEP_JAR="$REPO_ROOT/resource/LeafSleep/leafsleep-plugin/build/libs/LeafSleep-1.0.0.jar"
 

@@ -299,10 +299,10 @@ class LcaRegionCodecTest {
         byte[] mcaBytes = loadFixture("/anvil/real/1_21_R1/r.0.0.mca");
         byte[] validLca = LcaRegionWriter.transcodeFromMca(mcaBytes, 0, 0, false);
         LcaRegionReader reader = LcaRegionReader.INSTANCE;
-        assertEquals(0x0002, LcaRegionReader.LCA_FORMAT_VERSION);
-        assertEquals(0x0002, LcaSectionCodec.readUint16BE(validLca, 0x08));
+        assertEquals(0x0003, LcaRegionReader.LCA_FORMAT_VERSION);
+        assertEquals(0x0003, LcaSectionCodec.readUint16BE(validLca, 0x08));
 
-        // T1: Unsupported formatVersion (0x0000, legacy 0x0001, or future > 0x0002)
+        // T1: Unsupported formatVersion (0x0000, legacy 0x0001, or future > 0x0003)
         byte[] badVersionZero = Arrays.copyOf(validLca, validLca.length);
         ByteBuffer.wrap(badVersionZero).putShort(0x08, (short) 0x0000);
         assertThrows(CorruptRegionEntryException.class, () -> reader.readChunk(badVersionZero, 0, 0));
@@ -310,7 +310,7 @@ class LcaRegionCodecTest {
         ByteBuffer.wrap(badVersionOne).putShort(0x08, (short) 0x0001);
         assertThrows(CorruptRegionEntryException.class, () -> reader.readChunk(badVersionOne, 0, 0));
         byte[] badVersionFuture = Arrays.copyOf(validLca, validLca.length);
-        ByteBuffer.wrap(badVersionFuture).putShort(0x08, (short) 0x0003);
+        ByteBuffer.wrap(badVersionFuture).putShort(0x08, (short) 0x0004);
         assertThrows(CorruptRegionEntryException.class, () -> reader.readChunk(badVersionFuture, 0, 0));
 
         // T1: Bad superblock magic
@@ -685,7 +685,8 @@ class LcaRegionCodecTest {
                 "minecraft:full", "full", "minecraft:empty", "minecraft:structure_starts",
                 "minecraft:structure_references", "minecraft:biomes", "minecraft:noise",
                 "minecraft:surface", "minecraft:carvers", "minecraft:features",
-                "minecraft:initialize_light", "minecraft:light", "minecraft:spawn")) {
+                "minecraft:initialize_light", "minecraft:light", "minecraft:spawn",
+                "minecraft:terrain", "terrain")) {
             int ord = LcaRegionReader.encodeStatusOrdinal(status);
             assertNotNull(LcaRegionReader.decodeStatusOrdinal(ord));
         }
@@ -1219,15 +1220,15 @@ class LcaRegionCodecTest {
                         + "   - Vanilla .mca (4 KiB Zlib sectors) : %,10d B (100.0%%)%n"
                         + "   - .linear (whole-region Zstd-1)     : %,10d B (%5.1f%% of .mca)%n"
                         + "   - .lca Mode A (Pure 0-LZ)           : %,10d B (%5.1f%% of .mca)%n"
-                        + "   - .lca Mode B (+ Zstd-1)            : %,10d B (%5.1f%% of .mca)%n"
+                        + "   - .lca Mode B (+ LCD2)              : %,10d B (%5.1f%% of .mca)%n"
                         + "2. RANDOM 1-Chunk Read Latency (Store -> Runtime AnvilChunkView):%n"
                         + "   - Cold Random (.linear Zstd region) : %8.2f us%n"
                         + "   - Cold/Warm Random (.mca Zlib)      : %8.2f us%n"
                         + "   - Cold Random (.lca Mode A 0-LZ)    : %8.2f us (%.2fx < .mca, %.1fx < cold .linear)%n"
-                        + "   - Cold Random (.lca Mode B Zstd-1)  : %8.2f us (%.2fx < .mca, %.1fx < cold .linear)%n"
+                        + "   - Cold Random (.lca Mode B LCD2)    : %8.2f us (%.2fx < .mca, %.1fx < cold .linear)%n"
                         + "   - Warm Random (.linear cached NBT)  : %8.2f us%n"
                         + "   - Warm Random (.lca Mode A 0-LZ)    : %8.2f us (%.2fx < warm .linear, %.2fx < .mca)%n"
-                        + "   - Warm Random (.lca Mode B Zstd-1)  : %8.2f us (%.2fx < warm .linear, %.2fx < .mca)%n"
+                        + "   - Warm Random (.lca Mode B LCD2)    : %8.2f us (%.2fx < warm .linear, %.2fx < .mca)%n"
                         + "3. SEQUENTIAL WHOLE-REGION SWEEP (All %d Chunks -> Runtime AnvilChunkView):%n"
                         + "   - Cold Whole Region (.mca Zlib)     : %8.2f ms total (%7.2f us/chunk)%n"
                         + "   - Cold Whole Region (.linear Zstd)  : %8.2f ms total (%7.2f us/chunk) [%.2fx < .mca]%n"
@@ -2014,7 +2015,7 @@ class LcaRegionCodecTest {
         AnvilReader.ChunkEntry orig00 = AnvilReader.readChunkEntry(mcaBytes, 0, 0);
         assertNotNull(orig00);
 
-        // 1. Encode chunk (0, 0) in Mode B (Zstd-1 with uncompressed 72B ChunkFrame header + 9B SEC-DED parity)
+        // 1. Encode chunk (0, 0) in Mode B (LCD2 with uncompressed 72B ChunkFrame header + 9B SEC-DED parity)
         LcaRegionWriter.LcaLiveArchive modeBArchive =
                 LcaRegionWriter.createEmptyLiveArchive(0, 0, -4, 24, 4671, true);
         modeBArchive.saveChunkCoW(0, 0, orig00.root);
@@ -2886,12 +2887,25 @@ class LcaRegionCodecTest {
                             "Disk file must maintain LCA1_END footer canary at EOF even immediately after dictionary segment allocation");
                 }
                 archive.saveChunkCoW(i, 0, root);
+                archive.saveChunkCoW(i, 0, root);
                 AnvilChunkView view = LcaRegionReader.readChunkViewFromFile(lcaFile, i, 0);
                 assertNotNull(view, "Single-chunk reader must decode newly appended chunk using cached header/dictionary");
             }
             LcaRegionReader.CachedFileHeader cached = LcaRegionReader.peekCachedFileHeader(lcaFile);
             assertNotNull(cached, "CachedFileHeader must remain hot in FILE_HEADER_CACHE across live chunk saves");
             assertNotNull(cached.parsedDict, "Cached dictionary must remain populated when subsequent saves do not mutate dictionary");
+
+            long writesBeforeCleanSave = archive.diskChannelWriteCount();
+            LinkedHashMap<String, Object> cleanSaveRoot =
+                    Nbt.readRootCompound(Nbt.writeNamedRoot("", orig.root));
+            cleanSaveRoot.put("xPos", 38);
+            cleanSaveRoot.put("zPos", 0);
+            archive.saveChunkCoW(6, 0, cleanSaveRoot);
+            long writesDelta = archive.diskChannelWriteCount() - writesBeforeCleanSave;
+            assertEquals(
+                    3L,
+                    writesDelta,
+                    "EOF chunk save with clean dictionary segments must coalesce slab + LCA1_END canary into 1 write plus 2 header metadata writes");
         }
     }
 }

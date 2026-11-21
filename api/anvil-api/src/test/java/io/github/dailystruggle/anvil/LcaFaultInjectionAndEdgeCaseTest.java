@@ -208,7 +208,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
     @DisplayName("Pillar 1 (ENOSPC Rollback): Mid-write disk full during chunk slab & dictionary continuation rolls back cleanly")
     void enospcMidWriteRollsBackCleanlyAndRecoversWhenSpaceFreed(@TempDir Path tempDir) throws IOException {
         Path lcaFile = tempDir.resolve("r.0.0.lca");
-        boolean modeB = DynamicZstdBinding.isAvailable();
+        boolean modeB = true;
 
         try (LcaRegionWriter.LcaLiveArchive init = LcaRegionWriter.createEmptyLiveArchive(
                 lcaFile, 0, 0, -4, 24, 4671, modeB, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 1024)) {
@@ -279,7 +279,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
     @DisplayName("Pillar 2 (Crash Consistency): Unclean shutdown missing LCA1_END footer, torn syndrome byte, and Mode B Slab Reverse-Scan")
     void uncleanShutdownMissingFooterAndTornSyndromeRecoversOnOpen(@TempDir Path tempDir) throws IOException {
         Path lcaFile = tempDir.resolve("r.0.0.lca");
-        boolean modeB = DynamicZstdBinding.isAvailable();
+        boolean modeB = true;
 
         try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.createEmptyLiveArchive(
                 lcaFile, 0, 0, -4, 24, 4671, modeB, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 4096)) {
@@ -326,7 +326,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
     @DisplayName("Pillar 3 (Hot-Read SEC-DED & Tier-4 CoW Fallback): Live bit-flip self-healing with durable FileChannel write-back")
     void hotReadSecDedSelfHealingAndCoWRollback(@TempDir Path tempDir) throws IOException {
         Path lcaFile = tempDir.resolve("r.0.0.lca");
-        boolean modeB = DynamicZstdBinding.isAvailable();
+        boolean modeB = true;
 
         try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.createEmptyLiveArchive(
                 lcaFile, 0, 0, -4, 24, 4671, modeB, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 4096)) {
@@ -367,7 +367,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
                         "Hot read must heal 1-bit flip in Mode B ChunkFrame header and write back to channel");
             }
 
-            // 2. Corrupt the latest CoW slab of chunk (0,0) on disk beyond SEC-DED repair (wipe its header + Zstd body)
+            // 2. Corrupt the latest CoW slab of chunk (0,0) on disk beyond SEC-DED repair (wipe its header + LCD2 body)
             try (FileChannel extCh = FileChannel.open(lcaFile, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
                 ByteBuffer bb = ByteBuffer.allocate(8);
                 extCh.read(bb, LcaRegionReader.POINTER_DIRECTORY_OFFSET);
@@ -499,8 +499,8 @@ class LcaFaultInjectionAndEdgeCaseTest {
     }
 
     @Test
-    @DisplayName("Mode A On-Disk Preservation & Zstd Level 0..22 Write Preference Separation")
-    void modeAFileOpenPreservesOnDiskSemanticsAndSupportsZstdLevelVariation(@TempDir Path tempDir) throws IOException {
+    @DisplayName("Mode A On-Disk Preservation & LCD2 Level 0..22 Write Preference Separation")
+    void modeAFileOpenPreservesOnDiskSemanticsAndSupportsLcd2LevelVariation(@TempDir Path tempDir) throws IOException {
         Path modeAFile = tempDir.resolve("r.0.0.lca");
         try (LcaRegionWriter.LcaLiveArchive archive = LcaRegionWriter.createEmptyLiveArchive(
                 modeAFile, 0, 0, -4, 24, 4671, 0, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 4096)) {
@@ -509,7 +509,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
             archive.flush();
         }
 
-        // 1. Default 1-arg openLiveArchive(Path) on Mode A file inherits Mode A (zstdLevel = 0)
+        // 1. Default 1-arg openLiveArchive(Path) on Mode A file inherits Mode A (lcd2Level = 0)
         try (LcaRegionWriter.LcaLiveArchive reopenedDefault = LcaRegionWriter.openLiveArchive(modeAFile)) {
             reopenedDefault.saveChunkCoW(3, 0, buildTestChunk(3, 0, "minecraft:dirt", 4));
             AnvilReader.ChunkEntry c30 = reopenedDefault.readChunkEntry(3, 0);
@@ -519,9 +519,9 @@ class LcaFaultInjectionAndEdgeCaseTest {
             reopenedDefault.flush();
         }
 
-        // 2. Simulate crash on Mode A file and reopen via LcaRegionFileStorage (default zstdLevel = 1)
+        // 2. Simulate crash on Mode A file and reopen via LcaRegionFileStorage (default lcd2Level = 1)
         byte[] rawModeA = Files.readAllBytes(modeAFile);
-        assertEquals(0, rawModeA[0x0B] & 8, "Mode A superblock must not have DEFAULT_ZSTD1 bit set");
+        assertEquals(0, rawModeA[0x0B] & 8, "Mode A superblock must not have DEFAULT_MODE_B bit set");
         ByteBuffer.wrap(rawModeA).putLong(LcaRegionReader.POINTER_DIRECTORY_OFFSET + 8, 0xCAFE_BABE_DEAD_BEEFL);
         byte[] crashedModeA = Arrays.copyOf(rawModeA, rawModeA.length + 256);
         Arrays.fill(crashedModeA, rawModeA.length - 8, crashedModeA.length, (byte) 0x5A);
@@ -547,10 +547,10 @@ class LcaFaultInjectionAndEdgeCaseTest {
 
         byte[] afterRecovery = Files.readAllBytes(modeAFile);
         assertEquals(0, afterRecovery[0x0B] & 8,
-                "Superblock DEFAULT_ZSTD1 flag must remain 0 on Mode A file after recovery and close");
+                "Superblock DEFAULT_MODE_B flag must remain 0 on Mode A file after recovery and close");
 
-        // 3. Vary zstdLevel across 0..22 (e.g. 6 and 22 on Mode A file, and 0 on Mode B file)
-        if (DynamicZstdBinding.isAvailable()) {
+        // 3. Vary lcd2Level across 0..22 (e.g. 6 and 22 on Mode A file, and 0 on Mode B file)
+        if (true) {
             try (LcaRegionWriter.LcaLiveArchive modeAWithLevel6 = LcaRegionWriter.openLiveArchive(modeAFile, 6)) {
                 modeAWithLevel6.saveChunkCoW(2, 0, buildTestChunk(2, 0, "minecraft:deepslate", 6));
                 modeAWithLevel6.flush();
@@ -560,10 +560,10 @@ class LcaFaultInjectionAndEdgeCaseTest {
                 assertNotNull(c00);
                 assertNotNull(c20);
                 assertEquals(3, c00.compressionType, "Existing chunk (0,0) remains Mode A");
-                assertEquals(5, c20.compressionType, "Newly written chunk (2,0) uses Mode B (Zstd-6)");
+                assertEquals(5, c20.compressionType, "Newly written chunk (2,0) uses Mode B (LCD2-6)");
             }
             assertEquals(0, Files.readAllBytes(modeAFile)[0x0B] & 8,
-                    "On-disk superblock flag must remain Mode A even when new chunks are written with zstdLevel=6");
+                    "On-disk superblock flag must remain Mode A even when new chunks are written with lcd2Level=6");
 
             // 3b. Crash-recover a Mode B chunk (2,0) AND a Mode A chunk (1,0) inside the Mode A file
             //     (also inject a 1-bit flip into the Mode B chunk's uncompressed header word 0 to verify per-slab SEC-DED healing)
@@ -616,7 +616,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
                 assertEquals(106L, ((Number) rec20.root.get("LastUpdate")).longValue());
             }
 
-            // Now open a Mode B file with preferredZstdLevel = 0 (switch new writes to Mode A 0-LZ) and 22
+            // Now open a Mode B file with preferredLcd2Level = 0 (switch new writes to Mode A 0-LZ) and 22
             Path modeBFile = tempDir.resolve("r.1.0.lca");
             try (LcaRegionWriter.LcaLiveArchive modeB22 = LcaRegionWriter.createEmptyLiveArchive(
                     modeBFile, 1, 0, -4, 24, 4671, 22, LcaRegionReader.STORAGE_KIND_REGION_VOXEL, 4096)) {
@@ -624,7 +624,7 @@ class LcaFaultInjectionAndEdgeCaseTest {
                 modeB22.flush();
             }
             assertEquals(8, Files.readAllBytes(modeBFile)[0x0B] & 8,
-                    "Mode B file created with zstdLevel=22 must have DEFAULT_ZSTD1 set in superblock");
+                    "Mode B file created with lcd2Level=22 must have DEFAULT_MODE_B set in superblock");
 
             try (LcaRegionWriter.LcaLiveArchive modeBWithLevel0 = LcaRegionWriter.openLiveArchive(modeBFile, 0)) {
                 modeBWithLevel0.saveChunkCoW(1, 0, buildTestChunk(33, 0, "minecraft:granite", 7));
@@ -634,11 +634,11 @@ class LcaFaultInjectionAndEdgeCaseTest {
                 AnvilReader.ChunkEntry c10 = modeBWithLevel0.readChunkEntry(1, 0);
                 assertNotNull(c00);
                 assertNotNull(c10);
-                assertEquals(5, c00.compressionType, "Existing chunk (0,0) remains Mode B (Zstd-22)");
+                assertEquals(5, c00.compressionType, "Existing chunk (0,0) remains Mode B (LCD2-22)");
                 assertEquals(3, c10.compressionType, "Newly written chunk (1,0) uses Mode A (0-LZ)");
             }
             assertEquals(8, Files.readAllBytes(modeBFile)[0x0B] & 8,
-                    "On-disk superblock flag must remain Mode B even when new chunks are written with zstdLevel=0");
+                    "On-disk superblock flag must remain Mode B even when new chunks are written with lcd2Level=0");
 
             // 3c. Crash-recover a Mode A chunk (1,0) and Mode B chunk (0,0) inside the Mode B file
             byte[] mixedModeBBytes = Files.readAllBytes(modeBFile);

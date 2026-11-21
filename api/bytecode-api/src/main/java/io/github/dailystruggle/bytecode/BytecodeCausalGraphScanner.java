@@ -62,6 +62,11 @@ import java.util.zip.ZipFile;
 public final class BytecodeCausalGraphScanner {
 
     private static final Logger LOGGER = Logger.getLogger(BytecodeCausalGraphScanner.class.getName());
+    private static final int MAX_LOGGED_ABORT_WARNINGS = 32;
+    private static final Set<String> LOGGED_ABORT_WARNINGS =
+            Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private static final java.util.concurrent.atomic.AtomicBoolean ABORT_WARNING_CAP_LOGGED =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
     private static final int CLASS_MAGIC = 0xCAFEBABE;
     private static final int MAX_CAUSAL_HOPS = 4;
     private static final int MAX_RESOURCE_BYTES = 1024 * 1024;
@@ -87,14 +92,15 @@ public final class BytecodeCausalGraphScanner {
     private static final int CONSTANT_Package = 20;
 
     // Access flags
+    static final int ACC_PRIVATE = 0x0002;
     static final int ACC_STATIC = 0x0008;
     static final int ACC_FINAL = 0x0010;
     static final int ACC_SYNCHRONIZED = 0x0020;
     static final int ACC_VOLATILE = 0x0040;
-    private static final int ACC_INTERFACE = 0x0200;
-    private static final int ACC_ABSTRACT = 0x0400;
-    private static final int ACC_SYNTHETIC = 0x1000;
-    private static final int ACC_ENUM = 0x4000;
+    static final int ACC_INTERFACE = 0x0200;
+    static final int ACC_ABSTRACT = 0x0400;
+    static final int ACC_SYNTHETIC = 0x1000;
+    static final int ACC_ENUM = 0x4000;
 
     private static final Set<String> CONFIG_GETTER_METHODS = Set.of(
             "getBoolean", "getInt", "getLong", "getDouble", "getString",
@@ -849,6 +855,15 @@ public final class BytecodeCausalGraphScanner {
         }
     }
 
+    record IndyFunctionalSite(
+            String functionalInterface,
+            String samMethodName,
+            String targetSymbol,
+            String enclosingClass,
+            String enclosingMethod
+    ) {
+    }
+
     record MethodNode(
             String ownerClass,
             String name,
@@ -892,8 +907,303 @@ public final class BytecodeCausalGraphScanner {
             boolean callsAccessOrderLinkedHashMap,
             Set<String> collectionAddedFields,
             Set<String> collectionRemovedFields,
+            Set<String> arrayMutatedFields,
+            Set<String> receiverMutatedFields,
+            Set<String> dynamicFunctionalDispatches,
+            Set<String> asyncFunctionalDispatches,
             String returnedField
     ) {
+        MethodNode(
+                String ownerClass,
+                String name,
+                String descriptor,
+                int accessFlags,
+                boolean isEventHandler,
+                String eventTypeSimpleName,
+                boolean isCommandAnnotated,
+                List<String> annotatedCommandRoots,
+                List<String> subcommandLiterals,
+                List<String> argumentParsers,
+                List<String> inlinePermissions,
+                String commandDescription,
+                List<String> calledMethods,
+                List<String> spawnedLambdas,
+                List<String> orphanedSuppliers,
+                Set<String> instantiatedClasses,
+                Map<String, String> conditionalInstantiations,
+                Map<String, String> conditionalMethodCalls,
+                Set<String> readFields,
+                Set<String> writtenFields,
+                Set<String> producedQueueFields,
+                Set<String> dispatchedEventTypes,
+                Map<String, String> configKeyToAssignedField,
+                Map<String, String> configKeyScalingHint,
+                Set<String> referencedConfigKeys,
+                Set<String> stringLiterals,
+                List<String> guards,
+                Set<String> directEffectSinks,
+                Set<String> syncMainThreadCalls,
+                List<String> swallowedExceptions,
+                boolean callsCurrentTimeMillis,
+                boolean multipliesBy1000Or20,
+                boolean usesDynamicConfigIteration,
+                Set<String> acquiredLocks,
+                Set<String> blockingIoCalls,
+                List<String> allocatedResources,
+                boolean closesOrTracksResourcesOnAllPaths,
+                String resourceLeakReason,
+                Set<String> semanticMacros,
+                boolean callsAccessOrderLinkedHashMap,
+                Set<String> collectionAddedFields,
+                Set<String> collectionRemovedFields,
+                Set<String> arrayMutatedFields,
+                Set<String> dynamicFunctionalDispatches,
+                Set<String> asyncFunctionalDispatches,
+                String returnedField
+        ) {
+            this(
+                    ownerClass,
+                    name,
+                    descriptor,
+                    accessFlags,
+                    isEventHandler,
+                    eventTypeSimpleName,
+                    isCommandAnnotated,
+                    annotatedCommandRoots,
+                    subcommandLiterals,
+                    argumentParsers,
+                    inlinePermissions,
+                    commandDescription,
+                    calledMethods,
+                    spawnedLambdas,
+                    orphanedSuppliers,
+                    instantiatedClasses,
+                    conditionalInstantiations,
+                    conditionalMethodCalls,
+                    readFields,
+                    writtenFields,
+                    producedQueueFields,
+                    dispatchedEventTypes,
+                    configKeyToAssignedField,
+                    configKeyScalingHint,
+                    referencedConfigKeys,
+                    stringLiterals,
+                    guards,
+                    directEffectSinks,
+                    syncMainThreadCalls,
+                    swallowedExceptions,
+                    callsCurrentTimeMillis,
+                    multipliesBy1000Or20,
+                    usesDynamicConfigIteration,
+                    acquiredLocks,
+                    blockingIoCalls,
+                    allocatedResources,
+                    closesOrTracksResourcesOnAllPaths,
+                    resourceLeakReason,
+                    semanticMacros,
+                    callsAccessOrderLinkedHashMap,
+                    collectionAddedFields,
+                    collectionRemovedFields,
+                    arrayMutatedFields,
+                    Set.of(),
+                    dynamicFunctionalDispatches,
+                    asyncFunctionalDispatches,
+                    returnedField
+            );
+        }
+        MethodNode(
+                String ownerClass,
+                String name,
+                String descriptor,
+                int accessFlags,
+                boolean isEventHandler,
+                String eventTypeSimpleName,
+                boolean isCommandAnnotated,
+                List<String> annotatedCommandRoots,
+                List<String> subcommandLiterals,
+                List<String> argumentParsers,
+                List<String> inlinePermissions,
+                String commandDescription,
+                List<String> calledMethods,
+                List<String> spawnedLambdas,
+                List<String> orphanedSuppliers,
+                Set<String> instantiatedClasses,
+                Map<String, String> conditionalInstantiations,
+                Map<String, String> conditionalMethodCalls,
+                Set<String> readFields,
+                Set<String> writtenFields,
+                Set<String> producedQueueFields,
+                Set<String> dispatchedEventTypes,
+                Map<String, String> configKeyToAssignedField,
+                Map<String, String> configKeyScalingHint,
+                Set<String> referencedConfigKeys,
+                Set<String> stringLiterals,
+                List<String> guards,
+                Set<String> directEffectSinks,
+                Set<String> syncMainThreadCalls,
+                List<String> swallowedExceptions,
+                boolean callsCurrentTimeMillis,
+                boolean multipliesBy1000Or20,
+                boolean usesDynamicConfigIteration,
+                Set<String> acquiredLocks,
+                Set<String> blockingIoCalls,
+                List<String> allocatedResources,
+                boolean closesOrTracksResourcesOnAllPaths,
+                String resourceLeakReason,
+                Set<String> semanticMacros,
+                boolean callsAccessOrderLinkedHashMap,
+                Set<String> collectionAddedFields,
+                Set<String> collectionRemovedFields,
+                Set<String> arrayMutatedFields,
+                String returnedField
+        ) {
+            this(
+                    ownerClass,
+                    name,
+                    descriptor,
+                    accessFlags,
+                    isEventHandler,
+                    eventTypeSimpleName,
+                    isCommandAnnotated,
+                    annotatedCommandRoots,
+                    subcommandLiterals,
+                    argumentParsers,
+                    inlinePermissions,
+                    commandDescription,
+                    calledMethods,
+                    spawnedLambdas,
+                    orphanedSuppliers,
+                    instantiatedClasses,
+                    conditionalInstantiations,
+                    conditionalMethodCalls,
+                    readFields,
+                    writtenFields,
+                    producedQueueFields,
+                    dispatchedEventTypes,
+                    configKeyToAssignedField,
+                    configKeyScalingHint,
+                    referencedConfigKeys,
+                    stringLiterals,
+                    guards,
+                    directEffectSinks,
+                    syncMainThreadCalls,
+                    swallowedExceptions,
+                    callsCurrentTimeMillis,
+                    multipliesBy1000Or20,
+                    usesDynamicConfigIteration,
+                    acquiredLocks,
+                    blockingIoCalls,
+                    allocatedResources,
+                    closesOrTracksResourcesOnAllPaths,
+                    resourceLeakReason,
+                    semanticMacros,
+                    callsAccessOrderLinkedHashMap,
+                    collectionAddedFields,
+                    collectionRemovedFields,
+                    arrayMutatedFields,
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    returnedField
+            );
+        }
+
+        MethodNode(
+                String ownerClass,
+                String name,
+                String descriptor,
+                int accessFlags,
+                boolean isEventHandler,
+                String eventTypeSimpleName,
+                boolean isCommandAnnotated,
+                List<String> annotatedCommandRoots,
+                List<String> subcommandLiterals,
+                List<String> argumentParsers,
+                List<String> inlinePermissions,
+                String commandDescription,
+                List<String> calledMethods,
+                List<String> spawnedLambdas,
+                List<String> orphanedSuppliers,
+                Set<String> instantiatedClasses,
+                Map<String, String> conditionalInstantiations,
+                Map<String, String> conditionalMethodCalls,
+                Set<String> readFields,
+                Set<String> writtenFields,
+                Set<String> producedQueueFields,
+                Set<String> dispatchedEventTypes,
+                Map<String, String> configKeyToAssignedField,
+                Map<String, String> configKeyScalingHint,
+                Set<String> referencedConfigKeys,
+                Set<String> stringLiterals,
+                List<String> guards,
+                Set<String> directEffectSinks,
+                Set<String> syncMainThreadCalls,
+                List<String> swallowedExceptions,
+                boolean callsCurrentTimeMillis,
+                boolean multipliesBy1000Or20,
+                boolean usesDynamicConfigIteration,
+                Set<String> acquiredLocks,
+                Set<String> blockingIoCalls,
+                List<String> allocatedResources,
+                boolean closesOrTracksResourcesOnAllPaths,
+                String resourceLeakReason,
+                Set<String> semanticMacros,
+                boolean callsAccessOrderLinkedHashMap,
+                Set<String> collectionAddedFields,
+                Set<String> collectionRemovedFields,
+                String returnedField
+        ) {
+            this(
+                    ownerClass,
+                    name,
+                    descriptor,
+                    accessFlags,
+                    isEventHandler,
+                    eventTypeSimpleName,
+                    isCommandAnnotated,
+                    annotatedCommandRoots,
+                    subcommandLiterals,
+                    argumentParsers,
+                    inlinePermissions,
+                    commandDescription,
+                    calledMethods,
+                    spawnedLambdas,
+                    orphanedSuppliers,
+                    instantiatedClasses,
+                    conditionalInstantiations,
+                    conditionalMethodCalls,
+                    readFields,
+                    writtenFields,
+                    producedQueueFields,
+                    dispatchedEventTypes,
+                    configKeyToAssignedField,
+                    configKeyScalingHint,
+                    referencedConfigKeys,
+                    stringLiterals,
+                    guards,
+                    directEffectSinks,
+                    syncMainThreadCalls,
+                    swallowedExceptions,
+                    callsCurrentTimeMillis,
+                    multipliesBy1000Or20,
+                    usesDynamicConfigIteration,
+                    acquiredLocks,
+                    blockingIoCalls,
+                    allocatedResources,
+                    closesOrTracksResourcesOnAllPaths,
+                    resourceLeakReason,
+                    semanticMacros,
+                    callsAccessOrderLinkedHashMap,
+                    collectionAddedFields,
+                    collectionRemovedFields,
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    returnedField
+            );
+        }
+
         String symbol() {
             return ownerClass + "#" + name;
         }
@@ -909,8 +1219,36 @@ public final class BytecodeCausalGraphScanner {
             Map<String, MethodNode> methods,
             boolean usesReflectiveScanner,
             ParsedAnnotations classAnnotations,
-            Set<String> referencedClasses
+            Set<String> referencedClasses,
+            List<IndyFunctionalSite> indyFunctionalSites
     ) {
+        ParsedClass(
+                String binaryClassName,
+                String superClassName,
+                int accessFlags,
+                Set<String> interfaces,
+                Set<String> declaredFields,
+                Map<String, FieldDescriptorMeta> declaredFieldMeta,
+                Map<String, MethodNode> methods,
+                boolean usesReflectiveScanner,
+                ParsedAnnotations classAnnotations,
+                Set<String> referencedClasses
+        ) {
+            this(
+                    binaryClassName,
+                    superClassName,
+                    accessFlags,
+                    interfaces,
+                    declaredFields,
+                    declaredFieldMeta,
+                    methods,
+                    usesReflectiveScanner,
+                    classAnnotations,
+                    referencedClasses,
+                    List.of()
+            );
+        }
+
         ParsedClass(
                 String binaryClassName,
                 String superClassName,
@@ -932,7 +1270,8 @@ public final class BytecodeCausalGraphScanner {
                     methods,
                     usesReflectiveScanner,
                     classAnnotations,
-                    Set.of()
+                    Set.of(),
+                    List.of()
             );
         }
         boolean isConcrete() {
@@ -2151,7 +2490,7 @@ public final class BytecodeCausalGraphScanner {
      * Parses a raw {@code .class} byte array into a {@link ParsedClass} with constant pool,
      * method bodies, exception tables, annotations, and {@code BootstrapMethods} lambda links.
      */
-    private static ParsedClass parseClassBytes(byte[] classBytes) {
+    static ParsedClass parseClassBytes(byte[] classBytes) {
         if (classBytes == null || classBytes.length < 24) {
             return null;
         }
@@ -2357,6 +2696,8 @@ public final class BytecodeCausalGraphScanner {
 
             // Parse class-level BootstrapMethods and class-level annotations
             Map<Integer, String> bootstrapTargetMethod = new LinkedHashMap<>();
+            Map<Integer, List<String>> bootstrapTargetMethods = new LinkedHashMap<>();
+            Map<Integer, String> bootstrapFactoryOwner = new LinkedHashMap<>();
             ParsedAnnotations classAnnotations = ParsedAnnotations.empty();
             int classAttrsCount = in.readUnsignedShort();
             for (int a = 0; a < classAttrsCount; a++) {
@@ -2372,6 +2713,13 @@ public final class BytecodeCausalGraphScanner {
                         int bsmRef = readUnsignedShort(bsmBytes, cur);
                         int numArgs = readUnsignedShort(bsmBytes, cur + 2);
                         cur += 4;
+                        if (bsmRef > 0 && bsmRef < cpCount && methodHandleRefIdx[bsmRef] > 0) {
+                            int factoryRef = methodHandleRefIdx[bsmRef];
+                            String fOwner = resolveClassName(methodClassIdx[factoryRef], classNameIdx, utf8Pool);
+                            if (fOwner != null) {
+                                bootstrapFactoryOwner.put(b, fOwner);
+                            }
+                        }
                         for (int argIdx = 0; argIdx < numArgs && cur + 2 <= bsmBytes.length; argIdx++) {
                             int argCpIdx = readUnsignedShort(bsmBytes, cur);
                             cur += 2;
@@ -2380,7 +2728,15 @@ public final class BytecodeCausalGraphScanner {
                                 String owner = resolveClassName(methodClassIdx[targetRef], classNameIdx, utf8Pool);
                                 String name = resolveMethodName(targetRef, methodNatIdx, natNameIdx, utf8Pool);
                                 if (owner != null && name != null) {
-                                    bootstrapTargetMethod.put(b, owner.replace('/', '.') + "#" + name);
+                                    String targetSym = owner.replace('/', '.') + "#" + name;
+                                    bootstrapTargetMethod.putIfAbsent(b, targetSym);
+                                    List<String> allHandles = bootstrapTargetMethods.computeIfAbsent(
+                                            b,
+                                            k -> new ArrayList<>()
+                                    );
+                                    if (!allHandles.contains(targetSym)) {
+                                        allHandles.add(targetSym);
+                                    }
                                 }
                             }
                         }
@@ -2404,6 +2760,7 @@ public final class BytecodeCausalGraphScanner {
                     || "shutdown".equals(m.name())
                     || "closeQuietly".equals(m.name()));
             Map<String, MethodNode> parsedMethods = new LinkedHashMap<>();
+            List<IndyFunctionalSite> classIndySites = new ArrayList<>();
             for (RawMethodData rm : rawMethods) {
                 MethodNode node = analyzeMethodBytecode(
                         binaryClassName,
@@ -2422,7 +2779,10 @@ public final class BytecodeCausalGraphScanner {
                         natDescIdx,
                         indyBootstrapIdx,
                         indyNatIdx,
-                        bootstrapTargetMethod
+                        bootstrapTargetMethod,
+                        bootstrapTargetMethods,
+                        bootstrapFactoryOwner,
+                        classIndySites
                 );
                 String key = parsedMethods.containsKey(rm.name())
                         ? (rm.name() + rm.descriptor())
@@ -2440,7 +2800,8 @@ public final class BytecodeCausalGraphScanner {
                     parsedMethods,
                     usesReflectiveScanner,
                     classAnnotations,
-                    referencedClasses
+                    referencedClasses,
+                    List.copyOf(classIndySites)
             );
         } catch (IOException | RuntimeException e) {
             LOGGER.log(Level.FINE, "[LeafConfig] Skipping unreadable or non-standard .class payload", e);
@@ -2720,7 +3081,10 @@ public final class BytecodeCausalGraphScanner {
             int[] natDescIdx,
             int[] indyBootstrapIdx,
             int[] indyNatIdx,
-            Map<Integer, String> bootstrapTargetMethod
+            Map<Integer, String> bootstrapTargetMethod,
+            Map<Integer, List<String>> bootstrapTargetMethods,
+            Map<Integer, String> bootstrapFactoryOwner,
+            List<IndyFunctionalSite> classIndySitesOut
     ) {
         ParsedAnnotations methodAnn = rm.annotations() != null ? rm.annotations() : ParsedAnnotations.empty();
         ParsedAnnotations clsAnn = classAnnotations != null ? classAnnotations : ParsedAnnotations.empty();
@@ -2787,6 +3151,10 @@ public final class BytecodeCausalGraphScanner {
                     "",
                     emptyMacros,
                     false,
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
                     Set.of(),
                     Set.of(),
                     ""
@@ -3015,11 +3383,14 @@ public final class BytecodeCausalGraphScanner {
                                 || fDesc.contains("Queue") || fDesc.contains("Deque")
                                 || fDesc.contains("RingBuffer")
                         );
+                        boolean isArrayField = fDesc != null && fDesc.startsWith("[");
                         recentReadFullField = isCollectionOrQueueField ? fullField : null;
                         recentReadFieldDesc = isCollectionOrQueueField ? fDesc : null;
                         sawAload0SinceFieldRead = false;
                         int nextFieldPc = pc + insLen;
-                        if (isCollectionOrQueueField && nextFieldPc < code.length && (code[nextFieldPc] & 0xFF) == 0xB0) {
+                        if ((isCollectionOrQueueField || isArrayField)
+                                && nextFieldPc < code.length
+                                && (code[nextFieldPc] & 0xFF) == 0xB0) {
                             returnedField = fullField;
                         }
                     } else {
@@ -3351,12 +3722,40 @@ public final class BytecodeCausalGraphScanner {
                 int indyCpIdx = readUnsignedShort(code, pc + 1);
                 if (indyCpIdx > 0 && indyCpIdx < indyBootstrapIdx.length) {
                     int bsmIdx = indyBootstrapIdx[indyCpIdx];
-                    String targetLambda = bootstrapTargetMethod.get(bsmIdx);
-                    if (targetLambda != null) {
-                        if (!spawnedLambdas.contains(targetLambda)) {
-                            spawnedLambdas.add(targetLambda);
+                    List<String> targetLambdas = bootstrapTargetMethods.getOrDefault(bsmIdx, List.of());
+                    if (targetLambdas.isEmpty()) {
+                        String single = bootstrapTargetMethod.get(bsmIdx);
+                        if (single != null) {
+                            targetLambdas = List.of(single);
                         }
-                        recentIndyLambdaTarget = targetLambda;
+                    }
+                    if (!targetLambdas.isEmpty()) {
+                        int natIdx = indyCpIdx < indyNatIdx.length ? indyNatIdx[indyCpIdx] : 0;
+                        String samName = (natIdx > 0 && natIdx < natNameIdx.length)
+                                ? safeUtf8(utf8Pool, natNameIdx[natIdx])
+                                : null;
+                        String factoryDesc = (natIdx > 0 && natIdx < natDescIdx.length)
+                                ? safeUtf8(utf8Pool, natDescIdx[natIdx])
+                                : null;
+                        String funcIface = extractReturnObjectBinaryName(factoryDesc);
+                        for (String targetLambda : targetLambdas) {
+                            if (!spawnedLambdas.contains(targetLambda)) {
+                                spawnedLambdas.add(targetLambda);
+                            }
+                            recentIndyLambdaTarget = targetLambda;
+                            if (funcIface != null && samName != null && classIndySitesOut != null) {
+                                IndyFunctionalSite site = new IndyFunctionalSite(
+                                        funcIface,
+                                        samName,
+                                        targetLambda,
+                                        binaryClassName,
+                                        rm.name()
+                                );
+                                if (!classIndySitesOut.contains(site)) {
+                                    classIndySitesOut.add(site);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3424,6 +3823,30 @@ public final class BytecodeCausalGraphScanner {
               }
         }
 
+        StackDataflowSummary stackSummary = analyzeStackArrayAndCallbackDataflow(
+                binaryClassName,
+                rm,
+                code,
+                utf8Pool,
+                classNameIdx,
+                fieldClassIdx,
+                fieldNatIdx,
+                methodClassIdx,
+                methodNatIdx,
+                natNameIdx,
+                natDescIdx,
+                indyBootstrapIdx,
+                indyNatIdx,
+                bootstrapTargetMethods,
+                bootstrapFactoryOwner
+        );
+        collectionAddedFields.addAll(stackSummary.collectionAddedFields());
+        collectionRemovedFields.addAll(stackSummary.collectionRemovedFields());
+        writtenFields.addAll(stackSummary.collectionMutatedDirectFields());
+        if (returnedField.isEmpty() && !stackSummary.returnedField().isEmpty()) {
+            returnedField = stackSummary.returnedField();
+        }
+
         return new MethodNode(
                 binaryClassName,
                 rm.name(),
@@ -3467,6 +3890,10 @@ public final class BytecodeCausalGraphScanner {
                 callsAccessOrderLinkedHashMap,
                 collectionAddedFields,
                 collectionRemovedFields,
+                stackSummary.arrayMutatedFields(),
+                stackSummary.receiverMutatedFields(),
+                stackSummary.dynamicFunctionalDispatches(),
+                stackSummary.asyncFunctionalDispatches(),
                 returnedField
         );
     }
@@ -5000,4 +5427,1523 @@ public final class BytecodeCausalGraphScanner {
           }
           return null;
       }
-  }
+
+    // =========================================================================
+    // CFG Operand-Stack & Local-Slot Array / Callback Dataflow Analyzer
+    // =========================================================================
+
+    private static final Map<String, String> JDK_FUNCTIONAL_SAM_METHODS = Map.ofEntries(
+            Map.entry("java.lang.Runnable", "run"),
+            Map.entry("java.util.concurrent.Callable", "call"),
+            Map.entry("java.security.PrivilegedAction", "run"),
+            Map.entry("java.security.PrivilegedExceptionAction", "run"),
+            Map.entry("java.util.Comparator", "compare"),
+            Map.entry("java.util.function.Supplier", "get"),
+            Map.entry("java.util.function.BooleanSupplier", "getAsBoolean"),
+            Map.entry("java.util.function.IntSupplier", "getAsInt"),
+            Map.entry("java.util.function.LongSupplier", "getAsLong"),
+            Map.entry("java.util.function.DoubleSupplier", "getAsDouble"),
+            Map.entry("java.util.function.Consumer", "accept"),
+            Map.entry("java.util.function.BiConsumer", "accept"),
+            Map.entry("java.util.function.IntConsumer", "accept"),
+            Map.entry("java.util.function.LongConsumer", "accept"),
+            Map.entry("java.util.function.DoubleConsumer", "accept"),
+            Map.entry("java.util.function.ObjIntConsumer", "accept"),
+            Map.entry("java.util.function.ObjLongConsumer", "accept"),
+            Map.entry("java.util.function.ObjDoubleConsumer", "accept"),
+            Map.entry("java.util.function.Function", "apply"),
+            Map.entry("java.util.function.BiFunction", "apply"),
+            Map.entry("java.util.function.UnaryOperator", "apply"),
+            Map.entry("java.util.function.BinaryOperator", "apply"),
+            Map.entry("java.util.function.IntFunction", "apply"),
+            Map.entry("java.util.function.LongFunction", "apply"),
+            Map.entry("java.util.function.DoubleFunction", "apply"),
+            Map.entry("java.util.function.ToIntFunction", "applyAsInt"),
+            Map.entry("java.util.function.ToLongFunction", "applyAsLong"),
+            Map.entry("java.util.function.ToDoubleFunction", "applyAsDouble"),
+            Map.entry("java.util.function.ToIntBiFunction", "applyAsInt"),
+            Map.entry("java.util.function.ToLongBiFunction", "applyAsLong"),
+            Map.entry("java.util.function.ToDoubleBiFunction", "applyAsDouble"),
+            Map.entry("java.util.function.IntUnaryOperator", "applyAsInt"),
+            Map.entry("java.util.function.LongUnaryOperator", "applyAsLong"),
+            Map.entry("java.util.function.DoubleUnaryOperator", "applyAsDouble"),
+            Map.entry("java.util.function.IntBinaryOperator", "applyAsInt"),
+            Map.entry("java.util.function.LongBinaryOperator", "applyAsLong"),
+            Map.entry("java.util.function.DoubleBinaryOperator", "applyAsDouble"),
+            Map.entry("java.util.function.IntToLongFunction", "applyAsLong"),
+            Map.entry("java.util.function.IntToDoubleFunction", "applyAsDouble"),
+            Map.entry("java.util.function.LongToIntFunction", "applyAsInt"),
+            Map.entry("java.util.function.LongToDoubleFunction", "applyAsDouble"),
+            Map.entry("java.util.function.DoubleToIntFunction", "applyAsInt"),
+            Map.entry("java.util.function.DoubleToLongFunction", "applyAsLong"),
+            Map.entry("java.util.function.Predicate", "test"),
+            Map.entry("java.util.function.BiPredicate", "test"),
+            Map.entry("java.util.function.IntPredicate", "test"),
+            Map.entry("java.util.function.LongPredicate", "test"),
+            Map.entry("java.util.function.DoublePredicate", "test")
+    );
+
+    static String samMethodForJdkFunctionalInterface(String binaryClassName) {
+        return JDK_FUNCTIONAL_SAM_METHODS.get(binaryClassName);
+    }
+
+    private static String extractReturnObjectBinaryName(String methodDescriptor) {
+        if (methodDescriptor == null) {
+            return null;
+        }
+        int closeParen = methodDescriptor.indexOf(')');
+        if (closeParen < 0 || closeParen + 2 >= methodDescriptor.length()) {
+            return null;
+        }
+        String ret = methodDescriptor.substring(closeParen + 1);
+        if (ret.startsWith("L") && ret.endsWith(";") && ret.length() > 2) {
+            return ret.substring(1, ret.length() - 1).replace('/', '.');
+        }
+        return null;
+    }
+
+    private record StackDataflowSummary(
+            Set<String> arrayMutatedFields,
+            Set<String> receiverMutatedFields,
+            Set<String> collectionAddedFields,
+            Set<String> collectionRemovedFields,
+            Set<String> collectionMutatedDirectFields,
+            Set<String> dynamicFunctionalDispatches,
+            Set<String> asyncFunctionalDispatches,
+            String returnedField
+    ) {
+    }
+
+    private record StackVal(
+            int category,
+            boolean isNullConst,
+            boolean isFreshArray,
+            boolean isFreshObject,
+            boolean isInlineCallback,
+            boolean isUnknownRef,
+            Set<String> sources
+    ) {
+        static final StackVal OTHER_1 = new StackVal(1, false, false, false, false, false, Set.of());
+        static final StackVal OTHER_2 = new StackVal(2, false, false, false, false, false, Set.of());
+        static final StackVal NULL_1 = new StackVal(1, true, false, false, false, false, Set.of());
+        static final StackVal NEW_ARRAY_1 = new StackVal(1, false, true, false, false, false, Set.of());
+        static final StackVal NEW_OBJECT_1 = new StackVal(1, false, false, true, true, false, Set.of());
+        static final StackVal INLINE_CB_1 = new StackVal(1, false, false, true, true, false, Set.of());
+        static final StackVal UNKNOWN_1 = new StackVal(1, false, false, false, false, true, Set.of());
+
+        static StackVal knownSource(String src) {
+            return new StackVal(1, false, false, false, false, false, Set.of(src));
+        }
+
+        StackVal asArrayElementLoad() {
+            if (isFreshArray) {
+                return NEW_ARRAY_1;
+            }
+            if (!sources.isEmpty()) {
+                return new StackVal(1, false, false, false, false, isUnknownRef, sources);
+            }
+            return UNKNOWN_1;
+        }
+
+        static StackVal merge(StackVal a, StackVal b) {
+            if (a == null) {
+                return b;
+            }
+            if (b == null || a.equals(b)) {
+                return a;
+            }
+            if (a.isNullConst) {
+                return b;
+            }
+            if (b.isNullConst) {
+                return a;
+            }
+            int cat = Math.max(a.category, b.category);
+            boolean freshArr = a.isFreshArray && b.isFreshArray;
+            boolean freshObj = a.isFreshObject && b.isFreshObject;
+            boolean inlineCb = a.isInlineCallback && b.isInlineCallback;
+            Set<String> mergedSources;
+            if (a.sources.isEmpty()) {
+                mergedSources = b.sources;
+            } else if (b.sources.isEmpty()) {
+                mergedSources = a.sources;
+            } else if (a.sources.equals(b.sources)) {
+                mergedSources = a.sources;
+            } else {
+                Set<String> union = new LinkedHashSet<>(a.sources);
+                union.addAll(b.sources);
+                mergedSources = Collections.unmodifiableSet(union);
+            }
+            boolean aHasNonSourceRef = a.isUnknownRef
+                    || (a.sources.isEmpty() && !a.isFreshArray && !a.isFreshObject && !a.isInlineCallback);
+            boolean bHasNonSourceRef = b.isUnknownRef
+                    || (b.sources.isEmpty() && !b.isFreshArray && !b.isFreshObject && !b.isInlineCallback);
+            boolean unknown = a.isUnknownRef || b.isUnknownRef
+                    || (!mergedSources.isEmpty() && (aHasNonSourceRef || bHasNonSourceRef))
+                    || (a.isFreshArray != b.isFreshArray && mergedSources.isEmpty())
+                    || (a.isFreshObject != b.isFreshObject && mergedSources.isEmpty());
+            return new StackVal(cat, false, freshArr, freshObj, inlineCb, unknown, mergedSources);
+        }
+    }
+
+    private static final class AbstractFrame {
+        private final StackVal[] locals;
+        private final List<StackVal> stack;
+        private boolean underflowed;
+        private boolean stackHeightMismatch;
+
+        AbstractFrame(StackVal[] locals, List<StackVal> stack) {
+            this.locals = locals;
+            this.stack = stack;
+        }
+
+        AbstractFrame copy() {
+            AbstractFrame dup = new AbstractFrame(locals.clone(), new ArrayList<>(stack));
+            dup.underflowed = this.underflowed;
+            dup.stackHeightMismatch = this.stackHeightMismatch;
+            return dup;
+        }
+
+        void push(StackVal v) {
+            stack.add(v != null ? v : StackVal.UNKNOWN_1);
+        }
+
+        StackVal pop() {
+            if (stack.isEmpty()) {
+                underflowed = true;
+                return StackVal.UNKNOWN_1;
+            }
+            return stack.remove(stack.size() - 1);
+        }
+
+        StackVal getLocal(int slot) {
+            if (slot < 0 || slot >= locals.length) {
+                return StackVal.UNKNOWN_1;
+            }
+            StackVal v = locals[slot];
+            return v != null ? v : StackVal.UNKNOWN_1;
+        }
+
+        void setLocal(int slot, StackVal v) {
+            if (slot >= 0 && slot < locals.length) {
+                locals[slot] = v;
+                if (v != null && v.category == 2 && slot + 1 < locals.length) {
+                    locals[slot + 1] = StackVal.OTHER_1;
+                }
+            }
+        }
+
+        boolean mergeFrom(AbstractFrame incoming) {
+            boolean changed = false;
+            int len = Math.min(this.locals.length, incoming.locals.length);
+            for (int i = 0; i < len; i++) {
+                StackVal merged = StackVal.merge(this.locals[i], incoming.locals[i]);
+                if (!Objects.equals(this.locals[i], merged)) {
+                    this.locals[i] = merged;
+                    changed = true;
+                }
+            }
+            if (this.stack.size() != incoming.stack.size()) {
+                this.stackHeightMismatch = true;
+                int min = Math.min(this.stack.size(), incoming.stack.size());
+                for (int i = 0; i < min; i++) {
+                    StackVal merged = StackVal.merge(this.stack.get(i), incoming.stack.get(i));
+                    if (!Objects.equals(this.stack.get(i), merged)) {
+                        this.stack.set(i, merged);
+                        changed = true;
+                    }
+                }
+                for (int i = this.stack.size(); i < incoming.stack.size(); i++) {
+                    this.stack.add(incoming.stack.get(i));
+                    changed = true;
+                }
+            } else {
+                for (int i = 0; i < this.stack.size(); i++) {
+                    StackVal merged = StackVal.merge(this.stack.get(i), incoming.stack.get(i));
+                    if (!Objects.equals(this.stack.get(i), merged)) {
+                        this.stack.set(i, merged);
+                        changed = true;
+                    }
+                }
+            }
+            return changed;
+        }
+    }
+
+    private static StackDataflowSummary analyzeStackArrayAndCallbackDataflow(
+            String binaryClassName,
+            RawMethodData rm,
+            byte[] code,
+            String[] utf8Pool,
+            int[] classNameIdx,
+            int[] fieldClassIdx,
+            int[] fieldNatIdx,
+            int[] methodClassIdx,
+            int[] methodNatIdx,
+            int[] natNameIdx,
+            int[] natDescIdx,
+            int[] indyBootstrapIdx,
+            int[] indyNatIdx,
+            Map<Integer, List<String>> bootstrapTargetMethods,
+            Map<Integer, String> bootstrapFactoryOwner
+    ) {
+        String methodSym = binaryClassName + "#" + rm.name();
+        Set<String> arrayMutated = new LinkedHashSet<>();
+        Set<String> receiverMutated = new LinkedHashSet<>();
+        Set<String> collAdded = new LinkedHashSet<>();
+        Set<String> collRemoved = new LinkedHashSet<>();
+        Set<String> collDirectWritten = new LinkedHashSet<>();
+        Set<String> dynamicFnDispatches = new LinkedHashSet<>();
+        Set<String> asyncFnDispatches = new LinkedHashSet<>();
+        Set<String> returnedFieldSources = new LinkedHashSet<>();
+        boolean[] sawOpaqueReturn = new boolean[]{false};
+        Set<String> freshRefArrayEscapedSources = new LinkedHashSet<>();
+        boolean[] freshRefArrayEscapedUnknown = new boolean[]{false};
+
+        String abortReason = validateLinearCodeWellFormedness(code, indyBootstrapIdx);
+
+        List<String> paramDescs = parseMethodParamDescriptors(rm.descriptor());
+        int maxLocals = computeMaxLocalSlots(rm.accessFlags(), paramDescs, code);
+        StackVal[] entryLocals = new StackVal[maxLocals];
+        int slotCursor = 0;
+        if ((rm.accessFlags() & ACC_STATIC) == 0 && slotCursor < maxLocals) {
+            entryLocals[slotCursor++] = StackVal.UNKNOWN_1;
+        }
+        for (String pDesc : paramDescs) {
+            boolean cat2 = "J".equals(pDesc) || "D".equals(pDesc);
+            boolean ref = pDesc.startsWith("L") || pDesc.startsWith("[");
+            if (slotCursor < maxLocals) {
+                entryLocals[slotCursor] = ref ? StackVal.UNKNOWN_1 : (cat2 ? StackVal.OTHER_2 : StackVal.OTHER_1);
+            }
+            slotCursor += cat2 ? 2 : 1;
+        }
+        for (int i = slotCursor; i < maxLocals; i++) {
+            entryLocals[i] = StackVal.OTHER_1;
+        }
+
+        AbstractFrame[] frames = new AbstractFrame[code.length];
+        boolean[] queued = new boolean[code.length];
+        Deque<Integer> worklist = new ArrayDeque<>();
+        if (abortReason == null) {
+            for (ExceptionEntry ex : rm.exceptionTable()) {
+                if (ex.handlerPc() < 0 || ex.handlerPc() >= code.length) {
+                    abortReason = "invalid-exception-handler-pc=" + ex.handlerPc();
+                    break;
+                }
+            }
+        }
+        if (abortReason == null && code.length > 0) {
+            frames[0] = new AbstractFrame(entryLocals, new ArrayList<>());
+            queued[0] = true;
+            worklist.add(0);
+        }
+
+        int stepBudget = Math.max(4096, code.length * 10);
+        int steps = 0;
+        int freshArrayResets = 0;
+        boolean seededUnreachedHandlers = false;
+
+        while (abortReason == null) {
+            if (worklist.isEmpty()) {
+                if (!seededUnreachedHandlers) {
+                    seededUnreachedHandlers = true;
+                    seedUnreachedExceptionHandlers(rm, code.length, entryLocals, frames, queued, worklist);
+                    if (!worklist.isEmpty()) {
+                        continue;
+                    }
+                }
+                break;
+            }
+            int pc = worklist.poll();
+            queued[pc] = false;
+            if (++steps > stepBudget) {
+                abortReason = "step-budget-exceeded(limit=" + stepBudget + ")";
+                break;
+            }
+            int op = code[pc] & 0xFF;
+            int insLen = instructionLength(code, pc);
+            if (insLen <= 0 || pc + insLen > code.length) {
+                abortReason = "malformed-or-truncated-instruction@pc=" + pc;
+                break;
+            }
+            if (!propagateExceptionEdgesFromPc(pc, frames[pc], rm, code.length, frames, queued, worklist)) {
+                abortReason = "invalid-exception-handler-merge@pc=" + pc;
+                break;
+            }
+            AbstractFrame cur = frames[pc].copy();
+            int nextPc = pc + insLen;
+            boolean fallsThrough = true;
+
+            switch (op) {
+                case 0x00, 0x84 -> { // NOP, IINC
+                }
+                case 0x01 -> cur.push(StackVal.NULL_1);
+                case 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                        0x0B, 0x0C, 0x0D, 0x10, 0x11, 0x12, 0x13,
+                        0x15, 0x17, 0x1A, 0x1B, 0x1C, 0x1D,
+                        0x22, 0x23, 0x24, 0x25 -> cur.push(StackVal.OTHER_1);
+                case 0x09, 0x0A, 0x0E, 0x0F, 0x14,
+                        0x16, 0x18, 0x1E, 0x1F, 0x20, 0x21,
+                        0x26, 0x27, 0x28, 0x29 -> cur.push(StackVal.OTHER_2);
+                case 0x19 -> cur.push(cur.getLocal(code[pc + 1] & 0xFF));
+                case 0x2A, 0x2B, 0x2C, 0x2D -> cur.push(cur.getLocal(op - 0x2A));
+                case 0x2E, 0x30, 0x33, 0x34, 0x35 -> { // IALOAD, FALOAD, BALOAD, CALOAD, SALOAD
+                    cur.pop();
+                    cur.pop();
+                    cur.push(StackVal.OTHER_1);
+                }
+                case 0x2F, 0x31 -> { // LALOAD, DALOAD
+                    cur.pop();
+                    cur.pop();
+                    cur.push(StackVal.OTHER_2);
+                }
+                case 0x32 -> { // AALOAD
+                    cur.pop();
+                    StackVal arr = cur.pop();
+                    if (arr.isFreshArray
+                            && (freshRefArrayEscapedUnknown[0] || !freshRefArrayEscapedSources.isEmpty())) {
+                        cur.push(new StackVal(
+                                1,
+                                false,
+                                false,
+                                false,
+                                false,
+                                freshRefArrayEscapedUnknown[0],
+                                Set.copyOf(freshRefArrayEscapedSources)
+                        ));
+                    } else {
+                        cur.push(arr.asArrayElementLoad());
+                    }
+                }
+                case 0x36, 0x38 -> cur.setLocal(code[pc + 1] & 0xFF, popAndReturn(cur, StackVal.OTHER_1));
+                case 0x3B, 0x3C, 0x3D, 0x3E -> cur.setLocal(op - 0x3B, popAndReturn(cur, StackVal.OTHER_1));
+                case 0x43, 0x44, 0x45, 0x46 -> cur.setLocal(op - 0x43, popAndReturn(cur, StackVal.OTHER_1));
+                case 0x37, 0x39 -> cur.setLocal(code[pc + 1] & 0xFF, popAndReturn(cur, StackVal.OTHER_2));
+                case 0x3F, 0x40, 0x41, 0x42 -> cur.setLocal(op - 0x3F, popAndReturn(cur, StackVal.OTHER_2));
+                case 0x47, 0x48, 0x49, 0x4A -> cur.setLocal(op - 0x47, popAndReturn(cur, StackVal.OTHER_2));
+                case 0x3A -> cur.setLocal(code[pc + 1] & 0xFF, cur.pop());
+                case 0x4B, 0x4C, 0x4D, 0x4E -> cur.setLocal(op - 0x4B, cur.pop());
+                case 0x4F, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56 -> { // IASTORE..SASTORE
+                    StackVal val = cur.pop(); // value
+                    cur.pop(); // index
+                    StackVal arr = cur.pop(); // arrayref
+                    if (op == 0x53 && arr.isFreshArray && !val.isNullConst && !val.isFreshArray) {
+                        boolean added = freshRefArrayEscapedSources.addAll(val.sources);
+                        if ((val.isUnknownRef || val.sources.isEmpty()) && !freshRefArrayEscapedUnknown[0]) {
+                            freshRefArrayEscapedUnknown[0] = true;
+                            added = true;
+                        }
+                        if (added && !queued[0]) {
+                            if (++freshArrayResets > 8) {
+                                abortReason = "excessive-fresh-array-escape-resets";
+                                break;
+                            }
+                            // Re-propagate AALOAD consumers of fresh reference arrays and exception edges
+                            for (int resetPc = 1; resetPc < frames.length; resetPc++) {
+                                frames[resetPc] = null;
+                                queued[resetPc] = false;
+                            }
+                            worklist.clear();
+                            seededUnreachedHandlers = false;
+                            queued[0] = true;
+                            worklist.add(0);
+                            fallsThrough = false;
+                        }
+                    }
+                    recordArrayMutationFromSlot(arr, methodSym, arrayMutated);
+                }
+                case 0x57 -> cur.pop(); // POP
+                case 0x58 -> { // POP2
+                    StackVal v1 = cur.pop();
+                    if (v1.category == 1) {
+                        cur.pop();
+                    }
+                }
+                case 0x59 -> { // DUP
+                    StackVal v1 = cur.pop();
+                    cur.push(v1);
+                    cur.push(v1);
+                }
+                case 0x5A -> { // DUP_X1
+                    StackVal v1 = cur.pop();
+                    StackVal v2 = cur.pop();
+                    cur.push(v1);
+                    cur.push(v2);
+                    cur.push(v1);
+                }
+                case 0x5B -> { // DUP_X2
+                    StackVal v1 = cur.pop();
+                    StackVal v2 = cur.pop();
+                    if (v2.category == 2) {
+                        cur.push(v1);
+                        cur.push(v2);
+                        cur.push(v1);
+                    } else {
+                        StackVal v3 = cur.pop();
+                        cur.push(v1);
+                        cur.push(v3);
+                        cur.push(v2);
+                        cur.push(v1);
+                    }
+                }
+                case 0x5C -> { // DUP2
+                    StackVal v1 = cur.pop();
+                    if (v1.category == 2) {
+                        cur.push(v1);
+                        cur.push(v1);
+                    } else {
+                        StackVal v2 = cur.pop();
+                        cur.push(v2);
+                        cur.push(v1);
+                        cur.push(v2);
+                        cur.push(v1);
+                    }
+                }
+                case 0x5D -> { // DUP2_X1
+                    StackVal v1 = cur.pop();
+                    if (v1.category == 2) {
+                        StackVal v2 = cur.pop();
+                        cur.push(v1);
+                        cur.push(v2);
+                        cur.push(v1);
+                    } else {
+                        StackVal v2 = cur.pop();
+                        StackVal v3 = cur.pop();
+                        cur.push(v2);
+                        cur.push(v1);
+                        cur.push(v3);
+                        cur.push(v2);
+                        cur.push(v1);
+                    }
+                }
+                case 0x5E -> { // DUP2_X2
+                    StackVal v1 = cur.pop();
+                    if (v1.category == 2) {
+                        StackVal v2 = cur.pop();
+                        if (v2.category == 2) {
+                            cur.push(v1);
+                            cur.push(v2);
+                            cur.push(v1);
+                        } else {
+                            StackVal v3 = cur.pop();
+                            cur.push(v1);
+                            cur.push(v3);
+                            cur.push(v2);
+                            cur.push(v1);
+                        }
+                    } else {
+                        StackVal v2 = cur.pop();
+                        StackVal v3 = cur.pop();
+                        if (v3.category == 2) {
+                            cur.push(v2);
+                            cur.push(v1);
+                            cur.push(v3);
+                            cur.push(v2);
+                            cur.push(v1);
+                        } else {
+                            StackVal v4 = cur.pop();
+                            cur.push(v2);
+                            cur.push(v1);
+                            cur.push(v4);
+                            cur.push(v3);
+                            cur.push(v2);
+                            cur.push(v1);
+                        }
+                    }
+                }
+                case 0x5F -> { // SWAP
+                    StackVal v1 = cur.pop();
+                    StackVal v2 = cur.pop();
+                    cur.push(v1);
+                    cur.push(v2);
+                }
+                case 0x60, 0x62, 0x64, 0x66, 0x68, 0x6A, 0x6C, 0x6E, 0x70, 0x72,
+                        0x78, 0x7A, 0x7C, 0x7E, 0x80, 0x82,
+                        0x94, 0x95, 0x96, 0x97, 0x98 -> {
+                    cur.pop();
+                    cur.pop();
+                    cur.push(StackVal.OTHER_1);
+                }
+                case 0x61, 0x63, 0x65, 0x67, 0x69, 0x6B, 0x6D, 0x6F, 0x71, 0x73,
+                        0x79, 0x7B, 0x7D, 0x7F, 0x81, 0x83 -> {
+                    cur.pop();
+                    cur.pop();
+                    cur.push(StackVal.OTHER_2);
+                }
+                case 0x74, 0x76, 0x86, 0x88, 0x89, 0x8B, 0x8E, 0x90, 0x91, 0x92, 0x93 -> {
+                    cur.pop();
+                    cur.push(StackVal.OTHER_1);
+                }
+                case 0x75, 0x77, 0x85, 0x87, 0x8A, 0x8C, 0x8D, 0x8F -> {
+                    cur.pop();
+                    cur.push(StackVal.OTHER_2);
+                }
+                case 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0xC6, 0xC7 -> { // IFEQ..IFLE, IFNULL, IFNONNULL
+                    cur.pop();
+                    short rel = (short) (((code[pc + 1] & 0xFF) << 8) | (code[pc + 2] & 0xFF));
+                    if (!propagateFrameToTarget(pc + rel, cur, code.length, frames, queued, worklist)) {
+                        abortReason = "invalid-branch-or-ambiguous-stack@pc=" + pc;
+                    }
+                }
+                case 0x9F, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6 -> { // IF_ICMP*, IF_ACMP*
+                    cur.pop();
+                    cur.pop();
+                    short rel = (short) (((code[pc + 1] & 0xFF) << 8) | (code[pc + 2] & 0xFF));
+                    if (!propagateFrameToTarget(pc + rel, cur, code.length, frames, queued, worklist)) {
+                        abortReason = "invalid-branch-or-ambiguous-stack@pc=" + pc;
+                    }
+                }
+                case 0xA7 -> { // GOTO
+                    fallsThrough = false;
+                    short rel = (short) (((code[pc + 1] & 0xFF) << 8) | (code[pc + 2] & 0xFF));
+                    if (!propagateFrameToTarget(pc + rel, cur, code.length, frames, queued, worklist)) {
+                        abortReason = "invalid-goto-or-ambiguous-stack@pc=" + pc;
+                    }
+                }
+                case 0xC8 -> { // GOTO_W
+                    fallsThrough = false;
+                    int rel = readInt(code, pc + 1);
+                    if (!propagateFrameToTarget(pc + rel, cur, code.length, frames, queued, worklist)) {
+                        abortReason = "invalid-gotow-or-ambiguous-stack@pc=" + pc;
+                    }
+                }
+                case 0xA8, 0xA9, 0xC9 -> { // Legacy pre-Java-7 JSR / RET / JSR_W
+                    fallsThrough = false;
+                    abortReason = "unsupported-legacy-jsr-ret-opcode:0x" + Integer.toHexString(op);
+                }
+                case 0xB1 -> fallsThrough = false; // RETURN
+                case 0xAC, 0xAD, 0xAE, 0xAF, 0xBF -> { // IRETURN..DRETURN, ATHROW
+                    cur.pop();
+                    fallsThrough = false;
+                }
+                case 0xB0 -> { // ARETURN
+                    StackVal ret = cur.pop();
+                    fallsThrough = false;
+                    if (!ret.isNullConst) {
+                        if (!ret.sources.isEmpty() && !ret.isUnknownRef && !ret.isFreshArray) {
+                            returnedFieldSources.addAll(ret.sources);
+                        } else {
+                            sawOpaqueReturn[0] = true;
+                        }
+                    }
+                }
+                case 0xAA -> { // TABLESWITCH
+                    cur.pop();
+                    fallsThrough = false;
+                    int aligned = (pc + 4) & ~3;
+                    int defOff = readInt(code, aligned);
+                    int low = readInt(code, aligned + 4);
+                    int high = readInt(code, aligned + 8);
+                    if (!propagateFrameToTarget(pc + defOff, cur, code.length, frames, queued, worklist)) {
+                        abortReason = "invalid-tableswitch-default@pc=" + pc;
+                        break;
+                    }
+                    int count = high - low + 1;
+                    for (int idx = 0; idx < count; idx++) {
+                        int caseOff = readInt(code, aligned + 12 + idx * 4);
+                        if (!propagateFrameToTarget(pc + caseOff, cur, code.length, frames, queued, worklist)) {
+                            abortReason = "invalid-tableswitch-target@pc=" + pc;
+                            break;
+                        }
+                    }
+                }
+                case 0xAB -> { // LOOKUPSWITCH
+                    cur.pop();
+                    fallsThrough = false;
+                    int aligned = (pc + 4) & ~3;
+                    int defOff = readInt(code, aligned);
+                    int npairs = readInt(code, aligned + 4);
+                    if (!propagateFrameToTarget(pc + defOff, cur, code.length, frames, queued, worklist)) {
+                        abortReason = "invalid-lookupswitch-default@pc=" + pc;
+                        break;
+                    }
+                    for (int idx = 0; idx < npairs; idx++) {
+                        int caseOff = readInt(code, aligned + 12 + idx * 8);
+                        if (!propagateFrameToTarget(pc + caseOff, cur, code.length, frames, queued, worklist)) {
+                            abortReason = "invalid-lookupswitch-target@pc=" + pc;
+                            break;
+                        }
+                    }
+                }
+                case 0xB2, 0xB4 -> { // GETSTATIC, GETFIELD
+                    if (op == 0xB4) {
+                        cur.pop(); // receiver
+                    }
+                    int fCpIdx = readUnsignedShort(code, pc + 1);
+                    String fOwner = (fCpIdx > 0 && fCpIdx < fieldClassIdx.length)
+                            ? resolveClassName(fieldClassIdx[fCpIdx], classNameIdx, utf8Pool)
+                            : null;
+                    String fName = resolveFieldName(fCpIdx, fieldNatIdx, natNameIdx, utf8Pool);
+                    String fDesc = resolveMethodDesc(fCpIdx, fieldNatIdx, natDescIdx, utf8Pool);
+                    cur.push(classifyLoadedFieldStackVal(fOwner, fName, fDesc));
+                }
+                case 0xB3 -> cur.pop(); // PUTSTATIC
+                case 0xB5 -> { // PUTFIELD
+                    cur.pop(); // value
+                    cur.pop(); // receiver
+                }
+                case 0xB6, 0xB7, 0xB8, 0xB9 -> { // INVOKEVIRTUAL, INVOKESPECIAL, INVOKESTATIC, INVOKEINTERFACE
+                    int mCpIdx = readUnsignedShort(code, pc + 1);
+                    String mOwnerInternal = (mCpIdx > 0 && mCpIdx < methodClassIdx.length)
+                            ? resolveClassName(methodClassIdx[mCpIdx], classNameIdx, utf8Pool)
+                            : null;
+                    String mName = resolveMethodName(mCpIdx, methodNatIdx, natNameIdx, utf8Pool);
+                    String mDesc = resolveMethodDesc(mCpIdx, methodNatIdx, natDescIdx, utf8Pool);
+                    if (mDesc == null || !mDesc.startsWith("(") || mDesc.indexOf(')') < 0) {
+                        abortReason = "malformed-invoke-descriptor@pc=" + pc;
+                        break;
+                    }
+                    List<String> callArgDescs = parseMethodParamDescriptors(mDesc);
+                    StackVal[] callArgs = new StackVal[callArgDescs.size()];
+                    for (int a = callArgDescs.size() - 1; a >= 0; a--) {
+                        callArgs[a] = cur.pop();
+                    }
+                    StackVal receiver = (op != 0xB8) ? cur.pop() : null;
+                    inspectStackInvocationEffects(
+                            methodSym,
+                            mOwnerInternal,
+                            mName,
+                            mDesc,
+                            receiver,
+                            callArgDescs,
+                            callArgs,
+                            arrayMutated,
+                            receiverMutated,
+                            collAdded,
+                            collRemoved,
+                            collDirectWritten,
+                            dynamicFnDispatches,
+                            asyncFnDispatches
+                    );
+                    StackVal retVal = classifyMethodReturnStackVal(mOwnerInternal, mName, mDesc, receiver, callArgs);
+                    if (retVal != null) {
+                        cur.push(retVal);
+                    }
+                }
+                case 0xBA -> { // INVOKEDYNAMIC
+                    int indyCpIdx = readUnsignedShort(code, pc + 1);
+                    int natIdx = (indyCpIdx > 0 && indyCpIdx < indyNatIdx.length) ? indyNatIdx[indyCpIdx] : 0;
+                    String indyDesc = (natIdx > 0 && natIdx < natDescIdx.length)
+                            ? safeUtf8(utf8Pool, natDescIdx[natIdx])
+                            : null;
+                    if (indyDesc == null || !indyDesc.startsWith("(") || indyDesc.indexOf(')') < 0) {
+                        abortReason = "malformed-invokedynamic-descriptor@pc=" + pc;
+                        break;
+                    }
+                    List<String> indyArgs = parseMethodParamDescriptors(indyDesc);
+                    for (int a = 0; a < indyArgs.size(); a++) {
+                        cur.pop();
+                    }
+                    int bsmIdx = (indyCpIdx > 0 && indyCpIdx < indyBootstrapIdx.length)
+                            ? indyBootstrapIdx[indyCpIdx]
+                            : -1;
+                    boolean hasLambdaTarget = bsmIdx >= 0
+                            && !bootstrapTargetMethods.getOrDefault(bsmIdx, List.of()).isEmpty();
+                    if (!hasLambdaTarget) {
+                        String bsmOwner = bsmIdx >= 0 ? bootstrapFactoryOwner.get(bsmIdx) : null;
+                        if (!isPureJdkCompilerBootstrapFactory(bsmOwner)) {
+                            dynamicFnDispatches.add("UNKNOWN_INDY:" + methodSym);
+                        }
+                    }
+                    String retPart = indyDesc.substring(indyDesc.indexOf(')') + 1);
+                    if (!"V".equals(retPart)) {
+                        if ("J".equals(retPart) || "D".equals(retPart)) {
+                            cur.push(StackVal.OTHER_2);
+                        } else if (hasLambdaTarget) {
+                            cur.push(StackVal.INLINE_CB_1);
+                        } else if (retPart.startsWith("L") || retPart.startsWith("[")) {
+                            cur.push(StackVal.UNKNOWN_1);
+                        } else {
+                            cur.push(StackVal.OTHER_1);
+                        }
+                    }
+                }
+                case 0xBB -> cur.push(StackVal.NEW_OBJECT_1); // NEW
+                case 0xBC, 0xBD -> { // NEWARRAY, ANEWARRAY
+                    cur.pop();
+                    cur.push(StackVal.NEW_ARRAY_1);
+                }
+                case 0xBE, 0xC1 -> { // ARRAYLENGTH, INSTANCEOF
+                    cur.pop();
+                    cur.push(StackVal.OTHER_1);
+                }
+                case 0xC0 -> { // CHECKCAST preserves underlying origin
+                    StackVal castTarget = cur.pop();
+                    cur.push(castTarget);
+                }
+                case 0xC2, 0xC3 -> cur.pop(); // MONITORENTER, MONITOREXIT
+                case 0xC4 -> { // WIDE
+                    int subOp = code[pc + 1] & 0xFF;
+                    int wideSlot = readUnsignedShort(code, pc + 2);
+                    switch (subOp) {
+                        case 0x19 -> cur.push(cur.getLocal(wideSlot));
+                        case 0x15, 0x17 -> cur.push(StackVal.OTHER_1);
+                        case 0x16, 0x18 -> cur.push(StackVal.OTHER_2);
+                        case 0x3A -> cur.setLocal(wideSlot, cur.pop());
+                        case 0x36, 0x38 -> cur.setLocal(wideSlot, popAndReturn(cur, StackVal.OTHER_1));
+                        case 0x37, 0x39 -> cur.setLocal(wideSlot, popAndReturn(cur, StackVal.OTHER_2));
+                        case 0x84 -> { // WIDE IINC
+                        }
+                        default -> abortReason = "unsupported-wide-subopcode:0x" + Integer.toHexString(subOp);
+                    }
+                }
+                case 0xC5 -> { // MULTIANEWARRAY
+                    int dims = code[pc + 3] & 0xFF;
+                    for (int d = 0; d < dims; d++) {
+                        cur.pop();
+                    }
+                    cur.push(StackVal.NEW_ARRAY_1);
+                }
+                default -> abortReason = "unsupported-opcode:0x" + Integer.toHexString(op) + "@pc=" + pc;
+            }
+
+            if (cur.underflowed) {
+                abortReason = "operand-stack-underflow@pc=" + pc;
+                break;
+            }
+
+            if (abortReason == null && fallsThrough && nextPc < code.length) {
+                if (!propagateFrameToTarget(nextPc, cur, code.length, frames, queued, worklist)) {
+                    abortReason = "invalid-fallthrough-or-ambiguous-stack@pc=" + nextPc;
+                    break;
+                }
+            }
+        }
+
+        if (abortReason != null) {
+            String warnKey = methodSym + "|" + abortReason;
+            if (LOGGED_ABORT_WARNINGS.size() < MAX_LOGGED_ABORT_WARNINGS && LOGGED_ABORT_WARNINGS.add(warnKey)) {
+                LOGGER.log(
+                        Level.WARNING,
+                        "[BytecodeCausalGraphScanner] Aborting stack/callback dataflow in "
+                                + methodSym + " (" + abortReason
+                                + "); emitting fail-closed field and callback markers."
+                );
+            } else if (LOGGED_ABORT_WARNINGS.size() >= MAX_LOGGED_ABORT_WARNINGS
+                    && ABORT_WARNING_CAP_LOGGED.compareAndSet(false, true)) {
+                LOGGER.log(
+                        Level.WARNING,
+                        "[BytecodeCausalGraphScanner] Further stack/callback dataflow abort warnings suppressed after "
+                                + MAX_LOGGED_ABORT_WARNINGS
+                                + " unique entries (fail-closed markers remain active)."
+                );
+            }
+            String fieldMarker = "UNKNOWN_ARRAY:" + methodSym;
+            String callbackMarker = "UNRESOLVED_CALLBACK:" + methodSym;
+            arrayMutated.add(fieldMarker);
+            dynamicFnDispatches.add(callbackMarker);
+            asyncFnDispatches.add(callbackMarker);
+            sawOpaqueReturn[0] = true;
+        }
+
+        String resolvedReturnedField = (!sawOpaqueReturn[0] && returnedFieldSources.size() == 1)
+                ? returnedFieldSources.iterator().next()
+                : "";
+        if (resolvedReturnedField.startsWith("GETTER:")) {
+            resolvedReturnedField = "";
+        }
+
+        return new StackDataflowSummary(
+                arrayMutated,
+                receiverMutated,
+                collAdded,
+                collRemoved,
+                collDirectWritten,
+                dynamicFnDispatches,
+                asyncFnDispatches,
+                resolvedReturnedField
+        );
+    }
+
+    private static boolean propagateExceptionEdgesFromPc(
+            int pc,
+            AbstractFrame preInstructionFrame,
+            RawMethodData rm,
+            int codeLength,
+            AbstractFrame[] frames,
+            boolean[] queued,
+            Deque<Integer> worklist
+    ) {
+        if (rm.exceptionTable().isEmpty() || preInstructionFrame == null) {
+            return true;
+        }
+        AbstractFrame handlerIncoming = null;
+        for (ExceptionEntry ex : rm.exceptionTable()) {
+            if (pc >= ex.startPc() && pc < ex.endPc()) {
+                if (handlerIncoming == null) {
+                    List<StackVal> exStack = new ArrayList<>(1);
+                    exStack.add(StackVal.UNKNOWN_1);
+                    handlerIncoming = new AbstractFrame(preInstructionFrame.locals.clone(), exStack);
+                }
+                if (!propagateFrameToTarget(ex.handlerPc(), handlerIncoming, codeLength, frames, queued, worklist)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void seedUnreachedExceptionHandlers(
+            RawMethodData rm,
+            int codeLength,
+            StackVal[] entryLocals,
+            AbstractFrame[] frames,
+            boolean[] queued,
+            Deque<Integer> worklist
+    ) {
+        for (ExceptionEntry ex : rm.exceptionTable()) {
+            int hPc = ex.handlerPc();
+            if (hPc >= 0 && hPc < codeLength && frames[hPc] == null) {
+                StackVal[] handlerLocals = entryLocals.clone();
+                for (int i = 0; i < handlerLocals.length; i++) {
+                    handlerLocals[i] = StackVal.UNKNOWN_1;
+                }
+                List<StackVal> handlerStack = new ArrayList<>(1);
+                handlerStack.add(StackVal.UNKNOWN_1);
+                frames[hPc] = new AbstractFrame(handlerLocals, handlerStack);
+                queued[hPc] = true;
+                worklist.add(hPc);
+            }
+        }
+    }
+
+    private static String validateLinearCodeWellFormedness(byte[] code, int[] indyBootstrapIdx) {
+        int pc = 0;
+        while (pc < code.length) {
+            int op = code[pc] & 0xFF;
+            int insLen = instructionLength(code, pc);
+            if (insLen <= 0 || pc + insLen > code.length) {
+                return "malformed-or-truncated-instruction@pc=" + pc;
+            }
+            if (op >= 0xCA || op == 0xA8 || op == 0xA9 || op == 0xC9) {
+                return "unsupported-opcode:0x" + Integer.toHexString(op) + "@pc=" + pc;
+            }
+            if (op == 0xC4) {
+                int subOp = code[pc + 1] & 0xFF;
+                if (!((subOp >= 0x15 && subOp <= 0x19) || (subOp >= 0x36 && subOp <= 0x3A) || subOp == 0x84)) {
+                    return "unsupported-wide-subopcode:0x" + Integer.toHexString(subOp) + "@pc=" + pc;
+                }
+            } else if (op == 0xBA) {
+                int indyCpIdx = readUnsignedShort(code, pc + 1);
+                if (indyCpIdx <= 0 || indyCpIdx >= indyBootstrapIdx.length) {
+                    return "invalid-invokedynamic-cp-index@pc=" + pc;
+                }
+            }
+            pc += insLen;
+        }
+        return null;
+    }
+
+    private static boolean isPureJdkCompilerBootstrapFactory(String bsmOwnerInternal) {
+        return "java/lang/invoke/StringConcatFactory".equals(bsmOwnerInternal)
+                || "java/lang/runtime/ObjectMethods".equals(bsmOwnerInternal)
+                || "java/lang/runtime/SwitchBootstraps".equals(bsmOwnerInternal);
+    }
+
+    private static StackVal popAndReturn(AbstractFrame cur, StackVal replacement) {
+        cur.pop();
+        return replacement;
+    }
+
+    private static boolean propagateFrameToTarget(
+            int targetPc,
+            AbstractFrame outgoing,
+            int codeLength,
+            AbstractFrame[] frames,
+            boolean[] queued,
+            Deque<Integer> worklist
+    ) {
+        if (targetPc < 0 || targetPc >= codeLength) {
+            return false;
+        }
+        AbstractFrame existing = frames[targetPc];
+        if (existing == null) {
+            frames[targetPc] = outgoing.copy();
+            if (!queued[targetPc]) {
+                queued[targetPc] = true;
+                worklist.add(targetPc);
+            }
+            return true;
+        }
+        boolean changed = existing.mergeFrom(outgoing);
+        if (existing.stackHeightMismatch) {
+            return false;
+        }
+        if (changed && !queued[targetPc]) {
+            queued[targetPc] = true;
+            worklist.add(targetPc);
+        }
+        return true;
+    }
+
+    private static void recordArrayMutationFromSlot(
+            StackVal arrSlot,
+            String methodSym,
+            Set<String> arrayMutatedOut
+    ) {
+        if (arrSlot == null) {
+            arrayMutatedOut.add("UNKNOWN_ARRAY:" + methodSym);
+            return;
+        }
+        if (arrSlot.isNullConst || (arrSlot.isFreshArray && arrSlot.sources.isEmpty() && !arrSlot.isUnknownRef)) {
+            return;
+        }
+        arrayMutatedOut.addAll(arrSlot.sources);
+        if (arrSlot.isUnknownRef || arrSlot.sources.isEmpty()) {
+            arrayMutatedOut.add("UNKNOWN_ARRAY:" + methodSym);
+        }
+    }
+
+    private static void recordReceiverContainerMutation(
+            StackVal receiverSlot,
+            String methodSym,
+            Set<String> receiverMutatedOut
+    ) {
+        if (receiverSlot == null) {
+            receiverMutatedOut.add("UNKNOWN_MUTATION:" + methodSym);
+            return;
+        }
+        if (receiverSlot.isNullConst
+                || ((receiverSlot.isFreshObject || receiverSlot.isFreshArray)
+                && receiverSlot.sources.isEmpty()
+                && !receiverSlot.isUnknownRef)) {
+            return;
+        }
+        receiverMutatedOut.addAll(receiverSlot.sources);
+        if (receiverSlot.isUnknownRef || receiverSlot.sources.isEmpty()) {
+            receiverMutatedOut.add("UNKNOWN_MUTATION:" + methodSym);
+        }
+    }
+
+    private static StackVal classifyLoadedFieldStackVal(String fOwnerInternal, String fName, String fDesc) {
+        if (fDesc == null || fDesc.isEmpty()) {
+            return StackVal.UNKNOWN_1;
+        }
+        if ("J".equals(fDesc) || "D".equals(fDesc)) {
+            return StackVal.OTHER_2;
+        }
+        if (fOwnerInternal != null && fName != null && !fName.startsWith("$")) {
+            if ((fDesc.startsWith("[") || fDesc.startsWith("L")) && !isDeeplyImmutableJdkValueDescriptor(fDesc)) {
+                return StackVal.knownSource(fOwnerInternal.replace('/', '.') + "#" + fName);
+            }
+        }
+        if (fDesc.startsWith("L") || fDesc.startsWith("[")) {
+            return isDeeplyImmutableJdkValueDescriptor(fDesc) ? StackVal.OTHER_1 : StackVal.UNKNOWN_1;
+        }
+        return StackVal.OTHER_1;
+    }
+
+    private static boolean isDeeplyImmutableJdkValueDescriptor(String desc) {
+        return "Ljava/lang/String;".equals(desc)
+                || "Ljava/lang/Integer;".equals(desc)
+                || "Ljava/lang/Long;".equals(desc)
+                || "Ljava/lang/Double;".equals(desc)
+                || "Ljava/lang/Float;".equals(desc)
+                || "Ljava/lang/Short;".equals(desc)
+                || "Ljava/lang/Byte;".equals(desc)
+                || "Ljava/lang/Boolean;".equals(desc)
+                || "Ljava/lang/Character;".equals(desc)
+                || "Ljava/lang/Class;".equals(desc);
+    }
+
+    private static final Set<String> READ_ONLY_ARRAYS_METHODS = Set.of(
+            "copyOf", "copyOfRange",
+            "equals", "deepEquals",
+            "hashCode", "deepHashCode",
+            "toString", "deepToString",
+            "binarySearch", "compare", "compareUnsigned", "mismatch",
+            "stream", "spliterator"
+    );
+
+    private static final Set<String> READ_ONLY_COLLECTION_AND_HOLDER_METHODS = Set.of(
+            "getClass", "hashCode", "equals", "toString", "clone",
+            // Atomic* / Adder / Accumulator read-only queries
+            "get", "getOpaque", "getAcquire", "getPlain", "getReference", "getStamp", "isMarked",
+            "length", "sum", "intValue", "longValue", "floatValue", "doubleValue", "byteValue", "shortValue",
+            // BitSet read-only queries
+            "size", "cardinality", "isEmpty", "nextSetBit", "nextClearBit",
+            "previousSetBit", "previousClearBit", "intersects", "toByteArray", "toLongArray",
+            // Collection / Map / Queue / Iterator read-only queries & view accessors
+            "getOrDefault", "getFirst", "getLast", "getProperty", "propertyNames", "stringPropertyNames",
+            "elementAt", "firstElement", "lastElement", "peek", "peekFirst", "peekLast", "element",
+            "contains", "containsKey", "containsValue", "containsAll", "indexOf", "lastIndexOf",
+            "iterator", "listIterator", "spliterator", "stream", "parallelStream", "elements", "keys",
+            "keySet", "values", "entrySet", "subList", "reversed",
+            "navigableKeySet", "descendingKeySet", "descendingMap", "descendingSet",
+            "headMap", "tailMap", "subMap", "headSet", "tailSet", "comparator",
+            "first", "last", "lower", "floor", "ceiling", "higher",
+            "lowerEntry", "floorEntry", "ceilingEntry", "higherEntry", "firstEntry", "lastEntry",
+            "lowerKey", "floorKey", "ceilingKey", "higherKey", "firstKey", "lastKey",
+            "toArray", "forEach", "forEachRemaining",
+            "hasNext", "hasPrevious", "next", "previous", "nextIndex", "previousIndex", "hasMoreElements", "nextElement",
+            // ThreadLocal read-only
+            "withInitial"
+    );
+
+    private static final Set<String> COMPLETABLE_FUTURE_MUTATOR_METHODS = Set.of(
+            "complete", "completeAsync", "completeExceptionally", "completeOnTimeout",
+            "orTimeout", "obtrudeValue", "obtrudeException", "cancel"
+    );
+
+    private static boolean isJdkOrSkippedInfrastructureOwner(String ownerInternal) {
+        return ownerInternal.startsWith("java/")
+                || ownerInternal.startsWith("javax/")
+                || ownerInternal.startsWith("jdk/")
+                || ownerInternal.startsWith("sun/")
+                || ownerInternal.startsWith("com/sun/")
+                || ownerInternal.startsWith("org/slf4j/")
+                || ownerInternal.startsWith("org/apache/logging/");
+    }
+
+    private static boolean isKnownReadOnlyJdkArrayCall(String ownerInternal, String methodName) {
+        if ("java/util/Arrays".equals(ownerInternal)) {
+            return READ_ONLY_ARRAYS_METHODS.contains(methodName);
+        }
+        if ("java/util/Objects".equals(ownerInternal)) {
+            return "equals".equals(methodName)
+                    || "deepEquals".equals(methodName)
+                    || "hashCode".equals(methodName)
+                    || "hash".equals(methodName)
+                    || "toString".equals(methodName)
+                    || "requireNonNull".equals(methodName)
+                    || "isNull".equals(methodName)
+                    || "nonNull".equals(methodName);
+        }
+        if ("java/lang/String".equals(ownerInternal)) {
+            return "<init>".equals(methodName)
+                    || "valueOf".equals(methodName)
+                    || "copyValueOf".equals(methodName)
+                    || "format".equals(methodName)
+                    || "join".equals(methodName);
+        }
+        if ("java/util/List".equals(ownerInternal) || "java/util/Set".equals(ownerInternal)) {
+            return "of".equals(methodName) || "copyOf".equals(methodName);
+        }
+        if (ownerInternal.startsWith("java/util/stream/")) {
+            return "of".equals(methodName) || "concat".equals(methodName);
+        }
+        if (ownerInternal.startsWith("org/slf4j/") || ownerInternal.startsWith("java/util/logging/")
+                || ownerInternal.startsWith("org/apache/logging/")) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isJdkCollectionOrMapOwner(String ownerInternal) {
+        return ownerInternal.contains("Collection")
+                || ownerInternal.contains("List")
+                || ownerInternal.contains("Set")
+                || ownerInternal.contains("Map")
+                || ownerInternal.contains("Queue")
+                || ownerInternal.contains("Deque")
+                || "java/util/Vector".equals(ownerInternal)
+                || "java/util/Stack".equals(ownerInternal)
+                || "java/util/Hashtable".equals(ownerInternal)
+                || "java/util/Dictionary".equals(ownerInternal)
+                || "java/util/Properties".equals(ownerInternal)
+                || "java/util/Iterator".equals(ownerInternal)
+                || "java/util/ListIterator".equals(ownerInternal);
+    }
+
+    static boolean isPotentiallyMutatingJdkMethod(String ownerBinary, String methodName) {
+        if (ownerBinary == null || methodName == null) {
+            return false;
+        }
+        String ownerInternal = ownerBinary.replace('.', '/');
+        if ("java/util/Arrays".equals(ownerInternal)) {
+            return !READ_ONLY_ARRAYS_METHODS.contains(methodName);
+        }
+        if ("java/util/Collections".equals(ownerInternal)) {
+            return "fill".equals(methodName)
+                    || "addAll".equals(methodName)
+                    || "replaceAll".equals(methodName)
+                    || "sort".equals(methodName)
+                    || "reverse".equals(methodName)
+                    || "shuffle".equals(methodName)
+                    || "swap".equals(methodName)
+                    || "copy".equals(methodName);
+        }
+        if ("java/lang/System".equals(ownerInternal)) {
+            return "arraycopy".equals(methodName)
+                    || "exit".equals(methodName)
+                    || "setProperty".equals(methodName)
+                    || "clearProperty".equals(methodName);
+        }
+        if ("java/lang/Runtime".equals(ownerInternal)) {
+            return "exec".equals(methodName) || "exit".equals(methodName) || "halt".equals(methodName);
+        }
+        if (ownerInternal.startsWith("java/nio/") && ownerInternal.endsWith("Buffer") && "wrap".equals(methodName)) {
+            return true;
+        }
+        return isMutableJdkHolderOrContainerOwner(ownerInternal)
+                && !isKnownReadOnlyJdkReceiverMethod(ownerInternal, methodName, null);
+    }
+
+    private static boolean isMutableJdkHolderOrContainerOwner(String ownerInternal) {
+        if (ownerInternal.startsWith("java/util/concurrent/atomic/")) {
+            return !ownerInternal.endsWith("FieldUpdater");
+        }
+        if ("java/util/BitSet".equals(ownerInternal)
+                || "java/lang/ThreadLocal".equals(ownerInternal)
+                || "java/lang/InheritableThreadLocal".equals(ownerInternal)
+                || "java/lang/StringBuilder".equals(ownerInternal)
+                || "java/lang/StringBuffer".equals(ownerInternal)
+                || "java/util/concurrent/CompletableFuture".equals(ownerInternal)) {
+            return true;
+        }
+        if (ownerInternal.startsWith("java/nio/") && ownerInternal.endsWith("Buffer")) {
+            return true;
+        }
+        return isJdkCollectionOrMapOwner(ownerInternal);
+    }
+
+    private static boolean isKnownReadOnlyJdkReceiverMethod(String ownerInternal, String methodName, String methodDesc) {
+        if ("java/util/concurrent/CompletableFuture".equals(ownerInternal)) {
+            return !COMPLETABLE_FUTURE_MUTATOR_METHODS.contains(methodName);
+        }
+        if (ownerInternal.startsWith("java/nio/") && ownerInternal.endsWith("Buffer")) {
+            if ("get".equals(methodName)) {
+                // Absolute indexed get(int) is read-only; relative get() / get(byte[]) advances position
+                return "(I)B".equals(methodDesc)
+                        || "(I)C".equals(methodDesc)
+                        || "(I)S".equals(methodDesc)
+                        || "(I)I".equals(methodDesc)
+                        || "(I)J".equals(methodDesc)
+                        || "(I)F".equals(methodDesc)
+                        || "(I)D".equals(methodDesc);
+            }
+            if (methodName.startsWith("get") && methodDesc != null && methodDesc.startsWith("(I)")) {
+                return true;
+            }
+            if ("position".equals(methodName) || "limit".equals(methodName)) {
+                return "()I".equals(methodDesc);
+            }
+            if ("order".equals(methodName)) {
+                return methodDesc != null && methodDesc.startsWith("()");
+            }
+            return "capacity".equals(methodName)
+                    || "remaining".equals(methodName)
+                    || "hasRemaining".equals(methodName)
+                    || "isDirect".equals(methodName)
+                    || "isReadOnly".equals(methodName)
+                    || "hasArray".equals(methodName)
+                    || "arrayOffset".equals(methodName)
+                    || "asReadOnlyBuffer".equals(methodName)
+                    || "duplicate".equals(methodName)
+                    || "slice".equals(methodName)
+                    || "equals".equals(methodName)
+                    || "hashCode".equals(methodName)
+                    || "toString".equals(methodName)
+                    || "compareTo".equals(methodName)
+                    || "mismatch".equals(methodName);
+        }
+        if ("java/lang/StringBuilder".equals(ownerInternal) || "java/lang/StringBuffer".equals(ownerInternal)) {
+            return "length".equals(methodName)
+                    || "capacity".equals(methodName)
+                    || "charAt".equals(methodName)
+                    || "codePointAt".equals(methodName)
+                    || "codePointBefore".equals(methodName)
+                    || "codePointCount".equals(methodName)
+                    || "indexOf".equals(methodName)
+                    || "lastIndexOf".equals(methodName)
+                    || "substring".equals(methodName)
+                    || "subSequence".equals(methodName)
+                    || "isEmpty".equals(methodName)
+                    || "chars".equals(methodName)
+                    || "codePoints".equals(methodName)
+                    || "compareTo".equals(methodName)
+                    || "toString".equals(methodName)
+                    || "hashCode".equals(methodName)
+                    || "equals".equals(methodName);
+        }
+        return READ_ONLY_COLLECTION_AND_HOLDER_METHODS.contains(methodName);
+    }
+
+    private static void inspectStackInvocationEffects(
+            String callerMethodSym,
+            String mOwnerInternal,
+            String mName,
+            String mDesc,
+            StackVal receiver,
+            List<String> callArgDescs,
+            StackVal[] callArgs,
+            Set<String> arrayMutatedOut,
+            Set<String> receiverMutatedOut,
+            Set<String> collAddedOut,
+            Set<String> collRemovedOut,
+            Set<String> collDirectWrittenOut,
+            Set<String> dynamicFnDispatchesOut,
+            Set<String> asyncFnDispatchesOut
+    ) {
+        if (mOwnerInternal == null || mName == null) {
+            return;
+        }
+        if ("java/lang/System".equals(mOwnerInternal) && "arraycopy".equals(mName) && callArgs.length >= 3) {
+            recordArrayMutationFromSlot(callArgs[2], callerMethodSym, arrayMutatedOut);
+        } else if ("java/lang/reflect/Array".equals(mOwnerInternal)
+                && mName.startsWith("set")
+                && callArgs.length >= 1) {
+            recordArrayMutationFromSlot(callArgs[0], callerMethodSym, arrayMutatedOut);
+        } else if (isJdkOrSkippedInfrastructureOwner(mOwnerInternal)) {
+            for (int idx = 0; idx < callArgDescs.size(); idx++) {
+                if (callArgDescs.get(idx).startsWith("[")
+                        && !isKnownReadOnlyJdkArrayCall(mOwnerInternal, mName)) {
+                    recordArrayMutationFromSlot(callArgs[idx], callerMethodSym, arrayMutatedOut);
+                }
+            }
+        }
+
+        if ("java/util/Collections".equals(mOwnerInternal)
+                && callArgs.length >= 1
+                && ("fill".equals(mName) || "addAll".equals(mName) || "replaceAll".equals(mName)
+                || "sort".equals(mName) || "reverse".equals(mName) || "shuffle".equals(mName)
+                || "swap".equals(mName) || "copy".equals(mName))) {
+            StackVal targetColl = callArgs[0];
+            if (targetColl != null && !targetColl.sources.isEmpty()) {
+                collAddedOut.addAll(targetColl.sources);
+            }
+            recordReceiverContainerMutation(targetColl, callerMethodSym, receiverMutatedOut);
+        }
+
+        if (receiver != null && !"<init>".equals(mName)) {
+            if (!receiver.sources.isEmpty() && isJdkCollectionOrMapOwner(mOwnerInternal)) {
+                if (QUEUE_PRODUCER_METHODS.contains(mName)
+                        || "set".equals(mName)
+                        || "putAll".equals(mName)
+                        || "addAll".equals(mName)
+                        || "compute".equals(mName)
+                        || "computeIfPresent".equals(mName)
+                        || "merge".equals(mName)
+                        || "replace".equals(mName)
+                        || "replaceAll".equals(mName)
+                        || "sort".equals(mName)) {
+                    collAddedOut.addAll(receiver.sources);
+                    for (String s : receiver.sources) {
+                        if (!s.startsWith("GETTER:")) {
+                            collDirectWrittenOut.add(s);
+                        }
+                    }
+                } else if ("remove".equals(mName)
+                        || "clear".equals(mName)
+                        || "removeAll".equals(mName)
+                        || "retainAll".equals(mName)
+                        || "removeIf".equals(mName)
+                        || "poll".equals(mName)) {
+                    collRemovedOut.addAll(receiver.sources);
+                    for (String s : receiver.sources) {
+                        if (!s.startsWith("GETTER:")) {
+                            collDirectWrittenOut.add(s);
+                        }
+                    }
+                }
+            }
+            if (isMutableJdkHolderOrContainerOwner(mOwnerInternal)
+                    && !isKnownReadOnlyJdkReceiverMethod(mOwnerInternal, mName, mDesc)) {
+                recordReceiverContainerMutation(receiver, callerMethodSym, receiverMutatedOut);
+            }
+        }
+
+        if (isJdkOrSkippedInfrastructureOwner(mOwnerInternal)) {
+            boolean isAsyncScheduler = isJdkAsyncSchedulerCall(mOwnerInternal, mName);
+            for (int idx = 0; idx < callArgDescs.size(); idx++) {
+                String argDesc = callArgDescs.get(idx);
+                if (!argDesc.startsWith("L") || !argDesc.endsWith(";")) {
+                    continue;
+                }
+                String argBinary = argDesc.substring(1, argDesc.length() - 1).replace('/', '.');
+                String sam = JDK_FUNCTIONAL_SAM_METHODS.get(argBinary);
+                if (sam == null) {
+                    continue;
+                }
+                StackVal argVal = callArgs[idx];
+                if (argVal == null || !argVal.isInlineCallback) {
+                    String fnDispatchSym = argBinary + "#" + sam;
+                    dynamicFnDispatchesOut.add(fnDispatchSym);
+                    if (isAsyncScheduler) {
+                        asyncFnDispatchesOut.add(fnDispatchSym);
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean isJdkAsyncSchedulerCall(String mOwnerInternal, String mName) {
+        if ("java/util/concurrent/CompletableFuture".equals(mOwnerInternal)
+                || "java/util/concurrent/CompletionStage".equals(mOwnerInternal)) {
+            return true;
+        }
+        return mOwnerInternal.startsWith("java/util/concurrent/")
+                && (mOwnerInternal.endsWith("Executor")
+                || mOwnerInternal.endsWith("ExecutorService")
+                || mOwnerInternal.endsWith("Pool")
+                || mOwnerInternal.endsWith("ForkJoinTask"))
+                && ("execute".equals(mName)
+                || "submit".equals(mName)
+                || mName.startsWith("schedule")
+                || mName.startsWith("invoke"));
+    }
+
+    private static StackVal classifyMethodReturnStackVal(
+            String mOwnerInternal,
+            String mName,
+            String mDesc,
+            StackVal receiver,
+            StackVal[] callArgs
+    ) {
+        if (mDesc == null) {
+            return StackVal.UNKNOWN_1;
+        }
+        int closeParen = mDesc.indexOf(')');
+        if (closeParen < 0 || closeParen + 1 >= mDesc.length()) {
+            return null;
+        }
+        String retDesc = mDesc.substring(closeParen + 1);
+        if ("V".equals(retDesc)) {
+            return null;
+        }
+        if ("J".equals(retDesc) || "D".equals(retDesc)) {
+            return StackVal.OTHER_2;
+        }
+        if (mOwnerInternal != null) {
+            if (mOwnerInternal.startsWith("[") && "clone".equals(mName)) {
+                return StackVal.NEW_ARRAY_1;
+            }
+            if ("java/util/Arrays".equals(mOwnerInternal)
+                    && ("copyOf".equals(mName) || "copyOfRange".equals(mName))) {
+                return StackVal.NEW_ARRAY_1;
+            }
+            if (mOwnerInternal.startsWith("java/nio/") && mOwnerInternal.endsWith("Buffer")
+                    && ("allocate".equals(mName) || "allocateDirect".equals(mName))) {
+                return StackVal.NEW_OBJECT_1;
+            }
+            if ("java/util/BitSet".equals(mOwnerInternal) && "valueOf".equals(mName)) {
+                return StackVal.NEW_OBJECT_1;
+            }
+            if ("java/util/concurrent/CompletableFuture".equals(mOwnerInternal)
+                    && ("completedFuture".equals(mName) || "failedFuture".equals(mName))) {
+                return StackVal.NEW_OBJECT_1;
+            }
+            if ("java/util/Collections".equals(mOwnerInternal)
+                    && callArgs.length >= 1
+                    && (mName.startsWith("synchronized")
+                    || mName.startsWith("checked")
+                    || "newSetFromMap".equals(mName)
+                    || "asLifoQueue".equals(mName))) {
+                return callArgs[0];
+            }
+            if (receiver != null && (!receiver.sources.isEmpty() || receiver.isFreshObject)) {
+                if (isMutableViewPropagatorMethod(mOwnerInternal, mName)) {
+                    return receiver;
+                }
+            }
+            if (!"<init>".equals(mName) && !isJdkOrSkippedInfrastructureOwner(mOwnerInternal) && callArgs.length == 0) {
+                if ((retDesc.startsWith("[") || retDesc.startsWith("L"))
+                        && !isDeeplyImmutableJdkValueDescriptor(retDesc)) {
+                    return StackVal.knownSource("GETTER:" + mOwnerInternal.replace('/', '.') + "#" + mName);
+                }
+            }
+        }
+        if (retDesc.startsWith("L") || retDesc.startsWith("[")) {
+            return isDeeplyImmutableJdkValueDescriptor(retDesc) ? StackVal.OTHER_1 : StackVal.UNKNOWN_1;
+        }
+        return StackVal.OTHER_1;
+    }
+
+    private static boolean isMutableViewPropagatorMethod(String ownerInternal, String methodName) {
+        if ("java/lang/StringBuilder".equals(ownerInternal) || "java/lang/StringBuffer".equals(ownerInternal)) {
+            return methodName.startsWith("append")
+                    || methodName.startsWith("insert")
+                    || methodName.startsWith("delete")
+                    || "replace".equals(methodName)
+                    || "reverse".equals(methodName);
+        }
+        if (ownerInternal.startsWith("java/nio/") && ownerInternal.endsWith("Buffer")) {
+            return "slice".equals(methodName)
+                    || "duplicate".equals(methodName)
+                    || "array".equals(methodName)
+                    || (methodName.startsWith("as")
+                    && methodName.endsWith("Buffer")
+                    && !"asReadOnlyBuffer".equals(methodName));
+        }
+        if (isJdkCollectionOrMapOwner(ownerInternal)) {
+            return "keySet".equals(methodName)
+                    || "values".equals(methodName)
+                    || "entrySet".equals(methodName)
+                    || "subList".equals(methodName)
+                    || "iterator".equals(methodName)
+                    || "listIterator".equals(methodName)
+                    || "reversed".equals(methodName)
+                    || "navigableKeySet".equals(methodName)
+                    || "descendingKeySet".equals(methodName)
+                    || "descendingMap".equals(methodName)
+                    || "descendingSet".equals(methodName)
+                    || "headMap".equals(methodName)
+                    || "tailMap".equals(methodName)
+                    || "subMap".equals(methodName)
+                    || "headSet".equals(methodName)
+                    || "tailSet".equals(methodName);
+        }
+        return false;
+    }
+
+    private static List<String> parseMethodParamDescriptors(String mDesc) {
+        if (mDesc == null || !mDesc.startsWith("(")) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>();
+        int idx = 1;
+        while (idx < mDesc.length() && mDesc.charAt(idx) != ')') {
+            int start = idx;
+            while (idx < mDesc.length() && mDesc.charAt(idx) == '[') {
+                idx++;
+            }
+            if (idx >= mDesc.length()) {
+                break;
+            }
+            char ch = mDesc.charAt(idx);
+            if (ch == 'L') {
+                int semi = mDesc.indexOf(';', idx);
+                if (semi < 0) {
+                    break;
+                }
+                idx = semi + 1;
+            } else {
+                idx++;
+            }
+            out.add(mDesc.substring(start, idx));
+        }
+        return out;
+    }
+
+    private static int computeMaxLocalSlots(int accessFlags, List<String> paramDescs, byte[] code) {
+        int maxSlot = (accessFlags & ACC_STATIC) == 0 ? 1 : 0;
+        for (String p : paramDescs) {
+            maxSlot += ("J".equals(p) || "D".equals(p)) ? 2 : 1;
+        }
+        int pc = 0;
+        while (pc < code.length) {
+            int op = code[pc] & 0xFF;
+            int len = instructionLength(code, pc);
+            if (len <= 0) {
+                break;
+            }
+            int slot = -1;
+            if ((op >= 0x15 && op <= 0x19) || (op >= 0x36 && op <= 0x3A) || op == 0x84 || op == 0xA9) {
+                if (pc + 1 < code.length) {
+                    slot = code[pc + 1] & 0xFF;
+                }
+            } else if (op >= 0x1A && op <= 0x2D) {
+                slot = (op - 0x1A) & 3;
+            } else if (op >= 0x3B && op <= 0x4E) {
+                slot = (op - 0x3B) & 3;
+            } else if (op == 0xC4 && pc + 3 < code.length) {
+                slot = readUnsignedShort(code, pc + 2);
+            }
+            if (slot >= maxSlot) {
+                maxSlot = slot + 2;
+            }
+            pc += len;
+        }
+        return Math.max(maxSlot + 2, 8);
+    }
+}

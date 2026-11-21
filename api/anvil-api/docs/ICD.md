@@ -1,10 +1,10 @@
 # `.lca` (LeafCraft Anvil) Binary Format Interface Control Document (ICD)
 
-- **Document ID:** `LCA-ICD-1.0`
-- **Format Version:** `0x0002` (`LCA_V001`, Major `2`, Minor `0`)
+- **Document ID:** `LCA-ICD-3.0` (superseding `LCA-ICD-1.0` `0x0002`, backward-compatible read)
+- **Format Version:** `0x0003` (`LCA_V001`, Major `3`, Minor `0`; readers accept `{0x0002, 0x0003}`)
 - **File Naming:** `r.<regionX>.<regionZ>.lca` (under `region/`, `entities/`, or `poi/`)
-- **Governing Specifications:** [`anvil-api-ADR-003`](adr/anvil-api-ADR-003-hilbert-roaring-gray-chunk-archive.md), [`anvil-api-ADR-002`](adr/anvil-api-ADR-002-multi-format-region-support.md), `leafanvil-ADR-001` (`resource/LeafAnvil`)
-- **Reference Implementation:** `io.github.dailystruggle.anvil.LcaRegionReader`, `LcaRegionWriter`, `LcaSectionCodec` ([`api/anvil-api`](../README.md), MIT License)
+- **Governing Specifications:** [`anvil-api-ADR-004`](adr/anvil-api-ADR-004-overlaid-eikonal-light-columnar-residuals-and-adaptive-rank-exclusion.md), [`anvil-api-ADR-005`](adr/anvil-api-ADR-005-performance-gated-entropy-and-prediction-carryovers.md), [`anvil-api-ADR-003`](adr/anvil-api-ADR-003-hilbert-roaring-gray-chunk-archive.md), [`anvil-api-ADR-002`](adr/anvil-api-ADR-002-multi-format-region-support.md), `leafanvil-ADR-001` (`resource/LeafAnvil`)
+- **Reference Implementation:** `io.github.dailystruggle.anvil.LcaRegionReader`, `LcaRegionWriter`, `LcaSectionCodec`, `LcaV3Codec` ([`api/anvil-api`](../README.md), MIT License)
 
 ---
 
@@ -19,6 +19,8 @@
 | **Atomic Chunk Pointer Directory (`uint64[1024]`)** | File `0x0040 .. 0x203F` | `8,192 B` | [Section 4.3 Atomic Chunk Pointer Directory](#43-atomic-chunk-pointer-directory-0x0040--0x203f-uint641024) |
 | **Root Region Shared Dictionary Segment** | File `0x2040 .. 0x2040 + cap - 1` | `1,024 B+` (`256B` slack) | [Section 5.1 Dictionary Segment Layout](#51-dictionary-segment-layout-root-or-continuation) |
 | **Dictionary Continuation Link Trailer** | `segmentStart + cap - 8` | `8 B` (`uint64`) | [Section 5.2 Chained Continuation Link Trailer](#52-chained-continuation-link-trailer-nextsegmentlinktrailer) |
+| **`dictPatternArena` (`384 B` Huffman + LZ Patterns)** | `DictSegment` `[entriesEnd .. 8 + usedPayloadBytes)` | `384 B .. 16,384 B` | [Section 5.3 Mode B Pattern Arena & Canonical Huffman](#53-mode-b-pattern-arena-dictpatternarena--384-byte-canonical-huffman-tables) |
+| **Dictionary Downward-Growing `SEC-DED` Syndromes** | `segmentStart + cap - 8 - 1 - w` | `1 B / 64-bit word` | [Section 5.4 Downward-Growing Dictionary `SEC-DED`](#54-downward-growing-dictionary-extended-hamming-72-64-sec-ded-syndromes) |
 | **Extended Hamming `(72, 64)` SEC-DED Syndrome Table** | `secDedTableByteOffset` (`0x2440` default) | `1,024 B` (`1 B/chunk`) | [Section 4.4 Extended Hamming `(72, 64)` SEC-DED Table](#44-extended-hamming-72-64-sec-ded-pointer-syndrome-table-1024-bytes) |
 | **`ChunkFrame` Uncompressed Header & Canary** | `slabOffset35 << 8` (`+0x00 .. +headerLen-1`) | `24 + 2 * sectionCount B` | [Section 6.1 Uncompressed `ChunkFrame` Header](#61-uncompressed-chunkframe-header-headerlen--24--2--sectioncount-bytes) |
 | **`Mode B` Header SEC-DED + `LCD2` Frame Body** | `(slabOffset35 << 8) + headerLen` | `headerWords B + LCD2` | [Section 6.2 Mode B (`codec1 = 1`) Wrapper](#62-mode-b-codec1--1-header-sec-ded-syndromes--continuous-atomic-region-dictionary-lcd2-body-decompression) |
@@ -52,6 +54,8 @@
 5. [Layer 2: Chained Region Shared Dictionary (`0x2040`)](#5-layer-2-chained-region-shared-dictionary-0x2040)
    - [5.1 Dictionary Segment Layout (`Root` or `Continuation`)](#51-dictionary-segment-layout-root-or-continuation)
    - [5.2 Chained Continuation Link Trailer (`nextSegmentLinkTrailer`)](#52-chained-continuation-link-trailer-nextsegmentlinktrailer)
+   - [5.3 Mode B Pattern Arena (`dictPatternArena`) & `384-Byte` Canonical Huffman Tables](#53-mode-b-pattern-arena-dictpatternarena--384-byte-canonical-huffman-tables)
+   - [5.4 Downward-Growing Dictionary Extended Hamming `(72, 64)` `SEC-DED` Syndromes](#54-downward-growing-dictionary-extended-hamming-72-64-sec-ded-syndromes)
 6. [Layer 3: Self-Describing `ChunkFrame` Header, Mode B Wrapper & Section Directory](#6-layer-3-self-describing-chunkframe-header-mode-b-wrapper--section-directory)
    - [6.1 Uncompressed `ChunkFrame` Header (`headerLen = 24 + 2 * sectionCount` Bytes)](#61-uncompressed-chunkframe-header-headerlen--24--2--sectioncount-bytes)
    - [6.2 Mode B (`codec1 = 1`) Header SEC-DED Syndromes & Continuous Atomic Region Dictionary (`LCD2`) Body Decompression](#62-mode-b-codec1--1-header-sec-ded-syndromes--continuous-atomic-region-dictionary-lcd2-body-decompression)
@@ -81,7 +85,7 @@
 
 This Interface Control Document (ICD) defines the on-disk binary specification for **`.lca` (LeafCraft Anvil)** region archive files (`r.<rx>.<rz>.lca`). It specifies all header layouts, bitfield allocations, space-filling curve equations, variable-length integer encodings, checksum/parity formulas, and static token lookup tables required for external tools, map renderers, backup utilities, or world editors to read, validate, and write `.lca` archives.
 
-> **Open Format & Interoperability License (`MIT`):** While the `LeafAnvil` runtime carrier plugin/mod (`net.leaf.anvil.*`, `resource/LeafAnvil`) is distributed under the **LeafCraft Commercial Software License** (`LicenseRef-LeafCraft-Commercial`), this `.lca` binary specification (`LCA-ICD-1.0`) and the `io.github.dailystruggle.anvil` codec library (`api/anvil-api`) are openly licensed under the **MIT License**. Third-party plugins, world generators, server forks, map renderers, and backup utilities may freely implement or reverse-engineer `.lca` readers and writers without restriction.
+> **Open Format & Interoperability License (`MIT`):** While the `LeafAnvil` runtime carrier plugin/mod (`net.leaf.anvil.*`, `resource/LeafAnvil`) is dual-licensed (`PolyForm-Noncommercial-1.0.0` for personal use, research, and private testing from source; `LicenseRef-LeafCraft-Commercial` for commercial/monetized servers), this `.lca` binary specification (`LCA-ICD-1.0`), `LeafAnvil-Net`, `rust/lca-format`, and the `io.github.dailystruggle.anvil` codec library (`api/anvil-api`) are openly licensed under the **MIT License**. Third-party plugins, world generators, server forks, map renderers, and backup utilities may freely implement or reverse-engineer `.lca` readers and writers without restriction.
 
 ---
 
@@ -252,8 +256,6 @@ The root dictionary segment starts at byte offset `0x2040` with total byte capac
 
 ### 5.1 Dictionary Segment Layout (`Root` or `Continuation`)
 
-### 5.1 Dictionary Segment Layout (`Root` or `Continuation`)
-
 ```
 Offset +0x00: uint32  segmentStateCount      // Number of BlockState entries in this segment
 Offset +0x04: uint16  segmentBiomeCount      // Number of Biome entries in this segment
@@ -288,6 +290,52 @@ Located at `segmentStartOffset + segmentCapacityBytes - 8`:
 - **`segmentFlags8` (`bits 7..0`, `uint8`):** Bit `0` (`0x01`) = continuation link active; Bit `1` (`0x02`) = downward-growing Extended Hamming `(72, 64)` `SEC-DED` syndromes (`1` byte at `segmentPayloadLimit - 1 - w` per active 64-bit word `w = 0 .. ((8 + usedPayloadBytes + 7) >>> 3) - 1`) and optional forward-indexed `LCD2` pattern arena (`dictPatternArena`) active.
 - Global `BlockState` IDs (`0 .. totalRegionStates - 1`), global `Biome` IDs (`0 .. totalRegionBiomes - 1`), and `dictPatternArena` bytes (`0 .. totalPatternBytes - 1`, starting with `384 B` of 4-bit Canonical Huffman code lengths for `lit`, `cmd`, `off` followed by monotonically appended cross-chunk byte patterns) are numbered sequentially in segment traversal order (`<= 64` chained segments maximum, `CBIT T5`).
 
+### 5.3 Mode B Pattern Arena (`dictPatternArena`) & `384-Byte` Canonical Huffman Tables
+
+When one or more chunks in the region use **Mode B (`codec1 = 1`)**, the chained Layer 2 dictionary segments carry a forward-addressed byte arena (`dictPatternArena`) immediately following each segment's `BiomeEntry[segmentBiomeCount]` list:
+
+1. **Multi-Segment Concatenation (`CBIT T5`):**
+   - For each chained dictionary segment `segOffset` with byte capacity `segCap` (`<= 64` segments maximum):
+     - Let `segPayloadLimit = segOffset + segCap - 8` and `activeEnd = segOffset + 8 + usedPayloadBytes`. Readers **must** reject the archive (`CBIT T5`) if `segStateCount > 65,536`, `segBiomeCount > 16,384`, or `activeEnd > segPayloadLimit`.
+     - Advance `pos` from `segOffset + 8` past all `segmentStateCount` `StateEntry` items and `segmentBiomeCount` `BiomeEntry` items. Reject (`CBIT T5`) if `pos > activeEnd`.
+     - If `pos < activeEnd`, append the slice `regionBytes[pos .. activeEnd)` to `dictPatternArena`.
+   - Across chained continuation segments, `dictPatternArena` is the contiguous concatenation of these per-segment slices in traversal order (`0 .. totalPatternBytes - 1`, capped at `MAX_DICT_ARENA_BYTES = 16,384` bytes by writers).
+
+2. **`384-Byte` Packed 4-Bit Canonical Huffman Header (`DICT_HUFF_HEADER_BYTES = 384`):**
+   The first `384 bytes` (`dictPatternArena[0 .. 383]`) encode three `256`-symbol, length-limited (`1 .. 12` bits) Canonical Huffman code-length tables (`128 bytes` per stream, `2` symbols per byte):
+
+   | `dictPatternArena` Slice | Size | Target `LCD2` Stream | Enabled by `frameFlags8` |
+   | :--- | :--- | :--- | :--- |
+   | `0x000 .. 0x07F` (`0 .. 127`) | `128 B` | `litStream` (`256` byte symbols `0x00 .. 0xFF`) | Bit `0` (`0x01`, `LIT_HUFFMAN`) |
+   | `0x080 .. 0x0FF` (`128 .. 255`) | `128 B` | `cmdStream` (`256` sequence command tokens `0x00 .. 0xFF`) | Bit `1` (`0x02`, `CMD_HUFFMAN`) |
+   | `0x100 .. 0x17F` (`256 .. 383`) | `128 B` | `offStream` (`256` offset & overflow `VarInt` bytes `0x00 .. 0xFF`) | Bit `3` (`0x08`, `OFF_HUFFMAN`) |
+
+   - **Nibble Packing & `8-Bit` Fallback Rule:**
+     For table byte `b = dictPatternArena[tableOffset + i] & 0xFF` (`i = 0 .. 127`):
+     - High nibble `l0 = (b >>> 4) & 0x0F` specifies the code bit-length for even symbol `2 * i`.
+     - Low nibble `l1 = b & 0x0F` specifies the code bit-length for odd symbol `2 * i + 1`.
+     - Any nibble outside `[1 .. 12]` (`0` or `13 .. 15`), or an arena shorter than `tableOffset + 128` bytes, **must** fall back to length `8` (`lens[sym] = 8`). When all `256` symbols have length `8`, Canonical assignment produces the identity mapping `code(sym) == sym`.
+   - **Canonical Code Construction (`1 .. 12` Bits):**
+     1. Count `blCount[L]` = number of symbols in `0 .. 255` with `lens[s] == L` for `L = 1 .. 12` (`blCount[0] = 0`).
+     2. Initialize `code = 0`; for `bits = 1 .. 12`, set `code = (code + blCount[bits - 1]) << 1` and `nextCode[bits] = code`.
+     3. Iterate `s = 0 .. 255` in ascending symbol order and assign the `lens[s]`-bit big-endian integer `codes[s] = nextCode[lens[s]]++`.
+   - **MSB-First Bitstream Packing:**
+     Huffman codewords are emitted and consumed **most-significant-bit (`MSB`) first** inside each stream byte (`bit 7` down to `bit 0`). On the final byte of a compressed Huffman stream, any unused low-order tail bits (`(8 - (totalBits & 7)) & 7` bits) are padded with `0` bits; decoders stop as soon as `outLen` (`litTotal`, `seqCount`, or `offTotal`) symbols have been emitted.
+
+3. **Forward-Addressed Cross-Chunk Pattern Slice (`dictPatternArena[384 .. totalPatternBytes)`):**
+   - Bytes at indices `384 .. dictPatternArena.length - 1` store immutable, monotonically appended cross-chunk byte patterns learned from recurring section headers, palettes, Roaring containers, and heightmap/residual sequences across chunks in the region.
+   - `LCD2` sequences with `matchMode == 2` reference `dictPatternArena[384 + off16BE .. 384 + off16BE + matchLen)` directly without copying per-chunk dictionary headers. Because existing offsets in `[384 .. oldUsedBytes)` are never shifted or overwritten during live `CoW` saves, older `ChunkFrame` slabs remain valid as new patterns append to dictionary slack or chained continuation segments.
+
+### 5.4 Downward-Growing Dictionary Extended Hamming `(72, 64)` `SEC-DED` Syndromes
+
+When `nextSegmentLinkTrailer` has `segmentFlags8` bit `1` (`0x02`) set, every active 64-bit word of `[segOffset .. segOffset + 8 + usedPayloadBytes)` is protected by a 1-byte Extended Hamming `(72, 64)` syndrome (using `computeHammingSecDed8` from Section 4.4) growing **downward** from `segPayloadLimit = segOffset + segCap - 8`:
+
+- Let `activeBytes = 8 + usedPayloadBytes` and `activeWords = (activeBytes + 7) >>> 3` (requiring `activeBytes + activeWords <= segCap - 8`).
+- Each 64-bit word `w = 0 .. activeWords - 1` is formed in big-endian byte order over `[segOffset .. segOffset + activeBytes)`, padding missing low-order bytes with `0x00` when `activeBytes` is not a multiple of `8` (`readHeaderWord64BE`, Section 6.2.5), and its syndrome byte is stored at `regionBytes[segPayloadLimit - 1 - w]`.
+- **Two-Step Header-First Healing (`verifyAndHealDictSegmentSecDed`):**
+  1. Verify and heal **Word `0`** (`[segOffset .. segOffset + 8)`, containing `segmentStateCount`, `segmentBiomeCount`, and `usedPayloadBytes`) first against `regionBytes[segPayloadLimit - 1]`. This guarantees a 1-bit flip inside `usedPayloadBytes` is repaired before `activeWords` is derived.
+  2. Re-read `usedPayloadBytes`, recompute `activeBytes = 8 + usedPayloadBytes` and `activeWords = (activeBytes + 7) >>> 3` (rejecting if `activeEnd > segPayloadLimit`), and verify/heal remaining words `w = 1 .. activeWords - 1` against `regionBytes[segPayloadLimit - 1 - w]`. Any uncorrectable double-bit (`DED`) fault fails closed with `CorruptRegionEntryException` (`CBIT T5`).
+
 ---
 
 ## 6. Layer 3: Self-Describing `ChunkFrame` Header, Mode B Wrapper & Section Directory
@@ -312,16 +360,325 @@ Let `sectionDirEnd = 24 + 2 * sectionCount`.
 
 ### 6.2 Mode B (`codec1 = 1`) Header SEC-DED Syndromes & Continuous Atomic Region Dictionary (`LCD2`) Body Decompression
 
-When the chunk pointer has `codec1 == 1` (**Mode B**):
-1. Bytes `[0 .. headerLen)` are the uncompressed `ChunkFrame` header above.
-2. Bytes `[headerLen .. headerLen + headerWords)` (where `headerWords = (headerLen + 7) >>> 3`, i.e., `9 bytes` when `headerLen = 72`) store the Extended Hamming `(72, 64)` `SEC-DED` syndrome bytes for each 64-bit word of `[0 .. headerLen)`.
-3. Bytes `[headerLen + headerWords .. exactByteLen20)` contain the **`.lca` `v2` Continuous Atomic Region Dictionary Frame (`LCD2`, magic `0x4C44` `"LD"`):** `9-byte` header (`uint16 magic = 0x4C44`, `uint8 frameFlags8`, `uint24BE compressedBodyLen`, `uint24BE uncompressedBodyLen`) followed by either raw passthrough bytes (`frameFlags8 & 0x04`) or `VarInt seqCount`, `VarInt litTotal`, `VarInt offTotal` and the (`litStream`, `cmdStream`, `offStream`) streams (entropy-coded via the Layer 2 `384 B` Canonical Huffman tables when `frameFlags8` bits `0`, `1`, `3` are set, with `matchMode` `0` = 1B short intra-chunk offset `1..256`, `1` = 2B far intra-chunk offset `257..65792`, `2` = 2B forward Layer 2 `dictPatternArena` offset, `3` = 0B repeat offset). Non-`0x4C44` payloads fail closed with `CorruptRegionEntryException` (`CBIT T5`).
+When a chunk pointer entry in `0x0040 .. 0x203F` has `codec1 == 1` (**Mode B**, the default storage format when `LeafAnvil` `lcd2-level >= 1` or `superblock.flags` bit `3` `DEFAULT_MODE_B = 0x08` is active), the chunk slab at `frameByteOffset = slabOffset35 << 8` of total on-disk length `exactByteLen20` keeps the `ChunkFrame` header uncompressed for $O(1)$ metadata and section-directory inspection while protecting the header with inline `SEC-DED` parity and compressing the chunk body `[headerLen .. uncompressedChunkLen)` as a single pure-Java **Continuous Atomic Region Dictionary (`LCD2`, magic `0x4C44`)** frame.
+
+#### 6.2.1 On-Disk Mode B Slab Envelope & Header `SEC-DED` Parity (`CBIT T3c`)
+
+Let `headerLen = 24 + 2 * sectionCount` (`sectionDirEnd`) and `headerWords = (headerLen + 7) >>> 3` (for example, `headerLen = 72` and `headerWords = 9` when `sectionCount = 24`):
+
+```
++-----------------------------------------------------------------------+ slabOffset = slabOffset35 << 8
+| 1. Uncompressed ChunkFrame Header: byte[headerLen]                    |
+|    (+0x00 .. +headerLen - 1; identical layout to Mode A Section 6.1)  |
++-----------------------------------------------------------------------+ +headerLen
+| 2. Inline Header SEC-DED Syndromes: uint8[headerWords]                |
+|    (+headerLen .. +headerLen + headerWords - 1; 1 B per 64-bit word)  |
++-----------------------------------------------------------------------+ +headerLen + headerWords (compStart)
+| 3. LCD2 Compressed Body Frame: byte[compFrameLen]                     |
+|    (0 bytes if chunk has zero body bytes; otherwise >= 9 bytes        |
+|     starting with magic 0x4C44 "LD" up to +exactByteLen20)            |
++-----------------------------------------------------------------------+ +exactByteLen20
+```
+
+1. **Header `SEC-DED` Word Framing & Verification (`CBIT T3c`):**
+   - Require `exactByteLen20 >= headerLen + headerWords` (else reject with `CBIT T3c` / `T4`).
+   - Partition the uncompressed header `[0 .. headerLen)` into `headerWords` big-endian 64-bit words `w = 0 .. headerWords - 1`. If the final word (`w = headerWords - 1`) has fewer than `8` bytes (`rem = headerLen - 8 * w` with `1 <= rem <= 7`, which occurs whenever `sectionCount` is not a multiple of `4`), its remaining `(8 - rem)` low-order byte lanes (`bits (8 - rem) * 8 - 1 .. 0`) are zero-padded with `0x00` (`readHeaderWord64BE` in Section 6.2.5).
+   - Verify each `word64` against `storedSyndrome8 = slab[headerLen + w] & 0xFF` using the Extended Hamming `(72, 64)` `SEC-DED` algorithm in Section 4.4:
+     - Single-bit flips in `[0 .. headerLen)` are repaired in-place before checking `selfTagAndDataVersion` (`0x5800_0000` canary and `chunkIdx`, `CBIT T3b`).
+     - Any unrecoverable double-bit error (`DED`, `totalParity == 0 && diff8 != 0`) fails closed with `CorruptRegionEntryException` (`CBIT T3c`).
+2. **Empty-Body Mode B Chunks (`compLen == 0`):**
+   - Let `compStart = headerLen + headerWords` and `compLen = exactByteLen20 - compStart`.
+   - If `compLen == 0` (occurring when every `sectionOffsets[i]` is `0x0000` void or `0x8000 | ...` inline uniform, `hasSlabLocalPalette == 0`, and `hasResidualNbt == 0`), the unpacked `ChunkFrame` is simply the `headerLen`-byte header (`uncompBodyLen = 0`), and no `LCD2` frame bytes are present.
+   - Whenever `compLen > 0`, `[compStart .. compStart + compLen)` **must** contain a valid `LCD2` frame (`compLen >= 9`).
+
+#### 6.2.2 `LCD2` (`0x4C44` `"LD"`) `9-Byte` Frame Header & `frameFlags8` (`CBIT T4`, `T5`, `T8`)
+
+At `compStart = headerLen + headerWords` (for `compLen > 0`):
+
+| Offset from `compStart` | Type | Field Name | Value / Invariant |
+| ---: | :--- | :--- | :--- |
+| `+0x00..0x01` | `uint16` | `magic` | **Must equal `0x4C44`** (`"LD"` ASCII). Any other value fails closed (`CBIT T8` / `T5`). |
+| `+0x02` | `uint8` | `frameFlags8` | Stream & passthrough bitmask:<br>- Bit `0` (`0x01`): `LIT_HUFFMAN` (`litStream` is 12-bit Canonical Huffman coded)<br>- Bit `1` (`0x02`): `CMD_HUFFMAN` (`cmdStream` is 12-bit Canonical Huffman coded)<br>- Bit `2` (`0x04`): `RAW_PASSTHROUGH` (body is stored uncompressed at `+0x09`)<br>- Bit `3` (`0x08`): `OFF_HUFFMAN` (`offStream` is 12-bit Canonical Huffman coded)<br>- Bits `7..4` (`0xF0`): Reserved (`0` in `LCA-ICD-1.0`) |
+| `+0x03..0x05` | `uint24BE` | `compFrameLen` | `((b3 & 0xFF) << 16) \| ((b4 & 0xFF) << 8) \| (b5 & 0xFF)`. **Total byte length of the `LCD2` frame including this `9-byte` header** (`9 <= compFrameLen <= compLen`; typically `exactByteLen20 == compStart + compFrameLen`). |
+| `+0x06..0x08` | `uint24BE` | `uncompBodyLen` | `((b6 & 0xFF) << 16) \| ((b7 & 0xFF) << 8) \| (b8 & 0xFF)`. Exact uncompressed byte length of the chunk body `[headerLen .. headerLen + uncompBodyLen)` (`0 <= uncompBodyLen <= MAX_CHUNK_UNCOMPRESSED_BYTES`, `16 MiB`, `CBIT T4`). |
+
+- **Raw Passthrough Path (`(frameFlags8 & 0x04) != 0`):**
+  - Emitted by the encoder whenever `9 + metaVarIntsLen + finalLitLen + finalCmdLen + finalOffLen >= 9 + uncompBodyLen` so incompressible payloads never expand beyond `+9 B`.
+  - Readers verify `9 + uncompBodyLen <= compFrameLen` (`CBIT T5`), copy the `headerLen` uncompressed header bytes into `dst[0 .. headerLen)`, copy `src[compStart + 9 .. compStart + 9 + uncompBodyLen)` into `dst[headerLen .. headerLen + uncompBodyLen)`, and return `dst`.
+- **Single-Pass Residual NBT Rule (`boilerplateFlags16` Bit `12`):**
+  - In Mode B, `boilerplateFlags16` bit `12` (`0x1000`, `DEFLATE`-compressed residual NBT, Section 8.2) is **always `0`** so `LCD2` compresses the Slab-Local Micro-Palette, all non-uniform `SectionFrame`s, heightmap delta streams, `ChunkPatchTail`, and trailing Mojang NBT together in one pass without nested `Zlib` framing.
+
+#### 6.2.3 Three-Stream Framing (`litStream`, `cmdStream`, `offStream`)
+
+When `(frameFlags8 & 0x04) == 0`, let `pos = compStart + 9` and `limit = compStart + compFrameLen`:
+
+1. **Stream Element Counts (`VarInt` Triple at `+0x09`):**
+   - Read `seqCount = readVarInt(src, pos, limit)` (number of LZ/dictionary match sequences; `1` command byte per sequence).
+   - Read `litTotal = readVarInt(src, pos, limit)` (total uncompressed literal bytes across all sequences plus any trailing literal tail).
+   - Read `offTotal = readVarInt(src, pos, limit)` (total uncompressed bytes in `offBuf`, comprising **both** length-overflow `VarInt`s and `1 B` / `2 B` match offsets).
+   - Reject (`CBIT T5`) if `seqCount < 0`, `litTotal < 0`, `offTotal < 0`, `litTotal > uncompBodyLen`, or `seqCount > uncompBodyLen`.
+2. **Sequential Stream Unpacking (`litBuf`, `cmdBuf`, `offBuf`):**
+   The three streams follow back-to-back in fixed order (`litStream`, then `cmdStream`, then `offStream`):
+   - **`litStream` $\to$ `byte[litTotal] litBuf`:**
+     - If `(frameFlags8 & 0x01) != 0` (`LIT_HUFFMAN`): read `VarInt compLitLen`, verify `pos + compLitLen <= limit`, decode `litTotal` symbols from `src[pos .. pos + compLitLen)` using the `lit` Canonical Huffman table (`dictPatternArena[0 .. 127]`, Section 5.3), and advance `pos += compLitLen`.
+     - Else: verify `pos + litTotal <= limit`, slice `litBuf = src[pos .. pos + litTotal)`, and advance `pos += litTotal`.
+   - **`cmdStream` $\to$ `byte[seqCount] cmdBuf`:**
+     - If `(frameFlags8 & 0x02) != 0` (`CMD_HUFFMAN`): read `VarInt compCmdLen`, verify `pos + compCmdLen <= limit`, decode `seqCount` symbols from `src[pos .. pos + compCmdLen)` using the `cmd` Canonical Huffman table (`dictPatternArena[128 .. 255]`, Section 5.3), and advance `pos += compCmdLen`.
+     - Else: verify `pos + seqCount <= limit`, slice `cmdBuf = src[pos .. pos + seqCount)`, and advance `pos += seqCount`.
+   - **`offStream` $\to$ `byte[offTotal] offBuf`:**
+     - If `(frameFlags8 & 0x08) != 0` (`OFF_HUFFMAN`): read `VarInt compOffLen`, verify `pos + compOffLen <= limit`, decode `offTotal` symbols from `src[pos .. pos + compOffLen)` using the `off` Canonical Huffman table (`dictPatternArena[256 .. 383]`, Section 5.3), and advance `pos += compOffLen`.
+     - Else: verify `pos + offTotal <= limit`, slice `offBuf = src[pos .. pos + offTotal)`, and advance `pos += offTotal`.
+
+#### 6.2.4 Sequence Command Byte (`cmd`) Bitfield & Match Execution State Machine
+
+Allocate `dst = new byte[headerLen + uncompBodyLen]`, copy the healed uncompressed header into `dst[0 .. headerLen)`, and initialize cursors `dstPos = headerLen`, `litPos = 0`, `offPos = 0`, `lastOffset = 0`, `lastIsDict = false`.
+
+Each sequence `s = 0 .. seqCount - 1` consumes one command token `cmd = cmdBuf[s] & 0xFF`:
+
+```
+  7         5 4       3 2         0
++------------+---------+-----------+
+|  litCode3  |matchMode| lenCode3  |
+|  (0 .. 7)  | (0 .. 3)| (0 .. 7)  |
++------------+---------+-----------+
+```
+
+Execute the following steps in **exact order** for each sequence `s` (noting that both overflow `VarInt`s reside in `offBuf` **prior to** the sequence's match-offset bytes):
+
+1. **Decode Literal Length & Copy Literals:**
+   - Let `litLen = (cmd >>> 5) & 7`.
+   - If `litLen == 7`, read `extraLit = readVarInt(offBuf, offPos, offTotal)` from **`offBuf`**, advance `offPos += varIntLen(extraLit)`, and set `litLen = 7 + extraLit`.
+   - If `litLen > 0`: verify `litPos + litLen <= litTotal` and `dstPos + litLen <= dst.length` (`CBIT T5`), copy `litBuf[litPos .. litPos + litLen)` to `dst[dstPos .. dstPos + litLen)`, and advance `litPos += litLen`, `dstPos += litLen`.
+2. **Decode Match Mode & Match Length:**
+   - Let `matchMode = (cmd >>> 3) & 3` and `lenCode3 = cmd & 7`.
+   - Determine minimum match length `minMatch`:
+     - `minMatch = 3` when `matchMode == 0` or `matchMode == 3`
+     - `minMatch = 4` when `matchMode == 1` or `matchMode == 2`
+   - Let `matchLen = lenCode3 + minMatch`.
+   - If `lenCode3 == 7`, read `extraMatch = readVarInt(offBuf, offPos, offTotal)` from **`offBuf`**, advance `offPos += varIntLen(extraMatch)`, and set `matchLen += extraMatch`.
+3. **Decode Match Offset from `offBuf` & Copy Match Bytes:**
+
+   | `matchMode` | Name | Offset Bytes in `offBuf` | Effective Offset & Source Domain | `minMatch` |
+   | :---: | :--- | :--- | :--- | :---: |
+   | `0` (`00`) | `SHORT_INTRA` | `1 B` (`uint8 u8`) | `lastOffset = u8 + 1` (`1 .. 256`), `lastIsDict = false`<br>Backward distance in `dst`: `srcPos = dstPos - lastOffset >= headerLen` | `3` |
+   | `1` (`01`) | `FAR_INTRA` | `2 B` (`uint16BE u16`) | `lastOffset = u16 + 257` (`257 .. 65,792`), `lastIsDict = false`<br>Backward distance in `dst`: `srcPos = dstPos - lastOffset >= headerLen` | `4` |
+   | `2` (`10`) | `DICT_ARENA` | `2 B` (`uint16BE u16`) | `lastOffset = u16 + 384` (`384 .. 65,919`), `lastIsDict = true`<br>Forward slice in Layer 2 `dictPatternArena[lastOffset .. lastOffset + matchLen)` | `4` |
+   | `3` (`11`) | `REPEAT_OFFSET` | `0 B` *(none)* | Reuses `(lastOffset, lastIsDict)` from the previous sequence (`lastOffset > 0` required; invalid on `s == 0`) | `3` |
+
+   - Verify `dstPos + matchLen <= dst.length` (`CBIT T5`).
+   - **If `lastIsDict == true`:** Verify `lastOffset >= 384` and `lastOffset + matchLen <= dictPatternArena.length` (`CBIT T5`), copy `dictPatternArena[lastOffset .. lastOffset + matchLen)` to `dst[dstPos .. dstPos + matchLen)`, and advance `dstPos += matchLen`.
+   - **If `lastIsDict == false`:** Verify `lastOffset > 0` and `dstPos - lastOffset >= headerLen` (`CBIT T5`, preventing matches from reading into the uncompressed `ChunkFrame` header). Let `matchSrc = dstPos - lastOffset`. Copy `matchLen` bytes forward byte-by-byte (`for (int k = 0; k < matchLen; k++) dst[dstPos++] = dst[matchSrc + k]`) when `lastOffset < matchLen` so overlapping RLE matches replicate properly; `System.arraycopy` may be used when `lastOffset >= matchLen`.
+4. **Copy Trailing Literals & Verify Exact Frame Output (`CBIT T5`):**
+   - After all `seqCount` sequences complete, let `remLit = litTotal - litPos`.
+   - If `remLit > 0`, verify `dstPos + remLit <= dst.length`, copy `litBuf[litPos .. litTotal)` into `dst[dstPos .. dstPos + remLit)`, and advance `dstPos += remLit`.
+   - Require `dstPos == headerLen + uncompBodyLen` (else throw `CorruptRegionEntryException`, `CBIT T5`). The resulting `dst` array has the exact same layout as an uncompressed Mode A `ChunkFrame` and is decoded identically by Sections 6.4, 6.5, 7, and 8.
+
+#### 6.2.5 Reference Mode B (`LCD2` + 12-Bit Canonical Huffman) Decoder Pseudocode
+
+```java
+static final int LCA_DICT_FRAME_MAGIC = 0x4C44; // "LD"
+static final int DICT_HUFF_HEADER_BYTES = 384;  // 3 * 128B (lit, cmd, off)
+
+static long readHeaderWord64BE(byte[] buf, int baseOffset, int byteLimitLen, int wordIdx) {
+    int rel = wordIdx << 3;
+    int rem = byteLimitLen - rel;
+    long v = 0L;
+    for (int b = 0; b < 8; b++) {
+        int byteVal = (b < rem) ? (buf[baseOffset + rel + b] & 0xFF) : 0;
+        v = (v << 8) | byteVal;
+    }
+    return v;
+}
+
+static int[] buildHuffDecTable12(byte[] dictArena, int tableOffset) {
+    int[] lens = new int[256];
+    if (dictArena == null || dictArena.length < tableOffset + 128) {
+        Arrays.fill(lens, 8);
+    } else {
+        for (int i = 0; i < 128; i++) {
+            int b = dictArena[tableOffset + i] & 0xFF;
+            int l0 = (b >>> 4) & 0x0F;
+            int l1 = b & 0x0F;
+            lens[i << 1] = (l0 >= 1 && l0 <= 12) ? l0 : 8;
+            lens[(i << 1) | 1] = (l1 >= 1 && l1 <= 12) ? l1 : 8;
+        }
+    }
+    int[] blCount = new int[13];
+    for (int l : lens) blCount[l]++;
+    int[] nextCode = new int[13];
+    int code = 0;
+    for (int bits = 1; bits <= 12; bits++) {
+        code = (code + blCount[bits - 1]) << 1;
+        nextCode[bits] = code;
+    }
+    int[] decTable = new int[4096]; // 12-bit MSB peek -> (symbol << 8) | bitLen
+    for (int sym = 0; sym < 256; sym++) {
+        int l = lens[sym];
+        int c = nextCode[l]++;
+        int base = (c << (12 - l)) & 0x0FFF;
+        int span = 1 << (12 - l);
+        int entry = (sym << 8) | l;
+        for (int k = base, end = Math.min(4096, base + span); k < end; k++) {
+            decTable[k] = entry;
+        }
+    }
+    return decTable;
+}
+
+static byte[] decodeHuffmanStream12(byte[] src, int srcOff, int compLen, int[] decTable, int outLen) {
+    int bitPos = srcOff, bitLimit = srcOff + compLen;
+    if (bitLimit > src.length) throw new IllegalArgumentException("CBIT T5: Truncated Huffman stream");
+    byte[] dst = new byte[outLen];
+    long bitBuf = 0L;
+    int bitsInBuf = 0, outIdx = 0;
+    while (outIdx < outLen) {
+        while (bitsInBuf <= 56 && bitPos < bitLimit) {
+            bitBuf |= ((long) (src[bitPos++] & 0xFF)) << (56 - bitsInBuf);
+            bitsInBuf += 8;
+        }
+        int entry = decTable[(int) (bitBuf >>> 52)];
+        int len = entry & 0xFF;
+        if (len == 0 || len > bitsInBuf) {
+            throw new IllegalArgumentException("CBIT T5: Truncated or invalid Huffman codeword");
+        }
+        dst[outIdx++] = (byte) (entry >>> 8);
+        bitBuf <<= len;
+        bitsInBuf -= len;
+    }
+    return dst;
+}
+
+static byte[] decodeModeBToFullFrame(
+        byte[] slab, int headerStart, int headerLen, int compStart, int compLen, byte[] dictPatternArena
+) {
+    if (compLen == 0) {
+        return Arrays.copyOfRange(slab, headerStart, headerStart + headerLen);
+    }
+    if (compLen < 9 || (slab[compStart] & 0xFF) != 0x4C || (slab[compStart + 1] & 0xFF) != 0x44) {
+        throw new IllegalArgumentException("CBIT T8: Invalid or truncated LCD2 header");
+    }
+    int flags = slab[compStart + 2] & 0xFF;
+    int compFrameLen = ((slab[compStart + 3] & 0xFF) << 16)
+            | ((slab[compStart + 4] & 0xFF) << 8) | (slab[compStart + 5] & 0xFF);
+    int uncompBodyLen = ((slab[compStart + 6] & 0xFF) << 16)
+            | ((slab[compStart + 7] & 0xFF) << 8) | (slab[compStart + 8] & 0xFF);
+    if (compFrameLen < 9 || compFrameLen > compLen || uncompBodyLen > 16 * 1024 * 1024) {
+        throw new IllegalArgumentException("CBIT T4/T5: Invalid LCD2 lengths");
+    }
+    byte[] dst = new byte[headerLen + uncompBodyLen];
+    System.arraycopy(slab, headerStart, dst, 0, headerLen);
+    if ((flags & 0x04) != 0) {
+        if (9 + uncompBodyLen > compFrameLen) throw new IllegalArgumentException("CBIT T5");
+        System.arraycopy(slab, compStart + 9, dst, headerLen, uncompBodyLen);
+        return dst;
+    }
+    int limit = compStart + compFrameLen, pos = compStart + 9;
+    int seqCount = readVarIntBounded(slab, pos, limit); pos += varIntLen(seqCount);
+    int litTotal = readVarIntBounded(slab, pos, limit); pos += varIntLen(litTotal);
+    int offTotal = readVarIntBounded(slab, pos, limit); pos += varIntLen(offTotal);
+    if (seqCount < 0 || litTotal < 0 || offTotal < 0
+            || litTotal > uncompBodyLen || seqCount > uncompBodyLen) {
+        throw new IllegalArgumentException("CBIT T5: Invalid LCD2 stream counts");
+    }
+
+    byte[] litBuf;
+    if ((flags & 0x01) != 0) {
+        int cLen = readVarIntBounded(slab, pos, limit); pos += varIntLen(cLen);
+        if (cLen < 0 || pos + cLen > limit) throw new IllegalArgumentException("CBIT T5");
+        litBuf = decodeHuffmanStream12(slab, pos, cLen, buildHuffDecTable12(dictPatternArena, 0), litTotal);
+        pos += cLen;
+    } else {
+        if (pos + litTotal > limit) throw new IllegalArgumentException("CBIT T5");
+        litBuf = Arrays.copyOfRange(slab, pos, pos + litTotal); pos += litTotal;
+    }
+    byte[] cmdBuf;
+    if ((flags & 0x02) != 0) {
+        int cLen = readVarIntBounded(slab, pos, limit); pos += varIntLen(cLen);
+        if (cLen < 0 || pos + cLen > limit) throw new IllegalArgumentException("CBIT T5");
+        cmdBuf = decodeHuffmanStream12(slab, pos, cLen, buildHuffDecTable12(dictPatternArena, 128), seqCount);
+        pos += cLen;
+    } else {
+        if (pos + seqCount > limit) throw new IllegalArgumentException("CBIT T5");
+        cmdBuf = Arrays.copyOfRange(slab, pos, pos + seqCount); pos += seqCount;
+    }
+    byte[] offBuf;
+    if ((flags & 0x08) != 0) {
+        int cLen = readVarIntBounded(slab, pos, limit); pos += varIntLen(cLen);
+        if (cLen < 0 || pos + cLen > limit) throw new IllegalArgumentException("CBIT T5");
+        offBuf = decodeHuffmanStream12(slab, pos, cLen, buildHuffDecTable12(dictPatternArena, 256), offTotal);
+    } else {
+        if (pos + offTotal > limit) throw new IllegalArgumentException("CBIT T5");
+        offBuf = Arrays.copyOfRange(slab, pos, pos + offTotal);
+    }
+
+    int dstPos = headerLen, litPos = 0, offPos = 0, lastOffset = 0;
+    boolean lastIsDict = false;
+    for (int s = 0; s < seqCount; s++) {
+        int cmd = cmdBuf[s] & 0xFF;
+        int litLen = (cmd >>> 5) & 7;
+        if (litLen == 7) {
+            int extra = readVarIntBounded(offBuf, offPos, offTotal); offPos += varIntLen(extra);
+            litLen += extra;
+        }
+        if (litPos + litLen > litTotal || dstPos + litLen > dst.length) {
+            throw new IllegalArgumentException("CBIT T5: Literal copy out of bounds");
+        }
+        System.arraycopy(litBuf, litPos, dst, dstPos, litLen);
+        litPos += litLen; dstPos += litLen;
+
+        int matchMode = (cmd >>> 3) & 3;
+        int minMatch = (matchMode == 0 || matchMode == 3) ? 3 : 4;
+        int matchLen = (cmd & 7) + minMatch;
+        if ((cmd & 7) == 7) {
+            int extra = readVarIntBounded(offBuf, offPos, offTotal); offPos += varIntLen(extra);
+            matchLen += extra;
+        }
+        if (matchMode == 0) {
+            if (offPos >= offTotal) throw new IllegalArgumentException("CBIT T5");
+            lastOffset = (offBuf[offPos++] & 0xFF) + 1; lastIsDict = false;
+        } else if (matchMode == 1) {
+            if (offPos + 2 > offTotal) throw new IllegalArgumentException("CBIT T5");
+            lastOffset = (((offBuf[offPos] & 0xFF) << 8) | (offBuf[offPos + 1] & 0xFF)) + 257;
+            offPos += 2; lastIsDict = false;
+        } else if (matchMode == 2) {
+            if (offPos + 2 > offTotal) throw new IllegalArgumentException("CBIT T5");
+            lastOffset = (((offBuf[offPos] & 0xFF) << 8) | (offBuf[offPos + 1] & 0xFF)) + DICT_HUFF_HEADER_BYTES;
+            offPos += 2; lastIsDict = true;
+        } else if (lastOffset <= 0) {
+            throw new IllegalArgumentException("CBIT T5: Repeat offset with no prior match");
+        }
+        if (dstPos + matchLen > dst.length) throw new IllegalArgumentException("CBIT T5");
+        if (lastIsDict) {
+            if (dictPatternArena == null || lastOffset < DICT_HUFF_HEADER_BYTES
+                    || lastOffset + matchLen > dictPatternArena.length) {
+                throw new IllegalArgumentException("CBIT T5: Dictionary offset out of bounds");
+            }
+            System.arraycopy(dictPatternArena, lastOffset, dst, dstPos, matchLen);
+            dstPos += matchLen;
+        } else {
+            int matchSrc = dstPos - lastOffset;
+            if (lastOffset <= 0 || matchSrc < headerLen) throw new IllegalArgumentException("CBIT T5");
+            for (int k = 0; k < matchLen; k++) dst[dstPos++] = dst[matchSrc + k];
+        }
+    }
+    int remLit = litTotal - litPos;
+    if (remLit > 0) {
+        if (dstPos + remLit > dst.length) throw new IllegalArgumentException("CBIT T5");
+        System.arraycopy(litBuf, litPos, dst, dstPos, remLit);
+        dstPos += remLit;
+    }
+    if (dstPos != dst.length) throw new IllegalArgumentException("CBIT T5: Length mismatch");
+    return dst;
+}
+```
+
 ### 6.3 `chunkStatusOrdinal` Mapping Table (`+0x14`)
 
 | Ordinal (`uint8`) | Mojang NBT `Status` String |
 | ---: | :--- |
 | `0xFF` (`255`) | `"minecraft:full"` |
 | `0xFE` (`254`) | *(Status tag absent; e.g. `entities/` or `poi/` chunks)* |
+| `0xFD` (`253`) | *(Unrecognized / custom `Status` string stored verbatim in Residual Tail `bit 10` `residualNbtSlice`)* |
 | `0xEF` (`239`) | `"full"` (pre-namespace legacy status) |
 | `1` | `"minecraft:empty"` |
 | `2` | `"minecraft:structure_starts"` |
@@ -334,6 +691,9 @@ When the chunk pointer has `codec1 == 1` (**Mode B**):
 | `9` | `"minecraft:initialize_light"` |
 | `10` | `"minecraft:light"` |
 | `11` | `"minecraft:spawn"` |
+| `12` | `"minecraft:terrain"` (Minecraft `26.3+` / `DataVersion >= 5023` merged terrain stage) |
+
+> **Unallocated Ordinals & `0xFD` Residual Escape (`CBIT T5`):** Unallocated ordinal values (`0`, `13..238`, `240..252`) are reserved and fail closed (`CorruptRegionEntryException`) on decode rather than defaulting to `"minecraft:full"`. When `chunkStatusOrdinal == 0xFD` (`253`), the chunk is treated as an incomplete `ProtoChunk` for view/column probes (`decodeWindowToViewOrProbe` returns `null`) and its exact `"Status"` `TAG_String` is read from Residual Tail `bit 10` (`residualNbtSlice`), failing closed under `CBIT T5` if absent.
 
 ### 6.4 Decoding `uint16 sectionOffsets[i]` (`i = 0 .. sectionCount - 1`, `Y = minSectionY + i`)
 
@@ -634,7 +994,7 @@ Mojang packs `256` 9-bit column heights ($16 \times 16$) into `long[37]` (`7` en
 | `7` | `0x0080` | Read `uint8 lowFlags`; prepend boundary lighting section at `Y = (byte) (minSectionY - 1)` (`skyMode = lowFlags & 3`, `blkMode = (lowFlags >>> 2) & 3`, where `0` = absent, `1` = `byte[2048]` of `0x00`, `2` = `byte[2048]` of `0xFF`) |
 | `8` | `0x0100` | Read `uint8 highFlags`; append boundary lighting section at `Y = (byte) (minSectionY + sectionCount)` (`skyMode = highFlags & 3`, `blkMode = (highFlags >>> 2) & 3`) |
 | `9` | `0x0200` | Read secondary heightmaps (`uint8 secHmCount` + entries, Section 8.1) into `"Heightmaps"` |
-| `10` | `0x0400` | Remaining bytes `[pos .. residualRelEnd)` contain a Mojang binary root `TAG_Compound` (containing non-empty `block_entities`, `structures`, custom tags, or `Entities`/`Sections` for `entities/` and `poi/` archives) |
+| `10` | `0x0400` | Remaining bytes `[pos .. residualRelEnd)` contain a Mojang binary root `TAG_Compound` (containing non-empty `block_entities`, `structures`, custom tags, unrecognized `Status` strings when `chunkStatusOrdinal == 0xFD`, or `Entities`/`Sections` for `entities/` and `poi/` archives) |
 | `11` | `0x0800` | Non-voxel chunk root (`entities/` or `poi/`): do **not** synthesize voxel chunk keys (`xPos`, `yPos`, `zPos`, `LastUpdate`, `InhabitedTime`, `Status`, `sections`); return only `DataVersion` + residual `TAG_Compound` entries |
 | `12` | `0x1000` | The residual `TAG_Compound` slice (`bit 10`) is `Zlib` (`DEFLATE`) compressed (used only in `Mode A` when residual NBT $\ge 256\text{ B}$; never set in `Mode B`) |
 | `13` | `0x2000` | Read `VarInt mbnlByteLen` + `byte[mbnlByteLen] mbnlStream` immediately following `boilerplateFlags16` and decode `"MOTION_BLOCKING_NO_LEAVES"` into `"Heightmaps"` (Section 8.1) |
@@ -871,11 +1231,34 @@ When `LcaRegionReader.healRegionBitRot(byte[])` or a fault-tolerant reader encou
 
 ### 10.3 Format Version `0x0001` $\to$ `0x0002` Upgrade Procedure
 
-Archives created under `formatVersion = 0x0001` (`LCA_FORMAT_VERSION_V1`) share the identical 64-byte superblock, 8 KiB pointer directory, chained shared dictionary, SEC-DED syndrome tables, `ChunkFrame` headers, and residual NBT layout as `formatVersion = 0x0002` (`LCA_FORMAT_VERSION`), differing only in section-level `octreeOccupancyMask64` cursor domain compaction (Section 7 item 4) and Gray light `planeModes8` `mode 01` sub-headers (Section 7 item 6):
+Archives created under `formatVersion = 0x0001` (`LCA_FORMAT_VERSION_V1`) share the identical 64-byte superblock, 8 KiB pointer directory, chained shared dictionary, SEC-DED syndrome tables, `ChunkFrame` headers, and residual NBT layout as `formatVersion = 0x0002`, differing only in section-level `octreeOccupancyMask64` cursor domain compaction (Section 7 item 4) and Gray light `planeModes8` `mode 01` sub-headers (Section 7 item 6).
 
-1. **Backward-Compatible Read Path (`LcaRegionReader` & `LcaSectionCodec`):**
-   - Readers accept `formatVersion` $\in \{\mathtt{0x0001}, \mathtt{0x0002}\}$ at superblock offset `0x08..0x09` (rejecting `0x0000` or `>= 0x0003` under `CBIT T1`).
-   - When `formatVersion == 0x0001`, `LcaSectionCodec` decodes `Delta-Roaring` containers over the uncompacted $4,096$-voxel curve domain (while still enforcing `CBIT T6b` against `octreeOccupancyMask64`) and interprets `planeModes8` `mode 01` as an `All-1` Gray bitplane (`0` extra bytes).
-2. **In-Memory & On-Disk Upgrade (`LcaRegionWriter` & `LcaRegionFileStorage`):**
-   - `LcaRegionWriter.upgradeToCurrentVersion(byte[], int)` validates the `0x0001` superblock and dictionary, decodes all occupied chunks `(rx, rz)`, and re-encodes them into a `formatVersion = 0x0002` archive while preserving `regionX`, `regionZ`, `minSectionY`, `sectionCount`, `defaultDataVersion`, `storageKind`, `Mode A` / `Mode B` compression flags, and per-chunk `generation8` counters.
-   - `LcaRegionFileStorage`, `LcaRegionWriter.openLiveArchive`, and `LeafAnvilWorldConverter.convertWorldToLca` automatically upgrade `0x0001` archives on open or batch conversion, writing a sibling `.v2.tmp` file, optionally preserving `.v1.bak`, atomically replacing the target `.lca` file via `ATOMIC_MOVE`, and invalidating `LcaRegionReader` header caches.
+---
+
+## 11. Format Version `0x0003` (`LCA-ICD-3.0`) Normative Extensions
+
+Archives written with superblock `formatVersion == 0x0003` (`0x08..0x09`) retain the identical 64-byte superblock, 8 KiB pointer directory, chained shared dictionary, SEC-DED syndrome tables, `ChunkFrame` headers, `LCD2` (`0x4C44`) `Mode B` framing, and footer canary (`"LCA1_END"`). Readers accept `formatVersion` $\in \{\mathtt{0x0002}, \mathtt{0x0003}\}$ (`CBIT T1` rejects `0x0000`, `0x0001`, and `>= 0x0004`). Any `0x0003` sentinel encountered inside a `formatVersion == 0x0002` archive fails closed (`CBIT T5`/`T7`).
+
+### 11.1 `SectionFrame` Extension Escape (`paletteLen == 0`, `secExtFlags`)
+- In `formatVersion >= 0x0003` with `blockEncodingMode` $\in \{\mathtt{01}, \mathtt{11}\}$, a leading `paletteLen == 0` (`0x00`) introduces:
+  - `uint8 secExtFlags` (`bit 0 = 0x01`: `RANK_EXCLUDED`; bits `7..1` reserved and must be `0`, else `CBIT T5`), followed by
+  - `VarInt actualPaletteLen` (`2 .. 4096`, else `CBIT T7`).
+- When `RANK_EXCLUDED` (`0x01`) is set, each minority container $p \in [1, \text{paletteLen}-1]$ encodes runs over the successively compacted unclaimed domain $D_p = D_{p-1} \setminus S_{p-1}$ (`LcaV3Codec#decodeRankExcludedDeltaRoaringBlocks`) and enforces mandatory `CBIT T6b` (`decodedOctreeMask64 == expectedOctreeMask64`). Because rank-exclusion increases `readChunkView` latency, default `v3` encoders keep `RANK_EXCLUDED` opt-in for archival compaction while decoders support it unconditionally.
+
+### 11.2 Block-Conditioned Eikonal Light Residuals + `ADR-005` `B1` (`sentinelHdr`)
+- In `formatVersion >= 0x0003` (`storageKind != 3`), when `skyLightMode == 10` or `blockLightMode == 10`, if `(firstByte & 0x03) == 0x02` (`sentinelHdr`), the channel encodes an Eikonal light residual rather than 4-bitplane `GrayPlanes`:
+  - `sentinelHdr` bit layout:
+    - Bits `1..0`: `10` (`0x02`, Eikonal sentinel)
+    - Bits `3..2`: `predictorSubMode2` (`0 = BlockLight`, `1 = SkyLight open-sky`, `2 = SkyLight top-face seeded`, `3 = reserved -> CBIT T5`)
+    - Bits `6..4`: `predictorTableId3` (`0 = LCA_LIGHT_TABLE_V1`; any non-zero value -> `CBIT T5`)
+    - Bit `7`: `topSeedMode` (`0 = nibble RLE`, `1 = raw 128 B packed nibbles`; valid only for `subMode == 2`, else `CBIT T5`)
+  - Immediately followed by `VarInt payloadByteLen` (`>= 1`, bounded by section limit -> `CBIT T5`), enabling $O(1)$ `skipLightChannel` (`REQ-RTP-S-005`).
+  - Inside `payloadByteLen`: optional `topFaceSeed` (when `subMode == 2`), `uint8 residualEncodingMode` (`0x00 = B1` `64-bit` octant-bitmask + per-active-octant `64-bit` voxel mask + packed 4-bit non-zero modular residuals `(actual - hatL) & 0x0F`, `lo | (hi << 4)`).
+- **`LCA_LIGHT_TABLE_V1` (`LcaV3Codec#classifyLightV1`):** Frozen static classifier mapping canonical blockstate strings to `(opacity4 << 4) | (emission4 & 0x0F)`, explicitly classifying `minecraft:tinted_glass` as opacity `15` and running bounded 6-connected fixed-point Eikonal relaxation (`int[4096]` circular ring + `long[64]` `inQueue` deduplication). Enabled by default in `Mode B` (`LCD2`) and opt-in in `Mode A` (`0-LZ`) to preserve `Mode A` live-save latency below `.mca` `Zlib`.
+
+### 11.3 `boilerplateFlags16` Bit `15` (`0x8000`) Columnar Ticks & Template `block_entities`
+- In `formatVersion >= 0x0003`, `boilerplateFlags16` bit `15` (`0x8000`, `HAS_EXTENDED_FLAGS`) appears strictly after `Bit 14` (`ChunkPatchTail`) and strictly before `Bit 10` (`residualNbtSlice`):
+  - `VarInt extFlags`: `bit 0 = 0x01` (`block_ticks`), `bit 1 = 0x02` (`fluid_ticks`), `bit 2 = 0x04` (`block_entities`), bits `3..31` reserved (`0`, else `CBIT T5`). Mutual exclusion with empty-list bits `0, 1, 2` is enforced (`CBIT T5`).
+  - Each active sub-stream is framed by `VarInt subStreamByteLen` + payload:
+    - `ColumnarTickStream`: `VarInt count` (`1..65536`), `uint8 tickFlags` (`bit 0 = allInChunkXZ`, `bit 1 = allPriorityZero`), unique ID dictionary (`(utfLen << 1) | mcPrefixBit`), optional `idOrds`, packed `XZ` (`(lx << 4) | lz`) or `ZigZagVarLong` `dX/dZ`, `ZigZagVarLong` `deltaY`, `deltaT`, and optional `p`. Non-vanilla schemas fall back losslessly to `Bit 10`.
+    - `ColumnarBlockEntityStream`: `VarInt count` (`1..16384`), `uint8 beFlags` (`bit 0 = allInChunkXYZ`), template table (`VarInt templateCount`, `[VarInt byteLen, rawNbtCompoundBodyWithTagEnd]`), and per-instance template ordinal + `x,y,z` / `Pos[3]` coordinates.
