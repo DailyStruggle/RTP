@@ -1559,10 +1559,10 @@ public final class JavaConceptBackendEmitter implements ConceptBackendEmitter {
             };
         } catch (Throwable directEx) {
             LOGGER.log(
-                    Level.FINE,
-                    "[JavaConceptBackendEmitter] Direct bytecode surface assembly deferred for "
+                    Level.WARNING,
+                    "[JavaConceptBackendEmitter S-004] Direct bytecode surface assembly deferred for "
                             + module.moduleName()
-                            + "; falling back to in-memory javac",
+                            + " (" + directEx.getClass().getSimpleName() + ": " + directEx.getMessage() + "); falling back to in-memory javac",
                     directEx);
         }
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();

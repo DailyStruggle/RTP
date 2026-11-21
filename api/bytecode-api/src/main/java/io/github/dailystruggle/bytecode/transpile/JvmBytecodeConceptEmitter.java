@@ -325,8 +325,9 @@ public final class JvmBytecodeConceptEmitter {
         }
     }
 
-    private static final int OUTLINE_FUNCTION_NODE_THRESHOLD = 320;
-    private static final int OUTLINE_UNIT_NODE_THRESHOLD = 160;
+    private static final int OUTLINE_FUNCTION_NODE_THRESHOLD = 380;
+    private static final int OUTLINE_UNIT_NODE_THRESHOLD = 90;
+    private static final int OUTLINE_MAX_PARAM_SLOTS = 240;
     private static final int OUTLINE_NO_RETURN_SENTINEL = Integer.MIN_VALUE;
 
     /**
@@ -337,23 +338,34 @@ public final class JvmBytecodeConceptEmitter {
         if (input == null || input.isEmpty()) {
             return List.of();
         }
-        int entryIdx = input.size() - 1;
-        List<ConceptFunction> helpersOut = new ArrayList<>(input.size() + 8);
-        ConceptFunction outlinedEntry = input.get(entryIdx);
+        List<ConceptFunction> current = input;
         int[] seq = new int[1];
-        for (int i = 0; i < input.size(); i++) {
-            ConceptFunction fn = input.get(i);
-            List<ConceptFunction> generated = new ArrayList<>();
-            ConceptFunction rewritten = outlineFunctionIfOversized(fn, generated, seq);
-            helpersOut.addAll(generated);
-            if (i == entryIdx) {
-                outlinedEntry = rewritten;
-            } else {
-                helpersOut.add(rewritten);
+        for (int pass = 0; pass < 5; pass++) {
+            int entryIdx = current.size() - 1;
+            List<ConceptFunction> helpersOut = new ArrayList<>(current.size() + 16);
+            ConceptFunction outlinedEntry = current.get(entryIdx);
+            boolean anyChanged = false;
+            for (int i = 0; i < current.size(); i++) {
+                ConceptFunction fn = current.get(i);
+                List<ConceptFunction> generated = new ArrayList<>();
+                ConceptFunction rewritten = outlineFunctionIfOversized(fn, generated, seq);
+                if (!generated.isEmpty() || rewritten != fn) {
+                    anyChanged = true;
+                }
+                helpersOut.addAll(generated);
+                if (i == entryIdx) {
+                    outlinedEntry = rewritten;
+                } else {
+                    helpersOut.add(rewritten);
+                }
+            }
+            helpersOut.add(outlinedEntry);
+            current = helpersOut;
+            if (!anyChanged) {
+                break;
             }
         }
-        helpersOut.add(outlinedEntry);
-        return helpersOut;
+        return current;
     }
 
     private static ConceptFunction outlineFunctionIfOversized(
@@ -361,16 +373,27 @@ public final class JvmBytecodeConceptEmitter {
         if (countStmtListNodes(fn.body()) <= OUTLINE_FUNCTION_NODE_THRESHOLD) {
             return fn;
         }
-        Map<String, ConceptType> paramScope = new LinkedHashMap<>();
+        Map<String, ConceptType> initialScope = new LinkedHashMap<>();
         for (ConceptParam p : fn.parameters()) {
-            paramScope.put(p.name(), p.type());
+            initialScope.put(p.name(), p.type());
+        }
+        // MethodEmitter zero-initializes all fn.localTypes() up front, so they are always in scope and definite-assigned.
+        for (Map.Entry<String, ConceptType> e : fn.localTypes().entrySet()) {
+            initialScope.putIfAbsent(e.getKey(), e.getValue());
         }
         Map<String, ConceptType> updatedLocals = new LinkedHashMap<>(fn.localTypes());
         List<ConceptStmt> rewrittenBody =
-                outlineStatementBlock(fn, fn.body(), paramScope, updatedLocals, extraHelpers, seq);
+                outlineStatementBlock(fn, fn.body(), initialScope, updatedLocals, extraHelpers, seq);
         if (rewrittenBody == fn.body()) {
             return fn;
         }
+        Set<String> liveInBody = new HashSet<>();
+        for (ConceptStmt s : rewrittenBody) {
+            collectReadVarsStmt(s, liveInBody);
+            collectAssignedVarsStmt(s, liveInBody);
+            collectDeclaredVarsStmt(s, liveInBody);
+        }
+        updatedLocals.keySet().retainAll(liveInBody);
         return new ConceptFunction(
                 fn.ownerClass(),
                 fn.name(),
@@ -396,25 +419,65 @@ public final class JvmBytecodeConceptEmitter {
         List<ConceptStmt> pass1 = new ArrayList<>(stmts.size());
         boolean changed = false;
 
-        // Pass 1: Bottom-up outlining of oversized If branches (either early-return I32 or single-var assignment).
-        for (ConceptStmt stmt : stmts) {
+        int nInit = stmts.size();
+        Set<String>[] initLiveAfter = computeLiveAfter(stmts);
+
+        // Pass 1: Bottom-up outlining of oversized expressions (Ternary/BinaryOp trees) and If branches.
+        for (int idx = 0; idx < nInit; idx++) {
+            ConceptStmt stmt = stmts.get(idx);
             if (stmt instanceof ConceptStmt.VarDecl vd) {
-                pass1.add(vd);
+                ConceptExpr init = vd.initializer();
+                ConceptExpr newInit = (init != null && countExprNodes(init) > OUTLINE_UNIT_NODE_THRESHOLD)
+                        ? outlineOversizedExpr(hostFn, init, curScope, extraHelpers, seq, true)
+                        : init;
+                if (newInit != init) {
+                    pass1.add(new ConceptStmt.VarDecl(vd.name(), vd.type(), newInit));
+                    changed = true;
+                } else {
+                    pass1.add(vd);
+                }
                 curScope.put(vd.name(), vd.type());
+            } else if (stmt instanceof ConceptStmt.Assign a) {
+                ConceptExpr newVal = countExprNodes(a.value()) > OUTLINE_UNIT_NODE_THRESHOLD
+                        ? outlineOversizedExpr(hostFn, a.value(), curScope, extraHelpers, seq, true)
+                        : a.value();
+                if (newVal != a.value()) {
+                    pass1.add(new ConceptStmt.Assign(a.name(), a.type(), newVal));
+                    changed = true;
+                } else {
+                    pass1.add(a);
+                }
+                curScope.putIfAbsent(a.name(), a.type());
+            } else if (stmt instanceof ConceptStmt.Return r) {
+                ConceptExpr val = r.value();
+                ConceptExpr newVal = (val != null && countExprNodes(val) > OUTLINE_UNIT_NODE_THRESHOLD)
+                        ? outlineOversizedExpr(hostFn, val, curScope, extraHelpers, seq, true)
+                        : val;
+                if (newVal != val) {
+                    pass1.add(new ConceptStmt.Return(newVal));
+                    changed = true;
+                } else {
+                    pass1.add(r);
+                }
             } else if (stmt instanceof ConceptStmt.If iff) {
+                ConceptExpr newCond = countExprNodes(iff.condition()) > OUTLINE_UNIT_NODE_THRESHOLD
+                        ? outlineOversizedExpr(hostFn, iff.condition(), curScope, extraHelpers, seq, true)
+                        : iff.condition();
                 List<ConceptStmt> newThen = outlineStatementBlock(
                         hostFn, iff.thenBody(), curScope, hostLocals, extraHelpers, seq);
                 List<ConceptStmt> newElse = outlineStatementBlock(
                         hostFn, iff.elseBody(), curScope, hostLocals, extraHelpers, seq);
-                ConceptStmt.If curIf = (newThen == iff.thenBody() && newElse == iff.elseBody())
+                ConceptStmt.If curIf = (newCond == iff.condition()
+                                && newThen == iff.thenBody()
+                                && newElse == iff.elseBody())
                         ? iff
-                        : new ConceptStmt.If(iff.condition(), newThen, newElse);
+                        : new ConceptStmt.If(newCond, newThen, newElse);
                 if (curIf != iff) {
                     changed = true;
                 }
                 if (countStmtNodes(curIf) > OUTLINE_UNIT_NODE_THRESHOLD) {
                     List<ConceptStmt> outlined = tryOutlineSingleIf(
-                            hostFn, curIf, curScope, hostLocals, extraHelpers, seq);
+                            hostFn, curIf, curScope, initLiveAfter[idx], hostLocals, extraHelpers, seq);
                     if (!outlined.isEmpty()) {
                         pass1.addAll(outlined);
                         changed = true;
@@ -422,29 +485,177 @@ public final class JvmBytecodeConceptEmitter {
                     }
                 }
                 pass1.add(curIf);
+            } else if (stmt instanceof ConceptStmt.While wh) {
+                ConceptExpr newCond = countExprNodes(wh.condition()) > OUTLINE_UNIT_NODE_THRESHOLD
+                        ? outlineOversizedExpr(hostFn, wh.condition(), curScope, extraHelpers, seq, true)
+                        : wh.condition();
+                List<ConceptStmt> newBody = outlineStatementBlock(
+                        hostFn, wh.body(), curScope, hostLocals, extraHelpers, seq);
+                ConceptStmt.While curWh = (newCond == wh.condition() && newBody == wh.body())
+                        ? wh
+                        : new ConceptStmt.While(newCond, newBody);
+                if (curWh != wh) {
+                    changed = true;
+                }
+                pass1.add(curWh);
             } else {
                 pass1.add(stmt);
             }
         }
 
-        // Pass 2: Outline contiguous sequential slices of large flat statement lists (e.g. unrolled rule sequences).
-        if (countStmtListNodes(pass1) <= OUTLINE_FUNCTION_NODE_THRESHOLD
-                || hostFn.returnType() != ConceptType.I32
-                || pass1.size() < 4) {
+        // Pass 2: Outline contiguous sequential slices (both early-return I32 slices and single-live-out VarDecl chains).
+        if (countStmtListNodes(pass1) <= OUTLINE_FUNCTION_NODE_THRESHOLD || pass1.size() < 4) {
             return changed ? pass1 : stmts;
         }
+        List<ConceptStmt> pass2 = outlineSequentialSlices(hostFn, pass1, outerScope, hostLocals, extraHelpers, seq);
+        return (pass2 != pass1 || changed) ? pass2 : stmts;
+    }
 
-        int n = pass1.size();
-        @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
+    private static Set<String>[] computeLiveAfter(List<ConceptStmt> stmts) {
+        int n = stmts.size();
         Set<String>[] liveAfter = new Set[n];
         Set<String> runningLive = new HashSet<>();
-        for (int i = n - 1; i >= 0; i--) {
-            liveAfter[i] = new HashSet<>(runningLive);
-            collectReadVarsStmt(pass1.get(i), runningLive);
-            if (pass1.get(i) instanceof ConceptStmt.VarDecl vd) {
+        for (int k = n - 1; k >= 0; k--) {
+            liveAfter[k] = new HashSet<>(runningLive);
+            ConceptStmt st = stmts.get(k);
+            if (st instanceof ConceptStmt.Assign a) {
+                runningLive.remove(a.name());
+            }
+            collectReadVarsStmt(st, runningLive);
+            if (st instanceof ConceptStmt.VarDecl vd) {
                 runningLive.remove(vd.name());
             }
         }
+        return liveAfter;
+    }
+
+    private static ConceptExpr outlineOversizedExpr(
+            ConceptFunction hostFn,
+            ConceptExpr expr,
+            Map<String, ConceptType> scope,
+            List<ConceptFunction> extraHelpers,
+            int[] seq,
+            boolean outlineRootIfStillBig) {
+        if (expr == null || countExprNodes(expr) <= OUTLINE_UNIT_NODE_THRESHOLD) {
+            return expr;
+        }
+        ConceptExpr rewritten = expr;
+        if (expr instanceof ConceptExpr.Ternary t) {
+            ConceptExpr c = outlineOversizedExpr(hostFn, t.condition(), scope, extraHelpers, seq, true);
+            ConceptExpr th = outlineOversizedExpr(hostFn, t.thenExpr(), scope, extraHelpers, seq, true);
+            ConceptExpr el = outlineOversizedExpr(hostFn, t.elseExpr(), scope, extraHelpers, seq, true);
+            if (c != t.condition() || th != t.thenExpr() || el != t.elseExpr()) {
+                rewritten = new ConceptExpr.Ternary(c, th, el, t.type());
+            }
+        } else if (expr instanceof ConceptExpr.BinaryOp b) {
+            ConceptExpr l = outlineOversizedExpr(hostFn, b.left(), scope, extraHelpers, seq, true);
+            ConceptExpr r = outlineOversizedExpr(hostFn, b.right(), scope, extraHelpers, seq, true);
+            if (l != b.left() || r != b.right()) {
+                rewritten = new ConceptExpr.BinaryOp(b.op(), l, r, b.type());
+            }
+        } else if (expr instanceof ConceptExpr.UnaryOp u) {
+            ConceptExpr op = outlineOversizedExpr(hostFn, u.operand(), scope, extraHelpers, seq, true);
+            if (op != u.operand()) {
+                rewritten = new ConceptExpr.UnaryOp(u.op(), op, u.type());
+            }
+        } else if (expr instanceof ConceptExpr.Cast c) {
+            ConceptExpr op = outlineOversizedExpr(hostFn, c.operand(), scope, extraHelpers, seq, true);
+            if (op != c.operand()) {
+                rewritten = new ConceptExpr.Cast(c.targetType(), op);
+            }
+        } else if (expr instanceof ConceptExpr.MathIntrinsic m) {
+            List<ConceptExpr> args = new ArrayList<>(m.arguments().size());
+            boolean any = false;
+            for (ConceptExpr a : m.arguments()) {
+                ConceptExpr na = outlineOversizedExpr(hostFn, a, scope, extraHelpers, seq, true);
+                if (na != a) {
+                    any = true;
+                }
+                args.add(na);
+            }
+            if (any) {
+                rewritten = new ConceptExpr.MathIntrinsic(m.kind(), args, m.type());
+            }
+        } else if (expr instanceof ConceptExpr.Call c) {
+            List<ConceptExpr> args = new ArrayList<>(c.arguments().size());
+            boolean any = false;
+            for (ConceptExpr a : c.arguments()) {
+                ConceptExpr na = outlineOversizedExpr(hostFn, a, scope, extraHelpers, seq, true);
+                if (na != a) {
+                    any = true;
+                }
+                args.add(na);
+            }
+            if (any) {
+                rewritten = new ConceptExpr.Call(c.ownerClass(), c.methodName(), c.descriptor(), args, c.returnType());
+            }
+        }
+        if (outlineRootIfStillBig
+                && countExprNodes(rewritten) > OUTLINE_UNIT_NODE_THRESHOLD
+                && rewritten.type() != ConceptType.VOID
+                && !(rewritten instanceof ConceptExpr.CompareTemp)) {
+            ConceptExpr outlined = emitPureExprHelper(hostFn, rewritten, scope, extraHelpers, seq);
+            if (outlined != null) {
+                return outlined;
+            }
+        }
+        return rewritten;
+    }
+
+    private static ConceptExpr.Call emitPureExprHelper(
+            ConceptFunction hostFn,
+            ConceptExpr bodyExpr,
+            Map<String, ConceptType> scope,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        Set<String> readVars = new LinkedHashSet<>();
+        collectReadVarsExpr(bodyExpr, readVars);
+        for (String rv : readVars) {
+            if (!scope.containsKey(rv)) {
+                return null;
+            }
+        }
+        List<ConceptParam> helperParams = new ArrayList<>();
+        List<ConceptExpr> callArgs = new ArrayList<>();
+        Map<String, ConceptType> helperLocals = new LinkedHashMap<>();
+        int slot = 0;
+        for (Map.Entry<String, ConceptType> e : scope.entrySet()) {
+            if (readVars.contains(e.getKey())) {
+                helperParams.add(new ConceptParam(e.getKey(), e.getValue(), slot));
+                callArgs.add(new ConceptExpr.Var(e.getKey(), e.getValue()));
+                helperLocals.put(e.getKey(), e.getValue());
+                slot += (e.getValue() == ConceptType.F64 || e.getValue() == ConceptType.I64) ? 2 : 1;
+            }
+        }
+        if (slot > OUTLINE_MAX_PARAM_SLOTS) {
+            return null;
+        }
+        ConceptType retType = bodyExpr.type();
+        String helperName = hostFn.name() + "__expr_" + (seq[0]++);
+        String desc = buildHelperDescriptor(helperParams, retType);
+        ConceptFunction helper = new ConceptFunction(
+                hostFn.ownerClass(),
+                helperName,
+                desc,
+                helperParams,
+                retType,
+                helperLocals,
+                List.of(new ConceptStmt.Return(bodyExpr)),
+                true);
+        extraHelpers.add(helper);
+        return new ConceptExpr.Call(hostFn.ownerClass(), helperName, desc, callArgs, retType);
+    }
+
+    private static List<ConceptStmt> outlineSequentialSlices(
+            ConceptFunction hostFn,
+            List<ConceptStmt> pass1,
+            Map<String, ConceptType> outerScope,
+            Map<String, ConceptType> hostLocals,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        int n = pass1.size();
+        Set<String>[] liveAfter = computeLiveAfter(pass1);
 
         List<ConceptStmt> pass2 = new ArrayList<>(n);
         Map<String, ConceptType> sliceOuterScope = new LinkedHashMap<>(outerScope);
@@ -452,25 +663,23 @@ public final class JvmBytecodeConceptEmitter {
         boolean pass2Changed = false;
         while (i < n) {
             int accNodes = 0;
-            Set<String> sliceDeclared = new HashSet<>();
-            Set<String> sliceAssignedOuter = new HashSet<>();
+            Map<String, ConceptType> sliceDeclared = new LinkedHashMap<>();
+            Set<String> sliceAssigned = new LinkedHashSet<>();
             boolean sliceHasReturn = false;
             boolean sliceHasStore = false;
             boolean sliceHasSentinel = false;
             int splitEnd = -1;
+            String singleLiveOutVar = null;
+            boolean singleLiveOutIsDeclared = false;
+            String pairLiveOutVarB = null;
+            boolean pairLiveOutBIsDeclared = false;
             for (int j = i; j < n; j++) {
                 ConceptStmt st = pass1.get(j);
                 accNodes += countStmtNodes(st);
                 if (st instanceof ConceptStmt.VarDecl vd) {
-                    sliceDeclared.add(vd.name());
+                    sliceDeclared.put(vd.name(), vd.type());
                 }
-                Set<String> assigned = new HashSet<>();
-                collectAssignedVarsStmt(st, assigned);
-                for (String a : assigned) {
-                    if (!sliceDeclared.contains(a) && sliceOuterScope.containsKey(a)) {
-                        sliceAssignedOuter.add(a);
-                    }
-                }
+                collectAssignedVarsStmt(st, sliceAssigned);
                 if (stmtContainsReturn(st)) {
                     sliceHasReturn = true;
                 }
@@ -480,28 +689,139 @@ public final class JvmBytecodeConceptEmitter {
                 if (stmtContainsIntConst(st, OUTLINE_NO_RETURN_SENTINEL)) {
                     sliceHasSentinel = true;
                 }
-                if (!sliceAssignedOuter.isEmpty() || sliceHasStore || sliceHasSentinel) {
+                if (sliceHasStore) {
                     break;
                 }
-                if (accNodes >= OUTLINE_UNIT_NODE_THRESHOLD && sliceHasReturn && (i > 0 || j < n - 1)) {
-                    boolean leaksLocal = false;
-                    for (String d : sliceDeclared) {
+                if (accNodes >= OUTLINE_UNIT_NODE_THRESHOLD && (i > 0 || j < n - 1)) {
+                    List<String> liveOut = new ArrayList<>();
+                    for (String d : sliceDeclared.keySet()) {
                         if (liveAfter[j].contains(d)) {
-                            leaksLocal = true;
+                            liveOut.add(d);
+                        }
+                    }
+                    for (String a : sliceAssigned) {
+                        if (!sliceDeclared.containsKey(a)
+                                && sliceOuterScope.containsKey(a)
+                                && liveAfter[j].contains(a)) {
+                            liveOut.add(a);
+                        }
+                    }
+                    if (liveOut.isEmpty()
+                            && sliceHasReturn
+                            && hostFn.returnType() == ConceptType.I32
+                            && !sliceHasSentinel) {
+                        splitEnd = j;
+                        singleLiveOutVar = null;
+                        pairLiveOutVarB = null;
+                        break;
+                    }
+                    if (liveOut.size() == 1 && !sliceHasReturn) {
+                        String vName = liveOut.get(0);
+                        boolean isDecl = sliceDeclared.containsKey(vName);
+                        ConceptType outType = isDecl ? sliceDeclared.get(vName) : sliceOuterScope.get(vName);
+                        if (outType != null && outType != ConceptType.VOID) {
+                            splitEnd = j;
+                            singleLiveOutVar = vName;
+                            singleLiveOutIsDeclared = isDecl;
+                            pairLiveOutVarB = null;
                             break;
                         }
                     }
-                    if (!leaksLocal) {
-                        splitEnd = j;
-                        break;
+                    if (liveOut.size() == 2 && !sliceHasReturn) {
+                        String vA = liveOut.get(0);
+                        String vB = liveOut.get(1);
+                        boolean declA = sliceDeclared.containsKey(vA);
+                        boolean declB = sliceDeclared.containsKey(vB);
+                        ConceptType tA = declA ? sliceDeclared.get(vA) : sliceOuterScope.get(vA);
+                        ConceptType tB = declB ? sliceDeclared.get(vB) : sliceOuterScope.get(vB);
+                        if (isPackable32(tA) && isPackable32(tB)) {
+                            splitEnd = j;
+                            singleLiveOutVar = vA;
+                            singleLiveOutIsDeclared = declA;
+                            pairLiveOutVarB = vB;
+                            pairLiveOutBIsDeclared = declB;
+                            break;
+                        }
                     }
                 }
             }
             if (splitEnd >= i) {
                 List<ConceptStmt> slice = new ArrayList<>(pass1.subList(i, splitEnd + 1));
-                List<ConceptStmt> callStmts = emitEarlyReturnOutlinedSlice(
-                        hostFn, slice, sliceOuterScope, hostLocals, extraHelpers, seq);
-                pass2.addAll(callStmts);
+                Set<String> exposed = collectExposedReadVars(slice);
+                int exposedSlots = 0;
+                boolean allExposedInScope = true;
+                for (String ev : exposed) {
+                    ConceptType et = sliceOuterScope.get(ev);
+                    if (et == null) {
+                        allExposedInScope = false;
+                        break;
+                    }
+                    exposedSlots += (et == ConceptType.F64 || et == ConceptType.I64) ? 2 : 1;
+                }
+                if (!allExposedInScope || exposedSlots > OUTLINE_MAX_PARAM_SLOTS) {
+                    ConceptStmt st = pass1.get(i);
+                    pass2.add(st);
+                    if (st instanceof ConceptStmt.VarDecl vd) {
+                        sliceOuterScope.put(vd.name(), vd.type());
+                    } else if (st instanceof ConceptStmt.Assign a) {
+                        sliceOuterScope.putIfAbsent(a.name(), a.type());
+                    }
+                    i++;
+                    continue;
+                }
+                if (singleLiveOutVar == null) {
+                    pass2.addAll(emitEarlyReturnOutlinedSlice(
+                            hostFn, slice, sliceOuterScope, hostLocals, extraHelpers, seq));
+                } else if (pairLiveOutVarB != null) {
+                    ConceptType tA = singleLiveOutIsDeclared
+                            ? sliceDeclared.get(singleLiveOutVar)
+                            : sliceOuterScope.get(singleLiveOutVar);
+                    ConceptType tB = pairLiveOutBIsDeclared
+                            ? sliceDeclared.get(pairLiveOutVarB)
+                            : sliceOuterScope.get(pairLiveOutVarB);
+                    pass2.addAll(emitPackedPairLiveOutSlice(
+                            hostFn,
+                            slice,
+                            singleLiveOutVar,
+                            tA,
+                            singleLiveOutIsDeclared,
+                            pairLiveOutVarB,
+                            tB,
+                            pairLiveOutBIsDeclared,
+                            sliceOuterScope,
+                            hostLocals,
+                            extraHelpers,
+                            seq));
+                    if (singleLiveOutIsDeclared) {
+                        sliceOuterScope.put(singleLiveOutVar, tA);
+                    } else {
+                        sliceOuterScope.putIfAbsent(singleLiveOutVar, tA);
+                    }
+                    if (pairLiveOutBIsDeclared) {
+                        sliceOuterScope.put(pairLiveOutVarB, tB);
+                    } else {
+                        sliceOuterScope.putIfAbsent(pairLiveOutVarB, tB);
+                    }
+                } else {
+                    ConceptType outType = singleLiveOutIsDeclared
+                            ? sliceDeclared.get(singleLiveOutVar)
+                            : sliceOuterScope.get(singleLiveOutVar);
+                    ConceptStmt callStmt = emitSingleLiveOutSlice(
+                            hostFn,
+                            slice,
+                            singleLiveOutVar,
+                            outType,
+                            singleLiveOutIsDeclared,
+                            sliceOuterScope,
+                            extraHelpers,
+                            seq);
+                    pass2.add(callStmt);
+                    if (singleLiveOutIsDeclared) {
+                        sliceOuterScope.put(singleLiveOutVar, outType);
+                    } else {
+                        sliceOuterScope.putIfAbsent(singleLiveOutVar, outType);
+                    }
+                }
                 pass2Changed = true;
                 i = splitEnd + 1;
             } else {
@@ -509,91 +829,55 @@ public final class JvmBytecodeConceptEmitter {
                 pass2.add(st);
                 if (st instanceof ConceptStmt.VarDecl vd) {
                     sliceOuterScope.put(vd.name(), vd.type());
+                } else if (st instanceof ConceptStmt.Assign a) {
+                    sliceOuterScope.putIfAbsent(a.name(), a.type());
                 }
                 i++;
             }
         }
-        return (pass2Changed || changed) ? pass2 : stmts;
+        return pass2Changed ? pass2 : pass1;
     }
 
-    private static List<ConceptStmt> tryOutlineSingleIf(
-            ConceptFunction hostFn,
-            ConceptStmt.If iff,
-            Map<String, ConceptType> outerScope,
-            Map<String, ConceptType> hostLocals,
-            List<ConceptFunction> extraHelpers,
-            int[] seq) {
-        if (stmtContainsStore(iff)) {
-            return List.of();
-        }
-        Set<String> declaredInside = new HashSet<>();
-        collectDeclaredVarsStmt(iff, declaredInside);
-        Set<String> assigned = new HashSet<>();
-        collectAssignedVarsStmt(iff, assigned);
-        Set<String> assignedOuter = new LinkedHashSet<>();
-        for (String a : assigned) {
-            if (!declaredInside.contains(a) && outerScope.containsKey(a)) {
-                assignedOuter.add(a);
+    private static Set<String> collectExposedReadVars(List<ConceptStmt> slice) {
+        Set<String> live = new LinkedHashSet<>();
+        for (int k = slice.size() - 1; k >= 0; k--) {
+            ConceptStmt st = slice.get(k);
+            if (st instanceof ConceptStmt.Assign a) {
+                live.remove(a.name());
+            }
+            collectReadVarsStmt(st, live);
+            if (st instanceof ConceptStmt.VarDecl vd) {
+                live.remove(vd.name());
             }
         }
-        boolean hasReturn = stmtContainsReturn(iff);
-        if (assignedOuter.isEmpty()
-                && hasReturn
-                && hostFn.returnType() == ConceptType.I32
-                && !stmtContainsIntConst(iff, OUTLINE_NO_RETURN_SENTINEL)) {
-            return emitEarlyReturnOutlinedSlice(
-                    hostFn, List.of(iff), outerScope, hostLocals, extraHelpers, seq);
-        }
-        if (assignedOuter.size() == 1 && !hasReturn) {
-            String targetVar = null;
-            for (String a : assignedOuter) {
-                targetVar = a;
-            }
-            ConceptType targetType = targetVar != null ? outerScope.get(targetVar) : null;
-            if (targetVar == null || targetType == null || targetType == ConceptType.VOID) {
-                return List.of();
-            }
-            Set<String> readVars = new LinkedHashSet<>();
-            collectReadVarsStmt(iff, readVars);
-            readVars.add(targetVar);
-            List<ConceptParam> helperParams = new ArrayList<>();
-            List<ConceptExpr> callArgs = new ArrayList<>();
-            Map<String, ConceptType> helperLocals = new LinkedHashMap<>();
-            int slot = 0;
-            for (Map.Entry<String, ConceptType> e : outerScope.entrySet()) {
-                if (readVars.contains(e.getKey())) {
-                    helperParams.add(new ConceptParam(e.getKey(), e.getValue(), slot));
-                    callArgs.add(new ConceptExpr.Var(e.getKey(), e.getValue()));
-                    helperLocals.put(e.getKey(), e.getValue());
-                    slot += (e.getValue() == ConceptType.F64 || e.getValue() == ConceptType.I64) ? 2 : 1;
-                }
-            }
-            collectDeclaredVarTypesStmt(iff, helperLocals);
-            String helperName = hostFn.name() + "__out_" + (seq[0]++);
-            String desc = buildHelperDescriptor(helperParams, targetType);
-            List<ConceptStmt> helperBody = new ArrayList<>(2);
-            helperBody.add(iff);
-            helperBody.add(new ConceptStmt.Return(new ConceptExpr.Var(targetVar, targetType)));
-            ConceptFunction helper = new ConceptFunction(
-                    hostFn.ownerClass(), helperName, desc, helperParams, targetType, helperLocals, helperBody, true);
-            extraHelpers.add(helper);
-            ConceptExpr.Call call = new ConceptExpr.Call(
-                    hostFn.ownerClass(), helperName, desc, callArgs, targetType);
-            return List.of(new ConceptStmt.Assign(targetVar, targetType, call));
-        }
-        return List.of();
+        return live;
     }
 
-    private static List<ConceptStmt> emitEarlyReturnOutlinedSlice(
+    private static ConceptStmt emitSingleLiveOutSlice(
             ConceptFunction hostFn,
             List<ConceptStmt> slice,
+            String liveOutVar,
+            ConceptType liveOutType,
+            boolean isNewDecl,
             Map<String, ConceptType> outerScope,
-            Map<String, ConceptType> hostLocals,
             List<ConceptFunction> extraHelpers,
             int[] seq) {
-        Set<String> readVars = new LinkedHashSet<>();
+        Set<String> readVars = collectExposedReadVars(slice);
+        Set<String> assignedVars = new LinkedHashSet<>();
         for (ConceptStmt st : slice) {
-            collectReadVarsStmt(st, readVars);
+            collectAssignedVarsStmt(st, assignedVars);
+        }
+        if (!isNewDecl) {
+            boolean alwaysOverwritten = false;
+            for (ConceptStmt st : slice) {
+                if (st instanceof ConceptStmt.Assign a && liveOutVar.equals(a.name())) {
+                    alwaysOverwritten = true;
+                    break;
+                }
+            }
+            if (!alwaysOverwritten) {
+                readVars.add(liveOutVar);
+            }
         }
         List<ConceptParam> helperParams = new ArrayList<>();
         List<ConceptExpr> callArgs = new ArrayList<>();
@@ -605,6 +889,251 @@ public final class JvmBytecodeConceptEmitter {
                 callArgs.add(new ConceptExpr.Var(e.getKey(), e.getValue()));
                 helperLocals.put(e.getKey(), e.getValue());
                 slot += (e.getValue() == ConceptType.F64 || e.getValue() == ConceptType.I64) ? 2 : 1;
+            }
+        }
+        for (String a : assignedVars) {
+            ConceptType t = outerScope.get(a);
+            if (t != null) {
+                helperLocals.putIfAbsent(a, t);
+            }
+        }
+        for (ConceptStmt st : slice) {
+            collectDeclaredVarTypesStmt(st, helperLocals);
+        }
+        String helperName = hostFn.name() + "__slc_" + (seq[0]++);
+        String desc = buildHelperDescriptor(helperParams, liveOutType);
+        List<ConceptStmt> helperBody = new ArrayList<>(slice.size() + 1);
+        helperBody.addAll(slice);
+        helperBody.add(new ConceptStmt.Return(new ConceptExpr.Var(liveOutVar, liveOutType)));
+        ConceptFunction helper = new ConceptFunction(
+                hostFn.ownerClass(), helperName, desc, helperParams, liveOutType, helperLocals, helperBody, true);
+        extraHelpers.add(helper);
+        ConceptExpr.Call call = new ConceptExpr.Call(
+                hostFn.ownerClass(), helperName, desc, callArgs, liveOutType);
+        return isNewDecl
+                ? new ConceptStmt.VarDecl(liveOutVar, liveOutType, call)
+                : new ConceptStmt.Assign(liveOutVar, liveOutType, call);
+    }
+
+    private static List<ConceptStmt> tryOutlineSingleIf(
+            ConceptFunction hostFn,
+            ConceptStmt.If iff,
+            Map<String, ConceptType> outerScope,
+            Set<String> liveAfterIf,
+            Map<String, ConceptType> hostLocals,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        if (stmtContainsStore(iff)) {
+            return List.of();
+        }
+        Set<String> exposed = collectExposedReadVars(List.of(iff));
+        int exposedSlots = 0;
+        for (String ev : exposed) {
+            ConceptType et = outerScope.get(ev);
+            if (et == null) {
+                return List.of();
+            }
+            exposedSlots += (et == ConceptType.F64 || et == ConceptType.I64) ? 2 : 1;
+        }
+        if (exposedSlots > OUTLINE_MAX_PARAM_SLOTS) {
+            return List.of();
+        }
+        Set<String> declaredInside = new HashSet<>();
+        collectDeclaredVarsStmt(iff, declaredInside);
+        Set<String> assigned = new HashSet<>();
+        collectAssignedVarsStmt(iff, assigned);
+        Set<String> assignedLiveOuter = new LinkedHashSet<>();
+        for (String a : assigned) {
+            if (!declaredInside.contains(a)
+                    && outerScope.containsKey(a)
+                    && liveAfterIf.contains(a)) {
+                assignedLiveOuter.add(a);
+            }
+        }
+        boolean hasReturn = stmtContainsReturn(iff);
+        if (assignedLiveOuter.isEmpty()
+                && hasReturn
+                && hostFn.returnType() == ConceptType.I32
+                && !stmtContainsIntConst(iff, OUTLINE_NO_RETURN_SENTINEL)) {
+            return emitEarlyReturnOutlinedSlice(
+                    hostFn, List.of(iff), outerScope, hostLocals, extraHelpers, seq);
+        }
+        if (assignedLiveOuter.size() == 1 && !hasReturn) {
+            String targetVar = null;
+            for (String a : assignedLiveOuter) {
+                targetVar = a;
+            }
+            ConceptType targetType = targetVar != null ? outerScope.get(targetVar) : null;
+            if (targetVar == null || targetType == null || targetType == ConceptType.VOID) {
+                return List.of();
+            }
+            ConceptStmt callStmt = emitSingleLiveOutSlice(
+                    hostFn, List.of(iff), targetVar, targetType, false, outerScope, extraHelpers, seq);
+            return List.of(callStmt);
+        }
+        if (assignedLiveOuter.size() == 2 && !hasReturn) {
+            List<String> pair = new ArrayList<>(assignedLiveOuter);
+            String vA = pair.get(0);
+            String vB = pair.get(1);
+            ConceptType tA = outerScope.get(vA);
+            ConceptType tB = outerScope.get(vB);
+            if (isPackable32(tA) && isPackable32(tB)) {
+                return emitPackedPairLiveOutSlice(
+                        hostFn,
+                        List.of(iff),
+                        vA,
+                        tA,
+                        false,
+                        vB,
+                        tB,
+                        false,
+                        outerScope,
+                        hostLocals,
+                        extraHelpers,
+                        seq);
+            }
+        }
+        return List.of();
+    }
+
+    private static boolean isPackable32(ConceptType t) {
+        return t == ConceptType.I32 || t == ConceptType.BOOL;
+    }
+
+    private static ConceptExpr toI64Word(String varName, ConceptType t) {
+        if (t == ConceptType.BOOL) {
+            return new ConceptExpr.Ternary(
+                    new ConceptExpr.Var(varName, ConceptType.BOOL),
+                    new ConceptExpr.LongConst(1L),
+                    new ConceptExpr.LongConst(0L),
+                    ConceptType.I64);
+        }
+        return new ConceptExpr.Cast(ConceptType.I64, new ConceptExpr.Var(varName, ConceptType.I32));
+    }
+
+    private static ConceptExpr unpack32FromI64(String packVar, boolean highWord, ConceptType targetType) {
+        ConceptExpr base = highWord
+                ? new ConceptExpr.BinaryOp(
+                        BinaryOperator.USHR,
+                        new ConceptExpr.Var(packVar, ConceptType.I64),
+                        new ConceptExpr.IntConst(32),
+                        ConceptType.I64)
+                : new ConceptExpr.Var(packVar, ConceptType.I64);
+        ConceptExpr asInt = new ConceptExpr.Cast(ConceptType.I32, base);
+        if (targetType == ConceptType.BOOL) {
+            return new ConceptExpr.BinaryOp(
+                    BinaryOperator.NE, asInt, new ConceptExpr.IntConst(0), ConceptType.BOOL);
+        }
+        return asInt;
+    }
+
+    private static List<ConceptStmt> emitPackedPairLiveOutSlice(
+            ConceptFunction hostFn,
+            List<ConceptStmt> slice,
+            String varA,
+            ConceptType typeA,
+            boolean isDeclA,
+            String varB,
+            ConceptType typeB,
+            boolean isDeclB,
+            Map<String, ConceptType> outerScope,
+            Map<String, ConceptType> hostLocals,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        Set<String> readVars = collectExposedReadVars(slice);
+        Set<String> assignedVars = new LinkedHashSet<>();
+        for (ConceptStmt st : slice) {
+            collectAssignedVarsStmt(st, assignedVars);
+        }
+        if (!isDeclA) {
+            readVars.add(varA);
+        }
+        if (!isDeclB) {
+            readVars.add(varB);
+        }
+        List<ConceptParam> helperParams = new ArrayList<>();
+        List<ConceptExpr> callArgs = new ArrayList<>();
+        Map<String, ConceptType> helperLocals = new LinkedHashMap<>();
+        int slot = 0;
+        for (Map.Entry<String, ConceptType> e : outerScope.entrySet()) {
+            if (readVars.contains(e.getKey())) {
+                helperParams.add(new ConceptParam(e.getKey(), e.getValue(), slot));
+                callArgs.add(new ConceptExpr.Var(e.getKey(), e.getValue()));
+                helperLocals.put(e.getKey(), e.getValue());
+                slot += (e.getValue() == ConceptType.F64 || e.getValue() == ConceptType.I64) ? 2 : 1;
+            }
+        }
+        for (String a : assignedVars) {
+            ConceptType t = outerScope.get(a);
+            if (t != null) {
+                helperLocals.putIfAbsent(a, t);
+            }
+        }
+        for (ConceptStmt st : slice) {
+            collectDeclaredVarTypesStmt(st, helperLocals);
+        }
+        int id = seq[0]++;
+        String helperName = hostFn.name() + "__pair_" + id;
+        String desc = buildHelperDescriptor(helperParams, ConceptType.I64);
+        ConceptExpr hi = new ConceptExpr.BinaryOp(
+                BinaryOperator.SHL, toI64Word(varA, typeA), new ConceptExpr.IntConst(32), ConceptType.I64);
+        ConceptExpr lo = new ConceptExpr.BinaryOp(
+                BinaryOperator.BIT_AND,
+                toI64Word(varB, typeB),
+                new ConceptExpr.LongConst(0xFFFFFFFFL),
+                ConceptType.I64);
+        ConceptExpr packed = new ConceptExpr.BinaryOp(BinaryOperator.BIT_OR, hi, lo, ConceptType.I64);
+        List<ConceptStmt> helperBody = new ArrayList<>(slice.size() + 1);
+        helperBody.addAll(slice);
+        helperBody.add(new ConceptStmt.Return(packed));
+        ConceptFunction helper = new ConceptFunction(
+                hostFn.ownerClass(), helperName, desc, helperParams, ConceptType.I64, helperLocals, helperBody, true);
+        extraHelpers.add(helper);
+
+        String packVar = "__outPair_" + id;
+        hostLocals.put(packVar, ConceptType.I64);
+        ConceptExpr.Call call = new ConceptExpr.Call(
+                hostFn.ownerClass(), helperName, desc, callArgs, ConceptType.I64);
+        ConceptStmt declPack = new ConceptStmt.VarDecl(packVar, ConceptType.I64, call);
+        ConceptExpr valA = unpack32FromI64(packVar, true, typeA);
+        ConceptExpr valB = unpack32FromI64(packVar, false, typeB);
+        ConceptStmt writeA = isDeclA
+                ? new ConceptStmt.VarDecl(varA, typeA, valA)
+                : new ConceptStmt.Assign(varA, typeA, valA);
+        ConceptStmt writeB = isDeclB
+                ? new ConceptStmt.VarDecl(varB, typeB, valB)
+                : new ConceptStmt.Assign(varB, typeB, valB);
+        return List.of(declPack, writeA, writeB);
+    }
+
+    private static List<ConceptStmt> emitEarlyReturnOutlinedSlice(
+            ConceptFunction hostFn,
+            List<ConceptStmt> slice,
+            Map<String, ConceptType> outerScope,
+            Map<String, ConceptType> hostLocals,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        Set<String> readVars = collectExposedReadVars(slice);
+        Set<String> assignedVars = new LinkedHashSet<>();
+        for (ConceptStmt st : slice) {
+            collectAssignedVarsStmt(st, assignedVars);
+        }
+        List<ConceptParam> helperParams = new ArrayList<>();
+        List<ConceptExpr> callArgs = new ArrayList<>();
+        Map<String, ConceptType> helperLocals = new LinkedHashMap<>();
+        int slot = 0;
+        for (Map.Entry<String, ConceptType> e : outerScope.entrySet()) {
+            if (readVars.contains(e.getKey())) {
+                helperParams.add(new ConceptParam(e.getKey(), e.getValue(), slot));
+                callArgs.add(new ConceptExpr.Var(e.getKey(), e.getValue()));
+                helperLocals.put(e.getKey(), e.getValue());
+                slot += (e.getValue() == ConceptType.F64 || e.getValue() == ConceptType.I64) ? 2 : 1;
+            }
+        }
+        for (String a : assignedVars) {
+            ConceptType t = outerScope.get(a);
+            if (t != null) {
+                helperLocals.putIfAbsent(a, t);
             }
         }
         for (ConceptStmt st : slice) {
@@ -2507,8 +3036,16 @@ public final class JvmBytecodeConceptEmitter {
                     nextSlot += slotSize(p.type());
                 }
             }
+            Set<String> usedInBody = new HashSet<>();
+            for (ConceptStmt s : fn.body()) {
+                collectReadVarsStmt(s, usedInBody);
+                collectAssignedVarsStmt(s, usedInBody);
+                collectDeclaredVarsStmt(s, usedInBody);
+            }
             for (var entry : fn.localTypes().entrySet()) {
-                declareLocalIfAbsent(entry.getKey(), entry.getValue());
+                if (usedInBody.contains(entry.getKey())) {
+                    declareLocalIfAbsent(entry.getKey(), entry.getValue());
+                }
             }
             collectStmtLocals(fn.body());
         }
