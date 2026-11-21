@@ -1531,14 +1531,43 @@ public final class JavaConceptBackendEmitter implements ConceptBackendEmitter {
             slotMap[i] = surfaceParamSlotIndex(params.get(i).name());
         }
         SurfaceRuleEvaluator irFallback = buildSurfaceIrEvaluator(module, params, slotMap);
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        if (compiler == null) {
-            return irFallback;
-        }
         for (int s : slotMap) {
             if (s < 0) {
                 return irFallback;
             }
+        }
+        // Prefer direct ClassFile v50.0 assembly (zero javac, static-setter LUT injection eliminating 64 KB <clinit>
+        // overflow, compact per-helper bytecode below HotSpot's 8 KB HugeMethodLimit, and 2D (x, z) helper memoization).
+        try {
+            Class<?> retCls = javaClassForConceptType(entry.returnType());
+            Class<?>[] paramClasses = new Class<?>[params.size()];
+            Class<?>[] adaptedParamClasses = new Class<?>[params.size()];
+            for (int i = 0; i < params.size(); i++) {
+                paramClasses[i] = javaClassForConceptType(params.get(i).type());
+                adaptedParamClasses[i] = SURFACE_EVAL_MT.parameterType(slotMap[i]);
+            }
+            MethodHandle rawMh = JvmBytecodeConceptEmitter.assembleEntryMethodHandle(
+                    module, "Surf_" + hash, retCls, paramClasses);
+            MethodHandle coercedMh = rawMh.asType(MethodType.methodType(int.class, adaptedParamClasses));
+            MethodHandle permuted = MethodHandles.permuteArguments(coercedMh, SURFACE_EVAL_MT, slotMap);
+            return (bx, by, bz, sda, sdb, wh, sd, bid, py, st, gx, gz, sec, temp) -> {
+                try {
+                    return (int) permuted.invokeExact(bx, by, bz, sda, sdb, wh, sd, bid, py, st, gx, gz, sec, temp);
+                } catch (Throwable t) {
+                    throw new IllegalStateException("Direct bytecode surface rule evaluation fault", t);
+                }
+            };
+        } catch (Throwable directEx) {
+            LOGGER.log(
+                    Level.FINE,
+                    "[JavaConceptBackendEmitter] Direct bytecode surface assembly deferred for "
+                            + module.moduleName()
+                            + "; falling back to in-memory javac",
+                    directEx);
+        }
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            return irFallback;
         }
         try {
             String uniqueModName = "IrSurface_" + hash;

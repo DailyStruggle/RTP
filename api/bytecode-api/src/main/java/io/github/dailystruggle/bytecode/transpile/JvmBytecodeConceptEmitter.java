@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -290,6 +291,665 @@ public final class JvmBytecodeConceptEmitter {
     }
 
     /**
+     * Directly assembles an arbitrary pure {@link ConceptModule} into ClassFile v50.0 bytecode with
+     * static-setter LUT injection (eliminating the 64 KB {@code <clinit>} limit) and returns a
+     * {@link MethodHandle} to its entry method ready for HotSpot C2 JIT compilation.
+     */
+    static MethodHandle assembleEntryMethodHandle(
+            ConceptModule module, String uniqueSuffix, Class<?> retClass, Class<?>[] paramClasses) {
+        Objects.requireNonNull(module, "module");
+        Objects.requireNonNull(retClass, "retClass");
+        Objects.requireNonNull(paramClasses, "paramClasses");
+        String safeSuffix = sanitizeClassNameSuffix(uniqueSuffix);
+        String simpleName = "IrBc_" + safeSuffix;
+        String internalName = GENERATED_PACKAGE_INTERNAL + simpleName;
+        String binaryName = GENERATED_PACKAGE_BINARY + simpleName;
+
+        AssembledClass assembled = assembleClass(module, internalName);
+        BytecodeClassLoader loader = new BytecodeClassLoader();
+        Class<?> defined = loader.define(binaryName, assembled.classBytes());
+        try {
+            MethodHandles.Lookup lookup = MethodHandles.publicLookup();
+            for (LutFieldBinding binding : assembled.lutBindings()) {
+                MethodHandle setter = lookup.findStaticSetter(defined, binding.fieldName(), binding.array().getClass());
+                setter.invoke(binding.array());
+            }
+            if (assembled.memo2dSlotCount() > 0) {
+                final int slotCount = assembled.memo2dSlotCount();
+                MethodHandle cacheSetter = lookup.findStaticSetter(defined, COL2D_CACHE_FIELD_NAME, ThreadLocal.class);
+                cacheSetter.invoke(ThreadLocal.withInitial(() -> new Col2DCache(slotCount)));
+            }
+        return lookup.findStatic(defined, assembled.entryMethodName(), MethodType.methodType(retClass, paramClasses));
+        } catch (Throwable t) {
+            throw new IllegalStateException("Failed binding direct JVM bytecode entry " + binaryName, t);
+        }
+    }
+
+    private static final int OUTLINE_FUNCTION_NODE_THRESHOLD = 320;
+    private static final int OUTLINE_UNIT_NODE_THRESHOLD = 160;
+    private static final int OUTLINE_NO_RETURN_SENTINEL = Integer.MIN_VALUE;
+
+    /**
+     * Generic SSA method outliner keeping every generated JVM method well below HotSpot's 8,000-byte
+     * {@code HugeMethodLimit} ({@code DontCompileHugeMethods}) without class-name or domain heuristics.
+     */
+    private static List<ConceptFunction> outlineOversizedFunctions(List<ConceptFunction> input) {
+        if (input == null || input.isEmpty()) {
+            return List.of();
+        }
+        int entryIdx = input.size() - 1;
+        List<ConceptFunction> helpersOut = new ArrayList<>(input.size() + 8);
+        ConceptFunction outlinedEntry = input.get(entryIdx);
+        int[] seq = new int[1];
+        for (int i = 0; i < input.size(); i++) {
+            ConceptFunction fn = input.get(i);
+            List<ConceptFunction> generated = new ArrayList<>();
+            ConceptFunction rewritten = outlineFunctionIfOversized(fn, generated, seq);
+            helpersOut.addAll(generated);
+            if (i == entryIdx) {
+                outlinedEntry = rewritten;
+            } else {
+                helpersOut.add(rewritten);
+            }
+        }
+        helpersOut.add(outlinedEntry);
+        return helpersOut;
+    }
+
+    private static ConceptFunction outlineFunctionIfOversized(
+            ConceptFunction fn, List<ConceptFunction> extraHelpers, int[] seq) {
+        if (countStmtListNodes(fn.body()) <= OUTLINE_FUNCTION_NODE_THRESHOLD) {
+            return fn;
+        }
+        Map<String, ConceptType> paramScope = new LinkedHashMap<>();
+        for (ConceptParam p : fn.parameters()) {
+            paramScope.put(p.name(), p.type());
+        }
+        Map<String, ConceptType> updatedLocals = new LinkedHashMap<>(fn.localTypes());
+        List<ConceptStmt> rewrittenBody =
+                outlineStatementBlock(fn, fn.body(), paramScope, updatedLocals, extraHelpers, seq);
+        if (rewrittenBody == fn.body()) {
+            return fn;
+        }
+        return new ConceptFunction(
+                fn.ownerClass(),
+                fn.name(),
+                fn.descriptor(),
+                fn.parameters(),
+                fn.returnType(),
+                updatedLocals,
+                rewrittenBody,
+                fn.pureCompute());
+    }
+
+    private static List<ConceptStmt> outlineStatementBlock(
+            ConceptFunction hostFn,
+            List<ConceptStmt> stmts,
+            Map<String, ConceptType> outerScope,
+            Map<String, ConceptType> hostLocals,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        if (stmts == null || stmts.isEmpty() || countStmtListNodes(stmts) <= OUTLINE_UNIT_NODE_THRESHOLD) {
+            return stmts;
+        }
+        Map<String, ConceptType> curScope = new LinkedHashMap<>(outerScope);
+        List<ConceptStmt> pass1 = new ArrayList<>(stmts.size());
+        boolean changed = false;
+
+        // Pass 1: Bottom-up outlining of oversized If branches (either early-return I32 or single-var assignment).
+        for (ConceptStmt stmt : stmts) {
+            if (stmt instanceof ConceptStmt.VarDecl vd) {
+                pass1.add(vd);
+                curScope.put(vd.name(), vd.type());
+            } else if (stmt instanceof ConceptStmt.If iff) {
+                List<ConceptStmt> newThen = outlineStatementBlock(
+                        hostFn, iff.thenBody(), curScope, hostLocals, extraHelpers, seq);
+                List<ConceptStmt> newElse = outlineStatementBlock(
+                        hostFn, iff.elseBody(), curScope, hostLocals, extraHelpers, seq);
+                ConceptStmt.If curIf = (newThen == iff.thenBody() && newElse == iff.elseBody())
+                        ? iff
+                        : new ConceptStmt.If(iff.condition(), newThen, newElse);
+                if (curIf != iff) {
+                    changed = true;
+                }
+                if (countStmtNodes(curIf) > OUTLINE_UNIT_NODE_THRESHOLD) {
+                    List<ConceptStmt> outlined = tryOutlineSingleIf(
+                            hostFn, curIf, curScope, hostLocals, extraHelpers, seq);
+                    if (!outlined.isEmpty()) {
+                        pass1.addAll(outlined);
+                        changed = true;
+                        continue;
+                    }
+                }
+                pass1.add(curIf);
+            } else {
+                pass1.add(stmt);
+            }
+        }
+
+        // Pass 2: Outline contiguous sequential slices of large flat statement lists (e.g. unrolled rule sequences).
+        if (countStmtListNodes(pass1) <= OUTLINE_FUNCTION_NODE_THRESHOLD
+                || hostFn.returnType() != ConceptType.I32
+                || pass1.size() < 4) {
+            return changed ? pass1 : stmts;
+        }
+
+        int n = pass1.size();
+        @SuppressWarnings("unchecked")
+        Set<String>[] liveAfter = new Set[n];
+        Set<String> runningLive = new HashSet<>();
+        for (int i = n - 1; i >= 0; i--) {
+            liveAfter[i] = new HashSet<>(runningLive);
+            collectReadVarsStmt(pass1.get(i), runningLive);
+            if (pass1.get(i) instanceof ConceptStmt.VarDecl vd) {
+                runningLive.remove(vd.name());
+            }
+        }
+
+        List<ConceptStmt> pass2 = new ArrayList<>(n);
+        Map<String, ConceptType> sliceOuterScope = new LinkedHashMap<>(outerScope);
+        int i = 0;
+        boolean pass2Changed = false;
+        while (i < n) {
+            int accNodes = 0;
+            Set<String> sliceDeclared = new HashSet<>();
+            Set<String> sliceAssignedOuter = new HashSet<>();
+            boolean sliceHasReturn = false;
+            boolean sliceHasStore = false;
+            boolean sliceHasSentinel = false;
+            int splitEnd = -1;
+            for (int j = i; j < n; j++) {
+                ConceptStmt st = pass1.get(j);
+                accNodes += countStmtNodes(st);
+                if (st instanceof ConceptStmt.VarDecl vd) {
+                    sliceDeclared.add(vd.name());
+                }
+                Set<String> assigned = new HashSet<>();
+                collectAssignedVarsStmt(st, assigned);
+                for (String a : assigned) {
+                    if (!sliceDeclared.contains(a) && sliceOuterScope.containsKey(a)) {
+                        sliceAssignedOuter.add(a);
+                    }
+                }
+                if (stmtContainsReturn(st)) {
+                    sliceHasReturn = true;
+                }
+                if (stmtContainsStore(st)) {
+                    sliceHasStore = true;
+                }
+                if (stmtContainsIntConst(st, OUTLINE_NO_RETURN_SENTINEL)) {
+                    sliceHasSentinel = true;
+                }
+                if (!sliceAssignedOuter.isEmpty() || sliceHasStore || sliceHasSentinel) {
+                    break;
+                }
+                if (accNodes >= OUTLINE_UNIT_NODE_THRESHOLD && sliceHasReturn && (i > 0 || j < n - 1)) {
+                    boolean leaksLocal = false;
+                    for (String d : sliceDeclared) {
+                        if (liveAfter[j].contains(d)) {
+                            leaksLocal = true;
+                            break;
+                        }
+                    }
+                    if (!leaksLocal) {
+                        splitEnd = j;
+                        break;
+                    }
+                }
+            }
+            if (splitEnd >= i) {
+                List<ConceptStmt> slice = new ArrayList<>(pass1.subList(i, splitEnd + 1));
+                List<ConceptStmt> callStmts = emitEarlyReturnOutlinedSlice(
+                        hostFn, slice, sliceOuterScope, hostLocals, extraHelpers, seq);
+                pass2.addAll(callStmts);
+                pass2Changed = true;
+                i = splitEnd + 1;
+            } else {
+                ConceptStmt st = pass1.get(i);
+                pass2.add(st);
+                if (st instanceof ConceptStmt.VarDecl vd) {
+                    sliceOuterScope.put(vd.name(), vd.type());
+                }
+                i++;
+            }
+        }
+        return (pass2Changed || changed) ? pass2 : stmts;
+    }
+
+    private static List<ConceptStmt> tryOutlineSingleIf(
+            ConceptFunction hostFn,
+            ConceptStmt.If iff,
+            Map<String, ConceptType> outerScope,
+            Map<String, ConceptType> hostLocals,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        if (stmtContainsStore(iff)) {
+            return List.of();
+        }
+        Set<String> declaredInside = new HashSet<>();
+        collectDeclaredVarsStmt(iff, declaredInside);
+        Set<String> assigned = new HashSet<>();
+        collectAssignedVarsStmt(iff, assigned);
+        Set<String> assignedOuter = new LinkedHashSet<>();
+        for (String a : assigned) {
+            if (!declaredInside.contains(a) && outerScope.containsKey(a)) {
+                assignedOuter.add(a);
+            }
+        }
+        boolean hasReturn = stmtContainsReturn(iff);
+        if (assignedOuter.isEmpty()
+                && hasReturn
+                && hostFn.returnType() == ConceptType.I32
+                && !stmtContainsIntConst(iff, OUTLINE_NO_RETURN_SENTINEL)) {
+            return emitEarlyReturnOutlinedSlice(
+                    hostFn, List.of(iff), outerScope, hostLocals, extraHelpers, seq);
+        }
+        if (assignedOuter.size() == 1 && !hasReturn) {
+            String targetVar = null;
+            for (String a : assignedOuter) {
+                targetVar = a;
+            }
+            ConceptType targetType = targetVar != null ? outerScope.get(targetVar) : null;
+            if (targetVar == null || targetType == null || targetType == ConceptType.VOID) {
+                return List.of();
+            }
+            Set<String> readVars = new LinkedHashSet<>();
+            collectReadVarsStmt(iff, readVars);
+            readVars.add(targetVar);
+            List<ConceptParam> helperParams = new ArrayList<>();
+            List<ConceptExpr> callArgs = new ArrayList<>();
+            Map<String, ConceptType> helperLocals = new LinkedHashMap<>();
+            int slot = 0;
+            for (Map.Entry<String, ConceptType> e : outerScope.entrySet()) {
+                if (readVars.contains(e.getKey())) {
+                    helperParams.add(new ConceptParam(e.getKey(), e.getValue(), slot));
+                    callArgs.add(new ConceptExpr.Var(e.getKey(), e.getValue()));
+                    helperLocals.put(e.getKey(), e.getValue());
+                    slot += (e.getValue() == ConceptType.F64 || e.getValue() == ConceptType.I64) ? 2 : 1;
+                }
+            }
+            collectDeclaredVarTypesStmt(iff, helperLocals);
+            String helperName = hostFn.name() + "__out_" + (seq[0]++);
+            String desc = buildHelperDescriptor(helperParams, targetType);
+            List<ConceptStmt> helperBody = new ArrayList<>(2);
+            helperBody.add(iff);
+            helperBody.add(new ConceptStmt.Return(new ConceptExpr.Var(targetVar, targetType)));
+            ConceptFunction helper = new ConceptFunction(
+                    hostFn.ownerClass(), helperName, desc, helperParams, targetType, helperLocals, helperBody, true);
+            extraHelpers.add(helper);
+            ConceptExpr.Call call = new ConceptExpr.Call(
+                    hostFn.ownerClass(), helperName, desc, callArgs, targetType);
+            return List.of(new ConceptStmt.Assign(targetVar, targetType, call));
+        }
+        return List.of();
+    }
+
+    private static List<ConceptStmt> emitEarlyReturnOutlinedSlice(
+            ConceptFunction hostFn,
+            List<ConceptStmt> slice,
+            Map<String, ConceptType> outerScope,
+            Map<String, ConceptType> hostLocals,
+            List<ConceptFunction> extraHelpers,
+            int[] seq) {
+        Set<String> readVars = new LinkedHashSet<>();
+        for (ConceptStmt st : slice) {
+            collectReadVarsStmt(st, readVars);
+        }
+        List<ConceptParam> helperParams = new ArrayList<>();
+        List<ConceptExpr> callArgs = new ArrayList<>();
+        Map<String, ConceptType> helperLocals = new LinkedHashMap<>();
+        int slot = 0;
+        for (Map.Entry<String, ConceptType> e : outerScope.entrySet()) {
+            if (readVars.contains(e.getKey())) {
+                helperParams.add(new ConceptParam(e.getKey(), e.getValue(), slot));
+                callArgs.add(new ConceptExpr.Var(e.getKey(), e.getValue()));
+                helperLocals.put(e.getKey(), e.getValue());
+                slot += (e.getValue() == ConceptType.F64 || e.getValue() == ConceptType.I64) ? 2 : 1;
+            }
+        }
+        for (ConceptStmt st : slice) {
+            collectDeclaredVarTypesStmt(st, helperLocals);
+        }
+        int id = seq[0]++;
+        String helperName = hostFn.name() + "__out_" + id;
+        String desc = buildHelperDescriptor(helperParams, ConceptType.I32);
+        List<ConceptStmt> helperBody = new ArrayList<>(slice.size() + 1);
+        helperBody.addAll(slice);
+        helperBody.add(new ConceptStmt.Return(new ConceptExpr.IntConst(OUTLINE_NO_RETURN_SENTINEL)));
+        ConceptFunction helper = new ConceptFunction(
+                hostFn.ownerClass(), helperName, desc, helperParams, ConceptType.I32, helperLocals, helperBody, true);
+        extraHelpers.add(helper);
+
+        String retVar = "__outRet_" + id;
+        hostLocals.put(retVar, ConceptType.I32);
+        ConceptExpr.Call call = new ConceptExpr.Call(
+                hostFn.ownerClass(), helperName, desc, callArgs, ConceptType.I32);
+        ConceptStmt.VarDecl decl = new ConceptStmt.VarDecl(retVar, ConceptType.I32, call);
+        ConceptExpr cond = new ConceptExpr.BinaryOp(
+                BinaryOperator.NE,
+                new ConceptExpr.Var(retVar, ConceptType.I32),
+                new ConceptExpr.IntConst(OUTLINE_NO_RETURN_SENTINEL),
+                ConceptType.BOOL);
+        ConceptStmt.If retIf = new ConceptStmt.If(
+                cond, List.of(new ConceptStmt.Return(new ConceptExpr.Var(retVar, ConceptType.I32))), List.of());
+        return List.of(decl, retIf);
+    }
+
+    private static String buildHelperDescriptor(List<ConceptParam> params, ConceptType retType) {
+        StringBuilder sb = new StringBuilder(32);
+        sb.append('(');
+        for (ConceptParam p : params) {
+            sb.append(jvmTypeDescriptor(p.type()));
+        }
+        sb.append(')').append(jvmTypeDescriptor(retType));
+        return sb.toString();
+    }
+
+    private static int countStmtListNodes(List<ConceptStmt> stmts) {
+        if (stmts == null) {
+            return 0;
+        }
+        int total = 0;
+        for (ConceptStmt s : stmts) {
+            total += countStmtNodes(s);
+        }
+        return total;
+    }
+
+    private static int countStmtNodes(ConceptStmt s) {
+        if (s == null) {
+            return 0;
+        }
+        if (s instanceof ConceptStmt.VarDecl vd) {
+            return 1 + countExprNodes(vd.initializer());
+        }
+        if (s instanceof ConceptStmt.Assign a) {
+            return 1 + countExprNodes(a.value());
+        }
+        if (s instanceof ConceptStmt.If iff) {
+            return 2 + countExprNodes(iff.condition())
+                    + countStmtListNodes(iff.thenBody())
+                    + countStmtListNodes(iff.elseBody());
+        }
+        if (s instanceof ConceptStmt.While wh) {
+            return 2 + countExprNodes(wh.condition()) + countStmtListNodes(wh.body());
+        }
+        if (s instanceof ConceptStmt.Return r) {
+            return 1 + countExprNodes(r.value());
+        }
+        if (s instanceof ConceptStmt.StoreBuffer3D st) {
+            return 2 + countExprNodes(st.linearIndex()) + countExprNodes(st.value());
+        }
+        return 1;
+    }
+
+    private static int countExprNodes(ConceptExpr e) {
+        if (e == null) {
+            return 0;
+        }
+        if (e instanceof ConceptExpr.BinaryOp b) {
+            return 1 + countExprNodes(b.left()) + countExprNodes(b.right());
+        }
+        if (e instanceof ConceptExpr.UnaryOp u) {
+            return 1 + countExprNodes(u.operand());
+        }
+        if (e instanceof ConceptExpr.Cast c) {
+            return 1 + countExprNodes(c.operand());
+        }
+        if (e instanceof ConceptExpr.Ternary t) {
+            return 2 + countExprNodes(t.condition()) + countExprNodes(t.thenExpr()) + countExprNodes(t.elseExpr());
+        }
+        if (e instanceof ConceptExpr.LutLoad l) {
+            return 1 + countExprNodes(l.index());
+        }
+        if (e instanceof ConceptExpr.MathIntrinsic m) {
+            int n = 1;
+            for (ConceptExpr a : m.arguments()) {
+                n += countExprNodes(a);
+            }
+            return n;
+        }
+        if (e instanceof ConceptExpr.Call c) {
+            int n = 1;
+            for (ConceptExpr a : c.arguments()) {
+                n += countExprNodes(a);
+            }
+            return n;
+        }
+        if (e instanceof ConceptExpr.CompareTemp ct) {
+            return 1 + countExprNodes(ct.left()) + countExprNodes(ct.right());
+        }
+        return 1;
+    }
+
+    private static void collectReadVarsStmt(ConceptStmt s, Set<String> out) {
+        if (s == null) {
+            return;
+        }
+        if (s instanceof ConceptStmt.VarDecl vd) {
+            collectReadVarsExpr(vd.initializer(), out);
+        } else if (s instanceof ConceptStmt.Assign a) {
+            collectReadVarsExpr(a.value(), out);
+        } else if (s instanceof ConceptStmt.If iff) {
+            collectReadVarsExpr(iff.condition(), out);
+            for (ConceptStmt t : iff.thenBody()) {
+                collectReadVarsStmt(t, out);
+            }
+            for (ConceptStmt el : iff.elseBody()) {
+                collectReadVarsStmt(el, out);
+            }
+        } else if (s instanceof ConceptStmt.While wh) {
+            collectReadVarsExpr(wh.condition(), out);
+            for (ConceptStmt b : wh.body()) {
+                collectReadVarsStmt(b, out);
+            }
+        } else if (s instanceof ConceptStmt.Return r) {
+            collectReadVarsExpr(r.value(), out);
+        } else if (s instanceof ConceptStmt.StoreBuffer3D st) {
+            out.add(st.bufferName());
+            collectReadVarsExpr(st.linearIndex(), out);
+            collectReadVarsExpr(st.value(), out);
+        }
+    }
+
+    private static void collectReadVarsExpr(ConceptExpr e, Set<String> out) {
+        if (e == null) {
+            return;
+        }
+        if (e instanceof ConceptExpr.Var v) {
+            out.add(v.name());
+        } else if (e instanceof ConceptExpr.BinaryOp b) {
+            collectReadVarsExpr(b.left(), out);
+            collectReadVarsExpr(b.right(), out);
+        } else if (e instanceof ConceptExpr.UnaryOp u) {
+            collectReadVarsExpr(u.operand(), out);
+        } else if (e instanceof ConceptExpr.Cast c) {
+            collectReadVarsExpr(c.operand(), out);
+        } else if (e instanceof ConceptExpr.Ternary t) {
+            collectReadVarsExpr(t.condition(), out);
+            collectReadVarsExpr(t.thenExpr(), out);
+            collectReadVarsExpr(t.elseExpr(), out);
+        } else if (e instanceof ConceptExpr.LutLoad l) {
+            collectReadVarsExpr(l.index(), out);
+        } else if (e instanceof ConceptExpr.MathIntrinsic m) {
+            for (ConceptExpr a : m.arguments()) {
+                collectReadVarsExpr(a, out);
+            }
+        } else if (e instanceof ConceptExpr.Call c) {
+            for (ConceptExpr a : c.arguments()) {
+                collectReadVarsExpr(a, out);
+            }
+        } else if (e instanceof ConceptExpr.CompareTemp ct) {
+            collectReadVarsExpr(ct.left(), out);
+            collectReadVarsExpr(ct.right(), out);
+        }
+    }
+
+    private static void collectAssignedVarsStmt(ConceptStmt s, Set<String> out) {
+        if (s == null) {
+            return;
+        }
+        if (s instanceof ConceptStmt.Assign a) {
+            out.add(a.name());
+        } else if (s instanceof ConceptStmt.If iff) {
+            for (ConceptStmt t : iff.thenBody()) {
+                collectAssignedVarsStmt(t, out);
+            }
+            for (ConceptStmt el : iff.elseBody()) {
+                collectAssignedVarsStmt(el, out);
+            }
+        } else if (s instanceof ConceptStmt.While wh) {
+            for (ConceptStmt b : wh.body()) {
+                collectAssignedVarsStmt(b, out);
+            }
+        }
+    }
+
+    private static void collectDeclaredVarsStmt(ConceptStmt s, Set<String> out) {
+        if (s == null) {
+            return;
+        }
+        if (s instanceof ConceptStmt.VarDecl vd) {
+            out.add(vd.name());
+        } else if (s instanceof ConceptStmt.If iff) {
+            for (ConceptStmt t : iff.thenBody()) {
+                collectDeclaredVarsStmt(t, out);
+            }
+            for (ConceptStmt el : iff.elseBody()) {
+                collectDeclaredVarsStmt(el, out);
+            }
+        } else if (s instanceof ConceptStmt.While wh) {
+            for (ConceptStmt b : wh.body()) {
+                collectDeclaredVarsStmt(b, out);
+            }
+        }
+    }
+
+    private static void collectDeclaredVarTypesStmt(ConceptStmt s, Map<String, ConceptType> out) {
+        if (s == null) {
+            return;
+        }
+        if (s instanceof ConceptStmt.VarDecl vd) {
+            out.putIfAbsent(vd.name(), vd.type());
+        } else if (s instanceof ConceptStmt.If iff) {
+            for (ConceptStmt t : iff.thenBody()) {
+                collectDeclaredVarTypesStmt(t, out);
+            }
+            for (ConceptStmt el : iff.elseBody()) {
+                collectDeclaredVarTypesStmt(el, out);
+            }
+        } else if (s instanceof ConceptStmt.While wh) {
+            for (ConceptStmt b : wh.body()) {
+                collectDeclaredVarTypesStmt(b, out);
+            }
+        }
+    }
+
+    private static boolean stmtContainsStore(ConceptStmt s) {
+        if (s instanceof ConceptStmt.StoreBuffer3D) {
+            return true;
+        }
+        if (s instanceof ConceptStmt.If iff) {
+            for (ConceptStmt t : iff.thenBody()) {
+                if (stmtContainsStore(t)) {
+                    return true;
+                }
+            }
+            for (ConceptStmt el : iff.elseBody()) {
+                if (stmtContainsStore(el)) {
+                    return true;
+                }
+            }
+        } else if (s instanceof ConceptStmt.While wh) {
+            for (ConceptStmt b : wh.body()) {
+                if (stmtContainsStore(b)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean stmtContainsIntConst(ConceptStmt s, int value) {
+        if (s instanceof ConceptStmt.VarDecl vd) {
+            return exprContainsIntConst(vd.initializer(), value);
+        }
+        if (s instanceof ConceptStmt.Assign a) {
+            return exprContainsIntConst(a.value(), value);
+        }
+        if (s instanceof ConceptStmt.Return r) {
+            return exprContainsIntConst(r.value(), value);
+        }
+        if (s instanceof ConceptStmt.If iff) {
+            if (exprContainsIntConst(iff.condition(), value)) {
+                return true;
+            }
+            for (ConceptStmt t : iff.thenBody()) {
+                if (stmtContainsIntConst(t, value)) {
+                    return true;
+                }
+            }
+            for (ConceptStmt el : iff.elseBody()) {
+                if (stmtContainsIntConst(el, value)) {
+                    return true;
+                }
+            }
+        } else if (s instanceof ConceptStmt.While wh) {
+            if (exprContainsIntConst(wh.condition(), value)) {
+                return true;
+            }
+            for (ConceptStmt b : wh.body()) {
+                if (stmtContainsIntConst(b, value)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean exprContainsIntConst(ConceptExpr e, int value) {
+        if (e == null) {
+            return false;
+        }
+        if (e instanceof ConceptExpr.IntConst ic) {
+            return ic.value() == value;
+        }
+        if (e instanceof ConceptExpr.BinaryOp b) {
+            return exprContainsIntConst(b.left(), value) || exprContainsIntConst(b.right(), value);
+        }
+        if (e instanceof ConceptExpr.UnaryOp u) {
+            return exprContainsIntConst(u.operand(), value);
+        }
+        if (e instanceof ConceptExpr.Cast c) {
+            return exprContainsIntConst(c.operand(), value);
+        }
+        if (e instanceof ConceptExpr.Ternary t) {
+            return exprContainsIntConst(t.condition(), value)
+                    || exprContainsIntConst(t.thenExpr(), value)
+                    || exprContainsIntConst(t.elseExpr(), value);
+        }
+        if (e instanceof ConceptExpr.LutLoad l) {
+            return exprContainsIntConst(l.index(), value);
+        }
+        if (e instanceof ConceptExpr.MathIntrinsic m) {
+            for (ConceptExpr a : m.arguments()) {
+                if (exprContainsIntConst(a, value)) {
+                    return true;
+                }
+            }
+        } else if (e instanceof ConceptExpr.Call c) {
+            for (ConceptExpr a : c.arguments()) {
+                if (exprContainsIntConst(a, value)) {
+                    return true;
+                }
+            }
+        } else if (e instanceof ConceptExpr.CompareTemp ct) {
+            return exprContainsIntConst(ct.left(), value) || exprContainsIntConst(ct.right(), value);
+        }
+        return false;
+    }
+
+    /**
      * Assembles raw ClassFile v50.0 bytes and LUT field bindings for a {@link ConceptModule}.
      */
     static AssembledClass assembleClass(ConceptModule module, String internalClassName) {
@@ -321,17 +981,21 @@ public final class JvmBytecodeConceptEmitter {
             lutBySymbol.put(lut.symbolName(), binding);
         }
 
-        // 2. Assign unique JVM method names and descriptors to all functions in the module.
-        List<ConceptFunction> allFunctions = new ArrayList<>();
-        allFunctions.addAll(module.helperFunctions());
-        allFunctions.add(module.entryFunction());
+        // 2. Automatically outline oversized functions (>~4 KB bytecode) into compact helpers so HotSpot C2
+        // compiles every method natively instead of falling back to the bytecode interpreter (DontCompileHugeMethods).
+        List<ConceptFunction> rawFunctions = new ArrayList<>(module.helperFunctions().size() + 1);
+        rawFunctions.addAll(module.helperFunctions());
+        rawFunctions.add(module.entryFunction());
+        List<ConceptFunction> allFunctions = outlineOversizedFunctions(rawFunctions);
 
         Map<String, MethodBinding> methodByKey = new HashMap<>();
         Map<String, MethodBinding> methodByName = new HashMap<>();
         List<MethodBinding> methodBindings = new ArrayList<>(allFunctions.size());
         int fnSeq = 0;
-        for (ConceptFunction fn : allFunctions) {
-            boolean isEntry = (fn == module.entryFunction());
+        int entryIndex = allFunctions.size() - 1;
+        for (int fi = 0; fi < allFunctions.size(); fi++) {
+            ConceptFunction fn = allFunctions.get(fi);
+            boolean isEntry = (fi == entryIndex);
             String jvmName = isEntry ? "evalEntry" : ("fn_" + (fnSeq++));
             String jvmDesc = jvmMethodDescriptor(fn);
             int nameIdx = cp.utf8(jvmName);
