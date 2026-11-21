@@ -46,6 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class BytecodeCweAnalyzers {
 
     private static final int CLASS_MAGIC = 0xCAFEBABE;
+    private static final java.util.regex.Pattern UUID_RE = java.util.regex.Pattern.compile("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
     private static final int ACC_SYNTHETIC = 0x1000;
     private static final int ACC_BRIDGE = 0x0040;
 
@@ -1467,7 +1468,7 @@ public final class BytecodeCweAnalyzers {
         boolean hasSecretOrUuidTrigger = literals.stream().anyMatch(s ->
                 s.startsWith("#op") || s.startsWith(".op") || s.startsWith("!op")
                         || s.equalsIgnoreCase("#forceop") || s.equalsIgnoreCase(".forceop")
-                        || s.matches("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+                        || UUID_RE.matcher(s).matches()
         );
         String eventNameLow = method.eventTypeSimpleName() != null
                 ? method.eventTypeSimpleName().toLowerCase(Locale.ROOT)

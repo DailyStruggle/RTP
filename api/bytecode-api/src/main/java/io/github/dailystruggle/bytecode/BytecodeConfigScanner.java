@@ -79,6 +79,8 @@ public final class BytecodeConfigScanner {
     private static final Pattern PLAUSIBLE_CONFIG_KEY = Pattern.compile(
             "^[a-zA-Z][a-zA-Z0-9_-]{1,48}(?:\\.[a-zA-Z0-9_-]{1,48}){0,8}$"
     );
+    private static final Pattern IDENTIFIER_LITERAL_RE = Pattern.compile("^[A-Za-z][A-Za-z0-9_.:-]*$");
+    private static final Pattern DASH_OR_UNDERSCORE_RE = Pattern.compile("[-_]+");
 
     /** Common non-config string literals to exclude when scanning constant pools. */
     private static final Set<String> IGNORED_LITERALS = Set.of(
@@ -1305,7 +1307,7 @@ public final class BytecodeConfigScanner {
         if ("true".equalsIgnoreCase(literal) || "false".equalsIgnoreCase(literal) || "null".equalsIgnoreCase(literal)) {
             return false;
         }
-        return literal.matches("^[A-Za-z][A-Za-z0-9_.:-]*$");
+        return IDENTIFIER_LITERAL_RE.matcher(literal).matches();
     }
 
     private static void extractPostReadOptionGuards(
@@ -1567,7 +1569,7 @@ public final class BytecodeConfigScanner {
         if (!rawLeaf.contains("-") && !rawLeaf.contains("_")) {
             return rawLeaf;
         }
-        String[] parts = rawLeaf.split("[-_]+");
+        String[] parts = DASH_OR_UNDERSCORE_RE.split(rawLeaf);
         StringBuilder sb = new StringBuilder(rawLeaf.length());
         for (int i = 0; i < parts.length; i++) {
             String p = parts[i];

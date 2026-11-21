@@ -482,7 +482,7 @@ public final class ServerConfigAtlas {
                         .toList();
                 for (Path unclaimedDir : subDirs) {
                     String folderName = unclaimedDir.getFileName().toString();
-                    String artifactId = "plugin:" + folderName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "");
+                    String artifactId = "plugin:" + NON_SLUG_CHAR_RE.matcher(folderName.toLowerCase(Locale.ROOT)).replaceAll("");
                     if (atlas.artifacts().containsKey(artifactId)) {
                         continue;
                     }
@@ -551,15 +551,15 @@ public final class ServerConfigAtlas {
         if (Files.isDirectory(direct)) {
             return direct;
         }
-        String displayNorm = art.displayName().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
-        String idStem = art.artifactId().replaceFirst("^plugin:", "").toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+        String displayNorm = NON_ALNUM_RE.matcher(art.displayName().toLowerCase(Locale.ROOT)).replaceAll("");
+        String idStem = NON_ALNUM_RE.matcher(PLUGIN_PREFIX_RE.matcher(art.artifactId()).replaceFirst("").toLowerCase(Locale.ROOT)).replaceAll("");
         String jarFileName = jarPath.getFileName().toString();
-        String jarStem = stripVersionSuffix(jarFileName.replaceFirst("(?i)\\.jar$", ""))
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]", "");
+        String jarStem = NON_ALNUM_RE.matcher(
+                stripVersionSuffix(JAR_EXT_RE.matcher(jarFileName).replaceFirst("")).toLowerCase(Locale.ROOT)
+        ).replaceAll("");
         try (Stream<Path> s = Files.list(pluginsDir)) {
             for (Path candidate : s.filter(Files::isDirectory).sorted().toList()) {
-                String folderNorm = candidate.getFileName().toString().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+                String folderNorm = NON_ALNUM_RE.matcher(candidate.getFileName().toString().toLowerCase(Locale.ROOT)).replaceAll("");
                 if (folderNorm.isEmpty()) continue;
                 if (folderNorm.equals(displayNorm) || folderNorm.equals(idStem) || folderNorm.equals(jarStem)) {
                     return candidate;
@@ -655,7 +655,7 @@ public final class ServerConfigAtlas {
 
     private static YamlConfig parseJsonOrHoconToYaml(String rawText) {
         YamlConfig cfg = YamlConfig.empty(null);
-        String[] lines = rawText.split("\r?\n", -1);
+        String[] lines = CRLF_OR_LF_RE.split(rawText, -1);
         List<String> pathStack = new ArrayList<>();
         List<String> pendingComments = new ArrayList<>();
         boolean inBlockComment = false;
@@ -939,7 +939,7 @@ public final class ServerConfigAtlas {
 
     private static YamlConfig parsePropertiesToYaml(String rawText) {
         YamlConfig cfg = YamlConfig.empty(null);
-        String[] lines = rawText.split("\r?\n", -1);
+        String[] lines = CRLF_OR_LF_RE.split(rawText, -1);
         List<String> pendingComments = new ArrayList<>();
         for (String line : lines) {
             String trimmed = line.trim();
@@ -982,7 +982,7 @@ public final class ServerConfigAtlas {
 
     private static YamlConfig parseTomlToYaml(String rawText) {
         YamlConfig cfg = YamlConfig.empty(null);
-        String[] lines = rawText.split("\r?\n", -1);
+        String[] lines = CRLF_OR_LF_RE.split(rawText, -1);
         List<String> pendingComments = new ArrayList<>();
         String currentSection = "";
         for (String line : lines) {
@@ -1060,14 +1060,14 @@ public final class ServerConfigAtlas {
         if ("true".equalsIgnoreCase(t)) return Boolean.TRUE;
         if ("false".equalsIgnoreCase(t)) return Boolean.FALSE;
         String numClean = t.replace("_", "");
-        if (numClean.matches("[-+]?\\d{1,18}")) {
+        if (INT18_RE.matcher(numClean).matches()) {
             long lv = Long.parseLong(numClean);
             if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) {
                 return (int) lv;
             }
             return lv;
         }
-        if (numClean.matches("[-+]?\\d{0,18}\\.\\d{1,18}([eE][-+]?\\d{1,3})?")) {
+        if (DECIMAL18_RE.matcher(numClean).matches()) {
             return Double.parseDouble(numClean);
         }
         return t;
@@ -1415,7 +1415,7 @@ public final class ServerConfigAtlas {
             }
             if (!matchedLiterals.isEmpty()) {
                 if (!sampleStr.isEmpty()
-                        && sampleStr.matches("^[A-Za-z][A-Za-z0-9_.:-]{1,39}$")
+                        && SAMPLE_TOKEN_RE.matcher(sampleStr).matches()
                         && !"true".equalsIgnoreCase(sampleStr)
                         && !"false".equalsIgnoreCase(sampleStr)
                         && !"null".equalsIgnoreCase(sampleStr)
@@ -2121,10 +2121,7 @@ public final class ServerConfigAtlas {
         // 3. Numeric coercion (thousand commas, unit suffixes `seconds` <-> `ticks`, `%` -> decimal probability, range clamping)
         boolean isInt = "integer".equals(type) || "int".equals(type) || "long".equals(type);
         boolean isDouble = "double".equals(type) || "float".equals(type) || "number".equals(type);
-        java.util.regex.Matcher numMatcher = java.util.regex.Pattern.compile(
-                "^(-?\\d{1,3}(?:,\\d{3})+|-?\\d+(?:\\.\\d+)?)\\s*(%|ms|milliseconds?|ticks?|t|s|sec|seconds?|m|min|minutes?|blocks?|b|chunks?|items?|chars?)?$",
-                java.util.regex.Pattern.CASE_INSENSITIVE
-        ).matcher(cleaned);
+        java.util.regex.Matcher numMatcher = NUMERIC_UNIT_RE.matcher(cleaned);
 
         if (numMatcher.matches() && (isInt || isDouble || numMatcher.group(2) != null)) {
             String rawNumPart = numMatcher.group(1).replace(",", "");
@@ -2200,6 +2197,23 @@ public final class ServerConfigAtlas {
     private static final java.util.regex.Pattern KV_LINE_RE = java.util.regex.Pattern.compile(
             "^(\\s*+)([A-Za-z0-9_.-]++)\\s*+(:|=)\\s*+([^#\\r\\n]*+)(#[^\\r\\n]*+)?$"
     );
+    private static final java.util.regex.Pattern NON_SLUG_CHAR_RE = java.util.regex.Pattern.compile("[^a-z0-9_-]");
+    private static final java.util.regex.Pattern NON_ALNUM_RE = java.util.regex.Pattern.compile("[^a-z0-9]");
+    private static final java.util.regex.Pattern PLUGIN_PREFIX_RE = java.util.regex.Pattern.compile("^plugin:");
+    private static final java.util.regex.Pattern JAR_EXT_RE = java.util.regex.Pattern.compile("(?i)\\.jar$");
+    private static final java.util.regex.Pattern CRLF_OR_LF_RE = java.util.regex.Pattern.compile("\r?\n");
+    private static final java.util.regex.Pattern INT18_RE = java.util.regex.Pattern.compile("[-+]?\\d{1,18}");
+    private static final java.util.regex.Pattern DECIMAL18_RE = java.util.regex.Pattern.compile("[-+]?\\d{0,18}\\.\\d{1,18}([eE][-+]?\\d{1,3})?");
+    private static final java.util.regex.Pattern SAMPLE_TOKEN_RE = java.util.regex.Pattern.compile("^[A-Za-z][A-Za-z0-9_.:-]{1,39}$");
+    private static final java.util.regex.Pattern NUMERIC_UNIT_RE = java.util.regex.Pattern.compile(
+            "^(-?\\d{1,3}(?:,\\d{3})+|-?\\d+(?:\\.\\d+)?)\\s*(%|ms|milliseconds?|ticks?|t|s|sec|seconds?|m|min|minutes?|blocks?|b|chunks?|items?|chars?)?$",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+    );
+    private static final java.util.regex.Pattern PLUGINS_OR_MODS_PREFIX_RE = java.util.regex.Pattern.compile("^(?:plugins|mods)/[^/]+/");
+    private static final java.util.regex.Pattern NON_SEARCH_TOKEN_RE = java.util.regex.Pattern.compile("[^\\p{L}a-z0-9_.-]+");
+    private static final java.util.regex.Pattern WHITESPACE_RE = java.util.regex.Pattern.compile("\\s+");
+    private static final java.util.regex.Pattern KEY_SEG_SPLIT_RE = java.util.regex.Pattern.compile("[._-]+");
+    private static final java.util.regex.Pattern SPATIAL_UNIT_SUFFIX_RE = java.util.regex.Pattern.compile("(?i)(blocks|b|chunks|c|regions|r)$");
 
     /**
      * Sanitizes and auto-coerces a raw YAML configuration text for a given artifact and file path:
@@ -2212,7 +2226,7 @@ public final class ServerConfigAtlas {
             return new CoercedYamlEdit("", false, List.of());
         }
         String normFile = filePath == null ? "config.yml" : filePath.replace('\\', '/');
-        String shortFile = normFile.replaceFirst("^(?:plugins|mods)/[^/]+/", "");
+        String shortFile = PLUGINS_OR_MODS_PREFIX_RE.matcher(normFile).replaceFirst("");
         String lowFile = normFile.toLowerCase(Locale.ROOT);
         boolean isToml = lowFile.endsWith(".toml");
         boolean isProps = lowFile.endsWith(".properties");
@@ -2225,7 +2239,7 @@ public final class ServerConfigAtlas {
         }
         String currentTomlSection = "";
         List<String> notes = new ArrayList<>();
-        String[] lines = rawYamlText.split("\r?\n", -1);
+        String[] lines = CRLF_OR_LF_RE.split(rawYamlText, -1);
         StringBuilder out = new StringBuilder(rawYamlText.length() + 64);
         Deque<int[]> indentStack = new ArrayDeque<>();
         Deque<String> keyStack = new ArrayDeque<>();
@@ -2350,7 +2364,7 @@ public final class ServerConfigAtlas {
             String rawText
     ) {
         List<String> notes = new ArrayList<>();
-        String[] lines = rawText.split("\r?\n", -1);
+        String[] lines = CRLF_OR_LF_RE.split(rawText, -1);
         StringBuilder out = new StringBuilder(rawText.length() + 64);
         Deque<String> keyStack = new ArrayDeque<>();
         boolean modified = false;
@@ -2663,7 +2677,7 @@ public final class ServerConfigAtlas {
         String qNorm = FuzzySearchEngine.normalize(query);
         String qLow = query.trim().toLowerCase(Locale.ROOT);
         String phraseAugmented = sharedThesaurus.normalizePhrases(qLow);
-        String[] rawTokens = phraseAugmented.replaceAll("[^\\p{L}a-z0-9_.-]+", " ").trim().split("\\s+");
+        String[] rawTokens = WHITESPACE_RE.split(NON_SEARCH_TOKEN_RE.matcher(phraseAugmented).replaceAll(" ").trim());
 
         List<String> tokens = new ArrayList<>();
         for (String rt : rawTokens) {
@@ -2747,7 +2761,7 @@ public final class ServerConfigAtlas {
             }
 
             // Per-token Local-First Cascade: Stage 1 (local key/doc 1.00x) -> Stage 2 (thesaurus/pivot 0.60x) -> Stage 3 (online 0.40x)
-            String[] keySegments = pathLow.split("[._-]+");
+            String[] keySegments = KEY_SEG_SPLIT_RE.split(pathLow);
             SchemaInferrer.InvestigatoryDocResult inv = node.investigatoryDoc();
             String docBlob = ((inv != null ? (inv.playerSummary() + " " + inv.synthesizedSummary() + " "
                     + String.join(" ", inv.subsystemTags()) + " " + String.join(" ", inv.fieldFlows()) + " "
@@ -3056,7 +3070,7 @@ public final class ServerConfigAtlas {
 
     private static Double parseDoubleNumeric(String raw) {
         if (raw == null || raw.isBlank()) return null;
-        String cleaned = raw.trim().replaceAll("(?i)(blocks|b|chunks|c|regions|r)$", "").trim();
+        String cleaned = SPATIAL_UNIT_SUFFIX_RE.matcher(raw.trim()).replaceAll("").trim();
         try {
             double v = Double.parseDouble(cleaned);
             if (raw.toLowerCase(Locale.ROOT).endsWith("c") || raw.toLowerCase(Locale.ROOT).endsWith("chunks")) {

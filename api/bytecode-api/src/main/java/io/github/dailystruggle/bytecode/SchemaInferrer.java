@@ -37,6 +37,8 @@ public final class SchemaInferrer {
             "\\(\\s*+(-?\\d++(?:\\.\\d++)?)\\s*+(?:\\.\\.|-)\\s*+(-?\\d++(?:\\.\\d++)?)\\s*+\\)"
     );
     private static final Pattern INTEGER_LITERAL_RE = Pattern.compile("^-?\\d+$");
+    private static final Pattern WHITESPACE_RE = Pattern.compile("\\s+");
+    private static final Pattern LINEBREAK_OR_TAB_RE = Pattern.compile("[\\r\\n\\t]+");
     private static final Pattern FLOAT_LITERAL_RE = Pattern.compile("^-?\\d+\\.\\d+$");
     private static final Pattern DURATION_UNIT_LITERAL_RE = Pattern.compile("^(\\d+(?:\\.\\d+)?)(ms|t|ticks|s|sec|m|min|h|d)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern DISTANCE_UNIT_LITERAL_RE = Pattern.compile("^(\\d+(?:\\.\\d+)?)(b|blocks|c|chunks|r|regions|km|mi)$", Pattern.CASE_INSENSITIVE);
@@ -1602,10 +1604,10 @@ public final class SchemaInferrer {
         String normLeaf = normalizeCamelToHyphen(leaf).replace('-', ' ').replace('_', ' ');
         int lastDot = kLow.lastIndexOf('.');
         String parentPart = lastDot >= 0 ? normalizeCamelToHyphen(kLow.substring(0, lastDot)).replace('.', ' ').replace('-', ' ').replace('_', ' ') : "";
-        Set<String> leafTokenSet = new LinkedHashSet<>(List.of(normLeaf.split("\\s+")));
+        Set<String> leafTokenSet = new LinkedHashSet<>(List.of(WHITESPACE_RE.split(normLeaf)));
         StringBuilder combined = new StringBuilder();
         if (!parentPart.isEmpty()) {
-            for (String pt : parentPart.split("\\s+")) {
+            for (String pt : WHITESPACE_RE.split(parentPart)) {
                 if (pt.isEmpty() || "defaults".equalsIgnoreCase(pt) || leafTokenSet.contains(pt)) {
                     continue;
                 }
@@ -1618,15 +1620,31 @@ public final class SchemaInferrer {
         }
         combined.append(normLeaf);
         String normPath = combined.toString();
-        for (String st : stripTokens) {
-            normPath = normPath.replaceAll("(?i)\\b" + Pattern.quote(st) + "\\b", " ");
+        if (stripTokens.length > 0) {
+            StringBuilder filtered = new StringBuilder(normPath.length());
+            for (String tok : WHITESPACE_RE.split(normPath.trim())) {
+                if (tok.isEmpty()) continue;
+                boolean strip = false;
+                for (String st : stripTokens) {
+                    if (tok.equalsIgnoreCase(st)) {
+                        strip = true;
+                        break;
+                    }
+                }
+                if (!strip) {
+                    if (filtered.length() > 0) filtered.append(' ');
+                    filtered.append(tok);
+                }
+            }
+            normPath = filtered.toString();
+        } else {
+            normPath = WHITESPACE_RE.matcher(normPath.trim()).replaceAll(" ");
         }
-        normPath = normPath.trim().replaceAll("\\s+", " ");
         if (normPath.isEmpty()) {
             normPath = normLeaf.trim();
         }
         // Format common technical acronyms cleanly
-        String[] words = normPath.split("\\s+");
+        String[] words = WHITESPACE_RE.split(normPath);
         List<String> formatted = new ArrayList<>(words.length);
         for (String w : words) {
             if (w.isEmpty()) continue;
@@ -1733,7 +1751,8 @@ public final class SchemaInferrer {
             return "";
         }
         String cleaned = UNSAFE_DISPLAY_LITERAL_RE.matcher(raw).replaceAll("[redacted]");
-        return cleaned.replace('<', '(').replace('>', ')').replaceAll("[\\r\\n\\t]+", " ").replaceAll("\\s+", " ").trim();
+        String collapsed = LINEBREAK_OR_TAB_RE.matcher(cleaned.replace('<', '(').replace('>', ')')).replaceAll(" ");
+        return WHITESPACE_RE.matcher(collapsed).replaceAll(" ").trim();
     }
 
     private static boolean isNoiseBannerOrHeaderLine(String strippedLine) {
@@ -2192,7 +2211,7 @@ public final class SchemaInferrer {
             return "";
         }
         String cleaned = UNSAFE_DISPLAY_LITERAL_RE.matcher(raw).replaceAll("[redacted]");
-        cleaned = cleaned.replace('<', '(').replace('>', ')').replaceAll("[\\r\\n\\t]+", " ").trim();
+        cleaned = LINEBREAK_OR_TAB_RE.matcher(cleaned.replace('<', '(').replace('>', ')')).replaceAll(" ").trim();
         if (cleaned.length() > 80) {
             cleaned = cleaned.substring(0, 80) + "...";
         }

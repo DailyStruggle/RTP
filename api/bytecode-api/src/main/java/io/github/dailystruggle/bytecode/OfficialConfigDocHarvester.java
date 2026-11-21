@@ -98,6 +98,11 @@ public final class OfficialConfigDocHarvester {
     private static final Pattern CACHE_DOC_ENTRY_RE = Pattern.compile(
             "\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\"\\s*+:\\s*+\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
     );
+    private static final Pattern LINE_BREAK_RE = Pattern.compile("\\r?\\n");
+    private static final Pattern ADMONITION_TAG_RE = Pattern.compile(":::[a-zA-Z]+(?:\\[[^\\]]*\\])?");
+    private static final Pattern WHITESPACE_RE = Pattern.compile("\\s+");
+    private static final Pattern MD_TABLE_SEP_RE = Pattern.compile("^[-:]+$");
+    private static final Pattern WORLD_SETTINGS_PREFIX_RE = Pattern.compile("^world-settings\\.[^.]++\\.");
 
     /** Pluggable off-thread HTTP GET fetcher for deterministic offline testing. */
     @FunctionalInterface
@@ -447,12 +452,11 @@ public final class OfficialConfigDocHarvester {
         if (raw == null || raw.isBlank()) {
             return "";
         }
-        String text = raw.replace("''", "'")
-                .replaceAll("\\r?\\n", " ")
-                .replaceAll(":::[a-zA-Z]+(?:\\[[^\\]]*\\])?", "")
-                .replace(":::", "")
-                .replaceAll("\\s+", " ")
-                .trim();
+        String text = raw.replace("''", "'");
+        text = LINE_BREAK_RE.matcher(text).replaceAll(" ");
+        text = ADMONITION_TAG_RE.matcher(text).replaceAll("");
+        text = text.replace(":::", "");
+        text = WHITESPACE_RE.matcher(text).replaceAll(" ").trim();
         text = MD_JAVADOC_LINK_RE.matcher(text).replaceAll("`$2`");
         text = MD_RELATIVE_LINK_RE.matcher(text).replaceAll("$1 (https://docs.papermc.io$2)");
         text = MD_INLINE_LINK_RE.matcher(text).replaceAll("$1 ($2)");
@@ -461,7 +465,7 @@ public final class OfficialConfigDocHarvester {
     }
 
     static String foldMultilineQuotedYamlScalars(String rawYaml) {
-        String[] lines = rawYaml.split("\\r?\\n", -1);
+        String[] lines = LINE_BREAK_RE.split(rawYaml, -1);
         StringBuilder out = new StringBuilder(rawYaml.length());
         int i = 0;
         while (i < lines.length) {
@@ -700,7 +704,7 @@ public final class OfficialConfigDocHarvester {
                 }
 
                 // 2. Markdown bullet lists, headings, and tables referencing config keys
-                String[] lines = md.split("\\r?\\n");
+                String[] lines = LINE_BREAK_RE.split(md);
                 String pendingHeadingKey = null;
                 StringBuilder headingParagraph = new StringBuilder();
                 for (String line : lines) {
@@ -736,7 +740,7 @@ public final class OfficialConfigDocHarvester {
                             String bestCol = "";
                             for (String col : cols) {
                                 String c = cleanUpstreamProse(col.replace("`", ""));
-                                if (c.length() > bestCol.length() && !c.matches("^[-:]+$")) {
+                                if (c.length() > bestCol.length() && !MD_TABLE_SEP_RE.matcher(c).matches()) {
                                     bestCol = c;
                                 }
                             }
@@ -848,7 +852,7 @@ public final class OfficialConfigDocHarvester {
             }
         }
         // Handle Paper world-settings.<world>.<rest> -> world-settings.default.<rest>
-        String worldNorm = kLow.replaceFirst("^world-settings\\.[^.]++\\.", "world-settings.default.");
+        String worldNorm = WORLD_SETTINGS_PREFIX_RE.matcher(kLow).replaceFirst("world-settings.default.");
         if (!worldNorm.equals(kLow)) {
             for (Map.Entry<String, OfficialKeyDoc> e : docs.entrySet()) {
                 if (e.getKey().equalsIgnoreCase(worldNorm)) {

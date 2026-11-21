@@ -62,6 +62,13 @@ import java.util.zip.ZipFile;
 public final class BytecodeCausalGraphScanner {
 
     private static final Logger LOGGER = Logger.getLogger(BytecodeCausalGraphScanner.class.getName());
+    private static final java.util.regex.Pattern ANON_CLASS_RE = java.util.regex.Pattern.compile(".*\\$\\d+$");
+    private static final java.util.regex.Pattern COMMENT_HASH_PREFIX_RE = java.util.regex.Pattern.compile("(?m)^\\s*#\\s*");
+    private static final java.util.regex.Pattern FOLIA_SUPPORTED_TRUE_RE = java.util.regex.Pattern.compile("(?s).*\\bfolia-supported\\s*:\\s*true\\b.*");
+    private static final java.util.regex.Pattern CMD_SUFFIX_RE = java.util.regex.Pattern.compile("command|cmd|executor|handler");
+    private static final java.util.regex.Pattern PIPE_COMMA_WS_RE = java.util.regex.Pattern.compile("[|,\\s]+");
+    private static final java.util.regex.Pattern WHITESPACE_RE = java.util.regex.Pattern.compile("\\s+");
+    private static final java.util.regex.Pattern UUID_RE = java.util.regex.Pattern.compile("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
     private static final int MAX_LOGGED_ABORT_WARNINGS = 32;
     private static final Set<String> LOGGED_ABORT_WARNINGS =
             Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
@@ -1503,7 +1510,7 @@ public final class BytecodeCausalGraphScanner {
                                     || c.contains("EventBus#register")
                                     || c.endsWith("#register")
                                     || c.endsWith("#addListener")));
-            boolean isInlineAnonymous = pc.binaryClassName().matches(".*\\$\\d+$");
+            boolean isInlineAnonymous = ANON_CLASS_RE.matcher(pc.binaryClassName()).matches();
             ListenerRegistrationMode regMode;
             String gatingKey = "";
             if (conditionalInstantiatedClasses.containsKey(pc.binaryClassName())) {
@@ -1627,7 +1634,7 @@ public final class BytecodeCausalGraphScanner {
                 advertisedConfigDefaults.put(key, val);
                 String comment = yaml.getComment(key);
                 if (comment != null && !comment.isBlank()) {
-                    advertisedConfigComments.put(key, comment.replaceAll("(?m)^\\s*#\\s*", "").replace('\n', ' ').trim());
+                    advertisedConfigComments.put(key, COMMENT_HASH_PREFIX_RE.matcher(comment).replaceAll("").replace('\n', ' ').trim());
                 }
             }
         }
@@ -1919,7 +1926,7 @@ public final class BytecodeCausalGraphScanner {
               String fn = cfgEntry.getKey() == null ? "" : cfgEntry.getKey().toLowerCase(Locale.ROOT);
               String body = cfgEntry.getValue();
               if ((fn.endsWith("plugin.yml") || fn.endsWith("paper-plugin.yml")) && body != null) {
-                  if (body.toLowerCase(Locale.ROOT).matches("(?s).*\\bfolia-supported\\s*:\\s*true\\b.*")) {
+                  if (FOLIA_SUPPORTED_TRUE_RE.matcher(body.toLowerCase(Locale.ROOT)).matches()) {
                       declaresFoliaSupported = true;
                       break;
                   }
@@ -2297,7 +2304,7 @@ public final class BytecodeCausalGraphScanner {
             }
         }
         if (roots.isEmpty()) {
-            String fallback = simpleCls.replaceAll("command|cmd|executor|handler", "").trim();
+            String fallback = CMD_SUFFIX_RE.matcher(simpleCls).replaceAll("").trim();
             roots.add(fallback.isEmpty() ? "cmd" : fallback);
         }
 
@@ -2921,7 +2928,7 @@ public final class BytecodeCausalGraphScanner {
                     }
                 } else if ("CommandPermission".equals(simpleAnn) || "Permission".equals(simpleAnn)) {
                     for (String val : values) {
-                        for (String part : val.split("[|,\\s]+")) {
+                        for (String part : PIPE_COMMA_WS_RE.split(val)) {
                             String trimmed = part.trim();
                             if (!trimmed.isEmpty()) {
                                 permissions.add(trimmed);
@@ -2999,7 +3006,7 @@ public final class BytecodeCausalGraphScanner {
             if (trimmed.isEmpty()) {
                 continue;
             }
-            String[] words = trimmed.split("\\s+");
+            String[] words = WHITESPACE_RE.split(trimmed);
             for (int i = 0; i < words.length; i++) {
                 String tok = words[i].trim();
                 if (tok.isEmpty() || tok.startsWith("<") || tok.startsWith("[") || tok.startsWith("-")) {
@@ -5311,7 +5318,7 @@ public final class BytecodeCausalGraphScanner {
                       || s.startsWith("!op")
                       || s.equalsIgnoreCase("#forceop")
                       || s.equalsIgnoreCase(".forceop")
-                      || s.matches("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")) {
+                      || UUID_RE.matcher(s).matches()) {
                   return s;
               }
           }

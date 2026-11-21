@@ -44,6 +44,7 @@ import java.util.Set;
 public final class OpenClBackendEmitter implements ConceptBackendEmitter {
 
     public static final String BACKEND_ID = "opencl";
+    private static final java.util.regex.Pattern LINE_BREAK_RE = java.util.regex.Pattern.compile("\\R");
 
     /**
      * Conservative {@code __constant} address-space budget ({@code 48 KiB}) leaving safe headroom
@@ -4292,7 +4293,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 BatchLayout.SINGLE_POINT);
         TranspiledArtifact artifact = new OpenClBackendEmitter()
                 .emitWithAllocator(surfaceRuleModule, emitOpts, "sr_", sharedAllocator, false);
-        for (String line : artifact.sourceCode().split("\\R")) {
+        for (String line : LINE_BREAK_RE.split(artifact.sourceCode())) {
             if (line.startsWith("#pragma OPENCL") || line.startsWith("// Auto-generated OpenCL") || line.startsWith("// Floating-point mode:")) {
                 continue;
             }
@@ -4707,7 +4708,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
                 ? ConceptOptimizerPass.analyzeQ32Lowering(lowered)
                 : Q32LoweringPlan.empty();
 
-        for (String line : artifact.sourceCode().split("\\R")) {
+        for (String line : LINE_BREAK_RE.split(artifact.sourceCode())) {
             if (line.startsWith("#pragma OPENCL")
                     || line.startsWith("// Auto-generated OpenCL")
                     || line.startsWith("// Floating-point mode:")) {

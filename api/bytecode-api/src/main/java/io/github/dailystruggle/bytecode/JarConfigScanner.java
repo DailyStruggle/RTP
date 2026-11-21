@@ -74,6 +74,11 @@ public final class JarConfigScanner {
     private static final Pattern TOML_MOD_ID_RE = Pattern.compile("(?m)^\\s*modId\\s*=\\s*\"([^\"]+)\"");
     private static final Pattern TOML_DISPLAY_NAME_RE = Pattern.compile("(?m)^\\s*displayName\\s*=\\s*\"([^\"]+)\"");
     private static final Pattern TOML_VERSION_RE = Pattern.compile("(?m)^\\s*version\\s*=\\s*\"([^\"]+)\"");
+    private static final Pattern CRLF_OR_LF_RE = Pattern.compile("\r?\n");
+    private static final Pattern NON_SLUG_CHAR_RE = Pattern.compile("[^a-z0-9_-]");
+    private static final Pattern ENGINE_JAR_VERSION_RE = Pattern.compile(
+            "(?i)(?:paper|purpur|folia|pufferfish|spigot|leaf)-([0-9][A-Za-z0-9._-]*)\\.jar$"
+    );
 
     /** Reload orchestration strategy for an installed artifact ({@code leafconfig-ADR-002} Section 5). */
     public enum ReloadStrategy {
@@ -571,7 +576,7 @@ public final class JarConfigScanner {
         List<String> pendingComments = new ArrayList<>();
         boolean inBlockComment = false;
 
-        for (String line : rawText.split("\r?\n", -1)) {
+        for (String line : CRLF_OR_LF_RE.split(rawText, -1)) {
             String trimmed = line.trim();
             if (trimmed.isEmpty()) {
                 if (!isJsonLike) {
@@ -659,7 +664,7 @@ public final class JarConfigScanner {
         boolean isToml = lowPath.endsWith(".toml");
         String commentPrefix = isJsonLike ? "// " : "# ";
         String lineSep = liveDiskText.contains("\r\n") ? "\r\n" : "\n";
-        String[] lines = liveDiskText.split("\r?\n", -1);
+        String[] lines = CRLF_OR_LF_RE.split(liveDiskText, -1);
         StringBuilder out = new StringBuilder(liveDiskText.length() + 256);
         List<String> pathStack = new ArrayList<>();
         String currentSection = "";
@@ -1103,7 +1108,7 @@ public final class JarConfigScanner {
 
     static String normalizeSlug(String raw) {
         if (raw == null || raw.isBlank()) return "unknown";
-        String cleaned = raw.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "");
+        String cleaned = NON_SLUG_CHAR_RE.matcher(raw.toLowerCase(Locale.ROOT)).replaceAll("");
         return cleaned.isEmpty() ? "unknown" : cleaned;
     }
 
@@ -1205,7 +1210,7 @@ public final class JarConfigScanner {
         int scannedClasses = 0;
         if (cachedJar != null && Files.isRegularFile(cachedJar)) {
             String fn = cachedJar.getFileName().toString();
-            Matcher vm = Pattern.compile("(?i)(?:paper|purpur|folia|pufferfish|spigot|leaf)-([0-9][A-Za-z0-9._-]*)\\.jar$").matcher(fn);
+            Matcher vm = ENGINE_JAR_VERSION_RE.matcher(fn);
             if (vm.find()) {
                 engineVersion = vm.group(1);
             }

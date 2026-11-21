@@ -53,6 +53,8 @@ import java.util.regex.Pattern;
 public final class LlmConfigDocSynthesizer implements AutoCloseable {
 
     private static final Pattern THINK_BLOCK_RE = Pattern.compile("(?s)<think>.*?</think>\\s*");
+    private static final Pattern WHITESPACE_RE = Pattern.compile("\\s+");
+    private static final Pattern LINEBREAK_OR_TAB_RE = Pattern.compile("[\\r\\n\\t]+");
     private static final Pattern JSON_STRING_FIELD_RE = Pattern.compile(
             "\"([A-Za-z0-9_]+)\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\""
     );
@@ -1266,7 +1268,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         }
 
         if (playerSummary.isEmpty() && !cleaned.startsWith("{")) {
-            playerSummary = cleaned.replaceAll("\\s+", " ").trim();
+            playerSummary = WHITESPACE_RE.matcher(cleaned).replaceAll(" ").trim();
         }
 
         if (playerSummary.length() > config.maxSummaryChars()) {
@@ -1317,7 +1319,7 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
             return "";
         }
         String cleaned = PROMPT_INJECTION_RE.matcher(raw).replaceAll("[redacted]");
-        cleaned = cleaned.replaceAll("[\\r\\n\\t]+", " ").trim();
+        cleaned = LINEBREAK_OR_TAB_RE.matcher(cleaned).replaceAll(" ").trim();
         if (cleaned.length() > maxLen) {
             cleaned = cleaned.substring(0, maxLen) + "...";
         }
