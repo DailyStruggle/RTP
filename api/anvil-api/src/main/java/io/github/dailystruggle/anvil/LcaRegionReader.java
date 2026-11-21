@@ -2246,7 +2246,37 @@ public final class LcaRegionReader implements RegionFileReader, BuiltInTestable 
                 java.util.function.Function<String, Integer> lookupRef,
                 int dictSize,
                 int[] mapping
-        ) {}
+        ) {
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof CachedRuntimeDictMapping other)) {
+                    return false;
+                }
+                return java.util.Objects.equals(this.lookupRef, other.lookupRef)
+                        && this.dictSize == other.dictSize
+                        && java.util.Arrays.equals(this.mapping, other.mapping);
+            }
+
+            @Override
+            public int hashCode() {
+                int result = 1;
+                result = 31 * result + java.util.Objects.hashCode(this.lookupRef);
+                result = 31 * result + this.dictSize;
+                result = 31 * result + java.util.Arrays.hashCode(this.mapping);
+                return result;
+            }
+
+            @Override
+            public String toString() {
+                return "CachedRuntimeDictMapping[lookupRef=" + this.lookupRef
+                        + ", dictSize=" + this.dictSize
+                        + ", mapping=" + java.util.Arrays.toString(this.mapping)
+                        + "]";
+            }
+        }
 
         final byte[] headerBytes;
         final byte[] secDedBytes;

@@ -335,7 +335,6 @@ class BytecodeConceptTranspilerTest {
         // If rustc is available, compile & run in debug mode (overflow-checks enabled) to verify 0 panics & parity
         Path rustcBin = null;
         for (String candidate : List.of(
-                "/tmp/junie-session-261111-193633-170y/cargo/bin/rustc",
                 System.getProperty("user.home", "") + "/.cargo/bin/rustc",
                 "/usr/bin/rustc")) {
             Path p = Path.of(candidate);
@@ -359,11 +358,13 @@ class BytecodeConceptTranspilerTest {
                 Files.writeString(rsFile, harness);
                 ProcessBuilder pb = new ProcessBuilder(
                         rustcBin.toString(), rsFile.toString(), "-o", binFile.toString());
-                pb.environment().putIfAbsent("RUSTUP_HOME", "/tmp/junie-session-261111-193633-170y/rustup");
+                pb.redirectErrorStream(true);
                 Process compileProc = pb.start();
-                assertEquals(0, compileProc.waitFor(), "rustc debug compilation of FP64 kernel failed");
-                Process runProc = new ProcessBuilder(binFile.toString()).start();
-                assertEquals(0, runProc.waitFor(), "Compiled Rust FP64 kernel panicked or failed parity in debug mode");
+                String compileOut = new String(compileProc.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                assertEquals(0, compileProc.waitFor(), "rustc debug compilation of FP64 kernel failed:\n" + compileOut);
+                Process runProc = new ProcessBuilder(binFile.toString()).redirectErrorStream(true).start();
+                String runOut = new String(runProc.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                assertEquals(0, runProc.waitFor(), "Compiled Rust FP64 kernel panicked or failed parity in debug mode:\n" + runOut);
 
                 String harnessFp32 = rustFp32Int64.sourceCode()
                         + "\nfn main() {\n"
@@ -376,10 +377,14 @@ class BytecodeConceptTranspilerTest {
                 Files.writeString(rsFile32, harnessFp32);
                 ProcessBuilder pb32 = new ProcessBuilder(
                         rustcBin.toString(), rsFile32.toString(), "-o", binFile32.toString());
-                pb32.environment().putIfAbsent("RUSTUP_HOME", "/tmp/junie-session-261111-193633-170y/rustup");
-                assertEquals(0, pb32.start().waitFor(), "rustc debug compilation of INT64+FP32 kernel failed");
-                assertEquals(0, new ProcessBuilder(binFile32.toString()).start().waitFor(),
-                        "Compiled Rust INT64+FP32 kernel panicked or failed parity in debug mode");
+                pb32.redirectErrorStream(true);
+                Process compileProc32 = pb32.start();
+                String compileOut32 = new String(compileProc32.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                assertEquals(0, compileProc32.waitFor(), "rustc debug compilation of INT64+FP32 kernel failed:\n" + compileOut32);
+                Process runProc32 = new ProcessBuilder(binFile32.toString()).redirectErrorStream(true).start();
+                String runOut32 = new String(runProc32.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                assertEquals(0, runProc32.waitFor(),
+                        "Compiled Rust INT64+FP32 kernel panicked or failed parity in debug mode:\n" + runOut32);
             } finally {
                 try (var stream = Files.walk(tempDir)) {
                     stream.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {

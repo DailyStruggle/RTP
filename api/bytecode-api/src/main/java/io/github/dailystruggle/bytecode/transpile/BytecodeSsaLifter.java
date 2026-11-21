@@ -405,6 +405,87 @@ public final class BytecodeSsaLifter {
             }
             return objectFieldRefs.get(fieldName);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof InstanceNode other)) {
+                return false;
+            }
+            return this.instanceId == other.instanceId
+                    && java.util.Objects.equals(this.concreteClass, other.concreteClass)
+                    && java.util.Objects.equals(this.internalClassName, other.internalClassName)
+                    && java.util.Arrays.equals(this.classBytes, other.classBytes)
+                    && java.util.Objects.equals(this.primitiveFields, other.primitiveFields)
+                    && java.util.Objects.equals(this.arrayLuts, other.arrayLuts)
+                    && java.util.Objects.equals(this.arrayRowWidths, other.arrayRowWidths)
+                    && java.util.Objects.equals(this.arrayLengths, other.arrayLengths)
+                    && java.util.Objects.equals(this.objectFieldRefs, other.objectFieldRefs)
+                    && java.util.Objects.equals(this.enumOrdinal, other.enumOrdinal)
+                    && java.util.Objects.equals(this.internedId, other.internedId)
+                    && this.optionalPresent == other.optionalPresent
+                    && java.util.Objects.equals(this.optionalTargetId, other.optionalTargetId)
+                    && java.util.Objects.equals(this.optionalPrimitiveValue, other.optionalPrimitiveValue)
+                    && this.collectionOrArray == other.collectionOrArray
+                    && java.util.Objects.equals(this.elementInstanceIds, other.elementInstanceIds)
+                    && java.util.Objects.equals(this.directPrimitiveLut, other.directPrimitiveLut)
+                    && this.directArrayRowWidth == other.directArrayRowWidth
+                    && this.directArrayLength == other.directArrayLength
+                    && java.util.Objects.equals(this.boxedPrimitiveValue, other.boxedPrimitiveValue);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.instanceId;
+            result = 31 * result + java.util.Objects.hashCode(this.concreteClass);
+            result = 31 * result + java.util.Objects.hashCode(this.internalClassName);
+            result = 31 * result + java.util.Arrays.hashCode(this.classBytes);
+            result = 31 * result + java.util.Objects.hashCode(this.primitiveFields);
+            result = 31 * result + java.util.Objects.hashCode(this.arrayLuts);
+            result = 31 * result + java.util.Objects.hashCode(this.arrayRowWidths);
+            result = 31 * result + java.util.Objects.hashCode(this.arrayLengths);
+            result = 31 * result + java.util.Objects.hashCode(this.objectFieldRefs);
+            result = 31 * result + java.util.Objects.hashCode(this.enumOrdinal);
+            result = 31 * result + java.util.Objects.hashCode(this.internedId);
+            result = 31 * result + Boolean.hashCode(this.optionalPresent);
+            result = 31 * result + java.util.Objects.hashCode(this.optionalTargetId);
+            result = 31 * result + java.util.Objects.hashCode(this.optionalPrimitiveValue);
+            result = 31 * result + Boolean.hashCode(this.collectionOrArray);
+            result = 31 * result + java.util.Objects.hashCode(this.elementInstanceIds);
+            result = 31 * result + java.util.Objects.hashCode(this.directPrimitiveLut);
+            result = 31 * result + this.directArrayRowWidth;
+            result = 31 * result + this.directArrayLength;
+            result = 31 * result + java.util.Objects.hashCode(this.boxedPrimitiveValue);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "InstanceNode[instanceId=" + this.instanceId
+                    + ", concreteClass=" + this.concreteClass
+                    + ", internalClassName=" + this.internalClassName
+                    + ", classBytes=" + java.util.Arrays.toString(this.classBytes)
+                    + ", primitiveFields=" + this.primitiveFields
+                    + ", arrayLuts=" + this.arrayLuts
+                    + ", arrayRowWidths=" + this.arrayRowWidths
+                    + ", arrayLengths=" + this.arrayLengths
+                    + ", objectFieldRefs=" + this.objectFieldRefs
+                    + ", enumOrdinal=" + this.enumOrdinal
+                    + ", internedId=" + this.internedId
+                    + ", optionalPresent=" + this.optionalPresent
+                    + ", optionalTargetId=" + this.optionalTargetId
+                    + ", optionalPrimitiveValue=" + this.optionalPrimitiveValue
+                    + ", collectionOrArray=" + this.collectionOrArray
+                    + ", elementInstanceIds=" + this.elementInstanceIds
+                    + ", directPrimitiveLut=" + this.directPrimitiveLut
+                    + ", directArrayRowWidth=" + this.directArrayRowWidth
+                    + ", directArrayLength=" + this.directArrayLength
+                    + ", boxedPrimitiveValue=" + this.boxedPrimitiveValue
+                    + "]";
+        }
     }
 
     /**
@@ -5365,6 +5446,32 @@ public final class BytecodeSsaLifter {
     }
 
     record BootstrapMethodEntry(int methodHandleCpIdx, int[] argumentCpIndices) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof BootstrapMethodEntry other)) {
+                return false;
+            }
+            return this.methodHandleCpIdx == other.methodHandleCpIdx
+                    && java.util.Arrays.equals(this.argumentCpIndices, other.argumentCpIndices);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.methodHandleCpIdx;
+            result = 31 * result + java.util.Arrays.hashCode(this.argumentCpIndices);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "BootstrapMethodEntry[methodHandleCpIdx=" + this.methodHandleCpIdx
+                    + ", argumentCpIndices=" + java.util.Arrays.toString(this.argumentCpIndices)
+                    + "]";
+        }
     }
 
     record LocalVarEntry(int startPc, int length, String name, String descriptor, int slot) {
@@ -5379,6 +5486,47 @@ public final class BytecodeSsaLifter {
             byte[] code,
             List<LocalVarEntry> localVariables
     ) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof RawMethod other)) {
+                return false;
+            }
+            return this.accessFlags == other.accessFlags
+                    && java.util.Objects.equals(this.name, other.name)
+                    && java.util.Objects.equals(this.descriptor, other.descriptor)
+                    && this.maxStack == other.maxStack
+                    && this.maxLocals == other.maxLocals
+                    && java.util.Arrays.equals(this.code, other.code)
+                    && java.util.Objects.equals(this.localVariables, other.localVariables);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.accessFlags;
+            result = 31 * result + java.util.Objects.hashCode(this.name);
+            result = 31 * result + java.util.Objects.hashCode(this.descriptor);
+            result = 31 * result + this.maxStack;
+            result = 31 * result + this.maxLocals;
+            result = 31 * result + java.util.Arrays.hashCode(this.code);
+            result = 31 * result + java.util.Objects.hashCode(this.localVariables);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "RawMethod[accessFlags=" + this.accessFlags
+                    + ", name=" + this.name
+                    + ", descriptor=" + this.descriptor
+                    + ", maxStack=" + this.maxStack
+                    + ", maxLocals=" + this.maxLocals
+                    + ", code=" + java.util.Arrays.toString(this.code)
+                    + ", localVariables=" + this.localVariables
+                    + "]";
+        }
     }
 
     static final class RawClassFile {

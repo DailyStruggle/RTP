@@ -236,6 +236,105 @@ public final class WorldgenKernelSwapper {
             secondYo = secondYo == null ? new double[0] : secondYo.clone();
             secondZo = secondZo == null ? new double[0] : secondZo.clone();
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedNormalGridKernelSpec other)) {
+                return false;
+            }
+            return Double.compare(this.minInc, other.minInc) == 0
+                    && Double.compare(this.maxExc, other.maxExc) == 0
+                    && Double.compare(this.outVal, other.outVal) == 0
+                    && Double.compare(this.xzScale, other.xzScale) == 0
+                    && Double.compare(this.yScale, other.yScale) == 0
+                    && Double.compare(this.addBias, other.addBias) == 0
+                    && Double.compare(this.mulScale, other.mulScale) == 0
+                    && Double.compare(this.valueFactor, other.valueFactor) == 0
+                    && this.firstLen == other.firstLen
+                    && this.firstMask == other.firstMask
+                    && Double.compare(this.firstInFactor, other.firstInFactor) == 0
+                    && Double.compare(this.firstValFactor, other.firstValFactor) == 0
+                    && java.util.Arrays.equals(this.firstAmp, other.firstAmp)
+                    && java.util.Arrays.equals(this.firstPerm, other.firstPerm)
+                    && java.util.Arrays.equals(this.firstXo, other.firstXo)
+                    && java.util.Arrays.equals(this.firstYo, other.firstYo)
+                    && java.util.Arrays.equals(this.firstZo, other.firstZo)
+                    && this.secondLen == other.secondLen
+                    && this.secondMask == other.secondMask
+                    && Double.compare(this.secondInFactor, other.secondInFactor) == 0
+                    && Double.compare(this.secondValFactor, other.secondValFactor) == 0
+                    && java.util.Arrays.equals(this.secondAmp, other.secondAmp)
+                    && java.util.Arrays.equals(this.secondPerm, other.secondPerm)
+                    && java.util.Arrays.equals(this.secondXo, other.secondXo)
+                    && java.util.Arrays.equals(this.secondYo, other.secondYo)
+                    && java.util.Arrays.equals(this.secondZo, other.secondZo);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + Double.hashCode(this.minInc);
+            result = 31 * result + Double.hashCode(this.maxExc);
+            result = 31 * result + Double.hashCode(this.outVal);
+            result = 31 * result + Double.hashCode(this.xzScale);
+            result = 31 * result + Double.hashCode(this.yScale);
+            result = 31 * result + Double.hashCode(this.addBias);
+            result = 31 * result + Double.hashCode(this.mulScale);
+            result = 31 * result + Double.hashCode(this.valueFactor);
+            result = 31 * result + this.firstLen;
+            result = 31 * result + this.firstMask;
+            result = 31 * result + Double.hashCode(this.firstInFactor);
+            result = 31 * result + Double.hashCode(this.firstValFactor);
+            result = 31 * result + java.util.Arrays.hashCode(this.firstAmp);
+            result = 31 * result + java.util.Arrays.hashCode(this.firstPerm);
+            result = 31 * result + java.util.Arrays.hashCode(this.firstXo);
+            result = 31 * result + java.util.Arrays.hashCode(this.firstYo);
+            result = 31 * result + java.util.Arrays.hashCode(this.firstZo);
+            result = 31 * result + this.secondLen;
+            result = 31 * result + this.secondMask;
+            result = 31 * result + Double.hashCode(this.secondInFactor);
+            result = 31 * result + Double.hashCode(this.secondValFactor);
+            result = 31 * result + java.util.Arrays.hashCode(this.secondAmp);
+            result = 31 * result + java.util.Arrays.hashCode(this.secondPerm);
+            result = 31 * result + java.util.Arrays.hashCode(this.secondXo);
+            result = 31 * result + java.util.Arrays.hashCode(this.secondYo);
+            result = 31 * result + java.util.Arrays.hashCode(this.secondZo);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedNormalGridKernelSpec[minInc=" + this.minInc
+                    + ", maxExc=" + this.maxExc
+                    + ", outVal=" + this.outVal
+                    + ", xzScale=" + this.xzScale
+                    + ", yScale=" + this.yScale
+                    + ", addBias=" + this.addBias
+                    + ", mulScale=" + this.mulScale
+                    + ", valueFactor=" + this.valueFactor
+                    + ", firstLen=" + this.firstLen
+                    + ", firstMask=" + this.firstMask
+                    + ", firstInFactor=" + this.firstInFactor
+                    + ", firstValFactor=" + this.firstValFactor
+                    + ", firstAmp=" + java.util.Arrays.toString(this.firstAmp)
+                    + ", firstPerm=" + java.util.Arrays.toString(this.firstPerm)
+                    + ", firstXo=" + java.util.Arrays.toString(this.firstXo)
+                    + ", firstYo=" + java.util.Arrays.toString(this.firstYo)
+                    + ", firstZo=" + java.util.Arrays.toString(this.firstZo)
+                    + ", secondLen=" + this.secondLen
+                    + ", secondMask=" + this.secondMask
+                    + ", secondInFactor=" + this.secondInFactor
+                    + ", secondValFactor=" + this.secondValFactor
+                    + ", secondAmp=" + java.util.Arrays.toString(this.secondAmp)
+                    + ", secondPerm=" + java.util.Arrays.toString(this.secondPerm)
+                    + ", secondXo=" + java.util.Arrays.toString(this.secondXo)
+                    + ", secondYo=" + java.util.Arrays.toString(this.secondYo)
+                    + ", secondZo=" + java.util.Arrays.toString(this.secondZo)
+                    + "]";
+        }
     }
 
     /**
@@ -282,6 +381,90 @@ public final class WorldgenKernelSwapper {
             maxYo = Objects.requireNonNull(maxYo, "maxYo").clone();
             maxZo = Objects.requireNonNull(maxZo, "maxZo").clone();
             extraGrids = extraGrids == null ? List.of() : List.copyOf(extraGrids);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedBlendedNoiseKernelSpec other)) {
+                return false;
+            }
+            return Double.compare(this.xzMultiplier, other.xzMultiplier) == 0
+                    && Double.compare(this.yMultiplier, other.yMultiplier) == 0
+                    && Double.compare(this.xzFactor, other.xzFactor) == 0
+                    && Double.compare(this.yFactor, other.yFactor) == 0
+                    && Double.compare(this.smearScaleMultiplier, other.smearScaleMultiplier) == 0
+                    && this.mainActiveMask == other.mainActiveMask
+                    && java.util.Arrays.equals(this.mainPerm, other.mainPerm)
+                    && java.util.Arrays.equals(this.mainXo, other.mainXo)
+                    && java.util.Arrays.equals(this.mainYo, other.mainYo)
+                    && java.util.Arrays.equals(this.mainZo, other.mainZo)
+                    && this.minActiveMask == other.minActiveMask
+                    && java.util.Arrays.equals(this.minPerm, other.minPerm)
+                    && java.util.Arrays.equals(this.minXo, other.minXo)
+                    && java.util.Arrays.equals(this.minYo, other.minYo)
+                    && java.util.Arrays.equals(this.minZo, other.minZo)
+                    && this.maxActiveMask == other.maxActiveMask
+                    && java.util.Arrays.equals(this.maxPerm, other.maxPerm)
+                    && java.util.Arrays.equals(this.maxXo, other.maxXo)
+                    && java.util.Arrays.equals(this.maxYo, other.maxYo)
+                    && java.util.Arrays.equals(this.maxZo, other.maxZo)
+                    && java.util.Objects.equals(this.extraGrids, other.extraGrids);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + Double.hashCode(this.xzMultiplier);
+            result = 31 * result + Double.hashCode(this.yMultiplier);
+            result = 31 * result + Double.hashCode(this.xzFactor);
+            result = 31 * result + Double.hashCode(this.yFactor);
+            result = 31 * result + Double.hashCode(this.smearScaleMultiplier);
+            result = 31 * result + this.mainActiveMask;
+            result = 31 * result + java.util.Arrays.hashCode(this.mainPerm);
+            result = 31 * result + java.util.Arrays.hashCode(this.mainXo);
+            result = 31 * result + java.util.Arrays.hashCode(this.mainYo);
+            result = 31 * result + java.util.Arrays.hashCode(this.mainZo);
+            result = 31 * result + this.minActiveMask;
+            result = 31 * result + java.util.Arrays.hashCode(this.minPerm);
+            result = 31 * result + java.util.Arrays.hashCode(this.minXo);
+            result = 31 * result + java.util.Arrays.hashCode(this.minYo);
+            result = 31 * result + java.util.Arrays.hashCode(this.minZo);
+            result = 31 * result + this.maxActiveMask;
+            result = 31 * result + java.util.Arrays.hashCode(this.maxPerm);
+            result = 31 * result + java.util.Arrays.hashCode(this.maxXo);
+            result = 31 * result + java.util.Arrays.hashCode(this.maxYo);
+            result = 31 * result + java.util.Arrays.hashCode(this.maxZo);
+            result = 31 * result + java.util.Objects.hashCode(this.extraGrids);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedBlendedNoiseKernelSpec[xzMultiplier=" + this.xzMultiplier
+                    + ", yMultiplier=" + this.yMultiplier
+                    + ", xzFactor=" + this.xzFactor
+                    + ", yFactor=" + this.yFactor
+                    + ", smearScaleMultiplier=" + this.smearScaleMultiplier
+                    + ", mainActiveMask=" + this.mainActiveMask
+                    + ", mainPerm=" + java.util.Arrays.toString(this.mainPerm)
+                    + ", mainXo=" + java.util.Arrays.toString(this.mainXo)
+                    + ", mainYo=" + java.util.Arrays.toString(this.mainYo)
+                    + ", mainZo=" + java.util.Arrays.toString(this.mainZo)
+                    + ", minActiveMask=" + this.minActiveMask
+                    + ", minPerm=" + java.util.Arrays.toString(this.minPerm)
+                    + ", minXo=" + java.util.Arrays.toString(this.minXo)
+                    + ", minYo=" + java.util.Arrays.toString(this.minYo)
+                    + ", minZo=" + java.util.Arrays.toString(this.minZo)
+                    + ", maxActiveMask=" + this.maxActiveMask
+                    + ", maxPerm=" + java.util.Arrays.toString(this.maxPerm)
+                    + ", maxXo=" + java.util.Arrays.toString(this.maxXo)
+                    + ", maxYo=" + java.util.Arrays.toString(this.maxYo)
+                    + ", maxZo=" + java.util.Arrays.toString(this.maxZo)
+                    + ", extraGrids=" + this.extraGrids
+                    + "]";
         }
     }
 
@@ -480,6 +663,36 @@ public final class WorldgenKernelSwapper {
                 }
                 knots = knots.clone();
                 values = values.clone();
+            }
+
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof Spline1D other)) {
+                    return false;
+                }
+                return java.util.Objects.equals(this.coordinate, other.coordinate)
+                        && java.util.Arrays.equals(this.knots, other.knots)
+                        && java.util.Arrays.equals(this.values, other.values);
+            }
+
+            @Override
+            public int hashCode() {
+                int result = 1;
+                result = 31 * result + java.util.Objects.hashCode(this.coordinate);
+                result = 31 * result + java.util.Arrays.hashCode(this.knots);
+                result = 31 * result + java.util.Arrays.hashCode(this.values);
+                return result;
+            }
+
+            @Override
+            public String toString() {
+                return "Spline1D[coordinate=" + this.coordinate
+                        + ", knots=" + java.util.Arrays.toString(this.knots)
+                        + ", values=" + java.util.Arrays.toString(this.values)
+                        + "]";
             }
         }
 
@@ -2849,6 +3062,32 @@ public final class WorldgenKernelSwapper {
                 long[] iScalar,
                 double[] fScalar
         ) {
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof ScratchFrame other)) {
+                    return false;
+                }
+                return java.util.Arrays.equals(this.iScalar, other.iScalar)
+                        && java.util.Arrays.equals(this.fScalar, other.fScalar);
+            }
+
+            @Override
+            public int hashCode() {
+                int result = 1;
+                result = 31 * result + java.util.Arrays.hashCode(this.iScalar);
+                result = 31 * result + java.util.Arrays.hashCode(this.fScalar);
+                return result;
+            }
+
+            @Override
+            public String toString() {
+                return "ScratchFrame[iScalar=" + java.util.Arrays.toString(this.iScalar)
+                        + ", fScalar=" + java.util.Arrays.toString(this.fScalar)
+                        + "]";
+            }
         }
 
         private final TacInsn[] insns;
@@ -3243,6 +3482,56 @@ public final class WorldgenKernelSwapper {
                 long[] initISlots,
                 double[] initFSlots
         ) {
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof TacProgram other)) {
+                    return false;
+                }
+                return java.util.Arrays.equals(this.insns, other.insns)
+                        && java.util.Arrays.equals(this.seedTape, other.seedTape)
+                        && java.util.Arrays.equals(this.xTape, other.xTape)
+                        && java.util.Arrays.equals(this.xzTape, other.xzTape)
+                        && java.util.Arrays.equals(this.yTape, other.yTape)
+                        && this.hasSplitTapes == other.hasSplitTapes
+                        && this.slotCount == other.slotCount
+                        && this.returnSlot == other.returnSlot
+                        && java.util.Arrays.equals(this.initISlots, other.initISlots)
+                        && java.util.Arrays.equals(this.initFSlots, other.initFSlots);
+            }
+
+            @Override
+            public int hashCode() {
+                int result = 1;
+                result = 31 * result + java.util.Arrays.hashCode(this.insns);
+                result = 31 * result + java.util.Arrays.hashCode(this.seedTape);
+                result = 31 * result + java.util.Arrays.hashCode(this.xTape);
+                result = 31 * result + java.util.Arrays.hashCode(this.xzTape);
+                result = 31 * result + java.util.Arrays.hashCode(this.yTape);
+                result = 31 * result + Boolean.hashCode(this.hasSplitTapes);
+                result = 31 * result + this.slotCount;
+                result = 31 * result + this.returnSlot;
+                result = 31 * result + java.util.Arrays.hashCode(this.initISlots);
+                result = 31 * result + java.util.Arrays.hashCode(this.initFSlots);
+                return result;
+            }
+
+            @Override
+            public String toString() {
+                return "TacProgram[insns=" + java.util.Arrays.toString(this.insns)
+                        + ", seedTape=" + java.util.Arrays.toString(this.seedTape)
+                        + ", xTape=" + java.util.Arrays.toString(this.xTape)
+                        + ", xzTape=" + java.util.Arrays.toString(this.xzTape)
+                        + ", yTape=" + java.util.Arrays.toString(this.yTape)
+                        + ", hasSplitTapes=" + this.hasSplitTapes
+                        + ", slotCount=" + this.slotCount
+                        + ", returnSlot=" + this.returnSlot
+                        + ", initISlots=" + java.util.Arrays.toString(this.initISlots)
+                        + ", initFSlots=" + java.util.Arrays.toString(this.initFSlots)
+                        + "]";
+            }
         }
 
         private static final class TacBuilder {
@@ -3585,6 +3874,47 @@ public final class WorldgenKernelSwapper {
                 byte[] bytecode,
                 int maxLocals
         ) {
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof HelperCompiledMethod other)) {
+                    return false;
+                }
+                return this.methodRefIdx == other.methodRefIdx
+                        && this.nameUtf8 == other.nameUtf8
+                        && this.descUtf8 == other.descUtf8
+                        && java.util.Objects.equals(this.returnType, other.returnType)
+                        && java.util.Objects.equals(this.paramTypes, other.paramTypes)
+                        && java.util.Arrays.equals(this.bytecode, other.bytecode)
+                        && this.maxLocals == other.maxLocals;
+            }
+
+            @Override
+            public int hashCode() {
+                int result = 1;
+                result = 31 * result + this.methodRefIdx;
+                result = 31 * result + this.nameUtf8;
+                result = 31 * result + this.descUtf8;
+                result = 31 * result + java.util.Objects.hashCode(this.returnType);
+                result = 31 * result + java.util.Objects.hashCode(this.paramTypes);
+                result = 31 * result + java.util.Arrays.hashCode(this.bytecode);
+                result = 31 * result + this.maxLocals;
+                return result;
+            }
+
+            @Override
+            public String toString() {
+                return "HelperCompiledMethod[methodRefIdx=" + this.methodRefIdx
+                        + ", nameUtf8=" + this.nameUtf8
+                        + ", descUtf8=" + this.descUtf8
+                        + ", returnType=" + this.returnType
+                        + ", paramTypes=" + this.paramTypes
+                        + ", bytecode=" + java.util.Arrays.toString(this.bytecode)
+                        + ", maxLocals=" + this.maxLocals
+                        + "]";
+            }
         }
 
         static NativeVoxelEvaluator tryCompile(ConceptModule module) {
@@ -5441,7 +5771,7 @@ public final class WorldgenKernelSwapper {
                             effBeardCount);
 
             if (!secHasBeard && baseBy > Math.max(maxSurfY + 1, seaLevel + 1)) {
-                short hdr = (short) (0x8000 | 0);
+                short hdr = (short) 0x8000;
                 buf.putShort(32 + (s << 1), hdr);
                 buf.putLong(80 + (s << 3), 0L);
                 buf.put(1736 + s, (byte) toGray4(15));

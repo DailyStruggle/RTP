@@ -540,7 +540,40 @@ public final class WeightedParityEvaluator {
             int localX,
             int localZ,
             String[][] sectionBlockIds,
-            Map<String, Object> rootCompound) {}
+            Map<String, Object> rootCompound) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof ChunkParityInput other)) {
+                return false;
+            }
+            return this.localX == other.localX
+                    && this.localZ == other.localZ
+                    && java.util.Arrays.deepEquals(this.sectionBlockIds, other.sectionBlockIds)
+                    && java.util.Objects.equals(this.rootCompound, other.rootCompound);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.localX;
+            result = 31 * result + this.localZ;
+            result = 31 * result + java.util.Arrays.deepHashCode(this.sectionBlockIds);
+            result = 31 * result + java.util.Objects.hashCode(this.rootCompound);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "ChunkParityInput[localX=" + this.localX
+                    + ", localZ=" + this.localZ
+                    + ", sectionBlockIds=" + java.util.Arrays.deepToString(this.sectionBlockIds)
+                    + ", rootCompound=" + this.rootCompound
+                    + "]";
+        }
+    }
 
     static final class Accumulator {
         private final TemplateConformityLibrary library;

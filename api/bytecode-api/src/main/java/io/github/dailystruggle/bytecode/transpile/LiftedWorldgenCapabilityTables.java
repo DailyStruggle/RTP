@@ -84,6 +84,60 @@ public final class LiftedWorldgenCapabilityTables {
 
         public static final RouterCapabilityChannels EMPTY = new RouterCapabilityChannels(
                 null, null, null, null, null, null, null, null, null, new DensityFieldEvaluator[0], null);
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof RouterCapabilityChannels other)) {
+                return false;
+            }
+            return java.util.Objects.equals(this.barrierNoise, other.barrierNoise)
+                    && java.util.Objects.equals(this.fluidLevelFloodednessNoise, other.fluidLevelFloodednessNoise)
+                    && java.util.Objects.equals(this.fluidLevelSpreadNoise, other.fluidLevelSpreadNoise)
+                    && java.util.Objects.equals(this.lavaNoise, other.lavaNoise)
+                    && java.util.Objects.equals(this.initialDensityWithoutJaggedness, other.initialDensityWithoutJaggedness)
+                    && java.util.Objects.equals(this.veinToggle, other.veinToggle)
+                    && java.util.Objects.equals(this.veinRidged, other.veinRidged)
+                    && java.util.Objects.equals(this.veinGap, other.veinGap)
+                    && java.util.Objects.equals(this.temperatureChannel, other.temperatureChannel)
+                    && java.util.Arrays.equals(this.conditionNoises, other.conditionNoises)
+                    && java.util.Arrays.equals(this.conditionNoiseIs3d, other.conditionNoiseIs3d);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Objects.hashCode(this.barrierNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.fluidLevelFloodednessNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.fluidLevelSpreadNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.lavaNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.initialDensityWithoutJaggedness);
+            result = 31 * result + java.util.Objects.hashCode(this.veinToggle);
+            result = 31 * result + java.util.Objects.hashCode(this.veinRidged);
+            result = 31 * result + java.util.Objects.hashCode(this.veinGap);
+            result = 31 * result + java.util.Objects.hashCode(this.temperatureChannel);
+            result = 31 * result + java.util.Arrays.hashCode(this.conditionNoises);
+            result = 31 * result + java.util.Arrays.hashCode(this.conditionNoiseIs3d);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "RouterCapabilityChannels[barrierNoise=" + this.barrierNoise
+                    + ", fluidLevelFloodednessNoise=" + this.fluidLevelFloodednessNoise
+                    + ", fluidLevelSpreadNoise=" + this.fluidLevelSpreadNoise
+                    + ", lavaNoise=" + this.lavaNoise
+                    + ", initialDensityWithoutJaggedness=" + this.initialDensityWithoutJaggedness
+                    + ", veinToggle=" + this.veinToggle
+                    + ", veinRidged=" + this.veinRidged
+                    + ", veinGap=" + this.veinGap
+                    + ", temperatureChannel=" + this.temperatureChannel
+                    + ", conditionNoises=" + java.util.Arrays.toString(this.conditionNoises)
+                    + ", conditionNoiseIs3d=" + java.util.Arrays.toString(this.conditionNoiseIs3d)
+                    + "]";
+        }
     }
 
     // WorldCarver kinds lifted from BiomeGenerationSettings#getCarvers
@@ -419,6 +473,54 @@ public final class LiftedWorldgenCapabilityTables {
                 return new LiftedNormalNoiseFp64Evaluator(this);
             }
             return new LiftedNormalNoiseEvaluator(this, 13);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedNormalNoiseSpec other)) {
+                return false;
+            }
+            return java.util.Arrays.equals(this.permTable, other.permTable)
+                    && java.util.Arrays.equals(this.freqX, other.freqX)
+                    && java.util.Arrays.equals(this.freqY, other.freqY)
+                    && java.util.Arrays.equals(this.freqZ, other.freqZ)
+                    && java.util.Arrays.equals(this.weights, other.weights)
+                    && java.util.Arrays.equals(this.xo, other.xo)
+                    && java.util.Arrays.equals(this.yo, other.yo)
+                    && java.util.Arrays.equals(this.zo, other.zo)
+                    && this.columnConstantY == other.columnConstantY;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Arrays.hashCode(this.permTable);
+            result = 31 * result + java.util.Arrays.hashCode(this.freqX);
+            result = 31 * result + java.util.Arrays.hashCode(this.freqY);
+            result = 31 * result + java.util.Arrays.hashCode(this.freqZ);
+            result = 31 * result + java.util.Arrays.hashCode(this.weights);
+            result = 31 * result + java.util.Arrays.hashCode(this.xo);
+            result = 31 * result + java.util.Arrays.hashCode(this.yo);
+            result = 31 * result + java.util.Arrays.hashCode(this.zo);
+            result = 31 * result + Boolean.hashCode(this.columnConstantY);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedNormalNoiseSpec[permTable=" + java.util.Arrays.toString(this.permTable)
+                    + ", freqX=" + java.util.Arrays.toString(this.freqX)
+                    + ", freqY=" + java.util.Arrays.toString(this.freqY)
+                    + ", freqZ=" + java.util.Arrays.toString(this.freqZ)
+                    + ", weights=" + java.util.Arrays.toString(this.weights)
+                    + ", xo=" + java.util.Arrays.toString(this.xo)
+                    + ", yo=" + java.util.Arrays.toString(this.yo)
+                    + ", zo=" + java.util.Arrays.toString(this.zo)
+                    + ", columnConstantY=" + this.columnConstantY
+                    + "]";
         }
     }
 
@@ -918,6 +1020,54 @@ public final class LiftedWorldgenCapabilityTables {
                 }
             }
             return true;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof GpuRouterNoiseTable other)) {
+                return false;
+            }
+            return java.util.Objects.equals(this.barrierNoise, other.barrierNoise)
+                    && java.util.Objects.equals(this.veinToggleNoise, other.veinToggleNoise)
+                    && java.util.Objects.equals(this.veinRidgedNoise, other.veinRidgedNoise)
+                    && java.util.Objects.equals(this.veinRidgedNoiseB, other.veinRidgedNoiseB)
+                    && Float.compare(this.veinRidgedOffset, other.veinRidgedOffset) == 0
+                    && java.util.Objects.equals(this.veinGapNoise, other.veinGapNoise)
+                    && java.util.Objects.equals(this.temperatureNoise, other.temperatureNoise)
+                    && java.util.Arrays.equals(this.conditionNoises, other.conditionNoises)
+                    && java.util.Arrays.equals(this.conditionNoiseIs3d, other.conditionNoiseIs3d);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Objects.hashCode(this.barrierNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.veinToggleNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.veinRidgedNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.veinRidgedNoiseB);
+            result = 31 * result + Float.hashCode(this.veinRidgedOffset);
+            result = 31 * result + java.util.Objects.hashCode(this.veinGapNoise);
+            result = 31 * result + java.util.Objects.hashCode(this.temperatureNoise);
+            result = 31 * result + java.util.Arrays.hashCode(this.conditionNoises);
+            result = 31 * result + java.util.Arrays.hashCode(this.conditionNoiseIs3d);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "GpuRouterNoiseTable[barrierNoise=" + this.barrierNoise
+                    + ", veinToggleNoise=" + this.veinToggleNoise
+                    + ", veinRidgedNoise=" + this.veinRidgedNoise
+                    + ", veinRidgedNoiseB=" + this.veinRidgedNoiseB
+                    + ", veinRidgedOffset=" + this.veinRidgedOffset
+                    + ", veinGapNoise=" + this.veinGapNoise
+                    + ", temperatureNoise=" + this.temperatureNoise
+                    + ", conditionNoises=" + java.util.Arrays.toString(this.conditionNoises)
+                    + ", conditionNoiseIs3d=" + java.util.Arrays.toString(this.conditionNoiseIs3d)
+                    + "]";
         }
     }
 
@@ -1473,6 +1623,35 @@ public final class LiftedWorldgenCapabilityTables {
     }
 
     private record AquiferColumnCacheEntry(int gx, int gz, int[] packed5) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof AquiferColumnCacheEntry other)) {
+                return false;
+            }
+            return this.gx == other.gx
+                    && this.gz == other.gz
+                    && java.util.Arrays.equals(this.packed5, other.packed5);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.gx;
+            result = 31 * result + this.gz;
+            result = 31 * result + java.util.Arrays.hashCode(this.packed5);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "AquiferColumnCacheEntry[gx=" + this.gx
+                    + ", gz=" + this.gz
+                    + ", packed5=" + java.util.Arrays.toString(this.packed5)
+                    + "]";
+        }
     }
 
     private static int lookupSharedPrelimY(
@@ -2474,9 +2653,9 @@ public final class LiftedWorldgenCapabilityTables {
             boolean aquifersEnabled = spec.aquifersEnabled();
             RouterCapabilityChannels rc = routerChannels != null ? routerChannels : RouterCapabilityChannels.EMPTY;
 
-            // Lazy per-corner-column FP64 cache: only sample the few (gx, gz) corner columns touched by flagged columns.
-            int numCornerCols = (cellsX + 1) * (cellsZ + 1);
-            double[][] cornerColCache = new double[numCornerCols][];
+            // Lazy per-corner FP64 cache: only sample the exact (gx, gz, gy) corners of boundary cells.
+            double[] cornerCache = new double[cornersPerChunk];
+            boolean[] cornerSampled = new boolean[cornersPerChunk];
             float[] beardCorners = null;
             if (beardPiecesI32 != null && beardPiecesI32.length >= 8) {
                 beardCorners = new float[cornersPerChunk];
@@ -2509,30 +2688,50 @@ public final class LiftedWorldgenCapabilityTables {
                     int dz = lz - gz * cellW;
                     double fx = (double) dx / (double) cellW;
                     double fz = (double) dz / (double) cellW;
-
-                    double[] c00Col = getOrSampleCornerColFp64(
-                            cornerColCache, gx, gz, cellsZ + 1, chunkBaseBx, chunkBaseBz, noiseMinY, cellW, cellH, strideZ, densityEval, beardCorners, strideX);
-                    double[] c10Col = getOrSampleCornerColFp64(
-                            cornerColCache, gx + 1, gz, cellsZ + 1, chunkBaseBx, chunkBaseBz, noiseMinY, cellW, cellH, strideZ, densityEval, beardCorners, strideX);
-                    double[] c01Col = getOrSampleCornerColFp64(
-                            cornerColCache, gx, gz + 1, cellsZ + 1, chunkBaseBx, chunkBaseBz, noiseMinY, cellW, cellH, strideZ, densityEval, beardCorners, strideX);
-                    double[] c11Col = getOrSampleCornerColFp64(
-                            cornerColCache, gx + 1, gz + 1, cellsZ + 1, chunkBaseBx, chunkBaseBz, noiseMinY, cellW, cellH, strideZ, densityEval, beardCorners, strideX);
+                    int c00Base = gx * strideX + gz * strideZ;
+                    int c10Base = (gx + 1) * strideX + gz * strideZ;
+                    int c01Base = gx * strideX + (gz + 1) * strideZ;
+                    int c11Base = (gx + 1) * strideX + (gz + 1) * strideZ;
 
                     boolean colChanged = false;
                     for (int cy = cellsY - 1; cy >= 0; cy--) {
-                        double v000 = c00Col[cy];
-                        double v001 = c00Col[cy + 1];
-                        double v100 = c10Col[cy];
-                        double v101 = c10Col[cy + 1];
-                        double v010 = c01Col[cy];
-                        double v011 = c01Col[cy + 1];
-                        double v110 = c11Col[cy];
-                        double v111 = c11Col[cy + 1];
+                        int cellBaseY = noiseMinY + cy * cellH;
+                        // Fast boundary filter: only refine cells near a solid/non-solid transition
+                        // (including 1-block neighbor above/below) so uniform deep stone / high air
+                        // never triggers redundant FP64 corner evaluations.
+                        boolean sawSolid = false;
+                        boolean sawNonSolid = false;
+                        int probeLo = Math.max(minBoundY, cellBaseY - 1);
+                        int probeHi = Math.min(maxBoundY, cellBaseY + cellH);
+                        for (int py = probeHi; py >= probeLo; py--) {
+                            int pv = readFlatOrUniformVoxel(
+                                    flatVoxels, chunkVoxelBase, uniformSlotHints, uniformHintBase, chunkMinY, secCount, py, col);
+                            boolean pSolid = pv != 0
+                                    && (defaultFluid == 0 || pv != defaultFluid)
+                                    && (lavaSlot == 0 || pv != lavaSlot);
+                            if (pSolid) {
+                                sawSolid = true;
+                            } else {
+                                sawNonSolid = true;
+                            }
+                            if (sawSolid && sawNonSolid) {
+                                break;
+                            }
+                        }
+                        if (!sawSolid || !sawNonSolid) {
+                            continue;
+                        }
+                        double v000 = getOrSampleCornerFp64(cornerCache, cornerSampled, c00Base + cy, chunkBaseBx + gx * cellW, noiseMinY + cy * cellH, chunkBaseBz + gz * cellW, densityEval, beardCorners);
+                        double v001 = getOrSampleCornerFp64(cornerCache, cornerSampled, c00Base + cy + 1, chunkBaseBx + gx * cellW, noiseMinY + (cy + 1) * cellH, chunkBaseBz + gz * cellW, densityEval, beardCorners);
+                        double v100 = getOrSampleCornerFp64(cornerCache, cornerSampled, c10Base + cy, chunkBaseBx + (gx + 1) * cellW, noiseMinY + cy * cellH, chunkBaseBz + gz * cellW, densityEval, beardCorners);
+                        double v101 = getOrSampleCornerFp64(cornerCache, cornerSampled, c10Base + cy + 1, chunkBaseBx + (gx + 1) * cellW, noiseMinY + (cy + 1) * cellH, chunkBaseBz + gz * cellW, densityEval, beardCorners);
+                        double v010 = getOrSampleCornerFp64(cornerCache, cornerSampled, c01Base + cy, chunkBaseBx + gx * cellW, noiseMinY + cy * cellH, chunkBaseBz + (gz + 1) * cellW, densityEval, beardCorners);
+                        double v011 = getOrSampleCornerFp64(cornerCache, cornerSampled, c01Base + cy + 1, chunkBaseBx + gx * cellW, noiseMinY + (cy + 1) * cellH, chunkBaseBz + (gz + 1) * cellW, densityEval, beardCorners);
+                        double v110 = getOrSampleCornerFp64(cornerCache, cornerSampled, c11Base + cy, chunkBaseBx + (gx + 1) * cellW, noiseMinY + cy * cellH, chunkBaseBz + (gz + 1) * cellW, densityEval, beardCorners);
+                        double v111 = getOrSampleCornerFp64(cornerCache, cornerSampled, c11Base + cy + 1, chunkBaseBx + (gx + 1) * cellW, noiseMinY + (cy + 1) * cellH, chunkBaseBz + (gz + 1) * cellW, densityEval, beardCorners);
                         double cornerMag = Math.abs(v000) + Math.abs(v001) + Math.abs(v100) + Math.abs(v101)
                                 + Math.abs(v010) + Math.abs(v011) + Math.abs(v110) + Math.abs(v111);
                         double signBandLimit = Math.max(0.02, cornerMag * 0.005);
-                        int cellBaseY = noiseMinY + cy * cellH;
                         for (int dy = cellH - 1; dy >= 0; dy--) {
                             int wy = cellBaseY + dy;
                             int sIdx = (wy - chunkMinY) >> 4;
@@ -2552,8 +2751,8 @@ public final class LiftedWorldgenCapabilityTables {
                             }
                             boolean solid64 = dens64 > 0.0;
 
-                            int flatIdx = chunkVoxelBase + (sIdx << 12) + (((wy & 15) << 8) | col);
-                            int cur = flatVoxels[flatIdx];
+                            int cur = readFlatOrUniformVoxel(
+                                    flatVoxels, chunkVoxelBase, uniformSlotHints, uniformHintBase, chunkMinY, secCount, wy, col);
                             boolean curSolid = cur != 0
                                     && (defaultFluid == 0 || cur != defaultFluid)
                                     && (lavaSlot == 0 || cur != lavaSlot);
@@ -2583,10 +2782,8 @@ public final class LiftedWorldgenCapabilityTables {
                             } else {
                                 nextVox = 0;
                             }
-                            flatVoxels[flatIdx] = nextVox;
-                            if (uniformSlotHints != null && uniformHintBase + sIdx < uniformSlotHints.length) {
-                                uniformSlotHints[uniformHintBase + sIdx] = -1;
-                            }
+                            writeFlatMaterializingUniformSection(
+                                    flatVoxels, chunkVoxelBase, uniformSlotHints, uniformHintBase, sIdx, wy, col, nextVox);
                             colChanged = true;
                         }
                     }
@@ -2595,8 +2792,8 @@ public final class LiftedWorldgenCapabilityTables {
                         refinedColumns++;
                         int newTop = chunkMinY - 1;
                         for (int wy = maxBoundY; wy >= minBoundY; wy--) {
-                            int sIdx = (wy - chunkMinY) >> 4;
-                            int v = flatVoxels[chunkVoxelBase + (sIdx << 12) + (((wy & 15) << 8) | col)];
+                            int v = readFlatOrUniformVoxel(
+                                    flatVoxels, chunkVoxelBase, uniformSlotHints, uniformHintBase, chunkMinY, secCount, wy, col);
                             if (v != 0 && (defaultFluid == 0 || v != defaultFluid) && (lavaSlot == 0 || v != lavaSlot)) {
                                 newTop = wy;
                                 break;
@@ -2647,8 +2844,8 @@ public final class LiftedWorldgenCapabilityTables {
                             int chunkBaseQz = chunkZ << 2;
                             for (int wy = startWy; wy >= minBoundY; wy--) {
                                 int sIdx = (wy - chunkMinY) >> 4;
-                                int flatIdx = chunkVoxelBase + (sIdx << 12) + (((wy & 15) << 8) | col);
-                                int cur = flatVoxels[flatIdx];
+                                int cur = readFlatOrUniformVoxel(
+                                        flatVoxels, chunkVoxelBase, uniformSlotHints, uniformHintBase, chunkMinY, secCount, wy, col);
                                 if (cur == 0) {
                                     floorDepth = -1;
                                     fluidAbove = false;
@@ -2675,7 +2872,8 @@ public final class LiftedWorldgenCapabilityTables {
                                         ceilDepth = ceilMax;
                                         break;
                                     }
-                                    int bv = flatVoxels[chunkVoxelBase + (((byP - chunkMinY) >> 4) << 12) + (((byP & 15) << 8) | col)];
+                                    int bv = readFlatOrUniformVoxel(
+                                            flatVoxels, chunkVoxelBase, uniformSlotHints, uniformHintBase, chunkMinY, secCount, byP, col);
                                     if (bv == 0 || (defaultFluid != 0 && bv == defaultFluid) || (lavaSlot > 0 && bv == lavaSlot)) {
                                         break;
                                     }
@@ -2716,10 +2914,8 @@ public final class LiftedWorldgenCapabilityTables {
                                         0.0,
                                         tempVal);
                                 if (nextSlot != cur) {
-                                    flatVoxels[flatIdx] = nextSlot;
-                                    if (uniformSlotHints != null && uniformHintBase + sIdx < uniformSlotHints.length) {
-                                        uniformSlotHints[uniformHintBase + sIdx] = -1;
-                                    }
+                                    writeFlatMaterializingUniformSection(
+                                            flatVoxels, chunkVoxelBase, uniformSlotHints, uniformHintBase, sIdx, wy, col, nextSlot);
                                 }
                             }
                         }
@@ -2729,39 +2925,75 @@ public final class LiftedWorldgenCapabilityTables {
             return refinedColumns;
         }
 
-        private static double[] getOrSampleCornerColFp64(
-                double[][] cache,
-                int gx,
-                int gz,
-                int colsZ,
-                int chunkBaseBx,
-                int chunkBaseBz,
-                int noiseMinY,
-                int cellW,
-                int cellH,
-                int strideZ,
-                DensityFieldEvaluator densityEval,
-                float[] beardCorners,
-                int strideX
+        private static int readFlatOrUniformVoxel(
+                int[] flatVoxels,
+                int chunkVoxelBase,
+                int[] uniformSlotHints,
+                int uniformHintBase,
+                int chunkMinY,
+                int secCount,
+                int wy,
+                int col
         ) {
-            int key = gx * colsZ + gz;
-            double[] col = cache[key];
-            if (col != null) {
-                return col;
+            int sIdx = (wy - chunkMinY) >> 4;
+            if (sIdx < 0 || sIdx >= secCount) {
+                return 0;
             }
-            col = new double[strideZ];
-            int bx = chunkBaseBx + gx * cellW;
-            int bz = chunkBaseBz + gz * cellW;
-            int beardBase = gx * strideX + gz * strideZ;
-            for (int gy = 0; gy < strideZ; gy++) {
-                double v = densityEval.sampleFp64(bx, noiseMinY + gy * cellH, bz);
-                if (beardCorners != null) {
-                    v += beardCorners[beardBase + gy];
+            if (uniformSlotHints != null && uniformHintBase + sIdx < uniformSlotHints.length) {
+                int hint = uniformSlotHints[uniformHintBase + sIdx];
+                if (hint >= 0) {
+                    return hint;
                 }
-                col[gy] = v;
             }
-            cache[key] = col;
-            return col;
+            return flatVoxels[chunkVoxelBase + (sIdx << 12) + (((wy & 15) << 8) | col)];
+        }
+
+        private static void writeFlatMaterializingUniformSection(
+                int[] flatVoxels,
+                int chunkVoxelBase,
+                int[] uniformSlotHints,
+                int uniformHintBase,
+                int sIdx,
+                int wy,
+                int col,
+                int nextVox
+        ) {
+            int secStart = chunkVoxelBase + (sIdx << 12);
+            if (uniformSlotHints != null && uniformHintBase + sIdx < uniformSlotHints.length) {
+                int hint = uniformSlotHints[uniformHintBase + sIdx];
+                if (hint >= 0) {
+                    if (hint == nextVox) {
+                        return;
+                    }
+                    // Native GPU readback intentionally skips DMA into recycled flatVoxels for
+                    // uniform sections, so materialize hint across all 4,096 voxels before mutating.
+                    Arrays.fill(flatVoxels, secStart, secStart + 4096, hint);
+                    uniformSlotHints[uniformHintBase + sIdx] = -1;
+                }
+            }
+            flatVoxels[secStart + (((wy & 15) << 8) | col)] = nextVox;
+        }
+
+        private static double getOrSampleCornerFp64(
+                double[] cache,
+                boolean[] sampled,
+                int cornerIdx,
+                int bx,
+                int by,
+                int bz,
+                DensityFieldEvaluator densityEval,
+                float[] beardCorners
+        ) {
+            if (sampled[cornerIdx]) {
+                return cache[cornerIdx];
+            }
+            double v = densityEval.sampleFp64(bx, by, bz);
+            if (beardCorners != null) {
+                v += beardCorners[cornerIdx];
+            }
+            cache[cornerIdx] = v;
+            sampled[cornerIdx] = true;
+            return v;
         }
 
         /**
@@ -3224,6 +3456,36 @@ public final class LiftedWorldgenCapabilityTables {
             mins7 = Arrays.copyOf(mins7, 7);
             maxs7 = Arrays.copyOf(maxs7, 7);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof BiomeParameterBox other)) {
+                return false;
+            }
+            return java.util.Arrays.equals(this.mins7, other.mins7)
+                    && java.util.Arrays.equals(this.maxs7, other.maxs7)
+                    && this.biomeOrdinal == other.biomeOrdinal;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Arrays.hashCode(this.mins7);
+            result = 31 * result + java.util.Arrays.hashCode(this.maxs7);
+            result = 31 * result + this.biomeOrdinal;
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "BiomeParameterBox[mins7=" + java.util.Arrays.toString(this.mins7)
+                    + ", maxs7=" + java.util.Arrays.toString(this.maxs7)
+                    + ", biomeOrdinal=" + this.biomeOrdinal
+                    + "]";
+        }
     }
 
     /**
@@ -3279,6 +3541,54 @@ public final class LiftedWorldgenCapabilityTables {
                     triangleDistribution,
                     singleSlotBitMask(targetBlockSlot),
                     null);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof OreVeinSpec other)) {
+                return false;
+            }
+            return this.targetBlockSlot == other.targetBlockSlot
+                    && this.oreBlockSlot == other.oreBlockSlot
+                    && this.veinSize == other.veinSize
+                    && this.countPerChunk == other.countPerChunk
+                    && this.minY == other.minY
+                    && this.maxY == other.maxY
+                    && this.triangleDistribution == other.triangleDistribution
+                    && java.util.Arrays.equals(this.targetSlotMask, other.targetSlotMask)
+                    && java.util.Arrays.equals(this.allowedBiomeMask, other.allowedBiomeMask);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.targetBlockSlot;
+            result = 31 * result + this.oreBlockSlot;
+            result = 31 * result + this.veinSize;
+            result = 31 * result + this.countPerChunk;
+            result = 31 * result + this.minY;
+            result = 31 * result + this.maxY;
+            result = 31 * result + Boolean.hashCode(this.triangleDistribution);
+            result = 31 * result + java.util.Arrays.hashCode(this.targetSlotMask);
+            result = 31 * result + java.util.Arrays.hashCode(this.allowedBiomeMask);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "OreVeinSpec[targetBlockSlot=" + this.targetBlockSlot
+                    + ", oreBlockSlot=" + this.oreBlockSlot
+                    + ", veinSize=" + this.veinSize
+                    + ", countPerChunk=" + this.countPerChunk
+                    + ", minY=" + this.minY
+                    + ", maxY=" + this.maxY
+                    + ", triangleDistribution=" + this.triangleDistribution
+                    + ", targetSlotMask=" + java.util.Arrays.toString(this.targetSlotMask)
+                    + ", allowedBiomeMask=" + java.util.Arrays.toString(this.allowedBiomeMask)
+                    + "]";
         }
     }
 
@@ -3419,6 +3729,48 @@ public final class LiftedWorldgenCapabilityTables {
                 case INT_CLAMPED_NORMAL, INT_WEIGHTED_LIST -> maxBound;
                 default -> Math.max(a, maxBound);
             };
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedIntProvider other)) {
+                return false;
+            }
+            return this.kind == other.kind
+                    && this.a == other.a
+                    && this.b == other.b
+                    && this.minBound == other.minBound
+                    && this.maxBound == other.maxBound
+                    && java.util.Arrays.equals(this.values, other.values)
+                    && java.util.Arrays.equals(this.cumWeights, other.cumWeights);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.kind;
+            result = 31 * result + this.a;
+            result = 31 * result + this.b;
+            result = 31 * result + this.minBound;
+            result = 31 * result + this.maxBound;
+            result = 31 * result + java.util.Arrays.hashCode(this.values);
+            result = 31 * result + java.util.Arrays.hashCode(this.cumWeights);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedIntProvider[kind=" + this.kind
+                    + ", a=" + this.a
+                    + ", b=" + this.b
+                    + ", minBound=" + this.minBound
+                    + ", maxBound=" + this.maxBound
+                    + ", values=" + java.util.Arrays.toString(this.values)
+                    + ", cumWeights=" + java.util.Arrays.toString(this.cumWeights)
+                    + "]";
         }
     }
 
@@ -3604,6 +3956,48 @@ public final class LiftedWorldgenCapabilityTables {
             if (axis == 2) return axisZSlot > 0 ? axisZSlot : primarySlot;
             return primarySlot;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedStateProvider other)) {
+                return false;
+            }
+            return this.kind == other.kind
+                    && this.primarySlot == other.primarySlot
+                    && this.axisXSlot == other.axisXSlot
+                    && this.axisZSlot == other.axisZSlot
+                    && java.util.Arrays.equals(this.slots, other.slots)
+                    && java.util.Arrays.equals(this.cumWeights, other.cumWeights)
+                    && java.util.Arrays.equals(this.upperHalfSlots, other.upperHalfSlots);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.kind;
+            result = 31 * result + this.primarySlot;
+            result = 31 * result + this.axisXSlot;
+            result = 31 * result + this.axisZSlot;
+            result = 31 * result + java.util.Arrays.hashCode(this.slots);
+            result = 31 * result + java.util.Arrays.hashCode(this.cumWeights);
+            result = 31 * result + java.util.Arrays.hashCode(this.upperHalfSlots);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedStateProvider[kind=" + this.kind
+                    + ", primarySlot=" + this.primarySlot
+                    + ", axisXSlot=" + this.axisXSlot
+                    + ", axisZSlot=" + this.axisZSlot
+                    + ", slots=" + java.util.Arrays.toString(this.slots)
+                    + ", cumWeights=" + java.util.Arrays.toString(this.cumWeights)
+                    + ", upperHalfSlots=" + java.util.Arrays.toString(this.upperHalfSlots)
+                    + "]";
+        }
     }
 
     /**
@@ -3612,12 +4006,66 @@ public final class LiftedWorldgenCapabilityTables {
     public record LiftedBlockPredicate(int[] ops, long[][] slotMasks) {
         public static final LiftedBlockPredicate ALWAYS_TRUE =
                 new LiftedBlockPredicate(new int[] {BP_TRUE, packBlockOffset(0, 0, 0), -1}, new long[0][]);
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedBlockPredicate other)) {
+                return false;
+            }
+            return java.util.Arrays.equals(this.ops, other.ops)
+                    && java.util.Arrays.deepEquals(this.slotMasks, other.slotMasks);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Arrays.hashCode(this.ops);
+            result = 31 * result + java.util.Arrays.deepHashCode(this.slotMasks);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedBlockPredicate[ops=" + java.util.Arrays.toString(this.ops)
+                    + ", slotMasks=" + java.util.Arrays.deepToString(this.slotMasks)
+                    + "]";
+        }
     }
 
     /**
      * Single {@code OreConfiguration$TargetBlockState} rule pairing a {@code RuleTest} slot bitmask with its ore slot.
      */
-    public record OreTargetRule(long[] targetSlotMask, int oreBlockSlot) {}
+    public record OreTargetRule(long[] targetSlotMask, int oreBlockSlot) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof OreTargetRule other)) {
+                return false;
+            }
+            return java.util.Arrays.equals(this.targetSlotMask, other.targetSlotMask)
+                    && this.oreBlockSlot == other.oreBlockSlot;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Arrays.hashCode(this.targetSlotMask);
+            result = 31 * result + this.oreBlockSlot;
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "OreTargetRule[targetSlotMask=" + java.util.Arrays.toString(this.targetSlotMask)
+                    + ", oreBlockSlot=" + this.oreBlockSlot
+                    + "]";
+        }
+    }
 
     /**
      * Single layer inside a lifted {@code BlockColumnConfiguration}.
@@ -3633,7 +4081,43 @@ public final class LiftedWorldgenCapabilityTables {
             LiftedIntProvider[] intProviders,
             LiftedBlockPredicate[] predicates,
             LiftedFeatureNode feature
-    ) {}
+    ) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof SelectorBranch other)) {
+                return false;
+            }
+            return this.chancePermille == other.chancePermille
+                    && java.util.Arrays.equals(this.placementOps, other.placementOps)
+                    && java.util.Arrays.equals(this.intProviders, other.intProviders)
+                    && java.util.Arrays.equals(this.predicates, other.predicates)
+                    && java.util.Objects.equals(this.feature, other.feature);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.chancePermille;
+            result = 31 * result + java.util.Arrays.hashCode(this.placementOps);
+            result = 31 * result + java.util.Arrays.hashCode(this.intProviders);
+            result = 31 * result + java.util.Arrays.hashCode(this.predicates);
+            result = 31 * result + java.util.Objects.hashCode(this.feature);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "SelectorBranch[chancePermille=" + this.chancePermille
+                    + ", placementOps=" + java.util.Arrays.toString(this.placementOps)
+                    + ", intProviders=" + java.util.Arrays.toString(this.intProviders)
+                    + ", predicates=" + java.util.Arrays.toString(this.predicates)
+                    + ", feature=" + this.feature
+                    + "]";
+        }
+    }
 
     /**
      * Optional tree decorator table (`TrunkVineDecorator`, `LeaveVineDecorator`, `CocoaDecorator`).
@@ -3644,7 +4128,43 @@ public final class LiftedWorldgenCapabilityTables {
             int cocoaProbPermille,
             int[] vineFaceSlots,
             int[] cocoaAgeFacingSlots
-    ) {}
+    ) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof TreeDecoratorSpec other)) {
+                return false;
+            }
+            return this.trunkVine == other.trunkVine
+                    && this.leaveVineProbPermille == other.leaveVineProbPermille
+                    && this.cocoaProbPermille == other.cocoaProbPermille
+                    && java.util.Arrays.equals(this.vineFaceSlots, other.vineFaceSlots)
+                    && java.util.Arrays.equals(this.cocoaAgeFacingSlots, other.cocoaAgeFacingSlots);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + Boolean.hashCode(this.trunkVine);
+            result = 31 * result + this.leaveVineProbPermille;
+            result = 31 * result + this.cocoaProbPermille;
+            result = 31 * result + java.util.Arrays.hashCode(this.vineFaceSlots);
+            result = 31 * result + java.util.Arrays.hashCode(this.cocoaAgeFacingSlots);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "TreeDecoratorSpec[trunkVine=" + this.trunkVine
+                    + ", leaveVineProbPermille=" + this.leaveVineProbPermille
+                    + ", cocoaProbPermille=" + this.cocoaProbPermille
+                    + ", vineFaceSlots=" + java.util.Arrays.toString(this.vineFaceSlots)
+                    + ", cocoaAgeFacingSlots=" + java.util.Arrays.toString(this.cocoaAgeFacingSlots)
+                    + "]";
+        }
+    }
 
     /**
      * Composable pure-primitive AST node representing a lifted {@code ConfiguredFeature}.
@@ -3759,6 +4279,105 @@ public final class LiftedWorldgenCapabilityTables {
                 null,
                 null,
                 null);
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedFeatureNode other)) {
+                return false;
+            }
+            return this.kind == other.kind
+                    && java.util.Arrays.equals(this.oreTargets, other.oreTargets)
+                    && this.intA == other.intA
+                    && this.intB == other.intB
+                    && this.intC == other.intC
+                    && this.intD == other.intD
+                    && this.intE == other.intE
+                    && this.flagA == other.flagA
+                    && this.flagB == other.flagB
+                    && this.flagC == other.flagC
+                    && java.util.Objects.equals(this.intProvA, other.intProvA)
+                    && java.util.Objects.equals(this.intProvB, other.intProvB)
+                    && java.util.Objects.equals(this.intProvC, other.intProvC)
+                    && java.util.Objects.equals(this.stateProvA, other.stateProvA)
+                    && java.util.Objects.equals(this.stateProvB, other.stateProvB)
+                    && java.util.Arrays.equals(this.auxSlotsA, other.auxSlotsA)
+                    && java.util.Arrays.equals(this.auxSlotsB, other.auxSlotsB)
+                    && java.util.Arrays.equals(this.slotMaskA, other.slotMaskA)
+                    && java.util.Arrays.equals(this.slotMaskB, other.slotMaskB)
+                    && java.util.Arrays.equals(this.columnLayers, other.columnLayers)
+                    && java.util.Arrays.equals(this.branches, other.branches)
+                    && java.util.Arrays.equals(this.innerPlacementOps, other.innerPlacementOps)
+                    && java.util.Arrays.equals(this.innerIntProviders, other.innerIntProviders)
+                    && java.util.Arrays.equals(this.innerPredicates, other.innerPredicates)
+                    && java.util.Objects.equals(this.childFeature, other.childFeature)
+                    && java.util.Objects.equals(this.treeDecorators, other.treeDecorators);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.kind;
+            result = 31 * result + java.util.Arrays.hashCode(this.oreTargets);
+            result = 31 * result + this.intA;
+            result = 31 * result + this.intB;
+            result = 31 * result + this.intC;
+            result = 31 * result + this.intD;
+            result = 31 * result + this.intE;
+            result = 31 * result + Boolean.hashCode(this.flagA);
+            result = 31 * result + Boolean.hashCode(this.flagB);
+            result = 31 * result + Boolean.hashCode(this.flagC);
+            result = 31 * result + java.util.Objects.hashCode(this.intProvA);
+            result = 31 * result + java.util.Objects.hashCode(this.intProvB);
+            result = 31 * result + java.util.Objects.hashCode(this.intProvC);
+            result = 31 * result + java.util.Objects.hashCode(this.stateProvA);
+            result = 31 * result + java.util.Objects.hashCode(this.stateProvB);
+            result = 31 * result + java.util.Arrays.hashCode(this.auxSlotsA);
+            result = 31 * result + java.util.Arrays.hashCode(this.auxSlotsB);
+            result = 31 * result + java.util.Arrays.hashCode(this.slotMaskA);
+            result = 31 * result + java.util.Arrays.hashCode(this.slotMaskB);
+            result = 31 * result + java.util.Arrays.hashCode(this.columnLayers);
+            result = 31 * result + java.util.Arrays.hashCode(this.branches);
+            result = 31 * result + java.util.Arrays.hashCode(this.innerPlacementOps);
+            result = 31 * result + java.util.Arrays.hashCode(this.innerIntProviders);
+            result = 31 * result + java.util.Arrays.hashCode(this.innerPredicates);
+            result = 31 * result + java.util.Objects.hashCode(this.childFeature);
+            result = 31 * result + java.util.Objects.hashCode(this.treeDecorators);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedFeatureNode[kind=" + this.kind
+                    + ", oreTargets=" + java.util.Arrays.toString(this.oreTargets)
+                    + ", intA=" + this.intA
+                    + ", intB=" + this.intB
+                    + ", intC=" + this.intC
+                    + ", intD=" + this.intD
+                    + ", intE=" + this.intE
+                    + ", flagA=" + this.flagA
+                    + ", flagB=" + this.flagB
+                    + ", flagC=" + this.flagC
+                    + ", intProvA=" + this.intProvA
+                    + ", intProvB=" + this.intProvB
+                    + ", intProvC=" + this.intProvC
+                    + ", stateProvA=" + this.stateProvA
+                    + ", stateProvB=" + this.stateProvB
+                    + ", auxSlotsA=" + java.util.Arrays.toString(this.auxSlotsA)
+                    + ", auxSlotsB=" + java.util.Arrays.toString(this.auxSlotsB)
+                    + ", slotMaskA=" + java.util.Arrays.toString(this.slotMaskA)
+                    + ", slotMaskB=" + java.util.Arrays.toString(this.slotMaskB)
+                    + ", columnLayers=" + java.util.Arrays.toString(this.columnLayers)
+                    + ", branches=" + java.util.Arrays.toString(this.branches)
+                    + ", innerPlacementOps=" + java.util.Arrays.toString(this.innerPlacementOps)
+                    + ", innerIntProviders=" + java.util.Arrays.toString(this.innerIntProviders)
+                    + ", innerPredicates=" + java.util.Arrays.toString(this.innerPredicates)
+                    + ", childFeature=" + this.childFeature
+                    + ", treeDecorators=" + this.treeDecorators
+                    + "]";
+        }
     }
 
     /**
@@ -3792,6 +4411,51 @@ public final class LiftedWorldgenCapabilityTables {
                     predicates,
                     rootFeature,
                     containsTreeFeature(rootFeature, 0));
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof LiftedPlacedFeatureSpec other)) {
+                return false;
+            }
+            return this.stepIndex == other.stepIndex
+                    && this.featureSalt == other.featureSalt
+                    && java.util.Arrays.equals(this.allowedBiomeMask, other.allowedBiomeMask)
+                    && java.util.Arrays.equals(this.placementOps, other.placementOps)
+                    && java.util.Arrays.equals(this.intProviders, other.intProviders)
+                    && java.util.Arrays.equals(this.predicates, other.predicates)
+                    && java.util.Objects.equals(this.rootFeature, other.rootFeature)
+                    && this.hasTree == other.hasTree;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.stepIndex;
+            result = 31 * result + this.featureSalt;
+            result = 31 * result + java.util.Arrays.hashCode(this.allowedBiomeMask);
+            result = 31 * result + java.util.Arrays.hashCode(this.placementOps);
+            result = 31 * result + java.util.Arrays.hashCode(this.intProviders);
+            result = 31 * result + java.util.Arrays.hashCode(this.predicates);
+            result = 31 * result + java.util.Objects.hashCode(this.rootFeature);
+            result = 31 * result + Boolean.hashCode(this.hasTree);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "LiftedPlacedFeatureSpec[stepIndex=" + this.stepIndex
+                    + ", featureSalt=" + this.featureSalt
+                    + ", allowedBiomeMask=" + java.util.Arrays.toString(this.allowedBiomeMask)
+                    + ", placementOps=" + java.util.Arrays.toString(this.placementOps)
+                    + ", intProviders=" + java.util.Arrays.toString(this.intProviders)
+                    + ", predicates=" + java.util.Arrays.toString(this.predicates)
+                    + ", rootFeature=" + this.rootFeature
+                    + ", hasTree=" + this.hasTree
+                    + "]";
         }
     }
 
@@ -4145,6 +4809,93 @@ public final class LiftedWorldgenCapabilityTables {
                     oreSpecs,
                     RouterVeinSpec.DISABLED);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof DimensionCapabilitySpec other)) {
+                return false;
+            }
+            return this.chunkMinY == other.chunkMinY
+                    && this.chunkSections == other.chunkSections
+                    && this.noiseMinY == other.noiseMinY
+                    && this.noiseHeight == other.noiseHeight
+                    && this.cellWidth == other.cellWidth
+                    && this.cellHeight == other.cellHeight
+                    && this.seaLevel == other.seaLevel
+                    && this.defaultBlockSlot == other.defaultBlockSlot
+                    && this.defaultFluidSlot == other.defaultFluidSlot
+                    && this.aquifersEnabled == other.aquifersEnabled
+                    && this.lavaFluidSlot == other.lavaFluidSlot
+                    && this.deepLavaFloorY == other.deepLavaFloorY
+                    && java.util.Arrays.equals(this.flatRTreeNodes, other.flatRTreeNodes)
+                    && java.util.Objects.equals(this.surfaceRuleModule, other.surfaceRuleModule)
+                    && java.util.Arrays.equals(this.carverSpecs, other.carverSpecs)
+                    && java.util.Arrays.equals(this.featureSpecs, other.featureSpecs)
+                    && java.util.Arrays.equals(this.oreSpecs, other.oreSpecs)
+                    && java.util.Objects.equals(this.routerVeinSpec, other.routerVeinSpec)
+                    && java.util.Objects.equals(this.gpuNoiseTable, other.gpuNoiseTable)
+                    && java.util.Arrays.equals(this.placedFeatureSpecs, other.placedFeatureSpecs)
+                    && java.util.Arrays.equals(this.nonMotionBlockingSlotMask, other.nonMotionBlockingSlotMask)
+                    && java.util.Objects.equals(this.finalDensityModule, other.finalDensityModule);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.chunkMinY;
+            result = 31 * result + this.chunkSections;
+            result = 31 * result + this.noiseMinY;
+            result = 31 * result + this.noiseHeight;
+            result = 31 * result + this.cellWidth;
+            result = 31 * result + this.cellHeight;
+            result = 31 * result + this.seaLevel;
+            result = 31 * result + this.defaultBlockSlot;
+            result = 31 * result + this.defaultFluidSlot;
+            result = 31 * result + Boolean.hashCode(this.aquifersEnabled);
+            result = 31 * result + this.lavaFluidSlot;
+            result = 31 * result + this.deepLavaFloorY;
+            result = 31 * result + java.util.Arrays.hashCode(this.flatRTreeNodes);
+            result = 31 * result + java.util.Objects.hashCode(this.surfaceRuleModule);
+            result = 31 * result + java.util.Arrays.hashCode(this.carverSpecs);
+            result = 31 * result + java.util.Arrays.hashCode(this.featureSpecs);
+            result = 31 * result + java.util.Arrays.hashCode(this.oreSpecs);
+            result = 31 * result + java.util.Objects.hashCode(this.routerVeinSpec);
+            result = 31 * result + java.util.Objects.hashCode(this.gpuNoiseTable);
+            result = 31 * result + java.util.Arrays.hashCode(this.placedFeatureSpecs);
+            result = 31 * result + java.util.Arrays.hashCode(this.nonMotionBlockingSlotMask);
+            result = 31 * result + java.util.Objects.hashCode(this.finalDensityModule);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "DimensionCapabilitySpec[chunkMinY=" + this.chunkMinY
+                    + ", chunkSections=" + this.chunkSections
+                    + ", noiseMinY=" + this.noiseMinY
+                    + ", noiseHeight=" + this.noiseHeight
+                    + ", cellWidth=" + this.cellWidth
+                    + ", cellHeight=" + this.cellHeight
+                    + ", seaLevel=" + this.seaLevel
+                    + ", defaultBlockSlot=" + this.defaultBlockSlot
+                    + ", defaultFluidSlot=" + this.defaultFluidSlot
+                    + ", aquifersEnabled=" + this.aquifersEnabled
+                    + ", lavaFluidSlot=" + this.lavaFluidSlot
+                    + ", deepLavaFloorY=" + this.deepLavaFloorY
+                    + ", flatRTreeNodes=" + java.util.Arrays.toString(this.flatRTreeNodes)
+                    + ", surfaceRuleModule=" + this.surfaceRuleModule
+                    + ", carverSpecs=" + java.util.Arrays.toString(this.carverSpecs)
+                    + ", featureSpecs=" + java.util.Arrays.toString(this.featureSpecs)
+                    + ", oreSpecs=" + java.util.Arrays.toString(this.oreSpecs)
+                    + ", routerVeinSpec=" + this.routerVeinSpec
+                    + ", gpuNoiseTable=" + this.gpuNoiseTable
+                    + ", placedFeatureSpecs=" + java.util.Arrays.toString(this.placedFeatureSpecs)
+                    + ", nonMotionBlockingSlotMask=" + java.util.Arrays.toString(this.nonMotionBlockingSlotMask)
+                    + ", finalDensityModule=" + this.finalDensityModule
+                    + "]";
+        }
     }
 
     public static int quantizeClimateCoord(float value) {
@@ -4411,9 +5162,48 @@ public final class LiftedWorldgenCapabilityTables {
         public int hashCode() {
             return System.identityHashCode(nodes);
         }
+
+        @Override
+        public String toString() {
+            return "RTreeIdentityKey[nodes=" + java.util.Arrays.toString(this.nodes)
+                    + "]";
+        }
     }
 
-    private record OrderedLeaf6d(int biomeOrd, int encodedNegOrder, int[] mins7, int[] maxs7) {}
+    private record OrderedLeaf6d(int biomeOrd, int encodedNegOrder, int[] mins7, int[] maxs7) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof OrderedLeaf6d other)) {
+                return false;
+            }
+            return this.biomeOrd == other.biomeOrd
+                    && this.encodedNegOrder == other.encodedNegOrder
+                    && java.util.Arrays.equals(this.mins7, other.mins7)
+                    && java.util.Arrays.equals(this.maxs7, other.maxs7);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + this.biomeOrd;
+            result = 31 * result + this.encodedNegOrder;
+            result = 31 * result + java.util.Arrays.hashCode(this.mins7);
+            result = 31 * result + java.util.Arrays.hashCode(this.maxs7);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "OrderedLeaf6d[biomeOrd=" + this.biomeOrd
+                    + ", encodedNegOrder=" + this.encodedNegOrder
+                    + ", mins7=" + java.util.Arrays.toString(this.mins7)
+                    + ", maxs7=" + java.util.Arrays.toString(this.maxs7)
+                    + "]";
+        }
+    }
 
     private static final java.util.concurrent.ConcurrentHashMap<RTreeIdentityKey, RTreeDepthPartition>
             RTREE_DEPTH_PARTITION_MEMO = new java.util.concurrent.ConcurrentHashMap<>();
@@ -4484,7 +5274,40 @@ public final class LiftedWorldgenCapabilityTables {
     }
 
     private static int[] buildOrdered6dSubRTree(java.util.List<OrderedLeaf6d> leaves) {
-        record BuildNode(int[] mins7, int[] maxs7, OrderedLeaf6d leaf, java.util.List<BuildNode> children) {}
+        record BuildNode(int[] mins7, int[] maxs7, OrderedLeaf6d leaf, java.util.List<BuildNode> children) {
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) {
+                    return true;
+                }
+                if (!(o instanceof BuildNode other)) {
+                    return false;
+                }
+                return java.util.Arrays.equals(this.mins7, other.mins7)
+                        && java.util.Arrays.equals(this.maxs7, other.maxs7)
+                        && java.util.Objects.equals(this.leaf, other.leaf)
+                        && java.util.Objects.equals(this.children, other.children);
+            }
+
+            @Override
+            public int hashCode() {
+                int result = 1;
+                result = 31 * result + java.util.Arrays.hashCode(this.mins7);
+                result = 31 * result + java.util.Arrays.hashCode(this.maxs7);
+                result = 31 * result + java.util.Objects.hashCode(this.leaf);
+                result = 31 * result + java.util.Objects.hashCode(this.children);
+                return result;
+            }
+
+            @Override
+            public String toString() {
+                return "BuildNode[mins7=" + java.util.Arrays.toString(this.mins7)
+                        + ", maxs7=" + java.util.Arrays.toString(this.maxs7)
+                        + ", leaf=" + this.leaf
+                        + ", children=" + this.children
+                        + "]";
+            }
+        }
         java.util.function.Function<java.util.List<OrderedLeaf6d>, BuildNode> buildRec =
                 new java.util.function.Function<>() {
                     @Override
@@ -5376,6 +6199,39 @@ public final class LiftedWorldgenCapabilityTables {
                 }
             }
             return lo - 1;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof MultipointSpline other)) {
+                return false;
+            }
+            return java.util.Objects.equals(this.coordinate, other.coordinate)
+                    && java.util.Arrays.equals(this.locations, other.locations)
+                    && java.util.Arrays.equals(this.values, other.values)
+                    && java.util.Arrays.equals(this.derivatives, other.derivatives);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Objects.hashCode(this.coordinate);
+            result = 31 * result + java.util.Arrays.hashCode(this.locations);
+            result = 31 * result + java.util.Arrays.hashCode(this.values);
+            result = 31 * result + java.util.Arrays.hashCode(this.derivatives);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "MultipointSpline[coordinate=" + this.coordinate
+                    + ", locations=" + java.util.Arrays.toString(this.locations)
+                    + ", values=" + java.util.Arrays.toString(this.values)
+                    + ", derivatives=" + java.util.Arrays.toString(this.derivatives)
+                    + "]";
         }
     }
 

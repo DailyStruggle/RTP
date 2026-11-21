@@ -815,6 +815,9 @@ public final class OfficialConfigDocHarvester {
     }
 
     private static boolean matchesByLcaSuffix(String fullTargetKey, String docKey) {
+        if (fullTargetKey == null || docKey == null) {
+            return false;
+        }
         if (fullTargetKey.equalsIgnoreCase(docKey)) {
             return true;
         }

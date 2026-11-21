@@ -604,6 +604,41 @@ public final class JvmBytecodeConceptEmitter {
             String entryMethodName,
             boolean hasColumnYMethod,
             int memo2dSlotCount) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof AssembledClass other)) {
+                return false;
+            }
+            return java.util.Arrays.equals(this.classBytes, other.classBytes)
+                    && java.util.Objects.equals(this.lutBindings, other.lutBindings)
+                    && java.util.Objects.equals(this.entryMethodName, other.entryMethodName)
+                    && this.hasColumnYMethod == other.hasColumnYMethod
+                    && this.memo2dSlotCount == other.memo2dSlotCount;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Arrays.hashCode(this.classBytes);
+            result = 31 * result + java.util.Objects.hashCode(this.lutBindings);
+            result = 31 * result + java.util.Objects.hashCode(this.entryMethodName);
+            result = 31 * result + Boolean.hashCode(this.hasColumnYMethod);
+            result = 31 * result + this.memo2dSlotCount;
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "AssembledClass[classBytes=" + java.util.Arrays.toString(this.classBytes)
+                    + ", lutBindings=" + this.lutBindings
+                    + ", entryMethodName=" + this.entryMethodName
+                    + ", hasColumnYMethod=" + this.hasColumnYMethod
+                    + ", memo2dSlotCount=" + this.memo2dSlotCount
+                    + "]";
+        }
     }
 
     private record Memo2DSpec(int slotId, int xParamSlot, int yParamSlot, int zParamSlot) {
@@ -1388,6 +1423,38 @@ public final class JvmBytecodeConceptEmitter {
     }
 
     private record CompiledMethod(MethodBinding binding, byte[] code, int maxStack, int maxLocals) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof CompiledMethod other)) {
+                return false;
+            }
+            return java.util.Objects.equals(this.binding, other.binding)
+                    && java.util.Arrays.equals(this.code, other.code)
+                    && this.maxStack == other.maxStack
+                    && this.maxLocals == other.maxLocals;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Objects.hashCode(this.binding);
+            result = 31 * result + java.util.Arrays.hashCode(this.code);
+            result = 31 * result + this.maxStack;
+            result = 31 * result + this.maxLocals;
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "CompiledMethod[binding=" + this.binding
+                    + ", code=" + java.util.Arrays.toString(this.code)
+                    + ", maxStack=" + this.maxStack
+                    + ", maxLocals=" + this.maxLocals
+                    + "]";
+        }
     }
 
     private static final class BytecodeClassLoader extends ClassLoader {

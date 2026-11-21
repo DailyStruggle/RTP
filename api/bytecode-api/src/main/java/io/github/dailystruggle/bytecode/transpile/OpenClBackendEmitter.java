@@ -121,6 +121,41 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
             int spilledLutCount,
             int deduplicatedLutCount
     ) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof CapabilityKernelProgram other)) {
+                return false;
+            }
+            return java.util.Objects.equals(this.sourceCode, other.sourceCode)
+                    && java.util.Arrays.equals(this.spilledLutWords, other.spilledLutWords)
+                    && this.usedConstantBytes == other.usedConstantBytes
+                    && this.spilledLutCount == other.spilledLutCount
+                    && this.deduplicatedLutCount == other.deduplicatedLutCount;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 1;
+            result = 31 * result + java.util.Objects.hashCode(this.sourceCode);
+            result = 31 * result + java.util.Arrays.hashCode(this.spilledLutWords);
+            result = 31 * result + this.usedConstantBytes;
+            result = 31 * result + this.spilledLutCount;
+            result = 31 * result + this.deduplicatedLutCount;
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "CapabilityKernelProgram[sourceCode=" + this.sourceCode
+                    + ", spilledLutWords=" + java.util.Arrays.toString(this.spilledLutWords)
+                    + ", usedConstantBytes=" + this.usedConstantBytes
+                    + ", spilledLutCount=" + this.spilledLutCount
+                    + ", deduplicatedLutCount=" + this.deduplicatedLutCount
+                    + "]";
+        }
     }
 
     /**
@@ -3828,7 +3863,7 @@ public final class OpenClBackendEmitter implements ConceptBackendEmitter {
         }
         sb.append("#define CAP_UNCERTAIN_SIGN_CPU_REFINE_FLAG 0x40000000\n");
         sb.append("#define CAP_CARVER_OVERFLOW_FALLBACK_FLAG 0x20000000\n");
-        sb.append("#define CAP_EXACT_SIGN_UNCERTAINTY_EPS 1.0e-3f\n");
+        sb.append("#define CAP_EXACT_SIGN_UNCERTAINTY_EPS 2.0e-5f\n");
         sb.append('\n').append(openClConstantArrayPrefix("float", "CAP_GRAD_X", 16))
                 .append("{1.0f,-1.0f,1.0f,-1.0f,1.0f,-1.0f,1.0f,-1.0f,0.0f,0.0f,0.0f,0.0f,1.0f,0.0f,-1.0f,0.0f};\n");
         sb.append(openClConstantArrayPrefix("float", "CAP_GRAD_Y", 16))
