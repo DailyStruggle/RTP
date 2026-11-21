@@ -297,7 +297,6 @@ class LcaSectionBackingAndCompactionTest {
         int workerCount = 4;
         ExecutorService pool = Executors.newFixedThreadPool(workerCount);
         AtomicInteger staleSectionCommits = new AtomicInteger();
-        AtomicInteger staleFenceCommits = new AtomicInteger();
 
         try {
             for (int iter = 0; iter < iterations; iter++) {
@@ -389,7 +388,6 @@ class LcaSectionBackingAndCompactionTest {
         }
 
         assertEquals(0, staleSectionCommits.get(), "Zero stale section compaction commits allowed");
-        assertEquals(0, staleFenceCommits.get(), "Zero stale EpochCommitFence commits allowed");
     }
 
     @Test

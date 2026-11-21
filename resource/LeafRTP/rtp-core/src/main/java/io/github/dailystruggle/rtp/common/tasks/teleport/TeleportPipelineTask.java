@@ -98,13 +98,9 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       held.close();
       return;
     }
-    io.github.dailystruggle.rtp.api.server.RTPServerAccessor accessor = RTPRuntime.serverAccessor();
-    long holdTicks = (accessor != null && "Folia".equals(accessor.getPlatform()))
-        ? 2L
-        : ARRIVAL_HOLD_TICKS;
     pendingArrivalReleases.put(held, world);
     try {
-      RTPRuntime.scheduler().runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), holdTicks);
+      RTPRuntime.scheduler().runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), ARRIVAL_HOLD_TICKS);
     } catch (Throwable t) {
       RTPRuntime.log(Level.WARNING, "[RTP] arrival chunk hold could not be scheduled; releasing now", t);
       releaseArrivalReservation(held);

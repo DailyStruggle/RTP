@@ -188,8 +188,8 @@ class ReqRtpS005ArrivalChunkHoldTest {
 
   @Test
   @Timeout(value = 5, unit = TimeUnit.SECONDS)
-  @DisplayName("REQ-RTP-S-002: Folia platform shortens arrival hold to 2 ticks and releases cleanly")
-  void foliaPlatformShortensArrivalHoldToTwoTicks() {
+  @DisplayName("REQ-RTP-S-005: Folia platform preserves full ARRIVAL_HOLD_TICKS window and releases cleanly")
+  void foliaPlatformPreservesFullArrivalHoldWindow() {
     MockRTPServerAccessor foliaAccessor = org.mockito.Mockito.spy(accessor);
     org.mockito.Mockito.doReturn("Folia").when(foliaAccessor).getPlatform();
     RTPRuntime.setServerAccessor(foliaAccessor);
@@ -197,11 +197,11 @@ class ReqRtpS005ArrivalChunkHoldTest {
     runPipeline(100, 200);
     MockRTPScheduler scheduler = accessor.getMockScheduler();
 
-    assertEquals(1, world.getActiveTicketCount(), "ticket must be held for the 2-tick Folia window");
+    assertEquals(1, world.getActiveTicketCount(), "ticket must be held for the full arrival hold window on Folia");
+    scheduler.tick(TeleportPipelineTask.ARRIVAL_HOLD_TICKS - 1);
+    assertEquals(1, world.getActiveTicketCount(), "ticket must still be held before ARRIVAL_HOLD_TICKS elapses on Folia");
     scheduler.tick(1);
-    assertEquals(1, world.getActiveTicketCount(), "ticket must still be held after 1 tick on Folia");
-    scheduler.tick(1);
-    assertEquals(0, world.getActiveTicketCount(), "ticket must be released after 2 ticks on Folia");
+    assertEquals(0, world.getActiveTicketCount(), "ticket must be released after ARRIVAL_HOLD_TICKS on Folia");
     assertEquals(0, TeleportPipelineTask.pendingArrivalReleaseCount());
   }
 }

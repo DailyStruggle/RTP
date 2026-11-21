@@ -59,6 +59,12 @@ syncAllottedTime: 5
 # @default: 25
 asyncAllottedTime: 25
 
+# Folia only: max concurrent in-flight regional tasks.
+# Omit to use the default: max(1, availableProcessors / 2).
+# Set a positive integer for a fixed cap, or <= 0 to disable the cap (uncapped).
+# Also overridable via JVM property -Drtp.folia.maxRegionalInflight=<n>.
+# maxRegionalInflight: 0
+
 # --- View-distance smoothing ---
 # Chunks loaded around a spot while searching. Keep at 0 (just the spot; surrounding view-distance chunks load after arrival rather than before); values above 0 load extra chunks per candidate and cause lag spikes.
 # @type: integer

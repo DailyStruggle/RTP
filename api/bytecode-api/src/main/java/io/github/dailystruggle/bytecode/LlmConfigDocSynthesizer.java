@@ -1109,15 +1109,13 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         if (key.isEmpty()) {
             throw new IOException("Missing Gemini API key (set llm-synthesis.api-key or env " + config.apiKeyEnv() + ")");
         }
-        String baseEndpoint = config.endpoint().replace("{model}", config.model());
-        String fullUrl = baseEndpoint.contains("?")
-                ? (baseEndpoint + "&key=" + key)
-                : (baseEndpoint + "?key=" + key);
+        String fullUrl = config.endpoint().replace("{model}", config.model());
         String body = "{\"contents\":[{\"parts\":[{\"text\":\"" + SchemaInferrer.escapeJson(prompt) + "\"}]}],"
                 + "\"generationConfig\":{\"temperature\":0.1,\"maxOutputTokens\":450,\"responseMimeType\":\"application/json\"}}";
         Map<String, String> headers = Map.of(
                 "Content-Type", "application/json",
-                "Accept", "application/json"
+                "Accept", "application/json",
+                "x-goog-api-key", key
         );
         String rawHttp = transport.postJson(fullUrl, headers, body, config.timeoutMs());
         return extractGeminiContent(rawHttp);
@@ -1465,7 +1463,9 @@ public final class LlmConfigDocSynthesizer implements AutoCloseable {
         int status = conn.getResponseCode();
         InputStream is = status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream();
         if (is == null) {
-            throw new IOException("HTTP " + status + " from " + url);
+            int q = url.indexOf('?');
+            String safeUrl = q >= 0 ? url.substring(0, q) : url;
+            throw new IOException("HTTP " + status + " from " + safeUrl);
         }
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         byte[] buf = new byte[4096];

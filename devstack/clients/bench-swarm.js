@@ -151,6 +151,8 @@ const statsIntervalS = Math.max(0, intArg('--stats-interval-s', null, 30));
 const statsFile = getArg('--stats-file', 'BENCH_STATS_FILE', '');
 const statsFileIntervalS = Math.max(0.1, parseFloat(getArg('--stats-file-interval-s', null, '1')) || 1);
 const swapStuck = hasFlag('--swap-stuck', 'BENCH_SWAP_STUCK');
+const swapIdleS = Math.max(1, parseFloat(getArg('--swap-idle-s', null, '120')) || 120);
+const swapMinActivity = Math.max(1, intArg('--swap-min-activity', null, 5));
 const logChat = hasFlag('--log-chat', null);
 const keepWorld = hasFlag('--keep-world', 'BENCH_KEEP_WORLD');
 const fuzzTaskMode = hasFlag('--fuzz-task-mode', 'BENCH_FUZZ_TASK_MODE');
@@ -666,6 +668,8 @@ function startAutonomousPolicyLoop(state, bot) {
 
 function shutdown(signal) {
   if (shuttingDown) {
+    console.log('[bench] second signal; exiting now');
+    process.exit(1);
   }
   shuttingDown = true;
   console.log(`[bench] ${signal}: disconnecting ${onlineCount()} bot(s)`);

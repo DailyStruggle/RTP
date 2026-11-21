@@ -868,12 +868,14 @@
     let esc = String(str || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    esc = esc.replace(/\[([^\]]+)\]\((?:&lt;)?(https?:\/\/[^\s)&]+|\/[^\s)&]+)(?:&gt;)?\)/g, (_m, label, u) => {
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    esc = esc.replace(/\[([^\]]+)\]\((?:&lt;)?(https?:\/\/[^\s)&"']+|\/[^\s)&"']+)(?:&gt;)?\)/g, (_m, label, u) => {
       const norm = normalizeSiteUrl(u);
       return '<a href="' + norm + '" target="_blank" rel="noopener" style="color:#89b4fa;text-decoration:underline;">' + label + '</a>';
     });
-    esc = esc.replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, (_m, u) => {
+    esc = esc.replace(/&lt;(https?:\/\/[^\s&"']+)&gt;/g, (_m, u) => {
       const norm = normalizeSiteUrl(u);
       return '<a href="' + norm + '" target="_blank" rel="noopener" style="color:#89b4fa;text-decoration:underline;">' + norm + '</a>';
     });
@@ -1354,7 +1356,15 @@
         const fileHtml = renderSymbolCrosslinkHtml(rc.file_path || '', rc.file_path || '');
         const keyLabel = (rc.key_path || rc.leaf || '') + ': ' + (rc.recommended_value || '');
         const keyHtml = renderSymbolCrosslinkHtml(rc.key_path || rc.leaf || '', keyLabel);
-        span.innerHTML = fileHtml + ' → <b>' + keyHtml + '</b> — ' + formatInlineMarkdown(cleanReason) + (rc.cli_command ? ' (<code>' + rc.cli_command + '</code>) ' : ' ');
+        const escCli = rc.cli_command
+          ? String(rc.cli_command)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;')
+          : '';
+        span.innerHTML = fileHtml + ' → <b>' + keyHtml + '</b> — ' + formatInlineMarkdown(cleanReason) + (escCli ? ' (<code>' + escCli + '</code>) ' : ' ');
         li.appendChild(span);
         const leaf = String(rc.leaf || rc.key_path || '').split('.').pop();
         if (window.RTPIntentCapture && typeof window.RTPIntentCapture.applyDeepLink === 'function') {

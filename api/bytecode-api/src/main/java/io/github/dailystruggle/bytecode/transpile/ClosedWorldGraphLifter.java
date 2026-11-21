@@ -1458,10 +1458,12 @@ final class ClosedWorldGraphLifter {
                 for (ConceptParam hp : helperParams) {
                     existingNames.add(hp.name());
                 }
+                List<IndexedContextBinding> appendedCtx = new ArrayList<>();
                 for (IndexedContextBinding icb : uniqueCtx) {
                     String cName = icb.binding().paramName();
                     if (existingNames.add(cName)) {
                         helperParams.add(new ConceptParam(cName, icb.binding().paramType(), helperParams.size()));
+                        appendedCtx.add(icb);
                     }
                 }
 
@@ -1486,7 +1488,7 @@ final class ClosedWorldGraphLifter {
                         bodyRes.body(),
                         bodyRes.pureCompute());
 
-                SpecializedHelper sh = new SpecializedHelper(helperFn, uniqueCtx, retInternedObj);
+                SpecializedHelper sh = new SpecializedHelper(helperFn, appendedCtx, retInternedObj);
                 helpersBySpecKey.put(specKey, sh);
                 emittedHelpers.put(ownerInternal + "#" + helperName + helperDesc, helperFn);
                 return sh;
@@ -1525,6 +1527,10 @@ final class ClosedWorldGraphLifter {
             }
             if (val instanceof SymVal.CompareTemp) {
                 return "CMP";
+            }
+            if (val instanceof SymVal.BoundDelegateRef bdr) {
+                return "BDR:" + bdr.targetInstanceId() + ":" + bdr.targetMethodName()
+                        + ":" + bdr.xParamName() + ":" + bdr.yParamNameOrNull() + ":" + bdr.zParamName();
             }
             if (val instanceof SymVal.InstanceRef ir) {
                 return "I:" + ir.instanceId();
@@ -1592,6 +1598,203 @@ final class ClosedWorldGraphLifter {
                 return lsb.toString();
             }
             return "UNCAP";
+        }
+
+        boolean isConstantGraphLocalObject(SymVal.LocalObjectRef lor) {
+            return isConstantGraphSymVal(lor, new java.util.IdentityHashMap<>(), 0);
+        }
+
+        private static boolean isConstantLeafSymVal(SymVal v) {
+            if (v instanceof SymVal.InstanceRef
+                    || v instanceof SymVal.ContextRef
+                    || v instanceof SymVal.BoundDelegateRef
+                    || v instanceof SymVal.NullRef
+                    || v instanceof SymVal.StringConst
+                    || v instanceof SymVal.Array1DRef
+                    || v instanceof SymVal.Array2DRef
+                    || v instanceof SymVal.CollectionRef
+                    || v instanceof SymVal.ThreadLocalRef
+                    || v instanceof SymVal.ColdMemoCacheRef
+                    || v instanceof SymVal.ColdCacheTagVal) {
+                return true;
+            }
+            if (v instanceof SymVal.Scalar sc) {
+                ConceptExpr e = sc.expr();
+                return e instanceof ConceptExpr.IntConst
+                        || e instanceof ConceptExpr.LongConst
+                        || e instanceof ConceptExpr.FloatConst
+                        || e instanceof ConceptExpr.DoubleConst
+                        || e instanceof ConceptExpr.BoolConst;
+            }
+            return v instanceof SymVal.InternedScalar is && is.expr() instanceof ConceptExpr.IntConst;
+        }
+
+        private boolean allConstantGraph(
+                Iterable<SymVal> values, java.util.IdentityHashMap<Object, Boolean> visited, int nextDepth) {
+            for (SymVal ev : values) {
+                if (ev != null && !isConstantGraphSymVal(ev, visited, nextDepth)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private boolean isConstantGraphSymVal(
+                SymVal v, java.util.IdentityHashMap<Object, Boolean> visited, int depth) {
+            if (v == null || depth > 64) {
+                return false;
+            }
+            if (isConstantLeafSymVal(v)) {
+                return true;
+            }
+            if (v instanceof SymVal.OptionalVal ov) {
+                return !ov.present() || isConstantGraphSymVal(ov.payload(), visited, depth + 1);
+            }
+            if (v instanceof SymVal.LambdaClosure lc) {
+                return allConstantGraph(lc.capturedArgs(), visited, depth + 1);
+            }
+            if (v instanceof SymVal.LocalObjectRef lor) {
+                return visited.put(lor, Boolean.TRUE) != null
+                        || allConstantGraph(lor.fields().values(), visited, depth + 1);
+            }
+            if (v instanceof SymVal.LocalObjectArrayRef loar) {
+                return visited.put(loar, Boolean.TRUE) != null
+                        || allConstantGraph(loar.elements(), visited, depth + 1);
+            }
+            if (v instanceof SymVal.LocalListRef llr) {
+                return visited.put(llr, Boolean.TRUE) != null
+                        || allConstantGraph(llr.elements(), visited, depth + 1);
+            }
+            return false;
+        }
+
+        SymVal.LocalObjectRef snapshotConstantGraphLocalObject(SymVal.LocalObjectRef lor) {
+            return (SymVal.LocalObjectRef) snapshotSymVal(lor, new java.util.IdentityHashMap<>());
+        }
+
+        private SymVal snapshotSymVal(SymVal v, java.util.IdentityHashMap<Object, SymVal> memo) {
+            if (v == null) {
+                return null;
+            }
+            SymVal existing = memo.get(v);
+            if (existing != null) {
+                return existing;
+            }
+            if (v instanceof SymVal.LocalObjectRef lor) {
+                SymVal.LocalObjectRef copy = new SymVal.LocalObjectRef(
+                        lor.allocId(), lor.internalClassName(), new LinkedHashMap<>());
+                memo.put(lor, copy);
+                for (Map.Entry<String, SymVal> e : lor.fields().entrySet()) {
+                    copy.fields().put(e.getKey(), snapshotSymVal(e.getValue(), memo));
+                }
+                return copy;
+            }
+            if (v instanceof SymVal.LocalObjectArrayRef loar) {
+                List<SymVal> elems = new ArrayList<>(loar.elements().size());
+                SymVal.LocalObjectArrayRef copy = new SymVal.LocalObjectArrayRef(
+                        loar.allocId(), loar.elementInternalClass(), elems);
+                memo.put(loar, copy);
+                for (SymVal e : loar.elements()) {
+                    elems.add(snapshotSymVal(e, memo));
+                }
+                return copy;
+            }
+            if (v instanceof SymVal.LocalListRef llr) {
+                List<SymVal> elems = new ArrayList<>(llr.elements().size());
+                SymVal.LocalListRef copy = new SymVal.LocalListRef(llr.allocId(), elems);
+                memo.put(llr, copy);
+                for (SymVal e : llr.elements()) {
+                    elems.add(snapshotSymVal(e, memo));
+                }
+                return copy;
+            }
+            if (v instanceof SymVal.LambdaClosure lc) {
+                List<SymVal> caps = new ArrayList<>(lc.capturedArgs().size());
+                for (SymVal c : lc.capturedArgs()) {
+                    caps.add(snapshotSymVal(c, memo));
+                }
+                return new SymVal.LambdaClosure(
+                        lc.samMethodName(),
+                        lc.targetOwner(),
+                        lc.targetMethodName(),
+                        lc.targetDescriptor(),
+                        lc.referenceKind(),
+                        caps);
+            }
+            if (v instanceof SymVal.OptionalVal ov && ov.present()) {
+                return new SymVal.OptionalVal(true, snapshotSymVal(ov.payload(), memo));
+            }
+            return v;
+        }
+
+        static ConceptExpr tryFoldZeroArgConstantFunction(ConceptFunction fn) {
+            if (fn == null || !fn.pureCompute() || !fn.parameters().isEmpty() || fn.body().isEmpty()) {
+                return null;
+            }
+            ConceptExpr singleRet = null;
+            for (ConceptStmt s : fn.body()) {
+                if (s instanceof ConceptStmt.Return r && r.value() != null) {
+                    if (singleRet != null) {
+                        return null;
+                    }
+                    singleRet = r.value();
+                } else {
+                    return null;
+                }
+            }
+            return tryEvalPureConstantExpr(singleRet);
+        }
+
+        private static ConceptExpr tryEvalPureConstantExpr(ConceptExpr e) {
+            if (e instanceof ConceptExpr.IntConst
+                    || e instanceof ConceptExpr.LongConst
+                    || e instanceof ConceptExpr.FloatConst
+                    || e instanceof ConceptExpr.DoubleConst
+                    || e instanceof ConceptExpr.BoolConst) {
+                return e;
+            }
+            if (e instanceof ConceptExpr.UnaryOp u && u.op() == UnaryOperator.NEG) {
+                ConceptExpr op = tryEvalPureConstantExpr(u.operand());
+                if (op instanceof ConceptExpr.IntConst ic) {
+                    return new ConceptExpr.IntConst(-ic.value());
+                }
+                if (op instanceof ConceptExpr.LongConst lc) {
+                    return new ConceptExpr.LongConst(-lc.value());
+                }
+            }
+            if (e instanceof ConceptExpr.BinaryOp b && b.type() == ConceptType.I32) {
+                ConceptExpr l = tryEvalPureConstantExpr(b.left());
+                ConceptExpr r = tryEvalPureConstantExpr(b.right());
+                if (l instanceof ConceptExpr.IntConst li && r instanceof ConceptExpr.IntConst ri) {
+                    return switch (b.op()) {
+                        case ADD -> new ConceptExpr.IntConst(li.value() + ri.value());
+                        case SUB -> new ConceptExpr.IntConst(li.value() - ri.value());
+                        case MUL -> new ConceptExpr.IntConst(li.value() * ri.value());
+                        default -> null;
+                    };
+                }
+            }
+            return null;
+        }
+
+        static boolean methodWritesFields(RawMethod m) {
+            byte[] code = m != null ? m.code() : null;
+            if (code == null || code.length == 0) {
+                return false;
+            }
+            int pc = 0;
+            while (pc < code.length) {
+                int op = code[pc] & 0xFF;
+                if (op == 0xB3 || op == 0xB5) { // PUTSTATIC / PUTFIELD
+                    return true;
+                }
+                int len = BytecodeSsaLifter.instructionLength(code, pc);
+                if (len <= 0) {
+                    return true;
+                }
+                pc += len;
+            }
+            return false;
         }
 
         boolean isImmutableScalarLocalObject(SymVal.LocalObjectRef lor) {
@@ -4316,6 +4519,40 @@ final class ClosedWorldGraphLifter {
                     frame.terminated = true;
                     return;
                 }
+                boolean hasMutableArg = false;
+                for (SymVal a : callArgs) {
+                    if ((a instanceof SymVal.LocalObjectRef argLor && !ctx.isImmutableScalarLocalObject(argLor))
+                            || a instanceof SymVal.LocalObjectArrayRef
+                            || a instanceof SymVal.LocalListRef
+                            || a instanceof SymVal.LocalIteratorRef
+                            || a instanceof SymVal.MuxInstanceRef
+                            || a instanceof SymVal.LambdaClosure) {
+                        hasMutableArg = true;
+                        break;
+                    }
+                }
+                boolean canSpecializeLocalObj = !"<init>".equals(resolved.method().name())
+                        && !"V".equals(retDesc)
+                        && !hasMutableArg
+                        && (!(retDesc.startsWith("L") || retDesc.startsWith("["))
+                                || ctx.hasInternedInstanceOfDescriptor(retDesc))
+                        && !ctx.methodWritesFields(resolved.method())
+                        && ctx.isConstantGraphLocalObject(lor);
+                if (canSpecializeLocalObj) {
+                    SymVal.LocalObjectRef isolatedRecv = ctx.snapshotConstantGraphLocalObject(lor);
+                    emitSpecializedCall(
+                            lorCls,
+                            resolved.owner(),
+                            resolved.method(),
+                            isolatedRecv,
+                            callArgs,
+                            null,
+                            pc,
+                            opcode,
+                            frame,
+                            out);
+                    return;
+                }
                 inlineMethodCall(
                         lorCls,
                         resolved.owner(),
@@ -4628,6 +4865,22 @@ final class ClosedWorldGraphLifter {
             }
 
             ConceptFunction fn = helper.function();
+            if (exprArgs.isEmpty()
+                    && helper.usedContextBindings().isEmpty()
+                    && fn.returnType() != ConceptType.VOID) {
+                ConceptExpr folded = ctx.tryFoldZeroArgConstantFunction(fn);
+                if (folded != null) {
+                    if (outerReturnCast != null && folded.type() != outerReturnCast) {
+                        folded = coerceScalar(folded, outerReturnCast);
+                    }
+                    if (helper.returnsInternedObject()) {
+                        frame.push(new SymVal.InternedScalar(folded));
+                    } else {
+                        frame.push(new SymVal.Scalar(folded));
+                    }
+                    return;
+                }
+            }
             ConceptExpr callExpr = new ConceptExpr.Call(
                     fn.ownerClass(),
                     fn.name(),

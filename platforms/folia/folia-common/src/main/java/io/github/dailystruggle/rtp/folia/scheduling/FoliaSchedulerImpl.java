@@ -162,7 +162,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
         int v = Integer.parseInt(prop.trim());
         return (v <= 0) ? Integer.MAX_VALUE : v;
       } catch (NumberFormatException e) {
-        RTP.log(Level.FINE, "[RTP] Invalid rtp.folia.maxRegionalInflight property: " + prop, e);
+        RTP.log(Level.WARNING, "[RTP] Invalid rtp.folia.maxRegionalInflight property: " + prop, e);
       }
     }
     try {
@@ -172,13 +172,17 @@ public class FoliaSchedulerImpl implements RTPScheduler {
           org.bukkit.configuration.file.YamlConfiguration cfg =
               org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(perfFile);
           if (cfg.contains("maxRegionalInflight")) {
-            int v = cfg.getInt("maxRegionalInflight", 0);
-            return (v <= 0) ? Integer.MAX_VALUE : v;
+            if (!cfg.isInt("maxRegionalInflight")) {
+              RTP.log(Level.WARNING, "[RTP] Invalid maxRegionalInflight in performance.yml: " + cfg.get("maxRegionalInflight"));
+            } else {
+              int v = cfg.getInt("maxRegionalInflight");
+              return (v <= 0) ? Integer.MAX_VALUE : v;
+            }
           }
         }
       }
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] Failed reading maxRegionalInflight from performance.yml: " + t.getMessage());
+      RTP.log(Level.WARNING, "[RTP] Failed reading maxRegionalInflight from performance.yml: " + t.getMessage(), t);
     }
     return Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
   }
